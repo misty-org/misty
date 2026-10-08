@@ -4,6 +4,16 @@
 (() => {
   if (window.top !== window || window.__MISTY_SET_STATUS__) return;
   let enabled = __MISTY_STATUS_ENABLED_PLACEHOLDER__;
+  // Escape-to-stop is reported over Kiri's host channel with the tab's token,
+  // which never leaves this closure. The message is built by concatenation
+  // because site scripts can replace JSON and prototype methods.
+  const statusToken = __MISTY_STATUS_TOKEN_PLACEHOLDER__;
+  const bindHost = __KIRI_HOST_SENDER_PLACEHOLDER__;
+  let postToHost = bindHost();
+  const reportStopped = () => {
+    postToHost = postToHost || bindHost();
+    if (postToHost) postToHost('{"token":"' + statusToken + '","status":"stopped"}');
+  };
   let loading = /^https?:$/.test(location.protocol) && document.readyState !== "complete";
   let link = "";
   let host = null;
@@ -72,12 +82,16 @@
     return loading ? `Loading ${location.hostname || "page"}…` : "";
   };
 
+  let cachedWidth = 0;
+  let cachedHeight = 0;
+
   const place = () => {
     if (!label) return;
     // Step aside when the pointer is over the bubble's corner.
-    const rect = label.getBoundingClientRect();
-    const covered = pointer.y >= innerHeight - Math.max(rect.height, 22) - 8
-      && pointer.x >= 0 && pointer.x <= rect.width + 8;
+    const height = cachedHeight || 22;
+    const width = cachedWidth || 120;
+    const covered = pointer.y >= innerHeight - Math.max(height, 22) - 8
+      && pointer.x >= 0 && pointer.x <= width + 8;
     if (covered !== onRight) {
       onRight = covered;
       label.classList.toggle("right", onRight);
@@ -90,6 +104,8 @@
     clearTimeout(showTimer);
     clearTimeout(hideTimer);
     if (!next) {
+      cachedWidth = 0;
+      cachedHeight = 0;
       // A short grace period stops flicker when moving between adjacent links.
       hideTimer = setTimeout(() => {
         shown = "";
@@ -104,6 +120,9 @@
       }
       shown = next;
       label.textContent = next;
+      const rect = label.getBoundingClientRect();
+      cachedWidth = rect.width;
+      cachedHeight = rect.height;
       place();
       label.classList.add("visible");
     };
@@ -151,7 +170,7 @@
     window.stop();
     loading = false;
     render();
-    window.location.href = "misty-status:stopped";
+    reportStopped();
   }, true);
   document.addEventListener("fullscreenchange", render);
   window.addEventListener("blur", () => setLink(""));

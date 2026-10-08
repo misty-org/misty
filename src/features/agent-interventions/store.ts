@@ -1,7 +1,5 @@
-import { useActivityStore } from "@/features/activity/useActivityStore";
 import { create } from "zustand";
-import { agentInterventionsApi, interventionLabels, type AgentInterventionWait } from "./api";
-import type { ActivityItem } from "@/features/activity/types";
+import { agentInterventionsApi, type AgentInterventionWait } from "./api";
 
 type ObservedWait = AgentInterventionWait & { observedAt: string };
 interface InterventionStore {
@@ -51,7 +49,8 @@ export const useAgentInterventions = create<InterventionStore>((set, get) => ({
     } catch {
       if (current === generation && !controller.signal.aborted)
         set({
-          error: "Browser requests could not be refreshed. Check your connection and try Refresh.",
+          error:
+            "Misty couldn't check what it is waiting for. Check your connection and try again.",
         });
     } finally {
       if (current === generation && !controller.signal.aborted) set({ loading: false });
@@ -76,7 +75,6 @@ export const useAgentInterventions = create<InterventionStore>((set, get) => ({
     try {
       await agentInterventionsApi.decide(id, ready, controller.signal);
       if (current !== generation || controller.signal.aborted) return false;
-      useActivityStore.getState().resolveSourceRequest(accountId, "interventions", id);
       set({ items: get().items.filter((item) => item.id !== id) });
       saved = true;
     } catch {
@@ -91,26 +89,3 @@ export const useAgentInterventions = create<InterventionStore>((set, get) => ({
     return saved && current === generation;
   },
 }));
-
-export function agentInterventionActivities(
-  accountId: string,
-  items: ObservedWait[],
-): ActivityItem[] {
-  return items
-    .filter((item) => Date.parse(item.expiresAt) > Date.now())
-    .map((item) => ({
-      id: `agent-intervention:${accountId}:${item.id}`,
-      accountId,
-      source: "interventions",
-      sourceId: item.id,
-      kind: "agent",
-      lifecycle: "request",
-      sourceLabel: "Misty",
-      title: interventionLabels[item.action],
-      // Keep website text and model-authored reasons out of system notifications.
-      body: "Misty is waiting for you in the original browser. Review the request in Activity.",
-      createdAt: item.observedAt,
-      attention: true,
-      target: { kind: "route", href: `/activity?intervention=${encodeURIComponent(item.id)}` },
-    }));
-}

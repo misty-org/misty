@@ -43,6 +43,28 @@ export function seedSpaceMember(spaceId: string, userId: string) {
   ]);
 }
 
+/**
+ * Marks a throwaway acceptance account's email verified in the local
+ * development database: AI needs a verified email, and these accounts have no
+ * inbox to confirm from.
+ */
+export function verifyAcceptanceEmail(userId: string) {
+  if (!/^[A-Za-z0-9_-]+$/.test(userId)) throw new Error("unexpected id format");
+  execFileSync("docker", [
+    "exec",
+    process.env.MISTY_ACCEPTANCE_DB_CONTAINER ?? "misty-server-postgres-1",
+    "psql",
+    "-U",
+    process.env.MISTY_ACCEPTANCE_DB_USER ?? "misty",
+    "-d",
+    process.env.MISTY_ACCEPTANCE_DB_NAME ?? "misty_server",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-c",
+    `UPDATE users SET email_verified_at=now() WHERE id='${userId}'`,
+  ]);
+}
+
 export interface InvocationEvent {
   id?: string;
   type: string;
@@ -78,6 +100,7 @@ export class MistyClient {
     if (!response.ok)
       throw new Error(`register failed: ${response.status} ${await response.text()}`);
     client.userId = ((await response.json()) as { user_id: string }).user_id;
+    verifyAcceptanceEmail(client.userId);
     mkdirSync(new URL(".", accountFile), { recursive: true });
     writeFileSync(accountFile, JSON.stringify(account), { mode: 0o600 });
     return client;

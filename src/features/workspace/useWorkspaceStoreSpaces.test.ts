@@ -42,8 +42,8 @@ describe("legacy workspace scope restoration", () => {
       scopeKey: "space:space-b",
     });
     const spaceBTab2 = useWorkspaceStore.getState().addSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Terminal",
       route: "/terminal",
     });

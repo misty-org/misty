@@ -209,10 +209,10 @@ it("restores a closed pane's own history and split proportions", () => {
   state().newTab();
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   const one = state().openSurface({
-    surfaceId: "files",
-    groupKey: "tool:files",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     title: "Files",
-    route: "/files",
+    route: "/agents",
     paneId,
   });
   state().updateViewRoute(one.id, "/files?path=Downloads");
@@ -220,5 +220,5 @@ it("restores a closed pane's own history and split proportions", () => {
   state().reopenClosedView();
   expect(state().layout.focusedPaneId).toBe(paneId);
   expect(activeLayoutView(state().layout)?.route).toBe("/files?path=Downloads");
-  expect(state().navigatePane(-1)).toMatchObject({ id: one.id, route: "/files" });
+  expect(state().navigatePane(-1)).toMatchObject({ id: one.id, route: "/agents" });
 });

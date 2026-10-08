@@ -103,8 +103,6 @@ fn create_popup(
         session.origin_space_id = origin_space_id;
     }
     let shortcut_token = shortcut_token_for(&state, &id).ok()?;
-    let navigation_app = app.clone();
-    let navigation_id = id.clone();
     let page_app = app.clone();
     let page_id = id.clone();
     let title_app = app.clone();
@@ -115,38 +113,30 @@ fn create_popup(
     let download_started = std::sync::atomic::AtomicBool::new(false);
     let popup_app = app.clone();
     let popup_id = id.clone();
+    let popup_state = app.state::<BrowserSessionState>();
+    let popup_bindings = crate::infra::browser_shortcuts::current_shortcut_bindings(&popup_state);
     let builder = tauri::WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url.clone()))
         .window_features(features)
         .visible(false)
         .focused(false)
         .background_throttling(BackgroundThrottlingPolicy::Throttle)
-        .initialization_script(browser_viewport_script(&shortcut_token, false))
-        .initialization_script(browser_status_script())
-        .on_navigation(move |url| {
-            #[cfg(target_os = "macos")]
-            if context_menu::forward(&navigation_app, &navigation_id, url) {
-                return false;
-            }
-            if let Some(pointer) = browser_pointer_navigation(url) {
-                emit_browser_pointer(&navigation_app, &navigation_id, pointer);
-                return false;
-            }
-            if forward_focus_navigation(&navigation_app, &navigation_id, url)
-                || forward_companion_navigation(&navigation_app, &navigation_id, url)
-                || forward_navigation(&navigation_app, &navigation_id, url)
-            {
-                return false;
-            }
-            external_url(url.as_str()).is_ok()
-        })
+        .initialization_script(browser_viewport_script(
+            &shortcut_token,
+            false,
+            &popup_bindings,
+        ))
+        .initialization_script(browser_status_script(&shortcut_token))
+        // Misty's page scripts report over Kiri's host channel, never by navigating.
+        .on_navigation(move |url| external_url(url.as_str()).is_ok())
         .on_page_load(move |window, payload| {
             let webview: &Webview = window.as_ref();
             let started = matches!(payload.event(), tauri::webview::PageLoadEvent::Started);
-            if started {
-                let state = page_app.state::<BrowserSessionState>();
-                if let Ok(mut sessions) = state.sessions.lock() {
-                    if let Some(session) = sessions.get_mut(&page_id) {
-                        session.element_targets.clear();
+            if let Some(state) = page_app.try_state::<BrowserSessionState>() {
+                if started {
+                    if let Ok(mut sessions) = state.sessions.lock() {
+                        if let Some(session) = sessions.get_mut(&page_id) {
+                            session.element_targets.clear();
+                        }
                     }
                 }
                 let _ = apply_shortcuts(webview, &state);
@@ -246,7 +236,7 @@ fn create_popup(
     };
     if super::super::browser_site_permissions::install(window.as_ref()).is_err()
         || attachment_download::install(window.as_ref()).is_err()
-        || focus_messages::install(app, window.as_ref(), &id).is_err()
+        || host_messages::install(window.as_ref()).is_err()
         || install_close_handler(app, window.as_ref(), &id).is_err()
     {
         let _ = window.destroy();

@@ -43,7 +43,7 @@ pub fn app(workspace: &Workspace) -> Result<()> {
         ])
         .run(&workspace.misty)?;
     CommandSpec::new(npm())
-        .args(["run", "test:tasks"])
+        .args(["run", "test:scripts"])
         .run(&workspace.misty)?;
     let mut manifests = vec![workspace
         .misty

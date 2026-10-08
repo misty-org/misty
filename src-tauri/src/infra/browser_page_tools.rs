@@ -337,3 +337,7 @@ pub async fn browser_webview_set_muted(
         .eval(MUTE_MEDIA_SCRIPT.replace("__MUTED__", if request.muted { "true" } else { "false" }))
         .map_err(|error| error.to_string())
 }
+
+// Media and reading tools live beside the everyday ones to keep both readable.
+#[path = "browser_media_tools.rs"]
+pub(crate) mod media_tools;

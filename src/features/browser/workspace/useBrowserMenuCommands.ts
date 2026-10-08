@@ -7,6 +7,7 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
+import { openPeek } from "@/features/workspace/peek";
 import { browserRuntimeId } from "./browserRuntime";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 
@@ -60,6 +61,14 @@ export function useBrowserMenuCommands(input: {
         case "open-link-split":
           if (payload.url) openInSplitView(tab, payload.url);
           break;
+        case "peek-link": {
+          const opened = payload.url ? openPeek(payload.url, tab.id) : null;
+          if (opened)
+            window.dispatchEvent(
+              new CustomEvent("misty:focus-workspace-tab", { detail: { tabId: opened.id } }),
+            );
+          break;
+        }
         case "search-web":
           if (payload.query) commands.openInNewTab(browserSearchUrl(payload.query));
           break;

@@ -43,10 +43,10 @@ it("collapses the only group without closing its views and expands a focused mem
 it("saves and restores mixed surfaces and split trees with fresh identities only once", () => {
   const first = tabs()[0].id;
   const file = state().addSurface({
-    surfaceId: "files",
-    groupKey: "tool:files",
+    surfaceId: "agents",
+    groupKey: "tool:agents",
     title: "Files",
-    route: "/files",
+    route: "/agents",
     state: { path: "/example" },
   });
   const second = tabs().find((t) => activeLayoutView(t)?.id === file.id)!.id;

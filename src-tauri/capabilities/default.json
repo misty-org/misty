@@ -48,7 +48,6 @@
     "deep-link:default",
     "dialog:allow-message",
     "dialog:allow-open",
-    "drag:default",
     "keystore:default",
     "notification:default",
     "os:allow-arch",

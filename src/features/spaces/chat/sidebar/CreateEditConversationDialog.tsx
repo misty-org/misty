@@ -1,5 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import type {
   SpaceActorRef,
   SpaceConversation,
@@ -146,11 +146,10 @@ export function CreateEditConversationDialog({
             ))}
           </fieldset>
           {error ? (
-            <SystemErrorActivity
+            <SystemErrorNotice
               error={error}
               scope={`social:conversation:${spaceId}`}
               title="Conversation could not be saved"
-              target={{ kind: "space-chat", spaceId }}
             />
           ) : null}
           <DialogFooter className="mt-5">

@@ -4,7 +4,7 @@ import {
   type DockPosition,
   type DockingLayout,
 } from "@/features/app-shell/dockingLayout";
-import { navigatorRailWidth } from "./navigatorMode";
+import { navigatorRailWidth, navigatorScale } from "./navigatorMode";
 
 export const dockingMetrics = {
   titlebar: 38,
@@ -12,7 +12,7 @@ export const dockingMetrics = {
   /** Gap between a horizontal tab strip's outer edge and its connected tabs. */
   tabInset: 3,
   rail: navigatorRailWidth,
-  horizontalRail: 38,
+  horizontalRail: Math.round(38 * navigatorScale),
   sideTabs: 200,
   gap: 8,
   tab: 28,

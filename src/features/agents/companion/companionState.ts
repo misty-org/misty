@@ -9,6 +9,10 @@ export interface CompanionSubmission {
   look?: boolean;
   /** Continues an earlier response; shows no new user turn. */
   continuation?: boolean;
+  /** Explain and point at the attached screens, with no tools. */
+  intent?: "teach";
+  /** Read the answer aloud: it continues a spoken request. */
+  voice?: boolean;
 }
 export type CompanionControl =
   | {

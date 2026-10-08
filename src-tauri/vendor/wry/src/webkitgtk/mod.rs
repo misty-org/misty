@@ -341,7 +341,7 @@ impl InnerWebView {
     };
 
     // Initialize message handler
-    w.init("Object.defineProperty(window, 'ipc', { value: Object.freeze({ postMessage: function(x) { window.webkit.messageHandlers['ipc'].postMessage(x) } }) })", true)?;
+    w.init("Object.defineProperty(window, 'ipc', { value: Object.freeze({ postMessage: function(x) { window.webkit.messageHandlers['ipc'].postMessage(x) } }), writable: true, enumerable: true })", true)?;
 
     // Initialize scripts
     for init_script in attributes.initialization_scripts {
@@ -634,8 +634,10 @@ impl InnerWebView {
       .user_content_manager()
       .expect("WebView does not have UserContentManager");
 
-    // Connect before registering as recommended by the docs
-    manager.connect_script_message_received(None, move |_m, msg| {
+    // Connect before registering as recommended by the docs. Listen to the
+    // "ipc" handler only: Kiri's host channel registers its own handler on
+    // the same manager, and its messages are not Tauri IPC.
+    manager.connect_script_message_received(Some("ipc"), move |_m, msg| {
       #[cfg(feature = "tracing")]
       let _span = tracing::info_span!(parent: None, "wry::ipc::handle").entered();
 

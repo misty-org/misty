@@ -1,7 +1,7 @@
 import type * as SocialRuntimeModule from "@/features/spaces/chat/SocialRuntime";
 vi.mock("@/features/spaces/chat/SocialRuntime", async (importOriginal) => ({
   ...(await importOriginal<typeof SocialRuntimeModule>()),
-  SocialError: (await import("@/features/activity")).SystemErrorActivity,
+  SocialError: (await import("@/features/support/systemErrors")).SystemErrorNotice,
 }));
 import { describe, expect, it, vi } from "vitest";
 import { createElement, createRef } from "react";

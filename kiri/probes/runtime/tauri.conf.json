@@ -1,0 +1,7 @@
+{
+  "productName": "kiri-runtime-probe",
+  "version": "0.1.0",
+  "identifier": "com.misty.kiri-runtime-probe",
+  "build": { "frontendDist": "web" },
+  "app": { "windows": [], "security": { "csp": null } }
+}

@@ -13,7 +13,7 @@ import {
 import { save } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
-import { bookmarkWindowViews } from "./bookmarkWindowViews";
+import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
 
 export interface BrowserPageCommands {
@@ -31,12 +31,15 @@ export interface BrowserPageCommands {
   print?: () => void;
   savePage?: () => void;
   developerTools?: () => void;
+  pictureInPicture?: () => void;
+  /** Reader mode, set by the workspace that shows the reader. */
+  readerMode?: () => void;
+  /** Translate the page with Misty, set by the workspace. */
+  translate?: () => void;
   stop?: () => void;
   copyLink?: () => void;
   qrCode?: () => void;
   bookmark?: () => void;
-  /** Saves every web page in this window to a new bookmark group. */
-  bookmarkAllViews: () => void;
   clearBrowsingData: () => void;
 }
 
@@ -99,7 +102,7 @@ export function useBrowserPageCommands(input: {
   };
 
   const commands: BrowserPageCommands = {
-    newTab: () => void invokeShortcutCommand("workspace.new_tab"),
+    newTab: () => void invokeShortcutCommand("search.toggle"),
     newWindow: () => void invokeShortcutCommand("workspace.new_virtual_window"),
     newPrivateView: () => {
       const workspace = useWorkspaceStore.getState();
@@ -120,19 +123,6 @@ export function useBrowserPageCommands(input: {
     clearBrowsingData: () => setClearDataRequest((value) => value + 1),
     bookmark: webPage ? () => setBookmarkRequest((value) => value + 1) : undefined,
     qrCode: webPage ? () => setQrCodeRequest((value) => value + 1) : undefined,
-    bookmarkAllViews: () => {
-      try {
-        const result = bookmarkWindowViews();
-        notice(
-          tab.id,
-          result
-            ? `Saved ${result.count} ${result.count === 1 ? "tab" : "tabs"} to “${result.group}”.`
-            : "There are no web pages in this window to bookmark.",
-        );
-      } catch (error) {
-        report(tab.id, error);
-      }
-    },
     copyLink: webPage
       ? () =>
           void navigator.clipboard
@@ -144,6 +134,11 @@ export function useBrowserPageCommands(input: {
   if (pageLive) {
     commands.find = () => setFindRequest((value) => value + 1);
     commands.print = () => void browserPageTools.print(id).catch((error) => report(tab.id, error));
+    if (pictureInPictureSupported())
+      commands.pictureInPicture = () =>
+        void browserPageTools
+          .pictureInPicture(id, "toggle")
+          .catch((error: unknown) => report(tab.id, error));
     commands.stop = () => {
       useBrowserRuntimeStore.getState().setLoading(tab.id, false);
       void browserPageTools.stop(id).catch((error) => report(tab.id, error));
@@ -183,6 +178,7 @@ export function useBrowserPageCommands(input: {
   useShortcutHandler("browser.new_private_tab", run(commands.newPrivateView), focused, 100);
   useShortcutHandler("browser.find", run(commands.find), focused, 100);
   useShortcutHandler("browser.print", run(commands.print), focused, 100);
+  useShortcutHandler("browser.picture_in_picture", run(commands.pictureInPicture), focused, 100);
   useShortcutHandler(
     "browser.history",
     run(() => openPage("history")),

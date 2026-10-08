@@ -1,4 +1,4 @@
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { useAuth } from "@/features/auth";
 import { useEffect, useRef } from "react";
 import { useSpacesStore } from "./store/useSpacesStore";
@@ -58,7 +58,6 @@ export function SpacesRealtimeBridge() {
       if (current.error !== error || current.loading) return;
       reportedErrorRef.current = error;
       reportSystemError({
-        accountId,
         error,
         scope: "spaces:realtime",
         intent: "background",

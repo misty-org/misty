@@ -4,7 +4,7 @@ import { SwitchControl } from "@/features/settings/SettingsControls";
 import { ExtensionIcon, plainDescription } from "./ExtensionIcon";
 import { ExtensionLoading } from "./ExtensionLoading";
 import { extensionsNative } from "./native";
-import { pinIds, togglePin, updateInstallation } from "./store";
+import { updateInstallation } from "./store";
 import type { CatalogEntry, Installation, InstalledState } from "./types";
 
 type Work = (action: () => Promise<unknown>) => Promise<void>;
@@ -129,7 +129,10 @@ function ExtensionControls({
           checked={selected.privateAccess}
           disabled={busy || local?.review?.privateAllowed === false}
           onChange={(value) =>
-            void work(() => updateInstallation(selected.id, { privateAccess: value }))
+            void work(async () => {
+              if (value) await extensionsNative.approve(selected.guid, [], [], true);
+              await updateInstallation(selected.id, { privateAccess: value });
+            })
           }
         />
       </DesktopSettingsRow>
@@ -143,13 +146,6 @@ function ExtensionControls({
           onChange={(value) =>
             void work(() => updateInstallation(selected.id, { agentAccess: value }))
           }
-        />
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Pin to toolbar">
-        <SwitchControl
-          checked={pinIds().includes(selected.id)}
-          disabled={busy}
-          onChange={() => void work(() => togglePin(selected.id))}
         />
       </DesktopSettingsRow>
       {local?.review?.hasOptions && (
@@ -178,10 +174,7 @@ function GrantedAccess({
   prepare(id: number): void;
 }) {
   return (
-    <DesktopSettingsSection
-      title="Granted access"
-      description="Removing a permission may disable functionality. Review the extension again to restore its requested access."
-    >
+    <DesktopSettingsSection title="Granted access">
       {[...selected.permissions, ...selected.hosts].map((permission) => (
         <DesktopSettingsRow key={permission} label={permission}>
           <Button

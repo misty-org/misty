@@ -3,7 +3,7 @@
   "identifier": "desktop-bot",
   "description": "Misty desktop bot overlay permissions",
   "platforms": ["macOS", "windows", "linux"],
-  "windows": ["misty-bot-*"],
+  "webviews": ["misty-bot-*"],
   "permissions": [
     "core:event:default",
     "core:menu:default",

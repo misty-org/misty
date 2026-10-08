@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { fetchPreviewBytes } from "@/api/preview/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import {
   EmbeddedUniversalPreviewView,
   useEmbeddedDocument as useEmbeddedDocumentView,
@@ -13,7 +13,7 @@ export function EmbeddedUniversalPreview(
     <EmbeddedUniversalPreviewView
       {...props}
       runtime={{
-        Error: SystemErrorActivity,
+        Error: SystemErrorNotice,
         readBytes: fetchPreviewBytes,
         extractDocumentText: extractDocumentText,
       }}

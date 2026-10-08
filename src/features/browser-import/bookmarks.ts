@@ -1,6 +1,8 @@
 import {
   bookmarkRoots,
   bookmarksBarId,
+  favoritesId,
+  appsId,
   bookmarkTree,
   canNestBookmarkFolders,
   mobileBookmarksId,
@@ -165,9 +167,17 @@ export function libraryRoots(tree: BookmarkTree): ImportedBookmarkRoots {
           ? { kind: "folder", title: node.name, addedAt: node.addedAt, children: nodes(node.id) }
           : { kind: "link", title: node.title, url: node.url, addedAt: node.addedAt },
       );
+  // Other browsers have no Favorites or Apps roots; they travel as folders in Other bookmarks.
+  const extra = [
+    { title: "Favorites", children: nodes(favoritesId) },
+    { title: "Apps", children: nodes(appsId) },
+  ].filter((folder) => folder.children.length);
   return {
     bar: nodes(bookmarksBarId),
-    other: nodes(otherBookmarksId),
+    other: [
+      ...nodes(otherBookmarksId),
+      ...extra.map((folder) => ({ kind: "folder" as const, ...folder })),
+    ],
     mobile: nodes(mobileBookmarksId),
   };
 }

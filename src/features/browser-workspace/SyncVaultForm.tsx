@@ -14,7 +14,6 @@ export interface VaultUnlockRequest {
 export function SyncVaultForm(props: {
   create: boolean;
   local: boolean;
-  compact?: boolean;
   sectionTitle?: string;
   /** The server rejected this device's identity; unlocking registers it again. */
   reenroll?: boolean;
@@ -91,7 +90,6 @@ export function SyncVaultForm(props: {
   return (
     <form onSubmit={submit} className="ph-no-capture" data-private="true">
       <SettingsSection
-        surface={props.compact ? "plain" : "card"}
         title={
           props.sectionTitle ??
           (props.create
@@ -99,13 +97,6 @@ export function SyncVaultForm(props: {
             : props.reenroll
               ? "Reconnect this device"
               : "Unlock your sync vault")
-        }
-        description={
-          props.create
-            ? "Choose a separate sync password. Your password and sync secret unlock this vault on your other devices."
-            : props.reenroll
-              ? "This device lost its sync access. Enter your sync password and secret to register it again. Its previous local sync data stays on this device."
-              : "Use the sync password and secret from your first device. Your Misty account password does not unlock the vault."
         }
       >
         <SettingsRow label="Sync password">
@@ -193,10 +184,7 @@ export function SyncVaultForm(props: {
             </label>
           </SettingsRow>
         )}
-        <SettingsRow
-          label="Remember on this device"
-          description="Keep the vault key in this device’s operating-system credential store."
-        >
+        <SettingsRow label="Remember on this device">
           <label className="flex items-center gap-2 text-sm text-cream">
             <Checkbox
               checked={remember}
@@ -211,11 +199,11 @@ export function SyncVaultForm(props: {
           account, device, connection and sync timing metadata.
         </SettingsNote>
         {error && (
-          <p role="alert" className="px-5 py-3 text-sm text-cream">
+          <p role="alert" className="py-3 text-sm text-cream">
             {error}
           </p>
         )}
-        <div className="flex flex-wrap justify-end gap-2 px-5 pb-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-charcoal-border py-3">
           {props.local && !props.create && !props.reenroll && (
             <Button
               type="button"

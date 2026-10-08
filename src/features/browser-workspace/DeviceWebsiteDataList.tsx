@@ -20,7 +20,7 @@ export function DeviceWebsiteDataList({ session }: { session: NativeSyncView }) 
           aria-label={`Website data on ${names.get(device.device_id) ?? "another device"}`}
           data-device-website-data={device.device_id}
         >
-          <p className="px-5 text-sm">
+          <p className="text-sm">
             <span className="font-medium text-cream-bright">
               {names.get(device.device_id) ?? "Another device"}
             </span>

@@ -14,7 +14,7 @@ export function orderedTabs<T extends { value: string }>(options: T[], raw: stri
   );
 }
 
-function savedTabIds(raw: string): string[] {
+export function savedTabIds(raw: string): string[] {
   let saved: unknown;
   try {
     saved = JSON.parse(raw);

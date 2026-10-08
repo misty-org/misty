@@ -1,4 +1,4 @@
-import type { ConnectedDevicesSnapshot, PeerRoot } from "@/native/ipc";
+import type { ConnectedDevicesSnapshot } from "@/native/ipc";
 import { invoke } from "./invoke";
 
 export function connectedDevicesInitialize(request: {
@@ -14,23 +14,7 @@ export function connectedDevicesSnapshot(): Promise<ConnectedDevicesSnapshot> {
   return invoke("connected_devices_snapshot");
 }
 
-export function connectedDevicesSubscribeDirectory(path: string): Promise<void> {
-  return invoke("connected_devices_subscribe_directory", { path });
-}
-
 /** This device's server id, which its other devices know it by. */
 export function connectedDevicesSetIdentity(deviceId: string): Promise<void> {
   return invoke("connected_devices_set_identity", { deviceId });
-}
-
-export function connectedDevicesRoots(deviceId: string): Promise<PeerRoot[]> {
-  return invoke("connected_devices_roots", { deviceId });
-}
-
-export function connectedDevicesMediaUrl(path: string): Promise<string> {
-  return invoke("connected_devices_media_url", { path });
-}
-
-export function connectedDevicesPrepareClipboardFiles(deviceId: string): Promise<boolean> {
-  return invoke("connected_devices_prepare_clipboard_files", { deviceId });
 }

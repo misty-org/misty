@@ -1,5 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useAuth } from "@/features/auth";
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
@@ -16,7 +16,7 @@ export function initializeHostSocialRuntime() {
     useAuth,
     useNativeSessionStore,
     Picker: MistyPicker,
-    Error: SystemErrorActivity,
+    Error: SystemErrorNotice,
     useAiSurfaceAdapter,
     useWorkspaceViewTitle: useWorkspaceViewTitle,
     useSpaceChatDraft,

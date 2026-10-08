@@ -5,19 +5,18 @@ import { cn } from "../utils";
  * never surface color, border, radius, shadow, or type size.
  */
 
-/** Card, edge, and shadow. The global popup rule in styles.css turns the ring into a real border. */
+/**
+ * Card, edge, and shadow. The global popup rule in styles.css turns the ring into a real border
+ * and clips contents to its rounded edge, so call sites need no `overflow-hidden` for corners.
+ */
 export const popupSurfaceClass =
   "rounded-lg bg-charcoal-card text-cream shadow-lg ring-1 ring-cream/10 outline-none";
 
-export const popupMotionClass = cn(
-  "origin-center duration-150 ease-out data-[state=open]:animate-in",
-  "data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-  "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
-  "data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2",
-  "data-[side=left]:slide-in-from-right-2",
-  "data-[side=right]:slide-in-from-left-2",
-  "data-[side=top]:slide-in-from-bottom-2",
-);
+/**
+ * Fade and a short slide away from the anchor, from literal keyframes in styles.css.
+ * Never a scale: scaled text wiggles while it animates in the desktop shell.
+ */
+export const popupMotionClass = "misty-popup-motion";
 
 /** Padding and row rhythm shared by every list of menu rows. */
 export const menuListClass = "grid gap-1 p-1";

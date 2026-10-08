@@ -122,7 +122,34 @@ pub(crate) async fn open_with_transferred_root(
 /// Native extension settings share the encrypted account transport, independent
 /// of whether this device shares its tabs or website sign-ins.
 pub(crate) async fn extension_sync_handle(account: &str) -> Option<WorkerHandle> {
-    session().lock().await.as_ref().filter(|s| s.scope.account_id == account).map(|s| s.handle.clone())
+    session()
+        .lock()
+        .await
+        .as_ref()
+        .filter(|s| s.scope.account_id == account)
+        .map(|s| s.handle.clone())
+}
+
+/// Whether `profile` is the account's own browser profile (its logical identity
+/// or the native store it is bound to), which a device profile must never be.
+pub(crate) async fn is_account_browser_profile(profile: &str) -> bool {
+    let logical = session()
+        .lock()
+        .await
+        .as_ref()
+        .and_then(|active| default_profile_id(&active.scope).ok());
+    let selected = selected_profile()
+        .lock()
+        .ok()
+        .and_then(|selected| selected.clone());
+    logical.as_deref() == Some(profile)
+        || selected.is_some_and(|selected| selected.logical == profile || selected.physical == profile)
+}
+
+/// Saved passwords live in the unlocked vault of the signed-in account. None
+/// while the vault is locked.
+pub(crate) async fn vault_handle() -> Option<WorkerHandle> {
+    session().lock().await.as_ref().map(|s| s.handle.clone())
 }
 
 // A browser creation/import owns a read/write lease independently of worker
@@ -1139,11 +1166,12 @@ pub async fn browser_sync_account_feed(
         account_id: active.scope.account_id.clone(),
         // A live socket is insufficient if its renderer event forwarder has
         // exited. Let consumers fall back to the authenticated event stream.
-        connected: !active.notifications.is_finished() && matches!(
-            active.handle.status.borrow().phase,
-            misty_browser_sync::worker::Phase::CatchingUp
-                | misty_browser_sync::worker::Phase::Ready
-        ),
+        connected: !active.notifications.is_finished()
+            && matches!(
+                active.handle.status.borrow().phase,
+                misty_browser_sync::worker::Phase::CatchingUp
+                    | misty_browser_sync::worker::Phase::Ready
+            ),
     }))
 }
 
@@ -1175,10 +1203,17 @@ pub async fn browser_sync_edit(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| "The workspace change is invalid.")?;
     if changes.iter().any(|change| {
-        let (Change::Create { kind, .. } | Change::Patch { kind, .. } | Change::Delete { kind, .. }) = change;
-        matches!(kind, document::entities::Kind::ExtensionSyncKey | document::entities::Kind::ExtensionRemoval)
+        let (Change::Create { kind, .. }
+        | Change::Patch { kind, .. }
+        | Change::Delete { kind, .. }) = change;
+        matches!(
+            kind,
+            document::entities::Kind::ExtensionSyncKey
+                | document::entities::Kind::ExtensionRemoval
+                | document::entities::Kind::Login
+        )
     }) {
-        return Err("Extension storage is managed by the native extension runtime.".into());
+        return Err("Extension storage and passwords are managed natively.".into());
     }
     if let Some(result) = workspace_edit(
         &session_id,

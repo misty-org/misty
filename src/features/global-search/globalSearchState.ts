@@ -95,11 +95,13 @@ export interface GlobalSearchState {
       methodInputs?: Record<string, string | number | boolean>;
       skillVersionIds?: string[];
       displayCaptures?: DisplayCapture[];
+      /** Explain and point at `displayCaptures`, with no tools. */
+      intent?: "teach";
       capture?: AiCaptureAttachment;
       /** Continues the conversation after a screen opened; shows no new user turn. */
       continuation?: boolean;
       /** Opens a tab in this window for the task, at this page when given. */
-      openScreen?: { url?: string };
+      openScreen?: { url?: string; hint?: string; tabId?: string; place?: "current" | "new" };
     },
   ) => Promise<void>;
   submitAgentTask: (

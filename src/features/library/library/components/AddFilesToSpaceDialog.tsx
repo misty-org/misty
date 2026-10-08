@@ -1,6 +1,5 @@
 import { readAccountSessionGeneration } from "@/features/auth";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
-import { useActivityStore } from "@/features/activity/useActivityStore";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import { useLibrarySpaces as useSpacesStore } from "../LibraryRuntime";
 import { spaceNavigationName } from "@/features/spaces/defaultSpace";
 import { libraryApi as spacesApi } from "../LibraryRuntime";
@@ -170,12 +169,6 @@ export function AddFilesToSpaceDialog({
         ? `${succeeded} added to ${destination}; ${failed} failed.`
         : `${succeeded} ${succeeded === 1 ? "copy" : "copies"} added to ${destination}.`;
     setMessage(summary);
-    useActivityStore.getState().ingestLocal({
-      title: summary,
-      kind: failed || controller.signal.aborted ? "system" : "completion",
-      appId: "library",
-      spaceId,
-    });
     if (succeeded > 0) {
       window.dispatchEvent(
         new CustomEvent("misty:space-library-event", { detail: { space_id: spaceId } }),
@@ -259,7 +252,7 @@ export function AddFilesToSpaceDialog({
                       {stageLabel(job.stage)}
                     </span>
                     {job.error ? (
-                      <SystemErrorActivity
+                      <SystemErrorNotice
                         error={job.error}
                         scope={`library:add-files:${job.id}`}
                         title={`${job.name} could not be added to the Space`}

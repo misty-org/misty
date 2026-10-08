@@ -1,6 +1,7 @@
 //! Where site permission choices live: persistent profiles in user defaults,
 //! private sessions on their own website-data store.
-use super::{PermissionScope, Permissions};
+use super::Permissions;
+use kiri::engine::StoreScope as PermissionScope;
 use objc2_foundation::{NSString, NSUserDefaults};
 use std::collections::BTreeMap;
 

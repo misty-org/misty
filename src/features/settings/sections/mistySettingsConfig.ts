@@ -12,12 +12,10 @@ export const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
   { id: "library", label: "Library" },
   { id: "photo-editor", label: "Photo editor" },
   { id: "files", label: "Files" },
-  { id: "home", label: "Home" },
   { id: "activity", label: "Activity" },
 ];
 
 export const recapSurfaces: Array<{ id: AiRecapRecord["surface_id"]; label: string }> = [
-  { id: "home", label: "Home" },
   { id: "activity", label: "Activity" },
   { id: "global", label: "Global Misty" },
 ];

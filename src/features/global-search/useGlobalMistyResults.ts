@@ -1,5 +1,5 @@
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
-import type { SearchResult } from "@/native/ipc";
+import { kuraOpen } from "@/native/kura";
 import { useNavigate } from "react-router-dom";
 import type { GlobalAiContextRef, GlobalSearchResult } from "./types";
 
@@ -17,59 +17,27 @@ export function useGlobalMistyResults(input: {
       input.onNavigate(result.href);
       return;
     }
-    const isFileLocation =
-      Boolean(result.fileResult) ||
-      result.kind === "file" ||
-      result.kind === "folder" ||
-      result.id.startsWith("file:") ||
-      result.href === "/files";
-
-    if (!isFileLocation || (result.href !== "/files" && !result.fileResult)) {
+    const fileResult = result.fileResult;
+    if (fileResult || result.href === "/files") {
+      // Files open in Kura, Misty's separate file manager.
+      const path =
+        fileResult?.entry.path ?? (result.id.startsWith("file:") ? result.id.slice(5) : "");
       input.closePanel();
-      const surface = workspaceSurfaceFromRoute(result.href);
-      if (surface) {
-        const tab = useWorkspaceStore.getState().openSurface(surface);
-        useWorkspaceStore.getState().focusView(tab.id);
-      }
-      navigate(result.href);
+      if (!path) return;
+      const folder = (fileResult?.entry.kind ?? result.kind) === "folder";
+      const parent = path.replace(/[\\/][^\\/]+[\\/]?$/, "") || "/";
+      await kuraOpen(
+        folder ? { action: "open", path } : { action: "open", path: parent, select: path },
+      ).catch(() => undefined);
       return;
     }
-
-    const fileResult: SearchResult = result.fileResult ?? {
-      entry: {
-        id: result.id.startsWith("file:") ? result.id.slice(5) : result.id,
-        name: result.title,
-        path: result.id.startsWith("file:") ? result.id.slice(5) : result.id,
-        extension: "",
-        mimeType: null,
-        remoteModified: result.updatedAt ?? null,
-        kind: result.kind === "folder" ? "folder" : "file",
-        sizeBytes: null,
-        modifiedMs: null,
-        createdMs: null,
-        readonly: false,
-        hidden: false,
-        location: { kind: "local", providerType: null, remoteName: null, remotePath: null },
-      },
-      score: result.score ?? 1,
-      sourceKind: "local",
-      indexedAtMs: Date.now(),
-    };
-
     input.closePanel();
-    const fileSelection =
-      fileResult.entry.kind === "file"
-        ? `&select=${encodeURIComponent(fileResult.entry.name)}`
-        : "";
-    const filesRoute = `/apps/files?path=${encodeURIComponent(fileResult.entry.path)}${fileSelection}`;
-    const surface = workspaceSurfaceFromRoute(filesRoute);
+    const surface = workspaceSurfaceFromRoute(result.href);
     if (surface) {
-      const tab = useWorkspaceStore.getState().openSurface({
-        ...surface,
-      });
+      const tab = useWorkspaceStore.getState().openSurface(surface);
       useWorkspaceStore.getState().focusView(tab.id);
     }
-    navigate(filesRoute);
+    navigate(result.href);
   };
   const addResultContext = (result: GlobalSearchResult) => {
     const localPath =

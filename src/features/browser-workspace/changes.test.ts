@@ -135,28 +135,18 @@ describe("workspace edit field diff", () => {
   });
 });
 
-it("round-trips Home and records its deletion alongside browser tabs", () => {
-  const before = fixture();
-  const home = structuredClone(before[0].layout.tabs![0]);
-  home.id = "layout:home";
-  home.root.id = "pane:home";
-  home.focusedPaneId = "pane:home";
-  const pane = dockLeaves(home.root)[0];
-  pane.views[0] = {
-    ...pane.views[0],
-    id: "tab:home",
-    surfaceId: "home",
-    groupKey: "tool:home",
-    route: "/home",
-    title: "Home",
-    state: {},
-  };
-  pane.activeViewId = "tab:home";
-  before[0].layout.tabs!.push(home);
-  const encoded = workspaceChanges([], before, profile).changes;
+it("opens a Home view synced by an older client as a new browser tab", () => {
+  const encoded = workspaceChanges([], fixture(), profile).changes;
   const records = encoded.flatMap((change) =>
     change.action === "create" ? [{ kind: change.kind, id: change.id, fields: change.fields }] : [],
   );
+  const view = records.find((record) => record.kind === "view")!;
+  view.fields = {
+    ...view.fields,
+    surface: "home",
+    url: null,
+    tool_route: "/home",
+  } as typeof view.fields;
   const projected = projectWorkspace(
     {
       version: 1,
@@ -172,13 +162,7 @@ it("round-trips Home and records its deletion alongside browser tabs", () => {
     projected.windows[0].layout.tabs!.flatMap((tab) =>
       dockLeaves(tab.root).flatMap((pane) => pane.views),
     ),
-  ).toContainEqual(expect.objectContaining({ surfaceId: "home", route: "/home", id: "tab:home" }));
-  const after = structuredClone(before);
-  after[0].layout.tabs = after[0].layout.tabs!.filter((tab) => tab.id !== "layout:home");
-  expect(workspaceChanges(before, after, profile).changes).toEqual(
-    expect.arrayContaining([
-      { action: "delete", kind: "view", id: "tab:home" },
-      { action: "delete", kind: "tab", id: "layout:home" },
-    ]),
+  ).toContainEqual(
+    expect.objectContaining({ id: view.id, surfaceId: "browser", route: "/browser" }),
   );
 });

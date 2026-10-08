@@ -1,5 +1,9 @@
-import { useAiSurfaceStore } from "@/features/ai-surface";
-import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
+import { profileDataIdForView } from "@/features/workspace/browserProfiles";
+import { startAutoPictureInPicture } from "./autoPictureInPicture";
+import { startBrowserTabSleep } from "./browserTabSleep";
+import { listenForPasswordOffers } from "@/features/passwords/offers";
+import { startTabArchive } from "@/features/workspace/tabArchive";
+import { useAuth } from "@/features/auth";
 import {
   browserViewUrl,
   recordBrowserVisitTitle,
@@ -9,19 +13,20 @@ import {
 import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
 import {
   dockLeaves,
-  useRecentToolsStore,
   useWorkspaceStore,
+  workspaceTabsById,
   type WorkspaceDockNode,
 } from "@/features/workspace";
+import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
   browserTabShowsInternalPage,
-  captureNativeBrowserRegion,
+  closeBrowserRuntime,
   parkAllBrowserWebviews,
   reconcileBrowserOverlayState,
   requestBrowserWebviewLayoutByRuntimeId,
@@ -29,6 +34,7 @@ import {
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
+import { setBrowserProfileResolver } from "./browserProfileResolver";
 import { openBrowserPopup } from "./openBrowserPopup";
 const browserBlockingOverlaySelector = [
   // Rail hints extend over native pages, above the renderer's own DOM layers.
@@ -68,7 +74,7 @@ interface BrowserFaviconEvent {
 }
 interface BrowserCompatibilityEvent {
   id: string;
-  kind: "cloudflare_challenge";
+  kind: "cloudflare_challenge" | "protected_media";
   url: string;
 }
 interface BrowserPopupEvent {
@@ -87,7 +93,24 @@ interface BrowserFocusEvent {
 }
 export function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
-  if (!tabId || !useWorkspaceStore.getState().focusView(tabId)) return false;
+  return tabId ? focusBrowserTab(tabId) : false;
+}
+
+/** The host reports a click on a native page before the page handles it; the
+ * page host under that point names the tab whose pane becomes active. */
+function focusBrowserPageAt(x: number, y: number): boolean {
+  for (const host of document.querySelectorAll<HTMLElement>("[data-browser-page-host]")) {
+    const rect = host.getBoundingClientRect();
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) continue;
+    const tabId = host.closest<HTMLElement>("[data-browser-workspace-tab]")?.dataset
+      .browserWorkspaceTab;
+    if (tabId) return focusBrowserTab(tabId);
+  }
+  return false;
+}
+
+function focusBrowserTab(tabId: string): boolean {
+  if (!useWorkspaceStore.getState().focusView(tabId)) return false;
   window.dispatchEvent(
     new CustomEvent("misty:focus-workspace-tab", {
       detail: {
@@ -105,18 +128,26 @@ interface BrowserDownloadEvent {
   success: boolean;
   error?: string;
 }
-interface BrowserCompanionEvent {
-  id: string;
-  kind: "submit" | "action" | "capture";
-  prompt: string;
-  actionId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+// Registered when the bridge loads, before any page opens, so a view in a device
+// profile always opens in that profile's own website data.
+setBrowserProfileResolver((viewId) => profileDataIdForView(useWorkspaceStore.getState(), viewId));
+
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
+  useEffect(() => startAutoPictureInPicture(), []);
+  useEffect(() => startBrowserTabSleep(), []);
+  useEffect(() => listenForPasswordOffers(), []);
+  const { user } = useAuth();
+  const archiveAccount = useRef(user?.id ?? "");
+  archiveAccount.current = user?.id ?? "";
+  useEffect(
+    () =>
+      startTabArchive({
+        accountId: () => archiveAccount.current,
+        audible: (viewId) => Boolean(useBrowserMediaStore.getState().audible[viewId]),
+      }),
+    [],
+  );
   const browserSurfaceActive = useWorkspaceStore((state) =>
     activeBrowserSurfaceExists(state.layout.root),
   );
@@ -135,6 +166,21 @@ export function BrowserRuntimeBridge() {
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
+  useEffect(() => {
+    let knownTabs = workspaceTabsById(useWorkspaceStore.getState());
+    return useWorkspaceStore.subscribe((state) => {
+      const nextTabs = workspaceTabsById(state);
+      for (const [tabId, tab] of knownTabs) {
+        if (!nextTabs.has(tabId) && tab.surfaceId === "browser") {
+          void closeBrowserRuntime(
+            tab,
+            () => !workspaceTabsById(useWorkspaceStore.getState()).has(tabId),
+          );
+        }
+      }
+      knownTabs = nextTabs;
+    });
+  }, []);
   useEffect(() => {
     const reorder = (event: Event) =>
       setBrowserWebviewsSuspended((event as CustomEvent<boolean>).detail, "pointer-reorder");
@@ -224,7 +270,8 @@ export function BrowserRuntimeBridge() {
     // React recreates a host, even if the website itself hasn't changed color.
     const backgroundHosts = new MutationObserver(() => {
       clearTimeout(backgroundTimer);
-      backgroundTimer = setTimeout(restorePageBackgrounds, 120);
+      restorePageBackgrounds();
+      backgroundTimer = setTimeout(restorePageBackgrounds, 60);
     });
     backgroundHosts.observe(document.body, {
       childList: true,
@@ -306,7 +353,7 @@ export function BrowserRuntimeBridge() {
       listen<BrowserCompatibilityEvent>("misty://browser-compatibility", ({ payload }) => {
         if (
           disposed ||
-          payload.kind !== "cloudflare_challenge" ||
+          (payload.kind !== "cloudflare_challenge" && payload.kind !== "protected_media") ||
           !/^https?:\/\//i.test(payload.url)
         ) {
           return;
@@ -355,6 +402,10 @@ export function BrowserRuntimeBridge() {
       listen<BrowserFocusEvent>("misty://browser-focus", ({ payload }) => {
         if (!disposed) focusBrowserRuntimeTab(payload.id);
       }),
+      listen<{ x: number; y: number }>("misty://browser-page-pointer-down", ({ payload }) => {
+        const scale = getAppliedAppRenderScale();
+        if (!disposed) focusBrowserPageAt(payload.x / scale, payload.y / scale);
+      }),
       listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
         if (disposed) return;
         focusBrowserRuntimeTab(payload.id);
@@ -371,66 +422,6 @@ export function BrowserRuntimeBridge() {
                 );
           });
       }),
-      listen<BrowserCompanionEvent>("misty://browser-companion", ({ payload }) => {
-        if (disposed) return;
-        const tabId = browserTabIdForRuntime(payload.id);
-        if (!tabId) return;
-        const pane = dockLeaves(useWorkspaceStore.getState().layout.root).find(
-          (candidate) => candidate.activeViewId === tabId,
-        );
-        if (!pane) return;
-        const ai = useAiSurfaceStore.getState();
-        const registration = Object.values(ai.registrations).find(
-          (candidate) => candidate.paneId === pane.id,
-        );
-        if (!registration) return;
-        if (payload.kind === "submit") {
-          ai.setPrompt(registration.accountId, pane.id, payload.prompt);
-          void ai.submit(registration.accountId, pane.id, registration.adapter);
-          return;
-        }
-        if (payload.kind === "action") {
-          const action = registration.adapter
-            .getSuggestedActions?.()
-            .find((candidate) => candidate.id === payload.actionId);
-          if (action) void ai.submit(registration.accountId, pane.id, registration.adapter, action);
-          return;
-        }
-        if (
-          payload.width < 8 ||
-          payload.height < 8 ||
-          ![payload.x, payload.y, payload.width, payload.height].every(Number.isFinite)
-        ) {
-          return;
-        }
-        void captureNativeBrowserRegion(payload.id, payload)
-          .then(({ dataUrl, width, height }) =>
-            captureAttachmentFromDataUrl(dataUrl, width, height),
-          )
-          .then(async (capture) => {
-            const { openMisty } = await import("@/features/misty/handoff");
-            const { mistyContextRef } = await import("@/features/misty/context");
-            await openMisty({
-              accountId: registration.accountId,
-              paneId: pane.id,
-              surfaceId: registration.adapter.surfaceId,
-              context: registration.adapter.getContext().map(mistyContextRef),
-              capture,
-            });
-          })
-          .catch((error: unknown) =>
-            useBrowserRuntimeStore
-              .getState()
-              .setError(
-                tabId,
-                error instanceof Error
-                  ? error.message
-                  : typeof error === "string"
-                    ? error
-                    : "Misty could not capture that region.",
-              ),
-          );
-      }),
       listen<string>("misty://open-web-url", ({ payload }) => {
         if (disposed || !/^https?:\/\//i.test(payload)) return;
         const tab = useWorkspaceStore.getState().openBrowserView({
@@ -442,8 +433,6 @@ export function BrowserRuntimeBridge() {
         if (disposed) return;
         const tab = openBrowserPopup(payload);
         if (!tab) return;
-        if (tab.groupKey === "app:browser")
-          useRecentToolsStore.getState().recordToolUsage("browser");
         navigate(tab.route);
       }),
       listen<BrowserDownloadEvent>("misty://browser-download", ({ payload }) => {

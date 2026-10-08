@@ -1,0 +1,29 @@
+/* Layout only: shared components and Misty's semantic tokens own the visual system. */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--misty-theme-workspace);
+  color: var(--misty-theme-text);
+}
+/* A stand-in for the app behind the dialog. */
+.preview-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 8px;
+  padding: 8px;
+  background: #000;
+}
+.preview-rail {
+  border-radius: 12px;
+  background: var(--misty-theme-workspace);
+}
+.preview-pane {
+  border-radius: 12px;
+  background: var(--misty-theme-card);
+}

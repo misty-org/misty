@@ -1,5 +1,5 @@
 import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import { Button } from "@/shared/ui";
 import { RotateCw } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
@@ -125,7 +125,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
       ) : null}
 
       {props.editError ? (
-        <SystemErrorActivity
+        <SystemErrorNotice
           error={props.editError}
           scope="library:edit"
           title="Library edit could not be applied"

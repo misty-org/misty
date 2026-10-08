@@ -1,11 +1,35 @@
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter};
-use url::Url;
 
 pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
+  // Page scripts share this JavaScript world and run after this one. They can
+  // replace globals, prototype methods (postMessage, URLSearchParams) and
+  // Object.prototype.toJSON, so nothing that carries the token may reach them.
+  // Capture what the messages need now and build them by concatenation.
+  const encode = encodeURIComponent;
+  const stringify = JSON.stringify;
+  // Kiri's host channel: the engine's native message handler, bound here.
+  const bindChannel = __KIRI_HOST_SENDER_PLACEHOLDER__;
+  let postToHost = bindChannel();
+  const sendToHost = (message) => {
+    // The handler is normally installed before the first document starts.
+    postToHost = postToHost || bindChannel();
+    if (!postToHost) return false;
+    postToHost(message);
+    return true;
+  };
+  const finite = (value) => (typeof value === 'number' && value === value && value !== Infinity && value !== -Infinity ? value : 0);
+  // Host navigations are posted through the captured channel: a page can
+  // observe its own navigations, but not a bound native function call.
+  const sendHostNavigation = (url) => {
+    sendToHost('{"navigate":"' + url + '"}');
+  };
+  const sendFocus = () => {
+    sendToHost(shortcutToken);
+  };
   __MISTY_CONTEXT_MENU_PLACEHOLDER__
   __MISTY_BACKGROUND_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
@@ -34,29 +58,36 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 
   // Only bindings supplied by Misty's trusted shell are intercepted. Page
   // typing and ordinary browser shortcuts remain owned by the page.
-  window.__MISTY_APP_SHORTCUTS__ = window.__MISTY_APP_SHORTCUTS__ || new Map();
+  const initialBindings = __MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__;
+  window.__MISTY_APP_SHORTCUTS__ = window.__MISTY_APP_SHORTCUTS__ || new Map(
+    (Array.isArray(initialBindings) ? initialBindings : []).map((binding) => [
+      binding.shortcut,
+      Boolean(binding.allowInEditable),
+    ])
+  );
   window.__MISTY_SET_SHORTCUTS__ = (bindings) => {
     window.__MISTY_APP_SHORTCUTS__ = new Map((Array.isArray(bindings) ? bindings : [])
       .map((binding) => [binding.shortcut, Boolean(binding.allowInEditable)]));
   };
   const shortcutKey = (event) => {
     let key = event.code;
-    if (/^Key[A-Z]$/.test(key)) key = key.slice(3);
+    if (/^Key[A-Z]$/i.test(key)) key = key.slice(3).toUpperCase();
     else if (/^Digit[0-9]$/.test(key)) key = key.slice(5);
     else key = ({
       Backquote: 'Grave', Backslash: 'Backslash', BracketLeft: 'LeftBracket',
       BracketRight: 'RightBracket', Comma: 'Comma', Period: 'Period',
       Equal: 'Plus', Minus: 'Minus', NumpadAdd: 'Plus', NumpadSubtract: 'Minus',
       ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp',
-      ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown'
-    })[key] || event.key;
+      ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown',
+      Escape: 'Escape', Esc: 'Escape', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace'
+    })[key] || (event.key?.length === 1 ? event.key.toUpperCase() : event.key);
     // `+` already implies Shift on the main keyboard. Match the renderer's
     // canonical form (Cmd+Plus rather than Cmd+Shift+Plus).
     return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt',
       event.shiftKey && key !== 'Plus' && 'Shift',
       event.metaKey && 'Cmd', key].filter(Boolean).join('+');
   };
-  document.addEventListener('keydown', (event) => {
+  window.addEventListener('keydown', (event) => {
     if (!event.isTrusted) return;
     const shortcut = shortcutKey(event);
     const editable = Boolean(event.target?.closest?.(
@@ -64,12 +95,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     ));
     const allowInEditable = window.__MISTY_APP_SHORTCUTS__.get(shortcut);
     if (allowInEditable === undefined || (editable && !allowInEditable)) return;
-    const params = new URLSearchParams({
-      key: event.key, code: event.code, alt: String(event.altKey),
-      ctrl: String(event.ctrlKey), meta: String(event.metaKey), shift: String(event.shiftKey),
-      repeat: String(event.repeat), token: shortcutToken, editable: String(editable)
-    });
-    window.location.href = `misty-shortcut:event?${params}`;
+    const flag = (value) => (value === true ? 'true' : 'false');
+    const params = 'key=' + encode(event.key) + '&code=' + encode(event.code) +
+      '&alt=' + flag(event.altKey) + '&ctrl=' + flag(event.ctrlKey) + '&meta=' + flag(event.metaKey) +
+      '&shift=' + flag(event.shiftKey) + '&repeat=' + flag(event.repeat) +
+      '&token=' + encode(shortcutToken) + '&editable=' + flag(editable);
+    sendHostNavigation('misty-shortcut:event?' + params);
     event.preventDefault();
     event.stopImmediatePropagation();
   }, true);
@@ -79,11 +110,12 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   // active workspace pane before shell shortcuts are evaluated.
   document.addEventListener('pointerdown', (event) => {
     if (!event.isTrusted) return;
-    window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);
+    sendFocus();
   }, true);
 
   const sendPointer = (pointer) => {
-    window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));
+    sendToHost('{"token":"' + shortcutToken + '","pointer":{"x":' + finite(pointer.x) + ',"y":' + finite(pointer.y) +
+      ',"inside":' + (pointer.inside === true ? 'true' : 'false') + '}}');
   };
   const reportPointer = (event) => {
     if (!pointerTrackingEnabled || !event?.isTrusted) return;
@@ -157,26 +189,33 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 })();
 "#;
 
-pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
+pub(super) fn browser_viewport_script(
+    shortcut_token: &str,
+    pointer_tracking: bool,
+    bindings: &[super::browser_shortcuts::BrowserShortcutBinding],
+) -> String {
+    let bindings_json = serde_json::to_string(bindings).unwrap_or_else(|_| "[]".to_owned());
     BROWSER_VIEWPORT_SCRIPT
         .replace(
-            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));",
+            "__KIRI_HOST_SENDER_PLACEHOLDER__",
+            kiri::channel::sender_script(),
+        )
+        .replace(
+            "__MISTY_BACKGROUND_PLACEHOLDER__",
             if cfg!(target_os = "macos") {
-                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(JSON.stringify({ token: shortcutToken, pointer }));"
+                include_str!("browser_background.js")
             } else {
-                "window.location.href = pointer.inside ? `misty-pointer:move?x=${pointer.x}&y=${pointer.y}` : 'misty-pointer:leave';"
+                ""
             },
         )
         .replace(
-            "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);",
-            if cfg!(target_os = "macos") {
-                "window.webkit?.messageHandlers?.mistyFocus?.postMessage(shortcutToken);"
-            } else {
-                "window.location.href = `misty-focus:event?${new URLSearchParams({ token: shortcutToken })}`;"
-            },
+            "__MISTY_CONTEXT_MENU_PLACEHOLDER__",
+            concat!(
+                include_str!("browser_context_menu.js"),
+                "\n",
+                include_str!("browser_passwords.js")
+            ),
         )
-        .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
-        .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_context_menu.js") } else { "" })
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
@@ -185,6 +224,7 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
             "__MISTY_POINTER_TRACKING_PLACEHOLDER__",
             if pointer_tracking { "true" } else { "false" },
         )
+        .replace("__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__", &bindings_json)
 }
 
 static STATUS_BUBBLE_ENABLED: AtomicBool = AtomicBool::new(true);
@@ -195,18 +235,26 @@ pub(super) fn set_status_bubble_enabled(enabled: bool) {
     STATUS_BUBBLE_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
-pub(super) fn browser_status_script() -> String {
-    include_str!("browser_status.js").replace(
-        "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
-        if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
-            "true"
-        } else {
-            "false"
-        },
-    )
+/// The tab's token authenticates the Escape-to-stop report on Kiri's host channel.
+pub(super) fn browser_status_script(shortcut_token: &str) -> String {
+    include_str!("browser_status.js")
+        .replace(
+            "__MISTY_STATUS_ENABLED_PLACEHOLDER__",
+            if STATUS_BUBBLE_ENABLED.load(Ordering::Relaxed) {
+                "true"
+            } else {
+                "false"
+            },
+        )
+        .replace(
+            "__KIRI_HOST_SENDER_PLACEHOLDER__",
+            kiri::channel::sender_script(),
+        )
+        .replace(
+            "__MISTY_STATUS_TOKEN_PLACEHOLDER__",
+            &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
+        )
 }
-
-pub(super) const BROWSER_MEDIA_SCRIPT: &str = include_str!("browser_media.js");
 
 pub(super) fn browser_scrollbar_script() -> String {
     include_str!("browser_scrollbars.js").replace(
@@ -288,43 +336,12 @@ pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPo
     );
 }
 
-pub(super) fn browser_pointer_navigation(url: &Url) -> Option<BrowserPointerNavigation> {
-    if url.scheme() != "misty-pointer" {
-        return None;
-    }
-    if url.path().trim_start_matches('/') == "leave" {
-        return Some(BrowserPointerNavigation {
-            x: 0.0,
-            y: 0.0,
-            inside: false,
-        });
-    }
-    if url.path().trim_start_matches('/') != "move" {
-        return None;
-    }
-    let mut x = None;
-    let mut y = None;
-    for (key, value) in url.query_pairs() {
-        match key.as_ref() {
-            "x" => x = value.parse::<f64>().ok(),
-            "y" => y = value.parse::<f64>().ok(),
-            _ => {}
-        }
-    }
-    let (x, y) = (x?, y?);
-    if !x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0 || x > 100_000.0 || y > 100_000.0 {
-        return None;
-    }
-    Some(BrowserPointerNavigation { x, y, inside: true })
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        browser_pointer_navigation, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
+        browser_status_script, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
         BROWSER_VIEWPORT_SCRIPT,
     };
-    use url::Url;
 
     #[test]
     fn pointer_reporting_uses_no_page_dom_mutation_or_remote_desktop_ipc() {
@@ -332,32 +349,28 @@ mod tests {
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
         assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:"));
-        assert!(BROWSER_VIEWPORT_SCRIPT.contains("mistyFocus?.postMessage(shortcutToken)"));
-        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-focus:event"));
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("sendToHost(shortcutToken)"));
     }
 
     #[test]
-    fn pointer_navigation_accepts_only_bounded_coordinates() {
-        let pointer =
-            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=12.5&y=44").unwrap())
-                .unwrap();
-        assert_eq!(pointer.x, 12.5);
-        assert_eq!(pointer.y, 44.0);
-        assert!(pointer.inside);
-        assert!(
-            browser_pointer_navigation(&Url::parse("misty-pointer:move?x=-1&y=4").unwrap())
-                .is_none()
-        );
-        assert!(
-            !browser_pointer_navigation(&Url::parse("misty-pointer:leave").unwrap())
-                .unwrap()
-                .inside
-        );
+    fn host_messages_ride_the_kiri_channel_and_never_navigate() {
+        let viewport = browser_viewport_script("token", true, &[]);
+        let status = browser_status_script("token");
+        for script in [&viewport, &status] {
+            assert!(script.contains(kiri::channel::sender_script()));
+            assert!(!script.contains("__KIRI_HOST_SENDER_PLACEHOLDER__"));
+        }
+        assert!(!viewport.contains("misty-focus:"));
+        assert!(!viewport.contains("location.href ="));
+        assert!(!status.contains("location.href ="));
+        assert!(!status.contains("misty-status:"));
+        assert!(!status.contains("__MISTY_STATUS_TOKEN_PLACEHOLDER__"));
+        assert!(status.contains("const statusToken = \"token\""));
     }
 
     #[test]
     fn shortcut_token_is_embedded_as_json_without_becoming_a_window_global() {
-        let script = browser_viewport_script("secret-token", false);
+        let script = browser_viewport_script("secret-token", false, &[]);
         assert!(script.contains("const shortcutToken = \"secret-token\""));
         assert!(script.contains("let pointerTrackingEnabled = false"));
         assert!(script.contains("if (!pointerTrackingEnabled || !event?.isTrusted) return"));
@@ -366,6 +379,7 @@ mod tests {
         assert!(!script.contains("__MISTY_POINTER_TRACKING_PLACEHOLDER__"));
         assert!(!script.contains("__MISTY_COMPANION_TOKEN_PLACEHOLDER__"));
         assert!(!script.contains("window.__MISTY_SHORTCUT_TOKEN"));
+        assert!(!script.contains("__MISTY_NATIVE_HOST_PLACEHOLDER__"));
         assert!(BROWSER_COMPANION_SCRIPT.contains("window.__MISTY_SET_COMPANION__"));
     }
 
@@ -378,7 +392,7 @@ mod tests {
 
     #[test]
     fn link_click_interception_opens_modifier_and_middle_clicks_in_new_window() {
-        let script = browser_viewport_script("token", false);
+        let script = browser_viewport_script("token", false, &[]);
         assert!(script.contains("const handleLinkClick"));
         assert!(script.contains("window.open(resolved, '_blank')"));
         assert!(script.contains("event.button === 1"));
@@ -387,7 +401,7 @@ mod tests {
 
     #[test]
     fn pointer_tracking_can_be_enabled_for_an_active_companion() {
-        let script = browser_viewport_script("token", true);
+        let script = browser_viewport_script("token", true, &[]);
         assert!(script.contains("let pointerTrackingEnabled = true"));
         assert!(script.contains("window.__MISTY_SET_POINTER_TRACKING__"));
         assert!(script.contains("if (!pointerTrackingEnabled) return"));

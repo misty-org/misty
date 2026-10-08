@@ -18,7 +18,6 @@ import { LibraryCollectionHeader } from "./librarySurfaces/LibraryCollectionHead
 import { LibraryItemsRegion } from "./librarySurfaces/LibraryItemsRegion";
 import { MemoryControls } from "./librarySurfaces/MemoryControls";
 import { SharedReferencesIndex } from "./librarySurfaces/SharedReferencesIndex";
-import { SmartLibrarySection } from "./librarySurfaces/SmartLibrarySection";
 import { SpaceLibraryProvider } from "./SpaceLibraryContext";
 import { LibraryCanEditContext } from "./SpaceLibraryPrimitives";
 import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionActions";
@@ -121,25 +120,21 @@ export function SpaceLibrary({
     >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
         <CollectionPage>
-          {data.collection === "smart" ? (
-            <SmartLibrarySection />
-          ) : (
-            <>
-              <LibraryEntryHeader />
-              <SpaceLibraryInlineStatus />
-              <div className="min-h-0">
-                <DateGroupIndex />
-                {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
-                <AlbumsIndex />
-                <ImportHistoryIndex />
-                <SharedReferencesIndex />
-                <DuplicatesIndex />
-                <LibraryCollectionHeader />
-                <MemoryControls />
-                <LibraryItemsRegion />
-              </div>
-            </>
-          )}
+          <>
+            <LibraryEntryHeader />
+            <SpaceLibraryInlineStatus />
+            <div className="min-h-0">
+              <DateGroupIndex />
+              {data.collection === "collections" ? <SpaceLibraryCollectionOverview /> : null}
+              <AlbumsIndex />
+              <ImportHistoryIndex />
+              <SharedReferencesIndex />
+              <DuplicatesIndex />
+              <LibraryCollectionHeader />
+              <MemoryControls />
+              <LibraryItemsRegion />
+            </div>
+          </>
           <SpaceLibraryOverlays />
         </CollectionPage>
       </LibraryCanEditContext.Provider>
@@ -148,7 +143,6 @@ export function SpaceLibrary({
 }
 const collectionTitles: Partial<Record<string, string>> = {
   recent: "Library",
-  smart: "Smart",
   months: "Months",
   years: "Years",
   "recent-days": "Recent days",

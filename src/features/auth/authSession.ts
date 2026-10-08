@@ -1,11 +1,11 @@
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
-import { useActivityStore } from "@/features/activity";
+import { clearSystemErrors } from "@/features/support/systemErrors";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
 import type { CurrentLicense } from "@/features/native-session";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState } from "@/features/spaces";
-import { resetWorkspaceAccountState, useRecentToolsStore } from "@/features/workspace";
+import { resetWorkspaceAccountState } from "@/features/workspace";
 import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
 import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
 import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
@@ -20,12 +20,11 @@ function scopedAuthUserStorageKey(): string {
 export function resetAccountScopedState(previousAccountId?: string): void {
   notifyAccountScopeWillReset();
   useUserStore.getState().clear();
-  useActivityStore.getState().setAccount("");
+  clearSystemErrors();
   resetSpacesAccountState();
   resetConnectionsAccountState();
   resetWorkspaceAccountState();
   useAppRouteMemoryStore.getState().resetAppRoute();
-  useRecentToolsStore.getState().resetRecentTools();
   resetAiSurfaceAccountState(previousAccountId);
   notifyAccountScopeReset();
 }
@@ -61,6 +60,7 @@ export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
     allows_use: me.allows_use,
     expires_at: me.expires_at,
     trial_started_at: me.trial_started_at,
+    email_verified: me.email_verified,
     license_device: me.license_device || null,
   };
 }

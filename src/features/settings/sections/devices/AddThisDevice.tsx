@@ -73,7 +73,7 @@ export function AddThisDevice() {
           )}
         </Row>
         {approval?.code && !approval.admitted ? (
-          <div className="border-t border-charcoal-border px-5 py-4">
+          <div className="border-t border-charcoal-border py-3">
             <p className="text-[13px] text-cream-muted">Your other device must show this code:</p>
             <p className="mt-1 font-mono text-2xl tracking-[0.3em] text-cream" aria-live="polite">
               {approval.code.slice(0, 3)} {approval.code.slice(3)}
@@ -81,7 +81,7 @@ export function AddThisDevice() {
           </div>
         ) : null}
         {error ? (
-          <p role="alert" className="border-t border-charcoal-border px-5 py-3 text-sm text-cream">
+          <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
             {error}
           </p>
         ) : null}

@@ -10,8 +10,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     path.startsWith("/settings") ||
     path.startsWith("/account") ||
     path === "/signin" ||
-    path === "/register" ||
-    path === "/activity"
+    path === "/register"
   )
     return null;
   const url = new URL(pathname, "https://misty.local");
@@ -35,11 +34,6 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       scopeKey: "global",
     };
   }
-  if (path === "/home")
-    return {
-      ...request("home", "tool:home", "Home", "/home", "home", "single"),
-      scopeKey: "global",
-    };
   if (path === "/spaces" || path.startsWith("/spaces/")) {
     const parts = path.split("/").filter(Boolean);
     let spaceId = "";
@@ -69,18 +63,6 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       scopeKey: "global",
     };
   }
-  if (path === "/files" || path === "/apps/files")
-    return {
-      ...request(
-        "files",
-        "tool:files",
-        "Files",
-        `/files${new URL(pathname, "https://misty.local").search}`,
-        "files",
-        "single",
-      ),
-      scopeKey: "global",
-    };
   if (path === "/agents" || path === "/apps/agents")
     return {
       ...request(

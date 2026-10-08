@@ -71,16 +71,17 @@ export const workspaceSource: WorkspaceSource = {
       bookmarkFolders: projected.folders.filter((folder) => folder.fields.icon !== "folder"),
       bookmarks: projected.bookmarks,
     });
+    // While a device profile is showing, its own windows stay on screen; the synced
+    // windows update in the background and appear when the default profile returns.
+    const showing = state.activeScopeKey === "global";
     useWorkspaceStore.setState({
       ...groupMigration,
       bookmarkFolders: projected.folders,
       bookmarks: projected.bookmarks,
-      activeScopeKey: "global",
-      activeWindowId: active.id,
+      ...(showing ? { activeWindowId: active.id, layout: active.layout } : {}),
       activeWindowIdByScope: { ...state.activeWindowIdByScope, global: active.id },
       windowsByScope: { ...state.windowsByScope, global: windows },
       layoutsByScope: { ...state.layoutsByScope, global: active.layout },
-      layout: active.layout,
       // Synced once every device supports it; otherwise each machine keeps its own.
       ...(projected.tabGroups ? { tabGroups: projected.tabGroups } : {}),
     });
@@ -108,7 +109,7 @@ export const workspaceSource: WorkspaceSource = {
     const layout = layoutTabs(active.layout).find(
       (layout) => layout.id === active.layout.activeTabId,
     );
-    if (layout && typeof window !== "undefined") {
+    if (showing && layout && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("misty:workspace-projection-applied"));
     }
   },

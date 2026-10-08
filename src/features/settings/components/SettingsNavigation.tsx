@@ -1,14 +1,11 @@
 import { cn, NavigationSectionButton } from "@/shared/ui";
 import type { LucideIcon } from "lucide-react";
-import { Fragment } from "react";
 export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;
   label: string;
   icon?: LucideIcon;
-  hasSections?: boolean;
-  breakBefore?: boolean;
 }
-/** The incumbent navigation chrome, with one destination per area and no disclosures. */
+/** The incumbent navigation chrome, with one destination per area and no disclosures, chevrons or dividers. */
 export function SettingsNavigation<Id extends string>(props: {
   items: readonly DesktopSettingsNavEntry<Id>[];
   activeId: Id;
@@ -27,22 +24,18 @@ export function SettingsNavigation<Id extends string>(props: {
         {props.items.map((entry) => {
           const Icon = entry.icon;
           return (
-            <Fragment key={entry.id}>
-              {entry.breakBefore && (
-                <div aria-hidden className="mx-2.5 my-2 h-px bg-charcoal-border" />
-              )}
-              <NavigationSectionButton
-                icon={Icon ? <Icon aria-hidden /> : null}
-                label={entry.label}
-                open={false}
-                aria-expanded={undefined}
-                showChevron={entry.hasSections}
-                aria-current={props.activeId === entry.id ? "page" : undefined}
-                data-settings-nav-entry={entry.id}
-                className={cn(props.activeId === entry.id && "bg-charcoal-hover text-cream-bright")}
-                onClick={() => props.onSelect(entry.id)}
-              />
-            </Fragment>
+            <NavigationSectionButton
+              key={entry.id}
+              icon={Icon ? <Icon aria-hidden /> : null}
+              label={entry.label}
+              open={false}
+              aria-expanded={undefined}
+              showChevron={false}
+              aria-current={props.activeId === entry.id ? "page" : undefined}
+              data-settings-nav-entry={entry.id}
+              className={cn(props.activeId === entry.id && "bg-charcoal-hover text-cream-bright")}
+              onClick={() => props.onSelect(entry.id)}
+            />
           );
         })}
       </div>

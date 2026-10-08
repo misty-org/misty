@@ -134,7 +134,7 @@ a fixture preview, not through an authenticated production account.
 Passing unit and local native fixtures does not satisfy these release gates.
 
 `compat-probe.m` loads `fixtures/compat` with the real compatibility layer
-(`src/infra/extensions/compat`) through the production host. It checks the
+(`kiri/src/extensions/compat`) through the production host. It checks the
 shims, native answers (language detection, idle state, site data removal),
 requests forwarded to the app, `tabs.move`, the OAuth redirect rewrite, and
 learned blocking: a request the extension cancels passes once, the repeat is

@@ -1,5 +1,6 @@
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { browserTabIdForRuntime } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
@@ -115,6 +116,8 @@ export function ShortcutRuntime(): null {
       }),
       listen<ForwardedShortcutEvent>("misty://browser-shortcut", (event) => {
         const forwarded = event.payload;
+        const tabId = browserTabIdForRuntime(forwarded.id);
+        if (tabId) useWorkspaceStore.getState().focusView(tabId);
         dispatchShortcutEvent(
           new KeyboardEvent("keydown", {
             key: forwarded.key,
@@ -143,11 +146,14 @@ export function ShortcutRuntime(): null {
 }
 
 export function dispatchShortcutEvent(event: KeyboardEvent, editableOverride?: boolean): boolean {
-  if (document.querySelector("[data-device-sync-sleep]")) return false;
   if (event.defaultPrevented || document.documentElement.dataset.shortcutCapture === "true")
     return false;
-  const activeScope = focusedShortcutScope();
   const editable = editableOverride ?? isEditableShortcutTarget(event.target);
+  // Plain typing in a field: every command allowed in one needs Cmd, Ctrl or Option,
+  // so skip the registry scan below rather than run it on each keystroke.
+  if (editable && !event.metaKey && !event.ctrlKey && !event.altKey) return false;
+  if (document.querySelector("[data-device-sync-sleep]")) return false;
+  const activeScope = focusedShortcutScope();
   const snapshot = useSettingsStore.getState().shortcuts;
   const platform = snapshot?.detectedPlatform ?? detectShortcutPlatform();
   const effectiveById = new Map(
@@ -262,8 +268,6 @@ function focusedShortcutScope(): ShortcutScope {
   switch (tab?.surfaceId) {
     case "browser":
       return "tool:browser";
-    case "files":
-      return "tool:files";
     case "space": {
       const route = tab.route.toLowerCase();
       if (route.includes("/tasks/roadmaps") || route.includes("/roadmap")) return "tool:roadmap";

@@ -59,7 +59,6 @@ export function EmbeddedUniversalPreviewView(props: {
           error={props.error || documentError}
           scope="files:embedded-preview"
           title="File preview could not be loaded"
-          target={{ kind: "workspace-tool", tool: "files" }}
         />
         <PreviewMessage
           icon={<FileQuestion size={34} />}

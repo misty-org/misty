@@ -58,3 +58,13 @@ it("changes docking orientation without remounting open work or rewriting the pa
   expect(lifecycle.mount).toHaveBeenCalledTimes(1);
   expect(lifecycle.unmount).not.toHaveBeenCalled();
 });
+it("keeps tab panels direct children of the pane frame so its rounded corner applies", () => {
+  useWorkspaceStore.getState().reset();
+  const { container } = render(
+    <MemoryRouter>
+      <WorkspaceCanvas tabPosition="top" />
+    </MemoryRouter>,
+  );
+  // docking.css draws the pane corner and seam on `[data-workspace-panes] > [role="tabpanel"]`.
+  expect(container.querySelector('[data-workspace-panes] > [role="tabpanel"]')).not.toBeNull();
+});

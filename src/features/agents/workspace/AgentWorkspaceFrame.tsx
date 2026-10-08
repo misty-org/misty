@@ -4,14 +4,19 @@ import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { Button } from "@/shared/ui";
-import { AgentRecentConversations, type RecentStatus } from "./AgentRecentConversations";
+import { useAgentFoldersStore } from "../folders/agentFoldersStore";
+import {
+  AgentRecentConversations,
+  type RecentFolder,
+  type RecentStatus,
+} from "./AgentRecentConversations";
 import { AgentActivityPage } from "./AgentActivityPage";
 import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
 export type AgentWorkspacePage = "task" | "activity" | "workflows" | "templates" | "integrations";
-type RecentConversation = { id: string; title?: string; updatedAt: string };
+type RecentConversation = { id: string; title?: string; folderId?: string; updatedAt: string };
 
 /** Presentation only. Existing conversation and account actions remain owned by AgentsPage. */
 export function AgentWorkspaceFrame({
@@ -47,14 +52,30 @@ export function AgentWorkspaceFrame({
   onStartWork(action: () => void): void;
   onCompanion(): void;
 }) {
-  const sorted = [...conversations]
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 12);
-  // Rows only show ids and titles; a streaming answer rewrites its conversation on every
-  // token, so key the list on what the rows show to keep the memoized list still.
-  const recentKey = sorted.map((c) => `${c.id}\u0000${c.title ?? ""}`).join("\u0001");
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- recentKey captures the shown fields
-  const recent = useMemo(() => sorted.map(({ id, title }) => ({ id, title })), [recentKey]);
+  const allFolders = useAgentFoldersStore((state) => state.folders);
+  const sorted = [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  // Rows only show ids, titles and filing; a streaming answer rewrites its conversation on
+  // every token, so key the lists on what the rows show to keep the memoized list still.
+  const listKey = sorted
+    .map((c) => `${c.id}\u0000${c.title ?? ""}\u0000${c.folderId ?? ""}`)
+    .join("\u0001");
+  const folderKey = allFolders
+    .filter((folder) => folder.agentId === agent.id)
+    .map((folder) => `${folder.id}\u0000${folder.name}`)
+    .join("\u0001");
+  const { folders, recent } = useMemo(() => {
+    const own = allFolders.filter((folder) => folder.agentId === agent.id);
+    const filed = new Set(own.map((folder) => folder.id));
+    const row = ({ id, title, folderId }: RecentConversation) => ({ id, title, folderId });
+    const groups: RecentFolder[] = own.map((folder) => ({
+      folder,
+      conversations: sorted.filter((c) => c.folderId === folder.id).map(row),
+    }));
+    // A chat whose folder is gone or not loaded yet stays visible in Recents.
+    const unfiled = sorted.filter((c) => !c.folderId || !filed.has(c.folderId));
+    return { folders: groups, recent: unfiled.slice(0, 12).map(row) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the keys capture the shown fields
+  }, [listKey, folderKey, agent.id]);
   // Latest top-level run per conversation, keyed on what the icons show so the memoized
   // list stays still while a run streams.
   const latestRuns = new Map<string, RecentStatus>();
@@ -110,6 +131,8 @@ export function AgentWorkspaceFrame({
           ))}
         </nav>
         <AgentRecentConversations
+          agentId={agent.id}
+          folders={folders}
           recent={recent}
           statuses={statuses}
           activeId={page === "task" ? conversationId : undefined}

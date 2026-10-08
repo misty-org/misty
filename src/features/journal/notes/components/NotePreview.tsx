@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { NotePreviewView, type NotePreviewProps } from "./NotePreviewView";
 const Editor = lazy(() => import("./NoteBlockEditor"));
 export function NotePreview(props: NotePreviewProps) {
@@ -11,7 +11,6 @@ export function NotePreview(props: NotePreviewProps) {
         copy: (text) => navigator.clipboard.writeText(text),
         report: (error) =>
           reportSystemError({
-            accountId: props.accountId,
             error,
             scope: `notes:${props.note.spaceId ?? "unknown"}:${props.note.sourceId}:copy`,
             title: "Note could not be copied",

@@ -3,19 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button, CollectionHeading, CollectionPage, CollectionSearch } from "@/shared/ui";
 import { resolveSetting, useSettingsProfiles } from "@/features/settings";
+import { loadCategories, loadDetail, loadSearch, peekDetail, peekSearch } from "./catalogCache";
 import { defaultCategories } from "./extensionCategories";
 import { ExtensionDetail } from "./ExtensionDetail";
 import { InstallReviewDialog, UninstallDialog } from "./ExtensionDialogs";
 import { ExtensionsCollection } from "./ExtensionsCollection";
 import { extensionsNative } from "./native";
-import {
-  install,
-  parseInstallations,
-  pinIds,
-  setPreference,
-  updateInstallation,
-  useExtensionsStore,
-} from "./store";
+import { install, parseInstallations, updateInstallation, useExtensionsStore } from "./store";
 import type { CatalogEntry, CatalogPage, ExtensionReview, Installation } from "./types";
 
 export function ExtensionsWorkspace() {
@@ -29,8 +23,7 @@ export function ExtensionsWorkspace() {
   useEffect(() => {
     if (!runtime.supported) return;
     let current = true;
-    void extensionsNative
-      .categories()
+    void loadCategories()
       .then((categories) => {
         if (current) setCategories(categories);
       })
@@ -75,27 +68,36 @@ export function ExtensionsWorkspace() {
   useEffect(() => {
     if (inInstalled || !runtime.supported) return;
     let current = true;
-    setLoading(true);
+    const args = { query, category, page, sort };
+    const cached = detailId ? peekDetail(Number(detailId)) : peekSearch(args);
     setFailure("");
-    setEntry(null);
+    if (detailId) setEntry(cached ? (cached.value as CatalogEntry) : null);
+    else if (cached) setCatalog(cached.value as CatalogPage);
+    // A cached view stays on screen; only an uncached one shows the skeleton.
+    setLoading(!cached);
+    if (cached?.fresh) return;
     const timer = window.setTimeout(
       () => {
         const request = detailId
-          ? extensionsNative.detail(Number(detailId)).then((value) => {
+          ? loadDetail(Number(detailId)).then((value) => {
               if (current) setEntry(value);
             })
-          : extensionsNative.search(query, category, page, sort).then((value) => {
-              if (current) setCatalog(value);
+          : loadSearch(args).then((value) => {
+              if (!current) return;
+              setCatalog(value);
+              // Warm the next page so the pager's next arrow is instant.
+              const next = { ...args, page: page + 1 };
+              if (value.hasMore && !peekSearch(next)?.fresh) void loadSearch(next).catch(() => {});
             });
         void request
           .catch((error) => {
-            if (current) setFailure(String(error));
+            if (current && !cached) setFailure(String(error));
           })
           .finally(() => {
             if (current) setLoading(false);
           });
       },
-      query && !detailId ? 250 : 0,
+      query && !detailId && !cached ? 250 : 0,
     );
     return () => {
       current = false;
@@ -268,10 +270,6 @@ export function ExtensionsWorkspace() {
         onUninstall={(removing) =>
           void work(async () => {
             await updateInstallation(removing.id, { installed: false, enabled: false });
-            await setPreference(
-              "pins",
-              JSON.stringify(pinIds().filter((id) => id !== removing.id)),
-            );
             setRemoving(null);
             go("/extensions/installed");
           })

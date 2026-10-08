@@ -1,4 +1,3 @@
-import { ActivityPage } from "@/features/activity";
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
 import { SpaceInvitationRedemption } from "@/features/spaces";
@@ -19,8 +18,7 @@ function StartupRedirect() {
   if (!user) {
     return <Navigate to={routes.signIn} replace />;
   }
-  const fallback = routes.home;
-  return <Navigate to={resolveStartupRoute(lastAppRoute, fallback)} replace />;
+  return <Navigate to={resolveStartupRoute(lastAppRoute, routes.browser)} replace />;
 }
 export const router = createBrowserRouter([
   {
@@ -47,16 +45,8 @@ export const router = createBrowserRouter([
             element: <AppPagesLayout />,
             children: [
               {
-                path: "home",
-                element: null,
-              },
-              {
                 path: "new",
                 element: null,
-              },
-              {
-                path: "activity",
-                element: <ActivityPage />,
               },
               {
                 path: "scheduled",
@@ -68,10 +58,6 @@ export const router = createBrowserRouter([
               },
               {
                 path: "agents",
-                element: null,
-              },
-              {
-                path: "files",
                 element: null,
               },
               {
@@ -107,7 +93,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "*",
-            element: <Navigate to={routes.home} replace />,
+            element: <Navigate to={routes.browser} replace />,
           },
         ],
       },

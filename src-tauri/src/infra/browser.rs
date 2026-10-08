@@ -23,9 +23,9 @@ mod native_input;
 #[path = "browser_task_files.rs"]
 mod task_files;
 
-#[cfg(target_os = "macos")]
-#[path = "browser_focus.rs"]
-mod focus_messages;
+#[path = "browser_host_messages.rs"]
+pub(crate) mod host_messages;
+pub(super) use host_messages::init as init_host_messages;
 
 #[cfg(target_os = "macos")]
 #[path = "browser_attachment_download_macos.rs"]
@@ -45,19 +45,21 @@ pub(crate) mod popup_probe;
 #[path = "browser_render_probe.rs"]
 pub(crate) mod render_probe;
 
-#[cfg(target_os = "macos")]
 #[path = "browser_context_menu.rs"]
 mod context_menu;
 
+#[cfg(all(debug_assertions, target_os = "macos"))]
+#[path = "browser_kiri_probe.rs"]
+pub(crate) mod kiri_probe;
+
 #[path = "browser_page_tools.rs"]
-mod page_tools;
+pub(crate) mod page_tools;
 pub use page_tools::{
     browser_clear_website_data, browser_webview_developer_tools, browser_webview_find,
     browser_webview_print, browser_webview_save_page, browser_webview_set_muted,
     browser_webview_stop,
 };
 
-#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn browser_context_menu_select(
     app: AppHandle,
@@ -66,6 +68,36 @@ pub fn browser_context_menu_select(
     action: String,
 ) -> Result<(), String> {
     context_menu::select(&app, &webview, &key, &action)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserContextMenuAtRequest {
+    pub id: String,
+    /// Fractions of the page's width and height.
+    pub x: f64,
+    pub y: f64,
+}
+
+/// Replays a right-click that landed on the renderer while it covered a page.
+#[tauri::command]
+pub fn browser_webview_context_menu_at(
+    caller: Webview,
+    app: AppHandle,
+    request: BrowserContextMenuAtRequest,
+) -> Result<(), String> {
+    if caller.label().starts_with("misty-browser-")
+        || !request.x.is_finite()
+        || !request.y.is_finite()
+    {
+        return Err("Browser menu is unavailable".into());
+    }
+    with_webview(&app, &request.id, |webview| {
+        if webview.window().label() != caller.window().label() {
+            return Err("Browser menu is unavailable".into());
+        }
+        context_menu::right_click(&webview, request.x, request.y)
+    })
 }
 
 #[cfg(windows)]
@@ -78,10 +110,9 @@ use super::browser_macos::{
     unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
-    browser_pointer_navigation, browser_scrollbar_script, browser_status_script,
-    browser_status_update_script, browser_viewport_script, emit_browser_pointer,
-    set_status_bubble_enabled, BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
-    BROWSER_MEDIA_SCRIPT,
+    browser_scrollbar_script, browser_status_script, browser_status_update_script,
+    browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
+    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
@@ -121,15 +152,43 @@ pub(super) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
         .unwrap_or_else(|| "main".into())
 }
 
-#[derive(Default)]
+/// Where a tab's site permissions live: its profile's store, or the private
+/// session's. Private tabs share one throwaway session.
+pub(super) fn session_permission_scope(
+    app: &AppHandle,
+    id: &str,
+) -> Option<kiri::engine::StoreScope> {
+    let state = app.try_state::<BrowserSessionState>()?;
+    let sessions = state.sessions.lock().ok()?;
+    let session = sessions.get(id)?;
+    if session.private || browser_requires_ephemeral_store() {
+        return Some(kiri::engine::StoreScope::Temporary(0));
+    }
+    super::browser_site_permissions::profile_key(session.profile_id.as_deref())
+        .ok()
+        .map(kiri::engine::StoreScope::Persistent)
+}
+
 pub struct BrowserSessionState {
-    #[cfg(target_os = "macos")]
     context_menu: Mutex<HashMap<String, context_menu::PendingMenu>>,
     pending_popups: Mutex<HashSet<String>>,
     sessions: Mutex<HashMap<String, BrowserSession>>,
     reserved_downloads: Mutex<HashSet<PathBuf>>,
     pub(super) shortcut_bindings: Mutex<Vec<BrowserShortcutBinding>>,
     pub(super) shortcut_tokens: Mutex<HashMap<String, String>>,
+}
+
+impl Default for BrowserSessionState {
+    fn default() -> Self {
+        Self {
+            context_menu: Mutex::default(),
+            pending_popups: Mutex::default(),
+            sessions: Mutex::default(),
+            reserved_downloads: Mutex::default(),
+            shortcut_bindings: Mutex::new(super::browser_shortcuts::default_shortcut_bindings()),
+            shortcut_tokens: Mutex::default(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -247,6 +306,10 @@ pub struct BrowserWebviewBoundsRequest {
     pub height: f64,
     #[serde(default)]
     pub native_live_resize: bool,
+    /// Top-left, top-right, bottom-right and bottom-left radii where the page
+    /// meets a rounded workspace corner.
+    #[serde(default)]
+    pub corner_radii: Option<[f64; 4]>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,19 +370,6 @@ pub struct BrowserCompanionStateRequest {
     capture_attached: bool,
     #[serde(default)]
     suggestions: Vec<BrowserCompanionSuggestion>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct BrowserCompanionEvent {
-    id: String,
-    kind: String,
-    prompt: String,
-    action_id: String,
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -580,6 +630,43 @@ fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String>
     refresh_browser_cursor_ownership(webview)
 }
 
+/// The page sits above the app renderer, so CSS cannot clip it. Mask its
+/// layer to match the workspace corners it reaches.
+#[cfg(target_os = "macos")]
+fn round_macos_webview_corners(webview: &Webview, radii: [f64; 4]) -> Result<(), String> {
+    use objc2::runtime::AnyObject;
+    webview
+        .with_webview(move |platform_webview| unsafe {
+            let view: &AnyObject = &*platform_webview.inner().cast();
+            let _: () = objc2::msg_send![view, setWantsLayer: true];
+            let layer: *mut AnyObject = objc2::msg_send![view, layer];
+            let Some(layer) = layer.as_ref() else {
+                return;
+            };
+            // CACornerMask names corners by layer coordinates; minimum Y is the
+            // top edge only when the layer's contents are flipped.
+            let flipped: bool = objc2::msg_send![layer, contentsAreFlipped];
+            let (top, bottom) = if flipped { (0usize, 2usize) } else { (2, 0) };
+            let [top_left, top_right, bottom_right, bottom_left] = radii;
+            let mut mask = 0usize;
+            for (radius, bit) in [
+                (top_left, 1usize << top),
+                (top_right, 2usize << top),
+                (bottom_right, 2usize << bottom),
+                (bottom_left, 1usize << bottom),
+            ] {
+                if radius > 0.0 {
+                    mask |= bit;
+                }
+            }
+            let radius = radii.into_iter().fold(0.0_f64, f64::max);
+            let _: () = objc2::msg_send![layer, setCornerRadius: radius];
+            let _: () = objc2::msg_send![layer, setMaskedCorners: mask];
+            let _: () = objc2::msg_send![layer, setMasksToBounds: mask != 0];
+        })
+        .map_err(|error| error.to_string())
+}
+
 #[cfg(windows)]
 fn position_windows_webview(
     webview: &Webview,
@@ -711,9 +798,12 @@ fn webview_label(id: &str) -> Result<String, String> {
         .ok_or_else(|| "Browser tab identifier is invalid.".to_owned())
 }
 
-fn browser_page_origin(url:&Url)->String {
-    if super::extensions::is_extension_url(url) { format!("webkit-extension://{}",url.host_str().unwrap_or_default()) }
-    else { url.origin().ascii_serialization() }
+fn browser_page_origin(url: &Url) -> String {
+    if super::extensions::is_extension_url(url) {
+        format!("webkit-extension://{}", url.host_str().unwrap_or_default())
+    } else {
+        url.origin().ascii_serialization()
+    }
 }
 
 fn external_url(raw: &str) -> Result<Url, String> {
@@ -726,7 +816,11 @@ fn external_url(raw: &str) -> Result<Url, String> {
     {
         return Ok(url);
     }
-    if url.scheme()=="webkit-extension" { return Err("This extension is not running. Enable it in Extensions on a supported Mac.".into()); }
+    if url.scheme() == "webkit-extension" {
+        return Err(
+            "This extension is not running. Enable it in Extensions on a supported Mac.".into(),
+        );
+    }
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
@@ -931,7 +1025,7 @@ pub async fn browser_webview_create(
         apply_shortcuts(&webview, &state)?;
         apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
         set_webview_bounds_if_changed(&app, &webview, position, size)?;
-        super::extensions::native::register(&webview,&request.id,request.private,&request.url);
+        super::extensions::native::register(&webview, &request.id, request.private, &request.url);
         return present_macos_webview(&webview);
     }
 
@@ -943,9 +1037,7 @@ pub async fn browser_webview_create(
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let navigation_app = app.clone();
-    let navigation_id = request.id.clone();
-    let replacing_extension_view=super::extensions::pending_navigation(&request.id).await;
+    let replacing_extension_view = super::extensions::pending_navigation(&request.id).await;
     let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
     let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session {
@@ -967,13 +1059,22 @@ pub async fn browser_webview_create(
     #[cfg(target_os = "macos")]
     let builder = {
         let pointer = super::extensions::native::configuration(
-            &app, profile_identifier, request.private || browser_requires_ephemeral_store(), request.url.clone(), !request.private && profile_lease.logical_profile_id.is_some(),
-        ).await?;
+            &app,
+            profile_identifier,
+            request.private || browser_requires_ephemeral_store(),
+            request.url.clone(),
+            !request.private && profile_lease.logical_profile_id.is_some(),
+        )
+        .await?;
         if let Some(pointer) = pointer {
-            let configuration = unsafe { objc2::rc::Retained::from_raw(pointer as *mut objc2_web_kit::WKWebViewConfiguration) }
-                .ok_or("Could not create extension-aware browser configuration.")?;
+            let configuration = unsafe {
+                objc2::rc::Retained::from_raw(pointer as *mut objc2_web_kit::WKWebViewConfiguration)
+            }
+            .ok_or("Could not create extension-aware browser configuration.")?;
             builder.with_webview_configuration(configuration)
-        } else { builder }
+        } else {
+            builder
+        }
     };
     // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
     // such as Google serve their legacy compatibility UI. Derive the desktop
@@ -984,6 +1085,7 @@ pub async fn browser_webview_create(
     } else {
         builder
     };
+    let initial_bindings = super::browser_shortcuts::current_shortcut_bindings(&state);
     let builder = builder
         .focused(false)
         .initialization_script(if preview_only {
@@ -995,42 +1097,17 @@ pub async fn browser_webview_create(
         .initialization_script(browser_viewport_script(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
+            &initial_bindings,
         ))
-        .initialization_script(browser_status_script())
-        .initialization_script(BROWSER_MEDIA_SCRIPT)
+        .initialization_script(browser_status_script(&shortcut_token))
+        .initialization_script(kiri::page_script())
         .on_navigation(move |url| {
             if restoring_tab_session && url.as_str() == "about:blank" { return true; }
-            #[cfg(target_os = "macos")]
-            if context_menu::forward(&navigation_app, &navigation_id, url) { return false; }
-            if url.scheme() == "misty-media" {
-                let audible = url.query_pairs().any(|(key, value)| key == "audible" && value == "1");
-                let _ = navigation_app.emit_to(
-                    browser_owner_label(&navigation_app, &navigation_id),
-                    "misty://browser-media",
-                    json!({ "id": navigation_id, "audible": audible }),
-                );
-                false
-            } else if url.scheme() == "misty-status" {
-                let _ = navigation_app.emit_to(
-                    browser_owner_label(&navigation_app, &navigation_id),
-                    "misty://browser-stopped",
-                    BrowserFocusEvent { id: navigation_id.clone() },
-                );
-                false
-            } else if let Some(pointer) = browser_pointer_navigation(url) {
-                emit_browser_pointer(&navigation_app, &navigation_id, pointer);
-                false
-            } else if forward_focus_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else if forward_companion_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else if forward_navigation(&navigation_app, &navigation_id, url) {
-                false
-            } else {
-                // This callback includes frames, redirects and POST submissions.
-                // Never turn these requests into URL-only Browser handoffs.
-                external_url(url.as_str()).is_ok()
-            }
+            // Misty's page scripts report over Kiri's host channel, never by
+            // navigating, so every non-web scheme is refused here. This
+            // callback includes frames, redirects and POST submissions.
+            // Never turn these requests into URL-only Browser handoffs.
+            external_url(url.as_str()).is_ok()
         })
         .on_new_window(move |url, features| {
             if preview_only { return NewWindowResponse::Deny; }
@@ -1071,7 +1148,7 @@ pub async fn browser_webview_create(
                     let _ = apply_shortcuts(&webview, &state);
                 }
                 #[cfg(target_os = "macos")]
-                focus_messages::forget_page_background(&page_id);
+                host_messages::forget_page_background(&page_id);
             }
             let phase = match payload.event() {
                 tauri::webview::PageLoadEvent::Started => "started",
@@ -1087,7 +1164,11 @@ pub async fn browser_webview_create(
                 },
             );
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                if let Some(state) = page_app.try_state::<BrowserSessionState>() {
+                    let _ = apply_shortcuts(&webview, &state);
+                }
                 apply_page_zoom_policy(&webview, &page_app, &page_id);
+                super::browser_site_style::apply(&webview);
                 let _ = webview.eval("window.__MISTY_REPORT_BACKGROUND__?.()");
                 request_browser_favicon(&webview, &page_app, &page_id);
                 request_browser_compatibility(&webview, &page_app, &page_id);
@@ -1112,13 +1193,18 @@ pub async fn browser_webview_create(
     let webview = window
         .add_child(builder, position, size)
         .map_err(|error| error.to_string())?;
-    if !preview_only { super::extensions::native::register(&webview, &request.id, request.private, &request.url); }
-    #[cfg(target_os = "macos")]
-    focus_messages::install(&app, &webview, &request.id)?;
+    if !preview_only {
+        super::extensions::native::register(&webview, &request.id, request.private, &request.url);
+    }
+    host_messages::install(&webview)?;
     #[cfg(target_os = "macos")]
     attachment_download::install(&webview)?;
     #[cfg(any(target_os = "macos", windows))]
-    if let Some(values) = profile_lease.tab_session.as_ref().filter(|_|!replacing_extension_view) {
+    if let Some(values) = profile_lease
+        .tab_session
+        .as_ref()
+        .filter(|_| !replacing_extension_view)
+    {
         let url = external_url(&request.url)?;
         if let Err(error) = super::browser_session_storage::install(
             &webview,
@@ -1141,63 +1227,6 @@ pub async fn browser_webview_create(
     webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     present_macos_webview(&webview)
-}
-
-fn forward_focus_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
-    if url.scheme() != "misty-focus" {
-        return false;
-    }
-    let token = url
-        .query_pairs()
-        .find_map(|(key, value)| (key == "token").then(|| value.into_owned()))
-        .unwrap_or_default();
-    let trusted = app
-        .try_state::<BrowserSessionState>()
-        .map(|state| shortcut_token_matches(&state, id, &token))
-        .unwrap_or(false);
-    if trusted {
-        let _ = app.emit_to(
-            browser_owner_label(app, id),
-            "misty://browser-focus",
-            BrowserFocusEvent { id: id.to_owned() },
-        );
-    }
-    true
-}
-
-fn forward_companion_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
-    if url.scheme() != "misty-companion" {
-        return false;
-    }
-    let values = url.query_pairs().collect::<HashMap<_, _>>();
-    let value = |key: &str| values.get(key).map(|value| value.as_ref()).unwrap_or("");
-    let trusted = app
-        .try_state::<BrowserSessionState>()
-        .map(|state| shortcut_token_matches(&state, id, value("token")))
-        .unwrap_or(false);
-    if !trusted {
-        return true;
-    }
-    let number = |key: &str| value(key).parse::<f64>().unwrap_or(0.0);
-    let kind = url.path().trim_start_matches('/').to_owned();
-    if !matches!(kind.as_str(), "submit" | "action" | "capture") {
-        return true;
-    }
-    let _ = app.emit_to(
-        browser_owner_label(app, id),
-        "misty://browser-companion",
-        BrowserCompanionEvent {
-            id: id.to_owned(),
-            kind,
-            prompt: value("prompt").chars().take(32 << 10).collect(),
-            action_id: value("action").chars().take(200).collect(),
-            x: number("x"),
-            y: number("y"),
-            width: number("width"),
-            height: number("height"),
-        },
-    );
-    true
 }
 
 fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {
@@ -1408,7 +1437,17 @@ pub fn browser_set_download_directory(directory: String) -> Result<(), String> {
     let chosen = if directory.trim().is_empty() {
         None
     } else if path.is_absolute() {
-        Some(path)
+        // The folder syncs with the account's settings, so it is checked here
+        // rather than trusted; anything else keeps the Downloads folder.
+        let home = dirs::home_dir().ok_or("Choose a folder for downloads.")?;
+        let safe = crate::platform::synced_paths::download_directory(&path, &home);
+        if safe.is_none() {
+            *user_download_directory()
+                .lock()
+                .map_err(|_| "Download settings are unavailable.".to_owned())? = None;
+            return Err("Choose a folder in your home folder or on an external drive.".to_owned());
+        }
+        safe
     } else {
         return Err("Choose a folder for downloads.".to_owned());
     };
@@ -1651,17 +1690,13 @@ pub async fn browser_webview_preview_document(
     let view = app
         .get_webview(&webview_label(&request.id)?)
         .ok_or("Browser page is unavailable.")?;
-    let source = include_str!("../../../src/features/workspace/pageSnapshot.js")
-        .replace("export function snapshotPage", "function snapshotPage");
-    let result = evaluate_browser_async_javascript(view.clone(), format!("{source}\nif (document.readyState !== 'complete') throw new Error('Page is still loading'); return JSON.stringify({{ url: location.href, document: snapshotPage(document.documentElement) }});")).await?;
-    let mut result: Value = serde_json::from_str(&result).map_err(|error| error.to_string())?;
     let size = view
         .size()
         .map_err(|e| e.to_string())?
         .to_logical::<f64>(view.window().scale_factor().map_err(|e| e.to_string())?);
     #[cfg(target_os = "macos")]
     let image = super::browser_macos::capture_webview_region_sized(
-        view,
+        view.clone(),
         0.0,
         0.0,
         size.width,
@@ -1670,13 +1705,31 @@ pub async fn browser_webview_preview_document(
     )
     .await;
     #[cfg(windows)]
-    let image = super::browser_capture_windows::capture(view).await;
+    let image = super::browser_capture_windows::capture(view.clone()).await;
     #[cfg(not(any(target_os = "macos", windows)))]
     let image: Result<Value, String> = Err("Native preview images are unavailable.".into());
+    let mut result = serde_json::json!({
+        "url": view.url().map_or_else(|_| "".into(), |u| u.to_string()),
+        "dataUrl": Value::Null,
+        "width": Value::Null,
+        "height": Value::Null,
+        "document": Value::Null,
+    });
     if let Ok(image) = image {
         result["dataUrl"] = image["dataUrl"].clone();
         result["width"] = image["width"].clone();
         result["height"] = image["height"].clone();
+    } else {
+        let source = include_str!("../../../src/features/workspace/pageSnapshot.js")
+            .replace("export function snapshotPage", "function snapshotPage");
+        if let Ok(html_result) = evaluate_browser_async_javascript(view, format!("{source}\nif (document.readyState !== 'complete') throw new Error('Page is still loading'); return JSON.stringify({{ url: location.href, document: snapshotPage(document.documentElement) }});")).await {
+            if let Ok(parsed) = serde_json::from_str::<Value>(&html_result) {
+                result["document"] = parsed["document"].clone();
+                if let Some(url) = parsed.get("url").and_then(Value::as_str) {
+                    result["url"] = url.into();
+                }
+            }
+        }
     }
     if result["document"].is_null() && result["dataUrl"].is_null() {
         return Err("Preview is unavailable.".into());
@@ -1754,12 +1807,14 @@ pub fn browser_webview_reconcile(
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
+    #[cfg(target_os = "macos")]
+    round_macos_webview_corners(&webview, request.corner_radii.unwrap_or_default())?;
     // Reconciliation owns geometry, visibility, and sibling order so a stale
     // frontend cache cannot leave the page detached from its Browser host.
     present_macos_webview(&webview)?;
     // A reloaded shell forgot the page's color; the page will not resend it.
     #[cfg(target_os = "macos")]
-    focus_messages::replay_page_background(&app, &request.id);
+    host_messages::replay_page_background(&app, &request.id);
     Ok(true)
 }
 
@@ -1861,14 +1916,12 @@ pub fn browser_webview_forward(
     })
 }
 
-fn apply_page_zoom_policy(webview: &Webview, app: &AppHandle, id: &str) {
-    let factor = app
-        .state::<BrowserSessionState>()
-        .sessions
-        .lock()
-        .ok()
-        .and_then(|sessions| sessions.get(id).and_then(|session| session.zoom_factor))
-        .unwrap_or(1.0);
+pub(crate) fn apply_page_zoom_policy(webview: &Webview, app: &AppHandle, id: &str) {
+    let state = app.state::<BrowserSessionState>();
+    let sessions = state.sessions.lock().ok();
+    let session = sessions.as_ref().and_then(|sessions| sessions.get(id));
+    let factor =
+        super::browser_site_zoom::page_factor(webview, session.map(|s| (s.private, s.zoom_factor)));
     let _ = webview.set_zoom(factor);
 }
 
@@ -1881,15 +1934,15 @@ pub fn browser_webview_set_zoom(app: AppHandle, request: BrowserZoomRequest) -> 
         webview
             .set_zoom(request.factor)
             .map_err(|error| error.to_string())?;
-        if let Some(session) = app
-            .state::<BrowserSessionState>()
-            .sessions
-            .lock()
-            .map_err(|_| "Browser state is unavailable.")?
-            .get_mut(&request.id)
-        {
+        let state = app.state::<BrowserSessionState>();
+        let Ok(mut sessions) = state.sessions.lock() else {
+            return Err("Browser state is unavailable.".into());
+        };
+        let private = sessions.get_mut(&request.id).is_some_and(|session| {
             session.zoom_factor = Some(request.factor);
-        }
+            session.private
+        });
+        super::browser_site_zoom::remember_unless_private(&webview, private, request.factor);
         Ok(())
     })
 }
@@ -1909,7 +1962,7 @@ pub fn browser_webview_show(
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    super::extensions::native::tab_event(&app,&request.id,"activate");
+    super::extensions::native::tab_event(&app, &request.id, "activate");
     with_webview(&app, &request.id, |webview| present_macos_webview(&webview))
 }
 
@@ -2166,8 +2219,7 @@ pub fn browser_webview_close(
     }
     #[cfg(target_os = "macos")]
     popups::forget_close_handler(&request.id);
-    #[cfg(target_os = "macos")]
-    focus_messages::forget(&request.id);
+    host_messages::forget(&request.id);
     if let Ok(mut pending) = state.pending_popups.lock() {
         pending.remove(&request.id);
     }
@@ -2180,11 +2232,31 @@ pub fn browser_webview_close(
     if private_session_ended {
         let _ = app.run_on_main_thread(wry::reset_private_data_store);
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = private_session_ended;
+    if private_session_ended {
+        super::browser_site_permissions::forget_private_session();
+    }
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
+    #[cfg(target_os = "macos")]
+    let _ = webview.with_webview(|platform_webview| unsafe {
+        let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();
+        if objc2::msg_send![view, respondsToSelector: objc2::sel!(_setPageMuted:)] {
+            let _: () = objc2::msg_send![view, _setPageMuted: 1usize];
+        }
+        if objc2::msg_send![view, respondsToSelector: objc2::sel!(pauseAllMediaPlaybackWithCompletionHandler:)] {
+            let _: () = objc2::msg_send![view, pauseAllMediaPlaybackWithCompletionHandler: std::ptr::null::<objc2::runtime::AnyObject>()];
+        }
+        if objc2::msg_send![view, respondsToSelector: objc2::sel!(stopLoading)] {
+            let _: () = objc2::msg_send![view, stopLoading];
+        }
+    });
+    let _ = webview.eval(
+        "try { window.stop(); document.querySelectorAll('audio, video').forEach(el => { el.pause(); el.muted = true; el.src = ''; el.load(); }); } catch (_) {}"
+    );
+    if let Ok(blank) = tauri::Url::parse("about:blank") {
+        let _ = webview.navigate(blank);
+    }
     #[cfg(any(target_os = "macos", windows))]
     super::browser_session_storage::clear(&webview);
     unregister_browser_cursor_ownership(&webview)?;
@@ -2192,8 +2264,45 @@ pub fn browser_webview_close(
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn misty_agent_page_ring(view: *mut std::ffi::c_void, active: bool);
+}
+
+/// An agent controls a page while its input is locked to the agent or any of
+/// its grants can act on it, not only read it.
+fn agent_controls_page(session: &BrowserSession) -> bool {
+    session.agent_input_locked || session.grants.values().any(grant_acts)
+}
+
+/// Grants that let an agent act on the page, not only read it.
+fn grant_acts(grant: &BrowserGrant) -> bool {
+    [
+        "browser.interact",
+        "browser.click",
+        "browser.type",
+        "browser.upload",
+        "browser.navigate",
+    ]
+    .iter()
+    .any(|capability| grant.capabilities.contains(*capability))
+}
+
+/// The control ring glows around a page while an agent controls it.
+fn sync_agent_ring(app: &AppHandle, id: &str, active: bool) {
+    #[cfg(target_os = "macos")]
+    if let Some(webview) = webview_label(id).ok().and_then(|label| app.get_webview(&label)) {
+        let _ = webview.with_webview(move |platform| unsafe {
+            misty_agent_page_ring(platform.inner().cast(), active);
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, id, active);
+}
+
 #[tauri::command]
 pub fn browser_agent_grant_register(
+    app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserAgentGrantRequest,
 ) -> Result<(), String> {
@@ -2232,11 +2341,15 @@ pub fn browser_agent_grant_register(
             expires_at,
         },
     );
+    let acting = agent_controls_page(session);
+    drop(sessions);
+    sync_agent_ring(&app, &request.id, acting);
     Ok(())
 }
 
 #[tauri::command]
 pub fn browser_agent_grant_revoke(
+    app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserAgentGrantRevokeRequest,
 ) -> Result<(), String> {
@@ -2244,13 +2357,18 @@ pub fn browser_agent_grant_revoke(
         .sessions
         .lock()
         .map_err(|_| "Browser state is unavailable.")?;
-    if let Some(session) = sessions.get_mut(&request.id) {
-        session.grants.remove(&request.grant_id);
-    }
+    let Some(session) = sessions.get_mut(&request.id) else {
+        return Ok(());
+    };
+    session.grants.remove(&request.grant_id);
+    let acting = agent_controls_page(session);
+    drop(sessions);
+    sync_agent_ring(&app, &request.id, acting);
     Ok(())
 }
 
 pub(super) fn revoke_execution_grant(
+    app: &AppHandle,
     state: &BrowserSessionState,
     scope: &str,
     grant: &str,
@@ -2259,11 +2377,17 @@ pub(super) fn revoke_execution_grant(
         .sessions
         .lock()
         .map_err(|_| "Browser state is unavailable.")?;
-    for session in sessions
-        .values_mut()
-        .filter(|session| session.scope_id == scope)
+    let mut rings = Vec::new();
+    for (id, session) in sessions
+        .iter_mut()
+        .filter(|(_, session)| session.scope_id == scope)
     {
         session.grants.remove(grant);
+        rings.push((id.clone(), agent_controls_page(session)));
+    }
+    drop(sessions);
+    for (id, acting) in rings {
+        sync_agent_ring(app, &id, acting);
     }
     Ok(())
 }
@@ -2348,10 +2472,17 @@ pub async fn browser_agent_execute(
     if request.operation.starts_with("browser.workspace.") {
         return super::workspace_autopilot::execute(&app, &request).await;
     }
-    if let Some(view)=app.get_webview(&webview_label(&id)?) {
-        super::extensions::authorize_agent_url(&view.url().map_err(|e|e.to_string())?).await?;
+    if let Some(view) = app.get_webview(&webview_label(&id)?) {
+        super::extensions::authorize_agent_url(&view.url().map_err(|e| e.to_string())?).await?;
     }
-    if let Some(url)=request.input.get("url").and_then(Value::as_str).and_then(|value|Url::parse(value).ok()) { super::extensions::authorize_agent_url(&url).await?; }
+    if let Some(url) = request
+        .input
+        .get("url")
+        .and_then(Value::as_str)
+        .and_then(|value| Url::parse(value).ok())
+    {
+        super::extensions::authorize_agent_url(&url).await?;
+    }
     if matches!(
         request.operation.as_str(),
         "browser.click"
@@ -2630,11 +2761,17 @@ async fn inspect_browser(
         include_str!("browser_inspection_snapshot.js"),
         include_str!("browser_semantic_snapshot.js")
     );
-    let extension_id=request.input.get("extensionId").and_then(Value::as_u64);
-    let raw = if let Some(extension)=extension_id {
-        super::extensions::agent_action("popup-evaluate",Some(extension),id,Some(script)).await?["result"].clone()
-    } else { eval_json(webview.clone(),script).await? };
-    let extension_actions=super::extensions::agent_action("actions",None,id,None).await.unwrap_or_else(|_|json!({"actions":[]}));
+    let extension_id = request.input.get("extensionId").and_then(Value::as_u64);
+    let raw = if let Some(extension) = extension_id {
+        super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
+            ["result"]
+            .clone()
+    } else {
+        eval_json(webview.clone(), script).await?
+    };
+    let extension_actions = super::extensions::agent_action("actions", None, id, None)
+        .await
+        .unwrap_or_else(|_| json!({"actions":[]}));
     if webview.url().map_err(|error| error.to_string())? != observed_url {
         return Err("browser_document_changed: inspect the current page again".into());
     }
@@ -2660,7 +2797,7 @@ async fn inspect_browser(
     {
         return Err("Browser inspection is not granted.".to_owned());
     }
-    session.snapshot_extension=extension_id;
+    session.snapshot_extension = extension_id;
     let interactive = replace_snapshot_targets(session, snapshot.interactive);
     Ok(json!({
         "documentId": document_id,
@@ -2827,18 +2964,32 @@ async fn interact_browser(
         .get("action")
         .ok_or_else(|| "A browser action is required.".to_owned())?;
     let kind = action.get("kind").and_then(Value::as_str).unwrap_or("");
-    if !matches!(kind, "fill" | "select" | "scroll" | "key" | "point" | "extension" | "native") {
+    if !matches!(
+        kind,
+        "fill" | "select" | "scroll" | "key" | "point" | "extension" | "native"
+    ) {
         return Err("Unsupported browser interaction.".to_owned());
     }
     let element_ref = action.get("elementRef").and_then(Value::as_str);
-    if element_ref.is_none() && kind != "scroll" && kind != "point" && kind != "extension" && kind != "native" {
+    if element_ref.is_none()
+        && kind != "scroll"
+        && kind != "point"
+        && kind != "extension"
+        && kind != "native"
+    {
         return Err("An inspected element reference is required.".to_owned());
     }
-    let extension_id=request.input.get("extensionId").and_then(Value::as_u64);
+    let extension_id = request.input.get("extensionId").and_then(Value::as_u64);
     if kind == "native" {
-        if extension_id.is_some() { return Err("Native input is only available for the granted website viewport.".into()); }
+        if extension_id.is_some() {
+            return Err("Native input is only available for the granted website viewport.".into());
+        }
         native_input::validate(&action["input"])?;
-        if request.input["documentId"].as_str().filter(|id| !id.is_empty()).is_none() {
+        if request.input["documentId"]
+            .as_str()
+            .filter(|id| !id.is_empty())
+            .is_none()
+        {
             return Err("Inspect the browser before native input.".into());
         }
     }
@@ -2851,7 +3002,9 @@ async fn interact_browser(
             .get_mut(id)
             .ok_or_else(|| "Browser tab is not running.".to_owned())?;
         validate_browser_grant(session, request)?;
-        if session.snapshot_extension!=extension_id { return Err("Inspect the requested page or extension popup again.".into()); }
+        if session.snapshot_extension != extension_id {
+            return Err("Inspect the requested page or extension popup again.".into());
+        }
         let target = match element_ref {
             Some(reference) => Some(
                 session
@@ -2873,22 +3026,34 @@ async fn interact_browser(
     let webview = app
         .get_webview(&webview_label(id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())?;
-    let origin = browser_page_origin(&webview.url().map_err(|error|error.to_string())?);
+    let origin = browser_page_origin(&webview.url().map_err(|error| error.to_string())?);
     let encoded_target = serde_json::to_string(&target).map_err(|error| error.to_string())?;
-    let validation_action=json!({"kind":"scroll","x":0,"y":0});
-    let encoded_action = serde_json::to_string(if kind=="extension" {&validation_action} else {action}).map_err(|error| error.to_string())?;
-    let encoded_origin = if extension_id.is_some() { "location.origin".to_owned() }
-        else { serde_json::to_string(&origin).map_err(|error| error.to_string())? };
+    let validation_action = json!({"kind":"scroll","x":0,"y":0});
+    let encoded_action = serde_json::to_string(if kind == "extension" {
+        &validation_action
+    } else {
+        action
+    })
+    .map_err(|error| error.to_string())?;
+    let encoded_origin = if extension_id.is_some() {
+        "location.origin".to_owned()
+    } else {
+        serde_json::to_string(&origin).map_err(|error| error.to_string())?
+    };
     let encoded_document = serde_json::to_string(&request.input.get("documentId"))
         .map_err(|error| error.to_string())?;
     let script = format!(
         "({})({encoded_target}, {encoded_action}, {encoded_origin}, {encoded_document})",
         include_str!("browser_inspection_interact.js")
     );
-    let result = if let Some(extension)=extension_id {
+    let result = if let Some(extension) = extension_id {
         // Evaluate inside the actual popup; it never receives renderer IPC.
-        super::extensions::agent_action("popup-evaluate",Some(extension),id,Some(script)).await?["result"].clone()
-    } else { eval_json(webview.clone(),script).await? };
+        super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
+            ["result"]
+            .clone()
+    } else {
+        eval_json(webview.clone(), script).await?
+    };
     if result.get("ok").and_then(Value::as_bool) != Some(true) {
         if result.get("errorCode").and_then(Value::as_str) == Some("browser_snapshot_stale") {
             return Err("browser_snapshot_stale: inspected content changed before dispatch".into());
@@ -2900,11 +3065,23 @@ async fn interact_browser(
             .to_owned());
     }
     if kind == "native" {
-        return native_input::dispatch(app, webview, request, &action["input"], &origin, &result, generation).await;
+        return native_input::dispatch(
+            app,
+            webview,
+            request,
+            &action["input"],
+            &origin,
+            &result,
+            generation,
+        )
+        .await;
     }
-    if kind=="extension" {
-        let extension=action.get("extensionId").and_then(Value::as_u64).ok_or("An extension action ID is required.")?;
-        super::extensions::agent_action("invoke",Some(extension),id,None).await?;
+    if kind == "extension" {
+        let extension = action
+            .get("extensionId")
+            .and_then(Value::as_u64)
+            .ok_or("An extension action ID is required.")?;
+        super::extensions::agent_action("invoke", Some(extension), id, None).await?;
     }
     let mut output = json!({"attempted": true});
     for field in ["textRetained", "websiteEditVerified", "scrolled"] {
@@ -2987,7 +3164,7 @@ pub fn browser_profile_persistence() -> bool {
 }
 
 #[path = "browser_profile_cleanup.rs"]
-mod profile_cleanup;
+pub(crate) mod profile_cleanup;
 #[tauri::command]
 pub async fn browser_profile_remove(app: AppHandle, profile_id: String) -> Result<(), String> {
     profile_cleanup::remove(app, profile_id).await
@@ -3037,14 +3214,17 @@ pub fn browser_agent_set_locked(
     if view.window().label() != caller.window().label() {
         return Err("browser_window_mismatch".into());
     }
-    if let Some(session) = state
-        .sessions
-        .lock()
-        .map_err(|_| "browser_state_unavailable")?
-        .get_mut(&request.id)
-    {
-        session.agent_input_locked = locked;
-    }
+    let controlled = {
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| "browser_state_unavailable")?;
+        sessions.get_mut(&request.id).map(|session| {
+            session.agent_input_locked = locked;
+            agent_controls_page(session)
+        })
+    };
+    sync_agent_ring(&app, &request.id, controlled.unwrap_or(locked));
     apply_agent_input_lock(&view, locked)
 }
 
@@ -3083,7 +3263,7 @@ async fn upload_browser(
     let webview = app
         .get_webview(&webview_label(id)?)
         .ok_or("browser_context_closed")?;
-    let origin = browser_page_origin(&webview.url().map_err(|e|e.to_string())?);
+    let origin = browser_page_origin(&webview.url().map_err(|e| e.to_string())?);
     // Reading a file must not extend a revoked task or execution grant.
     super::agent_workspace::authorize_scope(
         app,

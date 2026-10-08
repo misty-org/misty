@@ -25,7 +25,9 @@ export interface Execution {
   agentId: string;
   spaceId: string;
   mode: "agent" | "team";
-  state: "running" | "paused" | "finished";
+  /** waiting: the run is suspended until the user acts. It keeps its lease and
+   * screen, but input, the control ring and Misty's cursor go back to the user. */
+  state: "running" | "waiting" | "paused" | "finished";
   views: string[];
   autopilot?: boolean;
   desktopControl?: boolean;
@@ -56,6 +58,12 @@ export async function startLocalExecution(
     openWhenMissing?: boolean;
     /** The page a newly opened tab starts on. */
     url?: string;
+    /** What the agent said the tab is for, to find the user's matching tab. */
+    hint?: string;
+    /** Exactly this tab: a follow-up continues where the earlier run worked. */
+    tabId?: string;
+    /** new: always a fresh tab; current: the tab in front of the user. */
+    place?: "current" | "new";
     desktopControl?: boolean;
     method?: Execution["method"];
   },
@@ -74,26 +82,22 @@ export async function startLocalExecution(
   };
   assertAccount();
   let previous = useLocalExecution.getState().execution;
-  if (
-    previous?.state === "finished" &&
-    (previous.agentId !== agentId ||
-      previous.spaceId !== spaceId ||
-      previous.mode !== mode ||
-      previous.normalTabs !== options?.normalTabs ||
-      previous.desktopControl !== options?.desktopControl)
-  ) {
+  // A new request replaces whatever the waiting run asked the user for.
+  if (previous?.state === "waiting") {
+    await pauseLocalExecution(previous.taskId);
+    previous = useLocalExecution.getState().execution;
+  }
+  const sameScope = (run: Execution) =>
+    run.agentId === agentId &&
+    run.spaceId === spaceId &&
+    run.mode === mode &&
+    run.normalTabs === options?.normalTabs &&
+    run.desktopControl === options?.desktopControl;
+  if (previous?.state === "finished" && !sameScope(previous)) {
     await finishLocalExecution();
     previous = null;
   }
-  if (
-    previous &&
-    (previous.accountId !== accountId ||
-      previous.agentId !== agentId ||
-      previous.spaceId !== spaceId ||
-      previous.mode !== mode ||
-      previous.normalTabs !== options?.normalTabs ||
-      previous.desktopControl !== options?.desktopControl)
-  )
+  if (previous && (previous.accountId !== accountId || !sameScope(previous)))
     throw new Error("Stop the current task before changing its agent or conversation scope.");
   if (previous?.state === "running")
     throw new Error("Pause the active task before starting another request.");
@@ -175,7 +179,14 @@ export async function startLocalExecution(
     if (options?.normalTabs) {
       const normal = await (
         await import("./companion/normalTabs")
-      ).companionBrowserContext(assertCurrent, options.openWhenMissing, options.url);
+      ).companionBrowserContext(
+        assertCurrent,
+        options.openWhenMissing,
+        options.url,
+        options.hint,
+        options.tabId,
+        options.place,
+      );
       assertCurrent();
       execution.views = [];
       execution.context = normal.context;

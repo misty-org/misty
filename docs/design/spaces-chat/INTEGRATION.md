@@ -36,7 +36,7 @@ The design fixture is not evidence of live account delivery. The isolated migrat
 
 ## Shared composer and compact density follow-up
 
-`MessageComposer` now provides the frame, growing textarea, leading/trailing actions, reply/attachment context, footer, and overlay slots for `SpaceChatComposer`, `MistyComposer` (Agents and Global Misty), and `AgentExecutionSurface`. `GlobalMistyChrome` uses that same frame. Feature adapters retain draft, upload, permission, mention, recording, and submission behavior. The shared `MessageComposerSend` uses ArrowUp; running agents retain Stop. Agents-only composer CSS overrides were removed. See the [usage contract](../../../src/shared/ui/patterns/MessageComposer.md).
+`MessageComposer` now provides the frame, growing textarea, leading/trailing actions, reply/attachment context, footer, and overlay slots for `SpaceChatComposer`, `MistyComposer` (Agents and Global Misty), and `AgentControlIsland`. `GlobalMistyChrome` uses that same frame. Feature adapters retain draft, upload, permission, mention, recording, and submission behavior. The shared `MessageComposerSend` uses ArrowUp; running agents retain Stop. Agents-only composer CSS overrides were removed. See the [usage contract](../../../src/shared/ui/patterns/MessageComposer.md).
 
 The shared sidebar is 224px wide with 8px padding and a 14px heading. Space navigation and management labels use 13px text; section links are 32px tall with a 44px coarse-pointer minimum. Shared collection pages use 20px titles, 16px gaps, 16px/24px horizontal padding, 28px filter controls with 13px text, and 32px search fields.
 

@@ -48,7 +48,11 @@ export function ConnectedTabShape() {
               <stop offset="1" style={{ stopColor: "var(--workspace-tab-surface)" }} />
             </linearGradient>
           </defs>
-          <path d={`${outline} V ${size.height} H 0 Z`} fill={`url(#${gradientId})`} />
+          <path
+            d={`${outline} V ${size.height} H 0 Z`}
+            fill={`url(#${gradientId})`}
+            className="misty-workspace-tab-shape-fill"
+          />
           <path d={outline} className="misty-workspace-tab-shape-outline" />
         </>
       )}

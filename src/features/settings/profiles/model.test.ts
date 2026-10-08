@@ -64,7 +64,7 @@ describe("account settings", () => {
         version: 1,
         selectedProfileId: "work",
         profiles: { work: profile({ "browser.searchEngine": "bing" }) },
-        overrides: { work: { "files.hidden": true } },
+        overrides: { work: { "browser.searchSuggestions": true } },
         outbox: [
           {
             id: "old",
@@ -78,12 +78,27 @@ describe("account settings", () => {
     );
     expect(migrated.seed).toMatchObject({
       "browser.searchEngine": "bing",
-      "files.hidden": true,
+      "browser.searchSuggestions": true,
       "app.zoom": 1.25,
       "browser.homepage": "https://example.com",
     });
     expect(migrated).not.toHaveProperty("overrides");
     expect(migrated).not.toHaveProperty("selectedProfileId");
+  });
+  it("drops queued edits to retired settings so later saves are not blocked", () => {
+    const migrated = migrateProfileState(
+      {
+        version: 2,
+        profile: null,
+        seed: {},
+        outbox: [
+          { id: "retired", set: { "files.hidden": true }, unset: [] },
+          { id: "mixed", set: { "app.zoom": 1.25 }, unset: ["files.view"] },
+        ],
+      },
+      {},
+    );
+    expect(migrated.outbox).toEqual([{ id: "mixed", set: { "app.zoom": 1.25 }, unset: [] }]);
   });
   it("uses server values instead of another device's migration seed", () => {
     const old = initialProfileState({ appearance: { app_zoom: 2 } });
@@ -93,8 +108,11 @@ describe("account settings", () => {
   });
   it("keeps offline edits over incoming snapshots until acknowledged", () => {
     let state = editPreference(selected(), "app.zoom", 1.5, "edit");
-    state = reconcileProfile(state, profile({ "app.zoom": 1.25, "files.hidden": true }, 2));
-    expect(effectiveValues(state)).toEqual({ "app.zoom": 1.5, "files.hidden": true });
+    state = reconcileProfile(
+      state,
+      profile({ "app.zoom": 1.25, "browser.searchSuggestions": true }, 2),
+    );
+    expect(effectiveValues(state)).toEqual({ "app.zoom": 1.5, "browser.searchSuggestions": true });
     expect(state.outbox).toHaveLength(1);
   });
   it("resets a setting across devices through the outbox", () => {
@@ -113,11 +131,11 @@ describe("account settings", () => {
   });
   it("rejects invalid values and malformed JSON settings", () => {
     expect(() => editPreference(selected(), "browser.searchEngine", "invalid", "x")).toThrow();
-    expect(validPreference(definitionById.get("app.appearance.panel_opacity")!, 10)).toBe(false);
+    expect(validPreference(definitionById.get("app.zoom")!, 10)).toBe(false);
     expect(validPreference(definitionById.get("app.shortcuts.bindings")!, "[broken")).toBe(false);
   });
   it("round-trips offline edits without losing mutation IDs", () => {
-    const state = editPreference(selected(), "files.hidden", true, "stable-id");
+    const state = editPreference(selected(), "browser.searchSuggestions", true, "stable-id");
     expect(effectiveValues(JSON.parse(JSON.stringify(state)))).toEqual(effectiveValues(state));
     expect(JSON.parse(JSON.stringify(state)).outbox[0].id).toBe("stable-id");
   });

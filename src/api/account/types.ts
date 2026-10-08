@@ -14,7 +14,9 @@ export interface AccountMeResponse {
   email: string;
   avatar_version?: number;
   created_at: string;
-  tier: "basic" | "pro" | "max";
+  tier: "basic" | "pro" | "max" | "ultra" | "ultra_plus";
+  /** AI needs a confirmed email; older servers omit the field. */
+  email_verified?: boolean;
   status: "active" | "trialing" | "cancelled" | "expired";
   allows_use: boolean;
   expires_at: string | null;

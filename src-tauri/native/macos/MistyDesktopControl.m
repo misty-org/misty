@@ -3,6 +3,7 @@
 #import <Carbon/Carbon.h>
 #import "MistyDesktopCapture.h"
 #import "MistyAgentPointer.h"
+#import "MistyAgentRing.h"
 
 static NSString *task;
 static BOOL stopped, controlling;
@@ -44,10 +45,10 @@ static char *DesktopJSON(NSDictionary *value) {
 static void onMain(void (^work)(void)) {
   if (NSThread.isMainThread) work(); else dispatch_sync(dispatch_get_main_queue(), work);
 }
-static void stopControl(NSString *reason) {
-  BOOL announce = !stopped && reason.length;
-  stopped = YES; controlling = NO;
-  [askPanel decline:nil]; askPanel = nil;
+// Gives the desktop back without ending the task: no input tap, strip, cursor,
+// ring or capture. The next visual tool call enters control again.
+static void releaseControl(void) {
+  controlling = NO;
   if (inputTap) {
     CGEventTapEnable(inputTap, NO);
     CFMachPortInvalidate(inputTap);
@@ -57,10 +58,17 @@ static void stopControl(NSString *reason) {
     CFRunLoopRemoveSource(CFRunLoopGetMain(), inputSource, kCFRunLoopCommonModes);
     CFRelease(inputSource); inputSource = NULL;
   }
-  [watchdog invalidate]; watchdog = nil;
   [controlPanel orderOut:nil]; controlPanel = nil;
   misty_agent_pointer_hide();
+  misty_agent_ring_hide();
   MistyDesktopCaptureStop();
+}
+static void stopControl(NSString *reason) {
+  BOOL announce = !stopped && reason.length;
+  stopped = YES;
+  [askPanel decline:nil]; askPanel = nil;
+  releaseControl();
+  [watchdog invalidate]; watchdog = nil;
   if (announce && notifyStopped) {
     char *value = DesktopJSON(@{@"taskId": task ?: @"", @"reason": reason});
     notifyStopped(value); free(value);
@@ -132,6 +140,7 @@ static NSString *beginControl(CGDirectDisplayID displayID) {
   [panel.contentView addSubview:stop];
   controlPanel = panel;
   [panel orderFrontRegardless];
+  misty_agent_ring_show(display);
   return nil;
 }
 
@@ -202,6 +211,11 @@ static NSString *confirmControl(NSString *expected) {
 void misty_desktop_renew(const char *taskID) {
   NSString *expected = [NSString stringWithUTF8String:taskID];
   onMain(^{ if (!stopped && [task isEqualToString:expected]) leaseUntil = NSProcessInfo.processInfo.systemUptime + 30; });
+}
+// The task waits for the person: hand the desktop back but keep the task.
+void misty_desktop_yield(const char *taskID) {
+  NSString *expected = [NSString stringWithUTF8String:taskID];
+  onMain(^{ if (!stopped && [task isEqualToString:expected]) releaseControl(); });
 }
 void misty_desktop_stop(const char *taskID) {
   NSString *expected = [NSString stringWithUTF8String:taskID];
@@ -276,5 +290,19 @@ char *misty_desktop_action(const char *json) {
     NSString *kind = action[@"kind"];
     if ([kind isEqual:@"point"] || [kind isEqual:@"scroll"]) output[@"cursor"] = @{@"x": @(x), @"y": @(y)};
     return DesktopJSON(output);
+  }
+}
+
+// The controlled display's recent audio for the task that holds control.
+char *misty_desktop_audio(const char *taskID, double seconds) {
+  @autoreleasepool {
+    NSString *expected = [NSString stringWithUTF8String:taskID];
+    __block BOOL valid;
+    onMain(^{ valid = !stopped && controlling && [task isEqualToString:expected]; });
+    if (!valid) return DesktopJSON(@{@"error": @"Desktop control is not running for this task."});
+    NSData *wav = MistyDesktopRecentAudio(MIN(30, MAX(1, seconds)));
+    if (!wav) return DesktopJSON(@{@"error": @"No desktop audio has been captured yet."});
+    return DesktopJSON(@{@"dataUrl": [@"data:audio/wav;base64," stringByAppendingString:[wav base64EncodedStringWithOptions:0]],
+      @"seconds": @((wav.length - 44) / 2 / 16000.0), @"sampleRate": @16000});
   }
 }

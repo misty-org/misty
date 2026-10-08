@@ -1,10 +1,7 @@
 export const routes = {
   root: "/",
   agents: "/agents",
-  activity: "/activity",
   browser: "/browser",
-  files: "/files",
-  home: "/home",
   invite: "/invite",
   newTab: "/new",
   spaces: "/spaces",

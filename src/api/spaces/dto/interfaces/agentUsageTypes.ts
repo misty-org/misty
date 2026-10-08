@@ -20,8 +20,20 @@ export interface AgentUsage {
   plan?: string;
 }
 
+/** One AI limit: the 5-hour window, the week, or any rolling month. */
+export interface AiLimit {
+  used: number;
+  limit: number;
+  remaining: number;
+  percentage_used: number;
+  /** When it refills; absent for a 5-hour window that has not started. */
+  resets_at?: string | null;
+}
+
 /** Weekly account weighted-token meter. Legacy servers may omit the accounting unit. */
 export interface AiQuotaUsage {
+  /** The three limits work must fit; older servers send only the weekly meter. */
+  limits?: { window?: AiLimit; weekly?: AiLimit; monthly?: AiLimit };
   percentage_used?: number;
   default_command_limit?: number;
   background_command_limit?: number;

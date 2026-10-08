@@ -1,10 +1,10 @@
 import type { ComponentProps, ComponentType, RefObject } from "react";
-import type { SystemErrorActivity } from "@/features/activity";
+import type { SystemErrorNotice } from "@/features/support/systemErrors";
 import type {
   GlobalPreviewSource,
   PreviewResource,
 } from "../../model/interfaces/components/GlobalPreview";
-export type PreviewErrorComponent = ComponentType<ComponentProps<typeof SystemErrorActivity>>;
+export type PreviewErrorComponent = ComponentType<ComponentProps<typeof SystemErrorNotice>>;
 export interface PreviewRuntime {
   Error: PreviewErrorComponent;
   load(source: GlobalPreviewSource, signal: AbortSignal): Promise<PreviewResource>;

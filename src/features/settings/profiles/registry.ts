@@ -29,11 +29,19 @@ export type SettingSearchEntry = Pick<
 // Controls with their own server APIs are searchable alongside preferences.
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Retain stored preset data for compatibility, but no longer offer that control.
+  // Tab orders are edited in place; hidden destinations are searched as "Show in navigation".
   ...settingDefinitions.filter(
     (definition) =>
-      definition.id !== "app.layout.presets" && !definition.id.startsWith("collections.tabs."),
+      definition.id !== "app.navigation.hidden" && !definition.id.startsWith("collections.tabs."),
   ),
+  {
+    id: "app.navigation.show",
+    label: "Show in navigation",
+    page: "layout",
+    owner: "account",
+    platforms: ["desktop"],
+    keywords: ["rail", "sidebar", "hide", "Browser", "Agents", "Extensions", "Spaces"],
+  },
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -85,18 +93,21 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
     (value.length > (d.maxLength ?? 4096) || (d.enum && !d.enum.includes(value)))
   )
     return false;
+  if (d.id === "app.appearance.accent" && !/^(#[0-9a-f]{6})?$/.test(String(value))) return false;
+  if (
+    (d.id === "app.appearance.theme_light_start" || d.id === "app.appearance.theme_dark_start") &&
+    !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))
+  )
+    return false;
   if (d.format === "json") {
     try {
       const parsed: unknown = JSON.parse(String(value));
-      if (d.id === "files.openWith")
-        return Boolean(
-          parsed &&
-          typeof parsed === "object" &&
-          !Array.isArray(parsed) &&
-          Object.values(parsed).every((path) => typeof path === "string" && path.length <= 4096),
-        );
       if (!Array.isArray(parsed)) return false;
-      if (d.id.startsWith("collections.tabs."))
+      if (
+        d.id.startsWith("collections.tabs.") ||
+        d.id === "app.navigation.hidden" ||
+        d.id === "browser.toolbarHidden"
+      )
         return (
           parsed.length <= 40 &&
           new Set(parsed).size === parsed.length &&
@@ -111,6 +122,36 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
               (slot) => slot === undefined || slot === null || typeof slot === "string",
             ),
         );
+      if (d.id === "browser.siteStyles")
+        return parsed.every(
+          (entry) =>
+            entry &&
+            typeof entry.host === "string" &&
+            entry.host.length > 0 &&
+            entry.host.length <= 253 &&
+            typeof entry.css === "string" &&
+            entry.css.length <= 32768 &&
+            typeof entry.dark === "boolean",
+        );
+      if (d.id === "browser.contentBlockingAllowedSites")
+        return parsed.every(
+          (entry) =>
+            entry &&
+            typeof entry.host === "string" &&
+            entry.host.length > 0 &&
+            entry.host.length <= 253,
+        );
+      if (d.id === "browser.siteZoom")
+        return parsed.every(
+          (entry) =>
+            entry &&
+            typeof entry.host === "string" &&
+            entry.host.length > 0 &&
+            entry.host.length <= 253 &&
+            typeof entry.factor === "number" &&
+            entry.factor >= 0.25 &&
+            entry.factor <= 5,
+        );
       if (d.id === "app.layout.presets")
         return parsed.every(
           (entry) =>
@@ -118,8 +159,7 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
             typeof entry.id === "string" &&
             typeof entry.name === "string" &&
             ["left", "right", "top", "bottom"].includes(entry.navigation) &&
-            ["left", "right", "top", "bottom"].includes(entry.tabs) &&
-            entry.navigation !== entry.tabs,
+            ["left", "right", "top", "bottom"].includes(entry.tabs),
         );
     } catch {
       return false;
@@ -136,11 +176,6 @@ export function portableValues(document: Record<string, unknown>): PreferenceVal
   for (const d of settingDefinitions) {
     const section = document[d.section] as Record<string, unknown> | undefined;
     if (section?.[d.key] !== undefined) values[d.id] = fromLegacy(d, section[d.key]);
-  }
-  if (document.open_with && typeof document.open_with === "object") {
-    const associations = JSON.stringify(document.open_with);
-    if (validPreference(definitionById.get("files.openWith")!, associations))
-      values["files.openWith"] = associations;
   }
   return values;
 }
@@ -174,9 +209,5 @@ export function projectPreferences(document: Record<string, unknown>, values: Pr
       .get(d.id)!
       .write(result, validPreference(d, values[d.id]) ? values[d.id] : d.default);
   }
-  const associations = values["files.openWith"];
-  result.open_with = validPreference(definitionById.get("files.openWith")!, associations)
-    ? JSON.parse(String(associations))
-    : {};
   return result;
 }

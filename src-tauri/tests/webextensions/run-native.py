@@ -103,7 +103,7 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
         # compat::apply writes them; the runner installs the real assets.
         fixture = root / "compat"
         shutil.copytree(HERE / "fixtures/compat", fixture)
-        shutil.copytree(TAURI / "src/infra/extensions/compat", fixture / "__misty_compat__")
+        shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
         run(compat, fixture, page)
         if NOTIFICATIONS:
             output = root / "notification-probe.log"

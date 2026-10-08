@@ -51,7 +51,9 @@ export function WorkspacePaneControls({
     if (!paneElement) return;
     const update = () => {
       const rect = paneElement.getBoundingClientRect();
-      const top = Math.max(4, rect.top - 14);
+      // The tray straddles the pane's top edge, except under another pane: that pane's
+      // native page would draw over it, so the tray stays inside this pane instead.
+      const top = paneDirectlyAbove(paneElement, rect) ? rect.top + 4 : Math.max(4, rect.top - 14);
       const right = Math.max(4, window.innerWidth - rect.right + 4);
       // Runs for every scroll anywhere in the window; skip the render when nothing moved.
       setBounds((previous) =>
@@ -173,5 +175,21 @@ export function WorkspacePaneControls({
         </div>
       </Portal>
     </>
+  );
+}
+
+/** Another pane ends just above this one's top-right corner, where the tray sits. */
+function paneDirectlyAbove(pane: HTMLElement, rect: DOMRect): boolean {
+  return Array.from(document.querySelectorAll<HTMLElement>("[data-workspace-pane]")).some(
+    (other) => {
+      if (other === pane) return false;
+      const above = other.getBoundingClientRect();
+      return (
+        above.bottom <= rect.top + 1 &&
+        rect.top - above.bottom < 24 &&
+        above.left < rect.right - 4 &&
+        above.right > rect.right - 112
+      );
+    },
   );
 }

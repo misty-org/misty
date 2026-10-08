@@ -13,7 +13,6 @@ export function AdvancedSection(props: SettingsContentProps) {
         <SettingsRow
           label="Frame pacing overlay"
           description="Show the live idle, light, and heavy pacing state in the top-right corner."
-          last
         >
           <SwitchControl
             checked={booleanSetting(
@@ -44,7 +43,6 @@ export function AdvancedSection(props: SettingsContentProps) {
         <SettingsRow
           label="Data path"
           description="Where Misty stores local app data on this device."
-          last
         >
           {props.app?.environment.mistyDir ? (
             <CopyableValueText value={props.app.environment.mistyDir} />

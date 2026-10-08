@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { agentInterventionsApi, type AgentInterventionWait } from "./api";
-import { agentInterventionActivities, useAgentInterventions } from "./store";
+import { useAgentInterventions } from "./store";
 import type * as ApiModule from "./api";
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof ApiModule>()),
@@ -80,17 +80,4 @@ it("does not let a stale account submit a decision or publish its late confirmat
   expect(await pending).toBe(false);
   expect(useAgentInterventions.getState().items).toEqual([]);
   expect(agentInterventionsApi.decide).toHaveBeenCalledTimes(1);
-});
-it("removes expired attention and keeps browser content out of notification text", () => {
-  const item = { ...wait(), observedAt: "2026-09-07T00:00:00Z" };
-  const activities = agentInterventionActivities("owner", [
-    item,
-    { ...item, id: crypto.randomUUID(), expiresAt: "2000-01-01T00:00:00Z" },
-  ]);
-  expect(activities).toHaveLength(1);
-  expect(activities[0].body).not.toContain(item.reason);
-  expect(activities[0].target).toEqual({
-    kind: "route",
-    href: `/activity?intervention=${item.id}`,
-  });
 });

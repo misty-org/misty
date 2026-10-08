@@ -17,6 +17,7 @@ import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./wor
 import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
 import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
 import type { WorkspaceScopeKey, WorkspaceWindow } from "./model";
+import type { BrowserProfile } from "./browserProfiles";
 
 export function migrateWorkspaceStore(persisted: unknown, version: number): WorkspaceStore {
   // Every load path (storage, native recovery, account switch) comes through here.
@@ -81,6 +82,7 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     ...initialBookmarkNavigation(),
     ...initialTabGroups(),
     ...sanitizeRetiredWorkspaceSurfaces(migrated),
+    browserProfiles: validBrowserProfiles(migrated.browserProfiles),
     ...migrateSavedLinkGroups({
       ...migrated,
       bookmarkFolders: userBookmarkFolders(
@@ -91,6 +93,23 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     }),
     bookmarkFolders: userBookmarkFolders(migrated.bookmarkFolders ?? [], migrated.bookmarks ?? []),
   } as WorkspaceStore;
+}
+
+/** Stored profiles are kept only when complete; a broken entry is dropped, not repaired. */
+function validBrowserProfiles(value: unknown): BrowserProfile[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (profile): profile is BrowserProfile =>
+      Boolean(profile) &&
+      typeof profile.id === "string" &&
+      typeof profile.name === "string" &&
+      typeof profile.dataId === "string" &&
+      /^[a-f0-9]{64}$/.test(profile.dataId) &&
+      typeof profile.createdAt === "number" &&
+      (profile.sites === undefined ||
+        (Array.isArray(profile.sites) &&
+          profile.sites.every((site: unknown) => typeof site === "string"))),
+  );
 }
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
@@ -185,6 +204,7 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
       savedTabs: g.savedTabs ? savableGroupTabs(g.savedTabs) : undefined,
     })),
     migratedTabGroupIds: state.migratedTabGroupIds,
+    browserProfiles: state.browserProfiles,
     bookmarkFolders: state.bookmarkFolders,
     bookmarks: state.bookmarks,
     expandedBookmarkFolders: state.expandedBookmarkFolders,

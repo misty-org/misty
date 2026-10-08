@@ -19,9 +19,9 @@ if (window === window.top) {
     }
     const channels = context.getImageData(0, 0, 1, 1).data;
     const background = '#' + Array.from(channels.slice(0, 3), v => v.toString(16).padStart(2, '0')).join('');
-    const channel = window.webkit?.messageHandlers?.mistyFocus;
-    if (background === lastBackground || !channel) return;
-    channel.postMessage(JSON.stringify({ token: shortcutToken, background }));
+    if (background === lastBackground) return;
+    // Built by concatenation: a page-defined toJSON must never see the token.
+    if (!sendToHost('{"token":"' + shortcutToken + '","background":"' + background + '"}')) return;
     lastBackground = background;
   };
   const scheduleBackground = () => {
@@ -31,8 +31,18 @@ if (window === window.top) {
   window.__MISTY_REPORT_BACKGROUND__ = scheduleBackground;
   new MutationObserver(scheduleBackground).observe(document, {
     subtree: true, childList: true, attributes: true,
-    attributeFilter: ['class', 'style', 'hidden', 'data-theme', 'data-color-mode'],
+    attributeFilter: ['class', 'hidden', 'data-theme', 'data-color-mode'],
   });
+  if (document.documentElement) {
+    new MutationObserver(scheduleBackground).observe(document.documentElement, {
+      attributes: true, attributeFilter: ['style'],
+    });
+  }
+  if (document.body) {
+    new MutationObserver(scheduleBackground).observe(document.body, {
+      attributes: true, attributeFilter: ['style'],
+    });
+  }
   addEventListener('DOMContentLoaded', scheduleBackground);
   addEventListener('load', scheduleBackground);
   addEventListener('scroll', scheduleBackground, { passive: true });

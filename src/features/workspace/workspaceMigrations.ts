@@ -9,9 +9,7 @@ import {
 } from "./model";
 /** Saved views synced from records without a route; restore them at their tool's root. */
 const missingRouteFallback: Partial<Record<string, string>> = {
-  home: "/home",
   space: "/spaces",
-  files: "/files",
   agents: "/agents",
   scheduled: "/scheduled",
   extensions: "/extensions",
@@ -83,32 +81,10 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
       route: `/agents?${params}`,
     };
   }
-  if (tab.surfaceId === "home" && tab.route === "/home") return tab;
   if (tab.surfaceId === "extensions" && /^\/extensions(?:\/|$)/.test(route.pathname)) return tab;
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
-  const retiredTransfers =
-    (tab.surfaceId as string) === "transfers" || (tab.groupKey as string) === "tool:transfers";
-  if (tab.surfaceId === "files" || tab.groupKey === "app:files" || retiredTransfers) {
-    const url = new URL(tab.route, "https://misty.local");
-    const transfers = retiredTransfers || url.searchParams.get("view") === "transfers";
-    if (transfers) url.searchParams.set("view", "transfers");
-    const search = url.search;
-    return {
-      ...tab,
-      surfaceId: "files",
-      title: transfers ? "Transfers" : tab.title,
-      state: transfers
-        ? {
-            ...(tab.state && typeof tab.state === "object" ? tab.state : {}),
-            version: 1,
-            path: "misty-transfers://history",
-          }
-        : tab.state,
-      groupKey: "tool:files",
-      route: `/files${search}`,
-      placeholder: tab.placeholder,
-    };
-  }
+  // Files and Transfers moved to Kura, a separate app; their saved views
+  // become new browser tabs below.
   const agents = tab.surfaceId === "agents" || tab.groupKey === "app:agents";
   if (agents) {
     // Legacy Scheduled routes keep their section inside Agents.

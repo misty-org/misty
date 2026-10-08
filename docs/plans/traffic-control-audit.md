@@ -133,7 +133,8 @@ Status of each audit group on `codex/traffic-control`. Details follow in the per
 | T17 | Done: coalesced realtime reloads and topic-routed activity sources. The Space inbox had no reader since Activity replaced it, so it is removed end to end (see "Space inbox removal") |
 | T18 | Done: the desktop main window follows the sync socket's account events while it is connected and falls back to the event stream otherwise; needs on-device verification |
 | T19 | Done: HTTP, invocation stream, Space socket, Connected Devices and native control advertisement back off with jitter; the account event stream and Space socket also wait out the HTTP client's outage cooldown |
-| T20, T21 | Done |
+| T20 | Done |
+| T21 | Retired with the Home page (2026-10-07) |
 | T22 | Instrumented: the op builder already suppresses unchanged records and empty ops; counters now show which layer churns |
 | T23, T24, T36 | Done where an event source exists (sync heartbeat, device views, agent worker window, navigation names); the rest are local-only timers with no event source, listed with reasons in the timer inventory |
 | T25 | Done: local–local pairs compare on FSEvents notifications plus a 10-minute safety pass; remote pairs keep 5 s with failure backoff; peer rescans adapt |
@@ -284,6 +285,8 @@ Validation: the server changes build and the full Go suite passes; the triggers 
 
 
 ## Implementation progress — Home agenda
+
+The Home page, this endpoint and Home visit tracking were removed on 2026-10-07; the record below is historical.
 
 T21: `GET /me/home/agenda` merges today's earliest open entries across the account's active Spaces in one request and one transaction. It applies each Space's task permission and audience rules, skips Spaces without permission, reads at most 200 Spaces and returns at most 50 entries. Home uses it and falls back to per-Space agendas on servers without it (404). The effect now depends on Space IDs, not array identity. Home visits are recorded once per day across the app's windows (shared local storage) instead of once per window. A full-schema contract covers merge order, the limit, closed-entry filtering and isolation from other accounts' Spaces. `TestRouteInventory` already fails on the base commit and still needs its golden regenerated together with the new route.
 

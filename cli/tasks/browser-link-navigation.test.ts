@@ -42,31 +42,46 @@ test('explicit new-tab gestures still work', () => {
   }
 });
 
+// Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).
+const sender = readFileSync(new URL('../../kiri/src/channel/macos.rs', import.meta.url), 'utf8')
+  .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
+
+// The script as WebKit renders it: host messages use Kiri's captured native channel.
+function rendered(tracking) {
+  return source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
+    .replace('__KIRI_HOST_SENDER_PLACEHOLDER__', sender)
+    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
+    .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
+    .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
+    .replace('__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__', '[]')
+    .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', String(tracking));
+}
+
 test('pointer focus reports over native messaging without navigating the page', () => {
-  const start = source.indexOf("  document.addEventListener('pointerdown'");
-  const end = source.indexOf('\n\n  const reportPointer', start);
-  let pointer;
+  const listeners = {};
   const messages = [];
-  const window = { webkit: { messageHandlers: { mistyFocus: { postMessage: token => messages.push(token) } } } };
+  const window = {
+    webkit: { messageHandlers: { kiriHost: { postMessage: token => messages.push(token) } } },
+    addEventListener() {},
+  };
   Object.defineProperty(window, 'location', { get() { throw new Error('Focus must not touch page navigation'); } });
-  runInNewContext(source.slice(start, end), { shortcutToken: 'test-token', window, document: { addEventListener: (_, fn) => { pointer = fn; } } });
-  pointer({ isTrusted: true });
-  pointer({ isTrusted: false });
+  runInNewContext(rendered(false), {
+    window, Map, URL,
+    document: { addEventListener: (type, fn) => { listeners[type] = fn; } },
+  });
+  listeners.pointerdown({ isTrusted: true });
+  listeners.pointerdown({ isTrusted: false });
   assert.deepEqual(messages, ['test-token']);
 });
 
 test('companion pointer tracking reports over native messaging without interrupting navigation', () => {
-  const script = source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
-    .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
-    .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
-    .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
-    .replace('__MISTY_POINTER_TRACKING_PLACEHOLDER__', 'true');
+  const script = rendered(true);
   const listeners = {};
   const frames = [];
   const messages = [];
   const window = {
     innerWidth: 800, innerHeight: 600,
-    webkit: { messageHandlers: { mistyFocus: { postMessage: body => messages.push(JSON.parse(body)) } } },
+    webkit: { messageHandlers: { kiriHost: { postMessage: body => messages.push(JSON.parse(body)) } } },
     addEventListener: (type, fn) => { listeners[type] = fn; },
   };
   Object.defineProperty(window, 'location', { get() { throw new Error('Pointer tracking must not navigate'); } });

@@ -1,5 +1,5 @@
 import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { routes } from "@/features/app-shell";
 import { useNativeSessionStore } from "@/features/native-session";
 import {
@@ -57,11 +57,9 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
       }
       setSwitchError("The account could not be switched. Try selecting it again.");
       reportSystemError({
-        accountId: account?.id,
         scope: "account:switch",
         title: "Account could not be switched",
         error,
-        target: { kind: "route", href: currentPath },
       });
     } finally {
       setSwitchingAccountId("");
@@ -72,7 +70,6 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
     props.onClose();
     void logout().catch((error: unknown) =>
       reportSystemError({
-        accountId: account?.id,
         scope: "account:sign-out",
         title: "Could not sign out",
         error,

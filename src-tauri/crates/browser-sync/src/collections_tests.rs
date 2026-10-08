@@ -57,6 +57,7 @@ fn pending_writes_show_immediately_and_settle_on_the_servers_answer() {
     // k1 lost to another device's edit at version 2: retried on it.
     c.answered(
         "k1",
+        &Some(bookmark("b1", "Renamed")),
         false,
         2,
         Some(Confirmed {
@@ -66,7 +67,7 @@ fn pending_writes_show_immediately_and_settle_on_the_servers_answer() {
     );
     assert_eq!(c.outgoing()[0].base_version, 2);
     // k2 applied.
-    c.answered("k2", true, 1, None);
+    c.answered("k2", &Some(bookmark("b2", "New")), true, 1, None);
     assert!(c.pending.get("k2").is_none());
     assert_eq!(c.confirmed["k2"].version, 1);
 }
@@ -143,4 +144,83 @@ fn extension_removal_is_separate_from_stale_key_edits_and_new_installs() {
     collection.write("new-key".into(),Some(record(Kind::ExtensionSyncKey,"new","01951d32-40ac-7000-8000-000000000002",Some(json!({"value":"new install"})))));
     assert!(collection.view().iter().any(|v|v.kind==Kind::ExtensionRemoval && v.fields["generation"]==generation));
     assert!(collection.view().iter().any(|v|v.fields["generation"]=="01951d32-40ac-7000-8000-000000000002"));
+}
+
+#[test]
+fn deleting_a_record_the_server_never_had_sends_nothing() {
+    let mut c = Collection::default();
+    c.pulled("k1".into(), 1, Some(bookmark("b1", "Docs")));
+    assert!(c.queue("k2".into(), Some(bookmark("b2", "New")), true));
+    assert!(!c.queue("k2".into(), None, true));
+    assert!(c.outgoing().is_empty());
+    // A push may still land the create: the delete stays queued.
+    assert!(c.queue("k3".into(), Some(bookmark("b3", "New")), true));
+    assert!(c.queue("k3".into(), None, false));
+    assert_eq!(c.outgoing().len(), 1);
+    // A record on the server always needs its delete.
+    assert!(c.queue("k1".into(), None, true));
+    assert_eq!(c.outgoing().len(), 2);
+}
+
+#[test]
+fn an_edit_made_while_a_push_is_in_flight_goes_next() {
+    let mut c = Collection::default();
+    c.pulled("k1".into(), 1, Some(bookmark("b1", "Docs")));
+    c.write("k1".into(), Some(bookmark("b1", "First")));
+    let sent = c.outgoing().remove(0);
+    assert_eq!(sent.base_version, 1);
+    // Edited again before the push is answered.
+    c.write("k1".into(), Some(bookmark("b1", "Second")));
+    c.answered("k1", &sent.record, true, 2, None);
+    // The server holds the first edit; the second still goes, on version 2.
+    assert!(c.confirmed["k1"].record == Some(bookmark("b1", "First")));
+    assert_eq!(c.confirmed["k1"].version, 2);
+    let out = c.outgoing();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].base_version, 2);
+    assert!(out[0].record == Some(bookmark("b1", "Second")));
+    assert_eq!(c.view()[0].fields["title"], json!("Second"));
+    // The second push settles the record.
+    c.answered("k1", &out[0].record, true, 3, None);
+    assert!(c.pending.is_empty());
+    assert_eq!(c.confirmed["k1"].version, 3);
+}
+
+#[test]
+fn a_delete_made_while_a_create_is_in_flight_goes_next() {
+    let mut c = Collection::default();
+    c.loaded = true;
+    assert!(c.queue("k1".into(), Some(bookmark("b1", "New")), true));
+    let sent = c.outgoing().remove(0);
+    // A push is in flight, so the delete is not settled away.
+    assert!(c.queue("k1".into(), None, false));
+    c.answered("k1", &sent.record, true, 1, None);
+    let out = c.outgoing();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].base_version, 1);
+    assert!(out[0].record.is_none());
+    assert!(c.view().is_empty());
+}
+
+#[test]
+fn an_edit_made_while_a_losing_push_is_in_flight_retries_on_the_servers_copy() {
+    let mut c = Collection::default();
+    c.pulled("k1".into(), 1, Some(bookmark("b1", "Docs")));
+    c.write("k1".into(), Some(bookmark("b1", "First")));
+    let sent = c.outgoing().remove(0);
+    c.write("k1".into(), Some(bookmark("b1", "Second")));
+    c.answered(
+        "k1",
+        &sent.record,
+        false,
+        2,
+        Some(Confirmed {
+            version: 2,
+            record: Some(bookmark("b1", "Theirs")),
+        }),
+    );
+    let out = c.outgoing();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].base_version, 2);
+    assert!(out[0].record == Some(bookmark("b1", "Second")));
 }

@@ -11,9 +11,16 @@ import { routes } from "./routes";
  */
 const startupPreferenceKey = "misty:startup-preference:v1";
 
-export const startupViewOptions = ["Browser", "Files", "Agents"];
+export const startupViewOptions = ["Browser", "Agents"];
 
-const startupViewRoutes = ["/browser", routes.files, routes.agents];
+/** Stored indexes keep their old meaning; 1 was the retired Files view. */
+const startupViewRoutes = ["/browser", "/browser", routes.agents];
+const startupViewStoredIndexes = [0, 2];
+
+/** The option shown for a stored index, and the index stored for an option. */
+export const startupViewOption = (storedIndex: number) =>
+  Math.max(0, startupViewStoredIndexes.indexOf(storedIndex));
+export const startupViewStoredIndex = (option: number) => startupViewStoredIndexes[option] ?? 0;
 
 export interface StartupPreference {
   reopenLastSession: boolean;
@@ -52,7 +59,7 @@ export function resolveStartupRoute(lastRoute: string, _fallback: string): strin
   const preference = readStartupPreference();
   if (preference.reopenLastSession) {
     const path = lastRoute.split(/[?#]/)[0];
-    return /^\/(browser|files|agents)(\/|$)/.test(path) ? lastRoute : "/browser";
+    return /^\/(browser|agents)(\/|$)/.test(path) ? lastRoute : "/browser";
   }
   return startupViewRoutes[preference.startupViewIndex] ?? "/browser";
 }

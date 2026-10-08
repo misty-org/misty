@@ -2,9 +2,7 @@ import { clientMetadata } from "@/telemetry/metadata";
 import { redactRecord } from "@/telemetry/redaction";
 import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
-import { useActivityStore } from "@/features/activity/useActivityStore";
-import { belongsToActivityAccount } from "@/features/activity/activityState";
-import { isDiagnosticActivity } from "@/features/activity/activityPolicy";
+import { readSystemErrors } from "./systemErrors";
 
 export interface SupportBundle {
   schema_version: 1;
@@ -17,16 +15,13 @@ export interface SupportBundle {
 
 export async function buildSupportBundle(): Promise<SupportBundle> {
   const metadata = await clientMetadata();
-  const activity = useActivityStore.getState();
-  const diagnostics = activity.localItems
-    .filter((item) => belongsToActivityAccount(item, activity) && isDiagnosticActivity(item))
-    .map((item) => ({
-      level: "error",
-      scope: "activity.background",
-      createdAt: item.createdAt,
-      message: item.title,
-      detail: item.body,
-    }));
+  const diagnostics = readSystemErrors().map((item) => ({
+    level: "error",
+    scope: "system-error",
+    createdAt: item.createdAt,
+    message: item.title,
+    detail: item.body,
+  }));
   const events = [...readClientDebugEvents(), ...diagnostics];
   return {
     schema_version: 1,

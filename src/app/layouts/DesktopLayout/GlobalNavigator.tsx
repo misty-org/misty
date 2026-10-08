@@ -5,16 +5,12 @@ import {
   NavigatorHeaderHomeButton,
   NavigatorHeaderAgentsButton,
   NavigatorHeaderSearchButton,
-  NavigatorHomeLink,
   NavigatorExtensionsLink,
 } from "./NavigatorUtilityIsland";
-import { useLocation } from "react-router-dom";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { WorkspaceSpaceNavigation } from "@/features/spaces";
-import { ActivityMenu } from "./ActivityMenu";
 import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
-import { NavigatorFiles } from "./NavigatorFiles";
 import { NavigatorDestinations } from "./NavigatorDestinations";
 import { NavigatorEdgeMarkers } from "./NavigatorEdgeMarkers";
 import { navigatorHeaderRowClass, navigatorHierarchyActionClass } from "./styles";
@@ -31,14 +27,12 @@ export function GlobalNavigator(props: {
   onStartWindowDrag?: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
   const navigatorRef = useRef<HTMLElement>(null);
-  const pathname = useLocation().pathname;
-  const onHome = pathname === "/home";
   const focusedTab = useWorkspaceStore((state) => {
     const panes = dockLeaves(state.layout.root);
     const pane = panes.find((p) => p.id === state.layout.focusedPaneId) ?? panes[0];
     return pane?.views.find((tab) => tab.id === pane.activeViewId);
   });
-  // Standalone pages such as Home and Activity cover the workspace, so no app is current.
+  // Standalone pages such as Activity cover the workspace, so no app is current.
   const activeTab = props.suppressActiveTool ? undefined : focusedTab;
   return (
     <OverlaySideProvider value={inwardSide[props.position ?? "left"]}>
@@ -86,7 +80,6 @@ export function GlobalNavigator(props: {
           <NavigatorDestinations
             position={props.position ?? "left"}
             items={[
-              { value: "home", label: "Home", content: <NavigatorHomeLink active={onHome} /> },
               {
                 value: "browser",
                 label: "Browser",
@@ -109,7 +102,6 @@ export function GlobalNavigator(props: {
                   />
                 ),
               },
-              { value: "files", label: "Files", content: <NavigatorFiles activeTab={activeTab} /> },
               {
                 value: "extensions",
                 label: "Extensions",
@@ -127,7 +119,6 @@ export function GlobalNavigator(props: {
           utilityControls={
             <>
               <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
-              <ActivityMenu className={navigatorHierarchyActionClass} />
               {props.syncControl}
             </>
           }

@@ -162,7 +162,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
         let observed_focus = focus_count.clone();
         let focus_listener = app.listen_any("misty://browser-focus", move |_| { observed_focus.fetch_add(1, Ordering::SeqCst); });
         let token = shortcut_token_for(&app.state::<BrowserSessionState>(), "oauth-other-account")?;
-        eval(&app, "oauth-other-account", &format!("window.webkit.messageHandlers.mistyFocus.postMessage({token:?}); return '{{}}';")).await?;
+        eval(&app, "oauth-other-account", &format!("window.webkit.messageHandlers.kiriHost.postMessage({token:?}); return '{{}}';")).await?;
         wait_for("native focus message", || async { focus_count.load(Ordering::SeqCst) == 1 }).await?;
         let location = eval(&app, "oauth-other-account", "return JSON.stringify({url:location.href});").await?;
         if location["url"] != source.as_str() { return Err("Focus message changed page navigation".into()); }
@@ -175,7 +175,7 @@ pub(crate) async fn run(app: AppHandle, origin: String) -> Result<String, String
             }
         });
         eval(&app, "oauth-other-account", &format!(r#"
-            const send = (token, inside) => window.webkit.messageHandlers.mistyFocus.postMessage(JSON.stringify({{token, pointer: {{x:12, y:34, inside}}}}));
+            const send = (token, inside) => window.webkit.messageHandlers.kiriHost.postMessage(JSON.stringify({{token, pointer: {{x:12, y:34, inside}}}}));
             send('invalid-token', true); send({token:?}, true); send({token:?}, false);
             return '{{}}';
         "#)).await?;

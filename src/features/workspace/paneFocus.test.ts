@@ -1,25 +1,16 @@
 import { expect, it } from "vitest";
 import { selectPaneFocusPreferences } from "./paneFocus";
-it("defaults to restrained dimming with no active border", () => {
-  expect(selectPaneFocusPreferences()).toEqual({ dim: true, strength: 0.15, indicator: "none" });
+it("defaults to restrained dimming", () => {
+  expect(selectPaneFocusPreferences()).toEqual({ dim: true, strength: 0.15 });
 });
-it.each([true, false])("allows every indicator independently with dimming %s", (dim) => {
-  for (const indicator of ["none", "outline", "border"]) {
-    expect(
-      selectPaneFocusPreferences({
-        appearance: {
-          dim_inactive_panes: dim,
-          pane_focus_indicator: indicator,
-          pane_dim_strength: 0.23,
-        },
-      }),
-    ).toEqual({ dim, strength: 0.23, indicator });
-  }
-});
-it("bounds dimming and rejects unknown indicators", () => {
+it.each([true, false])("keeps the chosen strength with dimming %s", (dim) => {
   expect(
     selectPaneFocusPreferences({
-      appearance: { pane_dim_strength: 3, pane_focus_indicator: "glow" },
+      appearance: { dim_inactive_panes: dim, pane_dim_strength: 0.23 },
     }),
-  ).toMatchObject({ strength: 0.4, indicator: "none" });
+  ).toEqual({ dim, strength: 0.23 });
+});
+it("bounds dimming between none and half", () => {
+  expect(selectPaneFocusPreferences({ appearance: { pane_dim_strength: 3 } }).strength).toBe(0.5);
+  expect(selectPaneFocusPreferences({ appearance: { pane_dim_strength: -1 } }).strength).toBe(0);
 });

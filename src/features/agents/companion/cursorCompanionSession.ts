@@ -2,10 +2,10 @@ import { effectiveValues, useSettingsProfiles } from "@/features/settings/sync";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
 import type { CompanionConversation } from "./companionConversation";
-import { companionReply, resolvePoint } from "./companionReply";
 import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
 import { companionStage } from "./companionStage";
 import { useCompanionState } from "./companionState";
+import { CursorCompanionPointer } from "./cursorCompanionPointer";
 import type { DisplayCapture, Presentation } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
@@ -28,7 +28,13 @@ export class CursorCompanionSession {
   conversationVoice: CompanionConversation | undefined;
   conversationScope: CompanionOrigin | undefined;
   creatingConversation = false;
-  delegatedTask: { id: string; conversationId: string } | undefined;
+  /**
+   * A task the voice conversation started, read aloud when it finishes. While
+   * it waits for a screen it asked for, its continuation is the answer to read.
+   */
+  delegatedTask: { id: string; conversationId: string; awaitingContinuation?: boolean } | undefined;
+  /** Pointing and walkthrough steps for finished replies. */
+  readonly pointer: CursorCompanionPointer = new CursorCompanionPointer(this);
   hideTimer: ReturnType<typeof setTimeout> | undefined;
   pointTimer: ReturnType<typeof setTimeout> | undefined;
   speechRetry: string | undefined;
@@ -166,6 +172,7 @@ export class CursorCompanionSession {
     this.stopAudio();
     clearTimeout(this.hideTimer);
     clearTimeout(this.pointTimer);
+    this.pointer.cancel();
     this.pointPending = false;
     const shouldCancel = this.owned && cancelTask;
     this.owned = false;
@@ -224,29 +231,6 @@ export class CursorCompanionSession {
     return this.active(next);
   };
 
-  presentReplyPoint = (text: string) => {
-    const parsed = companionReply(text);
-    const point = resolvePoint(parsed.point, this.captures);
-    this.pointPending = !!point;
-    this.change({
-      phase: "idle",
-      point,
-    });
-    if (point) {
-      const expected = this.turn;
-      // Handles display removal or an overlay reload before its animation completion event.
-      this.pointTimer = setTimeout(() => {
-        if (this.active(expected)) {
-          this.pointPending = false;
-          this.change({
-            point: undefined,
-          });
-          this.maybeHide();
-        }
-      }, 15_000);
-    }
-  };
-
   /** Finishes an owned typed turn once its response completes, pointing at what it names. */
   settle = () => {
     if (!this.owned || !this.invocationId || !this.active(this.submittedTurn)) return;
@@ -271,7 +255,7 @@ export class CursorCompanionSession {
       );
       return;
     }
-    this.presentReplyPoint(reply.content);
+    this.pointer.present(reply.content, this.invocationId);
     this.maybeHide();
   };
 

@@ -15,7 +15,7 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
         const ENTRIES: &[DefaultCommandEntry] = &[
             DefaultCommandEntry {
                 id: "search.toggle",
-                shortcut: "Cmd+K",
+                shortcut: "Cmd+T",
             },
             DefaultCommandEntry {
                 id: "search.cancel",
@@ -214,7 +214,7 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
         const ENTRIES: &[DefaultCommandEntry] = &[
             DefaultCommandEntry {
                 id: "search.toggle",
-                shortcut: "Ctrl+K",
+                shortcut: "Ctrl+T",
             },
             DefaultCommandEntry {
                 id: "search.cancel",

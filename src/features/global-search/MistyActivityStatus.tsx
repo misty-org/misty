@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Spinner } from "@/shared/ui";
+import { AnimatedEllipsis, withoutEllipsis } from "@/shared/ui";
 
 const calmPhrases = [
   "Thinking it through…",
@@ -52,12 +52,14 @@ export function MistyActivityStatus({
   const phrase = useMistyActivityPhrase(activity);
   return (
     <div
-      className={`flex items-center gap-2 text-cream-muted ${compact ? "py-1 text-xs" : "text-[13px]"}`}
+      className={`flex items-center text-cream-muted ${compact ? "py-1 text-xs" : "text-[13px]"}`}
       role="status"
       aria-live="polite"
     >
-      <Spinner size="sm" label={false} />
-      <span>{phrase}</span>
+      <span>
+        {withoutEllipsis(phrase)}
+        <AnimatedEllipsis />
+      </span>
     </div>
   );
 }

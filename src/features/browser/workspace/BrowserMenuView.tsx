@@ -11,9 +11,6 @@ import {
 import { ShortcutText } from "@/features/shortcuts";
 import {
   AppWindow,
-  Bookmark,
-  BookmarkCheck,
-  BookmarkPlus,
   CircleHelp,
   Code2,
   Copy,
@@ -21,8 +18,10 @@ import {
   Eraser,
   ExternalLink,
   FileDown,
-  Library,
   MoreVertical,
+  BookOpenText,
+  Languages,
+  PictureInPicture2,
   Plus,
   Printer,
   Puzzle,
@@ -38,10 +37,14 @@ import { BrowserZoomControls, useBrowserZoom } from "./BrowserZoomControls";
 import { useBrowserOverlay } from "./useBrowserOverlay";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 import { BrowserHistoryMenu } from "./BrowserHistoryMenu";
+import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
+import { SiteAppsMenu } from "./SiteAppsMenu";
 
 export interface BrowserMenuViewProps {
   setOverlay: (reason: string, active: boolean) => Promise<void>;
   zoomId?: string;
+  /** The site's saved zoom percent; omitted for private tabs. */
+  zoomPercent?: number;
   setZoom?: (factor: number) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   reportError: (error: unknown) => void;
@@ -51,6 +54,10 @@ export interface BrowserMenuViewProps {
   canOpenExternal?: boolean;
   label?: string;
   overlayReason?: string;
+  /** Page tools that used to sit in the toolbar; they lead the More tools submenu. */
+  tools?: ReactNode;
+  /** Installing and opening site apps; omitted where the menu has no page. */
+  app?: { title: string; bookmarkId?: string; installable: boolean };
 }
 
 /** A browser command row; rows without a handler render disabled. */
@@ -68,7 +75,12 @@ function Item(props: { icon: ReactNode; label: string; shortcut?: string; onSele
 
 /** The browser's More menu: tabs, library pages, zoom and page tools. */
 export function BrowserMenuView(props: BrowserMenuViewProps) {
-  const zoom = useBrowserZoom(props.zoomId, props.setZoom ?? (async () => {}), props.reportError);
+  const zoom = useBrowserZoom(
+    props.zoomId,
+    props.setZoom ?? (async () => {}),
+    props.reportError,
+    props.zoomPercent,
+  );
   const overlay = useBrowserOverlay(props.overlayReason ?? "menu", props.setOverlay);
   const setOverlayOpen = overlay.onOpenChange;
   useEffect(() => {
@@ -95,7 +107,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             <Item
               icon={<Plus />}
               label="New tab"
-              shortcut="workspace.new_tab"
+              shortcut="search.toggle"
               onSelect={commands.newTab}
             />
             <Item
@@ -128,24 +140,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.downloads"
               onSelect={() => commands.openPage("downloads")}
             />
-            <MenuSubmenu icon={<Bookmark />} label="Bookmarks" width="lg">
-              <Item
-                icon={<BookmarkPlus />}
-                label="Bookmark this page"
-                shortcut="browser.bookmark"
-                onSelect={commands.bookmark}
-              />
-              <Item
-                icon={<BookmarkCheck />}
-                label="Bookmark all tabs"
-                onSelect={commands.bookmarkAllViews}
-              />
-              <Item
-                icon={<Library />}
-                label="Bookmark manager"
-                onSelect={() => commands.openPage("bookmarks")}
-              />
-            </MenuSubmenu>
+            {props.app ? <SiteAppsMenu {...props.app} url={props.url} /> : null}
             <DropdownMenuSeparator />
           </>
         ) : null}
@@ -165,11 +160,32 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.print"
               onSelect={commands.print}
             />
+            <Item icon={<Languages />} label="Translate page" onSelect={commands.translate} />
+            <Item
+              icon={<BookOpenText />}
+              label="Reader view"
+              shortcut="browser.reader_mode"
+              onSelect={commands.readerMode}
+            />
+            {pictureInPictureSupported() && (
+              <Item
+                icon={<PictureInPicture2 />}
+                label="Picture in picture"
+                shortcut="browser.picture_in_picture"
+                onSelect={commands.pictureInPicture}
+              />
+            )}
             <MenuSubmenu icon={<Share2 />} label="Share" width="md">
               <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
               <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
             </MenuSubmenu>
             <MenuSubmenu icon={<Wrench />} label="More tools" width="lg">
+              {props.tools ? (
+                <>
+                  {props.tools}
+                  <DropdownMenuSeparator />
+                </>
+              ) : null}
               <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
               <Item
                 icon={<Eraser />}

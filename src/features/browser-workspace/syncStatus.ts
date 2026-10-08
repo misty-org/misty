@@ -1,7 +1,7 @@
 import type { NativeSyncView } from "./native";
 import { currentDeviceId } from "./websiteData";
 
-export type SyncActionKind = "retry" | "unlock" | "reenroll" | "setup" | "sign-in";
+export type SyncActionKind = "retry" | "unlock" | "reenroll" | "setup" | "sign-in" | "sync-now";
 export interface SyncStatus {
   /** Semantic only: all states render in the monochrome palette. */
   tone: "healthy" | "attention" | "neutral";
@@ -16,6 +16,7 @@ const actions: Record<SyncActionKind, NonNullable<SyncStatus["action"]>> = {
   reenroll: { kind: "reenroll", label: "Reconnect device", short: "Reconnect" },
   setup: { kind: "setup", label: "Set up sync", short: "Create" },
   "sign-in": { kind: "sign-in", label: "Sign in", short: "Sign in" },
+  "sync-now": { kind: "sync-now", label: "Sync now", short: "Sync" },
 };
 const attention = (title: string, detail: string, kind: SyncActionKind = "retry"): SyncStatus => ({
   tone: "attention",
@@ -227,6 +228,12 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
         ? `${session.status.pending_changes} workspace changes are waiting to sync.`
         : "Receiving workspace changes from the server.",
     );
+  // Edits are sent in batches; until a batch is due they wait here.
+  if (session?.status.phase === "ready" && session.sync?.pending.length)
+    return {
+      ...neutral("Syncing", "Recent changes are sent together in a few seconds."),
+      action: actions["sync-now"],
+    };
   if (!settingsOnly && recovery?.saves?.pending.length)
     return neutral(
       "Saving on this device",

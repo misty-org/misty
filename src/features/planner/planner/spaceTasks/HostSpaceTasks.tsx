@@ -3,7 +3,7 @@ import { spacesApi } from "@/api/spaces/api";
 import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useWorkspaceViewTitle } from "@/features/workspace";
 import { SpaceTasksView } from "../SpaceTasksView";
@@ -46,7 +46,7 @@ export function HostSpaceTasks(props: {
           <HostTaskIntegration {...input} workspaceTabId={props.workspaceTabId} />
         ),
         renderError: (message) => (
-          <SystemErrorActivity
+          <SystemErrorNotice
             error={message}
             scope="planner:tasks"
             title="Tasks could not be loaded"
