@@ -26,20 +26,11 @@ describe("browser workspace deep links", () => {
       workspaceSurfaceFromRoute("/browser?url=https%3A%2F%2Fexample.com%2Freport")?.state,
     ).toMatchObject({ url: "https://example.com/report" });
   });
-  it.each(["/files", "/apps/files"])(
-    "opens %s directly and preserves device-local selections",
-    (route) => {
-      expect(
-        workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`),
-      ).toMatchObject({
-        surfaceId: "files",
-        groupKey: "tool:files",
-        scopeKey: "global",
-        route: "/files?path=%2FUsers%2Fada&select=notes.txt",
-        instancePolicy: "single",
-      });
-    },
-  );
+  it.each(["/files", "/apps/files"])("no longer opens %s as a tool; Files moved to Kura", (route) => {
+    expect(
+      workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)?.surfaceId,
+    ).not.toBe("files");
+  });
   it("keeps agent run links intact", () => {
     expect(workspaceSurfaceFromRoute("/agents?run=task-1")).toMatchObject({
       surfaceId: "agents",

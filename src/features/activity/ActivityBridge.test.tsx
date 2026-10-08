@@ -140,7 +140,7 @@ describe("ActivityBridge", () => {
       id: "file-error",
       kind: "failure",
       title: "File action needs attention",
-      target: { kind: "workspace-tool", tool: "files" },
+      target: { kind: "workspace-tool", tool: "agents" },
       notify: false,
     });
 

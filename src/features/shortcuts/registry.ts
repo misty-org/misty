@@ -1,6 +1,5 @@
 import type { ShortcutBindingPair, ShortcutCommandDefinition, ShortcutPlatform } from "./types";
 import { command } from "./factory";
-import { filesShortcutCommands } from "./filesCommands";
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
@@ -307,7 +306,6 @@ const toolSlots = [
   ["social", "Social", 4],
   ["library", "Library", 5],
   ["browser", "Browser", 6],
-  ["files", "Files", 7],
   ["code", "Code", 8],
 ] as const;
 
@@ -343,7 +341,6 @@ const tabAndToolCommands = [
 ];
 
 const toolCommands: ShortcutCommandDefinition[] = [
-  ...filesShortcutCommands,
   command("planner.create", "Create Planner item", {
     description: "Create an item in the focused Planner view.",
     category: "Planner",

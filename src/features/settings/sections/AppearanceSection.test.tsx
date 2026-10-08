@@ -58,9 +58,7 @@ describe("AppearanceSection app zoom", () => {
     onShortcutChange: vi.fn(async () => undefined),
     onShortcutReassign: vi.fn(async () => undefined),
     onResetShortcuts: vi.fn(async () => undefined),
-    onRemoveOpenWithAssociation: vi.fn(async () => undefined),
     shortcuts: null,
-    openWithAssociations: [],
     app: null,
   };
 

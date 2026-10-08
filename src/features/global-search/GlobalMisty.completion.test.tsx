@@ -64,12 +64,7 @@ beforeEach(async () => {
   await act(async () =>
     root.render(
       <MemoryRouter>
-        <GlobalMisty
-          accountId="account-1"
-          currentPath="/agents"
-          activePaneId=""
-          activePanePath=""
-        />
+        <GlobalMisty accountId="account-1" currentPath="/agents" activePaneId="" />
       </MemoryRouter>,
     ),
   );

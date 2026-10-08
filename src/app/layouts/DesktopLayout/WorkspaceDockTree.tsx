@@ -44,7 +44,6 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   extensions: "Extensions",
   space: "Space",
   browser: "Browser",
-  files: "Files",
   agents: "Agents",
   scheduled: "Scheduled",
 };
@@ -202,7 +201,7 @@ const MountedWorkspaceView = memo(function MountedWorkspaceView(props: {
       active={props.active}
     >
       <WorkspaceViewTitleProvider tabId={props.tab.id}>
-        <WorkspaceSurface tab={props.tab} active={props.active} />
+        <WorkspaceSurface tab={props.tab} />
       </WorkspaceViewTitleProvider>
     </AiPaneHost>
   );
@@ -467,9 +466,7 @@ function aiContextForView(tab: WorkspaceView): AiContextReference {
       spaceId,
     };
   }
-  const privacy = (["browser", "files"] as WorkspaceSurfaceId[]).includes(tab.surfaceId)
-    ? "device"
-    : "private";
+  const privacy = tab.surfaceId === "browser" ? "device" : "private";
   return {
     kind: privacy === "device" ? "device-scope" : "route",
     id: tab.id,
@@ -538,13 +535,6 @@ const workspaceAiActions: Partial<Record<AiSurfaceId, AiSuggestedAction[]>> = {
       "browser.explain",
       "Explain page",
       "Explain the attached browser page in plain language.",
-    ),
-  ],
-  files: [
-    action(
-      "files.organize",
-      "Suggest cleanup",
-      "Suggest a reversible cleanup plan for the selected files.",
     ),
   ],
   drawings: [

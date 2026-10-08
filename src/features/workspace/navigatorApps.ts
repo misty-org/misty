@@ -3,7 +3,6 @@ import type { WorkspaceToolId } from "./workspaceTools";
 export const NAVIGATOR_APP_IDS = [
   "social",
   "journal",
-  "files",
   "agents",
   "planner",
   "library",
@@ -12,12 +11,7 @@ export const NAVIGATOR_APP_IDS = [
 
 export type NavigatorAppId = (typeof NAVIGATOR_APP_IDS)[number];
 
-export const DEFAULT_NAVIGATOR_APP_IDS: readonly NavigatorAppId[] = [
-  "social",
-  "journal",
-  "files",
-  "agents",
-];
+export const DEFAULT_NAVIGATOR_APP_IDS: readonly NavigatorAppId[] = ["social", "journal", "agents"];
 
 export function isNavigatorAppId(value: string): value is NavigatorAppId {
   return (NAVIGATOR_APP_IDS as readonly string[]).includes(value);

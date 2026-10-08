@@ -1,8 +1,6 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useMediaSearchStore } from "@/features/global-search/indexing";
-import { useSearchIndexStore } from "@/features/global-search/useSearchIndexStore";
-import { selectSearchMaintenancePreferences, useSettingsStore } from "@/features/settings";
+import { useSettingsStore } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useMemo, useRef } from "react";
@@ -16,10 +14,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const loadApp = useAppStore((state) => state.loadApp);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
-  const searchMaintenancePreferences = useMemo(
-    () => selectSearchMaintenancePreferences(settings?.document),
-    [settings?.document],
-  );
   const workspaceLayout = useWorkspaceStore((state) => state.layout);
   const activeWorkspacePane = useMemo(
     () =>
@@ -31,7 +25,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
   const appLoadStarted = useRef(false);
-  const searchMaintenanceRunningRef = useRef(false);
   const loadedRoutes = useRef(new Set<AppTab>());
   const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/browser", lastAppRoute));
   const routeId = params.getRouteId(location.pathname);
@@ -43,60 +36,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     void loadApp();
     void settingsLoad();
   }, [loadApp, settingsLoad]);
-
-  useEffect(() => {
-    if (!app || !hasTauriInternals()) return;
-    // The durable host queue resumes approved media work even while the Files
-    // App is closed. The UI itself remains outside the shell bundle.
-    void useMediaSearchStore.getState().load();
-  }, [app]);
-
-  useEffect(() => {
-    if (!settings || !hasTauriInternals()) return;
-    const intervalMs = searchMaintenancePreferences.discoveryIntervalMinutes * 60_000;
-    let disposed = false;
-
-    const maintainSearch = async () => {
-      if (disposed || searchMaintenanceRunningRef.current) return;
-      searchMaintenanceRunningRef.current = true;
-      try {
-        if (searchMaintenancePreferences.automaticFileDiscoveryEnabled) {
-          const search = useSearchIndexStore.getState();
-          await search.initialize();
-          const status = useSearchIndexStore.getState().status;
-          // A scan that failed or was canceled still counts as an attempt, so
-          // it is not retried on every focus change until the next interval.
-          const lastAttempt = Math.max(status?.lastScanTimeMs ?? 0, status?.lastScanStartedMs ?? 0);
-          const stale = !lastAttempt || Date.now() - lastAttempt >= intervalMs;
-          if (!status?.scanInProgress && stale) {
-            await useSearchIndexStore.getState().startScan(app?.environment.homeDir || "");
-          }
-        }
-      } finally {
-        searchMaintenanceRunningRef.current = false;
-      }
-    };
-
-    const initial = window.setTimeout(() => void maintainSearch(), 4_000);
-    const timer = window.setInterval(() => void maintainSearch(), intervalMs);
-    const resume = () => {
-      if (document.visibilityState === "visible") void maintainSearch();
-    };
-    window.addEventListener("online", maintainSearch);
-    document.addEventListener("visibilitychange", resume);
-    return () => {
-      disposed = true;
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-      window.removeEventListener("online", maintainSearch);
-      document.removeEventListener("visibilitychange", resume);
-    };
-  }, [
-    app?.environment.homeDir,
-    searchMaintenancePreferences.automaticFileDiscoveryEnabled,
-    searchMaintenancePreferences.discoveryIntervalMinutes,
-    settings,
-  ]);
 
   useEffect(() => {
     if (loadedRoutes.current.has(routeId)) return;
@@ -129,7 +68,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     app,
     settingsLoad,
     activePaneId: "",
-    activePanePath: "",
     activeWorkspacePaneId: activeWorkspacePane?.id ?? "",
     lastAppRoute,
     lastNonSettingsRouteRef,

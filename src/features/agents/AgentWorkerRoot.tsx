@@ -227,7 +227,6 @@ function Worker() {
           accountId={user.id}
           currentPath="/agents"
           activePaneId="agent-worker"
-          activePanePath="/agents"
           includeCurrentContext={false}
           allowCapture={false}
           suspendBrowserWebviews={false}

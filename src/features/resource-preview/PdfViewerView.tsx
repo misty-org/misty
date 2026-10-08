@@ -129,12 +129,7 @@ export default function PdfViewerView({
         aria-label={`PDF reader for ${name}`}
       >
         {loadError ? (
-          <Error
-            error={loadError}
-            scope="files:pdf-viewer"
-            title="PDF could not be opened"
-            target={{ kind: "workspace-tool", tool: "files" }}
-          />
+          <Error error={loadError} scope="files:pdf-viewer" title="PDF could not be opened" />
         ) : (
           <Document
             file={url}

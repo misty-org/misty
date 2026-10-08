@@ -125,7 +125,7 @@ describe("GlobalNavigator disclosures", () => {
     await act(async () => trigger?.click());
     expect(trigger?.getAttribute("aria-expanded")).toBe("false");
     expect(localStorage.getItem("misty:navigator-spaces-open")).toBe("false");
-    expect(container.querySelector('[aria-label="Files"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Agents"]')).not.toBeNull();
     expect(container.querySelector("#navigator-spaces")?.hasAttribute("inert")).toBe(true);
     await act(async () => trigger?.click());
     expect(localStorage.getItem("misty:navigator-spaces-open")).toBe("true");

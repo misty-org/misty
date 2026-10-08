@@ -94,7 +94,7 @@ export function ViewIcon({
     : null;
   if (
     website &&
-    ["planner", "journal", "library", "files"].includes(appId) &&
+    ["planner", "journal", "library"].includes(appId) &&
     Object.prototype.hasOwnProperty.call(websiteIntegrations, website)
   )
     return (

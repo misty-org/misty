@@ -4,11 +4,11 @@ Approved direction (October 5, 2026). The implementation plan is [docs/plans/dev
 
 ## Goal
 
-Add a device once. One secure step admits a device to sync, agents and LAN file sharing, and everything else follows from that step. A **device** is one signed-in Misty install on one physical machine.
+Add a device once. One secure step admits a device to sync, agents and the shared clipboard, and everything else follows from that step. A **device** is one signed-in Misty install on one physical machine.
 
 ## Rules
 
-1. **The server never carries file data.** Files, folders, clipboard, media and cross-device transfers go device to device over the LAN (iroh, no relay). When two devices are not on the same network, those features are unavailable and the UI says so in text. Users who want remote access bring their own tunnel (for example Tailscale), whose addresses count as LAN.
+1. **The server never carries readable file data.** Media and agent-triggered transfers go device to device over the LAN (iroh, no relay). When two devices are not on the same network, those features are unavailable and the UI says so in text. Users who want remote access bring their own tunnel (for example Tailscale), whose addresses count as LAN. The one exception is the clipboard: clips are encrypted on the device with a key derived from the vault root and carried through Cloudflare as ciphertext, so neither Misty nor Cloudflare can read them (amended October 7, 2026; see [docs/design/clipboard/BRIEF.md](../clipboard/BRIEF.md)). Browsing another device's files moved out of Misty into Kura, a separate account-free file manager, so Misty no longer serves or browses peer files.
 2. **The server coordinates.** It holds device records, presence, current addresses, signed permission records, job routing, revocation and the encrypted sync mailbox. It routes small control messages only.
 3. **Sync records stay on the server as ciphertext.** That is what lets devices sync without being online together. The server cannot read them. Moving large sync blobs to the LAN is a separate, later decision.
 4. **Agents run on the server runtime.** What an agent reads on a device enters the model's context through the runtime. Nothing else does: transfers between devices go over the LAN and only a receipt (hash, size, destination) returns.
@@ -59,7 +59,8 @@ What Misty does not claim: hardware attestation that the machine is uncompromise
 |---|---|---|
 | Control (one WebSocket per device, server) | Presence, address candidates, connect intents, device list and policy updates, job hints, revocation | File contents, clipboard, media |
 | Sync mailbox (server) | End-to-end encrypted sync records | Anything the server can read |
-| LAN data (iroh, device to device) | Files, clipboard, media, agent-triggered transfers | Anything routed through Misty |
+| LAN data (iroh, device to device) | Clipboard (fast path), media, agent-triggered transfers | Anything routed through Misty |
+| Cloud clipboard (Cloudflare Worker, Durable Object, R2) | Vault-encrypted clips up to 25 MB, kept 24 hours | Plaintext, keys, anything the server or Cloudflare can read |
 
 ### Addresses and connecting
 
@@ -76,8 +77,7 @@ What Misty does not claim: hardware attestation that the machine is uncompromise
 ## Permissions
 
 - Each device signs its own **policy record**:
-  - **File sharing:** Off, View, or View and edit
-  - **Clipboard:** on or off
+  - **Clipboard:** on or off. Covers the LAN fast path and the cloud clipboard.
   - **Agents:** which surfaces may be used (shared folders, Misty browser, terminal)
 - The device enforces its own local copy. The server stores and forwards the record for display, but cannot change it.
 - A device's permissions can be changed only on that device. Other devices show them read-only, with "Change this on <device name>".
@@ -105,10 +105,9 @@ Settings → **Devices** replaces the File sharing area. It keeps that area's `M
   - Last seen.
 - **Controls** (editable only on that device itself):
   - Sync mode: Full sync or Independent workspace (existing)
-  - File sharing: Off, View, or View and edit
   - Clipboard
   - Agents
-- **Remove device.** Available on any device holding the root key. It explains that the removed device loses sync, file sharing and agent access everywhere.
+- **Remove device.** Available on any device holding the root key. It explains that the removed device loses sync, the shared clipboard and agent access everywhere.
 - **Waiting for approval.** A section that appears only while a device is pending. It shows the comparison code with Approve and Deny.
 - **One name per device.** It replaces `trusted_devices.name`, `browser_sync_devices.display_name` and per-pair peer nicknames. Sync's Workspace devices section reads the same device records.
 

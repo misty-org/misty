@@ -3,7 +3,6 @@ export const routes = {
   agents: "/agents",
   activity: "/activity",
   browser: "/browser",
-  files: "/files",
   invite: "/invite",
   newTab: "/new",
   spaces: "/spaces",

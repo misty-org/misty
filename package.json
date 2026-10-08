@@ -28,7 +28,6 @@
     "release:keys": "node cli/tasks/release/setup-keys.ts"
   },
   "dependencies": {
-    "@crabnebula/tauri-plugin-drag": "2.1.0",
     "@excalidraw/excalidraw": "^0.18.1",
     "@impierce/tauri-plugin-keystore": "^2.1.0-alpha.1",
     "@midscene/core": "1.14.0",

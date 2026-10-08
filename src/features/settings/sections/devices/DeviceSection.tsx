@@ -6,26 +6,14 @@ import {
   useConnectedDevices,
   type DevicePeer,
 } from "@/features/connected-devices";
-import type { AgentSurface, FileSharing } from "@/native/devices";
+import type { AgentSurface } from "@/native/devices";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button } from "@/shared/ui";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "../../components/DesktopSettingsUI";
-import { ChoiceControl, SwitchControl, TextControl } from "../../SettingsControls";
-
-const fileSharingOptions = [
-  { value: "off", label: "Off" },
-  { value: "view", label: "View" },
-  { value: "edit", label: "View and edit" },
-];
-
-const fileSharingLabel: Record<string, string> = {
-  off: "Off",
-  view: "View",
-  edit: "View and edit",
-};
+import { SwitchControl, TextControl } from "../../SettingsControls";
 
 const readdNote =
   "Adding it again needs your sync password and secret or another device’s approval.";
@@ -70,11 +58,7 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => setBusy(false));
   };
-  const setPolicy = (change: {
-    files?: FileSharing;
-    clipboard?: boolean;
-    surface?: [AgentSurface, boolean];
-  }) => {
+  const setPolicy = (change: { clipboard?: boolean; surface?: [AgentSurface, boolean] }) => {
     if (!policy) return;
     const surfaces = new Set(policy.agentSurfaces);
     if (change.surface) {
@@ -83,7 +67,8 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
     }
     run(() =>
       devices.setPolicy({
-        files: change.files ?? policy.files,
+        // Misty no longer shares files between devices; Kura manages files.
+        files: "off",
         clipboard: change.clipboard ?? policy.clipboard,
         agentSurfaces: [...surfaces],
       }),
@@ -118,31 +103,11 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
         </Row>
       ) : null}
       <Row
-        label="File sharing"
-        description={
-          peer.isSelf
-            ? "What your other devices on this network can do with this device’s files."
-            : readOnly
-        }
-      >
-        {peer.isSelf && policy ? (
-          <ChoiceControl
-            presentation="pills"
-            value={policy.files}
-            options={fileSharingOptions}
-            disabled={busy}
-            onValueChange={(value) => setPolicy({ files: value as FileSharing })}
-          />
-        ) : (
-          <span className="text-sm text-cream-muted">
-            {policy ? fileSharingLabel[policy.files] : "Unknown"}
-          </span>
-        )}
-      </Row>
-      <Row
         label="Clipboard"
         description={
-          peer.isSelf ? "Share copied items with your other devices on this network." : readOnly
+          peer.isSelf
+            ? "Share what you copy with your other devices, end-to-end encrypted. Clips last a day."
+            : readOnly
         }
       >
         {peer.isSelf && policy ? (

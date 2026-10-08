@@ -160,7 +160,6 @@ function EditorStatus(props: {
               error={props.error}
               scope="files:photo-editor"
               title="Image could not be prepared"
-              target={{ kind: "workspace-tool", tool: "files" }}
             />
           ) : (
             <Skeleton
@@ -272,7 +271,6 @@ export function PhotoEditorView(props: PhotoEditorProps & { Error: PreviewErrorC
           error={saveError}
           scope="files:photo-editor:save"
           title="Edited image could not be saved"
-          target={{ kind: "workspace-tool", tool: "files" }}
         />
       ) : null}
     </EditorShell>

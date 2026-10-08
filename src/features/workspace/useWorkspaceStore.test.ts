@@ -121,38 +121,38 @@ describe("desktop dock store", () => {
 
   it("lets a tool be opened in an empty workspace", () => {
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "single",
     });
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((tab) => tab.surfaceId)).toEqual(
-      ["files"],
+      ["agents"],
     );
   });
 
-  it("keeps Files singleton even when opened repeatedly", () => {
-    const inbox = workspaceSurfaceFromRoute("/files");
+  it("keeps Agents singleton even when opened repeatedly", () => {
+    const inbox = workspaceSurfaceFromRoute("/agents");
     expect(inbox).not.toBeNull();
     useWorkspaceStore.getState().openSurface(inbox!);
     useWorkspaceStore.getState().openSurface(inbox!);
 
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).filter(
-        (tab) => tab.groupKey === "tool:files",
+        (tab) => tab.groupKey === "tool:agents",
       ),
     ).toHaveLength(1);
   });
 
   it("adds repeated app launches as separate window tabs", () => {
-    const files = workspaceSurfaceFromRoute("/files");
-    if (!files) throw new Error("Expected a Files workspace surface");
+    const files = workspaceSurfaceFromRoute("/agents");
+    if (!files) throw new Error("Expected an Agents workspace surface");
 
     const first = useWorkspaceStore.getState().addSurface(files);
     const second = useWorkspaceStore.getState().addSurface(files);
     const fileTabs = allLayoutViews(useWorkspaceStore.getState().layout).filter(
-      (tab) => tab.groupKey === "tool:files",
+      (tab) => tab.groupKey === "tool:agents",
     );
 
     expect(second.id).not.toBe(first.id);
@@ -160,8 +160,8 @@ describe("desktop dock store", () => {
   });
 
   it("treats singleton policy as one instance per pane", () => {
-    const inboxRequest = workspaceSurfaceFromRoute("/files");
-    if (!inboxRequest) throw new Error("Expected a Files workspace surface");
+    const inboxRequest = workspaceSurfaceFromRoute("/agents");
+    if (!inboxRequest) throw new Error("Expected an Agents workspace surface");
     const first = useWorkspaceStore.getState().openSurface(inboxRequest);
     const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     const secondPaneId = useWorkspaceStore.getState().splitPane(firstPane.id, "right");
@@ -172,7 +172,7 @@ describe("desktop dock store", () => {
     expect(second.id).not.toBe(first.id);
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).filter(
-        (tab) => tab.groupKey === "tool:files",
+        (tab) => tab.groupKey === "tool:agents",
       ),
     ).toHaveLength(2);
     expect(useWorkspaceStore.getState().openSurface(inboxRequest).id).toBe(second.id);
@@ -225,10 +225,10 @@ describe("desktop dock store", () => {
     const store = useWorkspaceStore.getState();
     store.setScope("space:family");
     store.openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "single",
     });
 
@@ -240,16 +240,16 @@ describe("desktop dock store", () => {
     useWorkspaceStore.getState().setScope("space:family");
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("files");
+    ).toContain("agents");
   });
 
   it("adopts the default Space once, then leaves the user's choice alone", () => {
     const store = useWorkspaceStore.getState();
     store.openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "single",
     });
 
@@ -258,14 +258,14 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:misty");
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("files");
+    ).toContain("agents");
 
     useWorkspaceStore.getState().setScope("space:family");
     useWorkspaceStore.getState().adoptDefaultScope("space:misty");
     expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
-  it("migrates a saved Transfers tab to the Files transfers view", () => {
+  it("migrates a saved Transfers tab to a browser tab", () => {
     const legacyTab = {
       id: "tab:legacy",
       surfaceId: "transfers",
@@ -291,9 +291,9 @@ describe("desktop dock store", () => {
 
     const restored = dockTreeViews(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
-    expect(restored[0].surfaceId).toBe("files");
-    expect(restored[0].route).toBe("/files?view=transfers");
-    expect(restored[0].groupKey).toBe("tool:files");
+    // Transfers moved to Kura; the saved tab reopens as a browser tab.
+    expect(restored[0].surfaceId).toBe("browser");
+    expect(restored[0].route).toBe("/browser");
   });
 
   it("preserves a legacy Space page and its identity", () => {
@@ -368,10 +368,10 @@ describe("desktop dock store", () => {
 
   it("can keep an embedded dock widget on its owning tool route", () => {
     const terminal = useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
+      title: "Agents",
+      route: "/agents",
       instancePolicy: "multiple",
     });
 

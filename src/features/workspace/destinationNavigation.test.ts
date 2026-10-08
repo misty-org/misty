@@ -34,22 +34,11 @@ it("returns to the most recently used browser without losing either URL or runti
   expect(store()).toBe(before);
 });
 
-it("reuses Files at its last route without mixing navbar selection into Back/Forward", () => {
-  const files = go("/files");
-  store().updateViewRoute(files.id, "/files?path=Projects");
-  go("/agents");
-  expect(store().navigatePane(-1)).toBeNull();
-  expect(go("/files")).toMatchObject({ id: files.id, route: "/files?path=Projects" });
-  expect(store().navigatePane(-1)?.route).toBe("/files");
-  expect(store().navigatePane(-1)).toBeNull();
-  expect(store().navigatePane(1)?.route).toBe("/files?path=Projects");
-});
-
 it("fills a fresh tab even when the selected destination is already open", () => {
-  const first = go("/files");
+  const first = go("/agents");
   store().newTab();
   const layoutId = store().layout.activeTabId;
-  const second = go("/files");
+  const second = go("/agents");
   expect(second.id).not.toBe(first.id);
   expect(store().layout.activeTabId).toBe(layoutId);
   expect(layoutTabs(store().layout)).toHaveLength(2);
@@ -64,7 +53,7 @@ it("fills a fresh split and later restores the whole split without replacing occ
   expect(second.id).not.toBe(first.id);
   expect(store().layout.focusedPaneId).toBe(pane);
   expect(store().layout.activeTabId).toBe(splitTabId);
-  go("/files");
+  go("/agents");
   expect(dockLeaves(store().layout.root)).toHaveLength(1);
   expect(go("/browser").id).toBe(second.id);
   expect(store().layout.activeTabId).toBe(splitTabId);
@@ -91,19 +80,19 @@ it("keeps destination reuse inside the current window and excludes private brows
 });
 
 it("starts configured fresh tabs and stops replacing them after interaction", () => {
-  configureWorkspaceDefaultView(2);
+  configureWorkspaceDefaultView(3);
   const fresh = store().newTab();
-  expect(fresh).toMatchObject({ surfaceId: "files", placeholder: true });
+  expect(fresh).toMatchObject({ surfaceId: "agents", placeholder: true });
   store().commitPlaceholder(fresh.id);
   go("/agents");
   expect(allLayoutViews(store().layout).find((view) => view.id === fresh.id)).toMatchObject({
     placeholder: false,
   });
-  expect(go("/files").id).toBe(fresh.id);
+  expect(go("/agents").id).toBe(fresh.id);
 });
 
 it("preserves established and fresh tabs across persistence", () => {
-  const files = go("/files");
+  const files = go("/agents");
   const fresh = store().newTab();
   const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(store())));
   useWorkspaceStore.setState(migrateWorkspaceStore(saved, 11));
@@ -119,7 +108,7 @@ it("preserves established and fresh tabs across persistence", () => {
 
 it("recovers views hidden by old cross-app history as visible tabs", () => {
   const browser = go("/browser");
-  const files = go("/files");
+  const files = go("/agents");
   const current = store().layout;
   const pane = dockLeaves(current.root)[0];
   const root = { ...pane, history: { entries: [browser, files], index: 1 } };
@@ -156,7 +145,7 @@ it("keeps a default browser replaceable through metadata updates, then commits n
   expect(activeLayoutView(store().layout)?.placeholder).toBe(true);
   store().updateBrowserView(fresh.id, { url: "https://work.example" });
   expect(activeLayoutView(store().layout)?.placeholder).toBe(false);
-  go("/files");
+  go("/agents");
   expect(allLayoutViews(store().layout).some((view) => view.id === fresh.id)).toBe(true);
 });
 

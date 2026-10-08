@@ -13,8 +13,8 @@ export const mistyBangs: readonly ScopeBang[] = [
     aliases: ["f"],
     scope: "files",
     label: "Files",
-    description: "File names and contents",
-    placeholder: "Search your files",
+    description: "Search your files in Kura",
+    placeholder: "Search your files in Kura",
   }),
   scope({
     trigger: "spaces",

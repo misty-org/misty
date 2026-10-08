@@ -6,7 +6,7 @@ import {
   type WorkspaceWindow,
 } from "@/features/workspace/model";
 import { retainDeviceState } from "./deviceState";
-function fixture(surface: "browser" | "files" = "browser"): WorkspaceWindow[] {
+function fixture(surface: "browser" | "agents" = "browser"): WorkspaceWindow[] {
   const tab: WorkspaceView = {
     id: "tab:a",
     instanceKey: "tab:a",
@@ -77,17 +77,6 @@ describe("device state retention during shared projection", () => {
       bookmarkId: "website:new",
     };
     expect(view(retainDeviceState(incoming, previous)).state).toEqual(view(incoming).state);
-  });
-  it("retains Files paths only for an existing Files view on this device", () => {
-    const previous = fixture("files"),
-      incoming = fixture("files");
-    view(previous).state = { selectedPath: "/Users/alice/Documents" };
-    expect(view(retainDeviceState(incoming, previous)).state).toEqual(view(previous).state);
-    view(incoming).id = "tab:other-device";
-    expect(view(retainDeviceState(incoming, previous)).state).toBeNull();
-    view(incoming).id = "tab:a";
-    view(incoming).surfaceId = "browser";
-    expect(view(retainDeviceState(incoming, previous)).state).toBeNull();
   });
   it("drops pane history when a different shared view occupies the pane", () => {
     const previous = fixture(),

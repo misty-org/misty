@@ -56,7 +56,6 @@ export function GlobalMistySurface(props: {
   currentPath: string;
   activePaneId: string;
   activeWorkspacePaneId?: string;
-  activePanePath: string;
   includeCurrentContext?: boolean;
   allowCapture?: boolean;
   suspendBrowserWebviews?: boolean;
@@ -180,15 +179,8 @@ export function GlobalMistySurface(props: {
   const registeredAiSelection = browserRequest?.selection ?? surfaceSnapshot.selection;
   const currentContext = useMemo(
     () =>
-      !includeCurrentContext
-        ? []
-        : contextForCurrentView(
-            props.currentPath,
-            props.activePanePath,
-            undefined,
-            registeredAiContext,
-          ),
-    [includeCurrentContext, props.activePanePath, props.currentPath, registeredAiContext],
+      !includeCurrentContext ? [] : contextForCurrentView(props.currentPath, registeredAiContext),
+    [includeCurrentContext, props.currentPath, registeredAiContext],
   );
   const activeMode = mode === "search" ? "search" : "ask";
   const attachmentState = useGlobalMistyAttachments({

@@ -41,7 +41,7 @@ describe("browser workspace migration", () => {
     },
   );
   it.each(["files", "official-app"] as const)(
-    "preserves %s Files state and selections",
+    "replaces retired %s Files views with a browser tab without changing identity",
     (surfaceId) => {
       const tab = legacyTab({
         surfaceId,
@@ -50,12 +50,13 @@ describe("browser workspace migration", () => {
         title: "Documents",
         state: { directory: "/Users/ada", selected: ["notes.txt"] },
       });
+      // Files moved to Kura, a separate app.
       const migrated = migrateRetiredWorkspaceView(tab);
       expect(migrated).toMatchObject({
-        ...tab,
-        surfaceId: "files",
-        groupKey: "tool:files",
-        route: "/files?path=%2FUsers%2Fada&select=notes.txt",
+        id: tab.id,
+        surfaceId: "browser",
+        groupKey: "tool:browser",
+        route: "/browser",
       });
       expect(migrateRetiredWorkspaceView(migrated)).toEqual(migrated);
     },
@@ -90,7 +91,7 @@ describe("browser workspace migration", () => {
       ),
     ).toMatchObject({ surfaceId: "agents", route: "/agents?run=run-1" });
   });
-  it("upgrades persisted layout contents while preserving focus and Files data", () => {
+  it("upgrades persisted layout contents while preserving focus", () => {
     const tab = legacyTab({
       surfaceId: "files",
       groupKey: "app:files",
@@ -112,11 +113,10 @@ describe("browser workspace migration", () => {
     );
     expect(dockTreeViews(migrated.layout.root)[0]).toMatchObject({
       id: tab.id,
-      surfaceId: "files",
-      state: tab.state,
+      surfaceId: "browser",
     });
     expect(migrated.layout.focusedPaneId).toBe(pane.id);
-    expect(dockTreeViews(migrateRetiredWorkspaceViews(layout).root)[0].surfaceId).toBe("files");
+    expect(dockTreeViews(migrateRetiredWorkspaceViews(layout).root)[0].surfaceId).toBe("browser");
   });
 });
 
@@ -184,12 +184,16 @@ it("restores saved views that lost their route instead of failing the whole work
     route: "/browser",
   });
   const files = legacyTab({
-    surfaceId: "files",
-    groupKey: "tool:files",
+    surfaceId: "files" as WorkspaceView["surfaceId"],
+    groupKey: "tool:files" as WorkspaceView["groupKey"],
     title: "Files",
     route: undefined as unknown as string,
   });
-  expect(migrateRetiredWorkspaceView(files)).toMatchObject({ surfaceId: "files", route: "/files" });
+  // Files moved to Kura; a saved Files view becomes a new browser tab.
+  expect(migrateRetiredWorkspaceView(files)).toMatchObject({
+    surfaceId: "browser",
+    route: "/browser",
+  });
 });
 
 it("restores a route-less Scheduled view into the current Agents collection", () => {
@@ -208,7 +212,7 @@ it("restores a route-less Scheduled view into the current Agents collection", ()
   });
 });
 
-it("restores retired Transfers views inside Files without losing their identity", () => {
+it("restores retired Transfers views as browser tabs without losing their identity", () => {
   const tab = legacyTab({
     surfaceId: "transfers",
     groupKey: "tool:transfers" as WorkspaceView["groupKey"],
@@ -216,12 +220,6 @@ it("restores retired Transfers views inside Files without losing their identity"
     title: "Transfers",
   });
   const restored = migrateRetiredWorkspaceView(tab);
-  expect(restored).toMatchObject({
-    id: tab.id,
-    surfaceId: "files",
-    title: "Transfers",
-    route: "/files?view=transfers",
-    state: { path: "misty-transfers://history" },
-  });
+  expect(restored).toMatchObject({ id: tab.id, surfaceId: "browser", route: "/browser" });
   expect(migrateRetiredWorkspaceView(restored)).toEqual(restored);
 });

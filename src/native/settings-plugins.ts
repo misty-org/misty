@@ -1,7 +1,6 @@
 import type {
   LaunchOnLoginSnapshot,
   NativeShortcutsSnapshot,
-  OpenWithAssociation,
   SaveSettingsRequest,
   SettingsSnapshot,
   ShortcutsSnapshot,
@@ -26,10 +25,6 @@ export function settingsLaunchOnLoginSnapshot(): Promise<LaunchOnLoginSnapshot> 
 
 export function settingsApplyLaunchOnLogin(enabled: boolean): Promise<LaunchOnLoginSnapshot> {
   return invoke("settings_apply_launch_on_login", { enabled });
-}
-
-export function settingsOpenWithAssociations(): Promise<OpenWithAssociation[]> {
-  return invoke("settings_open_with_associations");
 }
 
 export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
