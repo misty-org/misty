@@ -17,7 +17,8 @@ it("starts in Browser before a preference is configured", () => {
 it.each([
   [0, "browser"],
   [1, "browser"],
-  [2, "files"],
+  // 2 was the retired Files view.
+  [2, "browser"],
   [3, "agents"],
 ])("uses configured starting page %s", (index, surfaceId) => {
   configureWorkspaceDefaultView(Number(index));
@@ -35,7 +36,9 @@ it("falls back to Browser for invalid preferences and allocates independent iden
 it("maps stored indexes to the options shown in Settings", () => {
   expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(3)]).toBe("Agents");
   expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(0)]).toBe("Browser");
-  expect(workspaceDefaultViewStoredIndex(workspaceDefaultViewOptions.indexOf("Files"))).toBe(2);
+  expect(workspaceDefaultViewStoredIndex(workspaceDefaultViewOptions.indexOf("Agents"))).toBe(3);
+  // The retired Files choice opens the default view.
+  expect(workspaceDefaultViewOptions[workspaceDefaultViewOption(2)]).toBe("Browser");
 });
 
 it("round-trips the configurable starting page through portable settings", async () => {

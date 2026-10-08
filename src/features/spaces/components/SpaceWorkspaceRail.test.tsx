@@ -165,9 +165,9 @@ it("keeps the current page on load failure and ignores loads after the pane rout
       }),
   );
   fireEvent.click(screen.getByRole("link", { name: "Planner" }));
-  act(() => open("/files"));
+  act(() => open("/agents"));
   await act(async () => finish());
-  expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/files");
+  expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/agents");
 });
 
 it("keeps Library selected for Trash without duplicating Trash in the rail", () => {

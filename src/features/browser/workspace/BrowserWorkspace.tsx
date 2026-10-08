@@ -31,6 +31,7 @@ import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
 import { BrowserBookmarkDialog } from "./BrowserBookmarkDialog";
 import { BrowserBookmarkStar } from "./BrowserBookmarkStar";
 import { BrowserClearDataDialog } from "./BrowserClearDataDialog";
+import { BrowserClipboardButton } from "./BrowserClipboardButton";
 import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
@@ -623,6 +624,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
             onAttachPage={() => void attachPageToMisty()}
           />
           <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
+          <BrowserClipboardButton suspensionReason={`browser-clipboard:${browserRuntimeId(tab)}`} />
           {
             <BrowserDownloadsButton
               suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}

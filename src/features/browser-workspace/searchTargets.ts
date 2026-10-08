@@ -1,7 +1,6 @@
 import type { NavigateFunction } from "react-router-dom";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { openFilesTabRevealing } from "@/features/files/workspace";
 import type { OmniboxMatch } from "@/features/browser/omnibox";
 import type { ScopedSearchResult } from "./scopedSearchSources";
 
@@ -36,9 +35,6 @@ export function openResult(result: ScopedSearchResult, navigate: NavigateFunctio
         activeConversationId: target.conversationId,
       });
       navigate(`/agents?agent=${encodeURIComponent(target.agentId)}`);
-      return;
-    case "files":
-      navigate(openFilesTabRevealing(target.result));
       return;
     case "url":
       openInNewBrowserTab(target.url, navigate);

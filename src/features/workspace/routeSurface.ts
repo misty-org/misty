@@ -64,18 +64,6 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       scopeKey: "global",
     };
   }
-  if (path === "/files" || path === "/apps/files")
-    return {
-      ...request(
-        "files",
-        "tool:files",
-        "Files",
-        `/files${new URL(pathname, "https://misty.local").search}`,
-        "files",
-        "single",
-      ),
-      scopeKey: "global",
-    };
   if (path === "/agents" || path === "/apps/agents")
     return {
       ...request(

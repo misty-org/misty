@@ -77,7 +77,6 @@ describe("GlobalMisty", () => {
               accountId="account-1"
               currentPath="/apps/files"
               activePaneId="files-pane"
-              activePanePath="/apps/files"
             />
           </MemoryRouter>,
         );
@@ -97,7 +96,6 @@ describe("GlobalMisty", () => {
             accountId="account-1"
             currentPath="/browser"
             activePaneId=""
-            activePanePath=""
             onContentVisibilityChange={contentVisibilityChanged}
           />
         </MemoryRouter>,
@@ -153,7 +151,6 @@ describe("GlobalMisty", () => {
             accountId="account-1"
             currentPath="/browser"
             activePaneId=""
-            activePanePath=""
           />
         </MemoryRouter>,
       );
@@ -255,12 +252,7 @@ describe("GlobalMisty", () => {
         });
         root.render(
           <MemoryRouter>
-            <GlobalMisty
-              accountId="account-1"
-              currentPath="/browser"
-              activePaneId=""
-              activePanePath=""
-            />
+            <GlobalMisty accountId="account-1" currentPath="/browser" activePaneId="" />
           </MemoryRouter>,
         );
       });
@@ -304,12 +296,7 @@ describe("GlobalMisty", () => {
       });
       root.render(
         <MemoryRouter>
-          <GlobalMisty
-            accountId="account-1"
-            currentPath="/browser"
-            activePaneId=""
-            activePanePath=""
-          />
+          <GlobalMisty accountId="account-1" currentPath="/browser" activePaneId="" />
         </MemoryRouter>,
       );
     });
@@ -333,12 +320,7 @@ describe("GlobalMisty", () => {
       });
       root.render(
         <MemoryRouter>
-          <GlobalMisty
-            accountId="account-1"
-            currentPath="/browser"
-            activePaneId=""
-            activePanePath=""
-          />
+          <GlobalMisty accountId="account-1" currentPath="/browser" activePaneId="" />
         </MemoryRouter>,
       );
     });

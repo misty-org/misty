@@ -92,9 +92,6 @@
       "@uiw/react-md-editor": ["./node_modules/@uiw/react-md-editor/esm/index.d.ts"],
       "mammoth": ["./node_modules/mammoth/lib/index.d.ts"],
       "jszip": ["./node_modules/jszip/index.d.ts"],
-      "@crabnebula/tauri-plugin-drag": [
-        "./node_modules/@crabnebula/tauri-plugin-drag/dist-js/index.d.ts"
-      ],
       "@tauri-apps/api/webview": ["./node_modules/@tauri-apps/api/webview.d.ts"],
       "@tauri-apps/api/window": ["./node_modules/@tauri-apps/api/window.d.ts"],
     },

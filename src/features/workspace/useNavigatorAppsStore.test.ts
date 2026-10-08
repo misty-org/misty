@@ -25,7 +25,6 @@ describe("useNavigatorAppsStore", () => {
 
     expect(navigatorAppIdsForAccount(useNavigatorAppsStore.getState(), "account-1")).toEqual([
       "social",
-      "files",
       "agents",
       "browser",
     ]);
@@ -33,12 +32,12 @@ describe("useNavigatorAppsStore", () => {
     expect(NAVIGATOR_APP_IDS).not.toContain("home");
   });
 
-  it("filters Home out of an older saved app selection", () => {
+  it("filters Home and Files out of an older saved app selection", () => {
     const legacyState = {
-      appIdsByAccount: { "account-1": ["home", "inbox", "social", "files"] },
+      appIdsByAccount: { "account-1": ["home", "inbox", "social", "files", "agents"] },
     } as unknown as Pick<ReturnType<typeof useNavigatorAppsStore.getState>, "appIdsByAccount">;
 
-    expect(navigatorAppIdsForAccount(legacyState, "account-1")).toEqual(["social", "files"]);
+    expect(navigatorAppIdsForAccount(legacyState, "account-1")).toEqual(["social", "agents"]);
   });
 
   it("preserves an intentionally empty sidebar and keeps accounts separate", () => {

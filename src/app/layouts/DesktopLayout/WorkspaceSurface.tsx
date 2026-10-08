@@ -1,6 +1,5 @@
 import { ExtensionsWorkspace } from "@/features/extensions/ExtensionsWorkspace";
 import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
-import { FilesPage } from "@/features/files/workspace";
 import { BrowserWorkspace } from "@/features/browser/workspace";
 import { AgentsPage } from "@/features/agents";
 import {
@@ -11,7 +10,7 @@ import {
 import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
-export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceView; active?: boolean }) {
+export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const current = migrateRetiredWorkspaceView(tab);
   return (
     <RenderErrorBoundary key={`${current.id}:${current.surfaceId}`} scope="tab">
@@ -27,13 +26,6 @@ export function WorkspaceSurface({ tab, active = true }: { tab: WorkspaceView; a
             <SpaceWorkspaceSurface tab={current} />
           ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
             <AgentsPage />
-          ) : current.surfaceId === "files" ? (
-            <FilesPage
-              embedded
-              active={active}
-              workspaceId={current.id}
-              workspaceTitle={current.title}
-            />
           ) : (
             <BrowserWorkspace tab={current} />
           )}

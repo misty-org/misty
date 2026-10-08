@@ -1,6 +1,5 @@
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
 import type * as AppShell from "@/features/app-shell";
-import type * as FileSearch from "@/features/files/workspace/search";
 import type { SettingsSection } from "@/features/settings";
 import { fireEvent } from "@testing-library/react";
 import { act } from "react";
@@ -83,16 +82,6 @@ vi.mock("./store/useSettingsStore", async (importOriginal) => {
   return {
     ...actual,
     useSettingsStore,
-  };
-});
-vi.mock("@/features/files/workspace/search", async (importOriginal) => {
-  const actual = await importOriginal<typeof FileSearch>();
-  const useSearchStore = (selector?: (state: unknown) => unknown) =>
-    selector ? selector(mocks.searchState) : mocks.searchState;
-  useSearchStore.getState = () => mocks.searchState;
-  return {
-    ...actual,
-    useSearchStore,
   };
 });
 vi.mock("@/features/native-session", () => ({

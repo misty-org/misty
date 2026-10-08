@@ -16,8 +16,9 @@ describe("browser workspace route memory", () => {
   });
 
   it("does not remember retired tools, overlays, or external URLs", () => {
-    useAppRouteMemoryStore.getState().rememberAppRoute("/files");
+    useAppRouteMemoryStore.getState().rememberAppRoute("/agents");
     for (const route of [
+      "/files",
       "/code",
       "/store",
       "/discover",
@@ -30,7 +31,7 @@ describe("browser workspace route memory", () => {
       expect(isRememberableAppRoute(route)).toBe(false);
       useAppRouteMemoryStore.getState().rememberAppRoute(route);
     }
-    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/files");
+    expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe("/agents");
   });
 
   it.each(["/code", "/marketplace", "/home"])(

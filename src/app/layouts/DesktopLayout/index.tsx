@@ -69,10 +69,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   const {
     location,
     navigate,
-    app,
     settingsLoad,
     activePaneId,
-    activePanePath,
     activeWorkspacePaneId,
     lastAppRoute,
     lastNonSettingsRouteRef,
@@ -88,7 +86,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     closeTitlebarWindow,
   } = useDesktopWindowChrome();
   const appZoom = appZoomRenderScale(useAppZoomValue());
-  const { app: frameApp } = useDesktopFrameStyle();
+  useDesktopFrameStyle();
 
   const framePacingOverlayEnabled = useDesktopShellStatus();
 
@@ -256,7 +254,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   );
 
   useEffect(() => {
-    const tools = ["browser", "files", "agents"];
+    const tools = ["browser", "agents"];
     const unregister = tools.map((tool) =>
       registerShortcutHandler(`tool.${tool}`, () => focusTool(tool)),
     );
@@ -477,9 +475,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 currentPath={`${location.pathname}${location.search}`}
                 activePaneId={activePaneId}
                 activeWorkspacePaneId={activeWorkspacePaneId}
-                activePanePath={
-                  activePanePath || frameApp?.environment.homeDir || app?.environment.homeDir || ""
-                }
               />
             ) : null}
             <BrowserSearchDialog />

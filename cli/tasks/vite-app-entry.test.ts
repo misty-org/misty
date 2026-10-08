@@ -36,7 +36,7 @@ test("simultaneous desktop profiles do not rewrite each other's dependency cache
   assert.deepEqual(configuration("dev1", 5173), first);
 });
 
-test("the app dependency scan succeeds before Explorer or Drawings is opened", { timeout: 60000 }, async () => {
+test("the app dependency scan succeeds before Drawings is opened", { timeout: 60000 }, async () => {
   // Use the shipping config and graph, with a cold private cache. Standalone
   // probe HTML must not poison this scan or alter a running developer's cache.
   const cacheDir = await mkdtemp(join(tmpdir(), "misty-app-entry-test-"));
@@ -46,7 +46,6 @@ test("the app dependency scan succeeds before Explorer or Drawings is opened", {
     for (const dependency of [
       "react",
       "react-dom/client",
-      "@crabnebula/tauri-plugin-drag",
       "@excalidraw/excalidraw",
     ]) {
       assert.ok(metadata.optimized[dependency], `${dependency} must be ready before navigation`);

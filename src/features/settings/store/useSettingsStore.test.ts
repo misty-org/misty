@@ -58,14 +58,10 @@ describe("server preference runtime projection", () => {
       "app.startup.login": true,
       "app.shortcuts.bindings": JSON.stringify(shortcuts),
       "app.layout.presets": JSON.stringify(layouts),
-      "files.openWith": JSON.stringify({ ".txt": "/Applications/Editor.app" }),
     });
     expect(native.login).toHaveBeenCalledWith(true);
     expect(native.shortcuts).toHaveBeenCalledWith(shortcuts);
     expect(useDockingLayoutStore.getState().savedLayouts).toEqual(layouts);
-    expect(store.getState().openWithAssociations).toEqual([
-      { key: ".txt", applicationPath: "/Applications/Editor.app" },
-    ]);
     expect(store.getState().settings?.document.general).toMatchObject({ launch_on_login: true });
   });
   it("reassigns shortcuts as one shared mutation, including the unbound conflict", async () => {

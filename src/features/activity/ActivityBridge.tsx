@@ -1,5 +1,4 @@
 import { observeAccountChanges } from "@/api/accountEvents";
-import { useOperationActivity } from "./useOperationActivity";
 import { useAuth } from "@/features/auth";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -21,7 +20,6 @@ import { useActivityStore } from "./useActivityStore";
 export function ActivityBridge() {
   const { user, transitioning } = useAuth();
   const accountId = transitioning ? "" : (user?.id ?? "");
-  useOperationActivity(accountId);
   const interventions = useAgentInterventions();
   const memberRequests = useAgentMemberRequests();
   const { attentionCount, setAccount, syncSources, refresh, setOffline } = useActivityStore(

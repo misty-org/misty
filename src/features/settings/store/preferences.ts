@@ -30,15 +30,6 @@ export function selectAppearancePreferences(
     wallpaperPath: settingsString(source, "appearance", "wallpaper_path", ""),
   };
 }
-export function selectFilePreferences(
-  document: Record<string, unknown> | null | undefined,
-): FilePreferences {
-  const source = document ?? {};
-  return {
-    defaultViewModeIndex: settingsNumber(source, "files", "default_view_mode_index", 0),
-    showHiddenFiles: settingsBoolean(source, "files", "show_hidden_files", false),
-  };
-}
 export function selectNotificationPreferences(
   document: Record<string, unknown> | null | undefined,
 ): NotificationPreferences {
@@ -153,10 +144,6 @@ export interface AppearancePreferences {
   panelOpacity: number;
   thumbnailPreviewsEnabled: boolean;
   wallpaperPath: string;
-}
-export interface FilePreferences {
-  defaultViewModeIndex: number;
-  showHiddenFiles: boolean;
 }
 export interface NotificationPreferences {
   badgeCountEnabled: boolean;

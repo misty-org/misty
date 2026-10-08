@@ -1,12 +1,7 @@
 import type { AgentProfile } from "@/shared/schemas";
 import { searchApi } from "@/api/search/api";
 import type { GlobalAiConversation } from "@/features/global-search/types";
-import {
-  mergeHybridSearchResults,
-  queryIndexedExplorerSearch,
-  querySemanticExplorerSearch,
-} from "@/features/files/workspace";
-import type { SearchResult } from "@/native/ipc";
+import { kuraDownloadUrl, kuraOpen } from "@/native/kura";
 
 export type ScopedSearchKind =
   | "file"
@@ -33,7 +28,6 @@ export interface ScopedSearchResult {
   title: string;
   subtitle: string;
   target:
-    | { kind: "files"; result: SearchResult }
     | { kind: "route"; route: string }
     | { kind: "agent"; agentId: string; conversationId: string }
     /** A web page or Misty browser page, opened in a new browser tab. */
@@ -46,43 +40,28 @@ export interface ScopedSearchResult {
 
 export const resultLimit = 12;
 
-export async function searchIndexedFiles(query: string): Promise<SearchResult[]> {
-  try {
-    return await queryIndexedExplorerSearch(query, { limit: resultLimit * 2 }, null);
-  } catch {
-    return [];
-  }
-}
-
-/** Semantic hits cover file contents, captions and media transcripts. Space
- * library hits are left to `!spaces` so the two scopes don't overlap. */
-export async function searchFileContents(
-  query: string,
-  indexed: SearchResult[],
-): Promise<SearchResult[]> {
-  try {
-    const semantic = await querySemanticExplorerSearch(query, { limit: resultLimit * 2 });
-    return mergeHybridSearchResults(
-      indexed,
-      semantic.filter((hit) => hit.entry.location.providerType !== "misty-space"),
-      resultLimit,
-    );
-  } catch {
-    return indexed;
-  }
-}
-
-export function fileResults(hits: SearchResult[]): ScopedSearchResult[] {
-  return hits.slice(0, resultLimit).map((hit) => ({
-    id: `file:${hit.entry.path}#${hit.match?.mediaSegmentId ?? ""}`,
-    kind: hit.entry.kind === "folder" ? "folder" : "file",
-    title: hit.entry.name,
-    subtitle:
-      hit.match?.kind === "semantic" && hit.match.description
-        ? hit.match.description
-        : (hit.entry.location.remoteName ?? hit.entry.path),
-    target: { kind: "files", result: hit },
-  }));
+/** Files live in Kura, a separate file manager; `!files` hands the search to it. */
+export function kuraSearchResult(query: string, installed: boolean): ScopedSearchResult {
+  if (!installed)
+    return {
+      id: "kura:install",
+      kind: "action",
+      title: "Search your files with Kura",
+      subtitle: "Kura isn't installed. Get Kura, the free file manager",
+      target: { kind: "url", url: kuraDownloadUrl },
+    };
+  return {
+    id: `kura:search:${query}`,
+    kind: "action",
+    title: `Search for “${query}” in Kura`,
+    subtitle: "Opens Kura, the file manager",
+    target: {
+      kind: "run",
+      run: () => {
+        void kuraOpen({ action: "search", query }).catch(() => undefined);
+      },
+    },
+  };
 }
 
 export async function searchSpaces(

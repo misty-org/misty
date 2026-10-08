@@ -2,7 +2,7 @@ import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useActivityStore } from "@/features/activity";
-import { activeLayoutView, allLayoutViews, useWorkspaceStore } from "@/features/workspace";
+import { activeLayoutView, useWorkspaceStore } from "@/features/workspace";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { GlobalNavigator } from "./GlobalNavigator";
@@ -75,27 +75,26 @@ function pointer(element: EventTarget, type: string, x: number, y: number) {
 describe("navigation reordering", () => {
   it("saves keyboard moves without navigating or toggling a tray, survives remounts and isolates accounts", async () => {
     const ui = renderNavigator();
-    const files = screen.getByRole("button", { name: "Files" });
-    files.focus();
+    const agents = screen.getByRole("link", { name: "Agents" });
+    agents.focus();
     const before = workspace().layout;
-    fireEvent.keyDown(files, { key: "ArrowUp", altKey: true, shiftKey: true });
+    fireEvent.keyDown(agents, { key: "ArrowUp", altKey: true, shiftKey: true });
     await waitFor(() =>
-      expect(destinationOrder()).toEqual(["browser", "files", "agents", "extensions", "spaces"]),
+      expect(destinationOrder()).toEqual(["agents", "browser", "extensions", "spaces"]),
     );
     expect(saveOrder).toHaveBeenCalledWith(
       "collections.tabs.navigator",
-      '["browser","files","agents","extensions","spaces"]',
+      '["agents","browser","extensions","spaces"]',
     );
-    expect(document.activeElement).toBe(files);
-    expect(files.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(agents);
     expect(workspace().layout).toBe(before);
     ui.unmount();
     renderNavigator();
-    expect(destinationOrder()[1]).toBe("files");
+    expect(destinationOrder()[0]).toBe("agents");
     act(() =>
       useSettingsProfiles.setState({ accountId: "account-2", state: initialProfileState({}) }),
     );
-    expect(destinationOrder()).toEqual(["browser", "agents", "files", "extensions", "spaces"]);
+    expect(destinationOrder()).toEqual(["browser", "agents", "extensions", "spaces"]);
   });
 
   it.each(["left", "right", "top", "bottom"] as const)(
@@ -120,7 +119,7 @@ describe("navigation reordering", () => {
       pointer(window, "pointerup", vertical ? 10 : 110, vertical ? 110 : 10);
       fireEvent.click(browser, { detail: 1 });
       await waitFor(() =>
-        expect(destinationOrder().slice(0, 3)).toEqual(["agents", "files", "browser"]),
+        expect(destinationOrder().slice(0, 3)).toEqual(["agents", "extensions", "browser"]),
       );
       expect(workspace().layout).toBe(before);
       expect(document.querySelector(".pointer-reorder-shield")).toBeNull();
@@ -129,15 +128,13 @@ describe("navigation reordering", () => {
 
   it("leaves child destinations and fixed utilities out of reordering", () => {
     renderNavigator();
-    for (const name of ["Explorer", "Transfers", "Search", "Create Space"])
-      fireEvent.keyDown(
-        screen.getByRole(name === "Explorer" || name === "Transfers" ? "link" : "button", { name }),
-        { key: "ArrowUp", altKey: true, shiftKey: true },
-      );
+    for (const name of ["Search", "Create Space"])
+      fireEvent.keyDown(screen.getByRole("button", { name }), {
+        key: "ArrowUp",
+        altKey: true,
+        shiftKey: true,
+      });
     expect(saveOrder).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("link", { name: "Explorer" }).closest("[data-reorder-handle]"),
-    ).toBeNull();
     expect(
       screen.getByRole("button", { name: "Search" }).closest("[data-reorder-item]"),
     ).toBeNull();
@@ -175,7 +172,7 @@ describe("browser workspace navigator", () => {
     saveBookmark({ title: "Example", url: "example.com", folderId: folder });
     renderNavigator();
     const nav = screen.getByRole("navigation", { name: "Primary" });
-    for (const name of ["Browser", "Agents", "Explorer", "Transfers"])
+    for (const name of ["Browser", "Agents"])
       expect(within(nav).getByRole("link", { name })).toBeTruthy();
     expect(within(nav).getByRole("button", { name: "Spaces" })).toBeTruthy();
     expect(within(nav).queryByRole("heading", { name: "Groups" })).toBeNull();
@@ -183,14 +180,12 @@ describe("browser workspace navigator", () => {
     expect(within(nav).queryByText("Reading")).toBeNull();
     expect(workspace().bookmarks).toHaveLength(1);
     const pages = within(nav).getAllByRole("link");
-    expect(pages.slice(0, 4).map((page) => page.getAttribute("aria-label"))).toEqual([
+    expect(pages.slice(0, 2).map((page) => page.getAttribute("aria-label"))).toEqual([
       "Browser",
       "Agents",
-      "Explorer",
-      "Transfers",
     ]);
     expect(pages[0].closest(".misty-navigator-items")).toBeTruthy();
-    for (const name of ["Browser", "Agents", "Explorer", "Transfers"])
+    for (const name of ["Browser", "Agents"])
       expect(
         within(nav).getByRole("link", { name }).hasAttribute("data-navigation-destination"),
       ).toBe(true);
@@ -208,76 +203,6 @@ describe("browser workspace navigator", () => {
       surfaceId: "agents",
       route: "/agents",
     });
-  });
-  it("opens Explorer inside the Files group", () => {
-    renderNavigator();
-    fireEvent.click(screen.getByRole("link", { name: "Explorer" }));
-    expect(activeLayoutView(workspace().layout)).toMatchObject({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      route: "/files",
-    });
-    expect(screen.getByRole("link", { name: "Explorer" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-  });
-  it("opens Transfers separately and resumes the matching Files destination", () => {
-    const folder = workspace().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Projects",
-      route: "/files?path=Projects",
-      state: { path: "/Projects" },
-    });
-    renderNavigator();
-    fireEvent.click(screen.getByRole("link", { name: "Transfers" }));
-    const transfer = activeLayoutView(workspace().layout)!;
-    expect(transfer).toMatchObject({
-      surfaceId: "files",
-      title: "Transfers",
-      route: "/files?view=transfers",
-      state: { path: "misty-transfers://history" },
-    });
-    expect(transfer.id).not.toBe(folder.id);
-    expect(screen.getByRole("link", { name: "Transfers" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-    fireEvent.click(screen.getByRole("link", { name: "Explorer" }));
-    expect(activeLayoutView(workspace().layout)?.id).toBe(folder.id);
-    fireEvent.click(screen.getByRole("link", { name: "Transfers" }));
-    expect(activeLayoutView(workspace().layout)?.id).toBe(transfer.id);
-    expect(
-      allLayoutViews(workspace().layout).filter((tab) => tab.surfaceId === "files"),
-    ).toHaveLength(2);
-  });
-  it("fills an explicit blank tab with Transfers", () => {
-    workspace().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
-      title: "Files",
-      route: "/files",
-    });
-    workspace().newTab();
-    const count = workspace().layout.tabs?.length;
-    renderNavigator();
-    fireEvent.click(screen.getByRole("link", { name: "Transfers" }));
-    expect(activeLayoutView(workspace().layout)?.route).toBe("/files?view=transfers");
-    expect(workspace().layout.tabs?.length).toBe(count);
-  });
-  it("collapses the Files destinations and retains the active group", () => {
-    renderNavigator();
-    fireEvent.click(screen.getByRole("link", { name: "Transfers" }));
-    const toggle = screen.getByRole("button", { name: "Files" });
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(toggle.getAttribute("data-active")).toBe("true");
-    expect(document.getElementById("navigator-files")?.hasAttribute("inert")).toBe(true);
-    fireEvent.click(toggle);
-    expect(document.getElementById("navigator-files")?.hasAttribute("inert")).toBe(false);
-    expect(screen.getByRole("link", { name: "Transfers" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
   });
   it("opens the same global browser search from the navbar button", () => {
     renderNavigator();

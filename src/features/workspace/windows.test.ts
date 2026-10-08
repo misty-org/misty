@@ -34,8 +34,8 @@ describe("workspace virtual windows", () => {
     });
     const secondWindow = useWorkspaceStore.getState().createWindow("Research");
     useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Terminal",
       route: "/terminal",
       forceNew: true,
@@ -47,7 +47,7 @@ describe("workspace virtual windows", () => {
     );
     expect(useWorkspaceStore.getState().switchWindow(secondWindow.id)).toBe(true);
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toContainEqual(
-      expect.objectContaining({ surfaceId: "files" }),
+      expect.objectContaining({ surfaceId: "agents" }),
     );
     useWorkspaceStore.getState().setScope("space:work");
     expect(useWorkspaceStore.getState().windowsByScope["space:work"]).toHaveLength(1);
@@ -175,10 +175,10 @@ describe("workspace virtual windows", () => {
   it("focuses a known tab by switching to its owning virtual window", () => {
     const firstWindowId = useWorkspaceStore.getState().activeWindowId;
     const files = useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       forceNew: true,
     });
     useWorkspaceStore.getState().createWindow("Second");
@@ -248,17 +248,17 @@ describe("workspace virtual windows", () => {
 
   it("swaps pane views without changing the tab layout", () => {
     const files = useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Files",
-      route: "/files",
+      route: "/agents",
       forceNew: true,
     });
     const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
     const terminal = useWorkspaceStore.getState().openSurface({
-      surfaceId: "files",
-      groupKey: "tool:files",
+      surfaceId: "agents",
+      groupKey: "tool:agents",
       title: "Terminal",
       route: "/terminal",
       forceNew: true,

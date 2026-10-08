@@ -133,8 +133,7 @@ impl Request {
             cancel: &self.cancel,
         };
         let entries = if self.input.format == "zip" {
-            crate::infra::power_pack::archive_zip_entries(reader, 500)
-                .map_err(|error| error.to_string())?
+            archive_zip_entries(reader, 500).map_err(|error| error.to_string())?
         } else {
             // System tools inspect a private snapshot. They cannot reopen the
             // original pathname, follow adjacent volumes or read outside this work area.
@@ -192,7 +191,7 @@ impl Request {
                 .lines()
                 .filter(|line| !line.trim().is_empty())
                 .take(500)
-                .map(|line| crate::infra::power_pack::ArchiveEntry {
+                .map(|line| ArchiveEntry {
                     path: line.trim().to_owned(),
                     is_dir: line.trim_end().ends_with('/'),
                     compressed_size: 0,
@@ -369,4 +368,35 @@ mod tests {
         p.archive_reads.remove(&id);
         assert!(p.archive_reads.is_empty());
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArchiveEntry {
+    pub path: String,
+    pub is_dir: bool,
+    pub compressed_size: u64,
+    pub uncompressed_size: u64,
+}
+
+/// ZIP metadata for an archive preview, read without extracting anything.
+fn archive_zip_entries<R: std::io::Read + std::io::Seek>(
+    file: R,
+    limit: usize,
+) -> Result<Vec<ArchiveEntry>, String> {
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|err| format!("Could not read ZIP archive: {err}"))?;
+    let mut entries = Vec::new();
+    for index in 0..archive.len().min(limit) {
+        let entry = archive
+            .by_index(index)
+            .map_err(|err| format!("Could not read ZIP entry: {err}"))?;
+        entries.push(ArchiveEntry {
+            path: entry.name().to_owned(),
+            is_dir: entry.is_dir(),
+            compressed_size: entry.compressed_size(),
+            uncompressed_size: entry.size(),
+        });
+    }
+    Ok(entries)
 }

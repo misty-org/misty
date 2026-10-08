@@ -1,7 +1,6 @@
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
   Bell,
-  Folder,
   Globe,
   Info,
   Keyboard,
@@ -34,13 +33,11 @@ import {
   SpaceAgendaSection,
   SpaceDefaultsSection,
 } from "./sections/FeatureSections";
-import { FilesSection } from "./sections/FilesSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { LayoutSection } from "./sections/LayoutSection";
 import { MistySection } from "./sections/MistySection";
 import { NotificationsSection } from "./sections/NotificationsSection";
 import { PrivacySection } from "./sections/PrivacySection";
-import { SearchSection } from "./sections/SearchSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
@@ -56,7 +53,6 @@ export type SettingsArea =
   | "notifications"
   | "shortcuts"
   | "browser"
-  | "files"
   | "spaces"
   | "agents"
   | "sync"
@@ -73,7 +69,6 @@ export const settingsAreas: Record<
   notifications: { label: "Notifications", icon: Bell },
   shortcuts: { label: "Shortcuts", icon: Keyboard },
   browser: { label: "Browser", icon: Globe, breakBefore: true },
-  files: { label: "Files", icon: Folder },
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
   sync: { label: "Sync", icon: RefreshCw, breakBefore: true },
@@ -123,24 +118,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "Privacy",
     (p) => <PrivacySection {...p} page="browser" />,
     "account",
-  ),
-  page("files", "files", "Browsing", FilesSection),
-  page(
-    "files",
-    "files-locations",
-    "Locations",
-    (p) => <FilesSection {...p} page="locations" />,
-    "account",
-    true,
-  ),
-  page("files", "search", "Search", (p) => <SearchSection {...p} page="search" />, "account", true),
-  page(
-    "files",
-    "files-indexing",
-    "Indexing",
-    (p) => <SearchSection {...p} page="indexing" />,
-    "account",
-    true,
   ),
   page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
   page("spaces", "spaces-agenda", "Agenda", SpaceAgendaSection),

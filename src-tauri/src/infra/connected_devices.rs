@@ -1210,7 +1210,8 @@ async fn handle_authorized_stream(
     let mut claims = claims;
     claims.permissions = policy_permissions(&policy.files, policy.clipboard);
     let consent = local.consent(&claims.source_device_id);
-    let writable = consent.accepts_writes;
+    // Peer file browsing moved to Kura; Misty never accepts file changes.
+    let writable = false;
     let _ = &connections;
     match envelope.request {
         PeerRequest::DeliverFile {

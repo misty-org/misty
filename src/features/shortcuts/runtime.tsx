@@ -262,8 +262,6 @@ function focusedShortcutScope(): ShortcutScope {
   switch (tab?.surfaceId) {
     case "browser":
       return "tool:browser";
-    case "files":
-      return "tool:files";
     case "space": {
       const route = tab.route.toLowerCase();
       if (route.includes("/tasks/roadmaps") || route.includes("/roadmap")) return "tool:roadmap";

@@ -16,7 +16,6 @@ import { configurePageRestore } from "@/features/browser-workspace/pageRestoreSe
 import {
   settingsApplyLaunchOnLogin,
   settingsLaunchOnLoginSnapshot,
-  settingsOpenWithAssociations,
   settingsSave,
   settingsSnapshot,
   shortcutsReplace,
@@ -24,7 +23,6 @@ import {
 } from "@/native";
 import type {
   LaunchOnLoginSnapshot,
-  OpenWithAssociation,
   ReassignShortcutRequest,
   ResetShortcutRequest,
   SettingsSnapshot,
@@ -69,7 +67,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
   settings: null,
   launchOnLogin: null,
-  openWithAssociations: [],
   shortcuts: null,
   loaded: false,
   working: false,
@@ -81,10 +78,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     settingsLoad = (async () => {
       set({ working: true, error: null });
       try {
-        const [settings, shortcuts, openWithAssociations, launchOnLogin] = await Promise.all([
+        const [settings, shortcuts, launchOnLogin] = await Promise.all([
           settingsSnapshot(),
           shortcutsSnapshot(),
-          settingsOpenWithAssociations(),
           settingsLaunchOnLoginSnapshot(),
         ]);
         if (
@@ -100,7 +96,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         set({
           settings,
           launchOnLogin,
-          openWithAssociations,
           shortcuts,
         });
       } catch (error) {
@@ -124,12 +119,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const saved = await saveLocalDocument(document);
       if (!valid()) return;
       applySettingsSideEffects(saved.document);
-      set({
-        settings: saved,
-        openWithAssociations: Object.entries(
-          (saved.document.open_with as Record<string, string>) ?? {},
-        ).map(([key, applicationPath]) => ({ key, applicationPath })),
-      });
+      set({ settings: saved });
       const desired = settingsBoolean(saved.document, "general", "launch_on_login", false);
       const launch = get().launchOnLogin;
       if (launch?.supported && launch.enabled !== desired) {
@@ -166,28 +156,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       return;
     }
     set({ error: `Unknown setting: ${section}.${key}` });
-  },
-
-  setOpenWithAssociation: async (filePath, applicationPath) => {
-    const name = filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? filePath;
-    const dot = name.lastIndexOf(".");
-    const key = (dot >= 0 ? name.slice(dot) : name).toLowerCase();
-    const associations = {
-      ...((get().settings?.document.open_with as Record<string, string>) ?? {}),
-      [key]: applicationPath,
-    };
-    await writeProfilePreference("files.openWith", JSON.stringify(associations));
-  },
-  removeOpenWithAssociation: async (key) => {
-    const associations = {
-      ...((get().settings?.document.open_with as Record<string, string>) ?? {}),
-    };
-    delete associations[key];
-    try {
-      await writeProfilePreference("files.openWith", JSON.stringify(associations));
-    } catch (error) {
-      set({ error: errorText(error) });
-    }
   },
 
   updateShortcut: async (request) => {
@@ -313,7 +281,6 @@ export interface SettingsStore {
   activeSection: SettingsSection;
   settings: SettingsSnapshot | null;
   launchOnLogin: LaunchOnLoginSnapshot | null;
-  openWithAssociations: OpenWithAssociation[];
   shortcuts: ShortcutsSnapshot | null;
   loaded: boolean;
   working: boolean;
@@ -323,8 +290,6 @@ export interface SettingsStore {
   load: () => Promise<void>;
   applyProfileValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
-  setOpenWithAssociation: (filePath: string, applicationPath: string) => Promise<void>;
-  removeOpenWithAssociation: (key: string) => Promise<void>;
   updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;
   reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;
   resetShortcuts: (request?: ResetShortcutRequest) => Promise<void>;

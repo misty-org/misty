@@ -11,17 +11,16 @@ vi.mock("@/features/workspace", () => ({
 vi.mock("@/features/spaces/SpaceWorkspaceSurface", () => ({
   SpaceWorkspaceSurface: () => <div>Space content</div>,
 }));
-vi.mock("@/features/agents", () => ({ AgentsPage: () => <div>Agents content</div> }));
 vi.mock("@/features/browser/workspace/BrowserWorkspace", () => ({
   BrowserWorkspace: () => <input aria-label="Browser draft" defaultValue="Keep my work" />,
 }));
-vi.mock("@/features/files/workspace/explorer", async () => {
+vi.mock("@/features/agents", async () => {
   const { lazy, Suspense } = await import("react");
   const FailedModule = lazy(() =>
     Promise.reject(new TypeError("Importing a module script failed.")),
   );
   return {
-    default: () => (
+    AgentsPage: () => (
       <Suspense>
         <FailedModule />
       </Suspense>
@@ -29,20 +28,20 @@ vi.mock("@/features/files/workspace/explorer", async () => {
   };
 });
 
-const filesTab: WorkspaceView = {
-  id: "files",
-  surfaceId: "files",
-  groupKey: "tool:files",
-  instanceKey: "files",
-  title: "Files",
-  route: "/files",
+const agentsTab: WorkspaceView = {
+  id: "agents",
+  surfaceId: "agents",
+  groupKey: "tool:agents",
+  instanceKey: "agents",
+  title: "Agents",
+  route: "/agents",
   sidebarVisible: true,
   state: null,
   createdAt: 1,
   lastFocusedAt: 1,
 };
 const browserTab: WorkspaceView = {
-  ...filesTab,
+  ...agentsTab,
   id: "browser",
   surfaceId: "browser",
   groupKey: "tool:browser",
@@ -60,7 +59,7 @@ it("contains a rejected lazy module without unmounting the browser or navigation
     <RenderErrorBoundary>
       <nav>Browser navigation</nav>
       <WorkspaceSurface tab={browserTab} />
-      <WorkspaceSurface tab={filesTab} />
+      <WorkspaceSurface tab={agentsTab} />
     </RenderErrorBoundary>,
   );
   const draft = screen.getByLabelText("Browser draft");
@@ -73,7 +72,7 @@ it("contains a rejected lazy module without unmounting the browser or navigation
 });
 
 it("can navigate to another surface after a tab failed", async () => {
-  const { rerender } = render(<WorkspaceSurface tab={filesTab} />);
+  const { rerender } = render(<WorkspaceSurface tab={agentsTab} />);
   await screen.findByText("This tab could not be loaded");
   rerender(<WorkspaceSurface tab={browserTab} />);
   expect(screen.getByLabelText("Browser draft")).toBeTruthy();
@@ -83,7 +82,7 @@ it("can navigate to another surface after a tab failed", async () => {
 it("does not reset workspace snapshots when retrying a failed module request", async () => {
   localStorage.setItem("misty.providers.multipanel.v1", "saved-layout");
   localStorage.setItem("misty.explorer.fileTable.columnOrder", "saved-columns");
-  render(<WorkspaceSurface tab={filesTab} />);
+  render(<WorkspaceSurface tab={agentsTab} />);
   fireEvent.click(await screen.findByRole("button", { name: "Reload Misty" }));
   expect(localStorage.getItem("misty.providers.multipanel.v1")).toBe("saved-layout");
   expect(localStorage.getItem("misty.explorer.fileTable.columnOrder")).toBe("saved-columns");

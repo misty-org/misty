@@ -137,7 +137,7 @@ function itemFixture(): ActivityItem {
     attention: true,
     target: {
       kind: "workspace-tool",
-      tool: "files",
+      tool: "agents",
     },
   };
 }

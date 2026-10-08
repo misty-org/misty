@@ -66,10 +66,6 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
-                path: "files",
-                element: null,
-              },
-              {
                 path: "spaces/*",
                 element: null,
               },

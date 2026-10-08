@@ -7,7 +7,6 @@ import {
   TasksDestinationIcon,
   AgendaDestinationIcon,
   RoadmapsDestinationIcon,
-  ExplorerDestinationIcon,
   AllItemsDestinationIcon,
   FavoritesDestinationIcon,
   CollectionsDestinationIcon,
@@ -35,9 +34,6 @@ export function DestinationIcon({
   appId: NavigatorAppId;
   item: MistyNavigationItem;
 }) {
-  if (appId === "files") {
-    if (item.id === "explorer") return <ExplorerDestinationIcon aria-hidden />;
-  }
   if (isPinnedDestination(item)) return <Link2 aria-hidden />;
   if (item.id === "misty") return <MistyBrandIcon size={18} />;
   if (Object.prototype.hasOwnProperty.call(websiteIntegrations, item.id))

@@ -197,6 +197,11 @@ func (s *Server) mountAgentsRoutes(prefix string, service *api.AgentsService) {
 	s.Router.Put(prefix+"/devices/{deviceID}/devices/{targetID}/name", service.DeviceAuthenticated(service.RenameDevice()))
 	s.Router.Put(prefix+"/devices/{deviceID}/policy", service.DeviceAuthenticated(service.StoreDevicePolicy()))
 	s.Router.Post(prefix+"/devices/{deviceID}/remove-device", service.DeviceAuthenticated(service.RemoveDevice()))
+	// The cloud clipboard Worker accepts only tickets signed here; clips are
+	// end-to-end encrypted and never pass through this server.
+	if clipboard, err := api.ClipboardConfigFromEnv(); err == nil {
+		s.Router.Post(prefix+"/devices/{deviceID}/clipboard-ticket", service.DeviceAuthenticated(service.ClipboardTicket(clipboard)))
+	}
 	if connectedDevicesEnabled {
 		// Space peer sessions between accounts still verify server tickets.
 		s.Router.Get(prefix+"/devices/peer-ticket-keys", service.ConnectedDeviceTicketKeys())

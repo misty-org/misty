@@ -3,9 +3,6 @@
 #[cfg(target_os = "macos")]
 #[path = "mini_app_capability_worker.rs"]
 mod capability_worker;
-#[cfg(target_os = "macos")]
-#[path = "mini_app_file_index.rs"]
-mod file_index;
 use super::{require_host, MiniAppState};
 #[path = "mini_app_remembered_permissions.rs"]
 mod remembered_permissions;
@@ -526,10 +523,6 @@ pub async fn mini_app_device_call(
     params: Value,
 ) -> Result<Value, String> {
     require_host(&webview)?;
-    #[cfg(target_os = "macos")]
-    if method == "files.index" {
-        return file_index::execute(app, &state, &instance, params).await;
-    }
     if method == "files.renderOwnedImage" {
         return document_processing::image_preview(&state, &instance, params).await;
     }
