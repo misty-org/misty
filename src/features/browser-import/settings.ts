@@ -55,9 +55,5 @@ export function applyImportedSettings(settings: ImportedSettings) {
     update("general", "reopen_last_session", settings.restoreSession);
     applied.push(settings.restoreSession ? "reopening your last session" : "starting fresh");
   }
-  if (typeof settings.showBookmarksBar === "boolean") {
-    update("general", "browser_bookmarks_bar", settings.showBookmarksBar);
-    applied.push(settings.showBookmarksBar ? "the bookmarks bar" : "a hidden bookmarks bar");
-  }
   return { applied, skipped };
 }

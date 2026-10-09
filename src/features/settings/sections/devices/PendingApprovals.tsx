@@ -98,7 +98,7 @@ export function PendingApprovals() {
               )}
             </Row>
             {current?.code ? (
-              <div className="border-b border-charcoal-border px-5 py-4">
+              <div className="border-t border-charcoal-border py-3">
                 <p className="font-mono text-2xl tracking-[0.3em] text-cream" aria-live="polite">
                   {current.code.slice(0, 3)} {current.code.slice(3)}
                 </p>
@@ -108,7 +108,7 @@ export function PendingApprovals() {
         );
       })}
       {error ? (
-        <p role="alert" className="px-5 py-3 text-sm text-cream">
+        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
           {error}
         </p>
       ) : null}

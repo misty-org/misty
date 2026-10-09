@@ -9,6 +9,7 @@
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "eval:pointing": "vitest run --config evals/pointing/vitest.config.ts",
     "world:setup": "bootstrap",
     "postinstall": "node scripts/patch-workflow-schema.ts"
   },

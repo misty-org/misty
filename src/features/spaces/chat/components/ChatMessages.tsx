@@ -44,7 +44,7 @@ export interface SpaceChatMessagesProps {
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
 import {
-  SocialError as SystemErrorActivity,
+  SocialError as SystemErrorNotice,
   socialErrorMessage as systemErrorMessage,
 } from "../SocialRuntime";
 import { Button } from "@/shared/ui";
@@ -79,11 +79,10 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
       <div>
         {props.error ? (
           <>
-            <SystemErrorActivity
+            <SystemErrorNotice
               error={props.error}
               scope={`social:${props.spaceId}`}
               title="Social messages could not be loaded"
-              target={{ kind: "space-chat", spaceId: props.spaceId }}
             />
             <div
               className="mb-3 flex items-start gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"

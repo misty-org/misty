@@ -11,17 +11,8 @@ import {
 import { errorText } from "@/shared/lib/format";
 import { formatBytes } from "@/shared/lib/fileFormat";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import {
-  Button,
-  IconButton,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  SkeletonList,
-  toolbarIconProps,
-} from "@/shared/ui";
+import { Button, MenuSubmenu, SkeletonList } from "@/shared/ui";
 import { listen } from "@tauri-apps/api/event";
-import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
 const statusText: Record<CloudClipboardView["status"], string> = {
   off: "Clipboard sharing is off for this device.",
@@ -32,9 +23,11 @@ const statusText: Record<CloudClipboardView["status"], string> = {
     "Your shared clipboard can't be reached right now. Paired devices on this network still share it.",
 };
 
-/** Recent clips from this account's devices. Copying one puts it on this device's clipboard. */
-export function BrowserClipboardButton(props: { suspensionReason: string }) {
-  const overlay = useBrowserOverlayControl(props.suspensionReason);
+/**
+ * Recent clips from this account's devices, as a submenu of the browser menu. Copying one
+ * puts it on this device's clipboard. The menu mounts it fresh each time it opens.
+ */
+export function BrowserClipboardButton() {
   const [view, setView] = useState<CloudClipboardView | null>(null);
   const [message, setMessage] = useState("");
   const refresh = useCallback(() => {
@@ -45,7 +38,6 @@ export function BrowserClipboardButton(props: { suspensionReason: string }) {
   }, []);
 
   useEffect(() => {
-    if (!overlay.open) return;
     refresh();
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -58,7 +50,7 @@ export function BrowserClipboardButton(props: { suspensionReason: string }) {
       disposed = true;
       unlisten?.();
     };
-  }, [overlay.open, refresh]);
+  }, [refresh]);
 
   const run = (action: () => Promise<string>) => {
     setMessage("");
@@ -68,20 +60,8 @@ export function BrowserClipboardButton(props: { suspensionReason: string }) {
   };
 
   return (
-    <Popover
-      open={overlay.open}
-      onOpenChange={(open) => {
-        setMessage("");
-        overlay.onOpenChange(open);
-      }}
-    >
-      <PopoverTrigger asChild>
-        <IconButton label="Shared clipboard" tooltip={false} title="Shared clipboard">
-          <ClipboardList {...toolbarIconProps} />
-        </IconButton>
-      </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={8} className="grid w-80 gap-1 p-1">
-        <p className="px-2 pt-1.5 text-xs text-cream-muted">Shared clipboard</p>
+    <MenuSubmenu icon={<ClipboardList />} label="Clipboard" width="lg">
+      <div className="grid gap-1">
         {view === null ? (
           <SkeletonList label="Loading clips" rows={3} lines={2} className="px-1" />
         ) : (
@@ -96,7 +76,6 @@ export function BrowserClipboardButton(props: { suspensionReason: string }) {
                 justify="start"
                 className="w-full font-normal"
                 onClick={() => {
-                  overlay.onOpenChange(false);
                   window.dispatchEvent(
                     new CustomEvent("misty:open-settings", { detail: { section: "devices" } }),
                   );
@@ -139,8 +118,8 @@ export function BrowserClipboardButton(props: { suspensionReason: string }) {
             {message}
           </p>
         ) : null}
-      </PopoverContent>
-    </Popover>
+      </div>
+    </MenuSubmenu>
   );
 }
 

@@ -5,8 +5,21 @@ import { AgentConversationView } from "./AgentConversationView";
 
 afterEach(cleanup);
 
-function message(id: string, role: GlobalAiMessage["role"], content: string, extra: Partial<GlobalAiMessage> = {}): GlobalAiMessage {
-  return { id, role, mode: "ask", content, createdAt: "2026-10-05T12:00:00Z", state: "completed", ...extra };
+function message(
+  id: string,
+  role: GlobalAiMessage["role"],
+  content: string,
+  extra: Partial<GlobalAiMessage> = {},
+): GlobalAiMessage {
+  return {
+    id,
+    role,
+    mode: "ask",
+    content,
+    createdAt: "2026-10-05T12:00:00Z",
+    state: "completed",
+    ...extra,
+  };
 }
 
 function conversation(messages: GlobalAiMessage[]) {
@@ -38,7 +51,10 @@ it("shows no divider before anything was summarized", () => {
     <AgentConversationView
       working={false}
       onRetry={() => {}}
-      conversation={conversation([message("1-user", "user", "Hi"), message("1-assistant", "assistant", "Hello.")])}
+      conversation={conversation([
+        message("1-user", "user", "Hi"),
+        message("1-assistant", "assistant", "Hello."),
+      ])}
     />,
   );
   expect(screen.queryByRole("separator", { name: "Earlier messages summarized" })).toBeNull();

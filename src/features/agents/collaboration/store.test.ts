@@ -20,7 +20,13 @@ const plan = (version: number, state: AgentPlan["state"] = "proposed"): AgentPla
   conversationId: "c1",
   version,
   author: "agent",
-  plan: { title: `Plan ${version}`, summary: "", steps: [{ id: "s1", title: "Read", risk: "read" }], assumptions: [], successCriteria: [] },
+  plan: {
+    title: `Plan ${version}`,
+    summary: "",
+    steps: [{ id: "s1", title: "Read", risk: "read" }],
+    assumptions: [],
+    successCriteria: [],
+  },
   progress: {},
   state,
   createdAt: `2026-10-06T0${version}:00:00Z`,
@@ -31,7 +37,14 @@ const questionSet = (state: AgentQuestionSet["state"]): AgentQuestionSet => ({
   id: "question_1",
   runId: "invocation_1",
   conversationId: "c1",
-  questions: [{ header: "Scope", question: "Which week?", multiSelect: false, options: [{ label: "This" }, { label: "Next" }] }],
+  questions: [
+    {
+      header: "Scope",
+      question: "Which week?",
+      multiSelect: false,
+      options: [{ label: "This" }, { label: "Next" }],
+    },
+  ],
   state,
   handedOff: false,
   createdAt: "2026-10-06T00:00:00Z",
@@ -81,7 +94,9 @@ it("rolls a mode change back when the server refuses it", async () => {
 it("applies question and plan events, ignoring a stale plan version", () => {
   const store = useCollaborationStore.getState();
   store.applyEvent("c1", { type: "question.requested", questionSet: questionSet("pending") });
-  expect(pendingQuestionSet(useCollaborationStore.getState().byConversation.c1)?.id).toBe("question_1");
+  expect(pendingQuestionSet(useCollaborationStore.getState().byConversation.c1)?.id).toBe(
+    "question_1",
+  );
   store.applyEvent("c1", { type: "question.answered", questionSet: questionSet("answered") });
   expect(pendingQuestionSet(useCollaborationStore.getState().byConversation.c1)).toBeUndefined();
   store.applyEvent("c1", { type: "plan.proposed", plan: plan(2) });
@@ -90,7 +105,11 @@ it("applies question and plan events, ignoring a stale plan version", () => {
   expect(state.plan?.version).toBe(2);
   expect(state.planHistory.map((item) => item.version)).toEqual([2]);
   store.applyEvent("c1", { type: "plan.proposed", plan: plan(3) });
-  expect(useCollaborationStore.getState().byConversation.c1!.planHistory.map((item) => [item.version, item.state])).toEqual([
+  expect(
+    useCollaborationStore
+      .getState()
+      .byConversation.c1!.planHistory.map((item) => [item.version, item.state]),
+  ).toEqual([
     [3, "proposed"],
     [2, "superseded"],
   ]);
@@ -112,7 +131,9 @@ it("drops another account's state and answers", async () => {
   useCollaborationStore.getState().applyEvent("c1", { type: "plan.proposed", plan: plan(1) });
   let resolve!: (value: unknown) => void;
   api.answer.mockReturnValue(new Promise((done) => (resolve = done)));
-  const answering = useCollaborationStore.getState().answer(questionSet("pending"), [{ selected: ["This"] }]);
+  const answering = useCollaborationStore
+    .getState()
+    .answer(questionSet("pending"), [{ selected: ["This"] }]);
   useCollaborationStore.getState().setAccount("other");
   resolve({ questionSet: questionSet("answered"), continuation: { prompt: "My answers" } });
   expect(await answering).toBeUndefined();
@@ -121,9 +142,11 @@ it("drops another account's state and answers", async () => {
 
 it("attaches to a goal continuation once it starts, and stops looking without a goal", async () => {
   const reconnect = vi.fn();
-  api.get.mockResolvedValueOnce(loaded({ goal: { status: "pursuing" } as never })).mockResolvedValueOnce(
-    loaded({ goal: { status: "pursuing" } as never, runningInvocationId: "invocation_2" }),
-  );
+  api.get
+    .mockResolvedValueOnce(loaded({ goal: { status: "pursuing" } as never }))
+    .mockResolvedValueOnce(
+      loaded({ goal: { status: "pursuing" } as never, runningInvocationId: "invocation_2" }),
+    );
   useCollaborationStore.getState().afterRunSettled("c1", reconnect, () => false);
   await vi.advanceTimersByTimeAsync(1_600);
   expect(reconnect).not.toHaveBeenCalled();

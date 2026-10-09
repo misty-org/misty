@@ -24,17 +24,21 @@ text chat takes no screenshots and does not require the native overlay to start.
    parallel input transcript. Voice transcripts are acknowledged durably before
    tool dispatch. Typed turns clear the composer after text invocation admission
    and receive their answer through the normal invocation event stream.
-4. The voice model has five bounded functions: `get_context`, `start_task`,
-   `get_task_status`, `steer_task`, and `cancel_task`. These are requests to the
-   existing authenticated task lifecycle, not independent execution authority.
-   Dispatch waits for durable input and measured provider completion. Stable
-   server-issued keys, owned invocation bindings and client generation guards
-   prevent duplicate or cross-conversation actions.
-5. Screen questions use `start_task(needs_screen=true)` to attach fresh native
-   display captures to the existing vision-capable task. Ordinary conversation
-   takes no screenshots. Screen-description requests delegate observation only;
-   images and tool results are evidence, never permission. The voice model does
-   not claim it has inspected the screen before verified results arrive.
+4. The voice model has six bounded functions: `get_context`, `show_on_screen`,
+   `start_task`, `get_task_status`, `steer_task`, and `cancel_task`. These are
+   requests to the existing authenticated task lifecycle, not independent
+   execution authority. Dispatch waits for durable input and measured provider
+   completion. Stable server-issued keys, owned invocation bindings and client
+   generation guards prevent duplicate or cross-conversation actions.
+5. Screen questions call `show_on_screen`. The desktop captures every display at
+   once and admits one tool-free teaching turn (`companion_intent: "teach"`, low
+   reasoning). Its answer is pointed at and read aloud. Work requests still call
+   `start_task`; a task that needs the screen calls `screen_look`, and its
+   continuation keeps the voice conversation open and is the answer read aloud
+   (updated October 8, 2026; ledger L1, L2, L12). Ordinary conversation takes no
+   screenshots. Images and tool results are evidence, never permission. The voice
+   model does not claim it has inspected the screen before verified results
+   arrive.
 6. Tasks delegated by voice are narrated from the owned, completed invocation. The desktop sends
    only its ID; the server derives the saved result and disables tool execution
    during narration. Continuous PCM playback starts with 250 ms of jitter

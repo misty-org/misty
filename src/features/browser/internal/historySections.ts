@@ -3,6 +3,7 @@ export const historySections = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "older", label: "Older" },
+  { value: "archived", label: "Archived" },
 ] as const;
 
 export type HistorySection = (typeof historySections)[number]["value"];

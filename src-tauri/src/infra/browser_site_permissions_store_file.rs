@@ -23,7 +23,8 @@ fn file_lock() -> &'static Mutex<()> {
 }
 
 fn path() -> Option<PathBuf> {
-    super::super::paths::misty_home_dir().map(|home| home.join("browser").join("site-permissions.json"))
+    super::super::paths::misty_home_dir()
+        .map(|home| home.join("browser").join("site-permissions.json"))
 }
 
 pub(super) fn forget_temporary() {
@@ -62,7 +63,9 @@ pub(super) unsafe fn update_scope(
 ) -> Result<SitePermissions, String> {
     match scope {
         StoreScope::Persistent(profile) => {
-            let _guard = file_lock().lock().map_err(|_| "Site permissions are unavailable.")?;
+            let _guard = file_lock()
+                .lock()
+                .map_err(|_| "Site permissions are unavailable.")?;
             let mut store = read_store();
             let sites = store.entry(profile.clone()).or_default();
             update_site(sites, origin, permissions);
@@ -72,7 +75,9 @@ pub(super) unsafe fn update_scope(
             Ok(sites)
         }
         StoreScope::Temporary(session) => {
-            let mut sessions = temporary().lock().map_err(|_| "Site permissions are unavailable.")?;
+            let mut sessions = temporary()
+                .lock()
+                .map_err(|_| "Site permissions are unavailable.")?;
             let sites = sessions.entry(*session).or_default();
             update_site(sites, origin, permissions);
             Ok(sites.clone())
@@ -88,7 +93,9 @@ pub(super) fn read_store() -> PermissionStore {
 }
 
 pub(super) fn write_store(store: &PermissionStore) -> Result<(), String> {
-    let _guard = file_lock().lock().map_err(|_| "Site permissions are unavailable.")?;
+    let _guard = file_lock()
+        .lock()
+        .map_err(|_| "Site permissions are unavailable.")?;
     write_file(store)
 }
 
@@ -120,7 +127,10 @@ mod tests {
             let persisted_before = read_store();
             let sites = update_scope(&scope, "https://example.com", allowed.clone()).unwrap();
             assert_eq!(sites.get("https://example.com"), Some(&allowed));
-            assert_eq!(sites_for_scope(&scope).get("https://example.com"), Some(&allowed));
+            assert_eq!(
+                sites_for_scope(&scope).get("https://example.com"),
+                Some(&allowed)
+            );
             assert_eq!(read_store(), persisted_before);
             update_scope(&scope, "https://example.com", Permissions::default()).unwrap();
             assert!(sites_for_scope(&scope).is_empty());

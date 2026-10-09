@@ -387,7 +387,9 @@ impl ConnectedDevicesService {
                 Some(true) => return self.snapshot(),
                 // Another account or device: nothing of the previous one carries over.
                 Some(false) => {
-                    if let Some(previous) = self.state.write().map_err(lock_error)?.take() {
+                    // Release the lock before awaiting the close.
+                    let previous = self.state.write().map_err(lock_error)?.take();
+                    if let Some(previous) = previous {
                         previous.endpoint.close().await;
                     }
                 }

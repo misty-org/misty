@@ -3,9 +3,10 @@ import { aiSurfaceApi, type ScreenLocation } from "@/features/ai-surface/api";
 import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
 import { ChoiceControl } from "../SettingsControls";
 
+// "window" is a new tab in this window; the stored name predates the label.
 const options: { value: ScreenLocation; label: string }[] = [
+  { value: "window", label: "New tab" },
   { value: "separate", label: "Separate window" },
-  { value: "window", label: "This window" },
   { value: "ask", label: "Ask each time" },
 ];
 
@@ -18,7 +19,7 @@ export function ScreenLocationSection() {
     let live = true;
     aiSurfaceApi
       .settings()
-      .then((result) => live && setLocation(result.settings.screen_location ?? "separate"))
+      .then((result) => live && setLocation(result.settings.screen_location ?? "window"))
       .catch(() => live && setError("This setting couldn’t load."));
     return () => {
       live = false;
@@ -46,12 +47,14 @@ export function ScreenLocationSection() {
       }
     >
       <DesktopSettingsRow
-        label="Where Misty works on screen"
-        description="A separate window leaves this one to you. This window opens a tab beside your work."
-        last
+        label="Where Misty opens new screens"
+        description={
+          "A new tab opens beside your work. A separate window leaves this one to you. " +
+          "Saying where in your request, such as this tab or my whole screen, always wins."
+        }
       >
         <ChoiceControl
-          value={location ?? "separate"}
+          value={location ?? "window"}
           options={options}
           disabled={location === null || working}
           onValueChange={(value) => void change(value as ScreenLocation)}

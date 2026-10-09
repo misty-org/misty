@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/library/library/LibraryRuntime", async () => ({
-  LibraryError: (await import("@/features/activity")).SystemErrorActivity,
+  LibraryError: (await import("@/features/support/systemErrors")).SystemErrorNotice,
   libraryApi: {
     libraryItems: vi.fn().mockResolvedValue({ items: [] }),
   },

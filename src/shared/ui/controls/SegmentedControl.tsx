@@ -35,9 +35,9 @@ const itemSizes = {
 } as const;
 
 /**
- * A pill track of mutually exclusive choices, such as view modes or Search/Ask. It is a radio
+ * A rounded-rectangle track of mutually exclusive choices, such as view modes or Search/Ask. It is a radio
  * group: the chosen option is the tab stop, and arrow keys, Home, and End change the choice.
- * Features never draw their own segmented pills.
+ * Features never draw their own segmented controls.
  */
 function SegmentedControl<T extends string>({
   label,
@@ -56,7 +56,7 @@ function SegmentedControl<T extends string>({
       orientation="horizontal"
       aria-label={label}
       className={cn(
-        "flex shrink-0 items-center gap-0.5 rounded-full border border-charcoal-border/70 bg-charcoal-sidebar p-0.5",
+        "flex shrink-0 items-center gap-0.5 rounded-lg border border-charcoal-border/70 bg-charcoal-sidebar p-0.5",
         fill ? "w-full" : "w-fit",
         className,
       )}
@@ -78,7 +78,7 @@ function SegmentedControl<T extends string>({
           title={option.title}
           {...option.attributes}
           className={cn(
-            "inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-full font-medium text-cream-muted outline-none transition-colors",
+            "inline-flex min-w-0 items-center justify-center whitespace-nowrap rounded-md font-medium text-cream-muted outline-none transition-colors",
             "hover:bg-control-hover hover:text-cream",
             "data-[state=checked]:bg-charcoal-active data-[state=checked]:text-cream-bright data-[state=checked]:shadow-sm",
             "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:pointer-events-none disabled:opacity-50",

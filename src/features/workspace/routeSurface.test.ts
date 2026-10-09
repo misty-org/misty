@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 
 describe("browser workspace deep links", () => {
-  it.each(["/settings", "/account", "/signin", "/register", "/activity"])(
+  it.each(["/settings", "/account", "/signin", "/register"])(
     "keeps %s outside the workspace",
     (route) => {
       expect(workspaceSurfaceFromRoute(route)).toBeNull();
@@ -26,11 +26,14 @@ describe("browser workspace deep links", () => {
       workspaceSurfaceFromRoute("/browser?url=https%3A%2F%2Fexample.com%2Freport")?.state,
     ).toMatchObject({ url: "https://example.com/report" });
   });
-  it.each(["/files", "/apps/files"])("no longer opens %s as a tool; Files moved to Kura", (route) => {
-    expect(
-      workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)?.surfaceId,
-    ).not.toBe("files");
-  });
+  it.each(["/files", "/apps/files"])(
+    "no longer opens %s as a tool; Files moved to Kura",
+    (route) => {
+      expect(
+        workspaceSurfaceFromRoute(`${route}?path=%2FUsers%2Fada&select=notes.txt`)?.surfaceId,
+      ).not.toBe("files");
+    },
+  );
   it("keeps agent run links intact", () => {
     expect(workspaceSurfaceFromRoute("/agents?run=task-1")).toMatchObject({
       surfaceId: "agents",

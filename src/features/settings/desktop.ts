@@ -1,5 +1,6 @@
 export {
   DesktopSettingsFrame,
+  DesktopSettingsNotice,
   DesktopSettingsRow,
   DesktopSettingsSection,
 } from "./components/DesktopSettingsUI";

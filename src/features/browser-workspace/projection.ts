@@ -152,10 +152,15 @@ export function projectWorkspace(
         title: tab.fields.title,
         root: build(tab.fields.tree),
         focusedPaneId: paneIds.includes(focused) ? focused : paneIds[0],
-        ...(groups ? { tabGroupId: groups.groupOfTab.get(tab.id) } : {}),
+        ...(tab.fields.pinned_url ? { pinnedUrl: tab.fields.pinned_url } : {}),
+        ...(groups && !tab.fields.pinned_url ? { tabGroupId: groups.groupOfTab.get(tab.id) } : {}),
       });
     }
-    byWindow.set(window.id, windowTabs);
+    // Concurrent reorders can interleave; pinned tabs always lead their window.
+    byWindow.set(window.id, [
+      ...windowTabs.filter((tab) => tab.pinnedUrl),
+      ...windowTabs.filter((tab) => !tab.pinnedUrl),
+    ]);
   }
 
   // Preserve every live view even if a concurrently replaced split/container

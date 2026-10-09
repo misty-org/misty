@@ -264,6 +264,7 @@ variables and deliberate compatibility aliases are called out separately below.
 | `MISTY_AI_MODEL_CATALOG_JSON` | `integrations/ai.env` | `server/internal/agents/model_catalog_version.go` |
 | `VISION_PROCESSOR_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` |
 | `VISION_PROCESSOR_TOKEN` | `integrations/ai.env` | `server/internal/app/server_core.go` |
+| `MISTY_COMPANION_TEACH_REASONING` | `integrations/ai.env` | `server/internal/platform/httpapi/ai_cursor_companion.go` |
 | `MISTY_AGENT_MODEL` | `integrations/ai.env` | `server/internal/platform/config/agent_model.go` · `server/apps/agent-runtime/src/model-provider.ts` |
 | `MISTY_AI_MAX_TOKENS_PER_DAY` | `integrations/ai.env` | `server/internal/agents/provider_budget_limits.go` |
 | `MISTY_AI_MAX_TOKENS_PER_HOUR` | `integrations/ai.env` | `server/internal/agents/provider_budget_limits.go` |

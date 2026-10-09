@@ -26,7 +26,7 @@ This document covers the dedicated Bookmarks page and bookmark editor, including
 
 Bookmarks are saved links organized into a tree of folders under three roots, as in Chrome, Edge and Firefox: Bookmarks bar, Other bookmarks and Mobile bookmarks. Live tab groups belong to the visible workspace tab strip, documented in [DesktopLayout](../../app/layouts/DesktopLayout/DESIGN.md). The former Groups popup is retired.
 
-Sources: [tree.ts](tree.ts), [library.ts](library.ts), [BookmarkEditor.tsx](BookmarkEditor.tsx), [BookmarkFolderDialog.tsx](BookmarkFolderDialog.tsx), [BookmarksBar.tsx](BookmarksBar.tsx), [BookmarkRows.tsx](../browser/internal/BookmarkRows.tsx), [BookmarksPage.tsx](../browser/internal/BookmarksPage.tsx), [InternalPageFrame.tsx](../browser/internal/InternalPageFrame.tsx), and shared controls under `src/shared/ui`.
+Sources: [tree.ts](tree.ts), [library.ts](library.ts), [BookmarkEditor.tsx](BookmarkEditor.tsx), [BookmarkFolderDialog.tsx](BookmarkFolderDialog.tsx), [BookmarkRows.tsx](../browser/internal/BookmarkRows.tsx), [BookmarksPage.tsx](../browser/internal/BookmarksPage.tsx), [InternalPageFrame.tsx](../browser/internal/InternalPageFrame.tsx), and shared controls under `src/shared/ui`.
 
 ## Colors
 

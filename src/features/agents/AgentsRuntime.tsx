@@ -1,11 +1,10 @@
-import type { MistyActivityOperation } from "@/shared/schemas";
 import { runtimeProperty } from "@/shared/lib/runtimeProperty";
 import type { agentsApi } from "@/api/agents/api";
 import type { assistantApi } from "@/api/assistant/api";
 import type { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
 import type { useAuth, useAccountAvatarUrl } from "@/features/auth";
 import type { useWorkspaceStore } from "@/features/workspace";
-import type { SystemErrorActivity } from "@/features/activity";
+import type { SystemErrorNotice } from "@/features/support/systemErrors";
 import type {
   executeGlobalSearch,
   executeGlobalVisualSearch,
@@ -17,7 +16,6 @@ import type {
 } from "@/features/global-search/mistyImageAttachments";
 export interface AgentsRuntime {
   openMisty(input?: { spaceId?: string; conversationId?: string; agentId?: string }): Promise<void>;
-  reportActivity?(event: MistyActivityOperation, accountId: string): void;
   agentsApi: typeof agentsApi;
   assistantApi: typeof assistantApi;
   aiSurfaceApi: typeof aiSurfaceApi;
@@ -25,7 +23,7 @@ export interface AgentsRuntime {
   useAuth: typeof useAuth;
   useAccountAvatarUrl: typeof useAccountAvatarUrl;
   useWorkspaceStore: typeof useWorkspaceStore;
-  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorActivity>>;
+  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorNotice>>;
   executeGlobalSearch: typeof executeGlobalSearch;
   executeGlobalVisualSearch: typeof executeGlobalVisualSearch;
   createAgentOwnedBrowserWorkspace: typeof createAgentOwnedBrowserWorkspace;
@@ -77,11 +75,7 @@ export const runtimeAgentsApi = service("agentsApi"),
   uploadAgentsImage = service("uploadMistyImage"),
   deleteAgentsImage = service("deleteMistyImage"),
   readAgentsImage = service("readImage");
-export const AgentsError = (props: React.ComponentProps<typeof SystemErrorActivity>) => {
+export const AgentsError = (props: React.ComponentProps<typeof SystemErrorNotice>) => {
   const View = agentsRuntime().Error;
   return <View {...props} />;
 };
-
-export function captureAgentActivityReporter() {
-  return current?.reportActivity;
-}

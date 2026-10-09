@@ -109,6 +109,11 @@ export default defineConfig(({ command, mode }) => {
           replacement: new URL(`../src/shared/platform/nodeShims/${file}.ts`, import.meta.url)
             .pathname,
         })),
+        {
+          find: /^sharp$/,
+          replacement: new URL("../src/shared/platform/nodeShims/sharp.ts", import.meta.url)
+            .pathname,
+        },
       ],
     },
     build: {

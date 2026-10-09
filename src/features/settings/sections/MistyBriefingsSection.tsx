@@ -36,7 +36,7 @@ export function MistyBriefingsSection(props: MistyBriefingsSectionProps) {
         title="Recurring briefings"
         description="Personal scheduled briefings are being prepared for a future Misty release."
       >
-        <div className="flex min-h-16 items-center justify-between gap-4 px-5 py-3.5">
+        <div className="flex min-h-16 items-center justify-between gap-4 border-t border-charcoal-border py-3.5">
           <span className="text-[13px] text-cream-muted">coming soon...</span>
           <a
             className={
@@ -160,7 +160,6 @@ export function MistyBriefingsSection(props: MistyBriefingsSectionProps) {
       <SettingsRow
         label="Briefing focus"
         description={`Runs in ${recapDraft.timezone}. Scheduled outputs are personal and cite their source objects.`}
-        last
       >
         <div className="w-full max-w-md space-y-2">
           <Textarea

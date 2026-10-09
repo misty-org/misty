@@ -1,13 +1,35 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), plan: vi.fn() }));
+import type { MistyScreenDevice } from "./screenDevice";
+type Script = (device: MistyScreenDevice, goal: string) => Promise<string | undefined>;
+const mocks = vi.hoisted(() => ({
+  invoke: vi.fn(),
+  script: undefined as unknown as Script,
+  options: undefined as unknown,
+}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("./screenActPlanner", () => ({ planScreenAction: mocks.plan }));
+vi.mock("@/api/client", () => ({ apiRequest: vi.fn() }));
+// Midscene's Agent plans; these tests script its plans against the real device.
+vi.mock("@midscene/core/agent", () => ({
+  Agent: class {
+    constructor(
+      readonly device: MistyScreenDevice,
+      options: unknown,
+    ) {
+      mocks.options = options;
+    }
+    aiAct(goal: string) {
+      return mocks.script(this.device, goal);
+    }
+  },
+}));
 import { runScreenAct } from "./screenActJob";
 
-const frame = {
-  documentId: "doc",
-  image: { dataUrl: "data:image/png;base64,AA", width: 800, height: 600 },
-};
+let frames = 0;
+let changing = true;
+const frame = () => ({
+  documentId: `doc-${frames}`,
+  image: { dataUrl: `data:image/png;base64,${changing ? frames++ : 0}`, width: 800, height: 600 },
+});
 const job = {
   id: "job",
   scopeId: "agent-scope-1",
@@ -20,28 +42,39 @@ const calls = (operation: string) =>
   mocks.invoke.mock.calls.filter(
     ([name, args]) => name === "browser_agent_execute" && args.request.operation === operation,
   );
+/** Runs one planned action the way Midscene does and returns its planning note. */
+async function act(device: MistyScreenDevice, name: string, param: Record<string, unknown>) {
+  await device.size();
+  await device.screenshotBase64();
+  const action = device.actionSpace().find((candidate) => candidate.name === name)!;
+  const context = { task: {} as { planningFeedback?: string } };
+  await action.call(param, context as never);
+  return context.task.planningFeedback;
+}
 beforeEach(() => {
+  frames = 0;
+  changing = true;
   mocks.invoke.mockReset();
-  mocks.plan.mockReset();
   mocks.invoke.mockImplementation(
     async (name: string, args: { request: { operation: string } }) => {
       if (name === "browser_runtime_for_scope") return "runtime";
       if (name !== "browser_agent_execute") return undefined;
-      return args.request.operation === "browser.visual" ? frame : { cursor: { x: 0.5, y: 0.25 } };
+      return args.request.operation.endsWith(".visual") ? frame() : { cursor: { x: 0.5, y: 0.25 } };
     },
   );
 });
 
-it("runs one goal locally with its own grant and reports where the cursor stopped", async () => {
-  mocks.plan
-    .mockResolvedValueOnce({
-      action: { kind: "click", x: 0.5, y: 0.25 },
+it("runs one goal with Midscene's Agent under its own grant", async () => {
+  let note: string | undefined;
+  mocks.script = async (device) => {
+    note = await act(device, "click", {
+      x: 0.5,
+      y: 0.25,
       consequential: false,
       description: "Save",
-      complete: false,
-      message: "",
-    })
-    .mockResolvedValueOnce({ complete: true, message: "The draft is saved." });
+    });
+    return "The draft is saved.";
+  };
   const result = await runScreenAct(job, new AbortController().signal);
   expect(result).toMatchObject({
     status: "done",
@@ -49,6 +82,7 @@ it("runs one goal locally with its own grant and reports where the cursor stoppe
     actions: 1,
     cursor: { x: 0.5, y: 0.25 },
   });
+  expect(mocks.options).toMatchObject({ generateReport: false, waitAfterAction: 0 });
   expect(mocks.invoke).toHaveBeenCalledWith("browser_agent_grant_register", {
     request: expect.objectContaining({
       grantId: "ctx:job:act",
@@ -56,36 +90,25 @@ it("runs one goal locally with its own grant and reports where the cursor stoppe
     }),
   });
   expect(calls("browser.interact")[0][1].request.input).toMatchObject({
-    documentId: "doc",
+    documentId: "doc-0",
     action: { kind: "native", input: { kind: "click", x: 0.5, y: 0.25 } },
     __mistyTaskId: "task",
   });
-  expect(mocks.plan.mock.calls[1][4][0]).toContain("Cursor now at (0.500, 0.250)");
+  expect(note).toContain("Cursor now at (0.500, 0.250)");
   expect(mocks.invoke).toHaveBeenLastCalledWith("browser_agent_grant_revoke", {
     request: { id: "runtime", grantId: "ctx:job:act" },
   });
 });
 
 it("stops before a consequential action unless the user allowed it", async () => {
-  mocks.plan.mockResolvedValue({
-    action: { kind: "click", x: 0.9, y: 0.9 },
-    consequential: true,
-    description: "Send",
-    complete: false,
-    message: "",
-  });
+  const send = { x: 0.9, y: 0.9, consequential: true, description: "Send" };
+  mocks.script = async (device) => {
+    await act(device, "click", send);
+    return "Sent.";
+  };
   const result = await runScreenAct(job, new AbortController().signal);
   expect(result.status).toBe("needs_confirmation");
   expect(calls("browser.interact")).toHaveLength(0);
-  mocks.plan
-    .mockResolvedValueOnce({
-      action: { kind: "click", x: 0.9, y: 0.9 },
-      consequential: true,
-      description: "Send",
-      complete: false,
-      message: "",
-    })
-    .mockResolvedValueOnce({ complete: true, message: "Sent." });
   const allowed = await runScreenAct(
     { ...job, input: { goal: "Send it", allowConsequential: true } },
     new AbortController().signal,
@@ -99,8 +122,11 @@ it("reports a failure before any input as not attempted", async () => {
     if (name === "browser_runtime_for_scope") return "runtime";
     if (name === "browser_agent_execute") throw new Error("browser_context_closed");
   });
+  mocks.script = async (device) => {
+    await device.size();
+    return undefined;
+  };
   await expect(runScreenAct(job, new AbortController().signal)).rejects.toMatchObject({
-    name: "Error",
     message: "browser_context_closed",
   });
   const { DeviceOperationNotAttempted } = await import("../workerBrowserJobs");
@@ -109,30 +135,50 @@ it("reports a failure before any input as not attempted", async () => {
   );
 });
 
-it("feeds a malformed planner reply back once instead of ending the goal", async () => {
-  mocks.plan
-    .mockRejectedValueOnce(new Error("XML parse error: Invalid parameters for action click"))
-    .mockResolvedValueOnce({ complete: true, message: "Done." });
+it("answers with the planner's reason when it cannot finish", async () => {
+  mocks.script = async () => {
+    throw new Error("Task failed: The page asks for a sign-in code.\nlog");
+  };
   const result = await runScreenAct(job, new AbortController().signal);
-  expect(result).toMatchObject({ status: "done", actions: 0 });
-  expect(mocks.plan.mock.calls.map((call) => call[1])).toEqual([0, 1]);
-  expect(mocks.plan.mock.calls[1][4][0]).toContain("Your last reply was invalid");
+  expect(result).toMatchObject({
+    status: "incomplete",
+    summary: "The page asks for a sign-in code.",
+  });
 });
 
 it("ends the goal when the page stops responding to its actions", async () => {
-  mocks.plan.mockResolvedValue({
-    action: { kind: "click", x: 0.3, y: 0.1 },
-    consequential: false,
-    description: "Click Save",
-    complete: false,
-    message: "",
-  });
+  changing = false;
+  const notes: Array<string | undefined> = [];
+  const click = { x: 0.3, y: 0.1, consequential: false, description: "Click Save" };
+  mocks.script = async (device) => {
+    for (;;) notes.push(await act(device, "click", click));
+  };
   const result = await runScreenAct(job, new AbortController().signal);
   expect(result).toMatchObject({ status: "incomplete", actions: 3 });
   expect(result.summary).toContain("did not respond after 3 tries at: Click Save");
-  expect(mocks.plan.mock.calls[2][4]).toContain(
-    'The screenshot did not change after "Click Save". Try something different or report that you cannot finish.',
-  );
+  expect(notes[0]).toContain('The screenshot did not change after "Click Save"');
+});
+
+it("waits on the live capture without acting", async () => {
+  // The bot moves once, then the board holds still.
+  mocks.invoke.mockImplementation(async (name: string) => {
+    if (name === "browser_runtime_for_scope") return "runtime";
+    if (name !== "browser_agent_execute") return undefined;
+    const next = Math.min(frames++, 2);
+    return { documentId: `doc-${next}`, image: { ...frame().image, dataUrl: `data:${next}` } };
+  });
+  let note: string | undefined;
+  mocks.script = async (device) => {
+    note = await act(device, "WaitForScreenChange", {
+      timeoutSeconds: 5,
+      description: "The bot's move",
+    });
+    return "Waited.";
+  };
+  const result = await runScreenAct(job, new AbortController().signal);
+  expect(result).toMatchObject({ status: "done", actions: 0 });
+  expect(note).toMatch(/The screen changed after \d+s and has settled/);
+  expect(calls("browser.interact")).toHaveLength(0);
 });
 
 it("acts on the desktop through workspace actions with Misty's own cursor", async () => {
@@ -141,36 +187,28 @@ it("acts on the desktop through workspace actions with Misty's own cursor", asyn
     async (name: string, args: { request: { operation: string } }) => {
       if (name === "browser_runtime_for_scope") return "runtime";
       if (name !== "browser_agent_execute") return undefined;
-      return args.request.operation === "browser.workspace.visual"
-        ? { ...frame, image: { ...frame.image, dataUrl: `data:${Math.random()}` } }
-        : { attempted: true };
+      return args.request.operation === "browser.workspace.visual" ? frame() : { attempted: true };
     },
   );
-  mocks.plan
-    .mockResolvedValueOnce({
-      action: { kind: "drag", fromX: 0.1, fromY: 0.1, toX: 0.2, toY: 0.2 },
-      consequential: false,
-      description: "Drag the slider",
-      complete: false,
-      message: "",
-    })
-    .mockResolvedValueOnce({
-      action: { kind: "click", x: 0.4, y: 0.6 },
+  let names: string[] = [];
+  mocks.script = async (device) => {
+    names = device.actionSpace().map((action) => action.name);
+    await act(device, "click", {
+      x: 0.4,
+      y: 0.6,
       consequential: false,
       description: "Click Add Row",
-      complete: false,
-      message: "",
-    })
-    .mockResolvedValueOnce({
-      action: { kind: "key", key: "SelectAll" },
+    });
+    await act(device, "key", {
+      key: "SelectAll",
       consequential: false,
       description: "Select the cell text",
-      complete: false,
-      message: "",
-    })
-    .mockResolvedValueOnce({ complete: true, message: "Row added." });
+    });
+    return "Row added.";
+  };
   const result = await runScreenAct(desktop, new AbortController().signal);
   expect(result).toMatchObject({ status: "done", actions: 2, cursor: { x: 0.4, y: 0.6 } });
+  expect(names).not.toContain("drag");
   expect(mocks.invoke).toHaveBeenCalledWith("browser_agent_grant_register", {
     request: expect.objectContaining({
       capabilities: ["browser.workspace.visual", "browser.workspace.interact"],
@@ -180,6 +218,4 @@ it("acts on the desktop through workspace actions with Misty's own cursor", asyn
     { kind: "point", x: 0.4, y: 0.6 },
     { kind: "key", key: "SelectAll" },
   ]);
-  expect(mocks.plan.mock.calls[1][4][0]).toContain("drag is not available here");
-  expect(mocks.plan.mock.calls[0][5]).toBe("desktop");
 });

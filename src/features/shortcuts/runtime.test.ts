@@ -9,6 +9,7 @@ import {
   useShortcutHandler,
   useShortcutTitle,
 } from "./runtime";
+import { detectShortcutPlatform } from "./bindings";
 
 describe("shortcut dispatcher", () => {
   beforeEach(() => {
@@ -74,7 +75,7 @@ describe("shortcut dispatcher", () => {
 
     expect(
       dispatchShortcutEvent(
-        new KeyboardEvent("keydown", { key: "k", code: "KeyK", ctrlKey: true }),
+        new KeyboardEvent("keydown", { key: "t", code: "KeyT", ctrlKey: true }),
       ),
     ).toBe(true);
     expect(calls).toEqual(["focused", "fallback"]);
@@ -109,8 +110,8 @@ describe("shortcut dispatcher", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("search.toggle", handler);
     const event = new KeyboardEvent("keydown", {
-      key: "k",
-      code: "KeyK",
+      key: "t",
+      code: "KeyT",
       ctrlKey: true,
     });
     Object.defineProperty(event, "target", { value: textarea });
@@ -129,8 +130,8 @@ describe("shortcut dispatcher", () => {
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
-          key: "k",
-          code: "KeyK",
+          key: "t",
+          code: "KeyT",
           ctrlKey: true,
           repeat: true,
         }),
@@ -226,5 +227,57 @@ describe("shortcut dispatcher", () => {
     expect(result.current).toContain("Back");
     rerender({ label: "Previous" });
     expect(result.current).toContain("Previous");
+  });
+
+  it("matches search.toggle with both primary and alternate shortcut keys", () => {
+    const handler = vi.fn();
+    const remove = registerShortcutHandler("search.toggle", handler);
+    // Primary: Cmd+T / Ctrl+T
+    const primaryEvent = new KeyboardEvent("keydown", {
+      key: "t",
+      code: "KeyT",
+      ctrlKey: true,
+      metaKey: false,
+    });
+    expect(dispatchShortcutEvent(primaryEvent)).toBe(true);
+
+    // Alternate: Cmd+K / Ctrl+K
+    const alternateEvent = new KeyboardEvent("keydown", {
+      key: "k",
+      code: "KeyK",
+      ctrlKey: true,
+      metaKey: false,
+    });
+    expect(dispatchShortcutEvent(alternateEvent)).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(2);
+    remove();
+  });
+
+  it("handles forwarded browser-scoped shortcut events when browser surface is active", () => {
+    const store = useWorkspaceStore.getState();
+    const browserTab = store.openSurface({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: "Browser",
+      route: "/browser",
+      instancePolicy: "multiple",
+    });
+    store.focusView(browserTab.id);
+    const editAddressHandler = vi.fn();
+    const remove = registerShortcutHandler("browser.edit_address", editAddressHandler);
+
+    const platform = detectShortcutPlatform();
+    const event = new KeyboardEvent("keydown", {
+      key: "l",
+      code: "KeyL",
+      metaKey: platform === "macos",
+      ctrlKey: platform !== "macos",
+    });
+    // Simulating forwarded event from embedded browser with editable=false
+    expect(dispatchShortcutEvent(event, false)).toBe(true);
+    expect(editAddressHandler).toHaveBeenCalledOnce();
+
+    remove();
+    store.closeView(browserTab.id);
   });
 });

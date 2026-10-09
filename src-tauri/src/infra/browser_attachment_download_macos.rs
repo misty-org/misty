@@ -1,5 +1,6 @@
 //! Honor HTTP attachment responses even when WebKit can display their MIME type.
 //! Wry 0.55 otherwise only selects Download for non-displayable responses.
+//! Also reports failed loads as finished, which Wry 0.55 never does on macOS.
 #![allow(unexpected_cfgs)]
 use objc::{msg_send, sel, sel_impl};
 use objc2_foundation::{NSHTTPURLResponse, NSString};
@@ -48,6 +49,25 @@ extern "C" fn response_policy(
     }
 }
 
+/// WebKit reports a failed or cancelled load through didFail instead of
+/// didFinish, and Wry only forwards didFinish, so the tab would keep showing
+/// a spinner. Finish it like WebView2 does, unless a newer load is underway.
+extern "C" fn load_failed(
+    delegate: &objc::runtime::Object,
+    _selector: objc::runtime::Sel,
+    webview: *mut objc::runtime::Object,
+    navigation: *mut objc::runtime::Object,
+    _error: *mut objc::runtime::Object,
+) {
+    unsafe {
+        let loading: objc::runtime::BOOL = msg_send![webview, isLoading];
+        if loading != objc::runtime::NO {
+            return;
+        }
+        let _: () = msg_send![delegate, webView: webview didFinishNavigation: navigation];
+    }
+}
+
 pub(super) fn install(webview: &Webview) -> Result<(), String> {
     webview.with_webview(|native| unsafe {
         let view = native.inner() as *mut objc::runtime::Object;
@@ -59,6 +79,14 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
             declaration.add_method(sel!(webView:decidePolicyForNavigationResponse:decisionHandler:),
                 response_policy as extern "C" fn(&objc::runtime::Object, objc::runtime::Sel,
                     *mut objc::runtime::Object, *mut objc::runtime::Object, *mut objc::runtime::Object));
+            for selector in [
+                sel!(webView:didFailNavigation:withError:),
+                sel!(webView:didFailProvisionalNavigation:withError:),
+            ] {
+                declaration.add_method(selector,
+                    load_failed as extern "C" fn(&objc::runtime::Object, objc::runtime::Sel,
+                        *mut objc::runtime::Object, *mut objc::runtime::Object, *mut objc::runtime::Object));
+            }
             declaration.register()
         });
         extern "C" {

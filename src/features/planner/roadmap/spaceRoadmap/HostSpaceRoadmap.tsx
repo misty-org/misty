@@ -4,7 +4,7 @@ import { spacesApi } from "@/api/spaces/api";
 import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deployment/api";
 import { useAuth } from "@/features/auth";
 import { useAppThemeStore, useSettingsStore } from "@/features/settings";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useWorkspaceViewFocused, useWorkspaceViewTitle } from "@/features/workspace";
 import {
@@ -67,7 +67,7 @@ export function HostRoadmapRuntimeProvider(props: {
           <HostRoadmapIntegration {...input} workspaceTabId={props.workspaceTabId} />
         ),
         renderError: (error) => (
-          <SystemErrorActivity
+          <SystemErrorNotice
             error={error}
             scope="planner:roadmap"
             title="Roadmap needs attention"

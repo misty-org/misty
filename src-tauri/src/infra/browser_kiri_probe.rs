@@ -30,7 +30,9 @@ fn serve() -> Result<Url, String> {
 }
 
 async fn eval(app: &AppHandle, body: &str) -> Result<Value, String> {
-    let view = app.get_webview(&webview_label(ID)?).ok_or("Probe tab unavailable")?;
+    let view = app
+        .get_webview(&webview_label(ID)?)
+        .ok_or("Probe tab unavailable")?;
     let raw = evaluate_browser_async_javascript(view, body.to_owned()).await?;
     serde_json::from_str(&raw).map_err(|error| error.to_string())
 }
@@ -51,7 +53,9 @@ fn counter(app: &AppHandle, event: &'static str) -> (Arc<AtomicUsize>, tauri::Ev
     let count = Arc::new(AtomicUsize::new(0));
     let seen = count.clone();
     let id = app.listen_any(event, move |event| {
-        if serde_json::from_str::<Value>(event.payload()).is_ok_and(|v| v["id"] == ID || v["sourceId"] == ID) {
+        if serde_json::from_str::<Value>(event.payload())
+            .is_ok_and(|v| v["id"] == ID || v["sourceId"] == ID)
+        {
             seen.fetch_add(1, Ordering::SeqCst);
         }
     });
@@ -77,7 +81,10 @@ async fn page_calls_reach_kiri_and_nothing_else(app: &AppHandle) -> Result<(), S
             webauthnShim: String(navigator.credentials.create).includes('[native code]') ? 'native' : 'kiri',
         });
     "#).await?;
-    wait_for("media signal from the page", || media.load(Ordering::SeqCst) >= 1).await?;
+    wait_for("media signal from the page", || {
+        media.load(Ordering::SeqCst) >= 1
+    })
+    .await?;
     app.unlisten(listener);
     if result["media"] != "ok" {
         return Err(format!("media.state was refused: {result}"));
@@ -101,7 +108,10 @@ async fn host_channel_authenticates_misty_scripts(app: &AppHandle) -> Result<(),
     let (stopped, stopped_listener) = counter(app, "misty://browser-stopped");
     let (shortcut, shortcut_listener) = counter(app, "misty://browser-shortcut");
     let shortcut_url = format!("misty-shortcut:event?key=w&code=KeyW&alt=false&ctrl=false&meta=true&shift=false&repeat=false&editable=false&token={token}");
-    eval(app, &format!(r#"
+    eval(
+        app,
+        &format!(
+            r#"
         const post = (message) => window.webkit.messageHandlers.kiriHost.postMessage(message);
         post('forged-token');
         post({token:?});
@@ -109,7 +119,10 @@ async fn host_channel_authenticates_misty_scripts(app: &AppHandle) -> Result<(),
         post(JSON.stringify({{ token: {token:?}, status: 'stopped' }}));
         post(JSON.stringify({{ navigate: {shortcut_url:?} }}));
         return '{{}}';
-    "#)).await?;
+    "#
+        ),
+    )
+    .await?;
     wait_for("focus, status and shortcut over the host channel", || {
         stopped.load(Ordering::SeqCst) >= 1 && shortcut.load(Ordering::SeqCst) >= 1
     })
@@ -127,7 +140,10 @@ async fn host_channel_authenticates_misty_scripts(app: &AppHandle) -> Result<(),
         ));
     }
     let location = eval(app, "return JSON.stringify({url: location.href});").await?;
-    if location["url"].as_str().is_some_and(|url| url.starts_with("misty-")) {
+    if location["url"]
+        .as_str()
+        .is_some_and(|url| url.starts_with("misty-"))
+    {
         return Err("a host message navigated the page".into());
     }
     Ok(())
@@ -147,16 +163,20 @@ async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<
         "content": "Kiri copy check", "selection": true, "editable": false, "link": "", "image": "",
     })
     .to_string();
-    let open: String = url::form_urlencoded::Serializer::new(String::from("misty-context-menu:open?"))
-        .append_pair("token", &token)
-        .append_pair("payload", &payload)
-        .finish();
+    let open: String =
+        url::form_urlencoded::Serializer::new(String::from("misty-context-menu:open?"))
+            .append_pair("token", &token)
+            .append_pair("payload", &payload)
+            .finish();
     eval(app, &format!(r#"
         getSelection().selectAllChildren(document.getElementById('text'));
         window.webkit.messageHandlers.kiriHost.postMessage(JSON.stringify({{ navigate: {open:?} }}));
         return '{{}}';
     "#)).await?;
-    wait_for("context menu presented to the shell", || menu.lock().unwrap().is_some()).await?;
+    wait_for("context menu presented to the shell", || {
+        menu.lock().unwrap().is_some()
+    })
+    .await?;
     app.unlisten(listener);
     let key = menu.lock().unwrap().clone().unwrap_or_default();
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
@@ -166,7 +186,9 @@ async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<
     let result = async {
         context_menu::select(app, &main, &key, "copy")?;
         wait_for("copy through kiri::engine::edit", || {
-            arboard::Clipboard::new().and_then(|mut c| c.get_text()).is_ok_and(|t| t == "Kiri copy check")
+            arboard::Clipboard::new()
+                .and_then(|mut c| c.get_text())
+                .is_ok_and(|t| t == "Kiri copy check")
         })
         .await
     }
@@ -180,19 +202,39 @@ async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<
 async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), String> {
     use super::super::browser_site_permissions as permissions;
     let main = app.get_webview("main").ok_or("Missing main view")?;
-    let info = serde_json::to_value(permissions::browser_site_info(main.clone(), app.clone(), ID.into()).await?)
-        .map_err(|e| e.to_string())?;
+    let info = serde_json::to_value(
+        permissions::browser_site_info(main.clone(), app.clone(), ID.into()).await?,
+    )
+    .map_err(|e| e.to_string())?;
     let origin = info["origin"].as_str().ok_or("no origin")?.to_owned();
-    let profile = info["profile"].as_str().ok_or("probe tab has no persistent profile")?.to_owned();
-    let allowed = permissions::Permissions { camera: permissions::Decision::Allow, microphone: permissions::Decision::Block };
+    let profile = info["profile"]
+        .as_str()
+        .ok_or("probe tab has no persistent profile")?
+        .to_owned();
+    let allowed = permissions::Permissions {
+        camera: permissions::Decision::Allow,
+        microphone: permissions::Decision::Block,
+    };
     let saved = serde_json::to_value(
-        permissions::browser_site_permissions_set(main.clone(), app.clone(), ID.into(), origin.clone(), allowed).await?,
+        permissions::browser_site_permissions_set(
+            main.clone(),
+            app.clone(),
+            ID.into(),
+            origin.clone(),
+            allowed,
+        )
+        .await?,
     )
     .map_err(|e| e.to_string())?;
     let listed = permissions::browser_site_permissions_list(main.clone(), app.clone()).await?;
-    let found = listed.iter().any(|entry| entry.origin == origin && entry.profile == profile);
+    let found = listed
+        .iter()
+        .any(|entry| entry.origin == origin && entry.profile == profile);
     permissions::browser_site_permissions_reset(main.clone(), app.clone(), profile, origin).await?;
-    if saved["permissions"]["camera"] != "allow" || saved["permissions"]["microphone"] != "block" || !found {
+    if saved["permissions"]["camera"] != "allow"
+        || saved["permissions"]["microphone"] != "block"
+        || !found
+    {
         return Err(format!("decision did not round-trip: {saved}"));
     }
     Ok(())
@@ -209,18 +251,33 @@ async fn passkey_path_reaches_authentication_services(app: &AppHandle) -> Result
             let _ = self.0.run_on_main_thread(work);
         }
     }
-    let kiri = kiri::Kiri::new("kiri-probe", ProbeHost(app.clone())).with(WebAuthn::new(macos::MacAuthenticator));
+    let kiri = kiri::Kiri::new("kiri-probe", ProbeHost(app.clone()))
+        .with(WebAuthn::new(macos::MacAuthenticator));
     let page = Url::parse("https://example.com/login").map_err(|e| e.to_string())?;
-    let call = |method: &str, args: Value| kiri::Request { v: 1, cap: "webauthn".into(), method: method.into(), args };
+    let call = |method: &str, args: Value| kiri::Request {
+        v: 1,
+        cap: "webauthn".into(),
+        method: method.into(),
+        args,
+    };
     let state_before = authorization_state(app).await;
     // "challenge-challenge" in base64url.
-    let get = kiri.dispatch("kiri-probe", &page, call("get", json!({ "challenge": "Y2hhbGxlbmdlLWNoYWxsZW5nZQ", "rpId": "example.com" })));
+    let get = kiri.dispatch(
+        "kiri-probe",
+        &page,
+        call(
+            "get",
+            json!({ "challenge": "Y2hhbGxlbmdlLWNoYWxsZW5nZQ", "rpId": "example.com" }),
+        ),
+    );
     tokio::pin!(get);
     let (outcome, shown) = match tokio::time::timeout(Duration::from_secs(8), &mut get).await {
         Ok(outcome) => (outcome, false),
         Err(_) => {
             // System UI is up. Kiri's cancel must end it and settle the page's promise.
-            let _ = kiri.dispatch("kiri-probe", &page, call("cancel", Value::Null)).await;
+            let _ = kiri
+                .dispatch("kiri-probe", &page, call("cancel", Value::Null))
+                .await;
             match tokio::time::timeout(Duration::from_secs(8), &mut get).await {
                 Ok(outcome) => (outcome, true),
                 Err(_) => {
@@ -303,7 +360,10 @@ pub(crate) async fn run(app: AppHandle) -> bool {
         Ok(url)
     }
     .await;
-    report("tab on a loopback page", &setup.as_ref().map(|_| ()).map_err(Clone::clone));
+    report(
+        "tab on a loopback page",
+        &setup.as_ref().map(|_| ()).map_err(Clone::clone),
+    );
     let Ok(url) = setup else { return false };
     let checks = [
         ("page → plugin:kiri|call (ACL, gate, media signal, no app commands, no passkey shim unentitled)", page_calls_reach_kiri_and_nothing_else(&app).await),
@@ -316,6 +376,10 @@ pub(crate) async fn run(app: AppHandle) -> bool {
         report(stage, result);
         passed &= result.is_ok();
     }
-    let _ = browser_webview_close(app.clone(), app.state::<BrowserSessionState>(), BrowserWebviewIdRequest { id: ID.into() });
+    let _ = browser_webview_close(
+        app.clone(),
+        app.state::<BrowserSessionState>(),
+        BrowserWebviewIdRequest { id: ID.into() },
+    );
     passed
 }

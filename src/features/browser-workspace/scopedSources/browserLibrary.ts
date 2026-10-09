@@ -110,17 +110,19 @@ export async function searchBrowserHistory(query: string): Promise<ScopedSearchR
 
 /** Agent-owned tabs belong to their run and are left out, as in the address bar. */
 export function searchOpenTabs(query: string): ScopedSearchResult[] {
-  return openBrowserTabs()
-    .filter((tab) => !tab.agentOwned)
-    .filter((tab) => !query.trim() || contains(`${tab.title} ${tab.url}`, query))
-    .slice(0, resultLimit)
-    .map((tab) => ({
-      id: `tab:${tab.tabId}`,
-      kind: "tab",
-      title: tab.title || host(tab.url),
-      subtitle: tab.private ? `Private · ${host(tab.url)}` : host(tab.url),
-      target: { kind: "tab", tabId: tab.tabId },
-    }));
+  return (
+    openBrowserTabs()
+      .filter((tab) => !tab.agentOwned)
+      .filter((tab) => !query.trim() || contains(`${tab.title} ${tab.url}`, query))
+      // Tab search lists every match so any open tab is one keystroke away.
+      .map((tab) => ({
+        id: `tab:${tab.tabId}`,
+        kind: "tab",
+        title: tab.title || host(tab.url),
+        subtitle: tab.private ? `Private · ${host(tab.url)}` : host(tab.url),
+        target: { kind: "tab", tabId: tab.tabId },
+      }))
+  );
 }
 
 export function searchDownloads(query: string): ScopedSearchResult[] {

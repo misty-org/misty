@@ -31,7 +31,10 @@ pub const TAB_GROUPS: &str = "tab_groups";
 pub const HISTORY: &str = "history";
 /// Extension-owned declared sync settings. Native-only, never projected to a renderer.
 pub const EXTENSION_SYNC: &str = "extension_sync";
-pub const COLLECTIONS: [&str; 4] = [BOOKMARKS, TAB_GROUPS, HISTORY, EXTENSION_SYNC];
+/// Saved website sign-ins. Native-only, never projected to a renderer; the
+/// server only ever holds each one sealed with the vault key.
+pub const PASSWORDS: &str = "passwords";
+pub const COLLECTIONS: [&str; 5] = [BOOKMARKS, TAB_GROUPS, HISTORY, EXTENSION_SYNC, PASSWORDS];
 
 fn known(collection: &str) -> Result<()> {
     if COLLECTIONS.contains(&collection) {

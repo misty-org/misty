@@ -25,7 +25,7 @@ export function WebsiteDataCoverage({ sites }: { sites: WebsiteDataSite[] }) {
   const partial = sites.filter((site) => site.skipped.length > 0);
   const complete = sites.filter((site) => site.skipped.length === 0);
   return (
-    <section aria-label="Website data by site" className="px-5 pb-3">
+    <section aria-label="Website data by site" className="pb-3">
       <p role="status" className="text-sm text-cream-muted">
         {summary}
       </p>

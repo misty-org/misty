@@ -858,6 +858,7 @@ where
             }
             Command::WorkspaceChanges(changes, reply) => {
                 // Bookmarks go to their collection; the rest to the workspace.
+                let changes = self.gate_pinned_tabs(changes);
                 let result = self.route_record_changes(changes).and_then(|rest| {
                     if rest.is_empty() {
                         Ok(())

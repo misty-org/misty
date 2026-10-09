@@ -11,6 +11,7 @@ import {
   Columns2,
   Copy,
   ExternalLink,
+  Eye,
   Highlighter,
   Image,
   Link,
@@ -24,6 +25,8 @@ import {
 } from "lucide-react";
 import {
   browserOverlayReady,
+  browserRuntimeIdForTabId,
+  browserTabShowsInternalPage,
   setBrowserWebviewsSuspended,
 } from "@/features/webviews/browserRuntime";
 import {
@@ -52,6 +55,7 @@ const entries = {
   "search-web": { label: "Search the Web for Selection", icon: Search },
   "open-link": { label: "Open Link in New Tab", icon: ExternalLink },
   "open-link-split": { label: "Open Link in Split View", icon: Columns2 },
+  "peek-link": { label: "Peek Link", icon: Eye },
   "copy-link": { label: "Copy Link Address", icon: Link },
   "open-image": { label: "Open Image in New Tab", icon: Image },
   "copy-image-link": { label: "Copy Image Address", icon: Link },
@@ -66,6 +70,48 @@ const entries = {
   inspect: { label: "Inspect Page", icon: Code },
 };
 const suspensionReason = "browser-context-menu";
+
+/**
+ * The native page beneath a renderer point, as fractions of its bounds. While
+ * a renderer overlay is open the page sits under the renderer, which then
+ * receives clicks over it. Only the transparent path to the page counts:
+ * anything the renderer draws there itself (internal pages, annotations,
+ * notifications, the menu) keeps its own click.
+ */
+export function browserPageAtPoint(
+  target: EventTarget | null,
+  clientX: number,
+  clientY: number,
+  root: ParentNode = document,
+): { id: string; x: number; y: number } | null {
+  if (!(target instanceof Element)) return null;
+  for (const host of root.querySelectorAll<HTMLElement>("[data-browser-page-host]")) {
+    if (!target.contains(host)) continue;
+    const rect = host.getBoundingClientRect();
+    if (
+      rect.width <= 0 ||
+      rect.height <= 0 ||
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      continue;
+    }
+    const tabId = host
+      .closest("[data-browser-workspace-tab]")
+      ?.getAttribute("data-browser-workspace-tab");
+    if (!tabId || browserTabShowsInternalPage(tabId)) return null;
+    const id = browserRuntimeIdForTabId(tabId);
+    if (!id) return null;
+    return {
+      id,
+      x: (clientX - rect.left) / rect.width,
+      y: (clientY - rect.top) / rect.height,
+    };
+  }
+  return null;
+}
 
 export function BrowserContextMenuView({
   menu,
@@ -97,7 +143,9 @@ export function BrowserContextMenuView({
         sideOffset={0}
         collisionPadding={8}
         width="lg"
-        className="max-h-[min(560px,calc(100dvh-2rem))]"
+        // Stay within the space left in the window so the last items (Inspect
+        // Page, Extensions) scroll into view instead of running off-screen.
+        className="max-h-[min(560px,var(--radix-dropdown-menu-content-available-height))]"
         onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerDown={(event) => event.stopPropagation()}
       >
@@ -153,8 +201,18 @@ export function BrowserContextMenuBridge() {
         if (!disposed && current.current === payload) setMenu(payload);
       },
     );
+    // A right-click on a page under the renderer would otherwise get the
+    // renderer's own engine menu. Hand it to the page so this menu reopens there.
+    const forwardContextMenu = (event: MouseEvent) => {
+      const page = browserPageAtPoint(event.target, event.clientX, event.clientY);
+      if (!page) return;
+      event.preventDefault();
+      void invoke("browser_webview_context_menu_at", { request: page }).catch(() => undefined);
+    };
+    window.addEventListener("contextmenu", forwardContextMenu, true);
     return () => {
       disposed = true;
+      window.removeEventListener("contextmenu", forwardContextMenu, true);
       void unlisten.then((stop) => stop());
       const pending = current.current;
       current.current = null;

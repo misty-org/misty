@@ -70,7 +70,10 @@ fn private_session_permissions_end_with_the_session() {
     unsafe {
         let persisted_before = read_store();
         update_scope(&scope, "https://example.com", allowed.clone()).unwrap();
-        assert_eq!(sites_for_scope(&scope).get("https://example.com"), Some(&allowed));
+        assert_eq!(
+            sites_for_scope(&scope).get("https://example.com"),
+            Some(&allowed)
+        );
         assert_eq!(read_store(), persisted_before);
         forget_private_session();
         assert!(sites_for_scope(&scope).is_empty());

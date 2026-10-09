@@ -27,13 +27,20 @@ export function useBrowserPagePreview(
         () => !disposed && parseBrowserViewState(latest.current.state).url === url,
       );
     };
-    // Let the loaded page paint; refresh quietly while it is being used.
+    // Let the loaded page paint once; avoid periodic interval polling while the
+    // user is actively interacting with the live view to prevent lag spikes.
     const initial = window.setTimeout(capture, 1_500);
-    const refresh = window.setInterval(capture, 15_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        capture();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       disposed = true;
       window.clearTimeout(initial);
-      window.clearInterval(refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      capture();
     };
   }, [enabled, host, privateTab, tab.id, tab.instanceKey, url]);
 }

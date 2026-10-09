@@ -4,7 +4,7 @@
  * with words. Nothing here is tinted.
  */
 
-/* Question card above the composer. */
+/* Question and Waiting for you cards above the composer. */
 .agent-question-card,
 .agent-question-strip {
   margin-bottom: 8px;
@@ -51,6 +51,14 @@
   color: var(--color-cream-bright);
   font-size: 14px;
   line-height: 1.5;
+}
+.agent-waiting-reason {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .agent-question-options {
   display: grid;

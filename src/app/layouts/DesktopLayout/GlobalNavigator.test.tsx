@@ -1,7 +1,6 @@
 import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useActivityStore } from "@/features/activity";
 import { activeLayoutView, useWorkspaceStore } from "@/features/workspace";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
@@ -38,7 +37,6 @@ function renderNavigator(position: DockPosition = "left") {
 }
 beforeEach(() => {
   workspace().reset();
-  useActivityStore.setState({ allItems: [] });
   useBrowserSearchStore.getState().close();
   useSettingsProfiles.setState({
     accountId: "account-1",
@@ -218,12 +216,12 @@ describe("browser workspace navigator", () => {
 
 it("reveals a portalled side hint on keyboard focus and dismisses it with Escape", async () => {
   renderNavigator();
-  const activity = screen.getByRole("button", { name: /^Activity/ });
-  fireEvent.focus(activity);
+  const search = screen.getByRole("button", { name: "Search" });
+  fireEvent.focus(search);
   const hint = await screen.findByRole("tooltip");
-  expect(hint.textContent).toContain("Activity");
+  expect(hint.textContent).toContain("Search");
   expect(screen.getByRole("navigation").contains(hint)).toBe(false);
   expect(hint.closest("[data-navigation-tooltip]")?.getAttribute("data-side")).toBe("right");
-  fireEvent.keyDown(activity, { key: "Escape" });
+  fireEvent.keyDown(search, { key: "Escape" });
   expect(screen.queryByRole("tooltip")).toBeNull();
 });

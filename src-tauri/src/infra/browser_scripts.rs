@@ -58,29 +58,36 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
 
   // Only bindings supplied by Misty's trusted shell are intercepted. Page
   // typing and ordinary browser shortcuts remain owned by the page.
-  window.__MISTY_APP_SHORTCUTS__ = window.__MISTY_APP_SHORTCUTS__ || new Map();
+  const initialBindings = __MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__;
+  window.__MISTY_APP_SHORTCUTS__ = window.__MISTY_APP_SHORTCUTS__ || new Map(
+    (Array.isArray(initialBindings) ? initialBindings : []).map((binding) => [
+      binding.shortcut,
+      Boolean(binding.allowInEditable),
+    ])
+  );
   window.__MISTY_SET_SHORTCUTS__ = (bindings) => {
     window.__MISTY_APP_SHORTCUTS__ = new Map((Array.isArray(bindings) ? bindings : [])
       .map((binding) => [binding.shortcut, Boolean(binding.allowInEditable)]));
   };
   const shortcutKey = (event) => {
     let key = event.code;
-    if (/^Key[A-Z]$/.test(key)) key = key.slice(3);
+    if (/^Key[A-Z]$/i.test(key)) key = key.slice(3).toUpperCase();
     else if (/^Digit[0-9]$/.test(key)) key = key.slice(5);
     else key = ({
       Backquote: 'Grave', Backslash: 'Backslash', BracketLeft: 'LeftBracket',
       BracketRight: 'RightBracket', Comma: 'Comma', Period: 'Period',
       Equal: 'Plus', Minus: 'Minus', NumpadAdd: 'Plus', NumpadSubtract: 'Minus',
       ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', ArrowUp: 'ArrowUp',
-      ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown'
-    })[key] || event.key;
+      ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown',
+      Escape: 'Escape', Esc: 'Escape', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace'
+    })[key] || (event.key?.length === 1 ? event.key.toUpperCase() : event.key);
     // `+` already implies Shift on the main keyboard. Match the renderer's
     // canonical form (Cmd+Plus rather than Cmd+Shift+Plus).
     return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt',
       event.shiftKey && key !== 'Plus' && 'Shift',
       event.metaKey && 'Cmd', key].filter(Boolean).join('+');
   };
-  document.addEventListener('keydown', (event) => {
+  window.addEventListener('keydown', (event) => {
     if (!event.isTrusted) return;
     const shortcut = shortcutKey(event);
     const editable = Boolean(event.target?.closest?.(
@@ -182,11 +189,33 @@ pub(super) const BROWSER_COMPANION_SCRIPT: &str = r#"
 })();
 "#;
 
-pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bool) -> String {
+pub(super) fn browser_viewport_script(
+    shortcut_token: &str,
+    pointer_tracking: bool,
+    bindings: &[super::browser_shortcuts::BrowserShortcutBinding],
+) -> String {
+    let bindings_json = serde_json::to_string(bindings).unwrap_or_else(|_| "[]".to_owned());
     BROWSER_VIEWPORT_SCRIPT
-        .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", kiri::channel::sender_script())
-        .replace("__MISTY_BACKGROUND_PLACEHOLDER__", if cfg!(target_os = "macos") { include_str!("browser_background.js") } else { "" })
-        .replace("__MISTY_CONTEXT_MENU_PLACEHOLDER__", include_str!("browser_context_menu.js"))
+        .replace(
+            "__KIRI_HOST_SENDER_PLACEHOLDER__",
+            kiri::channel::sender_script(),
+        )
+        .replace(
+            "__MISTY_BACKGROUND_PLACEHOLDER__",
+            if cfg!(target_os = "macos") {
+                include_str!("browser_background.js")
+            } else {
+                ""
+            },
+        )
+        .replace(
+            "__MISTY_CONTEXT_MENU_PLACEHOLDER__",
+            concat!(
+                include_str!("browser_context_menu.js"),
+                "\n",
+                include_str!("browser_passwords.js")
+            ),
+        )
         .replace(
             "__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
@@ -195,6 +224,7 @@ pub(super) fn browser_viewport_script(shortcut_token: &str, pointer_tracking: bo
             "__MISTY_POINTER_TRACKING_PLACEHOLDER__",
             if pointer_tracking { "true" } else { "false" },
         )
+        .replace("__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__", &bindings_json)
 }
 
 static STATUS_BUBBLE_ENABLED: AtomicBool = AtomicBool::new(true);
@@ -216,7 +246,10 @@ pub(super) fn browser_status_script(shortcut_token: &str) -> String {
                 "false"
             },
         )
-        .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", kiri::channel::sender_script())
+        .replace(
+            "__KIRI_HOST_SENDER_PLACEHOLDER__",
+            kiri::channel::sender_script(),
+        )
         .replace(
             "__MISTY_STATUS_TOKEN_PLACEHOLDER__",
             &serde_json::to_string(shortcut_token).unwrap_or_else(|_| "\"\"".to_owned()),
@@ -321,7 +354,7 @@ mod tests {
 
     #[test]
     fn host_messages_ride_the_kiri_channel_and_never_navigate() {
-        let viewport = browser_viewport_script("token", true);
+        let viewport = browser_viewport_script("token", true, &[]);
         let status = browser_status_script("token");
         for script in [&viewport, &status] {
             assert!(script.contains(kiri::channel::sender_script()));
@@ -337,7 +370,7 @@ mod tests {
 
     #[test]
     fn shortcut_token_is_embedded_as_json_without_becoming_a_window_global() {
-        let script = browser_viewport_script("secret-token", false);
+        let script = browser_viewport_script("secret-token", false, &[]);
         assert!(script.contains("const shortcutToken = \"secret-token\""));
         assert!(script.contains("let pointerTrackingEnabled = false"));
         assert!(script.contains("if (!pointerTrackingEnabled || !event?.isTrusted) return"));
@@ -359,7 +392,7 @@ mod tests {
 
     #[test]
     fn link_click_interception_opens_modifier_and_middle_clicks_in_new_window() {
-        let script = browser_viewport_script("token", false);
+        let script = browser_viewport_script("token", false, &[]);
         assert!(script.contains("const handleLinkClick"));
         assert!(script.contains("window.open(resolved, '_blank')"));
         assert!(script.contains("event.button === 1"));
@@ -368,7 +401,7 @@ mod tests {
 
     #[test]
     fn pointer_tracking_can_be_enabled_for_an_active_companion() {
-        let script = browser_viewport_script("token", true);
+        let script = browser_viewport_script("token", true, &[]);
         assert!(script.contains("let pointerTrackingEnabled = true"));
         assert!(script.contains("window.__MISTY_SET_POINTER_TRACKING__"));
         assert!(script.contains("if (!pointerTrackingEnabled) return"));

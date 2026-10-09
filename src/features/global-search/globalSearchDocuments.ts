@@ -1,4 +1,3 @@
-import { activityTargetHref, useActivityStore } from "@/features/activity";
 import { messageReplyPreviewText } from "@/features/spaces/chat";
 import { spaceChatPath, useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
@@ -61,32 +60,6 @@ export function buildLocalIndex(accountId: string): GlobalSearchDocument[] {
         source: "local",
       });
     }
-  }
-
-  for (const item of useActivityStore.getState().allItems) {
-    if (item.accountId !== accountId) continue;
-    if (item.target.kind === "space" || item.target.kind === "space-chat") {
-      const space = spacesById.get(item.target.spaceId);
-      if (!space || (item.target.kind === "space-chat" && !space.permissions?.["messages.read"]))
-        continue;
-    }
-    if (item.target.kind === "space-task") {
-      const space = spacesById.get(item.target.spaceId);
-      if (!space || !space.permissions?.["tasks.view"]) continue;
-    }
-    const href = activityTargetHref(item.target);
-    if (!href) continue;
-    documents.push({
-      id: `activity:${item.id}`,
-      accountId,
-      kind: "activity",
-      title: item.title,
-      body: item.body,
-      keywords: [item.kind, "activity", item.attention ? "important" : "update"],
-      href,
-      updatedAt: item.createdAt,
-      source: "local",
-    });
   }
 
   for (const space of state.spaces) {

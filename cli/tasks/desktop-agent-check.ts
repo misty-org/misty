@@ -19,6 +19,7 @@ execFileSync(
     "-framework", "Carbon",
     "-framework", "QuartzCore",
     join(native, "MistyAgentPointer.m"),
+    join(native, "MistyAgentRing.m"),
     join(native, "checks/AgentPointerCheck.m"),
     "-o",
     binary,

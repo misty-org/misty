@@ -33,7 +33,7 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
   return (
     <>
       <Section title="Overview">
-        <div className="p-5">
+        <div className="border-t border-charcoal-border py-3">
           <SyncStatusView
             status={controller.status}
             busy={controller.busy}

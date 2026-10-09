@@ -5,7 +5,10 @@ import { activeLayoutView, parseBrowserViewState, useWorkspaceStore } from "@/fe
 import { configureBrowserSearchEngine } from "@/features/workspace/browserSearchEngine";
 import { BrowserSearchDialog } from "./BrowserSearchDialog";
 import { useBrowserSearchStore } from "./search";
-vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: vi.fn() }));
+vi.mock("@/features/webviews/browserRuntime", () => ({
+  onBrowserRuntimeClose: () => () => undefined,
+  setBrowserWebviewsSuspended: vi.fn(),
+}));
 beforeEach(() => {
   useWorkspaceStore.getState().reset();
   useBrowserSearchStore.getState().show();

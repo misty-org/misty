@@ -1,7 +1,12 @@
 import { AppWindow, Monitor, MousePointer2, PanelsTopLeft } from "lucide-react";
 import type { ScreenRequest } from "@/features/ai-surface/types";
 import { Button, Spinner } from "@/shared/ui";
-import { declineScreenRequest, openScreenAndContinue, type ScreenChoice } from "./screenRequests";
+import {
+  declineScreenRequest,
+  openScreenAndContinue,
+  screenChoice,
+  type ScreenChoice,
+} from "./screenRequests";
 import { useMistyStore } from "./useMistyStore";
 
 function status(request: ScreenRequest) {
@@ -80,28 +85,24 @@ export function ScreenRequestCard({
       <p className="mt-1.5 break-words text-[11px] leading-4 text-cream-muted">{request.reason}</p>
       {stalled ? (
         <div className="mt-3">
-          <Button
-            size="sm"
-            className="h-7"
-            onClick={() => choose(request.location === "window" ? "window" : "separate")}
-          >
+          <Button size="sm" className="h-7" onClick={() => choose(screenChoice(request.location))}>
             Continue
           </Button>
         </div>
       ) : null}
       {asking ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button size="sm" className="h-7" disabled={working} onClick={() => choose("separate")}>
-            <PanelsTopLeft className="size-3.5" /> Separate window
+          <Button size="sm" className="h-7" disabled={working} onClick={() => choose("window")}>
+            <AppWindow className="size-3.5" /> New tab
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="h-7"
             disabled={working}
-            onClick={() => choose("window")}
+            onClick={() => choose("separate")}
           >
-            <AppWindow className="size-3.5" /> This window
+            <PanelsTopLeft className="size-3.5" /> Separate window
           </Button>
           <Button
             size="sm"

@@ -1,26 +1,19 @@
 import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/model/types";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import type { AppTab } from "@/features/app-shell";
 import { useAppStore } from "@/features/app-shell";
-import { selectNotificationPreferences, useSettingsStore } from "@/features/settings";
+import { useSettingsStore } from "@/features/settings";
 import { Notification } from "@/shared/ui";
 import { memo, useEffect, useRef } from "react";
-import { useShallow } from "zustand/react/shallow";
 export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab }) {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);
   const settingsError = useSettingsStore((state) => state.error);
   const settingsMessage = useSettingsStore((state) => state.message);
-  const notificationPreferences = useSettingsStore(
-    useShallow((state) => selectNotificationPreferences(state.settings?.document)),
-  );
   const notice = noticeForRoute(props.routeId, {
     app: { error: appError, message: appMessage },
     settings: { error: settingsError, message: settingsMessage },
   });
-  const showMessage =
-    notificationPreferences.inAppNotificationsEnabled && !notificationPreferences.quietHoursEnabled;
-
   const dismissNotice = () => {
     useAppStore.getState().clearNotice();
     useSettingsStore.setState({ error: null, message: null });
@@ -33,7 +26,7 @@ export const RouteNotice = memo(function RouteNotice(props: { routeId: AppTab })
     return () => window.clearTimeout(timer);
   }, [notice.error]);
 
-  if (!(showMessage && notice.message)) return null;
+  if (!notice.message) return null;
 
   return (
     <Notification key={notice.message} tone="success" duration={3500} onDismiss={dismissNotice}>

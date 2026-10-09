@@ -39,13 +39,31 @@ it.each(["Left", "Top", "Right", "Bottom"])(
     ).toBe(true);
   },
 );
-it("has no preset controls or orphaned saved-layout search result", () => {
+it("saves the current layout by name and lists it for reuse", async () => {
+  useSettingsProfiles.setState({ ready: true });
   render(<LayoutSection />);
-  expect(screen.queryByText(/preset/i)).toBeNull();
-  expect(screen.queryByRole("button", { name: /classic|bottom dock|right rail/i })).toBeNull();
-  expect(searchSettings("Saved layouts")).not.toContainEqual(
-    expect.objectContaining({ focus: "Saved layouts" }),
+  choose("Navigation position", "Right");
+  fireEvent.change(screen.getByRole("textbox", { name: "Layout name" }), {
+    target: { value: "Focus" },
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  });
+  expect(useDockingLayoutStore.getState().savedLayouts).toEqual([
+    expect.objectContaining({ name: "Focus", navigation: "right", tabs: "top" }),
+  ]);
+  // The current layout's row and the saved layout's row describe the same positions.
+  expect(screen.getAllByText("Navigation right · Tabs top")).toHaveLength(2);
+  expect(searchSettings("Saved layouts")).toContainEqual(
+    expect.objectContaining({ page: "layout" }),
   );
+});
+it("hides a navigation destination through account settings", () => {
+  const edit = vi.fn(async () => {});
+  useSettingsProfiles.setState({ ready: true, syncing: false, edit });
+  render(<LayoutSection />);
+  fireEvent.click(screen.getByRole("switch", { name: "Extensions" }));
+  expect(edit).toHaveBeenCalledWith("app.navigation.hidden", JSON.stringify(["extensions"]));
 });
 it("edits the current virtual window and restores its arrangement when switching", () => {
   const firstId = useWorkspaceStore.getState().activeWindowId;

@@ -13,7 +13,6 @@ export type GlobalSearchKind =
   | "calendar"
   | "roadmap"
   | "drawing"
-  | "activity"
   | "library"
   | "folder"
   | "file"
@@ -148,6 +147,8 @@ export interface MistyImageAttachment {
 
 export interface GlobalAiConversation {
   agentId?: string;
+  /** The agent folder this conversation is filed in; absent means Recents. */
+  folderId?: string;
   id: string;
   title: string;
   spaceId?: string;

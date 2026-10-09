@@ -6,8 +6,13 @@ import {
   type GlobalSearchSet,
 } from "@/features/global-search/globalSearchStoreHelpers";
 
-/** Where a screen opens: a separate agent window or a tab in this window. */
-export type ScreenChoice = "separate" | "window";
+/** Where a screen opens: the user's tab, a new tab in this window, or a separate agent window. */
+export type ScreenChoice = "current" | "window" | "separate";
+
+/** The choice a request's location stands for; "ask" waits for the card. */
+export function screenChoice(location: ScreenRequest["location"]): ScreenChoice {
+  return location === "current" ? "current" : location === "separate" ? "separate" : "window";
+}
 
 function findRequest(get: GlobalSearchGet, conversationId: string, messageId: string) {
   return get()
@@ -42,13 +47,7 @@ export function continueAfterScreenRequest(
   const request = findRequest(get, conversationId, messageId);
   if (request?.state !== "pending" || (request.kind === "open" && request.location === "ask"))
     return;
-  void openScreenAndContinue(
-    set,
-    get,
-    conversationId,
-    messageId,
-    request.location === "window" ? "window" : "separate",
-  );
+  void openScreenAndContinue(set, get, conversationId, messageId, screenChoice(request.location));
 }
 
 /** Opens the screen (or captures it) and continues the same conversation. */
@@ -96,9 +95,11 @@ export async function openScreenAndContinue(
       ? "The user's screen is attached as an image."
       : desktop
         ? "Misty can now use the user's desktop apps with its own cursor."
-        : choice === "window"
-          ? "A browser tab in the user's Misty window is now attached."
-          : "A browser in a separate Misty window is now attached.";
+        : choice === "current"
+          ? "The user's current Misty tab is now attached."
+          : choice === "window"
+            ? "A new browser tab in the user's Misty window is now attached."
+            : "A browser in a separate Misty window is now attached.";
     const start = request.url && !look && !desktop ? ` Start at ${request.url}.` : "";
     await get().submitAnswer(
       `Continue the request above. ${where}${start}`,
@@ -109,10 +110,17 @@ export async function openScreenAndContinue(
       { conversationId, context: [] },
       {
         // Agent mode without a browser screen starts desktop control.
-        executionMode: look ? "user" : desktop || choice === "window" ? "agent" : "team",
+        executionMode: look ? "user" : desktop || choice !== "separate" ? "agent" : "team",
         continuation: true,
         capture,
-        openScreen: !look && !desktop && choice === "window" ? { url: request.url } : undefined,
+        openScreen:
+          !look && !desktop && choice !== "separate"
+            ? {
+                url: request.url,
+                hint: request.reason,
+                place: choice === "current" ? "current" : "new",
+              }
+            : undefined,
       },
     );
     const error = get().error;

@@ -22,7 +22,7 @@ import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
-export function PreferenceRow({ id }: { id: string }) {
+export function PreferenceRow({ id, description }: { id: string; description?: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
   const ready = useSettingsProfiles((s) => s.ready);
@@ -35,7 +35,7 @@ export function PreferenceRow({ id }: { id: string }) {
       d.legacyValues ? d.legacyValues.indexOf(String(next)) : next,
     );
   return (
-    <Row label={d.label}>
+    <Row label={d.label} description={description}>
       {d.type === "boolean" ? (
         <SwitchControl
           checked={Boolean(value)}
@@ -100,7 +100,7 @@ export function ManageSpacesSection(props: SettingsContentProps) {
           </Row>
         ))
       ) : (
-        <p className="p-5 text-sm text-cream-muted">
+        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
           Join or create a Space to manage its settings.
         </p>
       )}
@@ -110,19 +110,8 @@ export function ManageSpacesSection(props: SettingsContentProps) {
 export { ModelSensesSection as ModelsSection } from "./ModelSensesSection";
 
 export function AgentDefaultsSection() {
-  const setActiveSection = useSettingsStore((state) => state.setActiveSection);
   return (
     <>
-      <Section
-        title="Models"
-        description="Choose which model thinks, sees, listens and speaks for new agent tasks in Models settings."
-      >
-        <Row label="Model choices">
-          <Button variant="outline" onClick={() => setActiveSection("models")}>
-            Open Models
-          </Button>
-        </Row>
-      </Section>
       <Section
         title="Conversations"
         description={
@@ -133,7 +122,30 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
+      <Section title="Misty panel">
+        <PanelSideRow />
+      </Section>
     </>
+  );
+}
+function PanelSideRow() {
+  const d = definitionById.get("agents.panel_side")!;
+  const store = useSettingsStore();
+  const ready = useSettingsProfiles((s) => s.ready);
+  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
+  const value = String(fromLegacy(d, section?.[d.key]) || "right");
+  return (
+    <Row label={d.label}>
+      <ChoiceControl
+        disabled={store.working || !ready}
+        value={value}
+        onValueChange={(next) => void store.updateSetting(d.section, d.key, next)}
+        options={[
+          { value: "left", label: "Left" },
+          { value: "right", label: "Right" },
+        ]}
+      />
+    </Row>
   );
 }
 function CollaborationModeRow() {
@@ -159,7 +171,7 @@ function CollaborationModeRow() {
 export function NativeAvailability({ feature }: { feature: string }) {
   return (
     <Section title={feature}>
-      <p className="p-5 text-sm text-cream-muted">
+      <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
         Open Misty on a supported device to configure {feature.toLowerCase()}. Your settings remain
         available here.
       </p>
@@ -233,15 +245,12 @@ function AgentScopeList() {
         </Row>
       ))}
       {!scopes.length && (
-        <p className="p-5 text-sm text-cream-muted">
-          No folders have been granted. Choose a folder from Files when starting an agent task.
+        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
+          No folders have been granted. Choose a folder when starting an agent task.
         </p>
       )}
-      <Button className="m-4" variant="outline" onClick={() => void refresh()}>
-        Refresh permissions
-      </Button>
       {error && (
-        <p role="alert" className="p-5">
+        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
           {error}
         </p>
       )}

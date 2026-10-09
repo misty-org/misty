@@ -1,5 +1,5 @@
 //! The settings Misty has an equivalent for: search engine, homepage, startup,
-//! bookmarks bar, and camera and microphone decisions for sites.
+//! and camera and microphone decisions for sites.
 use super::discover::Family;
 use super::snapshot::Snapshot;
 use serde::Serialize;
@@ -14,7 +14,6 @@ pub struct ImportedSettings {
     pub homepage: Option<String>,
     /// Whether the browser reopens the last session at startup.
     pub restore_session: Option<bool>,
-    pub show_bookmarks_bar: Option<bool>,
     pub site_permissions: Vec<SitePermission>,
 }
 
@@ -45,9 +44,6 @@ impl ImportedSettings {
         }
         if self.restore_session.is_some() {
             out.push("startup");
-        }
-        if self.show_bookmarks_bar.is_some() {
-            out.push("bookmarksBar");
         }
         if !self.site_permissions.is_empty() {
             out.push("sitePermissions");
@@ -93,7 +89,6 @@ fn chromium(profile: &Path) -> ImportedSettings {
         restore_session: prefs["session"]["restore_on_startup"]
             .as_i64()
             .map(|value| value == 1),
-        show_bookmarks_bar: prefs["bookmark_bar"]["show_on_all_tabs"].as_bool(),
         site_permissions: chromium_permissions(&prefs),
     }
 }
@@ -173,10 +168,6 @@ fn firefox(profile: &Path) -> ImportedSettings {
             .get("browser.startup.page")
             .and_then(Value::as_i64)
             .map(|v| v == 3),
-        show_bookmarks_bar: prefs
-            .get("browser.toolbars.bookmarks.visibility")
-            .and_then(Value::as_str)
-            .map(|value| value == "always"),
         site_permissions: firefox_permissions(profile),
     }
 }
@@ -277,7 +268,6 @@ mod tests {
         let settings = read(Family::Chromium, dir.path());
         assert_eq!(settings.homepage.as_deref(), Some("https://home.example/"));
         assert_eq!(settings.restore_session, Some(true));
-        assert_eq!(settings.show_bookmarks_bar, Some(true));
         assert_eq!(settings.search_engine.unwrap().name, "DuckDuckGo");
         assert_eq!(
             settings.site_permissions,
@@ -312,7 +302,6 @@ mod tests {
         let settings = read(Family::Firefox, dir.path());
         assert_eq!(settings.homepage.as_deref(), Some("https://news.example/"));
         assert_eq!(settings.restore_session, Some(true));
-        assert_eq!(settings.show_bookmarks_bar, Some(false));
         assert_eq!(
             settings.search_engine,
             Some(SearchEngine {

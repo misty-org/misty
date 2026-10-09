@@ -6,7 +6,9 @@ export interface NavigatorLayout {
 }
 
 export const navigatorLayoutStorageKey = "misty:global-navigator-layout:v6";
-export const navigatorRailWidth = 54;
+/** The rail renders its icons, tiles and spacing 15% above their base sizes. */
+export const navigatorScale = 1.15;
+export const navigatorRailWidth = Math.round(54 * navigatorScale);
 
 export function readNavigatorLayout(
   storage: Pick<Storage, "getItem"> = window.localStorage,

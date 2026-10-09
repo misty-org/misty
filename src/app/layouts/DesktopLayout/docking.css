@@ -116,9 +116,6 @@
 .misty-navigator-items a[aria-current="page"] {
   background: var(--misty-theme-card);
 }
-.misty-navigator-items [data-navigator-toggle]:is([data-active="true"], [aria-expanded="true"]) {
-  background: var(--misty-theme-active);
-}
 .misty-global-navigator .misty-navigator-logo {
   box-shadow: inset 0 0 0 1px var(--misty-theme-active);
 }
@@ -140,13 +137,12 @@
   height: 20px;
   margin: auto 3px;
 }
+/* The tray is exactly one tile wide, like every other rail icon. */
 .misty-global-navigator [data-navigator-tray] {
-  --misty-navigator-tray-inset: 3px;
   display: flex;
   flex-direction: var(--navigator-direction);
   align-items: center;
-  padding: var(--misty-navigator-tray-inset);
-  border-radius: calc(8px + var(--misty-navigator-tray-inset));
+  border-radius: 8px;
 }
 .misty-global-navigator [data-navigator-stack] {
   min-width: 0;
@@ -187,16 +183,6 @@
 }
 .misty-global-navigator :is(a, button) {
   position: relative;
-}
-[data-navigator-tray]
-  .misty-navigator-tray-item:is(
-    :hover,
-    :focus-visible,
-    [aria-current="page"],
-    [data-state="open"],
-    :active
-  ) {
-  background-color: var(--misty-theme-active);
 }
 
 /* One tab surface. Vertical tabs use the same 28px row, controls and spacing. */
@@ -619,4 +605,60 @@
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-tab-group-member:not([data-group-active="true"])::after {
   bottom: 0;
+}
+
+/* Pinned tabs in a horizontal strip are icon-only and fixed width, like Chrome. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab.misty-workspace-tab-pinned {
+  min-width: 44px;
+  max-width: 44px;
+  flex: 0 0 44px;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab.misty-workspace-tab-pinned
+  [role="tab"] {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* Favorites lead the strip in every virtual window: icon tiles, monochrome states. */
+.misty-workspace-favorites {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin-right: 6px;
+  padding-right: 6px;
+  border-right: 1px solid var(--color-charcoal-border, rgba(255, 255, 255, 0.08));
+}
+.misty-workspace-favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-right: 0;
+  border-bottom: 1px solid var(--color-charcoal-border, rgba(255, 255, 255, 0.08));
+}
+.misty-workspace-favorite {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--workspace-tab-muted, inherit);
+}
+.misty-workspace-favorites-grid .misty-workspace-favorite {
+  width: 100%;
+  height: 32px;
+}
+.misty-workspace-favorite:hover,
+.misty-workspace-favorite[data-menu-open] {
+  background: var(--color-charcoal-hover, rgba(255, 255, 255, 0.06));
+}
+.misty-workspace-favorite[data-active] {
+  background: var(--color-charcoal-card, rgba(255, 255, 255, 0.1));
+}
+.misty-workspace-favorite:focus-visible {
+  outline: 1px solid var(--color-cream-muted, currentColor);
+  outline-offset: -1px;
 }

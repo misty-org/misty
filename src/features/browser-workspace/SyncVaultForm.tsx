@@ -14,7 +14,6 @@ export interface VaultUnlockRequest {
 export function SyncVaultForm(props: {
   create: boolean;
   local: boolean;
-  compact?: boolean;
   sectionTitle?: string;
   /** The server rejected this device's identity; unlocking registers it again. */
   reenroll?: boolean;
@@ -91,7 +90,6 @@ export function SyncVaultForm(props: {
   return (
     <form onSubmit={submit} className="ph-no-capture" data-private="true">
       <SettingsSection
-        surface={props.compact ? "plain" : "card"}
         title={
           props.sectionTitle ??
           (props.create
@@ -211,11 +209,11 @@ export function SyncVaultForm(props: {
           account, device, connection and sync timing metadata.
         </SettingsNote>
         {error && (
-          <p role="alert" className="px-5 py-3 text-sm text-cream">
+          <p role="alert" className="py-3 text-sm text-cream">
             {error}
           </p>
         )}
-        <div className="flex flex-wrap justify-end gap-2 px-5 pb-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-charcoal-border py-3">
           {props.local && !props.create && !props.reenroll && (
             <Button
               type="button"

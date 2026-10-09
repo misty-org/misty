@@ -3,6 +3,7 @@ import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, ArrowUpRight } from "lucide-react";
 import {
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,6 +15,7 @@ import {
 } from "@/shared/ui";
 import { browserSearchEngine } from "@/features/workspace/browserSearchEngine";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import { mistyBangs } from "./bangs/catalog";
 import { bangDestination, parseBang, parseLeadingBang } from "./bangs/parse";
 import type { Bang } from "./bangs/types";
 import { browserSearchDestination, useBrowserSearchStore } from "./search";
@@ -25,6 +27,7 @@ const close = () => useBrowserSearchStore.getState().close();
 
 export function BrowserSearchDialog() {
   const open = useBrowserSearchStore((state) => state.open);
+  const openScope = useBrowserSearchStore((state) => state.scope);
   const [bang, setBang] = useState<Bang | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -52,6 +55,13 @@ export function BrowserSearchDialog() {
     }
     return () => setBrowserWebviewsSuspended(false, "browser-search");
   }, [open]);
+
+  // Opened for one scope (Search open tabs): start inside it, with the full list showing.
+  useEffect(() => {
+    if (!open || !openScope) return;
+    setBang(mistyBangs.find((candidate) => candidate.scope === openScope) ?? null);
+    setQuery("");
+  }, [open, openScope]);
 
   useEffect(() => setActiveIndex(0), [bang, query]);
   // Slower sources can shorten the list under the highlight.
@@ -117,7 +127,7 @@ export function BrowserSearchDialog() {
   };
 
   const placeholder = !bang
-    ? `Search ${engine} or enter a URL`
+    ? "Search..."
     : bang.kind === "scope"
       ? bang.placeholder
       : `Search ${bang.label}`;
@@ -129,8 +139,14 @@ export function BrowserSearchDialog() {
       open={open}
       onOpenChange={(next) => (next ? useBrowserSearchStore.getState().show() : close())}
     >
-      <DialogContent placement="top" className="max-w-[620px] gap-3 p-4 pt-3">
-        <DialogTitle className="pr-8 text-sm">
+      <DialogContent
+        placement="top"
+        className={cn(
+          "max-w-[620px] gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
+          "ring-0 shadow-[0_24px_70px_rgba(0,0,0,0.65)] [&>[data-slot=dialog-close]]:hidden",
+        )}
+      >
+        <DialogTitle className="sr-only">
           {bang ? `Search ${bang.label}` : "Search or enter a URL"}
         </DialogTitle>
         <DialogDescription className="sr-only">
@@ -141,23 +157,24 @@ export function BrowserSearchDialog() {
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            const item = items[active];
+            const item = bang || query.trim() || activeIndex > 0 ? items[active] : undefined;
             if (item) choose(item);
             else submitText();
           }}
         >
-          <div className="flex items-center gap-2">
-            {loading ? (
-              <Spinner size="lg" label={false} className="text-cream-muted" />
+          <div className="flex items-center gap-3 px-4 py-3">
+            {loading && !items.length ? (
+              <Spinner size="sm" label={false} className="size-4 shrink-0 text-zinc-400" />
             ) : (
-              <Search size={18} className="shrink-0 text-cream-muted" aria-hidden="true" />
+              <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
             )}
             {bang && (
-              <span className="shrink-0 rounded-md bg-accent px-2 py-1 font-mono text-xs">
+              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/80">
                 !{bang.trigger}
               </span>
             )}
             <Input
+              variant="bare"
               autoFocus
               aria-label="Search or enter a URL"
               placeholder={placeholder}
@@ -166,25 +183,33 @@ export function BrowserSearchDialog() {
               onKeyDown={onKeyDown}
               autoComplete="off"
               spellCheck={false}
-              className="min-w-0 flex-1"
+              className="flex-1 text-zinc-100 placeholder:text-zinc-500"
             />
-            <IconButton label="Open in new tab" type="submit" disabled={!canSubmit}>
+            <IconButton
+              label="Open in new tab"
+              type="submit"
+              disabled={!canSubmit}
+              className="sr-only"
+            >
               <ArrowUpRight size={18} />
             </IconButton>
           </div>
+          <div className="border-b border-white/[0.08]" />
           {error && (
-            <p role="alert" className="mt-2 text-sm text-destructive">
+            <p role="alert" className="px-4 py-2 text-xs text-destructive">
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="mt-2 text-sm text-cream-muted">
+            <p role="status" className="px-4 py-2 text-xs text-zinc-400">
               {notice}
             </p>
           )}
         </form>
         {loading && !items.length ? (
-          <SkeletonList label={`Searching ${bang?.label ?? ""}`} rows={3} lines={1} />
+          <div className="p-3">
+            <SkeletonList label={`Searching ${bang?.label ?? ""}`} rows={3} lines={1} />
+          </div>
         ) : (
           <SearchResultList
             items={items}
@@ -194,11 +219,10 @@ export function BrowserSearchDialog() {
           />
         )}
         {bang?.kind === "scope" && query.trim() && !loading && !items.length && (
-          <p className="text-sm text-cream-muted">No matches in {bang.label.toLowerCase()}.</p>
+          <p className="px-4 py-3 text-sm text-zinc-400">
+            No matches in {bang.label.toLowerCase()}.
+          </p>
         )}
-        <p className="text-xs text-cream-muted">
-          Enter to open · Type ! for shortcuts · Esc to close
-        </p>
       </DialogContent>
     </Dialog>
   );

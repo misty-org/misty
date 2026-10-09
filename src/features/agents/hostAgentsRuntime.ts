@@ -1,11 +1,10 @@
 import { openMisty } from "@/features/misty/handoff";
-import { useActivityStore } from "@/features/activity/useActivityStore";
 import { agentsApi } from "@/api/agents/api";
 import { assistantApi } from "@/api/assistant/api";
 import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/ai-surface/api";
 import { useAuth, useAccountAvatarUrl } from "@/features/auth";
 import { useWorkspaceStore } from "@/features/workspace";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import {
   executeGlobalSearch,
   executeGlobalVisualSearch,
@@ -17,31 +16,6 @@ import { configureAgentsRuntime } from "./AgentsRuntime";
 export function initializeHostAgentsRuntime() {
   configureAgentsRuntime({
     openMisty,
-    reportActivity(event, accountId) {
-      const activity = useActivityStore.getState();
-      if (activity.accountId !== accountId) return;
-      activity.ingestLocal({
-        id: `agent-run:${event.operationId}`,
-        accountId,
-        appId: "agents",
-        sourceLabel: "Agents",
-        status: event.status,
-        revision: event.revision,
-        kind:
-          event.status === "completed"
-            ? "completion"
-            : event.status === "blocked"
-              ? "failure"
-              : "system",
-        lifecycle: event.status === "blocked" ? "request" : "update",
-        title: event.title,
-        body: event.body,
-        target: {
-          kind: "route",
-          href: `/agents?run=${encodeURIComponent(event.operationId)}`,
-        },
-      });
-    },
     agentsApi,
     assistantApi,
     aiSurfaceApi,
@@ -49,7 +23,7 @@ export function initializeHostAgentsRuntime() {
     useAuth,
     useAccountAvatarUrl,
     useWorkspaceStore,
-    Error: SystemErrorActivity,
+    Error: SystemErrorNotice,
     executeGlobalSearch,
     executeGlobalVisualSearch,
     createAgentOwnedBrowserWorkspace,

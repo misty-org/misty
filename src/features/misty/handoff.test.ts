@@ -9,6 +9,18 @@ const windowMocks = vi.hoisted(() => ({
   getByLabel: vi.fn(),
   getCurrentWindow: vi.fn(),
 }));
+// Conversations open on the Agents page.
+const workspace = vi.hoisted(() => ({
+  openDestination: vi.fn((request: { route: string }) => ({ id: "agents", route: request.route })),
+  updateViewRoute: vi.fn(),
+}));
+vi.mock("@/features/workspace/useWorkspaceStore", () => ({
+  useWorkspaceStore: { getState: () => workspace },
+}));
+const last = <T>(items: T[]) => items[items.length - 1];
+const openedRoute = () =>
+  last(workspace.updateViewRoute.mock.calls)?.[1] ??
+  last(workspace.openDestination.mock.calls)?.[0].route;
 
 vi.mock("@tauri-apps/api/window", () => ({
   Window: {
@@ -37,6 +49,8 @@ describe("openMisty", () => {
       conversationsLoading: false,
     });
     usePersonalAgentsStore.setState({ accountId: "account", agents: [], selected: {} });
+    workspace.openDestination.mockClear();
+    workspace.updateViewRoute.mockClear();
     windowMocks.getByLabel.mockReset();
     windowMocks.getCurrentWindow.mockReset().mockReturnValue({
       label: "main",
@@ -51,14 +65,13 @@ describe("openMisty", () => {
     delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
   });
 
-  it("opens in-app Misty panel without throwing when desktop companion window is unavailable", async () => {
+  it("opens the Agents page without throwing when desktop companion window is unavailable", async () => {
     windowMocks.getByLabel.mockResolvedValue(null);
 
     await expect(openMisty({ prompt: "What is the status of my tasks?" })).resolves.toBeUndefined();
 
-    const state = useMistyStore.getState();
-    expect(state.panel).toBe("answer");
-    expect(state.query).toBe("What is the status of my tasks?");
+    expect(openedRoute()).toBe("/agents");
+    expect(useMistyStore.getState().query).toBe("What is the status of my tasks?");
   });
 
   it("keeps handoffs in-app even if a legacy companion window exists", async () => {
@@ -70,21 +83,20 @@ describe("openMisty", () => {
     });
     expect(windowMocks.getByLabel).not.toHaveBeenCalled();
     expect(companion.emit).not.toHaveBeenCalled();
-    expect(useMistyStore.getState().panel).toBe("answer");
+    expect(openedRoute()).toBe("/agents");
     expect(useMistyStore.getState().query).toBe("Hello Misty");
     expect(useMistyStore.getState().context).toEqual([
       { kind: "file", id: "file-1", title: "Notes", source: "local" },
     ]);
   });
 
-  it("opens in-app panel directly when running outside Tauri", async () => {
+  it("opens the Agents page directly when running outside Tauri", async () => {
     delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
 
     await openMisty({ prompt: "Web prompt" });
 
-    const state = useMistyStore.getState();
-    expect(state.panel).toBe("answer");
-    expect(state.query).toBe("Web prompt");
+    expect(openedRoute()).toBe("/agents");
+    expect(useMistyStore.getState().query).toBe("Web prompt");
   });
 
   const conversation = (id = "conversation", agentId = "agent") =>
@@ -110,8 +122,8 @@ describe("openMisty", () => {
       handoff,
     });
     await openMisty();
+    expect(openedRoute()).toBe("/agents?agent=agent&conversation=conversation");
     expect(useMistyStore.getState()).toMatchObject({
-      panel: "answer",
       working: true,
       invocationId: "invocation",
       activeConversationId: "conversation",

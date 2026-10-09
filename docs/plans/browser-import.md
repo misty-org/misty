@@ -6,11 +6,11 @@ Status: implemented (2026-10-06), all six phases. Branch `new-onboarding`. "As b
 
 - **Nesting without a migration.** A folder with no `parent_id` sits in Other bookmarks, so existing folders keep their records unchanged and devices on older versions see nested folders as flat ones. The roots have fixed IDs: `group:bookmarks-bar`, `group:bookmarks` (Other bookmarks, the former default folder) and `group:bookmarks-mobile`.
 - **The sync gate reuses `control_version`.** This version advertises 2 (the server now accepts 1–2). `nested_bookmarks()` in `worker/collections.rs` requires every active device at 2; until then `write_records` drops `parent_id` and `added_at` instead of failing, and the app refuses to create a folder below anything but Other bookmarks (`canNestBookmarkFolders`). A device rename no longer bumps `control_version`, which used it as a counter by mistake. Folder writes are checked for cycles and depth.
-- **Bookmarks bar** under the tab strip (`features/bookmarks/BookmarksBar.tsx`), with an overflow menu, folder submenus and Other bookmarks at the trailing edge. "Show bookmarks bar" is an account setting (`browser_bookmarks_bar`, on by default). Links open through `openFromChrome`, which asks the focused browser tab to navigate.
+- **Bookmarks bar** under the tab strip: retired October 8, 2026. The bar, its `browser_bookmarks_bar` setting and `openFromChrome` are removed; the Bookmarks bar folder stays as a root.
 - **Native module** `src-tauri/src/infra/browser_import/`: `discover`, `chromium`, `firefox`, `safari`, `netscape`, `history`, `settings`, `cookies`, `chromium_key`, `cookie_writer`, `extensions`, `snapshot`. Commands: `browser_import_discover`, `_preview`, `_bookmarks`, `_bookmarks_file`, `_save_bookmarks`, `_history`, `_settings`, `_signins`. All `browser_import_*` commands are limited to the main window.
 - **Bookmarks merge in the app** (`features/browser-import/bookmarks.ts`), each root into Misty's matching root, reusing same-named folders and skipping links already in a folder, so a repeated import changes nothing. Safari bookmarks come from `Bookmarks.plist`; its Reading List becomes a folder in Other bookmarks.
 - **History** goes into `browser-library.sqlite` under the focused tab's profile, skipping visits already there; they sync like local visits.
-- **Settings** map to search engine (when Misty offers it), homepage, reopening the last session, the bookmarks bar, and camera and microphone decisions (macOS; only sites still set to Ask change).
+- **Settings** map to search engine (when Misty offers it), homepage, reopening the last session, and camera and microphone decisions (macOS; only sites still set to Ask change).
 - **Sign-ins** write straight into the profile's WebKit data store on macOS (`dataStoreForIdentifier`, macOS 14+), and through an open browser tab of that profile on Windows. Chrome's `v20` values are counted as locked. Linux Chromium and Safari report why they can't import.
 - **Extensions** are listed with a Find button that opens Misty's catalog searching for them (`/extensions?q=`).
 - **Entry points:** the onboarding step after the welcome dialog (desktop only, skippable), Settings > Browser > Other browsers, and the Bookmarks page header.
@@ -24,7 +24,7 @@ New users bring their browser with them, the way VS Code imports another editor'
 - **Sources:** the Chrome family (Chrome, Edge, Brave, Arc, Vivaldi, Opera share one profile format) and Firefox first; Safari later (it needs Full Disk Access).
 - **File format:** the Netscape bookmarks HTML file, which every major browser imports and exports. It is the only file format: no browser imports history or settings from a file.
 - **Bookmarks follow the Chrome and Firefox model:** a tree of folders with links and folders sharing one order inside each folder, under three roots: Bookmarks bar, Other bookmarks and Mobile bookmarks.
-- **A visible bookmarks bar** sits under the tab strip and shows the Bookmarks bar root.
+- **No visible bookmarks bar** (retired October 8, 2026). The Bookmarks bar root is still imported and shown on the Bookmarks page.
 - **The Bookmarks page** lists a folder's subfolders as rows above its links, with a breadcrumb for the path. No tree sidebar.
 - **Browser logos** appear in the import flow, through `BrandIcon` (needs new Chrome, Firefox, Edge, Brave, Arc, Vivaldi, Opera and Safari artwork; none exists yet). `AGENTS.md` needs the exception extended to this surface.
 - Settings stay account settings on the server; there are no device-only imports.
@@ -90,7 +90,7 @@ Folder records gain a parent folder, and both kinds share sibling order:
 - One `ImportFlow`, used by onboarding, Settings → Browser (an Import and export section) and the Bookmarks page header.
 - Shows detected browsers with their logos and profiles, and a checkmark per data type with its count. A skeleton shows while it scans.
 
-**Bookmarks bar** (`src/app/layouts/DesktopLayout/`): a row under `WorkspaceTabStrip`. Folders open menus; links open in the current view. Overflow goes into a trailing menu. A Browser setting shows or hides it.
+**Bookmarks bar:** retired October 8, 2026.
 
 **Onboarding:** an import step after `TourWelcomeModal`, before the tour, with Skip.
 

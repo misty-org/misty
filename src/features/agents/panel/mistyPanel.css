@@ -1,0 +1,16 @@
+/* Misty panel: a box docked beside the workspace */
+aside[data-misty-panel] {
+  background: var(--color-charcoal-bg, #131313);
+}
+
+aside[data-misty-panel] .agent-studio,
+aside[data-misty-panel] .agent-studio-canvas,
+aside[data-misty-panel] .agent-studio-task,
+aside[data-misty-panel] .agents-main,
+aside[data-misty-panel] .agents-body {
+  background: transparent;
+}
+
+aside[data-misty-panel] .agents-body {
+  --agents-canvas: transparent;
+}

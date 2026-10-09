@@ -41,7 +41,7 @@ export function migrateProfileState(
     overrides?: Record<string, PreferenceValues>;
     outbox?: (ProfileMutation & { profileId: string })[];
   };
-  if (legacy.version === 2) return saved as DeviceProfileState;
+  if (legacy.version === 2) return withoutRetiredSettings(saved as DeviceProfileState);
   const next = initialProfileState(document);
   const selected = legacy.selectedProfileId;
   Object.assign(next.seed, selected ? legacy.profiles?.[selected]?.values : legacy.localValues);
@@ -58,6 +58,17 @@ export function migrateProfileState(
     }),
   );
   return next;
+}
+/** Queued edits to retired settings would be rejected by the server and block every later save. */
+function withoutRetiredSettings(state: DeviceProfileState): DeviceProfileState {
+  const outbox = state.outbox
+    .map((edit) => ({
+      ...edit,
+      set: Object.fromEntries(Object.entries(edit.set).filter(([id]) => definitionById.has(id))),
+      unset: edit.unset.filter((id) => definitionById.has(id)),
+    }))
+    .filter((edit) => Object.keys(edit.set).length > 0 || edit.unset.length > 0);
+  return { ...state, outbox };
 }
 export function effectiveValues(state: DeviceProfileState): PreferenceValues {
   const values = { ...(state.profile?.values ?? state.seed) };

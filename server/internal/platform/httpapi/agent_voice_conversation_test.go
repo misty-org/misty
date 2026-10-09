@@ -298,3 +298,31 @@ func voiceFinished(t *testing.T, f *voiceFixture) {
 		t.Fatal("session did not finish")
 	}
 }
+
+func TestVoiceConversationShowsScreenQuestionsThroughTheClient(t *testing.T) {
+	f := conversationFixture(t, nil)
+	conversationText(t, f)
+	f.provider.events <- agent.VoiceRealtimeEvent{Type: "function-call-arguments-done", CallID: "show", Name: "show_on_screen", Arguments: `{"instruction":"where is the commit button?"}`}
+	f.responseDone("completed")
+	e := f.read(t)
+	// The desktop captures its own screens and admits the teaching turn under this key.
+	if e["type"] != "tool.call" || e["name"] != "show_on_screen" || e["instruction"] != "where is the commit button?" || e["key"] != "voice-fixture-1:show" {
+		t.Fatal(e)
+	}
+	conversationSend(t, f, map[string]string{"type": "tool.result", "callId": "show", "invocationId": "foreign"})
+	if e := f.read(t); e["type"] != "error" {
+		t.Fatal(e)
+	}
+	voiceFinished(t, f)
+}
+
+func TestVoiceShowOnScreenNeedsTheQuestionAndAdmitsByKey(t *testing.T) {
+	for _, arguments := range []string{`{}`, `{"instruction":""}`, `{"instruction":"where","needs_screen":true}`} {
+		if _, err := parseConversationTool(agent.VoiceRealtimeEvent{CallID: "x", Name: "show_on_screen", Arguments: arguments}); err == nil {
+			t.Fatalf("accepted %s", arguments)
+		}
+	}
+	if !voiceToolAdmits("show_on_screen") || !voiceToolAdmits("start_task") || voiceToolAdmits("steer_task") || voiceToolAdmits("cancel_task") {
+		t.Fatal("only admitting tools bind by idempotency key")
+	}
+}

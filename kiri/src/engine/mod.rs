@@ -10,6 +10,10 @@ use std::{
 use tauri::Webview;
 
 #[cfg(target_os = "linux")]
+mod content_filter_linux;
+#[cfg(target_os = "macos")]
+mod content_filter_macos;
+#[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -74,6 +78,39 @@ pub(crate) fn media_verdict(request: &MediaRequest) -> Verdict {
 /// Safe to call again for the same tab.
 pub fn install_media_permissions(webview: &Webview) -> Result<(), String> {
     platform::install_media_permissions(webview)
+}
+
+/// Applies the built-in content filter (`crate::content_filter`) to the tab.
+/// Call it for each new tab and again for every tab after the filter's
+/// configuration changes; repeated calls only swap what changed.
+pub fn install_content_filter(webview: &Webview) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return content_filter_macos::install_content_filter(webview);
+    #[cfg(target_os = "linux")]
+    return content_filter_linux::install_content_filter(webview);
+    #[cfg(windows)]
+    return webview2::install_content_filter(webview);
+    #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
+    {
+        let _ = webview;
+        Ok(())
+    }
+}
+
+/// Starts building the filter for the current configuration before any tab
+/// asks for it, so pages opened next get it at once. Call it after
+/// `content_filter::configure` changes something. WebView2 checks each request
+/// as it is made and needs nothing built.
+pub fn prepare_content_filter(app: &tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    return content_filter_macos::prepare_content_filter(app);
+    #[cfg(target_os = "linux")]
+    return content_filter_linux::prepare_content_filter(app);
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        let _ = app;
+        Ok(())
+    }
 }
 
 /// What the engine knows about the tab's current page.

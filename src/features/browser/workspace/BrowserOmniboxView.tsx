@@ -1,6 +1,6 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
 import { Button, Input, SuggestionList } from "@/shared/ui";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { OmniboxRow } from "./omnibox/OmniboxRow";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./omnibox/types";
 import { inlineCompletion } from "./omnibox/urlText";
@@ -24,6 +24,8 @@ export function BrowserOmniboxView(props: {
   /** Opens a place inside Misty, such as a note, by its app route. */
   onOpenInApp: (route: string) => void;
   onRemove?: (match: OmniboxMatch) => Promise<void>;
+  /** A control at the field's end while it rests, such as the bookmark star. */
+  trailing?: ReactNode;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [focused, setFocused] = useState(false);
@@ -189,8 +191,11 @@ export function BrowserOmniboxView(props: {
         autoComplete="off"
         spellCheck={false}
         variant="toolbar"
-        className="text-left"
+        className={props.trailing && !focused ? "pr-9 text-left" : "text-left"}
       />
+      {props.trailing && !focused ? (
+        <div className="absolute inset-y-0 right-0.5 flex items-center">{props.trailing}</div>
+      ) : null}
       {focused && overlay.open && matches.length ? (
         <SuggestionList
           id="browser-omnibox-suggestions"

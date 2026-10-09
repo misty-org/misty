@@ -84,6 +84,9 @@ pub struct SyncState {
     /// Every active device understands nested bookmark folders. Set by the
     /// worker; bookmark tree fields sync only then.
     pub nested_bookmarks: bool,
+    /// Every active device understands pinned tabs. Set by the worker; the
+    /// pinned fields of tab records sync only then.
+    pub pinned_tabs: bool,
     /// Records with changes the server has not confirmed yet (queued or in
     /// flight), one entry per record, so the renderer can name them per tab.
     pub unsynced: Vec<UnsyncedRecord>,
@@ -1120,6 +1123,7 @@ impl WorkspaceSync {
             collections: BTreeMap::new(),
             all_upgraded: false,
             nested_bookmarks: false,
+            pinned_tabs: false,
             unsynced: unsynced.into_values().collect(),
             retired_edits: store.retired_workspace_count()?,
         })

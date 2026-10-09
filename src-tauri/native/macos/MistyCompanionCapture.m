@@ -26,6 +26,13 @@ SOFTWARE.
 #import <AppKit/AppKit.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 
+// Vision providers resize larger images before the model sees them (OpenAI to
+// a 768px short side, Anthropic to a 1568px long side). Labels state the sent
+// size, so a resize would shift every point; stay inside both bounds instead.
+static double CompanionCaptureScale(double width, double height) {
+  return MIN(1.0, MIN(768.0 / MIN(width, height), 1568.0 / MAX(width, height)));
+}
+
 static char *CompanionJSON(NSDictionary *value) {
   NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
   return strdup([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String);
@@ -49,7 +56,7 @@ char *misty_companion_capture_display(uint32_t displayID) {
         }
         SCContentFilter *filter = [[SCContentFilter alloc] initWithDisplay:target excludingWindows:excluded];
         SCStreamConfiguration *config = [SCStreamConfiguration new];
-        double scale = 1280.0 / MAX(target.width, target.height);
+        double scale = CompanionCaptureScale(target.width, target.height);
         config.width = MAX(1, (size_t)(target.width * scale));
         config.height = MAX(1, (size_t)(target.height * scale));
         config.showsCursor = NO;

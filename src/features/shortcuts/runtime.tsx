@@ -1,5 +1,6 @@
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { browserTabIdForRuntime } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
@@ -115,6 +116,8 @@ export function ShortcutRuntime(): null {
       }),
       listen<ForwardedShortcutEvent>("misty://browser-shortcut", (event) => {
         const forwarded = event.payload;
+        const tabId = browserTabIdForRuntime(forwarded.id);
+        if (tabId) useWorkspaceStore.getState().focusView(tabId);
         dispatchShortcutEvent(
           new KeyboardEvent("keydown", {
             key: forwarded.key,

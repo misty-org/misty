@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({ open: vi.fn(), decline: vi.fn() }));
 vi.mock("./screenRequests", () => ({
   openScreenAndContinue: mocks.open,
   declineScreenRequest: mocks.decline,
+  screenChoice: (location: string) => (location === "separate" ? "separate" : "window"),
 }));
 import { ScreenRequestCard } from "./ScreenRequestCard";
 import { useMistyStore } from "./useMistyStore";
@@ -32,7 +33,7 @@ it("asks where to work only when the account asks each time", () => {
     />,
   );
   expect(screen.getByText("Where should Misty work?")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "This window" }));
+  fireEvent.click(screen.getByRole("button", { name: "New tab" }));
   expect(mocks.open).toHaveBeenCalledWith(
     useMistyStore.setState,
     useMistyStore.getState,

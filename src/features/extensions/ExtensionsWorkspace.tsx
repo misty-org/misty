@@ -8,14 +8,7 @@ import { ExtensionDetail } from "./ExtensionDetail";
 import { InstallReviewDialog, UninstallDialog } from "./ExtensionDialogs";
 import { ExtensionsCollection } from "./ExtensionsCollection";
 import { extensionsNative } from "./native";
-import {
-  install,
-  parseInstallations,
-  pinIds,
-  setPreference,
-  updateInstallation,
-  useExtensionsStore,
-} from "./store";
+import { install, parseInstallations, updateInstallation, useExtensionsStore } from "./store";
 import type { CatalogEntry, CatalogPage, ExtensionReview, Installation } from "./types";
 
 export function ExtensionsWorkspace() {
@@ -268,10 +261,6 @@ export function ExtensionsWorkspace() {
         onUninstall={(removing) =>
           void work(async () => {
             await updateInstallation(removing.id, { installed: false, enabled: false });
-            await setPreference(
-              "pins",
-              JSON.stringify(pinIds().filter((id) => id !== removing.id)),
-            );
             setRemoving(null);
             go("/extensions/installed");
           })

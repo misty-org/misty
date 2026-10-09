@@ -55,7 +55,8 @@ type AIUserSettings struct {
 	// AppActionsAsk pauses sends, shares, deletes and payments in connected
 	// apps until the user approves them in chat.
 	AppActionsAsk bool `json:"app_actions_ask"`
-	// ScreenLocation is where agents open a screen: separate, window or ask.
+	// ScreenLocation is where agents open a new screen: window (a new tab in the
+	// user's Misty window, the default), separate (an agent window) or ask.
 	ScreenLocation string    `json:"screen_location"`
 	RetentionDays  int       `json:"retention_days"`
 	PurgeState     string    `json:"purge_state"`
@@ -75,7 +76,7 @@ type AISurfacePreference struct {
 }
 
 func (db *Database) AISettings(ctx context.Context, userID string) (AIUserSettings, []AISurfacePreference, error) {
-	settings := AIUserSettings{Enabled: true, CursorCompanionEnabled: true, MemoryEnabled: true, AppActionsAsk: true, ScreenLocation: "separate", RetentionDays: 30, PurgeState: "none"}
+	settings := AIUserSettings{Enabled: true, CursorCompanionEnabled: true, MemoryEnabled: true, AppActionsAsk: true, ScreenLocation: "window", RetentionDays: 30, PurgeState: "none"}
 	preferences := []AISurfacePreference{}
 	err := db.TestingWithRLSContext(ctx, userRLSSettings(userID), func(tx *sql.Tx) error {
 		var disabledAt sql.NullTime

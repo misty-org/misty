@@ -18,7 +18,7 @@ export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | 
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 export type WorkspaceInstancePolicy = "multiple" | "single";
-export type WorkspaceScopeKey = "global" | `space:${string}`;
+export type WorkspaceScopeKey = "global" | `space:${string}` | `profile:${string}`;
 export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
@@ -181,6 +181,8 @@ export interface WorkspaceLayout {
 export interface WorkspaceTab {
   /** Chrome-style grouping of visible layout tabs, independent of pane identities. */
   tabGroupId?: string;
+  /** Pinned tabs sit first and return to this page when closed. */
+  pinnedUrl?: string;
   id: string;
   /** Legacy native aliases are resolved after account preferences load. */
   legacyNameKeys?: string[];

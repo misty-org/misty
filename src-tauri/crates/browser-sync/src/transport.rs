@@ -315,7 +315,7 @@ impl SyncApi {
                 reqwest::Method::POST,
                 "control",
                 Some(&serde_json::json!({
-                    "device_id": device_id, "control_version": 2,
+                    "device_id": device_id, "control_version": 3,
                     "platform": std::env::consts::OS,
                     "os_version": os_version.chars().take(64).collect::<String>(),
                 })),

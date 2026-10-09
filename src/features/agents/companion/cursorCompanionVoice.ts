@@ -36,7 +36,8 @@ export class CursorCompanionVoice {
     const controller = s.abort ?? new AbortController();
     s.abort = controller;
     try {
-      s.change({ phase: "processing" });
+      // While the character flies to a point, keep it visible instead of a spinner.
+      if (!s.pointPending) s.change({ phase: "processing" });
       await this.start().readResult(id);
       if (!s.active(generation)) return;
       s.voicePending = false;
@@ -63,12 +64,19 @@ export class CursorCompanionVoice {
     if (!origin || origin.conversationId !== conversationId || !s.originIsCurrent(origin))
       throw new Error("The voice conversation changed.");
     const current = useMistyStore.getState();
-    if (tool.name === "start_task") {
+    if (tool.name === "start_task" || tool.name === "show_on_screen") {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
-      // The task opens a screen or looks at the user's screen when it needs one.
+      const show = tool.name === "show_on_screen";
+      // A screen question is answered from the screens as they are now. A task
+      // opens a screen or looks at the user's screen itself when it needs one.
       s.captures = [];
-      await current.submitAnswer(
+      const screens = show ? await s.capture(generation, new AbortController().signal) : [];
+      if (!s.originIsCurrent(origin) || !s.active(generation)) return undefined;
+      if (useMistyStore.getState().working)
+        throw new Error("A task is already running; use steering.");
+      s.captures = screens;
+      await useMistyStore.getState().submitAnswer(
         tool.instruction,
         [],
         undefined,
@@ -81,6 +89,7 @@ export class CursorCompanionVoice {
           interactionMode: s.state.mode,
           model: s.state.model,
           idempotencyKey: tool.key,
+          ...(show ? { displayCaptures: screens, intent: "teach" as const } : {}),
         },
       );
       const admitted = useMistyStore.getState();
@@ -172,28 +181,74 @@ export class CursorCompanionVoice {
     return session;
   };
 
-  /** Points at and reads back a task the voice conversation started, once it finishes. */
+  /**
+   * Points at and reads back a task the voice conversation started, once it
+   * finishes. A task that asked to look at or open a screen is answered by its
+   * continuation, so that answer is the one pointed at and read aloud.
+   */
   settleDelegatedTask = () => {
     const s = this.s;
-    const task = s.delegatedTask;
+    let task = s.delegatedTask;
     const current = useMistyStore.getState();
     if (
       !task ||
       s.disposed ||
       current.accountId !== s.accountId ||
-      current.activeConversationId !== task.conversationId ||
-      current.working ||
-      s.state.phase !== "idle" ||
-      current.invocationId !== task.id
+      current.activeConversationId !== task.conversationId
     )
       return;
-    s.delegatedTask = undefined;
-    const reply = current.conversations
-      .find((c) => c.id === current.activeConversationId)
-      ?.messages.find((m) => m.role === "assistant" && m.invocationId === task.id);
-    if (reply?.state === "completed") {
-      s.presentReplyPoint(reply.content);
-      void this.speak(task.id, s.turn);
+    if (task.awaitingContinuation) {
+      if (
+        current.invocationId &&
+        current.invocationId !== task.id &&
+        current.invocationConversationId === task.conversationId
+      ) {
+        task = { id: current.invocationId, conversationId: task.conversationId };
+        s.delegatedTask = task;
+      } else if (openingScreen(this.reply(task.id)?.screenRequest?.state)) return;
     }
+    // Wait while the person is talking or a spoken reply plays.
+    if (
+      current.working ||
+      current.invocationId !== task.id ||
+      s.state.phase === "listening" ||
+      s.state.phase === "responding"
+    )
+      return;
+    const reply = this.reply(task.id);
+    if (
+      reply?.state === "completed" &&
+      !task.awaitingContinuation &&
+      openingScreen(reply.screenRequest?.state)
+    ) {
+      s.delegatedTask = { ...task, awaitingContinuation: true };
+      return;
+    }
+    s.delegatedTask = undefined;
+    if (reply?.state === "completed") {
+      s.pointer.present(reply.content, task.id, true);
+      void this.speak(task.id, s.turn);
+      return;
+    }
+    if (s.state.phase === "processing") s.change({ phase: "idle" });
+    s.maybeHide();
   };
+
+  /** Whether a typed continuation answers a spoken request in this conversation. */
+  ownsContinuation = (conversationId: string) =>
+    Boolean(
+      this.s.delegatedTask?.awaitingContinuation &&
+      this.s.delegatedTask.conversationId === conversationId,
+    );
+
+  private reply = (invocationId: string) =>
+    useMistyStore
+      .getState()
+      .conversations.find((c) => c.id === useMistyStore.getState().activeConversationId)
+      ?.messages.find((m) => m.role === "assistant" && m.invocationId === invocationId);
+}
+
+/** A screen the task asked for is still being chosen or opened. */
+function openingScreen(state: string | undefined) {
+  return state === "pending" || state === "opening";
 }

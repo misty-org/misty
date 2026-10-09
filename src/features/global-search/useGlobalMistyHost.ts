@@ -6,11 +6,11 @@ import { isAgentModeActive } from "./searchAvailability";
 import { useGlobalSearchStore } from "./useGlobalSearchStore";
 
 /**
- * Host duties of the global Misty surfaces: search stays closed while an agent
- * controls the screen, and the search surface installs the context bridge.
+ * Host duties of the search launcher: it stays closed while an agent controls
+ * the screen, and it installs the context bridge.
  * Returns the bridge's startup error, if any.
  */
-export function useGlobalMistyHost(controller?: "search" | "misty") {
+export function useGlobalMistyHost() {
   useEffect(() => {
     const enforceAgentMode = () => {
       if (isAgentModeActive() && useGlobalSearchStore.getState().panel !== "closed")
@@ -26,7 +26,6 @@ export function useGlobalMistyHost(controller?: "search" | "misty") {
   }, []);
   const [bridgeError, setBridgeError] = useState("");
   useEffect(() => {
-    if (controller === "misty") return;
     let disposed = false;
     let cleanup: (() => void) | undefined;
     void installMistyContextBridge()
@@ -42,6 +41,6 @@ export function useGlobalMistyHost(controller?: "search" | "misty") {
       disposed = true;
       cleanup?.();
     };
-  }, [controller]);
+  }, []);
   return bridgeError;
 }

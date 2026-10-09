@@ -36,6 +36,9 @@ pub enum Kind {
     ExtensionSyncKey,
     /// Durable account removal; old offline writes cannot restore this generation.
     ExtensionRemoval,
+    /// A saved website sign-in (`passwords` collection). Native-only: sealed with
+    /// the vault key and never projected to a renderer.
+    Login,
 }
 
 impl Kind {
@@ -55,6 +58,7 @@ impl Kind {
             Self::HistoryBatch => "history_batch",
             Self::ExtensionSyncKey => "extension_sync_key",
             Self::ExtensionRemoval => "extension_removal",
+            Self::Login => "login",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -169,6 +173,31 @@ pub struct SavedTabGroup {
     pub tabs: String,
 }
 
+/// A saved website sign-in. The origin is where it may be filled, never wider.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Login {
+    /// `scheme://host[:port]`, as the sign-in page reported it.
+    pub origin: String,
+    pub username: String,
+    pub password: String,
+    /// Milliseconds since the Unix epoch.
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+/// A web origin exactly as `Url::origin` serializes it, http or https only.
+pub fn login_origin(value: &str) -> Result<()> {
+    let url = url::Url::parse(value).map_err(|_| Error::Invalid)?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.origin().ascii_serialization() != value
+        || value.len() > 512
+    {
+        return Err(Error::Invalid);
+    }
+    Ok(())
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Visit {
@@ -267,7 +296,16 @@ pub struct Tab {
     pub title: String,
     pub order: f64,
     pub tree: SplitTree,
+    /// The page a pinned tab returns to; absent for unpinned tabs, so their
+    /// records keep the shape older versions accept (see `PINNED_TAB_FIELDS`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pinned_url: Option<String>,
 }
+
+/// Tab fields that versions before pinned tabs reject. They are only written
+/// once every device understands them (control version 3); until then sync
+/// drops them. A null value removes the field, so unpinning restores the old shape.
+pub const PINNED_TAB_FIELDS: [&str; 1] = ["pinned_url"];
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -375,6 +413,9 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             text(&v.title, 512, true)?;
             order(v.order)?;
             v.tree.panes()?;
+            if let Some(url) = &v.pinned_url {
+                web_url(url)?;
+            }
         }
         Kind::TabGroup => {
             let v: TabGroup = serde_json::from_value(value)?;
@@ -397,6 +438,20 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
                 return Err(Error::Invalid);
             }
             order(v.order)?;
+        }
+        Kind::Login => {
+            let v: Login = serde_json::from_value(value)?;
+            login_origin(&v.origin)?;
+            if v.username.len() > 512
+                || v.password.is_empty()
+                || v.password.len() > 4096
+                || v.username.contains('\0')
+                || v.password.contains('\0')
+            {
+                return Err(Error::Invalid);
+            }
+            added_at(Some(v.created_at))?;
+            added_at(Some(v.updated_at))?;
         }
         Kind::ExtensionRemoval => {
             #[derive(Deserialize)]

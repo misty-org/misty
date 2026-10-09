@@ -23,6 +23,9 @@ import {
   IconButton,
   Input,
 } from "@/shared/ui";
+import { useAgentFoldersStore } from "../folders/agentFoldersStore";
+import { FolderNameDialog } from "../folders/FolderNameDialog";
+import { MoveToFolderMenu } from "../folders/MoveToFolderMenu";
 
 /** Shared by collection rows, history, recents, and the open conversation. */
 export function AgentConversationActions({
@@ -30,12 +33,14 @@ export function AgentConversationActions({
   disabled,
   onOpen,
 }: {
-  conversation: { id: string; title?: string };
+  /** With an agent id, the menu can file the conversation into that agent's folders. */
+  conversation: { id: string; title?: string; agentId?: string; folderId?: string };
   disabled?: boolean;
   onOpen?(): void;
 }) {
   const [params, setParams] = useSearchParams();
   const [action, setAction] = useState<"rename" | "delete">();
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -89,7 +94,7 @@ export function AgentConversationActions({
         <DropdownMenuContent
           align="end"
           onCloseAutoFocus={(event) => {
-            if (action) event.preventDefault();
+            if (action || creatingFolder) event.preventDefault();
           }}
         >
           {onOpen && <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>}
@@ -103,6 +108,13 @@ export function AgentConversationActions({
           >
             <Pencil /> Rename
           </DropdownMenuItem>
+          {conversation.agentId && (
+            <MoveToFolderMenu
+              conversation={{ ...conversation, agentId: conversation.agentId }}
+              disabled={disabled}
+              onNewFolder={() => setCreatingFolder(true)}
+            />
+          )}
           <DropdownMenuItem
             disabled={disabled}
             onSelect={() => {
@@ -114,6 +126,20 @@ export function AgentConversationActions({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {conversation.agentId && (
+        <FolderNameDialog
+          open={creatingFolder}
+          title="New folder"
+          description="This conversation moves into the new folder."
+          submitLabel="Create"
+          onOpenChange={setCreatingFolder}
+          onSubmit={async (folderName) => {
+            const store = useAgentFoldersStore.getState();
+            const folder = await store.create(conversation.agentId!, folderName);
+            await store.file(conversation.id, folder.id);
+          }}
+        />
+      )}
       <Dialog
         open={action === "rename"}
         onOpenChange={(open) => {

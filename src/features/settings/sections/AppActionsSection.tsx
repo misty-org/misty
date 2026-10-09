@@ -41,7 +41,6 @@ export function AppActionsSection() {
       <DesktopSettingsRow
         label="Ask before acting for you"
         description="Sending, sharing, deleting and paying in connected apps wait for your approval in the chat."
-        last
       >
         <SwitchControl
           checked={ask ?? true}

@@ -5,10 +5,17 @@ import type { SharedRecord } from "@/features/browser-workspace/model";
 export const bookmarksBarId = "group:bookmarks-bar";
 export const otherBookmarksId = "group:bookmarks";
 export const mobileBookmarksId = "group:bookmarks-mobile";
+/** Sites shown in every virtual window's tab strip. Older versions read it as a
+ * folder in Other bookmarks, since it has no parent. */
+export const favoritesId = "group:favorites";
+/** Sites installed as apps; each opens in its own virtual window. */
+export const appsId = "group:apps";
 export const bookmarkRoots = [
   { id: bookmarksBarId, label: "Bookmarks bar", stored: "Bookmarks bar" },
   { id: otherBookmarksId, label: "Other bookmarks", stored: "Bookmarks" },
   { id: mobileBookmarksId, label: "Mobile bookmarks", stored: "Mobile bookmarks" },
+  { id: favoritesId, label: "Favorites", stored: "Favorites" },
+  { id: appsId, label: "Apps", stored: "Apps" },
 ] as const;
 export type BookmarkRootId = (typeof bookmarkRoots)[number]["id"];
 /** Folders nest at most this deep below a root (native sync enforces the same). */

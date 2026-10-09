@@ -20,7 +20,9 @@ const (
 	screenActTool        = "browser.act"
 	screenModelBodyLimit = 12 << 20
 	screenModelMaxOutput = 6000
-	screenModelMaxCalls  = 40
+	// One act job runs a whole goal for up to four minutes, waiting between
+	// moves without model calls; this caps runaway planners, not normal play.
+	screenModelMaxCalls = 80
 )
 
 // ScreenModel answers one OpenAI-style chat completion for a live act job.

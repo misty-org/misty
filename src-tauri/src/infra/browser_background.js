@@ -31,8 +31,18 @@ if (window === window.top) {
   window.__MISTY_REPORT_BACKGROUND__ = scheduleBackground;
   new MutationObserver(scheduleBackground).observe(document, {
     subtree: true, childList: true, attributes: true,
-    attributeFilter: ['class', 'style', 'hidden', 'data-theme', 'data-color-mode'],
+    attributeFilter: ['class', 'hidden', 'data-theme', 'data-color-mode'],
   });
+  if (document.documentElement) {
+    new MutationObserver(scheduleBackground).observe(document.documentElement, {
+      attributes: true, attributeFilter: ['style'],
+    });
+  }
+  if (document.body) {
+    new MutationObserver(scheduleBackground).observe(document.body, {
+      attributes: true, attributeFilter: ['style'],
+    });
+  }
   addEventListener('DOMContentLoaded', scheduleBackground);
   addEventListener('load', scheduleBackground);
   addEventListener('scroll', scheduleBackground, { passive: true });

@@ -1,3 +1,9 @@
+import { profileDataIdForView } from "@/features/workspace/browserProfiles";
+import { startAutoPictureInPicture } from "./autoPictureInPicture";
+import { startBrowserTabSleep } from "./browserTabSleep";
+import { listenForPasswordOffers } from "@/features/passwords/offers";
+import { startTabArchive } from "@/features/workspace/tabArchive";
+import { useAuth } from "@/features/auth";
 import {
   browserViewUrl,
   recordBrowserVisitTitle,
@@ -5,15 +11,21 @@ import {
   useBrowserMediaStore,
 } from "@/features/browser/library";
 import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
-import { dockLeaves, useWorkspaceStore, type WorkspaceDockNode } from "@/features/workspace";
+import {
+  dockLeaves,
+  useWorkspaceStore,
+  workspaceTabsById,
+  type WorkspaceDockNode,
+} from "@/features/workspace";
 import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   browserTabIdForRuntime,
   browserTabShowsInternalPage,
+  closeBrowserRuntime,
   parkAllBrowserWebviews,
   reconcileBrowserOverlayState,
   requestBrowserWebviewLayoutByRuntimeId,
@@ -21,6 +33,7 @@ import {
   setBrowserWebviewsSuspended,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
+import { setBrowserProfileResolver } from "./browserProfileResolver";
 import { openBrowserPopup } from "./openBrowserPopup";
 const browserBlockingOverlaySelector = [
   // Rail hints extend over native pages, above the renderer's own DOM layers.
@@ -60,7 +73,7 @@ interface BrowserFaviconEvent {
 }
 interface BrowserCompatibilityEvent {
   id: string;
-  kind: "cloudflare_challenge";
+  kind: "cloudflare_challenge" | "protected_media";
   url: string;
 }
 interface BrowserPopupEvent {
@@ -97,8 +110,26 @@ interface BrowserDownloadEvent {
   success: boolean;
   error?: string;
 }
+// Registered when the bridge loads, before any page opens, so a view in a device
+// profile always opens in that profile's own website data.
+setBrowserProfileResolver((viewId) => profileDataIdForView(useWorkspaceStore.getState(), viewId));
+
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
+  useEffect(() => startAutoPictureInPicture(), []);
+  useEffect(() => startBrowserTabSleep(), []);
+  useEffect(() => listenForPasswordOffers(), []);
+  const { user } = useAuth();
+  const archiveAccount = useRef(user?.id ?? "");
+  archiveAccount.current = user?.id ?? "";
+  useEffect(
+    () =>
+      startTabArchive({
+        accountId: () => archiveAccount.current,
+        audible: (viewId) => Boolean(useBrowserMediaStore.getState().audible[viewId]),
+      }),
+    [],
+  );
   const browserSurfaceActive = useWorkspaceStore((state) =>
     activeBrowserSurfaceExists(state.layout.root),
   );
@@ -117,6 +148,21 @@ export function BrowserRuntimeBridge() {
     const frame = window.requestAnimationFrame(() => void parkAllBrowserWebviews());
     return () => window.cancelAnimationFrame(frame);
   }, [browserSurfaceActive]);
+  useEffect(() => {
+    let knownTabs = workspaceTabsById(useWorkspaceStore.getState());
+    return useWorkspaceStore.subscribe((state) => {
+      const nextTabs = workspaceTabsById(state);
+      for (const [tabId, tab] of knownTabs) {
+        if (!nextTabs.has(tabId) && tab.surfaceId === "browser") {
+          void closeBrowserRuntime(
+            tab,
+            () => !workspaceTabsById(useWorkspaceStore.getState()).has(tabId),
+          );
+        }
+      }
+      knownTabs = nextTabs;
+    });
+  }, []);
   useEffect(() => {
     const reorder = (event: Event) =>
       setBrowserWebviewsSuspended((event as CustomEvent<boolean>).detail, "pointer-reorder");
@@ -206,7 +252,8 @@ export function BrowserRuntimeBridge() {
     // React recreates a host, even if the website itself hasn't changed color.
     const backgroundHosts = new MutationObserver(() => {
       clearTimeout(backgroundTimer);
-      backgroundTimer = setTimeout(restorePageBackgrounds, 120);
+      restorePageBackgrounds();
+      backgroundTimer = setTimeout(restorePageBackgrounds, 60);
     });
     backgroundHosts.observe(document.body, {
       childList: true,
@@ -288,7 +335,7 @@ export function BrowserRuntimeBridge() {
       listen<BrowserCompatibilityEvent>("misty://browser-compatibility", ({ payload }) => {
         if (
           disposed ||
-          payload.kind !== "cloudflare_challenge" ||
+          (payload.kind !== "cloudflare_challenge" && payload.kind !== "protected_media") ||
           !/^https?:\/\//i.test(payload.url)
         ) {
           return;

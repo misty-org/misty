@@ -113,3 +113,30 @@ it("reveals a saved website address on request and hides it after Escape without
   expect(input.hidden).toBe(true);
   expect(props.onNavigate).not.toHaveBeenCalled();
 });
+
+it("opens a typed address that is also open in another tab instead of switching to it", async () => {
+  const props = baseProps({
+    currentUrl: "about:blank",
+    providers: providers({
+      openTabs: () => [
+        {
+          tabId: "tab-2",
+          url: "https://github.com/",
+          title: "GitHub",
+          private: false,
+          agentOwned: false,
+        },
+      ],
+    }),
+  });
+  render(<BrowserOmniboxView {...props} />);
+  const input = screen.getByLabelText("Search or enter address") as HTMLInputElement;
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "github.com" } });
+  await screen.findByRole("button", { name: "Switch to tab" });
+  // Enter presses a form's first submit button, so the row's button must not be one.
+  expect(input.form!.querySelector("button:not([type]), button[type='submit']")).toBeNull();
+  fireEvent.submit(input.form!);
+  expect(props.onSwitchView).not.toHaveBeenCalled();
+  expect(props.onNavigate).toHaveBeenCalledWith("https://github.com/", { typed: true });
+});

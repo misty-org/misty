@@ -242,6 +242,57 @@ where
         active.peek().is_some() && active.all(|d| d.uses_collections && d.control_version >= 2)
     }
 
+    /// Every active device understands pinned tabs (control version 3); until
+    /// then the pinned fields of tab records are never written.
+    pub(super) fn pinned_tabs(&self) -> bool {
+        let devices = self.devices.borrow();
+        let mut active = devices.iter().filter(|d| d.revoked_at.is_none()).peekable();
+        active.peek().is_some() && active.all(|d| d.uses_collections && d.control_version >= 3)
+    }
+
+    /// Strips pinned fields from tab edits while some device would reject them.
+    /// An edit left with no fields is dropped.
+    pub(super) fn gate_pinned_tabs(&self, changes: Vec<Change>) -> Vec<Change> {
+        use crate::document::entities::{Kind, PINNED_TAB_FIELDS};
+        if self.pinned_tabs() {
+            return changes;
+        }
+        changes
+            .into_iter()
+            .filter_map(|change| match change {
+                Change::Create {
+                    kind: Kind::Tab,
+                    id,
+                    mut fields,
+                } => {
+                    for field in PINNED_TAB_FIELDS {
+                        fields.remove(field);
+                    }
+                    Some(Change::Create {
+                        kind: Kind::Tab,
+                        id,
+                        fields,
+                    })
+                }
+                Change::Patch {
+                    kind: Kind::Tab,
+                    id,
+                    mut fields,
+                } => {
+                    for field in PINNED_TAB_FIELDS {
+                        fields.remove(field);
+                    }
+                    (!fields.is_empty()).then_some(Change::Patch {
+                        kind: Kind::Tab,
+                        id,
+                        fields,
+                    })
+                }
+                other => Some(other),
+            })
+            .collect()
+    }
+
     /// Records that live in a collection (bookmarks, saved tab groups)
     /// are turned into whole-record writes there. Tab-group records wait for
     /// every device to understand them. Returns the remaining (workspace) changes.
@@ -414,7 +465,11 @@ where
         let mut out = BTreeMap::new();
         for collection in COLLECTIONS
             .into_iter()
-            .filter(|c| *c != collections::HISTORY && *c != collections::EXTENSION_SYNC)
+            .filter(|c| {
+                *c != collections::HISTORY
+                    && *c != collections::EXTENSION_SYNC
+                    && *c != collections::PASSWORDS
+            })
         {
             let state = self.store.collection(&self.root, collection)?;
             if state.loaded || !state.pending.is_empty() {

@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/auth";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { publicBetaFeatureEnabled } from "@/features/launch";
 import {
   aiSurfaceApi,
@@ -11,13 +11,13 @@ import {
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiSurfaceId } from "@/features/ai-surface/types";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { cn, Button, Switch } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { ChoiceControl } from "../SettingsControls";
+import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 import { MistyBriefingsSection } from "./MistyBriefingsSection";
@@ -34,9 +34,6 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
   const [recapDraft, setRecapDraft] = useState<AiRecapRecord>(() => defaultRecap("activity"));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
-  const [provider, setProvider] = useState<{ configured: boolean; model_name: string } | null>(
-    null,
-  );
 
   useEffect(() => {
     let active = true;
@@ -54,10 +51,6 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           active &&
           setError(reason instanceof Error ? reason.message : "Misty settings could not load."),
       );
-    void aiSurfaceApi
-      .status()
-      .then((result) => active && setProvider(result))
-      .catch(() => undefined);
     void aiSurfaceApi
       .memories()
       .then((result) => active && setMemories(result.memories))
@@ -185,38 +178,11 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
             label="Enable Misty"
             description="Allow hosted AI in embedded surfaces and Global Misty. Lexical search continues when this is off."
           >
-            <Switch
-              aria-label="Enable Misty"
-              className={cn(
-                "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg",
-                "disabled:opacity-100",
-                "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border",
-              )}
+            <SwitchControl
               checked={settings?.enabled ?? false}
               disabled={!settings || working}
-              onCheckedChange={(value) => void updateSettings(value)}
+              onChange={(value) => void updateSettings(value)}
             />
-          </SettingsRow>
-          <SettingsRow
-            label="Hosted provider"
-            description="Embedded and shared Misty features run on Misty's own model keys."
-          >
-            <span className="text-sm text-cream-muted">
-              {provider === null
-                ? "Checking…"
-                : provider.configured
-                  ? provider.model_name
-                  : "Unavailable — lexical search only"}
-            </span>
-          </SettingsRow>
-          <SettingsRow
-            label="Purge status"
-            description="Database deletion is transactional; device caches and object storage are verified by a high-priority cleanup job."
-            last
-          >
-            <span className="text-sm capitalize text-cream-muted">
-              {settings?.purge_state ?? "none"}
-            </span>
           </SettingsRow>
         </SettingsSectionBlock>
       )}
@@ -247,36 +213,17 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
               />
             </SettingsRow>
             <SettingsRow
-              label="Personal by default"
-              description="Corrections, rankings, pinned Agents, and saved actions remain personal unless you explicitly share an action with a Space."
-            >
-              <span className="text-xs text-cream-muted">Never shared silently</span>
-            </SettingsRow>
-            <SettingsRow
               label="Remembered context"
               description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
               muted={!settings || !settings.enabled}
             >
-              <Switch
-                aria-label="Use remembered context"
-                className={cn(
-                  "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg",
-                  "disabled:opacity-100",
-                  "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border",
-                )}
+              <SwitchControl
                 checked={settings?.memory_enabled ?? false}
                 disabled={!settings || working || !settings.enabled}
-                onCheckedChange={(value) =>
+                onChange={(value) =>
                   void updateSettings(true, settings?.retention_days ?? 30, value)
                 }
               />
-            </SettingsRow>
-            <SettingsRow
-              label="Dangerous actions"
-              description="External, destructive, permission-changing, and device actions always require exact review and confirmation."
-              last
-            >
-              <span className="text-xs text-cream-muted">Blanket approval disabled</span>
             </SettingsRow>
           </SettingsSectionBlock>
 
@@ -285,41 +232,33 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
             description="Review exactly what Misty can recall. Forgetting a detail removes it from future conversations."
           >
             {memories.length === 0 ? (
-              <div className="px-5 py-4 text-[13px] text-cream-muted">Nothing remembered yet.</div>
+              <p className="border-t border-charcoal-border py-3 text-[13px] text-cream-muted">
+                Misty remembers a detail only when you ask it to.
+              </p>
             ) : (
-              memories.map((memory, index) => (
+              memories.map((memory) => (
                 <SettingsRow
                   key={memory.id}
-                  label={
+                  label={memory.content}
+                  description={`${
                     memory.kind === "instruction"
                       ? "Standing instruction"
                       : memory.kind === "preference"
                         ? "Preference"
                         : "Detail"
-                  }
-                  description={
-                    memory.space_id
-                      ? "Private · used only in its Space"
-                      : "Private · available across Misty"
-                  }
-                  last={index === memories.length - 1}
+                  } · ${memory.space_id ? "used only in its Space" : "available across Misty"}`}
                 >
-                  <div className="flex w-full min-w-0 items-center justify-end gap-3 max-[760px]:justify-between">
-                    <span className="min-w-0 flex-1 truncate text-right text-[13px] text-cream max-[760px]:text-left">
-                      {memory.content}
-                    </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className={settingsDisabledControlClass}
-                      disabled={working}
-                      aria-label={`Forget ${memory.content}`}
-                      onClick={() => void forgetMemory(memory.id)}
-                    >
-                      Forget
-                    </Button>
-                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={settingsDisabledControlClass}
+                    disabled={working}
+                    aria-label={`Forget ${memory.content}`}
+                    onClick={() => void forgetMemory(memory.id)}
+                  >
+                    Forget
+                  </Button>
                 </SettingsRow>
               ))
             )}
@@ -334,30 +273,21 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
             "why it appeared, respects cooldowns and snooze, and never starts work until you review it."
           }
         >
-          {managedSurfaces.map((surface, index) => {
+          {managedSurfaces.map((surface) => {
             const preference = preferences[surface.id];
             return (
               <SettingsRow
                 key={surface.id}
                 label={surface.label}
                 muted={!settings || settings.enabled === false}
-                last={index === managedSurfaces.length - 1}
               >
-                <div className="flex w-full items-center justify-end gap-3 max-[760px]:justify-start">
-                  <Switch
-                    aria-label={`Proactive suggestions in ${surface.label}`}
-                    className={
-                      "disabled:border-charcoal-border/80 disabled:bg-charcoal-bg " +
-                      "disabled:opacity-100 " +
-                      "disabled:[&_[data-slot=switch-thumb]]:bg-charcoal-border"
-                    }
-                    checked={preference?.proactive_enabled ?? false}
-                    disabled={working || !settings || settings.enabled === false}
-                    onCheckedChange={(value) =>
-                      void updatePreference(surface.id, { proactive_enabled: value })
-                    }
-                  />
-                </div>
+                <SwitchControl
+                  checked={preference?.proactive_enabled ?? false}
+                  disabled={working || !settings || settings.enabled === false}
+                  onChange={(value) =>
+                    void updatePreference(surface.id, { proactive_enabled: value })
+                  }
+                />
               </SettingsRow>
             );
           })}
@@ -376,7 +306,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
         />
       )}
       {error ? (
-        <SystemErrorActivity
+        <SystemErrorNotice
           error={error}
           scope="settings:misty"
           title="Misty settings need attention"

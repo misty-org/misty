@@ -92,6 +92,7 @@ where
         view.collections = self.collections_view()?;
         view.all_upgraded = self.all_upgraded();
         view.nested_bookmarks = self.nested_bookmarks();
+        view.pinned_tabs = self.pinned_tabs();
         self.sync_state.send_if_modified(|current| {
             if *current == view {
                 false

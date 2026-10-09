@@ -91,4 +91,10 @@ export const browserPageTools = {
     invoke<void>("browser_webview_save_page", { request: { id, path } }),
   developerTools: (id: string) =>
     invoke<{ opened: boolean }>("browser_webview_developer_tools", { request: { id } }),
+  readerArticle: (id: string) =>
+    invoke<unknown>("browser_webview_reader_article", { request: { id } }),
+  mediaPlayback: (id: string, action: "pause" | "play") =>
+    invoke<void>("browser_webview_media_playback", { request: { id, action } }),
+  pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit") =>
+    invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

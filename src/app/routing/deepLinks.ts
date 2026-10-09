@@ -1,4 +1,5 @@
 import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
+import { openExternalLink } from "@/features/workspace/externalLinks";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
@@ -12,12 +13,26 @@ export function installMistyDeepLinkHandler(
   let active = true;
   let unlisten: UnlistenFn | null = null;
   let lastCurrentSignature: string | null = null;
+  let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
   const handleUrls = (urls: string[] | null, source: "current" | "event") => {
     if (!active || !urls) return;
     const signature = urls.join("\n");
     if (source === "current" && signature === lastCurrentSignature) return;
+    // A cold launch reports the same links as both the current URL and an event.
+    if (signature === lastCurrentSignature && Date.now() - lastHandledAt < 1500) return;
     lastCurrentSignature = signature;
+    lastHandledAt = Date.now();
+    // Web links arrive here once Misty is the default browser; each opens in its own tab.
+    const webUrls = urls.filter(isWebUrl);
+    for (const url of webUrls) {
+      try {
+        navigate(openExternalLink(url).route);
+      } catch {
+        // An address the browser can't open is ignored, as it would be from the omnibox.
+      }
+    }
+    if (webUrls.length) return;
     for (const url of urls) {
       const route = routeForMistyDeepLink(url, isRouteAllowed, resolveAuthRoute);
       if (route) {
@@ -76,6 +91,14 @@ export function routeForMistyDeepLink(
     );
   }
   return normalizeDeepLinkRoute(parts, url.search, isRouteAllowed);
+}
+function isWebUrl(rawUrl: string): boolean {
+  try {
+    const { protocol } = new URL(rawUrl);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 function parseMistyDeepLink(rawUrl: string): URL | null {
   try {

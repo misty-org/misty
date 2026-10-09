@@ -1,5 +1,5 @@
 import { personalSpaceTemplatesApi } from "@/api/spaces/templates";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceIntegrationProvider, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
 import { useEffect, useState, type FormEvent } from "react";

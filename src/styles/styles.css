@@ -182,23 +182,6 @@
     background-color: var(--misty-theme-bg);
   }
 
-  /* Panel opacity only means something when there is something behind the app
-     to see. The wallpaper plays on a native layer beneath the transparent
-     webview, so the base surfaces thin out to let it through; with no
-     wallpaper set these rules are inert and the app stays fully opaque. */
-  html[data-wallpaper-active="true"] body,
-  html[data-wallpaper-active="true"] #root {
-    background-color: color-mix(
-      in srgb,
-      var(--misty-theme-bg) calc(var(--misty-panel-opacity, 1) * 100%),
-      transparent
-    );
-  }
-
-  html[data-wallpaper-active="true"] [data-misty-desktop-frame] {
-    background-color: transparent;
-  }
-
   /* Keep the native Browser's transparent path stable for the lifetime of a
      mounted Browser surface. Toggling these full-window ancestors for every
      popup forced WebKit to clear and repaint its backing store, which appeared
@@ -218,7 +201,13 @@
   html:has([data-browser-page-host]) [data-browser-page-container]:has([data-browser-page-host]),
   html:has([data-browser-page-host]) [data-browser-workspace-tab],
   html:has([data-browser-page-host]) [data-browser-page-stage],
-  html:has([data-browser-page-host]) [data-browser-page-host]:not([data-misty-browser-background]) {
+  html:has([data-browser-page-host]) [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* While a renderer overlay is open the native page sits beneath the
+     renderer. Keep the host transparent so the page remains visible. */
+  html[data-browser-overlay-active] [data-browser-page-host] {
     background-color: transparent !important;
   }
 
@@ -1150,4 +1139,18 @@
 /* Tooltips and the drag ghost, always on top */
 @utility layer-tooltip {
   z-index: 2147483500;
+}
+
+/* The optional accent (Settings › Appearance) marks a fixed set of surfaces:
+   the active tab, switches that are on and selected text. Unset, the app stays
+   monochrome. */
+:root[data-accent] .misty-workspace-tab[data-active="true"] {
+  box-shadow: inset 0 2px 0 var(--misty-accent);
+}
+:root[data-accent] [data-slot="switch"][data-state="checked"] {
+  border-color: var(--misty-accent);
+  background-color: var(--misty-accent);
+}
+:root[data-accent] ::selection {
+  background-color: color-mix(in srgb, var(--misty-accent) 45%, transparent);
 }

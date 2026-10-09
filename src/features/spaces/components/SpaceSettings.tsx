@@ -1,4 +1,4 @@
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { DesktopSettingsFrame, type DesktopSettingsNavEntry } from "@/features/settings/desktop";
 import { SpaceMembers } from "@/features/spaces/members";
 import {
@@ -215,14 +215,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
                     </p>
                   ) : null}
                   {error && !leaveOpen && !deleteOpen ? (
-                    <SystemErrorActivity
+                    <SystemErrorNotice
                       error={error}
                       scope={`spaces:settings:${spaceId}`}
                       title="Space settings need attention"
-                      target={{
-                        kind: "route",
-                        href: `/spaces/${encodeURIComponent(spaceId)}`,
-                      }}
                     />
                   ) : null}
                   <Separator className="my-5" />
@@ -387,7 +383,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 function DangerError({ message }: { message: string }) {
   return (
-    <SystemErrorActivity
+    <SystemErrorNotice
       error={message}
       scope="spaces:settings:danger"
       title="Space action could not be completed"

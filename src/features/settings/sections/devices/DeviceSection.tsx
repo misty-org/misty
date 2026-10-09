@@ -152,7 +152,6 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
             ? `${peer.name} loses sync, file sharing and agent access everywhere. ${readdNote}`
             : "Unlock sync on this device to remove devices."
         }
-        last
       >
         <Button
           variant="outline"
@@ -169,7 +168,7 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
         </Button>
       </Row>
       {error ? (
-        <p role="alert" className="border-t border-charcoal-border px-5 py-3 text-sm text-cream">
+        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
           {error}
         </p>
       ) : null}

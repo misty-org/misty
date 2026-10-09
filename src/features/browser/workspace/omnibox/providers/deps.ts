@@ -33,6 +33,7 @@ export interface OmniboxDeps {
     profileId?: string;
     private: boolean;
     agentOwned: boolean;
+    faviconUrl?: string | null;
   }[];
 }
 

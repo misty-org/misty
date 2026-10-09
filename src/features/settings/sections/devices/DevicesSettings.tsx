@@ -15,7 +15,7 @@ export function DevicesSettings() {
   if (devices.loading && !devices.peers.length) {
     return (
       <Section title="This device">
-        <div className="grid gap-3 p-5">
+        <div className="grid gap-3 border-t border-charcoal-border py-3">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-5 w-72" />
           <Skeleton className="h-5 w-64" />

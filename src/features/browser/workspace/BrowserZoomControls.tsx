@@ -4,17 +4,25 @@ import { Button, cn, MenuItem } from "@/shared/ui";
 
 const levels = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
-/** Keep the displayed value tied to the page that actually accepted the change. */
+/**
+ * Keep the displayed value tied to the page that actually accepted the change.
+ * `remembered` is the site's saved level; when given it is the value shown, and the
+ * local state only covers a change in flight. Private tabs pass none and keep their own.
+ */
 export function useBrowserZoom(
   id: string | undefined,
   apply: (factor: number) => Promise<void>,
   report: (error: unknown) => void,
+  remembered?: number,
 ) {
   const [state, setState] = useState({ id, percent: 100, pending: false });
   const currentId = useRef(id);
   currentId.current = id;
   const busy = useRef<string | undefined>(undefined);
-  const percent = state.id === id ? state.percent : 100;
+  const percent =
+    state.id === id && (state.pending || remembered === undefined)
+      ? state.percent
+      : (remembered ?? 100);
   const pending = state.id === id && state.pending;
   const change = async (next: number) => {
     if (!id || busy.current === id || next === percent) return;

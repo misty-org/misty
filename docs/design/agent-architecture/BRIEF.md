@@ -224,6 +224,88 @@ Each phase leaves the product working.
   and confirms the person's pointer did not move. It needs Accessibility for
   the terminal that runs it.
 
+### Midscene's Agent, whole goals and the control ring (October 8, 2026)
+
+- The desktop runs Midscene's own `Agent.aiAct` against `MistyScreenDevice`
+  (`src/features/agents/screenAct/screenDevice.ts`), replacing the hand-written
+  loop. The device captures and acts through the same native operations and
+  job grant, so leases, Stop and takeover still apply to every action. Model
+  calls still go through `/me/screen-model/{jobID}`, now numbered per call and
+  capped at 80 per job; planning uses its own slot, so it never asks the model
+  to locate elements.
+- `browser_act` takes the whole goal ("play this chess game as white until it
+  ends"). The device adds `WaitForScreenChange`, which polls the live capture
+  until the screen changes and settles, with no model calls, so the agent can
+  wait for a page or another player's move. A goal runs up to four minutes;
+  when it reports progress without finishing, the model calls it again with
+  the same goal. Consequential actions and an unresponsive screen (three
+  unchanged frames) still end the goal.
+- `screen_open` takes `target: tab` to attach the user's current Misty tab
+  ("the game in my other tab"), whatever the screen-location setting says.
+  It treats a screen as already attached only when a scope can run
+  `browser_act`; shared folders and the tab list no longer count.
+- Control ring: a monochrome glowing frame marks everything an agent controls,
+  and a ring pulses where it acts. Every frame is native and drawn outside what
+  the agent captures (`MistyAgentRing.m`):
+  - A browser page (in the main window, the separate agent window or a normal
+    tab) shows it while its input is locked to the agent or any grant that can
+    act on it (interact, click, type, upload, navigate) is held. It is a view
+    inside the page's WKWebView, follows the page's rounded corners, and WebKit
+    snapshots leave it out.
+  - Controlling the whole Misty window adds a click-through child panel around
+    that window at its own corner radius, from start until the task stops;
+    single-window capture leaves it out.
+  - Desktop control surrounds the controlled display, and desktop capture
+    leaves it out.
+  Frames breathe unless Reduce Motion is on. The pulse is still drawn by the
+  in-page cursor script, and the planner is told neither is page content.
+  Windows has no frames yet.
+- Desktop capture also records the display's own audio (16 kHz mono, never
+  Misty's) into a 30-second buffer in memory. `agent_desktop_recent_audio`
+  returns it as WAV to the task that holds desktop control. Nothing sends it
+  to a model yet.
+
+### Waiting for the user (October 8, 2026)
+
+- A screen that needs the person (sign-in, a code, a CAPTCHA, choosing an
+  account, a permission dialog) suspends the run with
+  `browser_request_user_action` on that screen's scopeId: a browser page, the
+  Misty window or the desktop (any context with `browser.inspect` or
+  `browser.workspace.visual`). The prompt and `browser_act` tell the model to
+  use it instead of ending the response.
+- The desktop no longer cancels a run that starts waiting. The local execution
+  enters `waiting`: it keeps its lease and screen, unlocks page input, turns off
+  the control ring and hands the desktop strip and cursor back
+  (`agent_control_yield`, `misty_desktop_yield`). It returns to `running` when
+  the run resumes.
+- The request shows only in the conversation, as a Waiting for you card above
+  the composer (`WaitingForYouCard`) with Done, continue and Stop. Resume in the
+  agent window and the autopilot bar releases a pending wait before sending
+  anything; typing to a waiting run releases it and steers with the message. A
+  new task replaces the waiting run.
+- A follow-up to a run that handed off (a question or app card answered after
+  the 40-45 second hold) continues on that run's screen: the same tab, the
+  desktop, or the agent window's views (`continuationScreen`).
+- `browser_act` with `allowConsequential` goes through the same "Ask before
+  acting" approval card as app actions.
+
+### Where agents work (October 9, 2026)
+
+- `screen_open` takes `target`: `current_tab` (the tab in front of the user),
+  `new_tab`, `window` (a separate Misty window) or `desktop` (other apps or the
+  whole screen). The model picks it from the user's words; without one, Misty
+  uses the account's place for new screens. Older runs' `browser` and `tab`
+  still mean the default and the current tab.
+- Settings → Screens offers New tab (the default), Separate window and Ask each
+  time. The stored values stay `window`, `separate` and `ask`; a migration made
+  `window` the default and moved the old implicit `separate` default to it.
+- `new_tab` always opens a fresh tab. Only `current_tab` uses an existing tab:
+  the focused pane's live, non-private browser tab, falling back to the best
+  match. Tab matching by title is no longer used for new screens.
+- Every desktop request from the main window carries `current_tab` (title and
+  address of that tab, never a private one), so "this page" has a referent in
+  the side panel and elsewhere. The prompt treats it as untrusted page data.
+
 ### Retired features (removed October 4, 2026)
 
 These no longer exist in the app, server, runtime or database. Their tables

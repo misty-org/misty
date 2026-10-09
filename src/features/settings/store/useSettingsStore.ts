@@ -14,6 +14,7 @@ import { writeProfilePreference } from "../profiles/bridge";
 import { configureTabHistoryBudget } from "@/features/webviews/tabHistory";
 import { configurePageRestore } from "@/features/browser-workspace/pageRestoreSettings";
 import {
+  hydrateShortcutsSnapshot,
   settingsApplyLaunchOnLogin,
   settingsLaunchOnLoginSnapshot,
   settingsSave,
@@ -37,6 +38,7 @@ import {
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
 import {
   configureBrowserCustomBangs,
+  configureBrowserCustomSearchEngine,
   configureBrowserSearchEngine,
   configureBrowserSearchSuggestions,
 } from "@/features/workspace/browserSearchEngine";
@@ -49,6 +51,15 @@ import {
   setBrowserDownloadPrompt,
   setBrowserStatusBubbleEnabled,
 } from "@/features/webviews/browserRuntime";
+import { configureBrowserSiteZoom } from "@/features/webviews/siteZoom";
+import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
+import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
+import { applyAccentColor } from "./accentColor";
+import { configureBrowserTabSleep } from "@/features/webviews/tabSleepSettings";
+import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
+import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
+import { configureBrowserContentBlocking } from "@/features/webviews/contentBlocking";
+import { configureAutoPictureInPicture } from "@/features/webviews/pictureInPictureSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
@@ -59,6 +70,10 @@ export * from "./preferences";
 
 let settingsLoad: Promise<void> | null = null;
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
+/** The overrides the native shortcut store holds; the UI may already show newer ones. */
+let nativeShortcutOverrides = "[]";
+/** Set while an edit is on screen but not yet saved, so a reload from disk cannot show older values. */
+let unsavedPreview = false;
 async function saveLocalDocument(document: Record<string, unknown>): Promise<SettingsSnapshot> {
   return settingsSave({ document });
 }
@@ -76,7 +91,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   load: async () => {
     if (settingsLoad) return settingsLoad;
     settingsLoad = (async () => {
-      set({ working: true, error: null });
+      // Only the first load blocks controls; reloads keep the current values usable.
+      set({ working: !get().loaded, error: null });
       try {
         const [settings, shortcuts, launchOnLogin] = await Promise.all([
           settingsSnapshot(),
@@ -92,12 +108,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             overrides_json: JSON.stringify(shortcuts.overrides),
           };
         }
-        applySettingsSideEffects(settings.document, false);
-        set({
-          settings,
-          launchOnLogin,
-          shortcuts,
-        });
+        nativeShortcutOverrides = JSON.stringify(shortcuts?.overrides ?? []);
+        if (unsavedPreview) set({ launchOnLogin });
+        else {
+          applySettingsSideEffects(settings.document, false);
+          set({ settings, launchOnLogin, shortcuts });
+        }
       } catch (error) {
         set({ error: errorText(error) });
       } finally {
@@ -111,6 +127,22 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setActiveSection: (activeSection) => set({ activeSection }),
 
+  // In-memory only, so controls and runtime behavior change on the same frame as the edit.
+  previewProfileValues: (values) => {
+    const current = get().settings;
+    if (!current) return;
+    const document = projectPreferences(current.document, values);
+    unsavedPreview = true;
+    applySettingsSideEffects(document);
+    set({ settings: { ...current, document } });
+    const shortcuts = get().shortcuts;
+    const overrides = currentShortcutOverrides(document, null);
+    if (shortcuts && JSON.stringify(overrides) !== JSON.stringify(shortcuts.overrides)) {
+      set({ shortcuts: hydrateShortcutsSnapshot({ path: shortcuts.configPath, overrides }) });
+      window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
+    }
+  },
+
   applyProfileValues: async (values, valid = () => true) => {
     const apply = async () => {
       if (!valid()) return;
@@ -118,6 +150,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       const document = projectPreferences(current?.document ?? {}, values);
       const saved = await saveLocalDocument(document);
       if (!valid()) return;
+      unsavedPreview = false;
       applySettingsSideEffects(saved.document);
       set({ settings: saved });
       const desired = settingsBoolean(saved.document, "general", "launch_on_login", false);
@@ -128,8 +161,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         set({ launchOnLogin: applied });
       }
       const overrides = currentShortcutOverrides(saved.document, null);
-      if (JSON.stringify(overrides) !== JSON.stringify(get().shortcuts?.overrides ?? [])) {
+      if (JSON.stringify(overrides) !== nativeShortcutOverrides) {
         const shortcuts = await shortcutsReplace(overrides);
+        nativeShortcutOverrides = JSON.stringify(shortcuts.overrides);
         if (!valid()) return;
         set({ shortcuts });
         window.dispatchEvent(new CustomEvent("misty://shortcuts-changed"));
@@ -240,6 +274,7 @@ function applySettingsSideEffects(
     const autoHide = appearance.navigator_auto_hide;
     if (layout.autoHide !== autoHide) publishNavigatorLayout({ autoHide });
   }
+  applyAccentColor(settingsString(document, "appearance", "accent_color", ""));
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
@@ -258,6 +293,24 @@ function applySettingsSideEffects(
   );
   configureBrowserCustomBangs(
     settingsString(document, "general", "browser_custom_bangs_json", "[]"),
+  );
+  configureBrowserCustomSearchEngine(
+    settingsString(document, "general", "browser_custom_search_engine", ""),
+  );
+  configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
+  configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
+  configureBrowserMouseGestures(
+    settingsBoolean(document, "general", "browser_mouse_gestures", false),
+  );
+  configureBrowserTabSleep(settingsNumber(document, "general", "browser_tab_sleep_minutes", 30));
+  configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
+  configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
+  configureBrowserContentBlocking(
+    settingsBoolean(document, "general", "browser_content_blocking", true),
+    settingsString(document, "general", "browser_content_blocking_allowed_json", "[]"),
+  );
+  configureAutoPictureInPicture(
+    settingsBoolean(document, "general", "browser_auto_picture_in_picture", true),
   );
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
@@ -288,6 +341,7 @@ export interface SettingsStore {
   message: string | null;
   setActiveSection: (section: SettingsSection) => void;
   load: () => Promise<void>;
+  previewProfileValues: (values: PreferenceValues) => void;
   applyProfileValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
   updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;

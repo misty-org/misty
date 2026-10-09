@@ -264,6 +264,7 @@ function toServerInvocation(input: AiInvocationRequest) {
     method_inputs: input.methodInputs,
     skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
+    companion_intent: input.companionIntent,
     model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
     display_captures: input.displayCaptures?.map((c) => ({
@@ -296,6 +297,7 @@ function toServerInvocation(input: AiInvocationRequest) {
     task_id: input.taskId,
     execution_mode: input.executionMode,
     window_label: input.windowLabel,
+    current_tab: input.currentTab,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

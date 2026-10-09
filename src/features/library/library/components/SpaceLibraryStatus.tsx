@@ -1,5 +1,5 @@
 import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 
 import { Button, IconButton } from "@/shared/ui";
 
@@ -52,7 +52,7 @@ export function SpaceLibraryInlineStatus() {
         />
       ) : null}
       {localError ? (
-        <SystemErrorActivity
+        <SystemErrorNotice
           error={localError}
           scope="library:bulk-action"
           title="Library action could not be completed"

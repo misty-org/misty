@@ -1,4 +1,5 @@
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { useMistyPanelStore } from "@/features/agents";
 import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
 import { useExtensionsStore } from "@/features/extensions/store";
 import {
@@ -20,9 +21,17 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, IconButton, Notification, toolbarIconProps, Skeleton } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  DropdownMenuCheckboxItem,
+  IconButton,
+  Notification,
+  toolbarIconProps,
+  Skeleton,
+} from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
-import { ArrowLeft, ArrowRight, Pencil, RotateCw, VenetianMask, X } from "lucide-react";
+import { Pencil, Sparkles, VenetianMask } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserInternalPage } from "../internal/BrowserInternalPage";
 import { normalizeBrowserAddress } from "./browserAddress";
@@ -36,6 +45,7 @@ import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
 import { BrowserMenu } from "./BrowserMenu";
+import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
 import { BrowserOmnibox } from "./BrowserOmnibox";
@@ -63,11 +73,13 @@ import {
 import type { BrowserTheme } from "./types";
 import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
 import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
-import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 import { useBrowserPageCommands } from "./useBrowserPageCommands";
-import { browserNavigateEvent, type BrowserNavigateDetail } from "./openFromChrome";
-import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
+import { useBrowserReadingTools } from "./useBrowserReadingTools";
+import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButtons";
+import { profileDataIdForView } from "@/features/workspace/browserProfiles";
+import { PasswordOfferNotice } from "./PasswordOfferNotice";
+import { ReaderView } from "./ReaderView";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
@@ -109,13 +121,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const pageHostRef = useRef<HTMLDivElement | null>(null);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
+  const mistyPanelOpen = useMistyPanelStore((s) => s.open);
   const [addressFocusRequest, setAddressFocusRequest] = useState(0);
   const { viewport, setViewport, sizes, setSize, size: viewportSize } = useBrowserViewport();
   const [mistyPage, setMistyPage] = useState<BrowserMistyPage | null>(null);
   const [mistyPageLoading, setMistyPageLoading] = useState(false);
-  const storedGrants = useBrowserRuntimeStore((runtime) => runtime.grants[tab.id]);
   const storedHistory = useBrowserRuntimeStore((runtime) => runtime.histories[tab.id]);
-  const grants = storedGrants ?? [];
   const history = storedHistory ?? {
     entries: [state.url],
     index: 0,
@@ -123,6 +134,10 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
   const internalPage = browserInternalPage(state.url);
+  // Views in a device profile use that profile's website data and history.
+  const profileId = useWorkspaceStore(
+    (store) => state.profileId ?? profileDataIdForView(store, tab.id),
+  );
   useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const downloadNotice = useBrowserRuntimeStore((runtime) => runtime.notices[tab.id] ?? null);
   const compatibilityIssue = useBrowserRuntimeStore(
@@ -134,11 +149,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     nativeRuntime,
   );
   const browserChromeBackground = "var(--workspace-tab-surface)";
-  const agentAccess = grants.length > 0;
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
-  const agentMenuSuspensionReason = `browser-agent-menu:${browserRuntimeId(tab)}`;
-  const viewportMenuSuspensionReason = `browser-viewport-menu:${browserRuntimeId(tab)}`;
-  const agentMenuOverlay = useBrowserOverlayControl(agentMenuSuspensionReason);
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const scopeId = browserScopeId(tab);
     const content = mistyPage
@@ -319,6 +330,15 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     };
   }, [mistyPage, nativeRuntime, tab]);
   useAiSurfaceAdapter(aiAdapter);
+  const { reader, translate } = useBrowserReadingTools({
+    tab,
+    url: state.url,
+    available:
+      nativeRuntime &&
+      !internalPage &&
+      /^https?:\/\//i.test(state.url) &&
+      browserRuntimeCreated(tab),
+  });
   useBrowserWebviewGeometry({
     hostRef: pageHostRef,
     nativeRuntime,
@@ -326,8 +346,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     tab,
     url: state.url,
     theme: browserTheme,
-    // Misty's own pages and the offline page replace the native page.
-    offline: isOffline || internalPage !== null,
+    // Misty's own pages, reader mode and the offline page replace the native page.
+    offline: isOffline || internalPage !== null || reader.article !== null,
   });
   useEffect(() => {
     setBrowserTabShowsInternalPage(tab.id, internalPage !== null);
@@ -480,16 +500,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     focused,
     navigate: navigateActiveTab,
   });
-  // Links opened from workspace chrome (the bookmarks bar) for this tab.
-  const navigateFromChrome = useStableCallback(navigateActiveTab);
-  useEffect(() => {
-    const onNavigate = (event: Event) => {
-      const detail = (event as CustomEvent<BrowserNavigateDetail>).detail;
-      if (detail?.viewId === tab.id) navigateFromChrome(detail.url);
-    };
-    window.addEventListener(browserNavigateEvent, onNavigate);
-    return () => window.removeEventListener(browserNavigateEvent, onNavigate);
-  }, [navigateFromChrome, tab.id]);
+  page.commands.readerMode = reader.toggle;
+  page.commands.translate = translate;
   const reload = () => {
     if (!nativeRuntime || internalPage) return;
     useBrowserRuntimeStore.getState().setLoading(tab.id, true);
@@ -507,6 +519,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     annotate: () => setAnnotationsActive(true),
   });
   const showStop = pageLoading && !internalPage && Boolean(page.commands.stop);
+  const hiddenButtons = useHiddenToolbarButtons();
   return (
     <section
       className={cn(
@@ -527,36 +540,15 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         data-window-toolbar
         data-browser-toolbar
       >
-        <div className={browserToolbarStyles.group}>
-          <IconButton
-            label="Back"
-            tooltip={false}
-            disabled={history.index === 0}
-            onClick={() => travel(-1)}
-          >
-            <ArrowLeft {...toolbarIconProps} />
-          </IconButton>
-          <IconButton
-            label="Forward"
-            tooltip={false}
-            disabled={history.index >= history.entries.length - 1}
-            onClick={() => travel(1)}
-          >
-            <ArrowRight {...toolbarIconProps} />
-          </IconButton>
-          <IconButton
-            label={showStop ? "Stop loading" : "Reload"}
-            tooltip={false}
-            disabled={!showStop && Boolean(internalPage)}
-            onClick={showStop ? page.commands.stop : reload}
-          >
-            {showStop ? (
-              <X {...toolbarIconProps} />
-            ) : (
-              <RotateCw {...browserToolbarStyles.roundIcon} />
-            )}
-          </IconButton>
-        </div>
+        <BrowserNavigationButtons
+          canGoBack={history.index > 0}
+          canGoForward={history.index < history.entries.length - 1}
+          showStop={showStop}
+          reloadDisabled={Boolean(internalPage)}
+          onTravel={travel}
+          onStop={page.commands.stop}
+          onReload={reload}
+        />
 
         {state.private ? (
           <span
@@ -579,7 +571,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           </span>
         ) : null}
 
-        {supportsSitePermissions() && /^https?:/.test(state.url) ? (
+        {!hiddenButtons.has("site-info") &&
+        supportsSitePermissions() &&
+        /^https?:/.test(state.url) ? (
           <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
         ) : null}
         <BrowserOmnibox
@@ -590,52 +584,62 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           historyEntries={history.entries}
           tab={tab}
           onNavigate={navigateActiveTab}
+          trailing={
+            page.commands.bookmark && !hiddenButtons.has("bookmark") ? (
+              <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
+            ) : undefined
+          }
         />
-        {page.commands.bookmark ? (
-          <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
-        ) : null}
 
         <div className={browserToolbarStyles.group}>
-          {
-            <>
-              <IconButton
-                label={annotationsActive ? "Exit annotation mode" : "Annotate page"}
-                tooltip={false}
-                aria-pressed={annotationsActive}
-                onClick={() => setAnnotationsActive((active) => !active)}
-              >
-                <Pencil {...toolbarIconProps} />
-              </IconButton>
-              <BrowserViewportMenu
-                value={viewport}
-                onChange={setViewport}
-                sizes={sizes}
-                onSizeChange={setSize}
-                suspensionReason={viewportMenuSuspensionReason}
-              />
-            </>
-          }
-          <BrowserAgentAccessMenu
-            overlay={agentMenuOverlay}
-            agentAccess={agentAccess}
-            nativeRuntime={nativeRuntime}
-            mistyPage={mistyPage}
-            mistyPageLoading={mistyPageLoading}
-            onAttachPage={() => void attachPageToMisty()}
-          />
-          <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
-          <BrowserClipboardButton suspensionReason={`browser-clipboard:${browserRuntimeId(tab)}`} />
-          {
+          {hiddenButtons.has("misty") ? null : (
+            <IconButton
+              label="Misty"
+              tooltip={false}
+              aria-pressed={mistyPanelOpen}
+              onClick={() => useMistyPanelStore.getState().toggle()}
+            >
+              <Sparkles {...toolbarIconProps} />
+            </IconButton>
+          )}
+          {hiddenButtons.has("extensions") ? null : (
+            <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
+          )}
+          {hiddenButtons.has("downloads") ? null : (
             <BrowserDownloadsButton
               suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
               onShowAll={() => page.commands.openPage("downloads")}
             />
-          }
+          )}
           <BrowserMenu
             nativeRuntime={nativeRuntime}
             tab={tab}
             url={state.url}
             commands={page.commands}
+            tools={
+              <>
+                <DropdownMenuCheckboxItem
+                  checked={annotationsActive}
+                  onCheckedChange={(checked) => setAnnotationsActive(checked === true)}
+                >
+                  <Pencil />
+                  <span className="min-w-0 flex-1 truncate">Annotate page</span>
+                </DropdownMenuCheckboxItem>
+                <BrowserViewportMenu
+                  value={viewport}
+                  onChange={setViewport}
+                  sizes={sizes}
+                  onSizeChange={setSize}
+                />
+                <BrowserAgentAccessMenu
+                  nativeRuntime={nativeRuntime}
+                  mistyPage={mistyPage}
+                  mistyPageLoading={mistyPageLoading}
+                  onAttachPage={() => void attachPageToMisty()}
+                />
+                <BrowserClipboardButton />
+              </>
+            }
           />
         </div>
       </div>
@@ -664,21 +668,17 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       <BrowserClearDataDialog
         request={page.clearDataRequest}
         tabId={tab.id}
-        profileId={state.profileId}
+        profileId={profileId}
         suspensionReason={`browser-clear-data:${browserRuntimeId(tab)}`}
       />
 
       {runtimeError ? (
         <>
-          <SystemErrorActivity
+          <SystemErrorNotice
             intent="background"
             error={runtimeError}
             scope={`browser:${tab.id}`}
             title="Browser needs attention"
-            target={{
-              kind: "route",
-              href: "/browser",
-            }}
           />
           <Notification
             key={runtimeError}
@@ -692,6 +692,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         </>
       ) : null}
 
+      <PasswordOfferNotice runtimeId={browserRuntimeId(tab)} active={active} />
       {downloadNotice || compatibilityIssue ? (
         <Notification
           key={downloadNotice ?? compatibilityIssue?.url}
@@ -703,7 +704,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
             useBrowserRuntimeStore.getState().setCompatibilityIssue(tab.id, null);
           }}
         >
-          <p>{downloadNotice ?? "This site rejected Misty’s embedded browser verification."}</p>
+          <p>
+            {downloadNotice ??
+              (compatibilityIssue?.kind === "protected_media"
+                ? "This site’s protected video can’t play in Misty’s browser engine on this computer."
+                : "This site rejected Misty’s embedded browser verification.")}
+          </p>
           {compatibilityIssue ? (
             <Button
               variant="secondary"
@@ -756,7 +762,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           {internalPage ? (
             <BrowserInternalPage
               page={internalPage}
-              profileId={state.profileId}
+              profileId={profileId}
               navigate={navigateActiveTab}
               openInNewView={page.commands.openInNewTab}
               openPage={page.commands.openPage}
@@ -773,6 +779,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
                 )
               }
             />
+          ) : null}
+          {reader.article && !internalPage ? (
+            <ReaderView article={reader.article} onClose={reader.close} />
           ) : null}
           <BrowserAnnotationLayer
             active={annotationsActive}

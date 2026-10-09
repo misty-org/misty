@@ -1,6 +1,6 @@
+import { PasswordsSettings } from "./sections/PasswordsSettings";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
-  Bell,
   Globe,
   Info,
   Keyboard,
@@ -36,7 +36,6 @@ import {
 import { GeneralSection } from "./sections/GeneralSection";
 import { LayoutSection } from "./sections/LayoutSection";
 import { MistySection } from "./sections/MistySection";
-import { NotificationsSection } from "./sections/NotificationsSection";
 import { PrivacySection } from "./sections/PrivacySection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
@@ -44,13 +43,12 @@ import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
  * Flat sidebar areas. Registry entries within an area render together on one page.
- * `breakBefore` preserves the incumbent group dividers; chevrons never expand lists.
+ * Nav entries never show chevrons or group dividers.
  */
 export type SettingsArea =
   | "general"
   | "appearance"
   | "layout"
-  | "notifications"
   | "shortcuts"
   | "browser"
   | "spaces"
@@ -59,19 +57,15 @@ export type SettingsArea =
   | "devices"
   | "privacy"
   | "about";
-export const settingsAreas: Record<
-  SettingsArea,
-  { label: string; icon: LucideIcon; breakBefore?: boolean }
-> = {
+export const settingsAreas: Record<SettingsArea, { label: string; icon: LucideIcon }> = {
   general: { label: "General", icon: SlidersHorizontal },
   appearance: { label: "Appearance", icon: Palette },
   layout: { label: "Layout", icon: PanelsTopLeft },
-  notifications: { label: "Notifications", icon: Bell },
   shortcuts: { label: "Shortcuts", icon: Keyboard },
-  browser: { label: "Browser", icon: Globe, breakBefore: true },
+  browser: { label: "Browser", icon: Globe },
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
-  sync: { label: "Sync", icon: RefreshCw, breakBefore: true },
+  sync: { label: "Sync", icon: RefreshCw },
   devices: { label: "Devices", icon: MonitorSmartphone },
   privacy: { label: "Privacy", icon: Shield },
   about: { label: "About", icon: Info },
@@ -97,7 +91,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("general", "general", "General", GeneralSection),
   page("appearance", "appearance", "Appearance", AppearanceSection),
   page("layout", "layout", "Layout", LayoutSection, "resource", true),
-  page("notifications", "notifications", "Notifications", NotificationsSection),
   page("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection, "account", true),
   page("browser", "browser", "Browsing", BrowserSection),
   page("browser", "browser-downloads", "Downloads", (p) => (
@@ -111,6 +104,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "resource",
     true,
   ),
+  page("browser", "browser-passwords", "Passwords", PasswordsSettings, "resource", true),
   page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
   page(
     "browser",

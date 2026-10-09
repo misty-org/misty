@@ -3,8 +3,6 @@ import {
   cn,
   IconButton,
   Input,
-  RadioGroup,
-  RadioGroupItem,
   SegmentedControl,
   Select,
   SelectContent,
@@ -30,69 +28,9 @@ function useSettingsControlLabel(fallback: string) {
 }
 export function SettingsNote(props: { children: ReactNode }) {
   return (
-    <p className="m-0 max-w-2xl px-5 py-4 text-[13px] leading-[18px] text-cream-muted">
+    <p className="m-0 max-w-2xl border-t border-charcoal-border py-3 text-[13px] leading-[18px] text-cream-muted">
       {props.children}
     </p>
-  );
-}
-
-export function WorkspaceRootControl(props: {
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  const [choosing, setChoosing] = useState(false);
-
-  const chooseFolder = async () => {
-    setChoosing(true);
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Choose workspace root",
-      });
-      if (typeof selected === "string") props.onChange(selected);
-    } finally {
-      setChoosing(false);
-    }
-  };
-
-  return (
-    <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
-      <span
-        className={cn(
-          "max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
-          "max-[760px]:text-left",
-          props.disabled || !props.value ? "text-cream-muted" : "text-cream",
-        )}
-        title={props.value || "Default"}
-      >
-        {props.value || "Default"}
-      </span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          className={settingsControlButtonCompactClass}
-          disabled={props.disabled || choosing}
-          title="Choose workspace root"
-          onClick={() => void chooseFolder()}
-        >
-          {choosing ? "Choosing…" : "Choose"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          className={settingsControlButtonCompactClass}
-          disabled={props.disabled || !props.value}
-          onClick={() => props.onChange("")}
-        >
-          Reset
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -112,8 +50,8 @@ export function SelectControl(props: {
   );
 }
 
-/** Shared checkmarked dropdown for larger lists of account connections. */
-export function DropdownControl(props: {
+/** Shared checkmarked dropdown for choices with more than three options. */
+function DropdownControl(props: {
   value: string;
   label?: string;
   options: { value: string; label: string; disabled?: boolean }[];
@@ -137,16 +75,16 @@ export function DropdownControl(props: {
   );
 }
 
-/** Visible choices keep settings discoverable without opening a dropdown. */
+/** Up to four short options render as a segmented control; anything longer is a dropdown. */
 export function ChoiceControl(props: {
   value: string;
-  presentation?: "list" | "pills";
   options: { value: string; label: string; disabled?: boolean; title?: string }[];
   disabled: boolean;
   onValueChange(value: string): void;
 }) {
   const ariaLabel = useSettingsControlLabel("Setting");
-  if (props.presentation === "pills") {
+  const labelLength = props.options.reduce((total, option) => total + option.label.length, 0);
+  if (props.options.length <= 4 && labelLength <= 24) {
     return (
       <SegmentedControl
         label={ariaLabel}
@@ -158,32 +96,12 @@ export function ChoiceControl(props: {
     );
   }
   return (
-    <RadioGroup
+    <DropdownControl
       value={props.value}
-      onValueChange={props.onValueChange}
-      aria-label={ariaLabel}
+      options={props.options}
       disabled={props.disabled}
-      className="grid min-w-0 gap-2 text-sm text-cream disabled:text-cream-muted"
-    >
-      {props.options.map((option) => (
-        <label
-          key={option.value}
-          title={option.title}
-          className={cn(
-            "flex items-center gap-2",
-            option.disabled ? "cursor-default text-cream-muted" : "cursor-pointer",
-          )}
-        >
-          <RadioGroupItem
-            value={option.value}
-            aria-label={option.label}
-            className="size-3.5 shrink-0"
-            disabled={option.disabled}
-          />
-          {option.label}
-        </label>
-      ))}
-    </RadioGroup>
+      onValueChange={props.onValueChange}
+    />
   );
 }
 
@@ -213,7 +131,6 @@ export function TextControl(props: {
   placeholder?: string;
   disabled: boolean;
   onCommit: (value: string) => void;
-  wide?: boolean;
 }) {
   const ariaLabel = useSettingsControlLabel("Setting");
   const handleCommit = (event: ChangeEvent<HTMLInputElement>) => {
@@ -226,10 +143,7 @@ export function TextControl(props: {
     <Input
       aria-label={ariaLabel}
       key={props.value}
-      className={cn(
-        props.wide ? "w-full max-w-[520px]" : "w-[220px] max-w-full",
-        settingsDisabledControlClass,
-      )}
+      className={cn("w-full", settingsDisabledControlClass)}
       defaultValue={props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
@@ -261,7 +175,7 @@ export function SliderControl(props: {
   const ariaLabel = useSettingsControlLabel("Setting");
   const format = props.format ?? ((value: number) => String(value));
   return (
-    <div className="flex w-[220px] max-w-full items-center gap-3">
+    <div className="flex w-full items-center gap-3">
       <Slider
         aria-label={ariaLabel}
         aria-valuetext={format(props.value)}
@@ -327,7 +241,7 @@ export function TextAreaControl(props: {
   );
 }
 
-/** Picks a single file — the wallpaper row. Mirrors {@link WorkspaceRootControl}. */
+/** Picks a single file or folder, e.g. the download location. */
 export function FilePathControl(props: {
   value: string;
   title: string;
@@ -356,11 +270,10 @@ export function FilePathControl(props: {
   };
 
   return (
-    <div className="grid min-w-0 justify-items-end gap-2 max-[760px]:justify-items-start">
+    <div className="grid w-full min-w-0 justify-items-end gap-2">
       <span
         className={cn(
-          "max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
-          "max-[760px]:text-left",
+          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
           props.disabled || !props.value ? "text-cream-muted" : "text-cream",
         )}
         title={props.value || props.emptyLabel || "None"}
@@ -402,9 +315,12 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
   };
 
   return (
-    <span className="flex min-w-0 max-w-[420px] items-center justify-end gap-2 max-[760px]:justify-start">
+    <span className="flex w-full min-w-0 items-center justify-end gap-2">
       <span
-        className={`min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm max-[760px]:text-left ${props.disabled ? "text-cream-muted" : "text-cream"}`}
+        className={cn(
+          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-sm",
+          props.disabled ? "text-cream-muted" : "text-cream",
+        )}
         title={props.value}
       >
         {props.value}
@@ -424,7 +340,7 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
   );
 }
 
-export function sectionRecord(
+function sectionRecord(
   document: Record<string, unknown>,
   section: string,
 ): Record<string, unknown> {

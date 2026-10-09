@@ -4,6 +4,10 @@
 //! scripts hold; anything else is dropped.
 use super::*;
 use kiri::channel::{HostChannel, HostMessage};
+
+// Saved passwords answer the page script's sign-in messages, which arrive here.
+#[path = "browser_passwords.rs"]
+pub(crate) mod passwords;
 use std::sync::OnceLock;
 
 #[derive(serde::Deserialize)]
@@ -52,7 +56,11 @@ fn navigate_message(raw: &str) -> Option<Url> {
     }
     let message: NavigateMessage = serde_json::from_str(raw).ok()?;
     let url = Url::parse(&message.navigate).ok()?;
-    matches!(url.scheme(), "misty-shortcut" | "misty-context-menu").then_some(url)
+    matches!(
+        url.scheme(),
+        "misty-shortcut" | "misty-context-menu" | "misty-passwords"
+    )
+    .then_some(url)
 }
 
 #[derive(serde::Deserialize)]
@@ -166,7 +174,10 @@ impl HostChannel for Channel {
         };
         let raw = message.body;
         if let Some(url) = navigate_message(raw) {
-            if message.main_frame && !super::forward_navigation(app, id, &url) {
+            if message.main_frame
+                && !super::forward_navigation(app, id, &url)
+                && !passwords::forward(app, id, &url)
+            {
                 super::context_menu::forward(app, id, &url);
             }
             return;
@@ -261,7 +272,10 @@ mod tests {
     #[test]
     fn navigate_messages_carry_only_host_navigations() {
         assert!(navigate_message(r#"{"navigate":"misty-shortcut:event?key=w&token=t"}"#).is_some());
-        assert!(navigate_message(r#"{"navigate":"misty-context-menu:open?token=t&payload=%7B%7D"}"#).is_some());
+        assert!(navigate_message(
+            r#"{"navigate":"misty-context-menu:open?token=t&payload=%7B%7D"}"#
+        )
+        .is_some());
         for raw in [
             r#"{"navigate":"misty-companion:submit?token=t&prompt=hi"}"#,
             r#"{"navigate":"https://example.com/"}"#,
@@ -274,8 +288,13 @@ mod tests {
 
     #[test]
     fn pointer_messages_require_bounded_coordinates_and_a_token() {
-        assert!(pointer_message(r#"{"token":"test","pointer":{"x":12.5,"y":40,"inside":true}}"#).is_some());
-        assert!(pointer_message(r#"{"token":"test","pointer":{"x":0,"y":0,"inside":false}}"#).is_some());
+        assert!(
+            pointer_message(r#"{"token":"test","pointer":{"x":12.5,"y":40,"inside":true}}"#)
+                .is_some()
+        );
+        assert!(
+            pointer_message(r#"{"token":"test","pointer":{"x":0,"y":0,"inside":false}}"#).is_some()
+        );
         for raw in [
             r#"{"pointer":{"x":0,"y":0,"inside":true}}"#,
             r#"{"token":"test","pointer":{"x":-1,"y":0,"inside":true}}"#,

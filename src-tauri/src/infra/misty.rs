@@ -413,10 +413,18 @@ fn license_allows_local_use(license: &CurrentLicense) -> bool {
 fn sign_hs256(claims: &impl Serialize, secret: &[u8]) -> Result<String, String> {
     let encode = |bytes: &[u8]| general_purpose::URL_SAFE_NO_PAD.encode(bytes);
     let payload = serde_json::to_vec(claims).map_err(|error| error.to_string())?;
-    let signing_input = format!("{}.{}", encode(br#"{"typ":"JWT","alg":"HS256"}"#), encode(&payload));
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(secret).map_err(|error| error.to_string())?;
+    let signing_input = format!(
+        "{}.{}",
+        encode(br#"{"typ":"JWT","alg":"HS256"}"#),
+        encode(&payload)
+    );
+    let mut mac =
+        <Hmac<Sha256> as Mac>::new_from_slice(secret).map_err(|error| error.to_string())?;
     mac.update(signing_input.as_bytes());
-    Ok(format!("{signing_input}.{}", encode(&mac.finalize().into_bytes())))
+    Ok(format!(
+        "{signing_input}.{}",
+        encode(&mac.finalize().into_bytes())
+    ))
 }
 
 fn issue_local_access_token(conn: &Connection, user: &CurrentUser) -> Result<(), String> {

@@ -295,6 +295,14 @@ func validateAIInvocationInput(body *aiInvocationInput) error {
 	if err := validateAIContextReferences(body.Context); err != nil {
 		return err
 	}
+	if tab := body.CurrentTab; tab != nil {
+		tab.Title = strings.TrimSpace(tab.Title)
+		tab.URL = strings.TrimSpace(tab.URL)
+		if len(tab.Title) > 300 || len(tab.URL) > 2048 ||
+			(!strings.HasPrefix(tab.URL, "https://") && !strings.HasPrefix(tab.URL, "http://")) {
+			return errors.New("current tab must be an http or https page")
+		}
+	}
 	if err := validateAISelectionAnchor(body.Selection); err != nil {
 		return err
 	}

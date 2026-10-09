@@ -1,7 +1,7 @@
 import { lazy, useMemo } from "react";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
-import { SystemErrorActivity, reportSystemError } from "@/features/activity";
+import { SystemErrorNotice, reportSystemError } from "@/features/support/systemErrors";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { AiSurfaceAdapter } from "@/features/ai-surface/types";
 import { useWorkspaceViewTitle } from "@/features/workspace";
@@ -42,7 +42,7 @@ export function SpaceDrawings(props: {
       renderTitle: (title, tab) => <Title title={title} tab={tab} />,
       renderAiRegistration: (adapter) => <AI adapter={adapter} />,
       renderError: (error, scope, title) => (
-        <SystemErrorActivity error={error} scope={scope} title={title} />
+        <SystemErrorNotice error={error} scope={scope} title={title} />
       ),
       Header: (props) => <DrawingHeader {...props} reportError={reportSystemError} />,
       PreviewHeader: (props) => <DrawingPreviewHeader {...props} reportError={reportSystemError} />,

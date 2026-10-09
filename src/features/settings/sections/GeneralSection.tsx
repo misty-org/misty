@@ -93,19 +93,6 @@ export function GeneralSection(props: SettingsContentProps) {
             }
           />
         </SettingsRow>
-        <SettingsRow
-          label="Confirm destructive actions"
-          description="Ask before delete, empty trash, and other irreversible actions."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "general", "confirm_destructive_actions", true)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("general", "confirm_destructive_actions", value)
-            }
-          />
-        </SettingsRow>
       </SettingsSectionBlock>
     </>
   );

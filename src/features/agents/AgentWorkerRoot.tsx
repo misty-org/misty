@@ -6,7 +6,6 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AuthProvider, useAuth } from "@/features/auth";
 import { useDocumentAppAppearance } from "@/features/settings";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { GlobalMistySurface } from "@/features/global-search/GlobalMisty";
 import type { AiCaptureAttachment, AiSelectionSnapshot } from "@/features/ai-surface/types";
 import type { GlobalAiContextRef, MistyImageAttachment } from "@/features/global-search/types";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
@@ -221,17 +220,6 @@ function Worker() {
       </p>
       <AgentExecutionSurface />
       <BrowserContextMenuBridge />
-      {user?.id === expectedAccount && (
-        <GlobalMistySurface
-          controller="misty"
-          accountId={user.id}
-          currentPath="/agents"
-          activePaneId="agent-worker"
-          includeCurrentContext={false}
-          allowCapture={false}
-          suspendBrowserWebviews={false}
-        />
-      )}
     </main>
   );
 }

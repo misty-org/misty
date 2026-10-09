@@ -41,12 +41,27 @@ export interface Presentation {
     name: string;
   }[];
   error?: string;
-  point?: {
-    x: number;
-    y: number;
-    displayId: number;
-    label: string;
-  };
+  point?: PresentedPoint;
+}
+/** A rectangle in the same global units as cursor samples. */
+export interface PointFrame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface PresentedPoint {
+  x: number;
+  y: number;
+  displayId: number;
+  /** What to do there, such as "click Source Control". */
+  label: string;
+  /** The real control's bounds, when Accessibility found it. */
+  frame?: PointFrame;
+  /** This point is one step of a walkthrough. */
+  guide?: { step: number; total: number };
+  /** Hold the point until the person clicks it; the next step follows. */
+  awaitingClick?: boolean;
 }
 export const cursorEvent = "misty://cursor-sample";
 export const presentationEvent = "misty://cursor-presentation";

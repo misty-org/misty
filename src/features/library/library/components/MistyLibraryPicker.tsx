@@ -1,6 +1,6 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import {
   Button,
   cn,
@@ -170,11 +170,10 @@ export function MistyLibraryPicker({
               ))}
             </div>
           ) : error ? (
-            <SystemErrorActivity
+            <SystemErrorNotice
               error={error}
               scope={`library:picker:${spaceId}`}
               title="Library could not be loaded"
-              target={{ kind: "route", href: `/spaces/${encodeURIComponent(spaceId)}/library` }}
             />
           ) : filteredItems.length === 0 ? (
             <EmptyState

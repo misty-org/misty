@@ -27,6 +27,7 @@ use crate::infra::connected_devices::{
     ConnectedDevicesService, ConnectedDevicesSnapshot, InitializeConnectedDevicesRequest,
     PeerPathRequest, PeerReadRequest,
 };
+use crate::infra::default_browser::DefaultBrowserSnapshot;
 use crate::infra::devices::{DeviceSnapshot, DeviceUnmountRequest};
 #[cfg(not(target_os = "macos"))]
 use crate::infra::document_intelligence::PrepareAgentDocumentRequest;
@@ -571,6 +572,16 @@ pub fn settings_launch_on_login_snapshot() -> ApiResult<LaunchOnLoginSnapshot> {
 #[tauri::command]
 pub fn settings_apply_launch_on_login(enabled: bool) -> ApiResult<LaunchOnLoginSnapshot> {
     crate::infra::autostart::apply(enabled).map_err(ApiError::Message)
+}
+
+#[tauri::command]
+pub fn settings_default_browser_snapshot() -> ApiResult<DefaultBrowserSnapshot> {
+    Ok(crate::infra::default_browser::snapshot())
+}
+
+#[tauri::command]
+pub fn settings_request_default_browser() -> ApiResult<DefaultBrowserSnapshot> {
+    Ok(crate::infra::default_browser::request())
 }
 
 #[tauri::command]

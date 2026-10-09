@@ -13,10 +13,6 @@ export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 0 });
 }
 
-export function setNativeWallpaperVideo(window: unknown, path: string | null): Promise<boolean> {
-  return invoke("set_native_wallpaper_video", { window, path });
-}
-
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
 }

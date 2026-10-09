@@ -7,3 +7,4 @@ export { browserLibrary, browserPageTools } from "./library/native";
 export type { BrowserDownloadEntry, BrowserHistoryVisit } from "./library/native";
 // Used by the search popup (browser-workspace).
 export { bookmarkWindowViews } from "./workspace/bookmarkWindowViews";
+export { ClearBrowsingDataDialog } from "./workspace/BrowserClearDataDialog";

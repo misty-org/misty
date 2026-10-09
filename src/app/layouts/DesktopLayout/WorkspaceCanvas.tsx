@@ -1,7 +1,5 @@
-import { BookmarksBar } from "@/features/bookmarks/BookmarksBar";
 import { routes } from "@/features/app-shell";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { openMisty } from "@/features/misty/handoff";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
@@ -16,13 +14,17 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/workspace";
-import { allLayoutViews, layoutTabs, tabLabel } from "@/features/workspace/layoutTabs";
+import { allLayoutViews, layoutTabs } from "@/features/workspace/layoutTabs";
 import type { DockSplitDirection } from "@/features/workspace/model";
 import { mapAllWorkspaceWindowLayouts } from "@/features/workspace/windows";
 import { useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { minimumForWorkspaceViews, WorkspaceDockTree } from "./WorkspaceDockTree";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
+import { closePeek, usePeekStore } from "@/features/workspace/peek";
+import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
+import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
+import type { WorkspaceTab } from "@/features/workspace/model";
 import { useWindowTransition } from "./useWindowTransition";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
@@ -30,6 +32,8 @@ export function WorkspaceCanvas(props: {
   tabPosition?: DockPosition;
   titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
+  /** Focus mode: pages fill the window without the tab strip. */
+  hideTabStrip?: boolean;
 }) {
   const legacyNames = useNavigationNames((state) => state.names);
   const legacyNamesReady = useNavigationNames((state) => state.ready);
@@ -152,15 +156,22 @@ export function WorkspaceCanvas(props: {
 
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceView) => {
+      if (resetPinnedTabForView(tab.id)) return;
       if (closeTab(tab.id)) navigateToActiveLayoutTab();
     },
     [closeTab, navigateToActiveLayoutTab],
   );
 
   const closeActiveTab = useCallback(() => {
+    const peek = usePeekStore.getState().peek;
+    if (peek && peek.tabId === useWorkspaceStore.getState().layout.activeTabId) {
+      if (closePeek()) navigateToActiveLayoutTab();
+      return;
+    }
     const state = useWorkspaceStore.getState();
     const id = state.layout.activeTabId;
     const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
+    if (dockLeaves(state.layout.root).length === 1 && id && state.resetPinnedTab(id)) return;
     const closed =
       dockLeaves(state.layout.root).length > 1
         ? pane?.views[0] && state.closeView(pane.views[0].id)
@@ -184,12 +195,7 @@ export function WorkspaceCanvas(props: {
   );
 
   useShortcutHandler("workspace.close_tab", closeActiveTab, canCloseActiveTab);
-  useShortcutHandler(
-    "misty.contextual_companion",
-    useCallback(() => {
-      void openMisty();
-    }, []),
-  );
+  usePinTabShortcut();
   useShortcutHandler(
     "workspace.reopen_tab",
     useCallback(
@@ -401,6 +407,32 @@ export function WorkspaceCanvas(props: {
     return () => window.removeEventListener("misty:focus-workspace-tab", focusRequestedTab);
   }, [openSelectedTab]);
 
+  const dockTree = (tab: WorkspaceTab, active: boolean) => (
+    <WorkspaceDockTree
+      node={tab.root}
+      workspaceActive={active}
+      focusedPaneId={tab.focusedPaneId}
+      lastUsedViewByGroup={lastUsedTabByGroup}
+      onOpen={openTab}
+      onClose={closeWorkspaceTab}
+      onMoveView={moveTab}
+      onDockView={dockTab}
+      onSplitPane={splitWorkspacePane}
+      onClosePane={(paneId) => {
+        closePane(paneId);
+        navigateToActiveLayoutTab();
+      }}
+      windows={virtualWindows}
+      activeWindowId={activeVirtualWindowId}
+      canReopenWindow={canReopenVirtualWindow}
+      onSelectWindow={selectVirtualWindow}
+      onCreateWindow={createWorkspaceVirtualWindow}
+      onCloseWindow={closeWorkspaceVirtualWindow}
+      onReopenWindow={reopenWorkspaceVirtualWindow}
+      onResizeSplit={updateSplitRatio}
+    />
+  );
+
   // A lone Agents surface supplies its own compact titlebar. Keep workspace
   // navigation when other tabs/panes/windows or Windows caption buttons need it.
   const standaloneAgents =
@@ -420,7 +452,7 @@ export function WorkspaceCanvas(props: {
       data-workspace-scope={activeScopeKey}
       data-virtual-window={activeVirtualWindowId}
     >
-      {!standaloneAgents && (
+      {!standaloneAgents && !props.hideTabStrip && (
         <WorkspaceTabStrip
           position={props.tabPosition}
           titlebarInsets={props.titlebarInsets}
@@ -431,7 +463,9 @@ export function WorkspaceCanvas(props: {
           onClose={closeWorkspaceTab}
           onNewTab={() => openTab(useWorkspaceStore.getState().newTab())}
           onCloseLayoutTab={(id) => {
-            if (useWorkspaceStore.getState().closeTab(id)) navigateToActiveLayoutTab();
+            const state = useWorkspaceStore.getState();
+            if (state.resetPinnedTab(id)) return;
+            if (state.closeTab(id)) navigateToActiveLayoutTab();
           }}
           onMoveView={moveTab}
           onDockView={dockTab}
@@ -450,46 +484,13 @@ export function WorkspaceCanvas(props: {
           onResizeSplit={updateSplitRatio}
         />
       )}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {!standaloneAgents && <BookmarksBar />}
-        {layoutTabs(layout).map((tab) => {
-          const active = tab.id === layout.activeTabId;
-          return (
-            <div
-              key={tab.id}
-              className={active ? "min-h-0 min-w-0 flex-1 overflow-hidden" : "hidden"}
-              role="tabpanel"
-              aria-label={tabLabel(tab)}
-              aria-hidden={!active}
-              inert={!active}
-            >
-              <WorkspaceDockTree
-                node={tab.root}
-                workspaceActive={active}
-                focusedPaneId={tab.focusedPaneId}
-                lastUsedViewByGroup={lastUsedTabByGroup}
-                onOpen={openTab}
-                onClose={closeWorkspaceTab}
-                onMoveView={moveTab}
-                onDockView={dockTab}
-                onSplitPane={splitWorkspacePane}
-                onClosePane={(paneId) => {
-                  closePane(paneId);
-                  navigateToActiveLayoutTab();
-                }}
-                windows={virtualWindows}
-                activeWindowId={activeVirtualWindowId}
-                canReopenWindow={canReopenVirtualWindow}
-                onSelectWindow={selectVirtualWindow}
-                onCreateWindow={createWorkspaceVirtualWindow}
-                onCloseWindow={closeWorkspaceVirtualWindow}
-                onReopenWindow={reopenWorkspaceVirtualWindow}
-                onResizeSplit={updateSplitRatio}
-              />
-            </div>
-          );
-        })}
-      </div>
+      <WorkspaceTabPanels
+        layout={layout}
+        renderTree={dockTree}
+        onClosePeek={() => {
+          if (closePeek()) navigateToActiveLayoutTab();
+        }}
+      />
     </div>
   );
 }

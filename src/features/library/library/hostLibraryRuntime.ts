@@ -4,7 +4,7 @@ import { useWorkspaceViewTitle, useWorkspaceViewFocused } from "@/features/works
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { MistyFilePicker } from "@/features/picker";
-import { SystemErrorActivity } from "@/features/activity";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { EmbeddedUniversalPreview } from "@/features/resource-preview/EmbeddedUniversalPreview";
 import { PhotoEditor } from "@/features/editor";
 import { confirmAction } from "@/shared/lib/confirmAction";
@@ -19,7 +19,7 @@ export function initializeHostLibraryRuntime() {
     useAiSurfaceAdapter,
     useShortcutHandler,
     Picker: MistyFilePicker,
-    Error: SystemErrorActivity,
+    Error: SystemErrorNotice,
     Preview: EmbeddedUniversalPreview,
     PhotoEditor,
     confirm: confirmAction,

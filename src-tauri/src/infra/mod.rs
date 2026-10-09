@@ -7,6 +7,7 @@ pub mod autostart;
 pub mod browser;
 #[cfg(desktop)]
 pub mod browser_agent_control;
+pub mod default_browser;
 
 #[cfg(desktop)]
 pub mod browser_history;
@@ -26,9 +27,9 @@ pub mod browser_search_suggest;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
 mod browser_theme;
-pub mod command_defaults;
 pub mod clipboard_bridge;
 pub mod cloud_clipboard;
+pub mod command_defaults;
 pub mod commands;
 #[cfg(desktop)]
 pub mod connected_devices;
@@ -146,6 +147,15 @@ pub mod cursor_companion;
 
 #[cfg(desktop)]
 pub mod browser_site_permissions;
+
+#[cfg(desktop)]
+pub mod browser_site_zoom;
+
+#[cfg(desktop)]
+pub mod browser_content_blocking;
+
+#[cfg(desktop)]
+pub mod browser_site_style;
 
 pub mod settings_profile_store;
 

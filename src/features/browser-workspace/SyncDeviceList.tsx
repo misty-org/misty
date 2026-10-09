@@ -243,7 +243,7 @@ export function SyncDeviceList({
                 className={
                   compact
                     ? "flex items-center justify-between gap-3"
-                    : "flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                    : "flex flex-wrap items-center justify-between gap-3 py-3"
                 }
               >
                 <div className="min-w-0">
@@ -299,7 +299,6 @@ export function SyncDeviceList({
                           ? "Share this device’s tabs and website sign-ins."
                           : "Independent workspace. Tabs and website sign-ins stay here; account settings still sync."
                     }
-                    last
                   >
                     <SwitchControl
                       checked={device.full_sync}
@@ -308,12 +307,12 @@ export function SyncDeviceList({
                     />
                   </Row>
                   {!device.local && reason && (
-                    <p className="px-5 pb-3 text-xs text-cream-muted">{reason}</p>
+                    <p className="pb-3 text-xs text-cream-muted">{reason}</p>
                   )}
                 </>
               )}
               {busy && (
-                <p role="status" className="px-5 py-2 text-xs text-cream-muted">
+                <p role="status" className="py-2 text-xs text-cream-muted">
                   Waiting for the device to confirm…
                 </p>
               )}
@@ -322,7 +321,7 @@ export function SyncDeviceList({
         })}
       </ul>
       {error && (
-        <p role="alert" className="px-5 py-3 text-sm text-cream">
+        <p role="alert" className="py-3 text-sm text-cream">
           {error}
         </p>
       )}

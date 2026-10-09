@@ -18,7 +18,6 @@ import { Link2, Plug } from "lucide-react";
 import { BotMessageSquare, Workflow } from "lucide-react";
 import type { NavigationItem as MistyNavigationItem } from "@/shared/navigation/NavigationItem";
 import { FileText } from "lucide-react";
-import type { NavigatorAppId } from "@/features/workspace";
 
 function isPinnedDestination(item: MistyNavigationItem) {
   return (
@@ -31,7 +30,8 @@ export function DestinationIcon({
   appId,
   item,
 }: {
-  appId: NavigatorAppId;
+  /** The workspace app the destination belongs to, such as "social" or "library". */
+  appId: string;
   item: MistyNavigationItem;
 }) {
   if (isPinnedDestination(item)) return <Link2 aria-hidden />;

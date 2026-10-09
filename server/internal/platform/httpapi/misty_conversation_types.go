@@ -46,6 +46,7 @@ type mistyConversationAction struct {
 
 type mistyConversation struct {
 	AgentID       string                     `json:"agentId,omitempty"`
+	FolderID      string                     `json:"folderId,omitempty"`
 	ID            string                     `json:"id"`
 	Title         string                     `json:"title"`
 	SpaceID       string                     `json:"spaceId,omitempty"`

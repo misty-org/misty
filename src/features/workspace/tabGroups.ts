@@ -50,8 +50,9 @@ export interface TabGroupActions {
 }
 export const initialTabGroups = (): TabGroupState => ({ tabGroups: [], migratedTabGroupIds: [] });
 
-/** Keep each group a single contiguous block, retaining order within that block. */
-export function contiguousTabs(tabs: WorkspaceTab[]): WorkspaceTab[] {
+/** Pinned tabs first, then each group as a single contiguous block, keeping order within. */
+export function contiguousTabs(input: WorkspaceTab[]): WorkspaceTab[] {
+  const tabs = [...input.filter((tab) => tab.pinnedUrl), ...input.filter((tab) => !tab.pinnedUrl)];
   const seen = new Set<string>();
   return tabs.flatMap((tab) => {
     if (!tab.tabGroupId) return [tab];

@@ -5,6 +5,8 @@ import {
   type TabGroupActions,
   type TabGroupState,
 } from "./tabGroups";
+import { pinnedTabActions, type PinnedTabActions } from "./pinnedTabs";
+import { browserProfileSlice, scopeTarget, type BrowserProfileStore } from "./browserProfiles";
 import { validDockingLayout, type DockingLayout } from "@/features/app-shell/dockingLayout";
 import {
   initialBookmarkNavigation,
@@ -103,7 +105,13 @@ import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
 import { createDefaultWorkspaceView, createBlankWorkspaceView } from "./workspaceDefaultView";
 
 export interface WorkspaceStore
-  extends WorkspaceWindowsState, BookmarkNavigationState, TabGroupState, TabGroupActions {
+  extends
+    WorkspaceWindowsState,
+    BookmarkNavigationState,
+    TabGroupState,
+    TabGroupActions,
+    PinnedTabActions,
+    BrowserProfileStore {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
   closedWindowsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceWindow[]>>;
@@ -175,11 +183,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...initialWorkspaceWindow(),
       ...initialBookmarkNavigation(),
       ...initialTabGroups(),
+      ...browserProfileSlice(set, get),
       lastUsedViewByGroup: {},
       closedItems: [],
       closedWindowsByScope: {},
       setScope: (scopeKey) => {
-        const update = switchWorkspaceScope(get(), scopeKey);
+        const update = switchWorkspaceScope(get(), scopeTarget(get().activeScopeKey, scopeKey));
         if (update) set(update);
       },
       adoptDefaultScope: (scopeKey, validScopes) => {
@@ -187,6 +196,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (update) set(update);
       },
       ...tabGroupActions(set, get),
+      ...pinnedTabActions(set, get),
       openSurface: (request) => {
         if (request.scopeKey) get().setScope(request.scopeKey);
         else if (request.surfaceId === "space") get().setScope(scopeKeyForSurface(request));
@@ -948,6 +958,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         set(initialTabGroups());
         set({
           ...initialWorkspaceWindow(),
+          browserProfiles: [],
           ...initialBookmarkNavigation(),
           lastUsedViewByGroup: {},
           closedItems: [],

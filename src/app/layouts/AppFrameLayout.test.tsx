@@ -43,10 +43,6 @@ vi.mock("@/features/agents/AgentExecutionSurface", () => ({ AgentExecutionSurfac
 
 vi.mock("@/features/spaces/SpacesRealtimeBridge", () => ({ SpacesRealtimeBridge: () => null }));
 
-vi.mock("@/features/activity/ActivityPanel", () => ({
-  ActivityPanel: () => <div data-testid="activity-panel" />,
-}));
-
 vi.mock("@/features/updater/UpdateNotices", () => ({
   UpdateNotices: () => <div data-testid="update-notices" />,
 }));
@@ -176,7 +172,6 @@ describe("AppFrameLayout", () => {
     // Renders DesktopLayout (for the auth route)
     expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
     // Does NOT render background app panels
-    expect(container.querySelector('[data-testid="activity-panel"]')).toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
   });
 
@@ -196,7 +191,7 @@ describe("AppFrameLayout", () => {
     });
 
     expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="activity-panel"]')).toBeNull();
+    expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
   });
 
   it("allows unauthenticated access to /invite/:token", async () => {
@@ -235,7 +230,6 @@ describe("AppFrameLayout", () => {
     });
 
     expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="activity-panel"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="update-notices"]')).not.toBeNull();
   });
 

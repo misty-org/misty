@@ -1,7 +1,5 @@
-import { setNativeWallpaperVideo } from "@/native";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { setAppZoom } from "@/shared/hooks/useAppZoom";
-import { applyStoredExtensionTheme } from "../store/extensionTheme";
+import { applyAppTheme, msUntilNextThemeSwitch } from "../store/appTheme";
 import { selectAppearancePreferences } from "../store/preferences";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { useEffect } from "react";
@@ -14,26 +12,32 @@ export function useDocumentAppAppearance() {
 
   useEffect(() => {
     const root = document.documentElement;
-    root.dataset.theme = "dark";
-    root.dataset.mistyTheme = "warm-charcoal";
-    root.dataset.themeMode = "dark";
-    root.classList.add("dark");
-    root.style.colorScheme = "dark";
     root.dataset.compactMode = String(appearance.compactModeEnabled);
-    root.dataset.thumbnailPreviews = String(appearance.thumbnailPreviewsEnabled);
-    root.dataset.wallpaperActive = String(Boolean(appearance.wallpaperPath));
-    root.style.setProperty("--misty-panel-opacity", String(appearance.panelOpacity));
-    applyStoredExtensionTheme();
   }, [appearance]);
+
+  useEffect(() => {
+    const schedule = { lightAt: appearance.themeLightAt, darkAt: appearance.themeDarkAt };
+    applyAppTheme(appearance.themeMode, schedule);
+    if (appearance.themeMode === "scheduled") {
+      // Re-apply at each switch time; one timer at a time, re-armed after each.
+      let timer = 0;
+      const arm = () => {
+        timer = window.setTimeout(() => {
+          applyAppTheme("scheduled", schedule);
+          arm();
+        }, msUntilNextThemeSwitch(schedule));
+      };
+      arm();
+      return () => window.clearTimeout(timer);
+    }
+    if (appearance.themeMode !== "system") return;
+    const query = window.matchMedia?.("(prefers-color-scheme: light)");
+    const follow = () => applyAppTheme("system");
+    query?.addEventListener("change", follow);
+    return () => query?.removeEventListener("change", follow);
+  }, [appearance.themeMode, appearance.themeLightAt, appearance.themeDarkAt]);
 
   useEffect(() => {
     setAppZoom(appearance.appZoom);
   }, [appearance.appZoom]);
-
-  useEffect(() => {
-    // The wallpaper plays on a native layer behind the transparent webview,
-    // so it is applied through the Tauri command rather than the DOM.
-    if (!hasTauriInternals()) return;
-    void setNativeWallpaperVideo(null, appearance.wallpaperPath || null).catch(() => undefined);
-  }, [appearance.wallpaperPath]);
 }

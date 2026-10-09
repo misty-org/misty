@@ -60,7 +60,7 @@ Use a restrained rounded upper shell (12px) and compact bottom bar (8px), retain
 - **Context and apps:** The overlay uses the current view automatically; users express another destination in the prompt. Do not add manual Space, screen, or workspace-context selectors. Installed and connected apps follow the automatic availability path, subject to existing capabilities and permissions; the overlay has no per-agent assignment setup. `MistyContextBar` is reserved for artifact review, undo, handoff notices, and errors, not context configuration.
 - **Connected-app confirmations:** When _Ask before acting for you_ is on, connect and confirm cards appear in the conversation. They are not a separate approval surface.
 - **Bottom controls:** Idle controls expose disabled resume/pause plus close. Active execution exposes show chat, resume, pause, and stop/done, with availability reflecting execution state. Preserve accessible names and the screen-reader status; do not add visible explanatory text.
-- **Failures:** Execution failures propagate through Misty's existing error/activity path. They do not grow a second message panel inside the bottom bar.
+- **Failures:** Execution failures propagate through Misty's existing error path. They do not grow a second message panel inside the bottom bar.
 
 ## Do's and Don'ts
 
