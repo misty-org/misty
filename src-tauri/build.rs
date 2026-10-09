@@ -33,14 +33,18 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNativeMessaging.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNativeMessaging.h");
         println!("cargo:rerun-if-changed=native/macos/MistyCompanionCapture.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyCompanionPointing.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
         println!("cargo:rerun-if-changed=native/macos/MistyBrowserInput.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopControl.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDefaultBrowser.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
@@ -49,12 +53,15 @@ fn main() {
             .file("native/macos/MistyExtensionNotifications.m")
             .file("native/macos/MistyExtensionNativeMessaging.m")
             .file("native/macos/MistyCompanionCapture.m")
+            .file("native/macos/MistyCompanionPointing.m")
             .file("native/macos/MistyAutopilot.m")
             .file("native/macos/MistyBrowserInput.m")
             .file("native/macos/MistyDesktopControl.m")
             .file("native/macos/MistyAgentPointer.m")
+            .file("native/macos/MistyAgentRing.m")
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
+            .file("native/macos/MistyDefaultBrowser.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");

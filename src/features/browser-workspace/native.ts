@@ -52,6 +52,8 @@ export interface SyncState {
   all_upgraded?: boolean;
   /** Every device understands nested bookmark folders; until then folders stay flat. */
   nested_bookmarks?: boolean;
+  /** Every device understands pinned tabs; until then pins can't be kept through sync. */
+  pinned_tabs?: boolean;
   /** Records with changes the server has not confirmed yet, one per record. */
   unsynced?: UnsyncedRecord[];
   /** Edits an older version set aside unsent: kept on this device, never synced. */

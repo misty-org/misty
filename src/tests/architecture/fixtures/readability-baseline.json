@@ -5,12 +5,6 @@
       "hash": "b696271c03ef9587"
     }
   ],
-  "src/features/settings/SettingsControls.tsx": [
-    {
-      "length": 184,
-      "hash": "de5f715a25619ef0"
-    }
-  ],
   "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
     {
       "length": 164,

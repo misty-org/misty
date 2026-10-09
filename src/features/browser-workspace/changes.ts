@@ -55,7 +55,13 @@ export function workspaceRecords(windows: WorkspaceWindow[], profileId: string):
       add({
         kind: "tab",
         id: tab.id,
-        fields: { window_id: window.id, title: tab.title ?? "", order, tree: tree(tab.root) },
+        fields: {
+          window_id: window.id,
+          title: tab.title ?? "",
+          order,
+          tree: tree(tab.root),
+          pinned_url: tab.pinnedUrl ?? null,
+        },
       });
       for (const pane of dockLeaves(tab.root))
         // A pane's content in the workspace UI is a synced view.

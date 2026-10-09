@@ -14,14 +14,10 @@ use crate::infra::{
     device_trust,
 };
 use crate::{
-    domain::{
-        clipboard::{ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient},
-    },
+    domain::clipboard::{ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient},
     infra::{
-        document_intelligence::ServiceLease,
-        environment::AppEnvironmentService,
-        explorer::ExplorerService,
-        explorer_library::ExplorerLibraryService,
+        document_intelligence::ServiceLease, environment::AppEnvironmentService,
+        explorer::ExplorerService, explorer_library::ExplorerLibraryService,
         transfers::TransferService,
     },
     platform::mini_app::{insert_builtin_test_instance, MiniAppState},
@@ -219,48 +215,75 @@ async fn devices_trust_the_signed_list_share_the_clipboard_and_drop_removed_devi
     device_trust::set_server_device_id(peer_b).unwrap();
     device_trust::set_own_endpoint(&"0".repeat(64)).unwrap();
     device_trust::pin_root(&root.public_key().unwrap(), VAULT).unwrap();
-    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[]))).unwrap();
+    device_trust::apply_server_list(Some(&signed_list(&root, 1, &[member(&a), member(&b)], &[])))
+        .unwrap();
     set_policy("view", true);
     let inbox_scope = format!("inbox:{peer_b}");
-    let grant_for = |signer: &crate::infra::device_identity::DeviceIdentity, requester: &str, scope: &str| {
-        let grant = crate::infra::device_records::RunGrant {
-            account_id: ACCOUNT.into(),
-            grant_id: format!("rungrant_{}", uuid::Uuid::new_v4()),
-            requester_device_id: requester.into(),
-            target_device_id: peer_b.into(),
-            agent_id: String::new(),
-            capabilities: vec!["files.receive".into()],
-            scopes: vec![scope.into()],
-            issued_at: unix_now(),
-            expires_at: unix_now() + 600,
+    let grant_for =
+        |signer: &crate::infra::device_identity::DeviceIdentity, requester: &str, scope: &str| {
+            let grant = crate::infra::device_records::RunGrant {
+                account_id: ACCOUNT.into(),
+                grant_id: format!("rungrant_{}", uuid::Uuid::new_v4()),
+                requester_device_id: requester.into(),
+                target_device_id: peer_b.into(),
+                agent_id: String::new(),
+                capabilities: vec!["files.receive".into()],
+                scopes: vec![scope.into()],
+                issued_at: unix_now(),
+                expires_at: unix_now() + 600,
+            };
+            let payload = grant.payload().unwrap();
+            SignedRecord::new(&payload, signer.sign_record(&payload).unwrap())
         };
-        let payload = grant.payload().unwrap();
-        SignedRecord::new(&payload, signer.sign_record(&payload).unwrap())
-    };
-    let b_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_bbbbbbbbbbbb").unwrap();
-    let a_identity = crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_aaaaaaaaaaaa").unwrap();
+    let b_identity =
+        crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_bbbbbbbbbbbb")
+            .unwrap();
+    let a_identity =
+        crate::infra::device_identity::DeviceIdentity::load(ACCOUNT, "device_aaaaaaaaaaaa")
+            .unwrap();
     let local = tempfile::tempdir().unwrap();
     let content: Vec<u8> = (0..200_000u32).map(|value| (value % 251) as u8).collect();
     let report = local.path().join("report.pdf");
     std::fs::write(&report, &content[..200_000]).unwrap();
     let receipt = a
         .service
-        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &inbox_scope), &inbox_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&b_identity, peer_b, &inbox_scope),
+            &inbox_scope,
+        )
         .await
         .unwrap();
     assert_eq!(receipt.size, 200_000);
-    assert_eq!(receipt.sha256, hex::encode(Sha256::digest(&content[..200_000])));
-    assert_eq!(std::fs::read(inbox.path().join(&receipt.file_name)).unwrap(), &content[..200_000]);
+    assert_eq!(
+        receipt.sha256,
+        hex::encode(Sha256::digest(&content[..200_000]))
+    );
+    assert_eq!(
+        std::fs::read(inbox.path().join(&receipt.file_name)).unwrap(),
+        &content[..200_000]
+    );
     // A grant B did not sign, or for another inbox, delivers nothing.
     assert!(a
         .service
-        .deliver_file(peer_b, &report, grant_for(&a_identity, &a.network_id, &inbox_scope), &inbox_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&a_identity, &a.network_id, &inbox_scope),
+            &inbox_scope
+        )
         .await
         .is_err());
     let other_scope = format!("inbox:{}", a.network_id);
     assert!(a
         .service
-        .deliver_file(peer_b, &report, grant_for(&b_identity, peer_b, &other_scope), &other_scope)
+        .deliver_file(
+            peer_b,
+            &report,
+            grant_for(&b_identity, peer_b, &other_scope),
+            &other_scope
+        )
         .await
         .is_err());
     assert_eq!(std::fs::read_dir(inbox.path()).unwrap().count(), 1);

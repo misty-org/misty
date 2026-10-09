@@ -12,6 +12,7 @@ import { bangDestination, matchingBangs, parseBang } from "./bangs/parse";
 import type { Bang, WebBang } from "./bangs/types";
 import type { SearchListItem } from "./SearchResultList";
 import { useScopedSearch } from "./useScopedSearch";
+import { searchCommands, searchSiteApps } from "./commandResults";
 
 // Providers read their sources at query time, so one set serves every search.
 const providers = createOmniboxProviders(liveOmniboxDeps);
@@ -52,7 +53,7 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
   const scoped = useScopedSearch(scope, query, open);
 
   const text = query.trim();
-  const plain = open && !bang && !trailing && !suggestions.length && text ? query : null;
+  const plain = open && !bang && !trailing && !suggestions.length ? query : null;
   const webText = open && bang?.kind === "web" && text ? query : null;
   const plainInput = useMemo(() => (plain === null ? null : omniboxInput(plain)), [plain]);
   const webInput = useMemo(() => (webText === null ? null : omniboxInput(webText)), [webText]);
@@ -72,7 +73,14 @@ export function useSearchItems(bang: Bang | null, query: string, open: boolean) 
       webSearchMatch(bang, match.title).map((row) => ({ type: "match" as const, match: row })),
     );
   else if (bang) items = scoped.results.map((result) => ({ type: "result", result }));
-  else items = matches.map((match) => ({ type: "match", match }));
+  else
+    items = [
+      ...matches.map((match) => ({ type: "match" as const, match })),
+      // Matching commands follow the pages, so Enter still opens the typed address.
+      ...(plain === null ? [] : [...searchSiteApps(plain), ...searchCommands(plain)]).map(
+        (result) => ({ type: "result" as const, result }),
+      ),
+    ];
 
   return {
     items,

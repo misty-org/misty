@@ -1,9 +1,10 @@
 import type { WorkspaceView } from "@/features/workspace";
 import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
-import { create } from "zustand";
-import type { ActiveBrowserAgentGrant } from "./browserAgentAccess";
+import { browserProfileFor } from "./browserProfileResolver";
+import { useBrowserRuntimeStore } from "./browserRuntimeStore";
 import type { BrowserBounds, BrowserTheme } from "./types";
+export { useBrowserRuntimeStore } from "./browserRuntimeStore";
 export type {
   BrowserCompatibilityIssue,
   BrowserHistory,
@@ -14,12 +15,7 @@ export type {
   PagePreview,
 } from "./browserRuntimeTypes";
 
-import type {
-  BrowserCompatibilityIssue,
-  BrowserHistory,
-  HistoryStep,
-  PagePreview,
-} from "./browserRuntimeTypes";
+import type { PagePreview } from "./browserRuntimeTypes";
 export function savePagePreview(tabId: string, preview: PagePreview) {
   useBrowserRuntimeStore.setState((runtime) => {
     const previews = { ...runtime.previews };
@@ -38,149 +34,6 @@ export function pagePreviewGeneration() {
   return previewGeneration;
 }
 
-interface BrowserRuntimeUiState {
-  /** Local, session-only thumbnails. Never included in workspace persistence or sync. */
-  previews: Record<string, PagePreview>;
-  grants: Record<string, ActiveBrowserAgentGrant[]>;
-  histories: Record<string, BrowserHistory>;
-  errors: Record<string, string | null>;
-  notices: Record<string, string | null>;
-  compatibilityIssues: Record<string, BrowserCompatibilityIssue | null>;
-  loading: Record<string, boolean>;
-  setGrants: (tabId: string, grants: ActiveBrowserAgentGrant[]) => void;
-  ensureHistory: (tabId: string, url: string) => void;
-  pushHistory: (tabId: string, url: string) => void;
-  moveHistory: (tabId: string, direction: -1 | 1) => string | null;
-  travelHistory: (tabId: string, direction: -1 | 1) => HistoryStep | null;
-  replaceHistory: (tabId: string, history: BrowserHistory) => void;
-  resetNativeHistory: (tabId: string) => void;
-  setError: (tabId: string, error: string | null) => void;
-  setNotice: (tabId: string, notice: string | null) => void;
-  setCompatibilityIssue: (tabId: string, issue: BrowserCompatibilityIssue | null) => void;
-  setLoading: (tabId: string, loading: boolean) => void;
-  removeTab: (tabId: string) => void;
-}
-
-export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) => ({
-  previews: {},
-  grants: {},
-  histories: {},
-  errors: {},
-  notices: {},
-  compatibilityIssues: {},
-  loading: {},
-  setGrants: (tabId, grants) => set((state) => ({ grants: { ...state.grants, [tabId]: grants } })),
-  ensureHistory: (tabId, url) =>
-    set((state) =>
-      state.histories[tabId]
-        ? state
-        : { histories: { ...state.histories, [tabId]: { entries: [url], index: 0 } } },
-    ),
-  pushHistory: (tabId, url) =>
-    set((state) => {
-      const current = state.histories[tabId] ?? { entries: [url], index: 0 };
-      if (current.entries[current.index] === url) return state;
-      const existingIndex = current.entries.lastIndexOf(url);
-      const index = current.index + 1;
-      const native = current.native;
-      const next =
-        existingIndex >= 0 && Math.abs(existingIndex - current.index) === 1
-          ? { ...current, index: existingIndex }
-          : {
-              entries: [...current.entries.slice(0, current.index + 1), url],
-              index,
-              // The webview pushed this entry too.
-              native:
-                native && native.lo <= current.index && current.index <= native.hi
-                  ? { lo: native.lo, hi: index }
-                  : { lo: index, hi: index },
-            };
-      return { histories: { ...state.histories, [tabId]: next } };
-    }),
-  moveHistory: (tabId, direction) => {
-    const current = get().histories[tabId];
-    if (!current) return null;
-    const index = current.index + direction;
-    if (index < 0 || index >= current.entries.length) return null;
-    set((state) => ({
-      histories: { ...state.histories, [tabId]: { ...current, index } },
-    }));
-    return current.entries[index] ?? null;
-  },
-  travelHistory: (tabId, direction) => {
-    const current = get().histories[tabId];
-    if (!current) return null;
-    const index = current.index + direction;
-    const url = current.entries[index];
-    if (index < 0 || url === undefined) return null;
-    const range = current.native;
-    const native = Boolean(
-      range &&
-      range.lo <= current.index &&
-      current.index <= range.hi &&
-      range.lo <= index &&
-      index <= range.hi,
-    );
-    set((state) => ({
-      histories: {
-        ...state.histories,
-        // A direct load leaves the webview knowing only the loaded entry.
-        [tabId]: { ...current, index, native: native ? range : { lo: index, hi: index } },
-      },
-    }));
-    return { url, native };
-  },
-  replaceHistory: (tabId, history) =>
-    set((state) => ({
-      histories: {
-        ...state.histories,
-        [tabId]: { ...history, native: { lo: history.index, hi: history.index } },
-      },
-    })),
-  resetNativeHistory: (tabId) =>
-    set((state) => {
-      const current = state.histories[tabId];
-      if (!current) return state;
-      return {
-        histories: {
-          ...state.histories,
-          [tabId]: { ...current, native: { lo: current.index, hi: current.index } },
-        },
-      };
-    }),
-  setError: (tabId, error) =>
-    set((state) => ({
-      errors: { ...state.errors, [tabId]: error },
-      ...(error ? { loading: { ...state.loading, [tabId]: false } } : {}),
-    })),
-  setNotice: (tabId, notice) =>
-    set((state) => ({ notices: { ...state.notices, [tabId]: notice } })),
-  setCompatibilityIssue: (tabId, issue) =>
-    set((state) => ({
-      compatibilityIssues: { ...state.compatibilityIssues, [tabId]: issue },
-    })),
-  setLoading: (tabId, loading) =>
-    set((state) => ({ loading: { ...state.loading, [tabId]: loading } })),
-  removeTab: (tabId) =>
-    set((state) => {
-      const grants = { ...state.grants };
-      const histories = { ...state.histories };
-      const errors = { ...state.errors };
-      const notices = { ...state.notices };
-      const compatibilityIssues = { ...state.compatibilityIssues };
-      const loading = { ...state.loading };
-      const previews = { ...state.previews };
-      delete grants[tabId];
-      delete histories[tabId];
-      delete errors[tabId];
-      delete notices[tabId];
-      delete compatibilityIssues[tabId];
-      delete loading[tabId];
-      delete previews[tabId];
-      return { grants, histories, errors, notices, compatibilityIssues, loading, previews };
-    }),
-}));
-
 const createdRuntimeIds = new Set<string>();
 const visibleRuntimeIds = new Set<string>();
 const desiredVisibleRuntimeIds = new Set<string>();
@@ -188,6 +41,8 @@ const lastBounds = new Map<string, string>();
 const runtimeTabIds = new Map<string, string>();
 const runtimeQueues = new Map<string, Promise<void>>();
 const browserSyncStates = new Map<string, BrowserSyncState>();
+/** Runtimes whose tab was closed, with a check for whether it is still gone. */
+const closedRuntimes = new Map<string, () => boolean>();
 const browserWebviewSuspensions = new Set<string>();
 let browserParkGeneration = 0;
 let previewGeneration = 0;
@@ -218,6 +73,7 @@ export async function browserProfileChanged(
 }
 
 type BrowserRuntimeTab = Pick<WorkspaceView, "id" | "instanceKey">;
+
 type BrowserSyncInput = {
   originSpaceId?: string;
   /** Opaque host-issued context used by agent browser grants. */
@@ -322,6 +178,7 @@ export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
   const generation = previewGeneration;
   const current = () => stillCurrent() && generation === previewGeneration;
+  const profileId = browserProfileFor(tab.id, state.profileId);
   try {
     if (!existing) {
       await invoke("browser_webview_create", {
@@ -330,7 +187,7 @@ export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent
           previewOnly: true,
           workspaceTabId: tab.id,
           url: state.url,
-          ...(state.profileId ? { profileId: state.profileId } : {}),
+          ...(profileId ? { profileId } : {}),
           x: 100_000,
           y: 0,
           width: 1440,
@@ -460,6 +317,18 @@ async function flushBrowserSync(id: string, state: BrowserSyncState): Promise<vo
 }
 
 async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<void> {
+  // A pane that is still unmounting can measure once more after its tab
+  // closed. Recreating the page would start its audio again with no tab left
+  // to stop it; only a reopened tab may bring the runtime back.
+  const closed = closedRuntimes.get(id);
+  if (closed?.()) {
+    desiredVisibleRuntimeIds.delete(id);
+    return;
+  }
+  closedRuntimes.delete(id);
+  // A view in a device profile opens in that profile's own website data.
+  const profileId = browserProfileFor(input.tab.id, input.profileId);
+  if (profileId) input = { ...input, profileId };
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   if (!createdRuntimeIds.has(id)) {
     await invoke("browser_webview_create", {
@@ -617,6 +486,24 @@ export function setBrowserStatusBubbleEnabled(enabled: boolean): void {
   void invoke<void>("browser_webviews_set_status_bubble", { enabled }).catch(() => undefined);
 }
 
+function overlayParksChildViews(): boolean {
+  if (typeof navigator !== "undefined" && navigator.platform) {
+    if (/mac/i.test(navigator.platform)) return false;
+    if (/win/i.test(navigator.platform)) return false;
+    if (/linux/i.test(navigator.platform)) return true;
+  }
+  if (typeof navigator !== "undefined" && navigator.userAgent) {
+    if (/macintosh|mac os x/i.test(navigator.userAgent)) return false;
+    if (/windows/i.test(navigator.userAgent)) return false;
+    if (/linux/i.test(navigator.userAgent)) return true;
+  }
+  if (typeof process !== "undefined" && process.platform) {
+    if (process.platform === "darwin" || process.platform === "win32") return false;
+    if (process.platform === "linux") return true;
+  }
+  return false;
+}
+
 function scheduleBrowserOverlayResume(): void {
   if (typeof window === "undefined" || browserPointerGestureActive || !browserOverlayActive) return;
   const generation = ++browserOverlayResumeGeneration;
@@ -632,11 +519,16 @@ function scheduleBrowserOverlayResume(): void {
         return;
       }
       setBrowserOverlayActive(false);
-      void browserOverlayQueue.then(() => {
-        if (!browserOverlayActive && browserWebviewSuspensions.size === 0) {
-          // Non-macOS runtimes park child views while renderer popovers are
+      void browserOverlayReady().then(() => {
+        if (
+          !browserOverlayActive &&
+          browserWebviewSuspensions.size === 0 &&
+          overlayParksChildViews()
+        ) {
+          // WebKitGTK (Linux) parks child views while renderer popovers are
           // open. Invalidate the cached frames so each desired page is shown
-          // again even when its geometry did not change.
+          // again even when its geometry did not change. On macOS and Windows,
+          // native views stay alive in their sibling z-order.
           desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
           window.dispatchEvent(new Event(browserRuntimeResumeEvent));
         }
@@ -652,9 +544,10 @@ function setBrowserOverlayActive(active: boolean): void {
   }
   browserOverlayQueue = browserOverlayQueue
     .catch(() => undefined)
-    .then(() =>
-      invoke<void>("browser_webviews_set_overlay_active", { active }).catch(() => undefined),
-    );
+    .then(() => {
+      if (browserOverlayActive !== active) return;
+      return invoke<void>("browser_webviews_set_overlay_active", { active }).catch(() => undefined);
+    });
 }
 
 export async function browserOverlayReady(): Promise<void> {
@@ -672,6 +565,95 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
   return enqueue(id, async () => {
     await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
   });
+}
+
+const browserRuntimeCloseListeners = new Set<(tabId: string) => void>();
+
+export function onBrowserRuntimeClose(listener: (tabId: string) => void): () => void {
+  browserRuntimeCloseListeners.add(listener);
+  return () => {
+    browserRuntimeCloseListeners.delete(listener);
+  };
+}
+
+/** Destroy a closed tab's native page so its media stops with it. `isClosed`
+ * reports whether the tab is still gone; reopening it keeps the runtime. */
+export async function closeBrowserRuntime(
+  tab: BrowserRuntimeTab,
+  isClosed: () => boolean,
+): Promise<void> {
+  const id = registerBrowserRuntime(tab);
+  desiredVisibleRuntimeIds.delete(id);
+  closedRuntimes.set(id, isClosed);
+  const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
+  await Promise.allSettled(
+    grants.map((grant) =>
+      invoke("browser_agent_grant_revoke", { request: { id, grantId: grant.id } }).catch(
+        () => undefined,
+      ),
+    ),
+  );
+  browserRuntimeCloseListeners.forEach((listener) => {
+    try {
+      listener(tab.id);
+    } catch {
+      // Ignore listener failures during close.
+    }
+  });
+  await enqueue(id, async () => {
+    // Reopening a just-closed tab can request this same stable runtime while
+    // grant cleanup is still in flight. The new request owns the child now;
+    // do not let the stale close tear it down or delete its id mapping.
+    if (!isClosed()) {
+      closedRuntimes.delete(id);
+      return;
+    }
+    // Close even when this module lost track of the page (a profile switch or
+    // renderer reload clears createdRuntimeIds); the native command no-ops
+    // when no page exists.
+    await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
+    createdRuntimeIds.delete(id);
+    visibleRuntimeIds.delete(id);
+    deferredNavigations.delete(id);
+    lastBounds.delete(id);
+    browserSyncStates.delete(id);
+    runtimeTabIds.delete(id);
+    if (![...runtimeTabIds.values()].includes(tab.id)) {
+      useBrowserRuntimeStore.getState().removeTab(tab.id);
+    }
+  });
+}
+
+/** Native pages that exist now, with the workspace tab each belongs to. */
+export function liveBrowserRuntimes(): { id: string; tabId: string; visible: boolean }[] {
+  return [...createdRuntimeIds].map((id) => ({
+    id,
+    tabId: runtimeTabIds.get(id) ?? "",
+    visible: visibleRuntimeIds.has(id) || desiredVisibleRuntimeIds.has(id),
+  }));
+}
+
+/**
+ * Puts a hidden page to sleep: its native view is closed to free memory while
+ * the tab stays. Showing the tab creates the page again at its current address.
+ * Resolves false when the page was shown, closed or recreated meanwhile.
+ */
+export function sleepBrowserRuntime(id: string): Promise<boolean> {
+  let slept = false;
+  return enqueue(id, async () => {
+    if (
+      !createdRuntimeIds.has(id) ||
+      visibleRuntimeIds.has(id) ||
+      desiredVisibleRuntimeIds.has(id) ||
+      closedRuntimes.has(id)
+    )
+      return;
+    await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
+    createdRuntimeIds.delete(id);
+    lastBounds.delete(id);
+    deferredNavigations.delete(id);
+    slept = true;
+  }).then(() => slept);
 }
 
 export async function parkAllBrowserWebviews(): Promise<void> {
@@ -694,7 +676,14 @@ export async function parkAllBrowserWebviews(): Promise<void> {
 }
 
 function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): string {
-  return [bounds.x, bounds.y, bounds.width, bounds.height, nativeLiveResize ? 1 : 0]
+  return [
+    bounds.x,
+    bounds.y,
+    bounds.width,
+    bounds.height,
+    nativeLiveResize ? 1 : 0,
+    ...(bounds.cornerRadii ?? []),
+  ]
     .map((value) => Math.round(value * 2) / 2)
     .join(":");
 }

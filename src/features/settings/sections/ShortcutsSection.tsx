@@ -144,7 +144,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
         <SettingsRow
           label="Show shortcut hints"
           description="Display current shortcuts in buttons, menus, tooltips, and command results."
-          last
         >
           <SwitchControl
             checked={booleanSetting(props.document, "shortcuts", "shortcut_hints_enabled", true)}
@@ -157,7 +156,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Commands">
-        <div className="grid gap-4 p-4">
+        <div className="grid gap-4 border-t border-charcoal-border py-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="relative min-w-[220px] flex-1">
               <Search

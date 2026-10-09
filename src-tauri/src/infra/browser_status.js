@@ -82,12 +82,16 @@
     return loading ? `Loading ${location.hostname || "page"}…` : "";
   };
 
+  let cachedWidth = 0;
+  let cachedHeight = 0;
+
   const place = () => {
     if (!label) return;
     // Step aside when the pointer is over the bubble's corner.
-    const rect = label.getBoundingClientRect();
-    const covered = pointer.y >= innerHeight - Math.max(rect.height, 22) - 8
-      && pointer.x >= 0 && pointer.x <= rect.width + 8;
+    const height = cachedHeight || 22;
+    const width = cachedWidth || 120;
+    const covered = pointer.y >= innerHeight - Math.max(height, 22) - 8
+      && pointer.x >= 0 && pointer.x <= width + 8;
     if (covered !== onRight) {
       onRight = covered;
       label.classList.toggle("right", onRight);
@@ -100,6 +104,8 @@
     clearTimeout(showTimer);
     clearTimeout(hideTimer);
     if (!next) {
+      cachedWidth = 0;
+      cachedHeight = 0;
       // A short grace period stops flicker when moving between adjacent links.
       hideTimer = setTimeout(() => {
         shown = "";
@@ -114,6 +120,9 @@
       }
       shown = next;
       label.textContent = next;
+      const rect = label.getBoundingClientRect();
+      cachedWidth = rect.width;
+      cachedHeight = rect.height;
       place();
       label.classList.add("visible");
     };

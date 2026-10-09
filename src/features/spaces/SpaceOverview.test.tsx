@@ -31,9 +31,6 @@ vi.mock("./useSpacePersonalItems", () => ({
     retry: vi.fn(),
   }),
 }));
-vi.mock("@/features/activity/useActivityStore", () => ({
-  useActivityStore: (select: (s: unknown) => unknown) => select({ attentionItems: [] }),
-}));
 vi.mock("./components/SpaceCreateMenu", () => ({ SpaceCreateMenu: () => null }));
 afterEach(() => {
   cleanup();

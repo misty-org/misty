@@ -6,7 +6,6 @@ const deepLinkPrefixes = [
   routes.invite,
   routes.providers,
   routes.agents,
-  routes.activity,
   routes.scheduled,
   routes.spaces,
   routes.settings,

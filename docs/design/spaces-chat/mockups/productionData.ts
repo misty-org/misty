@@ -5,7 +5,6 @@ import { drawingsApi } from "@/api/drawings/api";
 import { spacePersonalItemsApi, type SpacePersonalItem } from "@/api/spaces/personalItems";
 import { configureApiSession } from "@/api/client/session";
 import { useSpacesStore } from "@/features/spaces/store/useSpacesStore";
-import { useActivityStore } from "@/features/activity/useActivityStore";
 import type { Space, SpaceConversation } from "@/api/spaces/dto/interfaces/types";
 // All non-fixture API requests remain blocked, including accidental menu mutations.
 configureApiSession({
@@ -128,21 +127,4 @@ useSpacesStore.setState({
   membersBySpace: { preview: [] },
   loadMembers: async () => {},
   presenceBySpace: { preview: [] },
-});
-useActivityStore.setState({
-  attentionItems: [
-    {
-      id: "mention",
-      accountId: "me",
-      spaceId: "preview",
-      source: "spaces",
-      sourceId: "mention",
-      kind: "mention",
-      title: "Sam mentioned you",
-      body: "Could you bring the blanket?",
-      attention: true,
-      createdAt: "2026-09-30",
-      target: { kind: "space-chat", spaceId: "preview", conversationId: "weekend" },
-    },
-  ],
 });

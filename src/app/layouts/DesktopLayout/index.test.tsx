@@ -1,4 +1,5 @@
 import type * as DeploymentApi from "@/api/deployment/api";
+import type * as AgentsModule from "@/features/agents";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -122,22 +123,30 @@ vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({
 vi.mock("@/features/webviews/browserRuntime", () => ({
   setBrowserWebviewsSuspended: vi.fn(),
   setBrowserPointerTrackingEnabled: vi.fn(),
+  onBrowserRuntimeClose: vi.fn(() => () => {}),
 }));
 vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
   BrowserContextMenuBridge: () => null,
 }));
 vi.mock("@/features/files/workspace/explorer", () => ({ MediaSearchViewer: () => null }));
-vi.mock("@/features/activity", () => ({ ActivityBridge: () => null }));
 vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", () => ({
   WorkflowSchedulesBridge: () => null,
 }));
 vi.mock("@/features/agents/AgentJobWorker", () => ({ AgentJobWorker: () => null }));
+vi.mock("@/features/agents", async (importOriginal) => {
+  const actual = await importOriginal<typeof AgentsModule>();
+  return {
+    ...actual,
+    MistyPanel: () => <div data-testid="misty-panel" />,
+  };
+});
 
 import { SavedAccountSessionUnavailableError } from "@/features/auth/sessionErrors";
 import SignIn from "@/features/auth/SignInPage";
 import { notifyAccountScopeReset } from "@/features/auth/store/accountEvents";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
+import { useMistyPanelStore } from "@/features/agents";
 import { DesktopLayout } from "./index";
 import { navigatorLayoutStorageKey, publishNavigatorLayout } from "./navigatorMode";
 
@@ -157,6 +166,7 @@ describe("DesktopLayout on Auth Routes", () => {
     vi.clearAllMocks();
     vi.spyOn(useSettingsStore.getState(), "updateSetting").mockImplementation(() => {});
     useNavigationNames.setState({ account: "", ready: false, names: {}, error: null });
+    useMistyPanelStore.setState({ open: false });
   });
 
   afterEach(async () => {
@@ -244,7 +254,7 @@ describe("DesktopLayout on Auth Routes", () => {
 
   it.each([
     ["/browser", "true", "1 / 4"],
-    ["/activity", "false", "1 / 4"],
+    ["/invite/token", "false", "1 / 4"],
     ["/signin", "false", "2"],
   ])("reserves native chrome correctly on %s", async (route, sharedTabs, row) => {
     await act(async () => {
@@ -356,5 +366,38 @@ describe("DesktopLayout on Auth Routes", () => {
     expect(container.querySelector('[data-testid="auth-outlet"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="global-navigator"]')).toBeNull();
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBeNull();
+  });
+
+  it("pushes workspace canvas to the left when Misty panel is open", async () => {
+    mocks.user = { id: "test-user", email: "test@example.com" };
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <Routes>
+            <Route element={<DesktopLayout getRouteId={() => "browser" as any} />}>
+              <Route path="/browser" element={<div data-testid="browser-outlet" />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    const host = container.querySelector<HTMLElement>("[data-browser-corner-clip]");
+    expect(host).not.toBeNull();
+    expect(host?.classList.contains("rounded-r-xl")).toBe(false);
+
+    await act(async () => {
+      useMistyPanelStore.getState().setOpen(true);
+    });
+
+    expect(host?.classList.contains("rounded-r-xl")).toBe(true);
+    expect(container.querySelector('[data-testid="misty-panel"]')).not.toBeNull();
+
+    await act(async () => {
+      useMistyPanelStore.getState().setOpen(false);
+    });
+
+    expect(host?.classList.contains("rounded-r-xl")).toBe(false);
+    expect(container.querySelector('[data-testid="misty-panel"]')).toBeNull();
   });
 });

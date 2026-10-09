@@ -1,7 +1,7 @@
-import { cn, IconButton } from "@/shared/ui";
-import { X } from "lucide-react";
+import { Button, cn, IconButton } from "@/shared/ui";
+import { CircleAlert, X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
-import { SettingActionsMenu } from "../profiles/SettingScope";
+import { useSettingReset } from "../profiles/SettingScope";
 import { type DesktopSettingsNavEntry, SettingsNavigation } from "./SettingsNavigation";
 export type { DesktopSettingsNavEntry } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
@@ -68,81 +68,112 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     </div>
   );
 }
+/** A group of rows under a small muted header. Rows draw their own hairlines; there is no card. */
 export function DesktopSettingsSection(props: {
   title: string;
   description?: string;
   children: ReactNode;
-  surface?: "card" | "plain";
 }) {
   return (
-    <section aria-label={props.title} className="@container/settings mb-6 min-w-0 last:mb-0">
-      <div className="mb-2.5 min-w-0">
+    <section aria-label={props.title} className="@container/settings mb-8 min-w-0 last:mb-0">
+      <div className="mb-1.5 min-w-0">
         <h2 className="text-[13px] font-medium leading-5 text-cream-muted">{props.title}</h2>
         {props.description ? (
-          <p className="mt-1 max-w-2xl text-[13px] leading-[18px] text-cream-muted">
+          <p className="mt-0.5 max-w-2xl text-[13px] leading-[18px] text-cream-muted">
             {props.description}
           </p>
         ) : null}
       </div>
-      <div
-        className={cn(
-          "overflow-hidden",
-          props.surface !== "plain" && "rounded-lg border border-charcoal-border bg-charcoal-card",
-        )}
-      >
-        {props.children}
-      </div>
+      <div className="min-w-0">{props.children}</div>
     </section>
   );
 }
+/**
+ * Label and description on the left, the control in one fixed 240px column on the right so every
+ * page lines up. Reset appears after the description only while the value differs from default.
+ */
 export function DesktopSettingsRow(props: {
   label: string;
-  description?: string;
+  description?: ReactNode;
   children: ReactNode;
-  last?: boolean;
   /** Unavailable right now; dims the text only. */
   muted?: boolean;
   /** Depends on the row above it and is drawn as its indented sub-row. */
   indent?: boolean;
+  /** The control needs the full width (lists, text areas) and sits under the label. */
+  stacked?: boolean;
 }) {
+  const reset = useSettingReset(props.label);
   return (
     <div
       data-setting-label={props.label}
       tabIndex={-1}
       aria-disabled={props.muted || undefined}
       className={cn(
-        "group/setting-row grid min-h-14 grid-cols-[minmax(0,0.52fr)_minmax(240px,0.48fr)] items-center gap-5",
-        "border-b border-charcoal-border px-5 py-3 last:border-b-0 outline-none",
+        "group/setting-row grid min-h-14 items-center gap-x-6 gap-y-2.5 border-t border-charcoal-border py-3 outline-none",
         "transition-colors duration-700 data-[setting-flash=true]:bg-charcoal-hover data-[setting-flash=true]:duration-0",
-        "@max-[560px]/settings:grid-cols-1 @max-[560px]/settings:items-start @max-[560px]/settings:gap-3",
-        props.indent && "pl-10",
-        props.last && "border-b-0",
+        props.stacked
+          ? "grid-cols-1"
+          : "grid-cols-[minmax(0,1fr)_240px] @max-[560px]/settings:grid-cols-1",
+        props.indent && "pl-5",
       )}
     >
       <div className="grid min-w-0 gap-0.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <strong
-            className={cn(
-              "text-sm font-medium leading-5",
-              props.muted ? "text-cream-muted" : "text-cream",
-            )}
-          >
-            {props.label}
-          </strong>
+        <span
+          className={cn(
+            "text-sm font-medium leading-5",
+            props.muted ? "text-cream-muted" : "text-cream",
+          )}
+        >
+          {props.label}
         </span>
-        {props.description ? (
-          <span className="text-[13px] leading-[18px] text-cream-muted">{props.description}</span>
+        {props.description || reset ? (
+          <p className="text-[13px] leading-[18px] text-cream-muted">
+            {props.description}
+            {reset ? (
+              <>
+                {props.description ? " " : null}
+                <Button
+                  type="button"
+                  variant="link"
+                  aria-label={`Reset ${props.label} to default`}
+                  className={cn(
+                    "inline h-auto border-0 p-0 align-baseline text-[13px] leading-[18px]",
+                    "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
+                  )}
+                  onClick={reset}
+                >
+                  Reset
+                </Button>
+              </>
+            ) : null}
+          </p>
         ) : null}
       </div>
       <SettingsControlLabelContext.Provider value={props.label}>
         <div
           data-setting-control
-          className="flex min-w-0 items-center justify-end gap-2 @max-[560px]/settings:w-full @max-[560px]/settings:justify-start"
+          className={cn(
+            "flex min-w-0 items-center gap-2",
+            props.stacked ? "justify-start" : "justify-end @max-[560px]/settings:justify-start",
+          )}
         >
-          <SettingActionsMenu label={props.label} />
           {props.children}
         </div>
       </SettingsControlLabelContext.Provider>
+    </div>
+  );
+}
+/** Inline status for a whole page, e.g. a save that failed. Monochrome; the icon carries the state. */
+export function DesktopSettingsNotice(props: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div
+      role="alert"
+      className="mb-5 flex min-w-0 items-center gap-2.5 rounded-lg border border-charcoal-border px-3 py-2 text-[13px] leading-[18px] text-cream"
+    >
+      <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
+      <span className="min-w-0 flex-1">{props.children}</span>
+      {props.action}
     </div>
   );
 }

@@ -41,12 +41,23 @@ pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), S
     capture_legacy_display(monitor)
 }
 
+/// The size a display is sent at. Vision providers resize larger images before
+/// the model sees them (OpenAI to a 768px short side, Anthropic to a 1568px
+/// long side), which would shift every point, so stay inside both bounds.
+/// Matches `CompanionCaptureScale` in MistyCompanionCapture.m.
+pub fn companion_capture_size(width: u32, height: u32) -> (u32, u32) {
+    let (w, h) = (width.max(1) as f64, height.max(1) as f64);
+    let scale = (768.0 / w.min(h)).min(1568.0 / w.max(h)).min(1.0);
+    (((w * scale) as u32).max(1), ((h * scale) as u32).max(1))
+}
+
 // Windows and macOS 12–13 retain xcap: SCScreenshotManager requires macOS 14.
 fn capture_legacy_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), String> {
     let image =
         image::DynamicImage::ImageRgba8(monitor.capture_image().map_err(|e| e.to_string())?);
+    let (width, height) = companion_capture_size(image.width(), image.height());
     let resized = image
-        .resize(1280, 1280, image::imageops::FilterType::Lanczos3)
+        .resize_exact(width, height, image::imageops::FilterType::Lanczos3)
         .to_rgb8();
     let mut bytes = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 80)
@@ -177,10 +188,19 @@ pub fn shortcut(tx: Sender<Shortcut>) {
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
+            vec![
+                CGEventType::FlagsChanged,
+                CGEventType::KeyDown,
+                CGEventType::LeftMouseDown,
+            ],
             move |_, kind, event| {
                 if matches!(kind, CGEventType::KeyDown) {
                     let _ = send.send(Shortcut::KeyboardActivity);
+                }
+                if matches!(kind, CGEventType::LeftMouseDown) {
+                    // Only a position; the host forwards it while a walkthrough waits.
+                    let p = event.location();
+                    let _ = send.send(Shortcut::Click(p.x, p.y));
                 }
                 if matches!(kind, CGEventType::FlagsChanged) {
                     let flags = event.get_flags();
@@ -261,7 +281,23 @@ pub fn shortcut(tx: Sender<Shortcut>) {
         }
         CallNextHookEx(null_mut(), code, message, data)
     }
+    thread_local! { static CLICKS: RefCell<Option<Sender<Shortcut>>> = const { RefCell::new(None) }; }
+    // Only a position; the host forwards it while a walkthrough waits.
+    unsafe extern "system" fn mouse(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
+        if code >= 0 && message as u32 == WM_LBUTTONDOWN {
+            let event = &*(data as *const MSLLHOOKSTRUCT);
+            if event.flags & LLMHF_INJECTED == 0 {
+                CLICKS.with(|target| {
+                    if let Some(tx) = target.borrow().as_ref() {
+                        let _ = tx.send(Shortcut::Click(event.pt.x as f64, event.pt.y as f64));
+                    }
+                });
+            }
+        }
+        CallNextHookEx(null_mut(), code, message, data)
+    }
     TARGET.with(|target| *target.borrow_mut() = Some((tx.clone(), [false; 4], false)));
+    CLICKS.with(|target| *target.borrow_mut() = Some(tx.clone()));
     unsafe {
         let handle = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), null_mut(), 0);
         if handle.is_null() {
@@ -270,10 +306,15 @@ pub fn shortcut(tx: Sender<Shortcut>) {
             ));
             return;
         }
+        // Walkthroughs fall back to "next" by voice or text without click hints.
+        let clicks = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), null_mut(), 0);
         let mut message: MSG = std::mem::zeroed();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
             TranslateMessage(&message);
             DispatchMessageW(&message);
+        }
+        if !clicks.is_null() {
+            UnhookWindowsHookEx(clicks);
         }
         UnhookWindowsHookEx(handle);
     }
@@ -369,4 +410,25 @@ pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod capture_size_tests {
+    use super::companion_capture_size;
+
+    #[test]
+    fn captures_stay_inside_the_sizes_vision_providers_keep() {
+        for (display, expected) in [
+            ((1496, 967), (1188, 768)),
+            ((2992, 1934), (1188, 768)),
+            ((1920, 1080), (1365, 768)),
+            ((3440, 1440), (1568, 656)),
+            ((1080, 1920), (768, 1365)),
+            ((800, 600), (800, 600)),
+        ] {
+            let (width, height) = companion_capture_size(display.0, display.1);
+            assert_eq!((width, height), expected, "{display:?}");
+            assert!(width.min(height) <= 768 && width.max(height) <= 1568);
+        }
+    }
 }

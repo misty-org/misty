@@ -24,7 +24,6 @@ import { useSpaceItemCreator } from "./useSpaceItemCreator";
 import { useSpaceOverviewActions } from "./useSpaceOverviewActions";
 import { SpaceCreateMenu } from "./components/SpaceCreateMenu";
 import { useSpacePersonalItems } from "./useSpacePersonalItems";
-import { useActivityStore } from "@/features/activity/useActivityStore";
 import { spaceSuggestions } from "./spaceSuggestions";
 
 const icons = {
@@ -46,7 +45,6 @@ export function SpaceOverview({ space }: { space: Space }) {
   const navigate = useNavigate();
   const source = useSpaceOverview(user?.id ?? "", space);
   const personal = useSpacePersonalItems(space.id);
-  const activity = useActivityStore((state) => state.attentionItems);
   const data = {
     ...source,
     items: source.items.map((item) => {
@@ -60,7 +58,7 @@ export function SpaceOverview({ space }: { space: Space }) {
       };
     }),
   };
-  const suggestions = spaceSuggestions(data.items, activity, user?.id ?? "", space.id);
+  const suggestions = spaceSuggestions(data.items, user?.id ?? "");
   const creatorName = useSpaceItemCreator(space.id);
   const itemActions = useSpaceOverviewActions(user?.id ?? "", space.id, data.items, data.retry);
   const [query, setQuery] = useState("");

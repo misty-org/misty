@@ -56,6 +56,7 @@ export function BrowserOmnibox(
       compact={props.compact}
       pageTitle={props.pageTitle}
       focusRequest={props.focusRequest}
+      trailing={props.trailing}
       context={context}
       providers={providers}
       suspensionReason={`browser-omnibox:${browserRuntimeId(props.tab)}`}

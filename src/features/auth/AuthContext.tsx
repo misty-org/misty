@@ -1,5 +1,5 @@
 import { apiSessionInvalidEvent, readApiAuthToken } from "@/api/client/session";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
 import { useNativeSessionStore } from "@/features/native-session";
 import { removeSpaceReferenceCache } from "@/features/spaces";
@@ -107,7 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       for (const error of failures) {
         reportSystemError({
-          accountId,
           scope: "account:sign-out",
           title: "Part of signing out did not finish",
           error,

@@ -58,7 +58,9 @@ pub(crate) fn init(app: &AppHandle) {
 }
 
 pub(super) fn install(webview: &Webview) -> Result<(), String> {
-    engine::install_media_permissions(webview)
+    engine::install_media_permissions(webview)?;
+    // Ad and tracker blocking covers every page and popup Misty shows.
+    engine::install_content_filter(webview)
 }
 
 /// The store a tab's choices live in, from the profile Misty opened it with.
@@ -184,7 +186,10 @@ async fn stop_capture(
             .await
             .map_err(|error| {
                 let mut letters = error.chars();
-                let first = letters.next().map(|c| c.to_lowercase().to_string()).unwrap_or_default();
+                let first = letters
+                    .next()
+                    .map(|c| c.to_lowercase().to_string())
+                    .unwrap_or_default();
                 format!("Permission saved, but {first}{}", letters.as_str())
             })?;
     }
@@ -200,7 +205,13 @@ pub async fn browser_site_permissions_set(
     permissions: Permissions,
 ) -> Result<SiteInfo, String> {
     require_host(&caller)?;
-    let before = inspect(&app, target(&app, &id)?, Some(canonical_origin(&origin)?), None).await?;
+    let before = inspect(
+        &app,
+        target(&app, &id)?,
+        Some(canonical_origin(&origin)?),
+        None,
+    )
+    .await?;
     let info = inspect(
         &app,
         target(&app, &id)?,

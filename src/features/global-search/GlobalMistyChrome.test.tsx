@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef, type ComponentProps } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { GlobalMistyComposerBar } from "./GlobalMistyChrome";
-vi.mock("./MistyAgentPicker", () => ({ MistyAgentPicker: () => <button>Editor</button> }));
+vi.mock("./MistyModelPicker", () => ({ MistyModelPicker: () => <button>Model</button> }));
 afterEach(cleanup);
 it("keeps attachment/options icon-only and separates microphone recording from input selection", async () => {
   const voice = {
@@ -18,7 +18,6 @@ it("keeps attachment/options icon-only and separates microphone recording from i
   };
   const props = {
     accountId: "account",
-    headerControls: <button>History</button>,
     query: "",
     onQuery: vi.fn(),
     mode: "ask",
@@ -39,11 +38,10 @@ it("keeps attachment/options icon-only and separates microphone recording from i
     onClose: vi.fn(),
     onModelChange: vi.fn(),
     reasoningEffort: "high",
-    onToggleSettings: vi.fn(),
   } as unknown as ComponentProps<typeof GlobalMistyComposerBar>;
   render(<GlobalMistyComposerBar {...props} />);
   expect(screen.getByRole("button", { name: "Add attachments" }).textContent).toBe("");
-  expect(screen.getByRole("button", { name: "Thinking options" }).textContent).toBe("");
+  expect(screen.getByRole("button", { name: "Close Misty" }).textContent).toBe("");
   fireEvent.pointerDown(screen.getByRole("button", { name: /Choose microphone/ }), {
     button: 0,
     pointerType: "mouse",

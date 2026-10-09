@@ -1,5 +1,5 @@
 import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import { Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
@@ -40,7 +40,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
         ) : null}
       </div>
       {props.error ? (
-        <SystemErrorActivity
+        <SystemErrorNotice
           error={props.error}
           scope="library:versions"
           title="Library version could not be updated"

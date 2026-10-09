@@ -14,6 +14,7 @@ DELETE /api/me/space-templates/{templateID}
 DELETE /api/misty/agent-execution/{taskID}
 DELETE /api/misty/agents/{agentID}
 DELETE /api/misty/attachments/{attachmentID}
+DELETE /api/misty/conversation-folders/{folderID}
 DELETE /api/misty/conversations/{conversationID}
 DELETE /api/spaces/{spaceID}
 DELETE /api/spaces/{spaceID}/agent-listings/{agentID}
@@ -52,6 +53,7 @@ DELETE /me/space-templates/{templateID}
 DELETE /misty/agent-execution/{taskID}
 DELETE /misty/agents/{agentID}
 DELETE /misty/attachments/{attachmentID}
+DELETE /misty/conversation-folders/{folderID}
 DELETE /misty/conversations/{conversationID}
 DELETE /spaces/{spaceID}
 DELETE /spaces/{spaceID}/agent-listings/{agentID}
@@ -95,6 +97,7 @@ DELETE /v1/me/space-templates/{templateID}
 DELETE /v1/misty/agent-execution/{taskID}
 DELETE /v1/misty/agents/{agentID}
 DELETE /v1/misty/attachments/{attachmentID}
+DELETE /v1/misty/conversation-folders/{folderID}
 DELETE /v1/misty/conversations/{conversationID}
 DELETE /v1/spaces/{spaceID}
 DELETE /v1/spaces/{spaceID}/agent-listings/{agentID}
@@ -195,6 +198,7 @@ GET /api/me/settings
 GET /api/me/space-templates
 GET /api/misty/agents
 GET /api/misty/attachments/{attachmentID}/content
+GET /api/misty/conversation-folders
 GET /api/misty/conversations
 GET /api/misty/events
 GET /api/oauth/connections/{provider}/callback
@@ -291,6 +295,7 @@ GET /me/settings
 GET /me/space-templates
 GET /misty/agents
 GET /misty/attachments/{attachmentID}/content
+GET /misty/conversation-folders
 GET /misty/conversations
 GET /misty/events
 GET /oauth/connections/{provider}/callback
@@ -407,6 +412,7 @@ GET /v1/me/settings
 GET /v1/me/space-templates
 GET /v1/misty/agents
 GET /v1/misty/attachments/{attachmentID}/content
+GET /v1/misty/conversation-folders
 GET /v1/misty/conversations
 GET /v1/misty/events
 GET /v1/oauth/connections/{provider}/callback
@@ -476,6 +482,7 @@ GET /v1/sync/devices
 GET /v1/sync/vault
 GET /v1/sync/ws
 PATCH /api/me/agent-goals/{goalID}
+PATCH /api/misty/conversation-folders/{folderID}
 PATCH /api/misty/conversations/{conversationID}
 PATCH /api/settings/preferences
 PATCH /api/spaces/{spaceID}
@@ -501,6 +508,7 @@ PATCH /api/spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 PATCH /api/spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 PATCH /api/spaces/{spaceID}/tasks/{taskID}
 PATCH /me/agent-goals/{goalID}
+PATCH /misty/conversation-folders/{folderID}
 PATCH /misty/conversations/{conversationID}
 PATCH /settings/preferences
 PATCH /spaces/{spaceID}
@@ -526,6 +534,7 @@ PATCH /spaces/{spaceID}/roadmaps/{roadmapID}/milestones/{milestoneID}
 PATCH /spaces/{spaceID}/roadmaps/{roadmapID}/nodes/{nodeID}
 PATCH /spaces/{spaceID}/tasks/{taskID}
 PATCH /v1/me/agent-goals/{goalID}
+PATCH /v1/misty/conversation-folders/{folderID}
 PATCH /v1/misty/conversations/{conversationID}
 PATCH /v1/settings/preferences
 PATCH /v1/spaces/{spaceID}
@@ -637,6 +646,7 @@ POST /api/me/agent-plans/{planID}/{action}
 POST /api/me/agent-questions/{questionID}/answer
 POST /api/me/app-requests/{requestID}
 POST /api/me/app-requests/{requestID}/link
+POST /api/me/companion/refine-point/{invocationID}
 POST /api/me/conversations/{conversationID}/goal
 POST /api/me/deletion
 POST /api/me/export
@@ -648,6 +658,7 @@ POST /api/misty/agent-followup
 POST /api/misty/agents
 POST /api/misty/attachments
 POST /api/misty/attachments/{attachmentID}/finalize
+POST /api/misty/conversation-folders
 POST /api/misty/conversations
 POST /api/provider-callbacks/google/calendar
 POST /api/realtime/tickets
@@ -754,6 +765,7 @@ POST /me/agent-plans/{planID}/{action}
 POST /me/agent-questions/{questionID}/answer
 POST /me/app-requests/{requestID}
 POST /me/app-requests/{requestID}/link
+POST /me/companion/refine-point/{invocationID}
 POST /me/conversations/{conversationID}/goal
 POST /me/deletion
 POST /me/export
@@ -765,6 +777,7 @@ POST /misty/agent-followup
 POST /misty/agents
 POST /misty/attachments
 POST /misty/attachments/{attachmentID}/finalize
+POST /misty/conversation-folders
 POST /misty/conversations
 POST /provider-callbacks/google/calendar
 POST /realtime/tickets
@@ -889,6 +902,7 @@ POST /v1/me/agent-plans/{planID}/{action}
 POST /v1/me/agent-questions/{questionID}/answer
 POST /v1/me/app-requests/{requestID}
 POST /v1/me/app-requests/{requestID}/link
+POST /v1/me/companion/refine-point/{invocationID}
 POST /v1/me/conversations/{conversationID}/goal
 POST /v1/me/deletion
 POST /v1/me/export
@@ -900,6 +914,7 @@ POST /v1/misty/agent-followup
 POST /v1/misty/agents
 POST /v1/misty/attachments
 POST /v1/misty/attachments/{attachmentID}/finalize
+POST /v1/misty/conversation-folders
 POST /v1/misty/conversations
 POST /v1/provider-callbacks/google/calendar
 POST /v1/realtime/tickets

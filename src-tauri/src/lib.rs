@@ -23,8 +23,9 @@ use app::commands::{
     clipboard_publish_shared, clipboard_set_local, clipboard_shared_image_bytes,
     clipboard_snapshot, clipboard_write_file_bytes, clipboard_write_file_refs, devices_snapshot,
     explorer_list_directory, explorer_prepare_open_item, navigation_names_snapshot,
-    navigation_names_update, settings_apply_launch_on_login, settings_launch_on_login_snapshot,
-    settings_profile_commit, settings_profile_state, settings_save, settings_snapshot,
+    navigation_names_update, settings_apply_launch_on_login, settings_default_browser_snapshot,
+    settings_launch_on_login_snapshot, settings_profile_commit, settings_profile_state,
+    settings_request_default_browser, settings_save, settings_snapshot,
 };
 
 #[cfg(desktop)]
@@ -63,6 +64,20 @@ use infra::browser::{
     browser_webview_developer_tools, browser_webview_find, browser_webview_print,
     browser_webview_save_page, browser_webview_set_muted, browser_webview_stop,
 };
+#[cfg(desktop)]
+use infra::browser::page_tools::media_tools::{
+    browser_webview_media_playback, browser_webview_picture_in_picture,
+    browser_webview_reader_article,
+};
+#[cfg(desktop)]
+use infra::browser::profile_cleanup::browser_device_profile_delete;
+#[cfg(desktop)]
+use infra::browser::host_messages::passwords::{
+    browser_password_offer_respond, browser_passwords_delete, browser_passwords_list,
+    browser_passwords_reveal, browser_passwords_save,
+};
+#[cfg(desktop)]
+use infra::browser_site_style::browser_set_mouse_gestures;
 #[cfg(desktop)]
 use infra::browser_agent_control::{
     browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew,
@@ -326,13 +341,14 @@ pub fn run() {
                     crate::infra::misty_context::misty_screen_status,
                     crate::infra::misty_context::misty_screen_capture,
                     crate::infra::workspace_autopilot::agent_workspace_context,
+                    crate::infra::workspace_autopilot::agent_desktop_recent_audio,
+                    crate::infra::workspace_autopilot::agent_control_yield,
                     #[cfg(desktop)]
                     platform::mini_app::builtin_service_open,
                     #[cfg(desktop)]
                     platform::mini_app::mini_app_close,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
-                    mac_rounded_corners::set_native_wallpaper_video,
                     app_snapshot,
                     agents_device_snapshot,
                     #[cfg(unix)]
@@ -347,6 +363,7 @@ pub fn run() {
                     infra::agent_files::agent_files_manifest,
                     #[cfg(unix)]
                     infra::agent_files::agent_files_history,
+                    #[cfg(unix)]
                     infra::agent_files::agent_files_snapshot,
                     #[cfg(unix)]
                     infra::agent_files::agent_files_undo,
@@ -430,6 +447,12 @@ pub fn run() {
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_snapshot,
                     #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_snap,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_capture_region,
+                    #[cfg(any(target_os = "macos", windows))]
+                    infra::cursor_companion::cursor_companion_watch_clicks,
+                    #[cfg(any(target_os = "macos", windows))]
                     infra::agent_workspace::agent_window_take_task,
                     infra::agent_workspace::agent_window_ack_task,
                     infra::agent_workspace::agent_window_task_receipt,
@@ -444,6 +467,8 @@ pub fn run() {
                     infra::agent_workspace::agent_browser_session_id,
                     #[cfg(desktop)]
                     crate::infra::browser::browser_context_menu_select,
+                    #[cfg(desktop)]
+                    crate::infra::browser::browser_webview_context_menu_at,
                     #[cfg(desktop)]
                     browser_shortcuts_update,
                     #[cfg(desktop)]
@@ -473,6 +498,14 @@ pub fn run() {
                     infra::browser_site_permissions::browser_site_permissions_list,
                     #[cfg(desktop)]
                     infra::browser_site_permissions::browser_site_permissions_reset,
+                    #[cfg(desktop)]
+                    infra::browser_site_zoom::browser_set_site_zoom_levels,
+                    #[cfg(desktop)]
+                    infra::browser_content_blocking::browser_set_content_blocking,
+                    #[cfg(desktop)]
+                    infra::browser_site_style::browser_set_site_styles,
+                    #[cfg(desktop)]
+                    infra::browser_site_style::browser_webview_pick_element,
                     browser_webview_set_zoom,
                     #[cfg(desktop)]
                     browser_webview_show,
@@ -500,6 +533,26 @@ pub fn run() {
                     browser_set_download_prompt,
                     #[cfg(desktop)]
                     browser_webview_set_muted,
+                    #[cfg(desktop)]
+                    browser_webview_picture_in_picture,
+                    #[cfg(desktop)]
+                    browser_webview_media_playback,
+                    #[cfg(desktop)]
+                    browser_webview_reader_article,
+                    #[cfg(desktop)]
+                    browser_device_profile_delete,
+                    #[cfg(desktop)]
+                    browser_set_mouse_gestures,
+                    #[cfg(desktop)]
+                    browser_password_offer_respond,
+                    #[cfg(desktop)]
+                    browser_passwords_list,
+                    #[cfg(desktop)]
+                    browser_passwords_reveal,
+                    #[cfg(desktop)]
+                    browser_passwords_delete,
+                    #[cfg(desktop)]
+                    browser_passwords_save,
                     #[cfg(desktop)]
                     browser_history_clear,
                     #[cfg(desktop)]
@@ -594,6 +647,8 @@ pub fn run() {
                     settings_save,
                     settings_launch_on_login_snapshot,
                     settings_apply_launch_on_login,
+                    settings_default_browser_snapshot,
+                    settings_request_default_browser,
                     shortcuts_snapshot,
                     crate::infra::kura::kura_installed,
                     crate::app::clipboard_commands::clipboard_cloud_view,

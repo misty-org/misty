@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dockingGeometry } from "./dockingGeometry";
+import { dockingGeometry, dockingMetrics } from "./dockingGeometry";
+import { navigatorRailWidth } from "./navigatorMode";
 import { dockPositions } from "@/features/app-shell/dockingLayout";
 
 const layouts = dockPositions.flatMap((navigation) =>
@@ -10,7 +11,11 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
     const geometry = dockingGeometry({ ...layout, autoHide });
     expect(geometry.content.gridColumn).toBe(2);
     expect(geometry.content.gridRow).toBe(layout.navigation === "top" && !autoHide ? 3 : "1 / 4");
-    const size = autoHide ? 0 : ["left", "right"].includes(layout.navigation) ? 54 : 38;
+    const size = autoHide
+      ? 0
+      : ["left", "right"].includes(layout.navigation)
+        ? navigatorRailWidth
+        : dockingMetrics.horizontalRail;
     expect(geometry.frame.gridTemplateColumns).toBe(
       `${layout.navigation === "left" ? size : 0}px minmax(0, 1fr) ${layout.navigation === "right" ? size : 0}px`,
     );
@@ -26,7 +31,8 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
     if (layout.tabs === "top") {
       // Tabs never occupy native traffic lights, even with hidden navigation.
       expect(
-        geometry.titlebarInsets!.left + (!autoHide && layout.navigation === "left" ? 54 : 0),
+        geometry.titlebarInsets!.left +
+          (!autoHide && layout.navigation === "left" ? navigatorRailWidth : 0),
       ).toBe(layout.navigation === "top" && !autoHide ? 8 : 92);
     } else expect(geometry.titlebarInsets).toBeUndefined();
   });
@@ -50,7 +56,7 @@ it("subtracts occupied rails from native controls on both sides at zoom", () => 
       chromeLeft: 8 / 1.5,
       chromeRight: 140 / 1.5,
     }).titlebarInsets,
-  ).toEqual({ animate: true, left: 8 + 8 / 1.5, right: 140 / 1.5 - 54 });
+  ).toEqual({ animate: true, left: 8 + 8 / 1.5, right: 140 / 1.5 - navigatorRailWidth });
   expect(
     dockingGeometry({ navigation: "right", tabs: "top", autoHide: true, chromeRight: 140 })
       .titlebarInsets?.right,

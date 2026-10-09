@@ -6,6 +6,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable } from "@/shared/ui";
 import { dockingGeometry, type DockingGeometry } from "./dockingGeometry";
+import { navigatorScale } from "./navigatorMode";
 import { navigatorMotionClass } from "./styles";
 
 /** One fixed-width rail; auto-hide reveals it above the workspace without reflow. */
@@ -146,7 +147,11 @@ export function NavigatorRail(props: {
           }
         }}
       >
-        {props.children}
+        {/* Zoom the contents so every tile, icon and gap grows together; the
+            rail's own track is already sized for the scaled contents. */}
+        <div className="h-full w-full" style={{ zoom: navigatorScale }}>
+          {props.children}
+        </div>
       </div>
       {props.autoHide && (
         <Pressable

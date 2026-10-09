@@ -44,6 +44,8 @@ export interface TabFields {
   title: string;
   order: number;
   tree: SplitTree;
+  /** A pinned tab's page; null clears it (native sync removes the field). */
+  pinned_url?: string | null;
 }
 export interface ViewFields {
   /** "home" is the retired Home page, still sent by older clients. */

@@ -10,8 +10,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     path.startsWith("/settings") ||
     path.startsWith("/account") ||
     path === "/signin" ||
-    path === "/register" ||
-    path === "/activity"
+    path === "/register"
   )
     return null;
   const url = new URL(pathname, "https://misty.local");

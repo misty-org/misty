@@ -15,7 +15,8 @@ export interface HistoryStep {
 }
 
 export interface BrowserCompatibilityIssue {
-  kind: "cloudflare_challenge";
+  /** A verification page that rejects embedded browsers, or protected video this engine can't play. */
+  kind: "cloudflare_challenge" | "protected_media";
   url: string;
 }
 

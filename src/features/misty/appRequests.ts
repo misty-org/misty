@@ -1,4 +1,5 @@
 import type { AppRequest } from "@/features/agents";
+import { continuationScreen } from "@/features/agents/executionHandoff";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
 import {
   patchConversationMessage,
@@ -43,7 +44,8 @@ export async function continueAfterAppRequest(
       get().panel === "closed" ? "workspace" : "panel",
       [],
       { conversationId, context: [] },
-      { executionMode: "user", continuation: true },
+      // On the screen the run that showed the card held, when it had one.
+      { executionMode: "user", ...continuationScreen(conversationId), continuation: true },
     );
   } catch (error) {
     continued.delete(request.id);

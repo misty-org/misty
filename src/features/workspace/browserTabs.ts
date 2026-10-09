@@ -10,6 +10,7 @@ export interface OpenBrowserTab {
   profileId?: string;
   private: boolean;
   agentOwned: boolean;
+  faviconUrl?: string | null;
 }
 
 /** Browser tabs in every window: the same ones `focusView` can switch to. */
@@ -26,6 +27,7 @@ export function openBrowserTabs(): OpenBrowserTab[] {
         profileId: state.profileId,
         private: Boolean(state.private),
         agentOwned: Boolean(state.agentOwned),
+        faviconUrl: state.faviconUrl,
       };
     });
 }

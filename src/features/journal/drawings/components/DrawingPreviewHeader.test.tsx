@@ -2,10 +2,10 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpaceDrawing } from "../types";
-import { reportSystemError } from "@/features/activity";
+import { reportSystemError } from "@/features/support/systemErrors";
 import { DrawingPreviewHeader } from "./DrawingPreviewHeader";
 
-vi.mock("@/features/activity", () => ({
+vi.mock("@/features/support/systemErrors", () => ({
   reportSystemError: vi.fn(),
 }));
 

@@ -1,6 +1,4 @@
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
-  appZoomDefault,
   appZoomRenderScale,
   appZoomMax,
   appZoomMin,
@@ -15,7 +13,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import {
   booleanSetting,
-  FilePathControl,
+  ChoiceControl,
   numberSetting,
   SliderControl,
   SelectControl,
@@ -23,51 +21,62 @@ import {
   SwitchControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { Button } from "@/shared/ui";
-
-const wallpaperFilters = [{ name: "Video", extensions: ["mp4", "mov", "m4v"] }];
+import { AccentColorControl } from "./AccentColorControl";
+import { Input } from "@/shared/ui";
+import { validThemeTime } from "../store/appTheme";
 
 export function AppearanceSection(props: SettingsContentProps) {
-  const wallpaperPath = stringSetting(props.document, "appearance", "wallpaper_path", "");
   const appZoom = useAppZoomValue();
   const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
   const displayedAppZoom = appZoomDraft ?? appZoom;
 
   return (
     <>
-      <SettingsSectionBlock title="Wallpaper">
+      <SettingsSectionBlock title="Theme">
         <SettingsRow
-          label="Wallpaper video"
-          description={
-            hasTauriInternals()
-              ? "Plays behind Misty. Leave unset for a solid background."
-              : "Wallpaper files are available in the native app."
-          }
+          label="Theme"
+          description="System follows your computer's light or dark appearance. Scheduled switches at the times you choose."
         >
-          <FilePathControl
-            value={wallpaperPath}
-            title="Choose wallpaper video"
-            filters={wallpaperFilters}
-            emptyLabel="None"
-            disabled={props.working || !hasTauriInternals()}
-            onChange={(value) => props.onSettingChange("appearance", "wallpaper_path", value)}
+          <ChoiceControl
+            value={stringSetting(props.document, "appearance", "theme_mode", "dark")}
+            disabled={props.working}
+            options={[
+              { value: "system", label: "System" },
+              { value: "dark", label: "Dark" },
+              { value: "light", label: "Light" },
+              { value: "scheduled", label: "Scheduled" },
+            ]}
+            onValueChange={(value) => props.onSettingChange("appearance", "theme_mode", value)}
           />
         </SettingsRow>
+        {stringSetting(props.document, "appearance", "theme_mode", "dark") === "scheduled" ? (
+          <>
+            <SettingsRow label="Light from" indent>
+              <ThemeTimeControl
+                value={stringSetting(props.document, "appearance", "theme_light_start", "07:00")}
+                disabled={props.working}
+                onChange={(value) =>
+                  props.onSettingChange("appearance", "theme_light_start", value)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow label="Dark from" indent>
+              <ThemeTimeControl
+                value={stringSetting(props.document, "appearance", "theme_dark_start", "19:00")}
+                disabled={props.working}
+                onChange={(value) => props.onSettingChange("appearance", "theme_dark_start", value)}
+              />
+            </SettingsRow>
+          </>
+        ) : null}
         <SettingsRow
-          label="Panel opacity"
-          description="How much of the wallpaper shows through Misty's surfaces."
-          muted={!wallpaperPath}
-          indent
-          last
+          label="Accent color"
+          description="Marks the active tab, switches that are on and selected text. Everything else stays black and white."
         >
-          <SliderControl
-            value={numberSetting(props.document, "appearance", "panel_opacity", 0.82)}
-            min={0.4}
-            max={1}
-            step={0.02}
-            disabled={props.working || !wallpaperPath}
-            format={(value) => `${Math.round(value * 100)}%`}
-            onCommit={(value) => props.onSettingChange("appearance", "panel_opacity", value)}
+          <AccentColorControl
+            value={stringSetting(props.document, "appearance", "accent_color", "")}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "accent_color", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -77,35 +86,20 @@ export function AppearanceSection(props: SettingsContentProps) {
           label="App zoom"
           description="Scales the whole interface. Use Cmd/Ctrl +, Cmd/Ctrl −, or Cmd/Ctrl 0."
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <SliderControl
-              value={displayedAppZoom}
-              min={appZoomMin}
-              max={appZoomMax}
-              step={appZoomStep}
-              disabled={props.working}
-              format={(value) => `${Math.round(value * 100)}%`}
-              onChange={setAppZoomDraft}
-              onCommit={(value) => {
-                setAppZoom(value);
-                setAppZoomDraft(null);
-                props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
-              }}
-            />
-            <Button
-              variant="link"
-              className={`h-auto p-0 text-xs text-cream-muted hover:text-cream ${displayedAppZoom === appZoomDefault ? "invisible pointer-events-none" : ""}`}
-              disabled={props.working || displayedAppZoom === appZoomDefault}
-              aria-hidden={displayedAppZoom === appZoomDefault}
-              onClick={() => {
-                setAppZoom(appZoomDefault);
-                setAppZoomDraft(null);
-                props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(appZoomDefault));
-              }}
-            >
-              Reset
-            </Button>
-          </div>
+          <SliderControl
+            value={displayedAppZoom}
+            min={appZoomMin}
+            max={appZoomMax}
+            step={appZoomStep}
+            disabled={props.working}
+            format={(value) => `${Math.round(value * 100)}%`}
+            onChange={setAppZoomDraft}
+            onCommit={(value) => {
+              setAppZoom(value);
+              setAppZoomDraft(null);
+              props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
+            }}
+          />
         </SettingsRow>
         <SettingsRow
           label="Compact mode"
@@ -144,7 +138,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Active-pane indicator" last>
+        <SettingsRow label="Active-pane indicator">
           <SelectControl
             value={Math.max(
               0,
@@ -164,27 +158,25 @@ export function AppearanceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Media">
-        <SettingsRow
-          label="Thumbnail previews"
-          description="Show preview-rich file rows where supported."
-          last
-        >
-          <SwitchControl
-            checked={booleanSetting(
-              props.document,
-              "appearance",
-              "thumbnail_previews_enabled",
-              true,
-            )}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("appearance", "thumbnail_previews_enabled", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
     </>
+  );
+}
+
+/** A local time for the scheduled theme; only complete times are saved. */
+function ThemeTimeControl(props: {
+  value: string;
+  disabled: boolean;
+  onChange(value: string): void;
+}) {
+  return (
+    <Input
+      type="time"
+      className="w-32"
+      value={props.value}
+      disabled={props.disabled}
+      onChange={(event) => {
+        if (validThemeTime(event.target.value)) props.onChange(event.target.value);
+      }}
+    />
   );
 }

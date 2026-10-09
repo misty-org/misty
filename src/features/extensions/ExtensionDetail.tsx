@@ -4,7 +4,7 @@ import { SwitchControl } from "@/features/settings/SettingsControls";
 import { ExtensionIcon, plainDescription } from "./ExtensionIcon";
 import { ExtensionLoading } from "./ExtensionLoading";
 import { extensionsNative } from "./native";
-import { pinIds, togglePin, updateInstallation } from "./store";
+import { updateInstallation } from "./store";
 import type { CatalogEntry, Installation, InstalledState } from "./types";
 
 type Work = (action: () => Promise<unknown>) => Promise<void>;
@@ -146,13 +146,6 @@ function ExtensionControls({
           onChange={(value) =>
             void work(() => updateInstallation(selected.id, { agentAccess: value }))
           }
-        />
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Pin to toolbar">
-        <SwitchControl
-          checked={pinIds().includes(selected.id)}
-          disabled={busy}
-          onChange={() => void work(() => togglePin(selected.id))}
         />
       </DesktopSettingsRow>
       {local?.review?.hasOptions && (

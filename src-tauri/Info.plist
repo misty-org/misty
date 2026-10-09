@@ -6,5 +6,29 @@
   <string>Misty uses your microphone when you choose voice input or hold the Agents companion shortcut. Recording stops when you release the shortcut.</string>
   <key>NSCameraUsageDescription</key>
   <string>Misty uses your camera only after you approve a camera action, and stops capture when that action finishes.</string>
+  <!-- Declares the misty: deep link (also configured for the deep-link plugin) and web links,
+       so macOS can offer Misty as the default browser. Choosing it stays the user's decision. -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>Misty</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>misty</string>
+      </array>
+    </dict>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>Web site URL</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>http</string>
+        <string>https</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>

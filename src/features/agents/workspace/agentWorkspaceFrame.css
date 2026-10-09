@@ -23,7 +23,7 @@
   min-height: 36px;
   margin-bottom: 4px;
 }
-/* Spacing follows the Spaces sidebar: 32px rows 4px apart, 13px labels, compact section labels. */
+/* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
 /* The switcher hugs its name instead of spanning the sidebar. */
 .agent-studio-identity {
   flex: 0 1 auto;
@@ -32,11 +32,12 @@
   min-height: 36px;
   justify-content: flex-start;
   padding: 4px 8px 4px 4px;
+  font-size: 15px;
   font-weight: 600;
 }
 .agent-studio-sidebar .agent-avatar {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
 }
 .agent-studio-sidebar nav {
@@ -46,12 +47,16 @@
 .agent-studio-sidebar nav > button,
 .agent-studio-recent-row > button:first-child {
   width: 100%;
-  height: 32px;
-  min-height: 32px;
-  gap: 8px;
-  padding: 0 8px;
-  font-size: 13px;
+  height: var(--misty-sidebar-row-height);
+  min-height: var(--misty-sidebar-row-height);
+  gap: 10px;
+  padding: 0 var(--misty-sidebar-row-padding);
+  font-size: var(--misty-sidebar-label-size);
   font-weight: 400;
+}
+.agent-studio-recent-row > button:first-child {
+  height: var(--misty-sidebar-item-height);
+  min-height: var(--misty-sidebar-item-height);
 }
 .agent-studio-sidebar button[aria-current="page"] {
   background: var(--color-charcoal-active);
@@ -59,6 +64,8 @@
 }
 .agent-studio-sidebar button > svg {
   flex-shrink: 0;
+  width: var(--misty-sidebar-icon-size);
+  height: var(--misty-sidebar-icon-size);
 }
 .agent-studio-sidebar button > span {
   min-width: 0;
@@ -91,19 +98,95 @@
 .agent-studio-recent-row > button:first-child {
   color: var(--color-cream-muted);
 }
-/* The title takes the row's width so a status icon sits at its end. */
-.agent-studio-recent-row > button:first-child > span:first-child {
+/* Recents heading carries the New folder action at its end. */
+.agent-studio-recents-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.agent-studio-recents-heading > button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  margin-right: 4px;
+  color: var(--color-cream-muted);
+}
+/* A folder header reads as a label above its chats: brighter title, folder glyph in the
+   icon column, count and chevron at the end. */
+.agent-studio-folder-row > button:first-child {
+  color: var(--color-cream);
+}
+.agent-studio-folder-row .agent-studio-recent-status > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-folder-count {
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-sidebar .agent-studio-folder-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--color-cream-muted);
+  transition: transform 150ms ease;
+}
+.agent-studio-folder-row > [aria-expanded="true"] > .agent-studio-folder-chevron {
+  transform: rotate(90deg);
+}
+.agent-studio-recent-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
 }
-/* Status is an icon with a text label (tooltip and screen readers), never a color. */
+/* The status dot sits in the nav icon column, centered under those icons. Colors come
+   from the --misty-status-* tokens (App.css); the tooltip always names the state. */
 .agent-studio-recent-status {
-  display: inline-flex;
+  display: inline-grid;
+  place-items: center;
   flex-shrink: 0;
-  color: var(--color-cream-muted);
+  width: var(--misty-sidebar-icon-size);
+  height: var(--misty-sidebar-icon-size);
+}
+.agent-studio-recent-dot {
+  width: var(--misty-sidebar-badge-size);
+  height: var(--misty-sidebar-badge-size);
+  border-radius: 50%;
+  background: var(--misty-status-idle);
+}
+[data-status="working"] > .agent-studio-recent-dot {
+  background: var(--color-cream-bright);
+  animation: agent-studio-dot-pulse 1.4s ease-in-out infinite;
+}
+[data-status="waiting"] > .agent-studio-recent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--misty-status-idle);
+}
+[data-status="needs-you"] > .agent-studio-recent-dot {
+  background: var(--misty-status-attention);
+}
+[data-status="partial"] > .agent-studio-recent-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--misty-status-attention);
+}
+[data-status="failed"] > .agent-studio-recent-dot {
+  background: var(--misty-status-failed);
+}
+[data-status="canceled"] > .agent-studio-recent-dot {
+  opacity: 0.45;
+}
+@keyframes agent-studio-dot-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-status="working"] > .agent-studio-recent-dot {
+    animation: none;
+  }
 }
 .agent-studio-canvas {
   position: relative;
@@ -176,8 +259,9 @@
     gap: 4px;
   }
   .agent-studio-identity > :not(.agent-avatar),
-  .agent-studio-sidebar button > span,
-  .agent-studio-recents h2 {
+  .agent-studio-sidebar button > span:not(.agent-studio-recent-status),
+  .agent-studio-sidebar .agent-studio-folder-chevron,
+  .agent-studio-recents-heading {
     display: none;
   }
   .agent-studio-sidebar nav > button,

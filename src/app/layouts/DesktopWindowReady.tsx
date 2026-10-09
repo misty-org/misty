@@ -1,4 +1,4 @@
-import { extensionThemeChangedEvent, extensionThemeSnapshot } from "@/features/settings";
+import { appThemeChangedEvent, appThemeSnapshot } from "@/features/settings";
 import { revealMainWindow } from "@/native";
 import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -16,11 +16,11 @@ export function DesktopWindowReady() {
     if (!hasTauriInternals() || platform() !== "macos") return;
     let disposed = false;
     // Color the NSWindow behind the renderer without making the renderer
-    // opaque: embedded Browser views and native wallpaper need transparency.
+    // opaque: embedded Browser views need transparency.
     let lastBackground = "";
     let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
     const syncBackground = async () => {
-      const color = windowSurfaceBackground(extensionThemeSnapshot().tokens.background);
+      const color = windowSurfaceBackground(appThemeSnapshot().tokens.background);
       if (disposed || color === lastBackground) return;
       await getCurrentWindow().setBackgroundColor(color);
       lastBackground = color;
@@ -40,7 +40,7 @@ export function DesktopWindowReady() {
       attributes: true,
       attributeFilter: ["class", "style", "hidden", "data-state", "data-misty-browser-background"],
     });
-    window.addEventListener(extensionThemeChangedEvent, scheduleBackground);
+    window.addEventListener(appThemeChangedEvent, scheduleBackground);
     window.addEventListener("resize", scheduleBackground);
     const prepare = async () => {
       await syncBackground();
@@ -64,7 +64,7 @@ export function DesktopWindowReady() {
       disposed = true;
       clearTimeout(backgroundTimer);
       backgroundObserver.disconnect();
-      window.removeEventListener(extensionThemeChangedEvent, scheduleBackground);
+      window.removeEventListener(appThemeChangedEvent, scheduleBackground);
       window.removeEventListener("resize", scheduleBackground);
     };
   }, []);

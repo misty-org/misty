@@ -2,6 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsControlsModule from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
+import { SettingsPageScope } from "../profiles/SettingScope";
+import { useSettingsProfiles } from "../profiles/store";
 import { AppearanceSection } from "./AppearanceSection";
 
 const zoomMocks = vi.hoisted(() => ({
@@ -10,7 +12,6 @@ const zoomMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/shared/hooks/useAppZoom", () => ({
-  appZoomDefault: 1,
   appZoomRenderScale: (zoom: number) => Math.round(zoom * 110) / 100,
   appZoomMin: 0.8,
   appZoomMax: 2,
@@ -30,7 +31,7 @@ vi.mock("../SettingsControls", async () => {
       onChange?: (value: number) => void;
       onCommit: (value: number) => void;
     }) => {
-      if (props.min !== 0.8) return <span>Panel opacity</span>;
+      if (props.min !== 0.8) return null;
       return (
         <div>
           <output>{props.format?.(props.value) ?? props.value}</output>
@@ -82,13 +83,30 @@ describe("AppearanceSection app zoom", () => {
     expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.21);
   });
 
-  it("resets a non-default zoom to 100%", () => {
-    zoomMocks.current = 2;
-    render(<AppearanceSection {...props} />);
+  it("offers Reset only while zoom differs from its default, and resets the account value", () => {
+    const edit = vi.fn(async () => {});
+    useSettingsProfiles.setState({
+      ready: true,
+      syncing: false,
+      edit,
+      state: { version: 2, profile: null, seed: { "app.zoom": 2 }, outbox: [] },
+    });
+    const view = render(
+      <SettingsPageScope.Provider value={{ page: "appearance", owner: "account" }}>
+        <AppearanceSection {...props} />
+      </SettingsPageScope.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Reset App zoom to default" }));
+    expect(edit).toHaveBeenCalledWith("app.zoom", undefined);
+    // Theme is still at its default, so it offers no Reset.
+    expect(screen.queryByRole("button", { name: "Reset Theme to default" })).toBeNull();
+    view.unmount();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    expect(zoomMocks.setAppZoom).toHaveBeenCalledWith(1);
-    expect(onSettingChange).toHaveBeenCalledWith("appearance", "app_zoom", 1.1);
+  it("switches the theme through account settings", () => {
+    render(<AppearanceSection {...props} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    expect(onSettingChange).toHaveBeenCalledWith("appearance", "theme_mode", "light");
   });
 
   it("leaves navigation visibility in Layout settings", () => {

@@ -21,50 +21,13 @@ const (
 	maxAIInvocationPrompt = 32 << 10
 )
 
-type aiSelectionSnapshot struct {
-	Kind        string         `json:"kind"`
-	Content     string         `json:"content,omitempty"`
-	Object      map[string]any `json:"object"`
-	Anchors     map[string]any `json:"anchors,omitempty"`
-	ContentHash string         `json:"contentHash"`
-}
-
-type aiCaptureAttachment struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	MimeType    string `json:"mime_type"`
-	DataURL     string `json:"data_url"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	ContentHash string `json:"content_hash"`
-}
-
-type aiDisplayCapture struct {
-	aiCaptureAttachment
-	CapturedAt int64  `json:"captured_at,omitempty"`
-	DisplayID  uint32 `json:"display_id,omitempty"`
-	Source     string `json:"source,omitempty"`
-	Screen     string `json:"screen"`
-	Primary    bool   `json:"primary"`
-}
-
-type aiInvocationDeviceContext struct {
-	DeviceID     string          `json:"device_id"`
-	Kind         string          `json:"kind"`
-	OpaqueRef    string          `json:"opaque_ref"`
-	DisplayName  string          `json:"display_name,omitempty"`
-	Capabilities json.RawMessage `json:"capabilities"`
-	Metadata     json.RawMessage `json:"metadata,omitempty"`
-	// RunGrant is signed by the device that asked for this context.
-	RunGrant *signedDeviceRecord `json:"run_grant,omitempty"`
-}
-
 type aiInvocationInput struct {
 	MethodVersionID       string                      `json:"method_version_id,omitempty"`
 	MethodInputs          map[string]any              `json:"method_inputs,omitempty"`
 	SkillVersionIDs       []string                    `json:"skill_version_ids,omitempty"`
 	CompanionMode         string                      `json:"companion_mode,omitempty"`
 	CompanionModel        string                      `json:"companion_model,omitempty"`
+	CompanionIntent       string                      `json:"companion_intent,omitempty"` // "teach": explain and point at the screens, no tools
 	// ModelOverride pins a new conversation's Thinking model with its first
 	// message; an existing conversation sets it with PATCH instead.
 	ModelOverride string `json:"model_override,omitempty"`
@@ -90,6 +53,14 @@ type aiInvocationInput struct {
 	ConversationID        string                      `json:"conversation_id,omitempty"`
 	IdempotencyKey        string                      `json:"idempotency_key"`
 	Timezone              string                      `json:"timezone,omitempty"`
+	// CurrentTab is the Misty browser tab in front of the user when they wrote,
+	// so "this page" has a referent. Its title and address are untrusted page data.
+	CurrentTab *aiCurrentTab `json:"current_tab,omitempty"`
+}
+
+type aiCurrentTab struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
 }
 
 type aiInvocationEvent struct {
@@ -334,6 +305,7 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
 			return
 		}
+		reasoning = companionAdmissionReasoning(body, reasoning)
 		available, err := s.database.AIActionAvailable(r.Context(), userID, body.SurfaceID, actionID, modelID)
 		if err != nil {
 			TestingWriteAIError(w, err)

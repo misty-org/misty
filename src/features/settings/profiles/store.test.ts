@@ -6,13 +6,16 @@ const mocks = vi.hoisted(() => ({
   failWrite: false,
   generation: 0,
   apply: vi.fn(async (_values: unknown, _valid?: () => boolean) => {}),
+  preview: vi.fn((_values: unknown) => {}),
   ensure: vi.fn(),
   read: vi.fn(),
   patch: vi.fn(),
 }));
 vi.mock("@/api/client/session", () => ({ readApiSessionGeneration: () => mocks.generation }));
 vi.mock("../store/useSettingsStore", () => ({
-  useSettingsStore: { getState: () => ({ applyProfileValues: mocks.apply }) },
+  useSettingsStore: {
+    getState: () => ({ applyProfileValues: mocks.apply, previewProfileValues: mocks.preview }),
+  },
 }));
 vi.mock("./persistence", () => ({
   readState: async (scope: string) => ({ state: structuredClone(mocks.disk.get(scope) ?? null) }),
@@ -62,12 +65,29 @@ describe("durable settings profile controller", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not apply or acknowledge an edit that failed durable persistence", async () => {
+  it("shows an edit before saving it and sends it to the account later", async () => {
+    await setup();
+    online(true);
+    const pending = store.getState().edit(key, "new");
+    expect(resolveSetting(store.getState().state!, key).value).toBe("new");
+    expect(mocks.preview).toHaveBeenCalledWith(expect.objectContaining({ [key]: "new" }));
+    expect(mocks.patch).not.toHaveBeenCalled();
+    await pending;
+    await vi.waitFor(() => expect(mocks.patch).toHaveBeenCalled());
+  });
+
+  it("puts the saved value back when an edit fails durable persistence", async () => {
     await setup();
     mocks.apply.mockClear();
     mocks.failWrite = true;
-    await expect(store.getState().edit(key, "unsaved")).rejects.toThrow("Disk full");
-    expect(mocks.apply).not.toHaveBeenCalled();
+    const pending = store.getState().edit(key, "unsaved");
+    expect(resolveSetting(store.getState().state!, key).value).toBe("unsaved");
+    await expect(pending).rejects.toThrow("Disk full");
+    expect(resolveSetting(store.getState().state!, key).value).toBe("old");
+    expect(mocks.apply).toHaveBeenLastCalledWith(
+      expect.objectContaining({ [key]: "old" }),
+      expect.any(Function),
+    );
     expect(store.getState().state?.outbox).toHaveLength(0);
     expect(store.getState().error).toContain("Disk full");
     expect(mocks.patch).not.toHaveBeenCalled();

@@ -1,4 +1,5 @@
 import type {
+  DefaultBrowserSnapshot,
   LaunchOnLoginSnapshot,
   NativeShortcutsSnapshot,
   SaveSettingsRequest,
@@ -27,6 +28,15 @@ export function settingsApplyLaunchOnLogin(enabled: boolean): Promise<LaunchOnLo
   return invoke("settings_apply_launch_on_login", { enabled });
 }
 
+export function settingsDefaultBrowserSnapshot(): Promise<DefaultBrowserSnapshot> {
+  return invoke("settings_default_browser_snapshot");
+}
+
+/** macOS confirms the change itself; re-read the snapshot when the window regains focus. */
+export function settingsRequestDefaultBrowser(): Promise<DefaultBrowserSnapshot> {
+  return invoke("settings_request_default_browser");
+}
+
 export async function shortcutsSnapshot(): Promise<ShortcutsSnapshot> {
   return hydrateShortcutsSnapshot(await invoke<NativeShortcutsSnapshot>("shortcuts_snapshot"));
 }
@@ -39,7 +49,8 @@ export async function shortcutsReplace(
   );
 }
 
-function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsSnapshot {
+/** Resolves bindings in the webview, so an override takes effect before native persistence. */
+export function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsSnapshot {
   const detectedPlatform = detectShortcutPlatform();
   const overrides = new Map(snapshot.overrides.map((entry) => [entry.commandId, entry]));
   const effectiveBindings = shortcutCommandRegistry.map((definition) => {
@@ -74,7 +85,12 @@ function hydrateShortcutsSnapshot(snapshot: NativeShortcutsSnapshot): ShortcutsS
     overrides: snapshot.overrides,
   };
   const forwarded = hydrated.commandDefinitions
-    .filter((definition) => definition.scope === "global" || definition.scope === "workspace")
+    .filter(
+      (definition) =>
+        definition.scope === "global" ||
+        definition.scope === "workspace" ||
+        definition.scope === "tool:browser",
+    )
     .flatMap((definition) => {
       const binding = hydrated.effectiveBindings.find(
         (candidate) => candidate.commandId === definition.id,

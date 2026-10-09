@@ -1,4 +1,5 @@
 #import "MistyDesktopCapture.h"
+#import "MistyAgentRing.h"
 #import <AppKit/AppKit.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 #import <CoreImage/CoreImage.h>
@@ -14,7 +15,14 @@ API_AVAILABLE(macos(14.0))
 @property BOOL stopped;
 @property uint32_t displayID;
 @property NSTimeInterval capturedAt;
+// The display's own audio, mono 16-bit PCM, as a rolling buffer in memory.
+@property NSMutableData *audio;
+@property NSUInteger audioWrite;
+@property BOOL audioWrapped;
 @end
+
+static const double audioRate = 16000;
+static const NSUInteger audioCapacity = 30 * 16000 * sizeof(int16_t);
 
 @implementation MistyDesktopStream
 - (instancetype)init {
@@ -31,8 +39,70 @@ API_AVAILABLE(macos(14.0))
   [self.condition unlock];
 }
 - (void)stream:(SCStream *)stream didStopWithError:(NSError *)error { [self failed:error]; }
+- (void)appendAudio:(CMSampleBufferRef)sample {
+  const AudioStreamBasicDescription *format = CMAudioFormatDescriptionGetStreamBasicDescription(CMSampleBufferGetFormatDescription(sample));
+  if (!format || !(format->mFormatFlags & kAudioFormatFlagIsFloat) || format->mBitsPerChannel != 32) return;
+  BOOL interleaved = !(format->mFormatFlags & kAudioFormatFlagIsNonInterleaved);
+  UInt32 channels = MAX(1, format->mChannelsPerFrame);
+  size_t listSize = 0;
+  CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, &listSize, NULL, 0, NULL, NULL, 0, NULL);
+  if (!listSize) return;
+  AudioBufferList *list = malloc(listSize);
+  CMBlockBufferRef block = NULL;
+  if (CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sample, NULL, list, listSize, NULL, NULL,
+        kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment, &block) == noErr && list->mNumberBuffers) {
+    const float *samples = list->mBuffers[0].mData;
+    UInt32 stride = interleaved ? channels : 1;
+    NSUInteger frames = list->mBuffers[0].mDataByteSize / sizeof(float) / stride;
+    NSMutableData *pcm = [NSMutableData dataWithLength:frames * sizeof(int16_t)];
+    int16_t *out = pcm.mutableBytes;
+    for (NSUInteger i = 0; i < frames; i++) out[i] = (int16_t)(fmaxf(-1, fminf(1, samples[i * stride])) * 32767);
+    [self.condition lock];
+    if (!self.stopped) {
+      if (!self.audio) self.audio = [NSMutableData dataWithLength:audioCapacity];
+      const uint8_t *bytes = pcm.bytes;
+      for (NSUInteger left = pcm.length; left;) {
+        NSUInteger chunk = MIN(left, audioCapacity - self.audioWrite);
+        memcpy((uint8_t *)self.audio.mutableBytes + self.audioWrite, bytes, chunk);
+        bytes += chunk; left -= chunk;
+        self.audioWrite = (self.audioWrite + chunk) % audioCapacity;
+        if (!self.audioWrite) self.audioWrapped = YES;
+      }
+    }
+    [self.condition unlock];
+  }
+  if (block) CFRelease(block);
+  free(list);
+}
+- (NSData *)recentAudio:(NSTimeInterval)seconds {
+  [self.condition lock];
+  NSUInteger stored = !self.audio ? 0 : self.audioWrapped ? audioCapacity : self.audioWrite;
+  NSUInteger length = MIN(stored, (NSUInteger)(MAX(0, seconds) * audioRate) * sizeof(int16_t));
+  NSMutableData *pcm = [NSMutableData dataWithLength:length];
+  NSUInteger start = (self.audioWrite + audioCapacity - length) % audioCapacity;
+  NSUInteger first = MIN(length, audioCapacity - start);
+  if (length) {
+    memcpy(pcm.mutableBytes, (const uint8_t *)self.audio.bytes + start, first);
+    memcpy((uint8_t *)pcm.mutableBytes + first, self.audio.bytes, length - first);
+  }
+  [self.condition unlock];
+  if (!length) return nil;
+  // A 44-byte WAV header: PCM, mono, 16-bit.
+  uint32_t rate = (uint32_t)audioRate, size = (uint32_t)length;
+  NSMutableData *wav = [NSMutableData dataWithCapacity:44 + length];
+  uint32_t riff = 36 + size, fmtSize = 16, byteRate = rate * 2, dataSize = size;
+  uint16_t pcmFormat = 1, mono = 1, align = 2, bits = 16;
+  [wav appendBytes:"RIFF" length:4]; [wav appendBytes:&riff length:4]; [wav appendBytes:"WAVEfmt " length:8];
+  [wav appendBytes:&fmtSize length:4]; [wav appendBytes:&pcmFormat length:2]; [wav appendBytes:&mono length:2];
+  [wav appendBytes:&rate length:4]; [wav appendBytes:&byteRate length:4]; [wav appendBytes:&align length:2];
+  [wav appendBytes:&bits length:2]; [wav appendBytes:"data" length:4]; [wav appendBytes:&dataSize length:4];
+  [wav appendData:pcm];
+  return wav;
+}
 - (void)stream:(SCStream *)stream didOutputSampleBuffer:(CMSampleBufferRef)sample ofType:(SCStreamOutputType)type {
-  if (type != SCStreamOutputTypeScreen || !CMSampleBufferIsValid(sample)) return;
+  if (!CMSampleBufferIsValid(sample)) return;
+  if (type == SCStreamOutputTypeAudio) { [self appendAudio:sample]; return; }
+  if (type != SCStreamOutputTypeScreen) return;
   NSArray *attachments = (__bridge NSArray *)CMSampleBufferGetSampleAttachmentsArray(sample, NO);
   NSNumber *status = attachments.firstObject[SCStreamFrameInfoStatus];
   if (!status) return;
@@ -70,6 +140,7 @@ API_AVAILABLE(macos(14.0))
   [self.condition lock];
   self.stopped = YES;
   self.jpeg = nil;
+  self.audio = nil;
   SCStream *stream = self.stream;
   self.stream = nil;
   [self.condition broadcast];
@@ -124,7 +195,7 @@ NSDictionary *MistyDesktopFrame(uint32_t displayID, NSTimeInterval after) {
           NSMutableArray *excluded = [NSMutableArray new];
           for (SCWindow *window in content.windows) {
             if (window.owningApplication.processID == NSProcessInfo.processInfo.processIdentifier &&
-                [window.title isEqualToString:@"Misty cursor"])
+                ([window.title isEqualToString:@"Misty cursor"] || [window.title isEqualToString:MistyAgentRingTitle]))
               [excluded addObject:window];
           }
           SCContentFilter *filter = [[SCContentFilter alloc] initWithDisplay:target excludingWindows:excluded];
@@ -136,13 +207,20 @@ NSDictionary *MistyDesktopFrame(uint32_t displayID, NSTimeInterval after) {
           config.queueDepth = 3;
           config.pixelFormat = kCVPixelFormatType_32BGRA;
           config.showsCursor = NO;
-          config.capturesAudio = NO;
+          // The display's audio (games, calls, videos); never Misty's own.
+          config.capturesAudio = YES;
+          config.sampleRate = (NSInteger)audioRate;
+          config.channelCount = 1;
+          config.excludesCurrentProcessAudio = YES;
           SCStream *stream = [[SCStream alloc] initWithFilter:filter configuration:config delegate:owner];
           NSError *outputError;
           if (![stream addStreamOutput:owner type:SCStreamOutputTypeScreen
                 sampleHandlerQueue:dispatch_queue_create("misty.desktop.frames", DISPATCH_QUEUE_SERIAL) error:&outputError]) {
             [owner stream:stream didStopWithError:outputError]; return;
           }
+          // Frames still flow if audio cannot be added.
+          [stream addStreamOutput:owner type:SCStreamOutputTypeAudio
+            sampleHandlerQueue:dispatch_queue_create("misty.desktop.audio", DISPATCH_QUEUE_SERIAL) error:nil];
           [owner.condition lock];
           if (owner.stopped) { [owner.condition unlock]; return; }
           owner.stream = stream;
@@ -173,4 +251,13 @@ NSDictionary *MistyDesktopFrame(uint32_t displayID, NSTimeInterval after) {
     return result;
   }
   return @{@"error": @"Desktop control requires macOS 14 or later."};
+}
+
+NSData *MistyDesktopRecentAudio(NSTimeInterval seconds) {
+  if (@available(macOS 14.0, *)) {
+    MistyDesktopStream *owner;
+    @synchronized(streamLock()) { owner = activeStream; }
+    return [owner recentAudio:seconds];
+  }
+  return nil;
 }

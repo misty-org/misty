@@ -169,7 +169,9 @@ pub fn extract(
                 .any(|p| !matches!(p, Component::Normal(_)))
             || !seen.insert(name.to_lowercase())
             || name.to_ascii_lowercase().starts_with("__misty_sync__")
-            || name.to_ascii_lowercase().starts_with(super::compat::DIRECTORY)
+            || name
+                .to_ascii_lowercase()
+                .starts_with(super::compat::DIRECTORY)
             || file
                 .unix_mode()
                 .is_some_and(|m| !matches!(m & 0o170000, 0 | 0o100000 | 0o040000))
@@ -336,8 +338,13 @@ mod tests {
         manifest["permissions"] = json!(["webRequest", "webRequestBlocking", "management"]);
         let review = inspect(&manifest, entry(&[]), "review".into()).unwrap();
         assert!(!review.blocked);
-        assert!(review.findings.iter().any(|v| v.contains("first matching request")));
-        assert!(review.permissions.contains(&"declarativeNetRequest".to_owned()));
+        assert!(review
+            .findings
+            .iter()
+            .any(|v| v.contains("first matching request")));
+        assert!(review
+            .permissions
+            .contains(&"declarativeNetRequest".to_owned()));
         manifest["permissions"] = json!([]);
         manifest["incognito"] = json!("not_allowed");
         assert!(

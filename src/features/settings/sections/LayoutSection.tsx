@@ -8,6 +8,8 @@ import { DesktopSettingsSection, DesktopSettingsRow } from "../components/Deskto
 import { booleanSetting, ChoiceControl, SwitchControl } from "../SettingsControls";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { useSettingsProfiles } from "../profiles/store";
+import { LayoutNavigationSettings } from "./LayoutNavigationSettings";
+import { SavedLayoutsSettings } from "./SavedLayoutsSettings";
 
 export function LayoutSection() {
   const windowId = useWorkspaceStore((state) => state.activeWindowId);
@@ -32,7 +34,9 @@ export function LayoutSection() {
           />
         </DesktopSettingsRow>
       </DesktopSettingsSection>
+      <LayoutNavigationSettings />
       <WindowLayoutEditor key={windowId} />
+      <SavedLayoutsSettings />
     </>
   );
 }
@@ -62,7 +66,6 @@ function WindowLayoutEditor() {
           label={part === "navigation" ? "Navigation position" : "Tabs position"}
         >
           <ChoiceControl
-            presentation="pills"
             value={layout[part]}
             disabled={false}
             options={dockPositions.map((position) => ({

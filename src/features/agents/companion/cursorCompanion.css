@@ -98,6 +98,34 @@ body,
   transform: none;
   left: 0;
 }
+/* The exact spot a point names: a ring, or the real control's outline. The
+   character parks beside it so it never covers what it points at. */
+.cursor-point-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 2px solid #3380ff;
+  border-radius: 6px;
+  box-shadow:
+    0 0 8px #3380ff99,
+    inset 0 0 6px #3380ff55;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.cursor-point-marker[data-shape="ring"] {
+  border-radius: 50%;
+  animation: cursor-point-pulse 1.2s ease-in-out infinite;
+}
+@keyframes cursor-point-pulse {
+  50% {
+    box-shadow:
+      0 0 14px #3380ffcc,
+      inset 0 0 8px #3380ff77;
+  }
+}
 @keyframes cursor-spin {
   to {
     transform: translate(-50%, -50%) rotate(360deg);
@@ -105,7 +133,11 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cursor-group {
+  .cursor-group,
+  .cursor-point-marker {
     transition: none;
+  }
+  .cursor-point-marker[data-shape="ring"] {
+    animation: none;
   }
 }

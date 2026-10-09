@@ -78,6 +78,11 @@ func (s *SpacesService) prepareAIInvocationRuntime(ctx context.Context, record *
 		// Plan mode is read-only: write tools are neither listed nor executable.
 		allowedTools = planModeTools(toolbox, allowedTools)
 	}
+	if companionTeaches(body) {
+		// Teaching explains and points at the attached screens; with no tools
+		// listed, none can execute either.
+		allowedTools = []string{}
+	}
 	methodGuidance, err := invocationMethodGuidance(ctx, s.database, record.UserID, &body, allowedTools)
 	if err != nil {
 		return nil, err

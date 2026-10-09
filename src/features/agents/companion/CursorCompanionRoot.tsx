@@ -15,6 +15,7 @@ import {
   waveformHeight,
   type Point,
 } from "./motion";
+import { pointBubbleText, pointLayout, type PointLayout } from "./pointLayout";
 import { cursorEvent, presentationEvent, type CursorSample, type Presentation } from "./protocol";
 const initial: Presentation = {
   generation: 0,
@@ -60,6 +61,7 @@ function CursorOverlay() {
   latest.current = presentation;
   const group = useRef<HTMLDivElement>(null);
   const bubble = useRef<HTMLDivElement>(null);
+  const marker = useRef<HTMLDivElement>(null);
   const meter = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let disposed = false;
@@ -89,6 +91,9 @@ function CursorOverlay() {
       returnMouse = flightStart;
     let navigation: "follow" | "out" | "hold" | "return" = "follow";
     let holdUntil = Infinity;
+    // A walkthrough step stays until the person clicks it.
+    let holdForClick = false;
+    let markerBox: PointLayout["marker"] | undefined;
     let started = 0,
       last = performance.now(),
       seen = "",
@@ -162,25 +167,20 @@ function CursorOverlay() {
         navigation = "follow";
         velocity.x = 0;
         velocity.y = 0;
+        markerBox = undefined;
         if (state.point?.displayId === id) {
-          target = {
-            x: Math.max(20, Math.min(width - 20, (state.point.x - d.x) / factor + 8)),
-            y: Math.max(20, Math.min(height - 20, (state.point.y - d.y) / factor + 12)),
-          };
+          const layout = pointLayout(state.point, d, factor, state.size);
+          target = layout.companion;
+          markerBox = layout.marker;
+          holdForClick = Boolean(state.point.awaitingClick);
+          // The marker shows from the outbound flight until this hold ends.
+          holdUntil = Infinity;
           flightStart = {
             ...position,
           };
           started = now;
           navigation = "out";
-          const phrases = [
-            "right here!",
-            "this one!",
-            "over here!",
-            "click this!",
-            "here it is!",
-            "found it!",
-          ];
-          label = phrases[Math.floor(Math.random() * phrases.length)];
+          label = pointBubbleText(state.point);
           typed = 0;
           bubbleScale.x = 0.5;
           bubbleVelocity.x = 0;
@@ -246,11 +246,23 @@ function CursorOverlay() {
       const image = group.current.querySelector<HTMLImageElement>(".cursor-sprite");
       if (image)
         image.style.transform = `translate(-50%,-50%) rotate(${rotation}deg) scale(${scale})`;
+      if (marker.current) {
+        const shown =
+          markerBox && (navigation === "out" || navigation === "hold") && now <= holdUntil;
+        if (markerBox) {
+          marker.current.style.transform = `translate(${markerBox.x}px, ${markerBox.y}px)`;
+          marker.current.style.width = `${markerBox.width}px`;
+          marker.current.style.height = `${markerBox.height}px`;
+          marker.current.dataset.shape = markerBox.ring ? "ring" : "frame";
+        }
+        marker.current.style.opacity = shown ? "1" : "0";
+      }
       if (bubble.current) {
         if (navigation === "hold" && now >= nextChar && typed < label.length) {
           typed++;
           nextChar = now + 30 + Math.random() * 30;
-          if (typed === label.length) holdUntil = nextChar + POINT_HOLD_MS;
+          if (typed === label.length)
+            holdUntil = holdForClick ? Infinity : nextChar + POINT_HOLD_MS;
         }
         bubble.current.textContent = label.slice(0, typed);
         bubble.current.style.opacity = navigation === "hold" && now <= holdUntil ? "1" : "0";
@@ -279,6 +291,7 @@ function CursorOverlay() {
   }, []);
   return (
     <div className="cursor-overlay" aria-hidden="true">
+      <div ref={marker} className="cursor-point-marker" />
       <div
         ref={group}
         className="cursor-group"

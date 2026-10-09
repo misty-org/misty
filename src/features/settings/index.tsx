@@ -3,7 +3,7 @@ export * from "./components/DesktopSettingsUI";
 export * from "./hooks/useDocumentAppAppearance";
 export { SettingsProfilesBridge } from "./profiles/SettingsProfilesBridge";
 export type { SettingsSection } from "./settingsTypes";
-export * from "./store/extensionTheme";
+export * from "./store/appTheme";
 export { settingsBoolean } from "./store/preferences";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";

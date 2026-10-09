@@ -39,6 +39,9 @@ extern "C" {
     fn misty_desktop_stop(task: *const std::ffi::c_char);
     fn misty_desktop_capture(task: *const std::ffi::c_char) -> *mut std::ffi::c_char;
     fn misty_desktop_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
+    fn misty_desktop_audio(task: *const std::ffi::c_char, seconds: f64) -> *mut std::ffi::c_char;
+    fn misty_agent_window_ring(view: *mut std::ffi::c_void, active: bool);
+    fn misty_desktop_yield(task: *const std::ffi::c_char);
 }
 #[cfg(target_os = "macos")]
 extern "C" fn desktop_stopped(value: *const std::ffi::c_char) {
@@ -106,6 +109,12 @@ pub fn agent_workspace_context(
             snapshot: None,
         };
         drop(state);
+        // Controlling the Misty window itself: ring the window. Desktop control
+        // rings the controlled display instead, once control begins.
+        #[cfg(target_os = "macos")]
+        let _ = webview.with_webview(move |platform| unsafe {
+            misty_agent_window_ring(platform.inner().cast(), !desktop);
+        });
         #[cfg(target_os = "macos")]
         if desktop {
             DESKTOP_APP.get_or_init(|| app.clone());
@@ -125,6 +134,79 @@ pub fn agent_workspace_context(
     }
     Ok(())
 }
+/// The controlled display's recent audio (up to 30 seconds of WAV), for the task
+/// that holds desktop control. It lives only in memory while control runs.
+#[tauri::command]
+pub async fn agent_desktop_recent_audio(
+    webview: Webview,
+    task_id: String,
+    seconds: f64,
+) -> Result<Value, String> {
+    if webview.label() != "main" {
+        return Err("Invalid desktop audio request".into());
+    }
+    {
+        let state = session().lock().map_err(|_| "workspace_unavailable")?;
+        if state.task != task_id || state.context["desktopControl"] != true {
+            return Err("agent_task_paused".into());
+        }
+    }
+    let seconds = if seconds.is_finite() {
+        seconds.clamp(1.0, 30.0)
+    } else {
+        10.0
+    };
+    #[cfg(target_os = "macos")]
+    {
+        let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || unsafe {
+            decode(misty_desktop_audio(task.as_ptr(), seconds))
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = seconds;
+        Err("Desktop audio requires macOS 14 or later".into())
+    }
+}
+/// The task waits for the person (a sign-in, a challenge, a review): give back
+/// the window or desktop, its control ring and Misty's cursor, but keep the
+/// task so the run continues on the same screen. `yielded: false` takes the
+/// window back; the desktop is taken back by the next visual tool call.
+#[tauri::command]
+pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> Result<(), String> {
+    if webview.label() != "main" {
+        return Ok(());
+    }
+    let desktop = {
+        let state = session().lock().map_err(|_| "workspace_unavailable")?;
+        if state.task != task_id {
+            return Ok(());
+        }
+        state.context["desktopControl"] == true
+    };
+    #[cfg(target_os = "macos")]
+    {
+        if desktop {
+            if yielded {
+                let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+                unsafe { misty_desktop_yield(task.as_ptr()) };
+            }
+        } else {
+            if yielded {
+                unsafe { misty_autopilot_hide_cursor() };
+            }
+            let _ = webview.with_webview(move |platform| unsafe {
+                misty_agent_window_ring(platform.inner().cast(), !yielded);
+            });
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = (desktop, yielded);
+    Ok(())
+}
 pub fn stop(task: &str) {
     if let Ok(mut state) = session().lock() {
         if state.task == task {
@@ -135,6 +217,7 @@ pub fn stop(task: &str) {
     }
     #[cfg(target_os = "macos")]
     unsafe {
+        misty_agent_window_ring(std::ptr::null_mut(), false);
         misty_autopilot_hide_cursor();
         if let Ok(task) = std::ffi::CString::new(task) {
             misty_desktop_stop(task.as_ptr());

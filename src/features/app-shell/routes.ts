@@ -1,7 +1,6 @@
 export const routes = {
   root: "/",
   agents: "/agents",
-  activity: "/activity",
   browser: "/browser",
   invite: "/invite",
   newTab: "/new",

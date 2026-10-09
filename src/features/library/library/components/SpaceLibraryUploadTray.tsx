@@ -1,5 +1,5 @@
 import { Upload, X } from "lucide-react";
-import { LibraryError as SystemErrorActivity } from "../LibraryRuntime";
+import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 
 import { IconButton, Popover, PopoverContent, PopoverTrigger, Progress } from "@/shared/ui";
 import type { LibraryUploadJob } from "../types/useSpaceLibraryData";
@@ -82,7 +82,7 @@ export function SpaceLibraryUploadTray({
                 </span>
               </div>
               {job.stage === "failed" && job.error ? (
-                <SystemErrorActivity
+                <SystemErrorNotice
                   error={job.error}
                   scope={`library:upload:${job.id}`}
                   title={`${job.name} could not be uploaded`}

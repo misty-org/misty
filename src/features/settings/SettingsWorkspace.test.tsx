@@ -176,7 +176,8 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector('[data-settings-page="browser-downloads"]')).not.toBeNull();
     expect(container.querySelector('[data-settings-page="browser-privacy"]')).not.toBeNull();
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
-    expect(container.querySelector("[aria-expanded]")).toBeNull();
+    // Dropdown controls report aria-expanded; navigation never discloses entries.
+    expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
   it("shows a model choice per sense", async () => {
     await render("models");

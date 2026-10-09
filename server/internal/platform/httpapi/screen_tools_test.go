@@ -85,7 +85,7 @@ func TestDesktopScreensUseBrowserActWithMistysOwnCursor(t *testing.T) {
 		t.Fatal(desktop)
 	}
 	screens := agentCapabilityGuidance([]string{"screen.open", "screen.look"}, false)
-	if !strings.Contains(screens, "target desktop") {
+	if !strings.Contains(screens, "desktop for another app") {
 		t.Fatal(screens)
 	}
 }

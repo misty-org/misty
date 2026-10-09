@@ -35,6 +35,7 @@ vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
 const submit = vi.fn(async (..._args: unknown[]) => {});
+const companionSubmit = vi.fn(async () => {});
 const agent = {
   id: "writer",
   name: "Writing partner",
@@ -59,20 +60,7 @@ beforeEach(() => {
   voiceMock.recording = false;
   useCompanionState.setState({
     accountId: "owner",
-    submit: async ({ prompt, attachments, conversationId }) =>
-      submit(
-        prompt,
-        attachments,
-        undefined,
-        "workspace",
-        [],
-        { conversationId, context: [] },
-        {
-          executionMode: "agent",
-          interactionMode: useCompanionState.getState().presentation.mode,
-          model: "",
-        },
-      ),
+    submit: companionSubmit,
     presentation: initialCompanionPresentation,
     control: async (control) => {
       await finishExecutionMock();
@@ -142,11 +130,13 @@ describe("Agents workspace conversations", () => {
         context: [],
       },
       {
-        executionMode: "agent",
+        executionMode: "user",
         interactionMode: "auto",
         model: "",
       },
     );
+    // Typing here never goes through the cursor companion.
+    expect(companionSubmit).not.toHaveBeenCalled();
     expect((screen.getByLabelText("Message Misty") as HTMLTextAreaElement).value).toBe("");
   });
   it("keeps a failed draft available to retry", async () => {

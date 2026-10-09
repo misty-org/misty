@@ -1,5 +1,5 @@
 import type { spacesApi } from "@/api/spaces/api";
-import type { SystemErrorActivity } from "@/features/activity";
+import type { SystemErrorNotice } from "@/features/support/systemErrors";
 import type { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import type { useAuth } from "@/features/auth";
 import type { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
@@ -15,7 +15,7 @@ export interface SocialRuntime {
   useAuth: typeof useAuth;
   useNativeSessionStore: typeof useNativeSessionStore;
   Picker: typeof MistyPicker;
-  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorActivity>>;
+  Error: React.ComponentType<React.ComponentProps<typeof SystemErrorNotice>>;
   useAiSurfaceAdapter: typeof useAiSurfaceAdapter;
   useWorkspaceViewTitle: typeof useWorkspaceViewTitle;
   useSpaceChatDraft: typeof useSpaceChatDraft;
@@ -58,7 +58,7 @@ export const SocialPicker = (props: React.ComponentProps<typeof MistyPicker>) =>
   const View = socialRuntime().Picker;
   return <View {...props} />;
 };
-export const SocialError = (props: React.ComponentProps<typeof SystemErrorActivity>) => {
+export const SocialError = (props: React.ComponentProps<typeof SystemErrorNotice>) => {
   const View = socialRuntime().Error;
   return <View {...props} />;
 };

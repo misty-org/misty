@@ -4,10 +4,7 @@
 
 use super::{media_verdict, MediaRequest, PageFacts, Reply, StoreScope};
 use crate::permissions::{canonical_origin, MediaKind, Verdict};
-use std::{
-    collections::HashSet,
-    sync::{Mutex, OnceLock},
-};
+use std::{cell::RefCell, thread::LocalKey};
 use tauri::Webview;
 use webview2_com::{
     Microsoft::Web::WebView2::Win32::{
@@ -21,10 +18,25 @@ use webview2_com::{
 use windows::core::{Interface, HSTRING, PWSTR};
 use windows::Win32::System::Com::CoTaskMemFree;
 
-/// Native views that already have Kiri's handler.
-fn installed() -> &'static Mutex<HashSet<usize>> {
-    static INSTALLED: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
-    INSTALLED.get_or_init(Mutex::default)
+// Native views that already have one of Kiri's handlers. Holding them keeps a
+// closed view's address from passing for a new one; closed views, whose calls
+// fail, are dropped as new ones are added. Used on the UI thread only.
+thread_local! {
+    static MEDIA_HANDLED: RefCell<Vec<ICoreWebView2>> = RefCell::default();
+    static FILTERED: RefCell<Vec<ICoreWebView2>> = RefCell::default();
+}
+
+/// Records `core` in `views`; false when it was already there.
+fn first_install(views: &'static LocalKey<RefCell<Vec<ICoreWebView2>>>, core: &ICoreWebView2) -> bool {
+    views.with(|views| {
+        let mut views = views.borrow_mut();
+        views.retain(|view| unsafe { view.Settings() }.is_ok());
+        if views.contains(core) {
+            return false;
+        }
+        views.push(core.clone());
+        true
+    })
 }
 
 // Frees native strings even when the call fails after allocating them.
@@ -84,11 +96,7 @@ pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String>
             let Ok(core) = platform.controller().CoreWebView2() else {
                 return;
             };
-            let first = installed()
-                .lock()
-                .map(|mut views| views.insert(core.as_raw() as usize))
-                .unwrap_or(false);
-            if !first {
+            if !first_install(&MEDIA_HANDLED, &core) {
                 return;
             }
             let handler = PermissionRequestedEventHandler::create(Box::new(move |sender, args| {
@@ -165,6 +173,68 @@ pub(super) fn edit(webview: &Webview, command: super::EditCommand) -> Result<(),
                 &HSTRING::from(parameters.as_str()),
                 &handler,
             );
+        })
+        .map_err(|error| error.to_string())
+}
+
+/// WebView2 has no rule lists, so every request is checked against the
+/// content filter as it starts. The handler reads the live configuration, so
+/// installing it once per view is enough.
+pub(super) fn install_content_filter(webview: &Webview) -> Result<(), String> {
+    use webview2_com::{
+        Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2_2, COREWEBVIEW2_WEB_RESOURCE_CONTEXT,
+            COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+        },
+        WebResourceRequestedEventHandler,
+    };
+    webview
+        .with_webview(move |platform| unsafe {
+            let Ok(core) = platform.controller().CoreWebView2() else {
+                return;
+            };
+            if !first_install(&FILTERED, &core) {
+                return;
+            }
+            let Ok(environment) = core.cast::<ICoreWebView2_2>().and_then(|core| core.Environment())
+            else {
+                return;
+            };
+            if core
+                .AddWebResourceRequestedFilter(
+                    &HSTRING::from("*"),
+                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
+                )
+                .is_err()
+            {
+                return;
+            }
+            let handler = WebResourceRequestedEventHandler::create(Box::new(move |sender, args| {
+                let Some(args) = args else { return Ok(()) };
+                let mut context = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
+                args.ResourceContext(&mut context)?;
+                let Some(url) = args.Request().ok().and_then(|request| take_string(|p| request.Uri(p)))
+                else {
+                    return Ok(());
+                };
+                let page = sender.and_then(|view| take_string(|p| view.Source(p)));
+                if crate::content_filter::should_block(
+                    &url,
+                    page.as_deref(),
+                    context == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+                ) {
+                    let response = environment.CreateWebResourceResponse(
+                        None::<&windows::Win32::System::Com::IStream>,
+                        403,
+                        &HSTRING::from("Blocked"),
+                        &HSTRING::from(""),
+                    )?;
+                    args.SetResponse(&response)?;
+                }
+                Ok(())
+            }));
+            let mut token = 0i64;
+            let _ = core.add_WebResourceRequested(&handler, &mut token);
         })
         .map_err(|error| error.to_string())
 }

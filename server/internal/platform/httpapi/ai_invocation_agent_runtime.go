@@ -94,7 +94,7 @@ func (s *SpacesService) agentRuntimeContextAIInvocation(w http.ResponseWriter, r
 		"capture":               prepared.body.Capture,
 		"display_captures":      prepared.body.DisplayCaptures,
 		"companion_mode":        prepared.body.CompanionMode,
-		"companion_explanation": false,
+		"companion_explanation": companionTeaches(prepared.body),
 		"attachments":           attachments,
 	})
 }

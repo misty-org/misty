@@ -35,6 +35,9 @@ export function OmniboxRow(props: {
       <span className="max-w-[48%] truncate text-xs opacity-55">{detail}</span>
       {match.switchViewId ? (
         <Button
+          // The row sits inside the address bar's form: as a submit button,
+          // Enter would press it and switch tabs instead of opening the page.
+          type="button"
           variant="outline"
           size="xs"
           tabIndex={-1}

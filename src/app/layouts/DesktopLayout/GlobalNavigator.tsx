@@ -9,7 +9,6 @@ import {
 } from "./NavigatorUtilityIsland";
 import { NavigatorProfileBar } from "./NavigatorProfileBar";
 import { WorkspaceSpaceNavigation } from "@/features/spaces";
-import { ActivityMenu } from "./ActivityMenu";
 import mistyLogo from "@/assets/branding/misty-white.png";
 import { useRef } from "react";
 import { NavigatorDestinations } from "./NavigatorDestinations";
@@ -120,7 +119,6 @@ export function GlobalNavigator(props: {
           utilityControls={
             <>
               <NavigatorHeaderSearchButton className={navigatorHierarchyActionClass} />
-              <ActivityMenu className={navigatorHierarchyActionClass} />
               {props.syncControl}
             </>
           }

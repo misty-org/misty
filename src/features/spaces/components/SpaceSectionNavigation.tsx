@@ -1,5 +1,4 @@
 import { appIcons, TooltipProvider } from "@/shared/ui";
-import { unreadActivityCountForSpaceSection, useActivityStore } from "@/features/activity";
 import { useAuth } from "@/features/auth";
 import { Images, Layers, MessagesSquare, Notebook } from "lucide-react";
 import { rememberedJournalRoute } from "../spacesShell/spaceSubpageMemory";
@@ -39,7 +38,6 @@ export function SpaceSectionNavigation({
     .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
     .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);
   const accountId = user?.id ?? "";
-  const activityItems = useActivityStore((state) => state.allItems);
 
   return (
     <TooltipProvider delayDuration={350}>
@@ -64,9 +62,6 @@ export function SpaceSectionNavigation({
             }
             icon={Icon}
             label={label}
-            badgeCount={
-              id === "home" ? 0 : unreadActivityCountForSpaceSection(activityItems, spaceId, id)
-            }
             to={
               id === "journal"
                 ? rememberedJournalRoute(accountId, spaceId)

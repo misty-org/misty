@@ -23,9 +23,22 @@ export interface BrowserSearchEngine {
 export const browserSearchEngines: readonly BrowserSearchEngine[] = engineTable;
 
 let configuredEngine = browserSearchEngines[0];
+let customDefaultTrigger = "";
 
+/** The engine typed searches go to: a chosen search shortcut, else a built-in engine. */
 export function browserSearchEngine(): BrowserSearchEngine {
-  return configuredEngine;
+  const custom = customDefaultTrigger
+    ? customBangs.find((bang) => bang.trigger === customDefaultTrigger)
+    : undefined;
+  // A shortcut has no suggestions endpoint, so suggestions stay off while it is the default.
+  return custom
+    ? { id: `custom:${custom.trigger}`, name: custom.name, search: custom.url }
+    : configuredEngine;
+}
+
+/** Makes one of the person's search shortcuts the default; empty or unknown uses the built-in engine. */
+export function configureBrowserCustomSearchEngine(trigger: string): void {
+  customDefaultTrigger = trigger.trim().toLowerCase();
 }
 
 /** Selects an engine by its stable id; unknown ids fall back to the first engine. */
@@ -38,7 +51,7 @@ let suggestionsEnabled = false;
 
 /** Whether typed text may be sent to the search engine for suggestions. Off by default. */
 export function browserSearchSuggestionsEnabled(): boolean {
-  return suggestionsEnabled;
+  return suggestionsEnabled && Boolean(browserSearchEngine().suggest);
 }
 
 export function configureBrowserSearchSuggestions(enabled: boolean): void {
@@ -46,7 +59,7 @@ export function configureBrowserSearchSuggestions(enabled: boolean): void {
 }
 
 export function browserSearchUrl(query: string): string {
-  return configuredEngine.search.replace("%s", encodeURIComponent(query));
+  return browserSearchEngine().search.replace("%s", encodeURIComponent(query));
 }
 
 /** A search shortcut the person added, typed as `!trigger` in search. */

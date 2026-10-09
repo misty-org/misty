@@ -1,7 +1,6 @@
-import { useActivityStore } from "@/features/activity";
 import { useAiSurfaceStore } from "@/features/ai-surface";
 import { useSpacesStore } from "@/features/spaces";
-import { useNavigatorAppsStore, useWorkspaceStore } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -26,7 +25,6 @@ describe("GlobalNavigator disclosures", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    useActivityStore.setState({ allItems: [] });
     useAiSurfaceStore.setState({
       sessions: {},
       registrations: {},
@@ -43,10 +41,6 @@ describe("GlobalNavigator disclosures", () => {
     });
     useWorkspaceStore.getState().reset();
     seedNavigatorApps();
-    useNavigatorAppsStore.setState({
-      appIdsByAccount: {},
-      collapsedByAccount: { "account-1": false },
-    });
     useWorkspaceStore.setState({
       activeScopeKey: "space:space-1",
       layout: {
@@ -65,7 +59,6 @@ describe("GlobalNavigator disclosures", () => {
     await act(async () => root.unmount());
     container.remove();
     document.body.innerHTML = "";
-    useActivityStore.setState({ allItems: [] });
     useSpacesStore.setState({ spaces: [], invitations: [], presenceBySpace: {} });
     useAiSurfaceStore.setState({
       sessions: {},
