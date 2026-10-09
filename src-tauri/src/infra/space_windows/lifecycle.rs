@@ -162,12 +162,6 @@ pub fn quitting() {
     QUITTING.store(true, Ordering::SeqCst);
 }
 
-/// Whether this window should take links other apps hand to Misty: the last focused
-/// Space window. A Space that claims the site comes with Phase 6.
-pub fn is_link_target<R: Runtime>(app: &AppHandle<R>, label: &str) -> bool {
-    is_space_window(label) && primary_label(app).as_deref() == Some(label)
-}
-
 /// Rebuilds every menu that lists Spaces.
 pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "macos")]

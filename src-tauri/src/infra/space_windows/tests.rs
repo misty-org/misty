@@ -76,6 +76,7 @@ fn colors_are_the_palette_or_a_custom_hex() {
             space_id: None,
             name: "Personal".into(),
             color: Some("blue".into()),
+            ..Default::default()
         },
     );
     assert_eq!(next_color(&spaces), "red");

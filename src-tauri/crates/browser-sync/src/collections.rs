@@ -34,7 +34,17 @@ pub const EXTENSION_SYNC: &str = "extension_sync";
 /// Saved website sign-ins. Native-only, never projected to a renderer; the
 /// server only ever holds each one sealed with the vault key.
 pub const PASSWORDS: &str = "passwords";
-pub const COLLECTIONS: [&str; 5] = [BOOKMARKS, TAB_GROUPS, HISTORY, EXTENSION_SYNC, PASSWORDS];
+/// A Space's own settings that travel with its vault (the sites it claims).
+/// Native-only, never projected to a renderer.
+pub const SPACE_SETTINGS: &str = "space_settings";
+pub const COLLECTIONS: [&str; 6] = [
+    BOOKMARKS,
+    TAB_GROUPS,
+    HISTORY,
+    EXTENSION_SYNC,
+    PASSWORDS,
+    SPACE_SETTINGS,
+];
 /// The shared clipboard's ring of sealed clips. It is not a record
 /// collection: the worker moves its ciphertext without opening it.
 pub const CLIPBOARD: &str = "clipboard";

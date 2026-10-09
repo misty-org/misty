@@ -67,7 +67,7 @@ use infra::browser::page_tools::media_tools::{
 };
 use infra::browser::pane_dim::browser_webview_set_pane_dim;
 #[cfg(desktop)]
-use infra::browser::profile_cleanup::browser_device_profile_delete;
+use infra::browser::retired_profiles::browser_retired_profiles_erase;
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
@@ -151,11 +151,11 @@ pub fn run() {
         } else {
             let _ = infra::space_windows::restore(app);
         }
-        // Links opened while Misty runs, as the default browser, go to the last
-        // focused Space window.
+        // Links opened while Misty runs, as the default browser, go to the Space
+        // that claims their site, else to the last focused Space window.
         let urls = infra::default_browser::web_urls(args.iter().skip(1));
         if !urls.is_empty() {
-            infra::space_windows::emit_to_primary(app, "deep-link://new-url", urls);
+            infra::space_windows::route_app_links(app, urls);
         }
     }));
 
@@ -357,6 +357,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_set_frequency,
                     crate::infra::browser_sync::browser_sync_forget_key, crate::infra::browser_sync::browser_sync_space_window,
+                    crate::infra::browser_sync::browser_sync_space_sites, crate::infra::browser_sync::browser_sync_set_space_sites,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
                     crate::infra::auth_cookies::auth_cookie_forget,
@@ -633,7 +634,7 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_webview_reader_article,
                     #[cfg(desktop)]
-                    browser_device_profile_delete,
+                    browser_retired_profiles_erase,
                     crate::infra::space_windows::space_window_info,
                     crate::infra::space_windows::space_windows_set_spaces,
                     crate::infra::space_windows::space_window_open,
@@ -641,8 +642,7 @@ pub fn run() {
                     crate::infra::space_windows::space_window_set_color,
                     crate::infra::space_windows::space_window_close,
                     crate::infra::space_windows::space_windows_menu,
-                    crate::infra::space_windows::space_window_link_target,
-                    crate::infra::space_windows::space_window_remove,
+                    crate::infra::space_windows::space_window_link_target, crate::infra::space_windows::space_window_remove,
                     #[cfg(desktop)]
                     browser_set_mouse_gestures,
                     #[cfg(desktop)]

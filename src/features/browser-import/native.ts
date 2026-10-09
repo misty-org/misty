@@ -66,10 +66,9 @@ export interface ImportedSettings {
   restoreSession?: boolean | null;
   sitePermissions: { origin: string; kind: "camera" | "microphone"; allow: boolean }[];
 }
-/** Where history, site permissions and sign-ins land: a Misty browser profile. */
+/** History, site permissions and sign-ins land in the calling window's Space. */
 export interface ImportTargetRequest {
   source: ImportSourceRequest;
-  mistyProfile?: string;
 }
 export interface ImportAdded {
   added: number;

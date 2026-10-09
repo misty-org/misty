@@ -1,8 +1,6 @@
-import { dockLeaves, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { importBookmarks } from "./bookmarks";
 import { browserImport, type ImportedExtension, type ImportSourceRequest } from "./native";
 import { applyImportedSettings } from "./settings";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 export type ImportKind = "bookmarks" | "history" | "settings" | "signins" | "extensions";
 const importKinds: ImportKind[] = ["bookmarks", "history", "settings", "signins", "extensions"];
@@ -18,21 +16,6 @@ export interface ImportOutcome {
 const plural = (count: number, one: string, many = `${one}s`) =>
   `${count.toLocaleString()} ${count === 1 ? one : many}`;
 
-/** The Misty browser profile new pages open in: the focused tab's, else the default. */
-function currentBrowserProfile(): string | undefined {
-  const workspace = useWorkspaceStore.getState();
-  const panes = dockLeaves(workspace.layout.root);
-  const pane = panes.find((p) => p.id === workspace.layout.focusedPaneId) ?? panes[0];
-  const views = [
-    ...(pane?.views.filter((v) => v.id === pane.activeViewId) ?? []),
-    ...panes.flatMap((p) => p.views),
-  ];
-  const browser = views.find(
-    (v) => v.surfaceId === "browser" && !isIncognitoWindow(),
-  );
-  return browser ? parseBrowserViewState(browser.state).profileId : undefined;
-}
-
 function failure(kind: ImportKind, error: unknown): ImportOutcome {
   return { kind, ok: false, message: error instanceof Error ? error.message : String(error) };
 }
@@ -40,10 +23,10 @@ function failure(kind: ImportKind, error: unknown): ImportOutcome {
 async function run(
   kind: ImportKind,
   source: ImportSourceRequest,
-  mistyProfile: string | undefined,
   extensions: ImportedExtension[],
 ): Promise<ImportOutcome> {
-  const target = { source, mistyProfile };
+  // Everything lands in this window's Space; native code picks its store.
+  const target = { source };
   switch (kind) {
     case "bookmarks": {
       const { roots, skipped } = await browserImport.bookmarks(source);
@@ -104,17 +87,17 @@ async function run(
   }
 }
 
-/** Imports each chosen kind in turn; one kind failing never stops the rest. */
+/** Imports each chosen kind into this window's Space in turn; one kind failing never
+ * stops the rest. */
 export async function runImport(
   source: ImportSourceRequest,
   kinds: ImportKind[],
   extensions: ImportedExtension[],
   onOutcome: (outcome: ImportOutcome) => void,
 ) {
-  const mistyProfile = currentBrowserProfile();
   const outcomes: ImportOutcome[] = [];
   for (const kind of importKinds.filter((k) => kinds.includes(k))) {
-    const outcome = await run(kind, source, mistyProfile, extensions).catch((error: unknown) =>
+    const outcome = await run(kind, source, extensions).catch((error: unknown) =>
       failure(kind, error),
     );
     outcomes.push(outcome);

@@ -98,6 +98,8 @@ pub(super) async fn start_session(app: &tauri::AppHandle, opened: Opened) -> Res
     if let Some(active) = slot.lock().await.as_mut() {
         active.credential_task = credential_task;
         active.history_task = history_task;
+        // The sites this Space claims for links from other apps.
+        space_sites::watch(active.handle.clone(), active.space_id.clone());
     }
     Ok(slot)
 }
@@ -156,7 +158,7 @@ async fn notifications(
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                     };
                     if personal {
-                        let _ = crate::infra::space_windows::emit(
+                        crate::infra::space_windows::emit(
                             &notify_app,
                             "misty:account-event",
                             serde_json::json!({ "accountId": feed_account, "topic": topic, "id": id }),
@@ -168,7 +170,7 @@ async fn notifications(
             if !alive {
                 break;
             }
-            let _ = crate::infra::space_windows::emit(&notify_app, "misty:browser-sync-changed", &notify_workspace);
+            crate::infra::space_windows::emit(&notify_app, "misty:browser-sync-changed", &notify_workspace);
         }
     })
 }

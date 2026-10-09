@@ -28,7 +28,6 @@ export function BrowserPaneLayoutMenu({ tabId }: { tabId: string }) {
   };
   return (
     <>
-      {windows?.dialog}
       <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
         <MenuTrigger
           iconOnly

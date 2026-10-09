@@ -23,7 +23,6 @@ import {
   MenuItem,
   MenuTrigger,
 } from "@/shared/ui";
-import { BrowserProfileDialog, BrowserProfileMenu, type ProfileEdit } from "./BrowserProfileMenu";
 
 const spaceColorLabel = "Space color";
 const colorLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
@@ -31,11 +30,10 @@ const colorLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1
 /**
  * The window's Space menu: the account's Spaces (each opens in its own window, with
  * a checkmark on this one), a new incognito window, this Space's color and Close window.
- * The rows go inside any dropdown content; the dialog sits outside so it outlives the menu.
+ * The rows go inside any dropdown content.
  */
 export function useSpaceWindowMenu() {
   const [error, setError] = useState("");
-  const [profileEdit, setProfileEdit] = useState<ProfileEdit | null>(null);
   const spaces = useSpacesStore((state) => state.spaces);
   const space = useSpaceWindowStore((state) => state.space);
   const current = spaceWindow();
@@ -46,15 +44,8 @@ export function useSpaceWindowMenu() {
       () => setError(""),
       () => setError("That window couldn't open. Try again."),
     );
-  const dialog = <BrowserProfileDialog editing={profileEdit} onChange={setProfileEdit} />;
   const items = (
     <>
-      {incognito ? null : (
-        <>
-          <BrowserProfileMenu onError={setError} onEdit={setProfileEdit} />
-          <DropdownMenuSeparator />
-        </>
-      )}
       {spaces.map((item) => {
         const isPersonal = item.id === personal?.id;
         const here = isPersonal ? current.personal : item.id === current.spaceId;
@@ -110,15 +101,14 @@ export function useSpaceWindowMenu() {
       />
     </>
   );
-  return { dialog, items };
+  return { items };
 }
 
 /** The Space menu as its own button, for the Windows title bar. */
 export function SpaceWindowMenu() {
-  const { dialog, items } = useSpaceWindowMenu();
+  const { items } = useSpaceWindowMenu();
   return (
     <>
-      {dialog}
       <DropdownMenu>
         <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-charcoal-border" />
         <MenuTrigger

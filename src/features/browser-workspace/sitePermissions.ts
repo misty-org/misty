@@ -13,9 +13,12 @@ export interface BrowserSiteInfo {
   permissions: SitePermissions;
 }
 export interface SavedSitePermission {
+  /** The website data store holding the choice; native code names it. */
   profile: string;
   origin: string;
   permissions: SitePermissions;
+  /** The Space whose store it is. */
+  space: string;
 }
 /** Kiri decides camera and microphone requests on macOS (WebKit) and Windows (WebView2). */
 export function supportsSitePermissions() {

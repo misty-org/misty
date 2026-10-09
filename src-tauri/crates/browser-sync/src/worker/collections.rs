@@ -579,6 +579,7 @@ where
                 *c != collections::HISTORY
                     && *c != collections::EXTENSION_SYNC
                     && *c != collections::PASSWORDS
+                    && *c != collections::SPACE_SETTINGS
             })
         {
             let state = self.store.collection(&self.root, collection)?;

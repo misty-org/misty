@@ -61,17 +61,22 @@ pub fn remember_launch<S: AsRef<str>>(args: impl IntoIterator<Item = S>) {
     }
 }
 
-/// The web addresses Misty was started with, once.
+/// The links this Space window opens: the ones Misty was started with that belong to
+/// its Space, and those other apps sent it since. A link goes to the Space that claims
+/// its site ("Open these sites in this Space"), else to the window used last.
 #[tauri::command]
 pub fn app_take_launch_urls(webview: tauri::Webview) -> Vec<String> {
-    // The last focused Space window takes them; at launch that is the one reopened last.
-    if !crate::infra::space_windows::is_link_target(webview.app_handle(), webview.label()) {
+    use crate::infra::space_windows;
+    if !space_windows::is_app_window(webview.label()) {
         return Vec::new();
     }
-    LAUNCH_URLS
+    let launch = LAUNCH_URLS
         .lock()
         .map(|mut urls| std::mem::take(&mut *urls))
-        .unwrap_or_default()
+        .unwrap_or_default();
+    let mut urls = space_windows::route_links(webview.app_handle(), webview.label(), launch);
+    urls.extend(space_windows::take_links(webview.label()));
+    urls
 }
 
 /// The web addresses among a launch's arguments: what Windows passes Misty

@@ -14,9 +14,8 @@ export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | 
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";
-/** A Space window's own layout (`space:<id>`, or `space:personal` for the personal Space),
- * or a device profile's until those become Spaces. */
-export type WorkspaceScopeKey = `space:${string}` | `profile:${string}`;
+/** A Space window's own layout (`space:<id>`, or `space:personal` for the personal Space). */
+export type WorkspaceScopeKey = `space:${string}`;
 type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;

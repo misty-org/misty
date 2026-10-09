@@ -429,6 +429,37 @@ gate that `profile:` scopes are gone.
 
 **Risks.** Low. The import flow change is the only new behavior.
 
+**Built 2026-10-17 (unverified in the Tauri shell).**
+- **Gone.** `browserProfiles.ts`, `BrowserProfileMenu.tsx`, `browserProfileResolver.ts`,
+  `scopeTarget`, the `profile:` scope (`WorkspaceScopeKey` is `space:${string}`),
+  `browser_device_profile_delete`, the unused `browser_profile_remove` and
+  `is_account_browser_profile`. Pages in the personal Space no longer pass a renderer-chosen store:
+  `browser_create.rs` takes every Space's store from its window. Contract gate:
+  `src/tests/architecture/spaceProfiles.contract.test.ts`.
+- **Site routing.** The sites live in a native-only `space_settings` collection (kind
+  `space_sites`, one `sites` record per vault, server allowlist in `store_records.go`), edited in
+  Space settings › General ("Open these sites in this Space") through
+  `browser_sync_space_sites` / `browser_sync_set_space_sites`. Each open vault copies them to the
+  Space registry (`space-windows.json`, `SpaceEntry.sites`) on open and every minute, so links
+  route while the vault is locked. Links are routed natively (`space_windows/links.rs`): macOS
+  open-URL events (`app_lifecycle.rs`), Windows launch arguments and second-instance links. A
+  link goes to the Space that claims its host (subdomains included, most specific wins), else to
+  the last focused Space window, else the Space used last; that window opens or comes forward and
+  takes its queue (`app_take_launch_urls`, `misty://space-links`). The renderer no longer handles
+  web links from the deep-link plugin; `misty://` links still go to the last focused window.
+- **Import.** Native picks the import target from the calling window's Space
+  (`browser_import/mod.rs` `space_store`), not the focused tab. The review step offers "Make a
+  Space for this profile": it creates the Space, hands the import to the new window through shared
+  storage (`browser-import/spaceImport.ts`) and that window runs it (`SpaceImportRequest`).
+- **Settings.** Website permissions list each choice with its Space's name; `settings/profiles/`
+  holds device preferences only and listed no browser profiles, so it is unchanged.
+- **Migration.** Saved `browserProfiles` and `profile:` layouts and tab groups are dropped; their
+  stores are erased once per device (`browser_retired_profiles_erase`, marker
+  `~/.misty/retired-device-profiles`), never a Space's store or one a vault uses.
+- **Not done.** Non-personal Spaces still use Phase 3's `space_store_identity(key)` store rather
+  than the Space vault's logical profile from Phase 2 (`browser_profile_lease(Some(logical))`),
+  and only the personal window runs sync in the renderer (`AppFrameLayout.tsx` `syncAllowed`).
+
 ## Phase 7. The memory tree on the server
 
 **Goal.** Each person has one memory tree per Space (moments, summaries, facts, workflows), kept on

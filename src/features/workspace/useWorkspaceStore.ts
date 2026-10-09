@@ -6,7 +6,6 @@ import {
   type TabGroupState,
 } from "./tabGroups";
 import { pinnedTabActions, type PinnedTabActions } from "./pinnedTabs";
-import { browserProfileSlice, scopeTarget, type BrowserProfileStore } from "./browserProfiles";
 import {
   normalizeDockingLayout,
   validDockingLayout,
@@ -105,8 +104,7 @@ export interface WorkspaceStore
     BookmarkNavigationState,
     TabGroupState,
     TabGroupActions,
-    PinnedTabActions,
-    BrowserProfileStore {
+    PinnedTabActions {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
   newTab: () => WorkspaceView;
@@ -168,11 +166,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...initialWorkspaceWindow(),
       ...initialBookmarkNavigation(),
       ...initialTabGroups(),
-      ...browserProfileSlice(set, get),
       lastUsedViewByGroup: {},
       closedItems: [],
       setScope: (scopeKey) => {
-        const update = switchWorkspaceScope(get(), scopeTarget(get().activeScopeKey, scopeKey));
+        const update = switchWorkspaceScope(get(), scopeKey);
         if (update) set(update);
       },
       ...tabGroupActions(set, get),
@@ -815,7 +812,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         set(initialTabGroups());
         set({
           ...initialWorkspaceWindow(),
-          browserProfiles: [],
           ...initialBookmarkNavigation(),
           lastUsedViewByGroup: {},
           closedItems: [],

@@ -3,8 +3,10 @@ import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
 import { openExternalLink } from "@/features/workspace/externalLinks";
 import { isLinkTargetWindow } from "@/features/workspace/spaceWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import type { UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+/** Native routes web links to the Space that claims their site, then says so here. */
+const spaceLinksEvent = "misty://space-links";
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
 export function installMistyDeepLinkHandler(
@@ -14,31 +16,39 @@ export function installMistyDeepLinkHandler(
 ): () => void {
   let active = true;
   let unlisten: UnlistenFn | null = null;
+  let unlistenLinks: UnlistenFn | null = null;
   let lastCurrentSignature: string | null = null;
   let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
-  const handleUrls = async (urls: string[] | null, source: "current" | "event") => {
-    if (!active || !urls) return;
-    // Every Space window hears these; only the one used last opens them.
-    if (!(await isLinkTargetWindow())) return;
+  // Web links from other apps (Misty as the default browser) are routed natively to
+  // the Space that claims their site, else to the window used last; each window
+  // takes its own, one tab each.
+  const takeWebLinks = async () => {
     if (!active) return;
-    const signature = urls.join("\n");
-    if (source === "current" && signature === lastCurrentSignature) return;
-    // A cold launch reports the same links as both the current URL and an event.
-    if (signature === lastCurrentSignature && Date.now() - lastHandledAt < 1500) return;
-    lastCurrentSignature = signature;
-    lastHandledAt = Date.now();
-    // Web links arrive here once Misty is the default browser; each opens in its own tab.
-    const webUrls = urls.filter(isWebUrl);
+    const webUrls = await invoke<string[]>("app_take_launch_urls").catch(() => []);
     for (const url of webUrls) {
+      if (!active || !isWebUrl(url)) continue;
       try {
         navigate(openExternalLink(url).route);
       } catch {
         // An address the browser can't open is ignored, as it would be from the omnibox.
       }
     }
-    if (webUrls.length) return;
-    for (const url of urls) {
+  };
+  const handleUrls = async (urls: string[] | null, source: "current" | "event") => {
+    if (!active || !urls) return;
+    const mistyUrls = urls.filter((url) => !isWebUrl(url));
+    if (!mistyUrls.length) return;
+    // Every Space window hears these; only the one used last opens them.
+    if (!(await isLinkTargetWindow())) return;
+    if (!active) return;
+    const signature = mistyUrls.join("\n");
+    if (source === "current" && signature === lastCurrentSignature) return;
+    // A cold launch reports the same links as both the current URL and an event.
+    if (signature === lastCurrentSignature && Date.now() - lastHandledAt < 1500) return;
+    lastCurrentSignature = signature;
+    lastHandledAt = Date.now();
+    for (const url of mistyUrls) {
       const route = routeForMistyDeepLink(url, isRouteAllowed, resolveAuthRoute);
       if (route) {
         navigate(route);
@@ -59,8 +69,8 @@ export function installMistyDeepLinkHandler(
     try {
       if (!hasTauriInternals()) return;
       await handleCurrentUrls();
-      // Web links Misty was started with as the default browser (Windows).
-      await handleUrls(await invoke<string[]>("app_take_launch_urls"), "current");
+      unlistenLinks = await listen(spaceLinksEvent, () => void takeWebLinks());
+      await takeWebLinks();
       unlisten = await onOpenUrl((urls) => void handleUrls(urls, "event"));
     } catch {}
   })();
@@ -72,6 +82,7 @@ export function installMistyDeepLinkHandler(
     document.removeEventListener("visibilitychange", handleVisibleCurrentUrls);
     if (currentUrlPoll !== null) window.clearInterval(currentUrlPoll);
     if (unlisten) void unlisten();
+    if (unlistenLinks) void unlistenLinks();
   };
 }
 export function routeForMistyDeepLink(

@@ -39,6 +39,9 @@ pub enum Kind {
     /// A saved website sign-in (`passwords` collection). Native-only: sealed with
     /// the vault key and never projected to a renderer.
     Login,
+    /// The sites a Space claims: links to them from other apps open in its
+    /// window (`space_settings` collection). Native-only.
+    SpaceSites,
 }
 
 impl Kind {
@@ -59,6 +62,7 @@ impl Kind {
             Self::ExtensionSyncKey => "extension_sync_key",
             Self::ExtensionRemoval => "extension_removal",
             Self::Login => "login",
+            Self::SpaceSites => "space_sites",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -184,6 +188,28 @@ pub struct Login {
     /// Milliseconds since the Unix epoch.
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+/// The sites a Space claims, as hosts (`mail.example.com`); subdomains match too.
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpaceSites {
+    pub hosts: Vec<String>,
+}
+
+/// The most hosts one Space may claim.
+pub const MAX_SPACE_SITES: usize = 200;
+
+/// A lowercase DNS host without a scheme, port or path.
+pub fn site_host(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 253
+        && !value.starts_with('.')
+        && !value.ends_with('.')
+        && !value.contains("..")
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'-'))
 }
 
 /// A web origin exactly as `Url::origin` serializes it, http or https only.
@@ -452,6 +478,16 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             }
             added_at(Some(v.created_at))?;
             added_at(Some(v.updated_at))?;
+        }
+        Kind::SpaceSites => {
+            let v: SpaceSites = serde_json::from_value(value)?;
+            let unique: BTreeSet<&str> = v.hosts.iter().map(String::as_str).collect();
+            if v.hosts.len() > MAX_SPACE_SITES
+                || unique.len() != v.hosts.len()
+                || !v.hosts.iter().all(|host| site_host(host))
+            {
+                return Err(Error::Invalid);
+            }
         }
         Kind::ExtensionRemoval => {
             #[derive(Deserialize)]

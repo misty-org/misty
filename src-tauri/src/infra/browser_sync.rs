@@ -47,6 +47,7 @@ mod profile;
 mod profile_selection;
 mod session_start;
 mod sessions;
+mod space_sites;
 mod space_vaults;
 mod vault_open;
 mod view;
@@ -79,6 +80,12 @@ use profile_selection::{
 };
 #[cfg(test)]
 use profile::{local_tab_session, resolve_local_profile, select_bound_profile};
+pub use space_sites::{browser_sync_set_space_sites, browser_sync_space_sites};
+pub(crate) use space_sites::{
+    __cmd__browser_sync_set_space_sites, __cmd__browser_sync_space_sites,
+    __tauri_command_name_browser_sync_set_space_sites,
+    __tauri_command_name_browser_sync_space_sites,
+};
 pub use space_vaults::browser_sync_space_window;
 pub(crate) use space_vaults::{
     __cmd__browser_sync_space_window, __tauri_command_name_browser_sync_space_window,
@@ -216,18 +223,13 @@ pub(crate) async fn extension_sync_handle(account: &str, space: &str) -> Option<
         .map(|s| s.handle.clone())
 }
 
-/// Whether `profile` is one of the account's own browser profiles (a vault's
-/// logical identity or the native store it is bound to), which a device
-/// profile must never be.
-pub(crate) async fn is_account_browser_profile(profile: &str) -> bool {
-    if sessions()
-        .vaults
-        .values()
-        .any(|entry| entry.logical == profile)
-    {
-        return true;
-    }
-    profile_selection::any_selected(|selected| selected.logical == profile || selected.physical == profile)
+/// Whether a vault keeps its website data in `store` (its logical identity or the
+/// native store bound to it). Erasing retired device-profile stores skips these.
+pub(crate) fn vault_uses_store(store: &str) -> bool {
+    sessions().vaults.values().any(|entry| entry.logical == store)
+        || profile_selection::any_selected(|selected| {
+            selected.logical == store || selected.physical == store
+        })
 }
 
 /// The shared clipboard rides on the personal vault's connection and seals

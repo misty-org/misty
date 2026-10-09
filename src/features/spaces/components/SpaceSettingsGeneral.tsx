@@ -10,6 +10,7 @@ import {
   Separator,
 } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
+import { SpaceSiteLinks } from "./SpaceSiteLinks";
 import type { SpaceSettingsController, SpaceSettingsSpace } from "./useSpaceSettingsController";
 
 export function SpaceSettingsGeneral({
@@ -98,6 +99,8 @@ export function SpaceSettingsGeneral({
           ) : null}
         </CardContent>
       </Card>
+
+      <SpaceSiteLinks spaceId={spaceId} />
 
       {canDelete || canLeave ? (
         <Card className="ring-charcoal-active/20" aria-labelledby="space-danger-heading">

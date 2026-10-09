@@ -229,7 +229,7 @@ async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), String> {
     let listed = permissions::browser_site_permissions_list(main.clone(), app.clone()).await?;
     let found = listed
         .iter()
-        .any(|entry| entry.origin == origin && entry.profile == profile);
+        .any(|entry| entry.saved.origin == origin && entry.saved.profile == profile);
     permissions::browser_site_permissions_reset(main.clone(), app.clone(), profile, origin).await?;
     if saved["permissions"]["camera"] != "allow"
         || saved["permissions"]["microphone"] != "block"

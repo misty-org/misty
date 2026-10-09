@@ -1,6 +1,7 @@
+//! Erasing a Space's website data store once the Space is deleted or left.
 use super::*;
 
-/// The SDK host derives this identity from the caller; package code cannot select a store.
+/// Closes the store's pages and erases its data. The caller picks the store natively.
 pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), String> {
     let identifier = browser_profile_identifier(Some(&profile_id))?;
     let ids = {
@@ -64,23 +65,6 @@ async fn remove_profile_directory(directory: &std::path::Path) -> Result<(), Str
 fn is_locked(error: &std::io::Error) -> bool {
     // ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION, ERROR_DIR_NOT_EMPTY
     cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33 | 145))
-}
-
-/// Erases a deleted device profile's website data. The default account profile
-/// is never a device profile, so it cannot be removed this way.
-#[tauri::command]
-pub async fn browser_device_profile_delete(
-    webview: Webview,
-    app: AppHandle,
-    profile_id: String,
-) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("Only Misty's trusted shell can remove browser profiles.".into());
-    }
-    if super::super::browser_sync::is_account_browser_profile(&profile_id).await {
-        return Err("The account's own browser profile can't be removed.".into());
-    }
-    remove(app, profile_id).await
 }
 
 /// Erases a deleted or left Space's website data. Its windows are already closed;

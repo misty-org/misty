@@ -33,19 +33,8 @@ pub async fn browser_webview_create(
     request.private = incognito.is_some();
     // On Windows each Space keeps its pages' data in its own folder, incognito included.
     let space_data = space_windows::space_store_identity(&space);
-    if space == space_windows::PERSONAL {
-        // Device profiles (`profile:` scopes) still live in the personal Space until
-        // they become Spaces; they may never name another Space's store.
-        if request
-            .profile_id
-            .as_deref()
-            .is_some_and(space_windows::is_space_store)
-        {
-            return Err("This page belongs to another Space.".into());
-        }
-    } else {
-        request.profile_id = space_windows::space_store_identity(&space);
-    }
+    // The personal Space uses its vault's store; every other Space its own.
+    request.profile_id = space_windows::space_store_identity(&space);
     // Incognito pages never restore a synced session or bind an account profile.
     let profile_lease = if request.private {
         super::super::browser_sync::browser_profile_lease(Some(&app), None, None).await?

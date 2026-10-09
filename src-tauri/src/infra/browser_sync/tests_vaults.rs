@@ -168,7 +168,6 @@ async fn one_unlock_serves_every_vault_and_a_lock_closes_them_all() {
         vault_for_profile(&space_logical).map(|(vault, _)| vault),
         Some(space_vault.clone())
     );
-    assert!(is_account_browser_profile(&space_logical).await);
 
     // Holding one Space's session never blocks another's.
     let held = session_by_id(&space_id).await;

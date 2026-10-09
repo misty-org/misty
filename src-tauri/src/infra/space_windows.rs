@@ -19,9 +19,11 @@ use tauri::{AppHandle, Emitter, EventTarget, Manager, Runtime, Window};
 
 mod commands;
 mod lifecycle;
+mod links;
 mod registry;
 pub use commands::*;
 pub use lifecycle::*;
+pub use links::*;
 pub use registry::*;
 #[cfg(test)]
 mod tests;

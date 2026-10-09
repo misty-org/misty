@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	syncRecordCollections = map[string]bool{"bookmarks": true, "tab_groups": true, "history": true, "extension_sync": true, "passwords": true, syncClipboardCollection: true}
+	syncRecordCollections = map[string]bool{"bookmarks": true, "tab_groups": true, "history": true, "extension_sync": true, "passwords": true, "space_settings": true, syncClipboardCollection: true}
 	syncRecordKeyPattern  = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 

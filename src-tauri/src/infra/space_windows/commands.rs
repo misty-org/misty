@@ -113,10 +113,12 @@ pub fn space_windows_menu(webview: tauri::Webview, app: AppHandle) -> Result<(),
     }
 }
 
-/// Whether this window should open links other apps hand to Misty.
+
+/// Whether this window opens Misty's own links (`misty://`): the last focused Space
+/// window. Web links are routed natively instead (see `links`).
 #[tauri::command]
 pub fn space_window_link_target(webview: tauri::Webview, app: AppHandle) -> bool {
-    is_link_target(&app, webview.label())
+    is_space_window(webview.label()) && primary_label(&app).as_deref() == Some(webview.label())
 }
 
 /// Closes a deleted or left Space's windows. Its website data is removed afterwards

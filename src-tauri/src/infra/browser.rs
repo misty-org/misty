@@ -769,10 +769,8 @@ mod tests;
 
 #[path = "browser_profile_cleanup.rs"]
 pub(crate) mod profile_cleanup;
-#[tauri::command]
-pub async fn browser_profile_remove(app: AppHandle, profile_id: String) -> Result<(), String> {
-    profile_cleanup::remove(app, profile_id).await
-}
+#[path = "browser_retired_profiles.rs"]
+pub(crate) mod retired_profiles;
 
 #[tauri::command]
 pub fn browser_runtime_for_scope(

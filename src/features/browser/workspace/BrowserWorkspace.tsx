@@ -54,7 +54,6 @@ import { useBrowserPageCommands } from "./useBrowserPageCommands";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
 import { useBrowserReadingTools } from "./useBrowserReadingTools";
 import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButtons";
-import { profileDataIdForView } from "@/features/workspace/browserProfiles";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
@@ -95,10 +94,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
   const internalPage = browserInternalPage(state.url);
-  // Views in a device profile use that profile's website data and history.
-  const profileId = useWorkspaceStore(
-    (store) => state.profileId ?? profileDataIdForView(store, tab.id),
-  );
+  const profileId = state.profileId;
   useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const { isOffline, handleRetry, handleGoHome } = useBrowserOnlineStatus(
     tab,

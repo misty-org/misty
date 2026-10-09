@@ -15,6 +15,10 @@ pub struct SpaceEntry {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    /// The sites the Space claims, copied from its vault so links route while the
+    /// vault is locked (see `links`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sites: Vec<String>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -159,6 +163,7 @@ pub(super) fn ensure_entry(state: &mut Registry, key: &str) -> SpaceEntry {
                     "Space".into()
                 },
                 color: Some(color),
+                sites: Vec::new(),
             },
         );
     }

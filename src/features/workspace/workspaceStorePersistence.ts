@@ -11,9 +11,9 @@ import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./wor
 import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
 import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
 import type { WorkspaceScopeKey, WorkspaceWindow } from "./model";
-import type { BrowserProfile } from "./browserProfiles";
 import type { MistyTabGroup } from "./tabGroups";
 import { windowSpaceScope } from "./spaceWindow";
+import { eraseRetiredBrowserProfiles } from "./retiredBrowserProfiles";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 
 /** Saved state from before each Space had its own OS window: virtual windows per scope,
@@ -24,9 +24,13 @@ type LegacyWindows = {
   closedWindowsByScope?: unknown;
 };
 
-/** The scope this window keeps for what was saved under a legacy scope key. */
-function currentScope(scope: string | undefined): WorkspaceScopeKey {
-  return scope?.startsWith("profile:") ? (scope as WorkspaceScopeKey) : windowSpaceScope();
+/** The scope this window keeps for what was saved under a legacy scope key: the
+ * default workspace and Space scopes become this window's. Device browser profiles
+ * are gone (they became Spaces); their layouts are dropped, `null`. */
+function currentScope(scope: string | undefined): WorkspaceScopeKey | null {
+  return scope === undefined || scope === "global" || scope.startsWith("space:")
+    ? windowSpaceScope()
+    : null;
 }
 
 /**
@@ -40,30 +44,40 @@ function dropVirtualWindows(state: Partial<WorkspaceStore> & LegacyWindows): Par
   const layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>> = {};
   let windowId = state.activeWindowId;
   let dockingLayout: DockingLayout | undefined = state.dockingLayout;
-  for (const [scope, layout] of Object.entries(state.layoutsByScope ?? {}))
-    if (layout) layoutsByScope[currentScope(scope)] = layout;
+  const savedOwn = currentScope(savedActive) !== null;
+  for (const [scope, layout] of Object.entries(state.layoutsByScope ?? {})) {
+    const kept = currentScope(scope);
+    if (layout && kept) layoutsByScope[kept] = layout;
+  }
   for (const [scope, windows] of Object.entries(windowsByScope ?? {})) {
-    if (!windows?.length) continue;
+    const kept = currentScope(scope);
+    if (!windows?.length || !kept) continue;
     const active =
       windows.find((window) => window.id === activeWindowIdByScope?.[scope]) ?? windows[0];
-    layoutsByScope[currentScope(scope)] = active.layout;
-    if (scope === savedActive || (scope === "global" && !savedActive?.startsWith("profile:"))) {
+    layoutsByScope[kept] = active.layout;
+    if (scope === savedActive || (scope === "global" && !savedOwn)) {
       windowId = active.id;
       dockingLayout ??= active.dockingLayout;
     }
   }
-  const activeScopeKey = currentScope(savedActive);
-  const layout = state.layout ?? layoutsByScope[activeScopeKey];
+  const activeScopeKey = windowSpaceScope();
+  // A device profile's layout on screen at quit is dropped with the profile.
+  const layout = (savedOwn ? state.layout : undefined) ?? layoutsByScope[activeScopeKey];
   if (layout) layoutsByScope[activeScopeKey] = layout;
+  const { browserProfiles, ...kept } = rest as typeof rest & { browserProfiles?: unknown };
+  eraseRetiredBrowserProfiles(browserProfiles);
   return {
-    ...rest,
+    ...kept,
     activeScopeKey,
     layout: layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(activeScopeKey),
     layoutsByScope,
     activeWindowId: windowId ?? createWorkspaceWindowId(),
     dockingLayout,
-    tabGroups: (state.tabGroups as (MistyTabGroup & { scopeKey: string })[] | undefined)?.map(
-      (group) => ({ ...group, scopeKey: currentScope(group.scopeKey) }),
+    tabGroups: (state.tabGroups as (MistyTabGroup & { scopeKey: string })[] | undefined)?.flatMap(
+      (group) => {
+        const scopeKey = currentScope(group.scopeKey);
+        return scopeKey ? [{ ...group, scopeKey }] : [];
+      },
     ),
   };
 }
@@ -83,7 +97,6 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     ...initialBookmarkNavigation(),
     ...initialTabGroups(),
     ...sanitizeRetiredWorkspaceSurfaces(migrated),
-    browserProfiles: validBrowserProfiles(migrated.browserProfiles),
     ...migrateSavedLinkGroups({
       ...migrated,
       bookmarkFolders: userBookmarkFolders(
@@ -94,23 +107,6 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     }),
     bookmarkFolders: userBookmarkFolders(migrated.bookmarkFolders ?? [], migrated.bookmarks ?? []),
   } as WorkspaceStore;
-}
-
-/** Stored profiles are kept only when complete; a broken entry is dropped, not repaired. */
-function validBrowserProfiles(value: unknown): BrowserProfile[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(
-    (profile): profile is BrowserProfile =>
-      Boolean(profile) &&
-      typeof profile.id === "string" &&
-      typeof profile.name === "string" &&
-      typeof profile.dataId === "string" &&
-      /^[a-f0-9]{64}$/.test(profile.dataId) &&
-      typeof profile.createdAt === "number" &&
-      (profile.sites === undefined ||
-        (Array.isArray(profile.sites) &&
-          profile.sites.every((site: unknown) => typeof site === "string"))),
-  );
 }
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
@@ -177,7 +173,6 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
       savedTabs: g.savedTabs ? savableGroupTabs(g.savedTabs) : undefined,
     })),
     migratedTabGroupIds: state.migratedTabGroupIds,
-    browserProfiles: state.browserProfiles,
     bookmarkFolders: state.bookmarkFolders,
     bookmarks: state.bookmarks,
     expandedBookmarkFolders: state.expandedBookmarkFolders,

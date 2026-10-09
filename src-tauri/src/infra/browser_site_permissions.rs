@@ -15,6 +15,15 @@ pub struct SavedPermission {
     pub permissions: Permissions,
 }
 
+/// A saved choice with the Space whose store holds it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListedPermission {
+    #[serde(flatten)]
+    pub saved: SavedPermission,
+    pub space: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SiteInfo {
@@ -228,13 +237,23 @@ pub async fn browser_site_permissions_set(
     Ok(info)
 }
 
-/// Profiles with an open tab. Dormant profiles of another signed-in account stay hidden.
-fn active_profiles(app: &AppHandle) -> std::collections::HashSet<String> {
+/// The stores of Spaces with an open tab, with each Space's name. Dormant stores of
+/// another signed-in account stay hidden.
+fn active_profiles(app: &AppHandle) -> std::collections::HashMap<String, String> {
+    let spaces = crate::infra::space_windows::listed_spaces();
     app.webviews()
-        .into_keys()
-        .filter_map(|label| match session_scope(app, &label)? {
-            StoreScope::Persistent(profile) => Some(profile),
-            StoreScope::Temporary(_) => None,
+        .into_iter()
+        .filter_map(|(label, view)| {
+            let StoreScope::Persistent(profile) = session_scope(app, &label)? else {
+                return None;
+            };
+            let key = crate::infra::space_windows::space_for_owner(view.window().label())?;
+            let name = spaces
+                .iter()
+                .find(|space| space.key == key)
+                .map(|space| space.name.clone())
+                .unwrap_or_else(|| "Space".into());
+            Some((profile, name))
         })
         .collect()
 }
@@ -243,19 +262,22 @@ fn active_profiles(app: &AppHandle) -> std::collections::HashSet<String> {
 pub async fn browser_site_permissions_list(
     caller: Webview,
     app: AppHandle,
-) -> Result<Vec<SavedPermission>, String> {
+) -> Result<Vec<ListedPermission>, String> {
     require_host(&caller)?;
     let active = active_profiles(&app);
     Ok(read_store()
         .into_iter()
-        .filter(|(profile, _)| active.contains(profile))
-        .flat_map(|(profile, sites)| {
+        .filter_map(|(profile, sites)| Some((active.get(&profile)?.clone(), profile, sites)))
+        .flat_map(|(space, profile, sites)| {
             sites
                 .into_iter()
-                .map(move |(origin, permissions)| SavedPermission {
-                    profile: profile.clone(),
-                    origin,
-                    permissions,
+                .map(move |(origin, permissions)| ListedPermission {
+                    saved: SavedPermission {
+                        profile: profile.clone(),
+                        origin,
+                        permissions,
+                    },
+                    space: space.clone(),
                 })
         })
         .collect())
@@ -270,8 +292,8 @@ pub async fn browser_site_permissions_reset(
 ) -> Result<(), String> {
     require_host(&caller)?;
     let origin = canonical_origin(&origin)?;
-    if !active_profiles(&app).contains(&profile) {
-        return Err("Open a tab in this browser profile before resetting its permissions.".into());
+    if !active_profiles(&app).contains_key(&profile) {
+        return Err("Open a tab in this Space before resetting its permissions.".into());
     }
     // Serialize all store read/modify/write operations on the main thread.
     let (tx, rx) = tokio::sync::oneshot::channel();

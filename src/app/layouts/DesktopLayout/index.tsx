@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
+import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
 import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
@@ -179,6 +180,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <ExtensionPermissionRequest />
       <ExtensionInstallRequest />
+      <SpaceImportRequest />
       <main
         ref={shellRef}
         className={cn(

@@ -50,9 +50,9 @@ export function BrowserPermissionSettings() {
     <DesktopSettingsSection
       title="Website permissions"
       description={
-        "Saved choices for open browser profiles. Websites ask before using your camera or " +
-        "microphone. Change a site's choices from the information button beside its address. " +
-        "Resetting stops capture in that browser profile."
+        "Saved choices for the Spaces open now; each Space keeps its own. Websites ask before " +
+        "using your camera or microphone. Change a site's choices from the information button " +
+        "beside its address. Resetting stops capture in that Space."
       }
     >
       {loading ? (
@@ -66,7 +66,7 @@ export function BrowserPermissionSettings() {
         />
       ) : !error && entries.length === 0 ? (
         <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No saved choices for open browser profiles. Websites use the default Ask setting.
+          No saved choices in the Spaces open now. Websites use the default Ask setting.
         </p>
       ) : (
         <ul className="divide-y divide-charcoal-border">
@@ -81,13 +81,8 @@ export function BrowserPermissionSettings() {
                   Camera: {permissionLabels[entry.permissions.camera]} · Microphone:{" "}
                   {permissionLabels[entry.permissions.microphone]}
                 </p>
-                {entries.some(
-                  (other) => other.origin === entry.origin && other.profile !== entry.profile,
-                ) ? (
-                  <p className="mt-1 text-xs text-cream-muted">
-                    Browser profile{" "}
-                    {entries.findIndex((other) => other.profile === entry.profile) + 1}
-                  </p>
+                {new Set(entries.map((other) => other.space)).size > 1 ? (
+                  <p className="mt-1 text-xs text-cream-muted">{entry.space}</p>
                 ) : null}
               </div>
               <Button

@@ -27,9 +27,10 @@ pub async fn browser_sync_edit(
             document::entities::Kind::ExtensionSyncKey
                 | document::entities::Kind::ExtensionRemoval
                 | document::entities::Kind::Login
+                | document::entities::Kind::SpaceSites
         )
     }) {
-        return Err("Extension storage and passwords are managed natively.".into());
+        return Err("Extension storage, passwords and Space sites are managed natively.".into());
     }
     if let Some(result) = workspace_edit(
         &session_id,

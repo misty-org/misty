@@ -2,7 +2,6 @@ import type { WorkspaceView } from "@/features/workspace";
 import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
 import { checkBrowserOverlayTransparency } from "./browserOverlayGuard";
-import { browserProfileFor } from "./browserProfileResolver";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
 import {
   cancelDeferredHide,
@@ -187,7 +186,7 @@ export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
   const generation = previewGeneration;
   const current = () => stillCurrent() && generation === previewGeneration;
-  const profileId = browserProfileFor(tab.id, state.profileId);
+  const profileId = state.profileId;
   try {
     if (!existing) {
       await invoke("browser_webview_create", {
@@ -337,9 +336,6 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     return;
   }
   closedRuntimes.delete(id);
-  // A view in a device profile opens in that profile's own website data.
-  const profileId = browserProfileFor(input.tab.id, input.profileId);
-  if (profileId) input = { ...input, profileId };
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   if (!createdRuntimeIds.has(id)) {
     markBrowserPerf(id, "create start");
