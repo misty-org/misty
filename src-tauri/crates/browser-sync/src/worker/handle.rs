@@ -424,4 +424,15 @@ impl WorkerHandle {
     pub fn stop(&self) {
         let _ = self.stop.send(true);
     }
+
+    /// Keeps this vault's socket open while true (a window shows the vault).
+    /// While false it pulls every `batch::pull_interval`, and connects at once
+    /// to publish anything queued. New workers start live.
+    pub fn set_live(&self, live: bool) {
+        self.live.send_if_modified(|current| {
+            let changed = *current != live;
+            *current = live;
+            changed
+        });
+    }
 }

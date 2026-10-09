@@ -65,7 +65,7 @@ async fn workspace_edit(
     epoch: &str,
     edit: WorkspaceEdit,
 ) -> Option<Result<(), String>> {
-    let current = session().lock().await;
+    let current = session_by_id(session_id).await;
     let active = match current.as_ref() {
         Some(active) => active,
         None => return Some(Err("Unlock browser sync first.".into())),
@@ -97,7 +97,7 @@ pub(super) async fn enqueue(
     payload: Payload,
 ) -> Result<String, String> {
     payload.validate().map_err(issue)?;
-    let current = session().lock().await;
+    let current = session_by_id(session_id).await;
     let active = current.as_ref().ok_or("Unlock browser sync first.")?;
     require_session(active, session_id)?;
     if !full_sync_enabled(active) {

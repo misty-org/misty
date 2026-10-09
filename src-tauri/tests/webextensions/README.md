@@ -38,6 +38,12 @@ where a tab is queryable and has an action but is absent from WebKit's `openTabs
 content-script message routing requires that open registration. The regression
 fails against the previous registration path and passes for both fixture versions.
 
+`space-probe.m` runs two `WKWebExtensionController`s at once, one per Space, each
+over its Space's named website data store, as Misty's host does (one host per
+Space). It checks that a content script runs in both, that extension storage stays
+in its own Space across a restart (a second process), and that removing a Space's
+controller data and store leaves nothing behind.
+
 JavaScript tests use the production sync bridge. Rust tests cover package integrity,
 identity, traversal, symlinks, expanded-size limits, compatibility findings,
 encrypted journal namespace binding, encrypted collection records, removal
@@ -52,7 +58,10 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib mozilla_package_intake -- 
 
 ## Architecture and boundaries
 
-- `native/macos/MistyExtensions.m` owns controllers, context configurations,
+- `native/macos/MistyExtensions.m` keeps one host per Space, keyed by the Space's
+  key. Each owns its controller (identity derived from the account and Space,
+  default store the Space's own), contexts, tabs and windows; it is made when the
+  Space first runs extensions and freed when the Space's last window closes. It owns controllers, context configurations,
   tab/window adapters, permissions, actions and bridge views. Extension-page
   configurations retain WebKit's supplied data store. Each Misty-created extension
   page gets a fresh user-content controller; sharing WebKit's returned controller

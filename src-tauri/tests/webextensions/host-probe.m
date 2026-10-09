@@ -6,6 +6,9 @@
 #import <sys/resource.h>
 
 static NSString *account, *root, *pageURL;
+// Probes run as one Space with its own named store.
+static NSString *const ProbeStore = @"6D697374-7900-4000-8000-70726F626573";
+
 static NSWindow *window;
 static NSMutableArray<WKWebView *> *views;
 static BOOL bridgeReady, pageReady, privateReady, completed, replacing;
@@ -27,18 +30,18 @@ static void replied(void *pointer,const char *json) {
     completion(value);
 }
 static void request(NSDictionary *input,Completion completion) {
-    NSMutableDictionary *value=[input mutableCopy]; if (!value[@"account"]) value[@"account"]=account;
+    NSMutableDictionary *value=[input mutableCopy]; if (!value[@"account"]) value[@"account"]=account; if (!value[@"space"]) value[@"space"]=@"probe";
     NSData *data=[NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
     misty_extensions_request([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String,replied,(__bridge_retained void *)[completion copy]);
 }
 static WKWebView *viewFor(NSString *url,NSString *identifier,BOOL privateTab) {
     WKWebViewConfiguration *original=[WKWebViewConfiguration new]; original.websiteDataStore=[WKWebsiteDataStore nonPersistentDataStore];
-    WKWebViewConfiguration *configuration=CFBridgingRelease(misty_extensions_configuration((__bridge void *)original,url.UTF8String,false));
+    WKWebViewConfiguration *configuration=CFBridgingRelease(misty_extensions_configuration("probe",(__bridge void *)original,url.UTF8String));
     if (!configuration) fail(@"Native configuration was not returned");
     WKWebView *view=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,500,300) configuration:configuration];
     view.navigationDelegate=navigation;
     [views addObject:view]; [window.contentView addSubview:view];
-    misty_extensions_register_tab((__bridge void *)view,identifier.UTF8String,privateTab,url.UTF8String);
+    misty_extensions_register_tab("probe",(__bridge void *)view,identifier.UTF8String,privateTab,url.UTF8String);
     if (!replacing) [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]]];
     return view;
 }
@@ -112,11 +115,11 @@ int main(int argc,const char *argv[]) {
         window=[[NSWindow alloc] initWithContentRect:NSMakeRect(80,80,500,400) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
         [window makeKeyAndOrderFront:nil];
         misty_extensions_set_events(events);
-        request(@{@"operation":@"configure",@"controllerId":NSUUID.UUID.UUIDString},^(NSDictionary *result) {
+        request(@{@"operation":@"configure",@"controllerId":NSUUID.UUID.UUIDString,@"store":ProbeStore},^(NSDictionary *result) {
             request(@{@"operation":@"load",@"id":@"1",@"guid":@"native-fixture@misty.test",@"origin":NSUUID.UUID.UUIDString.lowercaseString,@"runtimePath":root,@"privateAccess":@YES,@"permissions":@[@"storage",@"activeTab",@"scripting"],@"hosts":@[@"http://127.0.0.1/*"]},^(NSDictionary *result) {
                 viewFor(pageURL,@"normal",NO);
                 viewFor(pageURL,@"private",YES);
-                misty_extensions_tab_event("normal","activate"); poll();
+                misty_extensions_tab_event("probe","normal","activate"); poll();
             });
         });
         [NSApp run];

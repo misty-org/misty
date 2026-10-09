@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
-        OnceLock,
+        Arc, OnceLock,
     },
 };
 
@@ -41,8 +41,13 @@ mod workspaces;
 
 mod account;
 mod database;
+mod database_legacy;
 mod os_version;
 mod profile;
+mod profile_selection;
+mod session_start;
+mod sessions;
+mod space_vaults;
 mod vault_open;
 mod view;
 mod workspace_control;
@@ -51,6 +56,7 @@ mod workspace_edits;
 pub use account::browser_sync_lock;
 pub use account::browser_sync_set_frequency;
 use account::stop;
+use sessions::*;
 pub(crate) use account::{__cmd__browser_sync_lock, __tauri_command_name_browser_sync_lock};
 pub(crate) use account::{
     __cmd__browser_sync_set_frequency, __tauri_command_name_browser_sync_set_frequency,
@@ -62,14 +68,21 @@ pub(crate) use database::{
     __tauri_command_name_browser_sync_availability, __tauri_command_name_browser_sync_forget_key,
 };
 pub use database::{browser_sync_availability, browser_sync_forget_key, VaultAvailability};
-use database::{database_path, retire_database};
+use database::{database_path, personal_vault_id, remember_personal_vault, retire_database};
 use os_version::os_version;
 #[cfg(any(target_os = "macos", windows))]
 pub(super) use profile::popup_lifecycle_lease;
 pub(super) use profile::{browser_profile_lease, BrowserProfileLease};
-use profile::{default_profile_id, selected_profile, SelectedProfile};
+use profile::{default_profile_id, SelectedProfile};
+use profile_selection::{
+    clear_selected_profiles, selected_profile, set_selected_profile, store_lock,
+};
 #[cfg(test)]
 use profile::{local_tab_session, resolve_local_profile, select_bound_profile};
+pub use space_vaults::browser_sync_space_window;
+pub(crate) use space_vaults::{
+    __cmd__browser_sync_space_window, __tauri_command_name_browser_sync_space_window,
+};
 pub(super) use vault_open::account_api;
 use vault_open::open_vault_with;
 pub(crate) use vault_open::{
@@ -130,22 +143,22 @@ struct Session {
     #[cfg(any(target_os = "macos", windows))]
     capture_view: Option<capture::CaptureView>,
     /// While the vault is open this device can admit and remove devices
-    /// (docs/design/devices/BRIEF.md). Dropped, and zeroized, on lock.
+    /// (docs/design/devices/BRIEF.md). Dropped, and zeroized, on lock. For
+    /// the personal vault it also opens every Space vault.
     admission_root: VaultRoot,
-}
-
-static SESSION: OnceLock<Mutex<Option<Session>>> = OnceLock::new();
-fn session() -> &'static Mutex<Option<Session>> {
-    SESSION.get_or_init(|| Mutex::new(None))
+    /// This device's signing key, shared by every vault it is in.
+    device_key: DeviceKey,
+    /// The Space this vault belongs to; None for the personal vault.
+    space_id: Option<String>,
 }
 
 /// The open vault's root, scope and this device's sync identity, for signing
-/// device grants and lists. None while the vault is locked.
+/// device grants and lists. Admission uses the personal vault, whose root
+/// opens every other vault. None while the vault is locked.
 pub(crate) async fn device_admission_authority(
     account: &str,
 ) -> Option<(VaultRoot, VaultScope, String)> {
-    session()
-        .lock()
+    personal_session()
         .await
         .as_ref()
         .filter(|s| s.scope.account_id == account)
@@ -182,49 +195,70 @@ pub(crate) async fn open_with_transferred_root(
     .await
 }
 
-/// Native extension settings share the encrypted account transport, independent
-/// of whether this device shares its tabs or website sign-ins.
-pub(crate) async fn extension_sync_handle(account: &str) -> Option<WorkerHandle> {
-    session()
-        .lock()
-        .await
+/// Native extension settings ride the vault of the Space they are installed in,
+/// independent of whether this device shares its tabs or website sign-ins.
+/// `space` is the Space's key; None while that Space's vault is not open.
+pub(crate) async fn extension_sync_handle(account: &str, space: &str) -> Option<WorkerHandle> {
+    let session = match crate::infra::space_windows::space_id_for_key(space) {
+        None => personal_session().await,
+        Some(space_id) => {
+            let slot = sessions()
+                .vaults
+                .values()
+                .find(|entry| entry.space_id.as_deref() == Some(space_id.as_str()))
+                .map(|entry| entry.slot.clone());
+            lock_slot(slot).await
+        }
+    };
+    session
         .as_ref()
         .filter(|s| s.scope.account_id == account)
         .map(|s| s.handle.clone())
 }
 
-/// Whether `profile` is the account's own browser profile (its logical identity
-/// or the native store it is bound to), which a device profile must never be.
+/// Whether `profile` is one of the account's own browser profiles (a vault's
+/// logical identity or the native store it is bound to), which a device
+/// profile must never be.
 pub(crate) async fn is_account_browser_profile(profile: &str) -> bool {
-    let logical = session()
-        .lock()
-        .await
-        .as_ref()
-        .and_then(|active| default_profile_id(&active.scope).ok());
-    let selected = selected_profile()
-        .lock()
-        .ok()
-        .and_then(|selected| selected.clone());
-    logical.as_deref() == Some(profile)
-        || selected
-            .is_some_and(|selected| selected.logical == profile || selected.physical == profile)
+    if sessions()
+        .vaults
+        .values()
+        .any(|entry| entry.logical == profile)
+    {
+        return true;
+    }
+    profile_selection::any_selected(|selected| selected.logical == profile || selected.physical == profile)
 }
 
-/// The shared clipboard rides on the account's sync connection and seals clips
-/// with a key derived from the vault root. None while the vault is locked.
+/// The shared clipboard rides on the personal vault's connection and seals
+/// clips with a key derived from its root: one ring per account, which every
+/// Space uses. None while the vault is locked.
 pub(crate) async fn clipboard_session(
     account: &str,
 ) -> Option<(WorkerHandle, misty_browser_sync::crypto::ClipboardKey)> {
-    let session = session().lock().await;
+    let session = personal_session().await;
     let active = session.as_ref().filter(|s| s.scope.account_id == account)?;
     let key = active.admission_root.clipboard_key(&active.scope).ok()?;
     Some((active.handle.clone(), key))
 }
 
-/// Saved passwords live in the unlocked vault of the signed-in account. None
-/// while the vault is locked.
+/// Saved passwords live in the unlocked personal vault of the signed-in
+/// account. None while the vault is locked.
 pub(crate) async fn vault_handle() -> Option<WorkerHandle> {
-    session().lock().await.as_ref().map(|s| s.handle.clone())
+    personal_session().await.as_ref().map(|s| s.handle.clone())
+}
+
+/// Whether a window shows `vault_id`. Only those vaults keep a socket open;
+/// the rest pull on the sync batching interval. The personal vault starts
+/// live and Space vaults dormant until a window opens them.
+pub(crate) async fn set_vault_open(vault_id: &str, open: bool) {
+    let slot = sessions()
+        .vaults
+        .get(vault_id)
+        .map(|entry| entry.slot.clone());
+    if let Some(active) = lock_slot(slot).await.as_ref() {
+        active.handle.set_live(open);
+    }
 }
 
 // A browser creation/import owns a read/write lease independently of worker

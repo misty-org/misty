@@ -25,7 +25,8 @@ impl CaptureView {
     }
 }
 
-pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
+/// One loop per vault session, in that vault's own store.
+pub(super) fn spawn(app: tauri::AppHandle, slot: Slot, expected: String) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(std::time::Duration::from_secs(2));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -36,11 +37,12 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 continue;
             }
             // The read side keeps the account from changing under the pass
-            // while pages still open; only loading or switching the store
-            // (which closes pages) takes the write side.
-            let lifecycle = browser_lifecycle().read().await;
+            // while pages still open; only loading or switching this vault's
+            // store (which closes its pages) takes that store's write side.
+            let _lifecycle = browser_lifecycle().read().await;
+            let mut vault = String::new();
             let pass = {
-                let mut current = session().lock().await;
+                let mut current = slot.lock().await;
                 let Some(active) = current.as_mut().filter(|active| active.id == expected) else {
                     break;
                 };
@@ -51,6 +53,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 ) {
                     continue;
                 }
+                vault.clone_from(&active.scope.vault_id);
                 // Workspaces keep sign-in data per device; legacy workspaces
                 // keep one set for the whole workspace.
                 if workspaces::workspace_mode(&active.handle.workspaces.borrow()) {
@@ -65,7 +68,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                 Ok(device_signin::Pass::Capture(plan)) => {
                     // Website storage is read with the session unlocked.
                     let collected = plan.collect(&app).await;
-                    let mut current = session().lock().await;
+                    let mut current = slot.lock().await;
                     let Some(active) = current.as_mut().filter(|active| active.id == expected)
                     else {
                         break;
@@ -75,9 +78,8 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                     continue;
                 }
                 Ok(device_signin::Pass::Exclusive) => {
-                    drop(lifecycle);
-                    let _lifecycle = browser_lifecycle().write().await;
-                    let mut current = session().lock().await;
+                    let _store = store_lock(&vault).write_owned().await;
+                    let mut current = slot.lock().await;
                     let Some(active) = current.as_mut().filter(|active| active.id == expected)
                     else {
                         break;
@@ -91,7 +93,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
                     continue;
                 }
             };
-            let mut current = session().lock().await;
+            let mut current = slot.lock().await;
             let Some(active) = current.as_mut().filter(|active| active.id == expected) else {
                 break;
             };
@@ -119,6 +121,7 @@ async fn report(
         }
     };
     if issue != active.credential_issue {
+        note_issue(&active.scope.vault_id, issue.clone());
         active.credential_issue = issue;
         let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
     }

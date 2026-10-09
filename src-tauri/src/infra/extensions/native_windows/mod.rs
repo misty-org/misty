@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-//! Extensions on Windows run in WebView2, which is Chromium. Misty installs
-//! each loaded extension into the profile behind every open browser view, and
-//! reconciles a profile when one of its views opens, so a profile runs exactly
-//! the extensions loaded for the account.
+//! Extensions on Windows run in WebView2, which is Chromium. Each Space has its
+//! own host, as on macOS: Misty installs each extension a Space loads into the
+//! profile behind every open browser view of that Space (the Space's own data
+//! folder), and reconciles a profile when one of its views opens, so a profile
+//! runs exactly the extensions loaded for its Space.
 //!
 //! Each version runs from its own copy of the package, holding only the
 //! granted permissions and sites, since WebView2 grants whatever a manifest
@@ -60,6 +61,8 @@ struct Loaded {
 
 #[derive(Default)]
 struct Host {
+    /// The Space's key; its views are the only ones this host touches.
+    space: String,
     account: String,
     loaded: HashMap<String, Loaded>,
     /// Per profile path, the folder each extension was last installed from.
@@ -67,9 +70,9 @@ struct Host {
     private_tabs: HashSet<String>,
 }
 
-fn host() -> &'static Mutex<Host> {
-    static HOST: OnceLock<Mutex<Host>> = OnceLock::new();
-    HOST.get_or_init(Default::default)
+fn hosts() -> &'static Mutex<HashMap<String, Host>> {
+    static HOSTS: OnceLock<Mutex<HashMap<String, Host>>> = OnceLock::new();
+    HOSTS.get_or_init(Default::default)
 }
 
 pub(crate) fn page_host(origin: &str) -> Option<String> {
@@ -93,8 +96,24 @@ fn base(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .join("webview2"))
 }
 
-fn extension_root(app: &tauri::AppHandle, account: &str, id: &str) -> Result<PathBuf, String> {
-    Ok(base(app)?.join(short(&format!("{account}:{id}"))))
+/// A Space's staged copies of an extension. The personal Space keeps the
+/// account's folder from before Spaces.
+fn extension_root(host: &Host, id: &str) -> Result<PathBuf, String> {
+    let name = if host.space == crate::infra::space_windows::PERSONAL {
+        format!("{}:{id}", host.account)
+    } else {
+        format!("{}:{}:{id}", host.account, host.space)
+    };
+    Ok(base(app()?)?.join(short(&name)))
+}
+
+/// A removal waits per Space: the same extension may still run in another Space.
+fn removal(space: &str, crx: &str) -> String {
+    if space == crate::infra::space_windows::PERSONAL {
+        crx.to_owned()
+    } else {
+        format!("{space}:{crx}")
+    }
 }
 
 /// The extensions Misty installed into WebView2 profiles, across accounts,
@@ -132,32 +151,58 @@ fn update_ledger(change: impl FnOnce(&mut Ledger)) {
     }
 }
 
-fn emit(account: &str, kind: &str, mut data: Value) {
+fn emit(host: &Host, kind: &str, mut data: Value) {
     data["kind"] = json!(kind);
-    data["account"] = json!(account);
+    data["account"] = json!(host.account);
+    data["space"] = json!(host.space);
     if let Ok(app) = app() {
-        let _ = crate::infra::space_windows::emit(&app, "misty://extensions", data);
+        crate::infra::space_windows::emit_to_space(app, &host.space, "misty://extensions", data);
     }
 }
 
 pub async fn request(value: Value) -> Result<Value, String> {
     let operation = value["operation"].as_str().unwrap_or_default();
     let account = value["account"].as_str().unwrap_or_default();
-    let mut host = host().lock().await;
+    let space = value["space"].as_str().unwrap_or_default();
+    if operation == "validate" {
+        return validate(Path::new(value["runtimePath"].as_str().unwrap_or_default()));
+    }
+    let mut hosts = hosts().lock().await;
+    if operation == "configure" && account.is_empty() {
+        // Signing out stops every Space's host.
+        for host in hosts.values_mut() {
+            unload_all(host).await;
+        }
+        hosts.clear();
+        return Ok(json!({"supported": true}));
+    }
+    if space.is_empty() {
+        return Err("Extensions run in a Space.".into());
+    }
+    if operation == "release-space" || operation == "remove-space" {
+        // The Space's views are gone; a removed Space's profile folder, with its
+        // extensions' storage, goes with its website data.
+        hosts.remove(space);
+        return Ok(json!({}));
+    }
     if operation == "configure" {
+        let host = hosts.entry(space.to_owned()).or_insert_with(|| Host {
+            space: space.to_owned(),
+            ..Default::default()
+        });
         if account != host.account {
-            unload_all(&mut host).await;
+            unload_all(host).await;
             host.account = account.to_owned();
         }
         return Ok(json!({"supported": true}));
     }
-    if host.account.is_empty() || account != host.account {
-        return Err("The extension account changed.".into());
-    }
+    let host = match hosts.get_mut(space) {
+        Some(host) if !host.account.is_empty() && host.account == account => host,
+        _ => return Err("The extension account changed.".into()),
+    };
     let id = value["id"].as_str().unwrap_or_default();
     match operation {
-        "diagnostics" => Ok(diagnostics(&host)),
-        "validate" => validate(Path::new(value["runtimePath"].as_str().unwrap_or_default())),
+        "diagnostics" => Ok(diagnostics(host)),
         "layout" => {
             host.private_tabs = value["tabs"]
                 .as_array()
@@ -175,18 +220,18 @@ pub async fn request(value: Value) -> Result<Value, String> {
         | "compat-reply"
         | "compat-event" => Ok(json!({})),
         "pending-navigation" => Ok(json!({"pending": false})),
-        "load" => load(&mut host, &value).await,
+        "load" => load(host, &value).await,
         "unload" => {
-            unload(&mut host, id).await;
+            unload(host, id).await;
             Ok(json!({}))
         }
         "remove" => {
-            remove_extension(&mut host, id).await;
+            remove_extension(host, id).await;
             Ok(json!({}))
         }
-        "actions" => Ok(actions(&host, value["tabId"].as_str())),
-        "invoke" => invoke(&host, id, value["tabId"].as_str()),
-        "options" => options(&host, id),
+        "actions" => Ok(actions(host, value["tabId"].as_str())),
+        "invoke" => invoke(host, id, value["tabId"].as_str()),
+        "options" => options(host, id),
         "popup-evaluate" => {
             Err("Inspecting extension popups is not available on Windows yet.".into())
         }
@@ -195,13 +240,21 @@ pub async fn request(value: Value) -> Result<Value, String> {
     }
 }
 
-/// Reconciles the profile behind a newly opened browser view.
+/// The Space a browser view belongs to, from the window that holds it.
+fn view_space(view: &Webview) -> Option<String> {
+    crate::infra::space_windows::space_for_owner(view.window().label())
+}
+
+/// Reconciles the profile behind a newly opened browser view, for its Space.
 pub fn register(view: &Webview) {
     let view = view.clone();
     tauri::async_runtime::spawn(async move {
-        let mut host = host().lock().await;
-        if !host.account.is_empty() {
-            let _ = reconcile(&mut host, &view).await;
+        let Some(space) = view_space(&view) else {
+            return;
+        };
+        let mut hosts = hosts().lock().await;
+        if let Some(host) = hosts.get_mut(&space).filter(|host| !host.account.is_empty()) {
+            let _ = reconcile(host, &view).await;
         }
     });
 }
@@ -238,11 +291,13 @@ async fn load(host: &mut Host, request: &Value) -> Result<Value, String> {
         &strings(&request["permissions"]),
         &strings(&request["hosts"]),
     );
-    let root = extension_root(app, &host.account, id)?;
+    let _ = app;
+    let root = extension_root(host, id)?;
     let folder = stage(&root, &runtime, &granted)?;
     let crx = page_host(origin).unwrap_or_default();
+    let removed = removal(&host.space, &crx);
     update_ledger(|ledger| {
-        ledger.removed.remove(&crx);
+        ledger.removed.remove(&removed);
         ledger.managed.insert(crx);
     });
     host.loaded.insert(
@@ -256,8 +311,7 @@ async fn load(host: &mut Host, request: &Value) -> Result<Value, String> {
     );
     let errors = reconcile_open(host).await;
     prune(&root, &folder);
-    let account = host.account.clone();
-    emit(&account, "changed", json!({"id": id}));
+    emit(host, "changed", json!({"id": id}));
     Ok(json!({"loaded": true, "errors": errors}))
 }
 
@@ -268,7 +322,7 @@ async fn unload(host: &mut Host, id: &str) -> Option<String> {
     for applied in host.applied.values_mut() {
         applied.remove(&crx);
     }
-    for view in browser_views() {
+    for view in browser_views(&host.space) {
         let _ = set_enabled(&view, crx.clone(), false).await;
     }
     Some(crx)
@@ -278,7 +332,7 @@ async fn unload(host: &mut Host, id: &str) -> Option<String> {
 async fn remove_extension(host: &mut Host, id: &str) {
     let crx = match unload(host, id).await {
         Some(crx) => crx,
-        None => match app().and_then(|app| extension_root(app, &host.account, id)) {
+        None => match extension_root(host, id) {
             // Not running: its ID is in any staged manifest.
             Ok(root) => match staged_crx(&root) {
                 Some(crx) => crx,
@@ -287,13 +341,14 @@ async fn remove_extension(host: &mut Host, id: &str) {
             Err(_) => return,
         },
     };
-    for view in browser_views() {
+    for view in browser_views(&host.space) {
         let _ = remove(&view, crx.clone()).await;
     }
+    let removed = removal(&host.space, &crx);
     update_ledger(|ledger| {
-        ledger.removed.insert(crx);
+        ledger.removed.insert(removed);
     });
-    if let Ok(root) = app().and_then(|app| extension_root(app, &host.account, id)) {
+    if let Ok(root) = extension_root(host, id) {
         let _ = std::fs::remove_dir_all(root);
     }
 }
@@ -307,8 +362,8 @@ async fn unload_all(host: &mut Host) {
     host.private_tabs.clear();
 }
 
-/// The open browser views.
-fn browser_views() -> Vec<Webview> {
+/// The open browser views of one Space.
+fn browser_views(space: &str) -> Vec<Webview> {
     let Ok(app) = app() else {
         return Vec::new();
     };
@@ -318,12 +373,13 @@ fn browser_views() -> Vec<Webview> {
             label.starts_with("misty-browser-") && !label.starts_with("misty-browser-capture-")
         })
         .map(|(_, view)| view)
+        .filter(|view| view_space(view).as_deref() == Some(space))
         .collect()
 }
 
 async fn reconcile_open(host: &mut Host) -> Vec<String> {
     let mut errors = Vec::new();
-    for view in browser_views() {
+    for view in browser_views(&host.space) {
         if let Err(error) = reconcile(host, &view).await {
             errors.push(error);
         }
@@ -347,7 +403,7 @@ async fn reconcile(host: &mut Host, view: &Webview) -> Result<(), String> {
         if !ledger.managed.contains(crx) {
             continue;
         }
-        if ledger.removed.contains(crx) {
+        if ledger.removed.contains(&removal(&host.space, crx)) {
             remove(view, crx.clone()).await?;
         } else if *enabled && !wanted.contains_key(crx) {
             set_enabled(view, crx.clone(), false).await?;
@@ -417,7 +473,7 @@ fn invoke(host: &Host, id: &str, tab: Option<&str>) -> Result<Value, String> {
         )?;
     let url = page_url(loaded, popup)?;
     emit(
-        &host.account,
+        host,
         "open-window",
         json!({"urls": [url], "popup": true, "focused": true, "private": false}),
     );
@@ -435,7 +491,7 @@ fn options(host: &Host, id: &str) -> Result<Value, String> {
         .ok_or("This extension has no options page.")?;
     let url = page_url(loaded, page)?;
     emit(
-        &host.account,
+        host,
         "open-tab",
         json!({"url": url, "private": false}),
     );

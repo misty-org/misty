@@ -142,6 +142,8 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
             if QUITTING.load(Ordering::SeqCst) {
                 return;
             }
+            // The Space's window was its last: its extension host goes with it.
+            crate::infra::extensions::release_space(&parsed.space);
             if let Ok(mut state) = lock_registry() {
                 state.open.retain(|key| *key != parsed.space);
                 if state.last_focused.as_deref() == Some(label) {
@@ -256,6 +258,10 @@ pub fn delete_space(app: &AppHandle, key: &str) -> Result<(), String> {
     remove_space(app, key)?;
     let (app, key) = (app.clone(), key.to_owned());
     tauri::async_runtime::spawn(async move {
+        // Its extensions' storage lives in the Space's own controller.
+        if let Err(error) = crate::infra::extensions::remove_space(&app, &key).await {
+            eprintln!("Could not remove a Space's extension data: {error}");
+        }
         if let Err(error) = crate::infra::browser::profile_cleanup::remove_space_data(app, key).await {
             eprintln!("Could not remove a Space's website data: {error}");
         }

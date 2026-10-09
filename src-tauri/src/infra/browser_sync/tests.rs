@@ -1,6 +1,9 @@
 use super::*;
 use std::time::Duration;
 
+/// Tests that open sessions share the process-wide registry; they take turns.
+pub(super) static REGISTRY: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 #[test]
 fn retiring_a_rejected_database_keeps_its_files_out_of_account_lookup() {
     let directory = tempfile::tempdir().unwrap();
@@ -170,6 +173,8 @@ async fn local_profile_survives_failed_sync_verification_and_stopped_worker() {
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
         admission_root,
+        device_key: DeviceKey::generate(),
+        space_id: None,
     };
     // A failed read-back must not revoke an activated local store. This is
     // the same journal failure that previously prevented native tab creation.
@@ -304,12 +309,15 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
         #[cfg(any(target_os = "macos", windows))]
         capture_view: None,
         admission_root,
+        device_key: DeviceKey::generate(),
+        space_id: None,
     };
-    *session().lock().await = Some(active);
+    let _registry = REGISTRY.lock().await;
+    install(active, true).unwrap();
     let epoch = BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire);
     change_account_if(None, |_| false, || Ok(())).await.unwrap();
     assert!(
-        session().lock().await.is_some(),
+        personal_session().await.is_some(),
         "forgetting another saved login must not stop this worker"
     );
     assert_eq!(epoch, BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire));
@@ -317,7 +325,7 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
     let change = change_account(None, || {
         assert!(observer.status.borrow().phase == misty_browser_sync::worker::Phase::Stopped);
         assert!(
-            session().try_lock().is_err(),
+            browser_lifecycle().try_read().is_err(),
             "jar replacement must remain serialized with unlock"
         );
         assert!(
@@ -331,7 +339,7 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
         .await
         .is_err());
     assert!(
-        session().lock().await.is_some(),
+        personal_session().await.is_some(),
         "account shutdown must await the native creation lease"
     );
     let queued_creation = browser_profile_lease(None, None, None);
@@ -350,9 +358,12 @@ async fn account_replacement_waits_for_key_owner_and_releases_process_lock() {
         queued_creation.await.is_err(),
         "creation queued for the old account must not reopen it"
     );
-    assert!(session().lock().await.is_none());
+    assert!(personal_session().await.is_none());
     assert!(
         observer.snapshot().await.is_err(),
         "old handles cannot read decrypted data after account replacement"
     );
 }
+
+#[path = "tests_vaults.rs"]
+mod vaults;

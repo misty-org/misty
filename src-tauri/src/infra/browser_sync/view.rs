@@ -34,6 +34,49 @@ pub(super) struct SyncViewData {
     pending_operation_ids: Vec<String>,
     /// Workspaces (roster, lease, pending). `None` before workspace mode.
     sync: Option<misty_browser_sync::workspace::sync::SyncState>,
+    /// Spaces whose vault has a problem, on the personal vault's view only.
+    /// Sync shows one state for the account and names a Space only here.
+    space_problems: Vec<SpaceProblem>,
+}
+
+#[derive(Serialize)]
+pub(super) struct SpaceProblem {
+    space_id: String,
+    /// Authored text only, never platform errors or website data.
+    issue: Cow<'static, str>,
+}
+
+const SPACE_STOPPED: &str = "Sync stopped for this Space. Retry to reconnect it.";
+
+fn space_problems() -> Vec<SpaceProblem> {
+    let all = sessions();
+    let mut problems: Vec<SpaceProblem> = all
+        .failed
+        .iter()
+        .map(|(space_id, issue)| SpaceProblem {
+            space_id: space_id.clone(),
+            issue: issue.clone(),
+        })
+        .collect();
+    for entry in all.vaults.values() {
+        let Some(space_id) = &entry.space_id else {
+            continue;
+        };
+        let stopped = matches!(
+            entry.status.borrow().phase,
+            Phase::Attention | Phase::Stopped
+        );
+        let issue = match (&entry.issue, stopped) {
+            (_, true) => Cow::Borrowed(SPACE_STOPPED),
+            (Some(issue), false) => issue.clone(),
+            (None, false) => continue,
+        };
+        problems.push(SpaceProblem {
+            space_id: space_id.clone(),
+            issue,
+        });
+    }
+    problems
 }
 
 pub(super) async fn view(active: &mut Session) -> Result<SyncView, String> {
@@ -120,6 +163,10 @@ pub(super) async fn view(active: &mut Session) -> Result<SyncView, String> {
         workspace: active.cached_workspace.clone(),
         pending_operation_ids: active.cached_pending.clone(),
         sync: workspace_mode.then_some(sync_state),
+        space_problems: match active.space_id {
+            None => space_problems(),
+            Some(_) => Vec::new(),
+        },
     }))
 }
 
@@ -137,7 +184,7 @@ pub async fn browser_sync_account_feed(
     webview: tauri::Webview,
 ) -> Result<Option<AccountFeed>, String> {
     require_main(&webview)?;
-    let current = session().lock().await;
+    let current = personal_session().await;
     Ok(current.as_ref().map(|active| AccountFeed {
         account_id: active.scope.account_id.clone(),
         // A live socket is insufficient if its renderer event forwarder has
@@ -154,7 +201,7 @@ pub async fn browser_sync_account_feed(
 #[tauri::command]
 pub async fn browser_sync_state(webview: tauri::Webview) -> Result<Option<SyncView>, String> {
     require_main(&webview)?;
-    let mut current = session().lock().await;
+    let mut current = personal_session().await;
     match current.as_mut() {
         Some(active) => view(active).await.map(Some),
         None => Ok(None),

@@ -154,6 +154,7 @@ pub struct WorkerHandle {
     browser_imports: Arc<tokio::sync::Mutex<()>>,
     commands: mpsc::Sender<Command>,
     stop: watch::Sender<bool>,
+    live: Arc<watch::Sender<bool>>,
     pub status: watch::Receiver<Status>,
     pub presence: watch::Receiver<Vec<Presence>>,
     pub devices: watch::Receiver<Vec<Device>>,
@@ -174,6 +175,13 @@ pub struct Worker<F> {
     reduce: F,
     commands: mpsc::Receiver<Command>,
     stop: watch::Receiver<bool>,
+    /// Whether this vault keeps its socket open (a window shows it). Without
+    /// one it connects to pull and publish, then disconnects until the next pull.
+    live: watch::Receiver<bool>,
+    /// When the last pull finished while not live.
+    pulled_at: Option<Instant>,
+    /// The connected loop disconnected to go dormant, not to stop.
+    dormant_exit: bool,
     status: watch::Sender<Status>,
     presence: watch::Sender<Vec<Presence>>,
     devices: watch::Sender<Vec<Device>>,
@@ -220,6 +228,7 @@ where
         let head = store.observed_head()?;
         let (commands_tx, commands) = mpsc::channel(16);
         let (stop_tx, stop) = watch::channel(false);
+        let (live_tx, live) = watch::channel(true);
         let (status, status_rx) = watch::channel(Status {
             phase: Phase::Offline,
             applied_sequence: cursor,
@@ -247,6 +256,7 @@ where
             browser_imports: Arc::new(tokio::sync::Mutex::new(())),
             commands: commands_tx,
             stop: stop_tx,
+            live: Arc::new(live_tx),
             status: status_rx,
             presence: presence_rx,
             devices: devices_rx,
@@ -265,6 +275,9 @@ where
                 reduce,
                 commands,
                 stop,
+                live,
+                pulled_at: None,
+                dormant_exit: false,
                 status,
                 presence,
                 devices,
@@ -327,9 +340,15 @@ where
             if *self.stop.borrow() {
                 return Ok(());
             }
+            if !self.dormant().await? {
+                return Ok(());
+            }
             self.roster.clear();
             self.presence.send_replace(Vec::new());
-            self.report(Phase::Connecting, None)?;
+            // A dormant vault's routine pull keeps showing its last state.
+            if *self.live.borrow() || self.pulled_at.is_none() {
+                self.report(Phase::Connecting, None)?;
+            }
             // The attempt owns copies of only its signing identity. Local edits
             // can continue using the database while DNS/HTTP/socket setup waits.
             let api = self.api.clone();
@@ -374,6 +393,10 @@ where
                 Err(error) => Err(error),
             };
             match result {
+                Ok(()) if std::mem::take(&mut self.dormant_exit) => {
+                    self.presence.send_replace(Vec::new());
+                    continue;
+                }
                 Ok(()) => return Ok(()),
                 Err(Error::Network) => {}
                 Err(error) => return Err(error),
@@ -399,6 +422,41 @@ where
                 }
             }
         }
+    }
+
+    /// Waits while this vault is not live, has nothing to publish and pulled
+    /// less than a pull interval ago. False when the worker stops meanwhile.
+    async fn dormant(&mut self) -> Result<bool> {
+        loop {
+            if *self.live.borrow() || self.store.pending_count()? > 0 {
+                return Ok(true);
+            }
+            let Some(due) = self.pulled_at.map(|at| at + crate::batch::pull_interval()) else {
+                return Ok(true);
+            };
+            if Instant::now() >= due {
+                return Ok(true);
+            }
+            let wait = tokio::time::sleep_until(due);
+            tokio::pin!(wait);
+            tokio::select! {
+                biased;
+                _ = self.stop.changed() => return Ok(false),
+                result = self.live.changed() => if result.is_err() { return Ok(true); },
+                command = self.commands.recv() => { if !self.command(command)? { return Ok(false); } },
+                _ = &mut wait => return Ok(true),
+            }
+        }
+    }
+
+    /// Not live, caught up and nothing left to send: time to disconnect.
+    fn settled_for_dormancy(&self, in_flight: bool) -> Result<bool> {
+        Ok(!*self.live.borrow()
+            && !in_flight
+            && self.workspace_outbox.is_empty()
+            && self.flushes.is_empty()
+            && self.store.applied_sequence()? >= self.head
+            && self.store.pending_count()? == 0)
     }
 
     fn refresh_status(&self) -> Result<()> {
@@ -666,6 +724,11 @@ where
                     self.records_tick(socket).await?;
                     self.clipboard_tick(socket).await?;
                     self.settle_flushes()?;
+                    if self.settled_for_dormancy(in_flight.is_some())? {
+                        self.pulled_at = Some(Instant::now());
+                        self.dormant_exit = true;
+                        return Ok(());
+                    }
                     // Catch up before publishing offline credentials; the reducer
                     // will enforce their base-version preconditions atomically.
                     if in_flight.is_none() && self.devices.borrow().iter().any(|d| d.grant.device_id == self.store.grant().device_id && d.full_sync) && !self.roster.is_empty() && self.store.applied_sequence()? >= self.head {

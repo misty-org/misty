@@ -203,6 +203,33 @@ changes and add a per-vault lock for store selection so one vault's restore does
 Space's tabs. Background cost: N vaults mean N sockets; use the sync batching policy and open sockets
 only for vaults with an open window, pulling the rest on a timer.
 
+**Built 2026-10-16.** Sessions live in a registry keyed by `vault_id` (`browser_sync/sessions.rs`),
+each in its own `Arc<Mutex<Option<Session>>>`, so one Space's restore never stalls another's pages.
+Account-wide services (device admission, extensions, passwords, the clipboard, the account event
+feed, control advertisement) use the personal vault. `SELECTED_PROFILE` is a per-vault map that
+remembers the personal vault while locked (`profile_selection.rs`), and each vault has a store lock:
+leases take its read side, restores and store switches its write side, and `browser_lifecycle()`
+stays for account changes (order: lifecycle, store lock, session). `BrowserProfileLease` carries
+`vault_id`; a lease with no profile uses the personal vault, a named logical profile its own vault.
+Restores and store switches close only that profile's pages (`close_profile_views_except`).
+Databases live at `.local/sync/<account>/vaults/<sha256(vault_id)>/workspace.sqlite`; the older
+single database moves to the personal vault's path on first launch, and a `personal-vault` file
+names it. Unlock opens the personal vault, then `space_vaults::open_all` opens every Space vault
+from `GET /sync/vaults` (or, offline, from local caches with a `space` marker) with
+`open_space_root`; a device not yet in a vault joins with its personal device id and key, and its
+worker enrolls it. A Space session's legacy capture never falls back to the pre-sync store.
+Crate: `Vault` takes `key_envelope` or `space_key_envelope` (both optional, exactly one checked in
+`CachedVault::verify`), `SyncApi::for_vault` scopes the device roster, enrollment finds a Space
+vault through `vaults()`, and `WorkerHandle::set_live(false)` makes a worker pull every
+`batch::pull_interval()` (5 min scaled by sync frequency) and publish queued changes, holding no
+socket in between. Space vaults start dormant; `browser_sync_space_window(space_id, open)` creates
+the Space's vault if the person has none, opens it and keeps its socket open while a window shows
+it. **Phase 3 must call it** when a Space window opens and closes, and pass the Space's logical
+profile to `browser_profile_lease`. Status: the personal view carries `space_problems` and the
+badge names a Space only when its vault is the one in trouble. Not done: agent tasks still stop
+account-wide on a store switch (`stop_account_tasks`), and the isolated-stack live check (two
+Spaces, a sign-in restored on a second device in one Space only) hasn't run.
+
 ## Phase 3. One OS window per Space; virtual windows removed
 
 **Goal.** Every Misty window belongs to one Space, opens its pages in that Space's store, and takes

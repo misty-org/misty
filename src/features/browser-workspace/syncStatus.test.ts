@@ -126,3 +126,20 @@ it("offers Sync now while batched workspace edits wait to be sent", () => {
   waiting.status.phase = "offline";
   expect(selectSyncStatus({ ...base, session: waiting }).action?.kind).toBe("retry");
 });
+
+it("shows one account state and names a Space only when its vault has the problem", () => {
+  const issue = "Sync stopped for this Space. Retry to reconnect it.";
+  const view = { ...syncSession(), space_problems: [{ space_id: "s1", issue }] };
+  expect(selectSyncStatus({ ...base, session: view, spaceNames: { s1: "Studio" } })).toMatchObject({
+    tone: "attention",
+    title: "Studio needs attention",
+    detail: issue,
+    action: { kind: "retry" },
+  });
+  // An account-wide problem is the account's, whichever Space also struggles.
+  expect(
+    selectSyncStatus({ ...base, session: view, issue: "sign_in_required", spaceNames: { s1: "Studio" } })
+      .title,
+  ).toBe(syncIssues.sign_in_required.title);
+  expect(selectSyncStatus(base).title).toBe("Up to date");
+});

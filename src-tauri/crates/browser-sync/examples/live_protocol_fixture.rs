@@ -122,7 +122,8 @@ async fn main() {
             key_epoch: 1,
             head_sequence: 0,
             root_public_key: public.clone(),
-            key_envelope: wrapper.clone(),
+            key_envelope: Some(wrapper.clone()),
+            space_key_envelope: None,
         },
         bootstrap_pending: true,
         enrollment_pending: true,
@@ -159,7 +160,7 @@ async fn main() {
         .unwrap();
     let root = VaultRoot::unlock(
         &scope,
-        &cached.vault.key_envelope,
+        cached.vault.key_envelope.as_ref().unwrap(),
         password,
         &secret,
         &cached.vault.root_public_key,

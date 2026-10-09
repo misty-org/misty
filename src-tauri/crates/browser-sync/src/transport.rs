@@ -79,6 +79,9 @@ pub struct SyncApi {
     refreshed: Option<Arc<dyn Fn() -> Result<()> + Send + Sync>>,
     refresh_lock: Option<Arc<tokio::sync::Mutex<()>>>,
     traffic: Arc<TrafficCounters>,
+    /// A Space vault this client serves. Device lists without one mean the
+    /// personal vault.
+    vault_id: Option<String>,
 }
 
 impl SyncApi {
@@ -105,7 +108,16 @@ impl SyncApi {
             refreshed: None,
             refresh_lock: None,
             traffic: Arc::new(TrafficCounters::default()),
+            vault_id: None,
         })
+    }
+
+    /// The same account client, answering for one Space vault: its device
+    /// roster instead of the personal vault's.
+    pub fn for_vault(&self, vault_id: &str) -> Self {
+        let mut api = self.clone();
+        api.vault_id = Some(vault_id.to_owned());
+        api
     }
 
     /// Runs after the shared cookie jar accepts a rotated session. Hosts use
@@ -150,7 +162,15 @@ impl SyncApi {
         path: &str,
         body: Option<&impl Serialize>,
     ) -> Result<T> {
-        let endpoint = self.endpoint(path);
+        self.request_to(method, self.endpoint(path), body).await
+    }
+
+    async fn request_to<T: DeserializeOwned>(
+        &self,
+        method: reqwest::Method,
+        endpoint: Url,
+        body: Option<&impl Serialize>,
+    ) -> Result<T> {
         let mut response = self.request_once(method.clone(), &endpoint, body).await?;
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             self.refresh_session().await?;
@@ -333,8 +353,12 @@ impl SyncApi {
         struct Response {
             devices: Vec<Device>,
         }
+        let mut endpoint = self.endpoint("devices");
+        if let Some(vault_id) = &self.vault_id {
+            endpoint.query_pairs_mut().append_pair("vault_id", vault_id);
+        }
         let response: Response = self
-            .request(reqwest::Method::GET, "devices", None::<&()>)
+            .request_to(reqwest::Method::GET, endpoint, None::<&()>)
             .await?;
         Ok(response.devices)
     }

@@ -7,18 +7,19 @@
 
 static NSString *const ExtensionKey = @"mistyExtension";
 static NSString *const NameKey = @"mistyNotification";
+/// The Space whose extension posted it: clicks go back to that Space's host.
+static NSString *const SpaceKey = @"mistySpace";
 
 API_AVAILABLE(macos(15.4))
 @interface MistyExtensionNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
-@property (weak) MistyExtensionHost *host;
 @end
 
 API_AVAILABLE(macos(15.4)) static MistyExtensionNotificationDelegate *notificationDelegate;
 static NSMutableDictionary<NSString *, NSDictionary *> *notificationOptions;
 static NSMutableSet<UNNotificationCategory *> *notificationCategories;
 
-static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
-    NSData *data = [NSJSONSerialization dataWithJSONObject:@[extension, name] options:0 error:nil];
+static NSString *NotificationIdentifier(NSString *space, NSString *extension, NSString *name) {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:@[space ?: @"", extension, name] options:0 error:nil];
     return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
 }
 
@@ -32,7 +33,7 @@ static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center didReceiveNotificationResponse:(UNNotificationResponse *)response withCompletionHandler:(void (^)(void))done {
     NSDictionary *info = response.notification.request.content.userInfo;
     NSString *extension = info[ExtensionKey], *name = info[NameKey];
-    MistyExtensionHost *host = self.host;
+    MistyExtensionHost *host = MistyExtensionHostForSpace(info[SpaceKey]);
     if (host && [extension isKindOfClass:NSString.class] && [name isKindOfClass:NSString.class]) {
         NSString *action = response.actionIdentifier;
         if ([action isEqual:UNNotificationDefaultActionIdentifier]) [host deliverCompatEvent:@"notifications.onClicked" args:@[name] to:extension];
@@ -57,7 +58,6 @@ static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
         notificationCategories = [NSMutableSet set];
         center.delegate = notificationDelegate;
     }
-    notificationDelegate.host = self;
     return center.delegate == notificationDelegate ? center : nil;
 }
 
@@ -65,7 +65,7 @@ static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
     UNUserNotificationCenter *center = [self notificationCenter];
     if (!center) return NO;
     NSString *name = [args.firstObject isKindOfClass:NSString.class] ? args.firstObject : @"";
-    NSString *key = NotificationIdentifier(identifier, name);
+    NSString *key = NotificationIdentifier(self.space, identifier, name);
     if ([method isEqual:@"notifications.create"] || [method isEqual:@"notifications.update"]) {
         NSDictionary *given = args.count > 1 && [args[1] isKindOfClass:NSDictionary.class] ? args[1] : @{};
         BOOL update = [method isEqual:@"notifications.update"];
@@ -94,7 +94,7 @@ static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
             NSMutableDictionary *all = [NSMutableDictionary dictionary];
             for (UNNotification *notification in delivered) {
                 NSDictionary *info = notification.request.content.userInfo;
-                if ([info[ExtensionKey] isEqual:identifier] && [info[NameKey] isKindOfClass:NSString.class]) all[info[NameKey]] = @YES;
+                if ([info[ExtensionKey] isEqual:identifier] && [info[SpaceKey] isEqual:self.space] && [info[NameKey] isKindOfClass:NSString.class]) all[info[NameKey]] = @YES;
             }
             dispatch_async(dispatch_get_main_queue(), ^{ reply(all, nil); });
         }];
@@ -121,7 +121,7 @@ static NSString *NotificationIdentifier(NSString *extension, NSString *name) {
     content.body = [[lines filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"length > 0"]] componentsJoinedByString:@"\n"];
     BOOL silent = [options[@"silent"] boolValue];
     if (!silent) content.sound = UNNotificationSound.defaultSound;
-    content.userInfo = @{ExtensionKey:identifier, NameKey:name, @"silent":@(silent)};
+    content.userInfo = @{ExtensionKey:identifier, NameKey:name, SpaceKey:self.space ?: @"", @"silent":@(silent)};
     content.interruptionLevel = [options[@"requireInteraction"] boolValue] ? UNNotificationInterruptionLevelTimeSensitive : UNNotificationInterruptionLevelActive;
     content.categoryIdentifier = [self categoryFor:options center:center];
     UNNotificationAttachment *attachment = [self attachment:options[@"imageUrl"] ?: options[@"iconUrl"] identifier:identifier];

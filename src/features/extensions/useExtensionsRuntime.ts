@@ -32,6 +32,7 @@ import {
   installations,
   updateInstallation,
   parseInstallations,
+  spaceInstallationsRaw,
   useExtensionsStore,
 } from "./store";
 
@@ -96,7 +97,7 @@ export function useExtensionsRuntime() {
   const profile = useSettingsProfiles((s) => s.state);
   const profilesReady = useSettingsProfiles((s) => s.ready);
   const profilesError = useSettingsProfiles((s) => s.error);
-  const raw = profile ? String(resolveSetting(profile, "extensions.installations").value) : "[]";
+  const raw = spaceInstallationsRaw(profile);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;
@@ -149,10 +150,7 @@ export function useExtensionsRuntime() {
     if (!hasTauriInternals()) return;
     let cancelled = false;
     const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
-      if (
-        state.layout !== previous.layout ||
-        state.activeWindowId !== previous.activeWindowId
-      )
+      if (state.layout !== previous.layout || state.activeWindowId !== previous.activeWindowId)
         void publishLayout().catch(() => {});
     });
     const unsubscribeMedia = useBrowserMediaStore.subscribe((state, previous) => {
@@ -163,7 +161,8 @@ export function useExtensionsRuntime() {
     const stopNewTabOverride = startNewTabOverride();
     const stopPopups = watchExtensionPopups();
     const listener = listen<ExtensionEvent>("misty://extensions", ({ payload: event }) => {
-      if (cancelled || event.account !== account) return;
+      // Events come from this window's Space; its incognito windows run no extensions.
+      if (cancelled || event.account !== account || isIncognitoWindow()) return;
       // Extension API calls are frequent and change no extension UI state.
       if (event.kind === "compat-request") {
         void answerCompatRequest(event);

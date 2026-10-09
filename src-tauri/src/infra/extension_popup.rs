@@ -77,6 +77,9 @@ pub async fn extension_popup_open(
         .lock()
         .map_err(|_| "extension_popup_unavailable")?
         .insert(label.clone(), (tab, window.label().to_owned()));
+    // The popup belongs to its tab's Space: that Space's extension host owns the
+    // page, and its events and new tabs stay in that Space.
+    space_windows::adopt(&label, window.label());
     let closing = (app.clone(), label.clone());
     host.on_window_event(move |event| match event {
         tauri::WindowEvent::CloseRequested { api, .. } => {

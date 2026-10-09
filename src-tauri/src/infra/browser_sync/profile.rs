@@ -1,20 +1,13 @@
 //! Browser profile selection: which store the account's pages open in, and the
 //! lease that keeps that choice steady while a view is created or reused.
 use super::*;
+use super::profile_selection::{remembered, selected_profile, set_selected_profile, store_lock};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct SelectedProfile {
     pub(super) logical: String,
     pub(super) physical: String,
 }
-// Non-secret native engine identity survives locking the vault, so opening a
-// tab while locked cannot silently fall back to the unrelated legacy store.
-// Account replacement clears it only after closing the previous browser views.
-static SELECTED_PROFILE: OnceLock<std::sync::Mutex<Option<SelectedProfile>>> = OnceLock::new();
-pub(super) fn selected_profile() -> &'static std::sync::Mutex<Option<SelectedProfile>> {
-    SELECTED_PROFILE.get_or_init(|| std::sync::Mutex::new(None))
-}
-
 pub(super) fn select_bound_profile(
     logical: &str,
     binding: &BrowserProfileBinding,
@@ -46,6 +39,9 @@ pub(super) fn select_bound_profile(
 
 pub(in crate::infra) struct BrowserProfileLease {
     _lifecycle: RwLockReadGuard<'static, ()>,
+    _store: Option<tokio::sync::OwnedRwLockReadGuard<()>>,
+    /// The vault (Space) whose store the page opens in, if any.
+    pub vault_id: Option<String>,
     pub profile_id: Option<String>,
     pub logical_profile_id: Option<String>,
     pub tab_session: Option<serde_json::Value>,
@@ -81,7 +77,26 @@ pub(in crate::infra) async fn browser_profile_lease(
     if BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire) != epoch {
         return Err("The browser account changed before this page could open.".into());
     }
-    let mut current = session().lock().await;
+    // No profile named: the personal vault. A named profile: the open vault
+    // it belongs to, or one remembered from before the vault locked.
+    let target = match requested {
+        None => personal_vault(),
+        Some(requested) => vault_for_profile(requested),
+    };
+    let remembered = match &target {
+        Some(_) => None,
+        None => remembered(requested)?,
+    };
+    let vault_id = target
+        .as_ref()
+        .map(|(vault, _)| vault.clone())
+        .or_else(|| remembered.as_ref().map(|(vault, _)| vault.clone()));
+    let store = match &vault_id {
+        Some(vault) => Some(store_lock(vault).read_owned().await),
+        None => None,
+    };
+    trace_lease(started, "got the store lock; waiting for the sync session");
+    let mut current = lock_slot(target.map(|(_, slot)| slot)).await;
     trace_lease(
         started,
         if current.is_some() {
@@ -93,29 +108,25 @@ pub(in crate::infra) async fn browser_profile_lease(
     let previous_issue = current
         .as_ref()
         .and_then(|active| active.credential_issue.clone());
-    let previous = selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")?
-        .clone();
+    let previous = match &vault_id {
+        Some(vault) => selected_profile(vault)?,
+        None => None,
+    };
     let mut selected = previous.clone();
     if let Some(active) = current.as_mut() {
         let logical = default_profile_id(&active.scope)?;
-        if requested.is_none() || requested == Some(logical.as_str()) {
-            selected = if workspaces::workspace_mode(&active.handle.workspaces.borrow()) {
-                resolve_device_profile(active, &logical, previous.as_ref()).await?
-            } else {
-                resolve_local_profile(active, &logical, previous.as_ref()).await?
-            };
-            // The authenticated binding selects local storage, not sync readiness.
-            // Live cookies/storage can legitimately differ from an import receipt.
-            // Background capture reports those failures through credential_issue;
-            // only incoming restores need native read-back before activation.
-            *selected_profile()
-                .lock()
-                .map_err(|_| "Browser profile state is unavailable")? = selected.clone();
-            if selected.is_none() && requested.is_some() {
-                return Err("The browser profile has not been migrated yet.".into());
-            }
+        selected = if workspaces::workspace_mode(&active.handle.workspaces.borrow()) {
+            resolve_device_profile(active, &logical, previous.as_ref()).await?
+        } else {
+            resolve_local_profile(active, &logical, previous.as_ref()).await?
+        };
+        // The authenticated binding selects local storage, not sync readiness.
+        // Live cookies/storage can legitimately differ from an import receipt.
+        // Background capture reports those failures through credential_issue;
+        // only incoming restores need native read-back before activation.
+        set_selected_profile(&active.scope.vault_id, selected.clone())?;
+        if selected.is_none() && requested.is_some() {
+            return Err("The browser profile has not been migrated yet.".into());
         }
     }
     trace_lease(started, "profile resolved");
@@ -148,6 +159,8 @@ pub(in crate::infra) async fn browser_profile_lease(
     Ok(BrowserProfileLease {
         tab_session,
         _lifecycle: lifecycle,
+        _store: store,
+        vault_id,
         profile_id,
         logical_profile_id,
     })

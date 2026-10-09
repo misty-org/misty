@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
     probe = root / "probe"
     messaging = root / "messaging"
     compat = root / "compat-probe"
+    spaces = root / "space-probe"
     executable = root / "native-host"
     production = [NATIVE / "MistyExtensions.m", NATIVE / "MistyExtensionNativeMessaging.m",
                   NATIVE / "MistyExtensionTabs.m", NATIVE / "MistyExtensionPopupWindows.m",
@@ -71,6 +72,7 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
     run(*FLAGS, HERE / "host-benchmark.m", *production, "-o", benchmark)
     run(*FLAGS, HERE / "native-messaging-probe.m", production[1], "-o", messaging)
     run(*FLAGS, HERE / "compat-probe.m", *production, "-o", compat)
+    run(*FLAGS, HERE / "space-probe.m", "-o", spaces)
     if NOTIFICATIONS:
         # UserNotifications serves only registered app bundles outside
         # temporary folders. A stable path, bundle identifier and signing
@@ -106,6 +108,11 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
         shutil.copytree(HERE / "fixtures/compat", fixture)
         shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
         run(compat, fixture, page)
+        # Two Spaces' controllers at once: storage stays in its Space, survives a
+        # restart (a second process) and goes with the Space.
+        identities = [str(uuid.uuid4()) for _ in range(4)]
+        for mode in ("write", "verify", "cleanup"):
+            run(spaces, HERE / "fixtures/space", page, mode, *identities)
         if NOTIFICATIONS:
             output = root / "notification-probe.log"
             print("Notification probe: allow Misty Notification Probe in System Settings > Notifications if asked.")

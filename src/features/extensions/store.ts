@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { useSettingsProfiles } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
+import { spaceWindow } from "@/features/workspace/spaceWindow";
 import type {
   ExtensionEvent,
   ExtensionReview,
@@ -126,8 +127,55 @@ export function parseInstallations(raw: string): Installation[] {
     return [];
   }
 }
+type SettingsState = NonNullable<ReturnType<typeof useSettingsProfiles.getState>["state"]>;
+/** Every other Space's installations: `[{ space, installations }]`. */
+type SpaceList = { space: string; installations: unknown };
+function spaceLists(raw: unknown): SpaceList[] {
+  try {
+    const value: unknown = JSON.parse(String(raw));
+    return Array.isArray(value)
+      ? value.filter(
+          (entry): entry is SpaceList =>
+            typeof entry === "object" && entry !== null && typeof entry.space === "string",
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+/**
+ * Extensions are installed per Space, as each Space runs its own extension host.
+ * The personal Space keeps the list from before Spaces; every other Space has its
+ * own entry. This window's Space is the one its toolbar and Settings manage.
+ */
+export function spaceInstallationsRaw(state: SettingsState | null | undefined): string {
+  if (!state) return "[]";
+  const space = spaceWindow();
+  if (space.personal) return String(resolveSetting(state, "extensions.installations").value);
+  const list = spaceLists(resolveSetting(state, "extensions.space_installations").value).find(
+    (entry) => entry.space === space.key,
+  )?.installations;
+  return Array.isArray(list) ? JSON.stringify(list) : "[]";
+}
+function installationsRaw(): string {
+  return spaceInstallationsRaw(useSettingsProfiles.getState().state);
+}
 export function installations() {
-  return parseInstallations(preference("installations", "[]"));
+  return parseInstallations(installationsRaw());
+}
+async function setInstallations(raw: string) {
+  const space = spaceWindow();
+  if (space.personal) {
+    await setPreference("installations", raw);
+    return;
+  }
+  const lists = spaceLists(preference("space_installations", "[]")).filter(
+    (entry) => entry.space !== space.key,
+  );
+  await setPreference(
+    "space_installations",
+    JSON.stringify([...lists, { space: space.key, installations: JSON.parse(raw) as unknown }]),
+  );
 }
 export async function setPreference(key: string, value: string | boolean) {
   await useSettingsProfiles.getState().edit(`extensions.${key}`, value);
@@ -148,7 +196,7 @@ function changeControls(work: () => Promise<void>) {
 export async function updateInstallation(id: string, patch: Partial<Installation>) {
   await changeControls(async () => {
     const next = installations().map((item) => (item.id === id ? { ...item, ...patch } : item));
-    await setPreference("installations", storedInstallations(next));
+    await setInstallations(storedInstallations(next));
   });
 }
 export async function revokePermissions(id: string, permissions: string[], hosts: string[]) {
@@ -163,7 +211,7 @@ export async function revokePermissions(id: string, permissions: string[], hosts
         : item,
     );
     const raw = storedInstallations(next);
-    if (raw !== preference("installations", "[]")) await setPreference("installations", raw);
+    if (raw !== installationsRaw()) await setInstallations(raw);
   });
 }
 export async function install(review: ExtensionReview, privateAccess: boolean) {
@@ -194,10 +242,7 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
       permissions: [...new Set([...(old?.permissions ?? []), ...review.permissions])],
       hosts: [...new Set([...(old?.hosts ?? []), ...review.hosts])],
     };
-    await setPreference(
-      "installations",
-      storedInstallations([...current.filter((i) => i.id !== next.id), next]),
-    );
+    await setInstallations(storedInstallations([...current.filter((i) => i.id !== next.id), next]));
   });
 }
 export function reportExtensionError(error: unknown) {

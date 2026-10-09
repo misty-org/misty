@@ -162,6 +162,62 @@ pub(crate) fn close_account_views_except(
     Ok(())
 }
 
+/// The browser views using `logical`'s store (one Space's pages), plus any
+/// native page not registered yet: a partial creation could use any store.
+/// Hidden capture and storage helpers are left to their owners.
+fn profile_view_ids(app: &AppHandle, logical: &str) -> Result<HashSet<String>, String> {
+    let state = app.state::<BrowserSessionState>();
+    let sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| "Browser state is unavailable.")?;
+    let mut ids: HashSet<String> = sessions
+        .iter()
+        .filter(|(_, session)| session.logical_profile_id.as_deref() == Some(logical))
+        .map(|(id, _)| id.clone())
+        .collect();
+    ids.extend(
+        app.webviews()
+            .keys()
+            .filter_map(|label| label.strip_prefix("misty-browser-"))
+            .filter(|id| {
+                !sessions.contains_key(*id)
+                    && !id.starts_with("capture-")
+                    && !id.starts_with("storage-")
+            })
+            .map(str::to_owned),
+    );
+    Ok(ids)
+}
+
+/// Labels of the pages a restore into `logical`'s store would replace.
+pub(crate) fn profile_view_labels(app: &AppHandle, logical: &str) -> Result<Vec<String>, String> {
+    Ok(profile_view_ids(app, logical)?
+        .into_iter()
+        .map(|id| format!("misty-browser-{id}"))
+        .collect())
+}
+
+/// Closes one Space's pages before its store is switched or reloaded; other
+/// Spaces' pages stay open. Caller holds that vault's store write lease.
+pub(crate) fn close_profile_views_except(
+    app: &AppHandle,
+    logical: &str,
+    keep_label: Option<&str>,
+) -> Result<(), String> {
+    for id in profile_view_ids(app, logical)? {
+        if keep_label == Some(format!("misty-browser-{id}").as_str()) {
+            continue;
+        }
+        close_browser_webview(
+            app.clone(),
+            app.state::<BrowserSessionState>(),
+            BrowserWebviewIdRequest { id },
+        )?;
+    }
+    Ok(())
+}
+
 /// Async so it never runs on the UI thread. While the UI thread builds another
 /// webview it holds Tauri's webview-context lock and pumps messages, which can
 /// deliver this very request; closing there would take the lock again and
@@ -180,7 +236,8 @@ pub fn close_browser_webview(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    super::super::extensions::native::tab_event(&app, &request.id, "close");
+    let space = super::super::extensions::native::page_space(&app, &request.id);
+    super::super::extensions::native::tab_event(&app, space.as_deref(), &request.id, "close");
     let children = {
         let mut sessions = state
             .sessions

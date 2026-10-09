@@ -6,18 +6,17 @@ use super::*;
 async fn activate(
     app: &tauri::AppHandle,
     account: &str,
+    space: &str,
     installation: &Installation,
 ) -> Result<InstalledState, String> {
     let id = installation.id.clone();
-    let package_root = root(app, account)?.join("packages").join(&id);
-    let removed = service().lock().await.removed.contains(&id);
+    let package_root = root(app, account, space)?.join("packages").join(&id);
+    let removed = service(space).lock().await.removed.contains(&id);
     if !installation.enabled || removed {
-        native::request(json!({"operation":"unload","account":account,"id":id})).await?;
-        service().lock().await.loaded.remove(&id);
-        sync::forget(account, &id);
-        if let Ok(mut origins) = origins().write() {
-            origins.remove(&uuid_for(&format!("{account}:{}", installation.guid)));
-        }
+        native::request(json!({"operation":"unload","account":account,"space":space,"id":id})).await?;
+        service(space).lock().await.loaded.remove(&id);
+        sync::forget(account, space, &id);
+        drop_origin(space, &installation_origin(account, &installation.guid));
         let review = selected_package(&package_root, false)
             .ok()
             .and_then(|path| read_review(&path).ok());
@@ -39,7 +38,7 @@ async fn activate(
         .ok()
         .and_then(|path| read_review(&path).ok());
     if review.is_none() {
-        let prepared = prepare(app, account, &id).await?;
+        let prepared = prepare(app, account, space, &id).await?;
         if prepared.entry.guid != installation.guid
             || prepared.blocked
             || prepared
@@ -60,7 +59,7 @@ async fn activate(
                 review: Some(prepared),
             });
         }
-        review = Some(commit(app, &prepared.token).await?);
+        review = Some(commit(app, space, &prepared.token).await?);
     }
     let review = review.ok_or("The installed package is missing.")?;
     let current = selected_package(&package_root, false)?;
@@ -73,28 +72,26 @@ async fn activate(
     let signature = identity(
         &serde_json::to_string(&(installation, &review.entry.digest)).map_err(|e| e.to_string())?,
     );
-    if service().lock().await.loaded.get(&id) != Some(&signature) {
+    let origin = installation_origin(account, &installation.guid);
+    if service(space).lock().await.loaded.get(&id) != Some(&signature) {
         // Extension pages load from this host: the origin itself on macOS,
         // the extension ID derived from it on Windows.
-        if let (Some(host), Ok(mut origins)) = (
-            page_host(&uuid_for(&format!("{account}:{}", installation.guid))),
-            origins().write(),
-        ) {
-            origins.insert(host);
+        if let Some(host) = page_host(&origin) {
+            allow_origin(space, host);
         }
-        sync::forget(account, &id);
+        sync::forget(account, space, &id);
         // Packages installed before the compatibility layer existed gain it here.
         let _ = compat::apply(&current.join("runtime"));
-        let result = native::request(json!({"operation":"load", "account":account,"id":id,"guid":installation.guid,
-            "session":ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire),"runtimePath":current.join("runtime"), "origin":uuid_for(&format!("{account}:{}",installation.guid)),
+        let result = native::request(json!({"operation":"load", "account":account,"space":space,"id":id,"guid":installation.guid,
+            "session":ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire),"runtimePath":current.join("runtime"), "origin":origin,
             "privateAccess":installation.private_access,"permissions":installation.permissions,"hosts":installation.hosts})).await;
         if let Err(error) = result {
             // The current package is retained for diagnostics; retry the prior runtime when possible.
             if let Ok(previous) = selected_package(&package_root, true) {
                 if let Ok(old) = read_review(&previous) {
                     let _ = compat::apply(&previous.join("runtime"));
-                    let fallback = native::request(json!({"operation":"load", "account":account,"id":id,"guid":installation.guid,
-                    "session":ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire),"runtimePath":previous.join("runtime"),"origin":uuid_for(&format!("{account}:{}",installation.guid)),
+                    let fallback = native::request(json!({"operation":"load", "account":account,"space":space,"id":id,"guid":installation.guid,
+                    "session":ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire),"runtimePath":previous.join("runtime"),"origin":origin,
                     "privateAccess":installation.private_access,"permissions":installation.permissions,"hosts":installation.hosts})).await;
                     fallback.map_err(|failure| {
                         format!("The update and previous runtime both failed: {error}; {failure}")
@@ -111,18 +108,15 @@ async fn activate(
             }
             return Err(error);
         }
-        service().lock().await.loaded.insert(id.clone(), signature);
+        service(space).lock().await.loaded.insert(id.clone(), signature);
         prune_versions(&package_root);
-    } else if let Some(previous) = service().lock().await.states.get(&id).cloned() {
+    } else if let Some(previous) = service(space).lock().await.states.get(&id).cloned() {
         if matches!(previous.status.as_str(), "needs-attention" | "needs-review") {
             return Ok(previous);
         }
     }
     Ok(InstalledState {
-        new_tab: new_tab_page(
-            &current.join("runtime"),
-            &uuid_for(&format!("{account}:{}", installation.guid)),
-        ),
+        new_tab: new_tab_page(&current.join("runtime"), &origin),
         id,
         status: "enabled".into(),
         version: Some(review.entry.version.clone()),
@@ -149,6 +143,19 @@ fn new_tab_page(runtime: &Path, origin: &str) -> Option<String> {
     inside.then(|| format!("{EXTENSION_SCHEME}://{host}/{page}"))
 }
 
+/// The website data store a Space's pages open in, as `browser_create` picks it:
+/// the personal vault's for the personal Space, the Space's own otherwise.
+#[cfg(target_os = "macos")]
+async fn space_store(
+    app: &tauri::AppHandle,
+    space: &str,
+) -> Result<(crate::infra::browser_sync::BrowserProfileLease, String), String> {
+    let requested = crate::infra::space_windows::space_store_identity(space);
+    let lease = crate::infra::browser_sync::browser_profile_lease(Some(app), requested.as_deref(), None).await?;
+    let identifier = crate::infra::browser_profile::data_store_identifier(lease.profile_id.as_deref())?;
+    Ok((lease, uuid::Uuid::from_bytes(identifier).to_string()))
+}
+
 #[tauri::command]
 pub async fn extensions_reconcile(
     caller: tauri::Webview,
@@ -158,59 +165,67 @@ pub async fn extensions_reconcile(
     agent_access: bool,
 ) -> Result<Vec<InstalledState>, ExtensionFailure> {
     let result: Result<_,String> = async {
-    native::trusted(&caller)?;
+    let space = native::caller_space(&caller)?;
     if account.len() > 256 || (account.is_empty() && !installations.is_empty()) || installations.len() > 256 || !installations.iter().all(valid_installation) { return Err("Invalid extension account preferences.".into()); }
     // Acquire the browser lease before the extension lifecycle lock: account
     // teardown owns the opposite end of the browser lifecycle, never SESSION here.
     #[cfg(target_os="macos")]
-    let profile=crate::infra::browser_sync::browser_profile_lease(Some(&app),None,None).await?;
+    let (profile, store) = space_store(&app, &space).await?;
+    #[cfg(not(target_os="macos"))]
+    let store = String::new();
     let _guard = lifecycle().lock().await;
     if CLOSING.load(std::sync::atomic::Ordering::Acquire) { return Err("The extension account changed.".into()); }
     native::initialize(&app);
-    let changed = service().lock().await.account != account;
-    if changed { advance_epoch(); sync::reset(); if let Ok(mut origins)=origins().write() { origins.clear(); } *service().lock().await = ExtensionService { account:account.clone(), ..Default::default() }; }
-    native::request(json!({"operation":"configure", "account":account,"controllerId":uuid_for(&account)})).await?;
-    #[cfg(target_os="macos")]
-    if !account.is_empty() {
-        let identifier=crate::infra::browser_profile::data_store_identifier(profile.profile_id.as_deref())?;
-        if let Some(pointer)=native::configuration(&app,identifier,false,"about:blank".into(),true).await? {
-            // No webview is allocated while priming the account controller.
-            let _=app.run_on_main_thread(move || unsafe { drop(objc2::rc::Retained::from_raw(pointer as *mut objc2_web_kit::WKWebViewConfiguration)); });
-        }
+    // Another account stops every Space; another Space of the same account starts beside the others.
+    let account_changed = current_account().lock().map(|current| *current != account).unwrap_or(true);
+    if account_changed {
+        advance_epoch(); sync::reset();
+        if let Ok(mut origins)=origins().write() { origins.clear(); }
+        for other in spaces_running() { *service(&other).lock().await = ExtensionService::default(); }
+        if let Ok(mut running)=running_spaces().lock() { running.clear(); }
+        if let Ok(mut current)=current_account().lock() { *current = account.clone(); }
     }
+    let changed = account_changed || service(&space).lock().await.account != account;
+    if changed {
+        if !account.is_empty() && space == crate::infra::space_windows::PERSONAL { spaces::adopt_account_packages(&app, &account)?; }
+        *service(&space).lock().await = ExtensionService { account:account.clone(), ..Default::default() };
+        if !account.is_empty() { if let Ok(mut running)=running_spaces().lock() { running.insert(space.clone()); } }
+    }
+    if account.is_empty() { return Ok(Vec::new()); }
+    native::request(json!({"operation":"configure", "account":account,"space":space,"controllerId":controller_id(&account,&space),"store":store})).await?;
     #[cfg(target_os="macos")]
     drop(profile);
-    let absent = { let state=service().lock().await; state.desired.values().filter(|old|!installations.iter().any(|new|new.id==old.id)).cloned().collect::<Vec<_>>() };
+    let absent = { let state=service(&space).lock().await; state.desired.values().filter(|old|!installations.iter().any(|new|new.id==old.id)).cloned().collect::<Vec<_>>() };
     for old in absent {
-        native::request(json!({"operation":"unload","account":account,"id":old.id})).await?;
-        sync::forget(&account,&old.id);
-        if let Ok(mut origins)=origins().write() { origins.remove(&uuid_for(&format!("{account}:{}",old.guid))); }
-        let mut state=service().lock().await; state.states.remove(&old.id); state.loaded.remove(&old.id);
+        native::request(json!({"operation":"unload","account":account,"space":space,"id":old.id})).await?;
+        sync::forget(&account,&space,&old.id);
+        drop_origin(&space, &installation_origin(&account, &old.guid));
+        let mut state=service(&space).lock().await; state.states.remove(&old.id); state.loaded.remove(&old.id);
     }
-    { let mut state = service().lock().await; state.desired = installations.iter().cloned().map(|v|(v.id.clone(),v)).collect(); state.agent_access = agent_access; }
+    { let mut state = service(&space).lock().await; state.desired = installations.iter().cloned().map(|v|(v.id.clone(),v)).collect(); state.agent_access = agent_access; }
     let reconcile_epoch=ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire);
     for installation in &installations {
         if ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire)!=reconcile_epoch { return Err("The extension account changed.".into()); }
         if !installation.installed {
-            let _ = native::request(json!({"operation":"remove", "account":account,"id":installation.id,"guid":installation.guid})).await;
-            sync::queue_removal(&app,&account,installation)?;
-            sync::forget(&account,&installation.id);
-            sync::clear_local(&app,&account,installation).await?;
-            if let Ok(mut origins)=origins().write() { origins.remove(&uuid_for(&format!("{account}:{}",installation.guid))); }
+            let _ = native::request(json!({"operation":"remove", "account":account,"space":space,"id":installation.id,"guid":installation.guid})).await;
+            sync::queue_removal(&app,&account,&space,installation)?;
+            sync::forget(&account,&space,&installation.id);
+            sync::clear_local(&app,&account,&space,installation).await?;
+            drop_origin(&space, &installation_origin(&account, &installation.guid));
             // Sync teardown can hold the account session lock; never await it while
             // holding the extension lifecycle lock used by account teardown.
-            let removed=installation.clone(); let removed_account=account.clone();
-            tauri::async_runtime::spawn(async move { sync::remove(&removed_account,&removed).await; });
-            let package = root(&app, &account)?.join("packages").join(&installation.id);
+            let removed=installation.clone(); let removed_account=account.clone(); let removed_space=space.clone();
+            tauri::async_runtime::spawn(async move { sync::remove(&removed_account,&removed_space,&removed).await; });
+            let package = root(&app, &account, &space)?.join("packages").join(&installation.id);
             if package.exists() { std::fs::remove_dir_all(package).map_err(|e| e.to_string())?; }
-            let mut state = service().lock().await; state.states.remove(&installation.id); state.loaded.remove(&installation.id);
+            let mut state = service(&space).lock().await; state.states.remove(&installation.id); state.loaded.remove(&installation.id);
             continue;
         }
-        let status = activate(&app, &account, installation).await.unwrap_or_else(|error| InstalledState { new_tab: None, id:installation.id.clone(),status:"needs-attention".into(),version:None,detail:Some(error),review:None });
-        service().lock().await.states.insert(installation.id.clone(), status);
+        let status = activate(&app, &account, &space, installation).await.unwrap_or_else(|error| InstalledState { new_tab: None, id:installation.id.clone(),status:"needs-attention".into(),version:None,detail:Some(error),review:None });
+        service(&space).lock().await.states.insert(installation.id.clone(), status);
     }
-    if changed && !account.is_empty() { sync::start(app.clone(), account.clone()); }
-    Ok(service().lock().await.states.values().cloned().collect())
+    if changed { sync::start(app.clone(), account.clone(), space.clone()); }
+    Ok(service(&space).lock().await.states.values().cloned().collect())
 
     }.await;
     result.map_err(ExtensionFailure::from)
@@ -225,11 +240,11 @@ pub async fn extensions_action(
     anchor: Option<Value>,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_, String> = async {
-        native::trusted(&caller)?;
+        let space = native::caller_space(&caller)?;
         if !["actions", "invoke", "options", "diagnostics"].contains(&operation.as_str()) {
             return Err("Invalid extension action.".into());
         }
-        let account = service().lock().await.account.clone();
+        let account = service(&space).lock().await.account.clone();
         if id
             .as_ref()
             .is_some_and(|id| catalog::Store::of(id).is_none())
@@ -237,7 +252,7 @@ pub async fn extensions_action(
             return Err("Invalid extension ID.".into());
         }
         native::request(
-            json!({"operation":operation,"account":account,"id":id,"tabId":tab_id,"anchor":anchor}),
+            json!({"operation":operation,"account":account,"space":space,"id":id,"tabId":tab_id,"anchor":anchor}),
         )
         .await
     }
@@ -252,9 +267,9 @@ pub async fn extensions_respond(
     allowed: bool,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_,String> = async {
-    native::trusted(&caller)?;
-    let account = service().lock().await.account.clone();
-    native::request(json!({"operation":"permission-response","account":account,"requestId":request_id,"allowed":allowed})).await
+    let space = native::caller_space(&caller)?;
+    let account = service(&space).lock().await.account.clone();
+    native::request(json!({"operation":"permission-response","account":account,"space":space,"requestId":request_id,"allowed":allowed})).await
 
     }.await;
     result.map_err(ExtensionFailure::from)
@@ -266,9 +281,9 @@ pub async fn extensions_tab_created(
     tab_id: String,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_,String> = async {
-    native::trusted(&caller)?;
-    let account = service().lock().await.account.clone();
-    native::request(json!({"operation":"tab-created","account":account,"requestId":request_id,"tabId":tab_id})).await
+    let space = native::caller_space(&caller)?;
+    let account = service(&space).lock().await.account.clone();
+    native::request(json!({"operation":"tab-created","account":account,"space":space,"requestId":request_id,"tabId":tab_id})).await
 
     }.await;
     result.map_err(ExtensionFailure::from)
@@ -280,10 +295,10 @@ pub async fn extensions_check_updates(
     app: tauri::AppHandle,
 ) -> Result<Vec<InstalledState>, ExtensionFailure> {
     let result: Result<_, String> = async {
-        native::trusted(&caller)?;
+        let space = native::caller_space(&caller)?;
         let _guard = lifecycle().lock().await;
         let (account, installations) = {
-            let state = service().lock().await;
+            let state = service(&space).lock().await;
             (
                 state.account.clone(),
                 state
@@ -304,17 +319,17 @@ pub async fn extensions_check_updates(
                 {
                     // The store took it down: stop running it everywhere it loaded.
                     Err(error) if error == catalog::REMOVED => {
-                        service()
+                        service(&space)
                             .lock()
                             .await
                             .removed
                             .insert(installation.id.clone());
-                        return Ok(Some(activate(&app, &account, &installation).await?));
+                        return Ok(Some(activate(&app, &account, &space, &installation).await?));
                     }
                     result => result?,
                 };
                 let current = read_review(&selected_package(
-                    &root(&app, &account)?
+                    &root(&app, &account, &space)?
                         .join("packages")
                         .join(&installation.id),
                     false,
@@ -322,7 +337,7 @@ pub async fn extensions_check_updates(
                 if current.entry.digest == latest.digest {
                     return Ok::<_, String>(None);
                 }
-                let review = prepare(&app, &account, &installation.id).await?;
+                let review = prepare(&app, &account, &space, &installation.id).await?;
                 if review.blocked
                     || review
                         .permissions
@@ -339,31 +354,33 @@ pub async fn extensions_check_updates(
                         review: Some(review),
                     }));
                 }
-                commit(&app, &review.token).await?;
-                Ok(Some(activate(&app, &account, &installation).await?))
+                commit(&app, &space, &review.token).await?;
+                Ok(Some(activate(&app, &account, &space, &installation).await?))
             }
             .await;
             match result {
                 Ok(Some(status)) => {
-                    service()
+                    service(&space)
                         .lock()
                         .await
                         .states
                         .insert(installation.id.clone(), status);
                 }
                 Err(error) => {
-                    if let Some(status) = service().lock().await.states.get_mut(&installation.id) {
+                    if let Some(status) = service(&space).lock().await.states.get_mut(&installation.id) {
                         status.detail = Some(format!("Could not check for updates: {error}"));
                     }
                 }
                 _ => {}
             }
         }
-        let _ = crate::infra::space_windows::emit(&app,
+        crate::infra::space_windows::emit_to_space(
+            &app,
+            &space,
             "misty://extensions",
-            json!({"kind":"changed","account":account}),
+            json!({"kind":"changed","account":account,"space":space}),
         );
-        Ok(service().lock().await.states.values().cloned().collect())
+        Ok(service(&space).lock().await.states.values().cloned().collect())
     }
     .await;
     result.map_err(ExtensionFailure::from)

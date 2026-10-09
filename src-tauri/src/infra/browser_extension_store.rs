@@ -29,19 +29,19 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
     match url.path() {
         "install" => {
             tauri::async_runtime::spawn(async move {
-                crate::infra::extensions::request_store_install(&app, &extension).await;
+                crate::infra::extensions::request_store_install(&app, &id, &extension).await;
             });
         }
         "remove" => {
             tauri::async_runtime::spawn(async move {
-                crate::infra::extensions::request_store_remove(&app, &extension).await;
+                crate::infra::extensions::request_store_remove(&app, &id, &extension).await;
             });
         }
         // Whether the page's extension is installed, so its button can offer
         // removal. The page learns only that, and only for the extension it shows.
         "state" => {
             tauri::async_runtime::spawn(async move {
-                let installed = crate::infra::extensions::store_installation(&extension)
+                let installed = crate::infra::extensions::store_installation(&id, &extension)
                     .await
                     .is_some();
                 if page_extension(&app, &id).as_deref() != Some(&extension) {

@@ -1,13 +1,11 @@
-//! Local sync database: where a vault's file lives, how it is locked, retired
-//! after a rejected enrollment, and how a remembered key is forgotten.
+//! Local sync databases, one per vault: where each file lives, how it is
+//! locked, retired after a rejected enrollment, and how a remembered key is
+//! forgotten.
 use super::*;
 
-pub(super) fn database_path(
-    app: &tauri::AppHandle,
-    deployment: &str,
-    account_id: &str,
-) -> Result<PathBuf, String> {
-    // A development profile has its own sync storage, even for the same account.
+/// The account's sync folder under Misty's data folder. A development profile
+/// has its own sync storage, even for the same account.
+pub(super) fn account_identity(deployment: &str, account_id: &str) -> Result<String, String> {
     let hash = Sha256::digest(
         match std::env::var("MISTY_PROFILE").ok() {
             Some(profile) => serde_json::to_vec(&(deployment, account_id, profile)),
@@ -15,60 +13,17 @@ pub(super) fn database_path(
         }
         .map_err(|_| "Could not identify sync storage")?,
     );
-    let identity: String = hash.iter().map(|byte| format!("{byte:02x}")).collect();
-    // Vault databases live under Misty's data folder. One an earlier layout kept in the
-    // app's own data folder stays where it is (see below).
-    let base = super::super::paths::misty_home_dir()
+    Ok(hash.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+pub(super) fn sync_base() -> Result<PathBuf, String> {
+    Ok(super::super::paths::misty_home_dir()
         .ok_or("Local application storage is unavailable")?
         .join(".local")
-        .join("sync");
-    let earlier_base = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|_| "Local application storage is unavailable")?
-        .join("browser-sync");
-    let directory = base.join(&identity);
-    let path = directory.join("workspace.sqlite");
-    if path.is_file() {
-        return Ok(path);
-    }
-    let earlier = earlier_base.join(&identity).join("workspace.sqlite");
-    if earlier.is_file() {
-        return Ok(earlier);
-    }
-    let base_for_scan = earlier_base;
-    // Reuse earlier workspace-scoped databases in place. Moving/copying a live
-    // WAL or reenrolling would risk losing pending edits or cloning counters.
-    let mut previous = None;
-    if base_for_scan.is_dir() {
-        let entries =
-            std::fs::read_dir(&base_for_scan).map_err(|_| "Could not inspect sync storage")?;
-        for (index, entry) in entries.enumerate() {
-            if index >= 1024 {
-                return Err("Too many local vaults to select safely".into());
-            }
-            let entry = entry.map_err(|_| "Could not inspect sync storage")?;
-            let name = entry.file_name();
-            let Some(name) = name.to_str() else {
-                continue;
-            };
-            if name.len() != 64 || !name.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-                continue;
-            }
-            let candidate = entry.path().join("workspace.sqlite");
-            if Store::belongs_to_account(&candidate, deployment, account_id).map_err(issue)? {
-                if previous.is_some() {
-                    return Err(
-                        "Multiple older vaults need recovery before sync can select one.".into(),
-                    );
-                }
-                previous = Some(candidate);
-            }
-        }
-    }
-    if let Some(path) = previous {
-        return Ok(path);
-    }
+        .join("sync"))
+}
+
+fn create_private_dir(directory: &std::path::Path) -> Result<(), String> {
     let mut builder = std::fs::DirBuilder::new();
     builder.recursive(true);
     #[cfg(unix)]
@@ -77,9 +32,89 @@ pub(super) fn database_path(
         builder.mode(0o700);
     }
     builder
-        .create(&directory)
-        .map_err(|_| "Could not create sync storage")?;
+        .create(directory)
+        .map_err(|_| "Could not create sync storage".into())
+}
+
+/// Each vault (one per Space) has its own encrypted local store and lock.
+pub(super) fn database_path(
+    deployment: &str,
+    account_id: &str,
+    vault_id: &str,
+) -> Result<PathBuf, String> {
+    let vault: String = Sha256::digest(vault_id.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let directory = vaults_dir(deployment, account_id)?.join(vault);
+    create_private_dir(&directory)?;
     Ok(directory.join("workspace.sqlite"))
+}
+
+/// Holds one folder per vault this device has a database for.
+pub(super) fn vaults_dir(deployment: &str, account_id: &str) -> Result<PathBuf, String> {
+    Ok(sync_base()?
+        .join(account_identity(deployment, account_id)?)
+        .join("vaults"))
+}
+
+/// Names the personal vault, whose database opens before any Space's.
+fn personal_pointer(deployment: &str, account_id: &str) -> Result<PathBuf, String> {
+    Ok(sync_base()?
+        .join(account_identity(deployment, account_id)?)
+        .join("personal-vault"))
+}
+
+pub(super) fn remember_personal_vault(
+    deployment: &str,
+    account_id: &str,
+    vault_id: &str,
+) -> Result<(), String> {
+    let pointer = personal_pointer(deployment, account_id)?;
+    if let Some(directory) = pointer.parent() {
+        create_private_dir(directory)?;
+    }
+    std::fs::write(&pointer, vault_id).map_err(|_| "Could not record the sync vault".into())
+}
+
+/// The personal vault this device already has a database for. On the first
+/// launch after vaults per Space, the account's single older database moves
+/// to the personal vault's path, with its WAL, while it is locked and closed.
+pub(super) fn personal_vault_id(
+    app: &tauri::AppHandle,
+    deployment: &str,
+    account_id: &str,
+) -> Result<Option<String>, String> {
+    let pointer = personal_pointer(deployment, account_id)?;
+    if let Ok(vault) = std::fs::read_to_string(&pointer) {
+        let vault = vault.trim();
+        if vault.is_empty() || vault.len() > 128 {
+            return Err("Local sync storage is unavailable.".into());
+        }
+        return Ok(Some(vault.to_owned()));
+    }
+    let Some(legacy) = database_legacy::legacy_database(app, deployment, account_id)? else {
+        return Ok(None);
+    };
+    let lock = lock_database(&legacy)?;
+    let Some(vault) = database_legacy::stored_vault_id(&legacy, deployment, account_id)? else {
+        return Ok(None);
+    };
+    let path = database_path(deployment, account_id, &vault)?;
+    if path.exists() {
+        return Err("Local sync storage needs recovery before sync can open it.".into());
+    }
+    for suffix in ["", "-wal", "-shm"] {
+        let from = PathBuf::from(format!("{}{suffix}", legacy.display()));
+        if from.exists() {
+            std::fs::rename(&from, format!("{}{suffix}", path.display()))
+                .map_err(|_| "Could not move local sync storage")?;
+        }
+    }
+    remember_personal_vault(deployment, account_id, &vault)?;
+    drop(lock);
+    let _ = std::fs::remove_file(legacy.with_extension("lock"));
+    Ok(Some(vault))
 }
 
 pub(in crate::infra) fn lock_database(path: &std::path::Path) -> Result<std::fs::File, String> {
@@ -113,7 +148,7 @@ pub async fn browser_sync_availability(
     account_id: String,
 ) -> Result<VaultAvailability, String> {
     require_main(&webview)?;
-    let current = session().lock().await;
+    let current = personal_session().await;
     let api = account_api(&api_base, &account_id)?;
     if current.as_ref().is_some_and(|active| {
         active.scope.deployment == api.deployment() && active.scope.account_id == account_id
@@ -123,16 +158,18 @@ pub async fn browser_sync_availability(
             remote: None,
         });
     }
-    let path = database_path(&app, &api.deployment(), &account_id)?;
-    let _lock = lock_database(&path)?;
-    if Store::read_cached_vault(&path, &api.deployment(), &account_id)
-        .map_err(issue)?
-        .is_some()
-    {
-        return Ok(VaultAvailability {
-            local: true,
-            remote: None,
-        });
+    if let Some(vault) = personal_vault_id(&app, &api.deployment(), &account_id)? {
+        let path = database_path(&api.deployment(), &account_id, &vault)?;
+        let _lock = lock_database(&path)?;
+        if Store::read_cached_vault(&path, &api.deployment(), &account_id)
+            .map_err(issue)?
+            .is_some()
+        {
+            return Ok(VaultAvailability {
+                local: true,
+                remote: None,
+            });
+        }
     }
     Ok(VaultAvailability {
         local: false,
@@ -171,15 +208,19 @@ pub async fn browser_sync_forget_key(
 ) -> Result<(), String> {
     require_main(&webview)?;
     let _lifecycle = browser_lifecycle().write().await;
-    let mut current = session().lock().await;
     let api = account_api(&api_base, &account_id)?;
-    if current.as_ref().is_some_and(|active| {
+    let open = personal_session().await.as_ref().is_some_and(|active| {
         active.scope.deployment == api.deployment() && active.scope.account_id == account_id
-    }) {
-        stop(current.take()).await;
+    });
+    if open {
+        stop_all().await;
         let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
     }
-    let path = database_path(&app, &api.deployment(), &account_id)?;
+    // Only the personal vault's root is remembered; it opens every other vault.
+    let Some(vault) = personal_vault_id(&app, &api.deployment(), &account_id)? else {
+        return Ok(());
+    };
+    let path = database_path(&api.deployment(), &account_id, &vault)?;
     let database_lock = lock_database(&path)?;
     let deployment = api.deployment();
     tokio::task::spawn_blocking(move || {

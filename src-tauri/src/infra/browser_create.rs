@@ -152,19 +152,20 @@ pub async fn browser_webview_create(
         apply_shortcuts(&webview, &state)?;
         apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
         set_webview_bounds_if_changed(&app, &webview, position, size)?;
-        super::super::extensions::native::register(&webview, &request.id, request.private, &request.url);
+        super::super::extensions::native::register(&webview, &space, &request.id, request.private, &request.url);
         return present_macos_webview(&webview);
     }
 
     let page_app = app.clone();
     let page_id = request.id.clone();
+    let page_space = space.clone();
     let title_app = app.clone();
     let title_id = request.id.clone();
     let popup_app = app.clone();
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let replacing_extension_view = super::super::extensions::pending_navigation(&request.id).await;
+    let replacing_extension_view = super::super::extensions::pending_navigation(&space, &request.id).await;
     let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
     let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session {
@@ -195,10 +196,10 @@ pub async fn browser_webview_create(
     } else {
         let pointer = super::super::extensions::native::configuration(
             &app,
+            &space,
             profile_identifier,
             request.private,
             request.url.clone(),
-            !request.private && profile_lease.logical_profile_id.is_some(),
         )
         .await?;
         if let Some(pointer) = pointer {
@@ -264,7 +265,7 @@ pub async fn browser_webview_create(
         })
         .on_page_load(move |webview, payload| {
             if preview_only { return; }
-            super::super::extensions::native::tab_event(&page_app, &page_id, "updated");
+            super::super::extensions::native::tab_event(&page_app, Some(&page_space), &page_id, "updated");
             if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
             #[cfg(any(target_os = "macos", windows))]
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::super::browser_session_storage::clear(&webview); }
@@ -360,7 +361,7 @@ pub async fn browser_webview_create(
         }
     };
     if !preview_only {
-        super::super::extensions::native::register(&webview, &request.id, request.private, &request.url);
+        super::super::extensions::native::register(&webview, &space, &request.id, request.private, &request.url);
     }
     host_messages::install(&webview)?;
     #[cfg(target_os = "macos")]

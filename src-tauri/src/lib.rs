@@ -356,7 +356,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_set_frequency,
-                    crate::infra::browser_sync::browser_sync_forget_key,
+                    crate::infra::browser_sync::browser_sync_forget_key, crate::infra::browser_sync::browser_sync_space_window,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
                     crate::infra::auth_cookies::auth_cookie_forget,

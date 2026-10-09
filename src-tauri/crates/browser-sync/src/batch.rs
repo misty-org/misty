@@ -64,6 +64,14 @@ pub fn set_frequency(name: &str) -> bool {
     true
 }
 
+/// How often a vault with no open window pulls: it holds no socket between
+/// pulls (see `WorkerHandle::set_live`). Five minutes, scaled like the longest
+/// wait by this device's sync frequency.
+pub fn pull_interval() -> Duration {
+    let (_, longest, _) = frequency().scale();
+    Duration::from_secs_f64(300.0 * longest)
+}
+
 fn frequency() -> Frequency {
     match FREQUENCY.load(Ordering::Relaxed) {
         0 => Frequency::Live,

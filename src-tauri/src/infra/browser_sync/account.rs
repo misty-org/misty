@@ -1,5 +1,5 @@
-//! Account changes: stopping the open vault's workers before another account's
-//! session, cookies or browser views take its place.
+//! Account changes: stopping every open vault's workers before another
+//! account's sessions, cookies or browser views take their place.
 use super::*;
 
 /// Lock, sign-out and account switches send batched changes first. Bounded:
@@ -47,14 +47,17 @@ pub(in crate::infra) async fn change_account_if<T>(
     action: impl FnOnce() -> Result<T, String>,
 ) -> Result<T, String> {
     let _lifecycle = browser_lifecycle().write().await;
-    let mut current = session().lock().await;
-    if !changes_active(current.as_ref().map(|active| &active.scope)) {
+    let scope = personal_session()
+        .await
+        .as_ref()
+        .map(|active| active.scope.clone());
+    if !changes_active(scope.as_ref()) {
         return action();
     }
     BROWSER_ACCOUNT_EPOCH.fetch_add(1, Ordering::AcqRel);
     super::super::extensions::close_account().await;
     super::super::workspace_recovery::close_account()?;
-    stop(current.take()).await;
+    stop_all().await;
     #[cfg(desktop)]
     if let Some(app) = app {
         super::super::agent_workspace::stop_account_tasks(app)?;
@@ -62,9 +65,7 @@ pub(in crate::infra) async fn change_account_if<T>(
     }
     #[cfg(not(desktop))]
     let _ = app;
-    *selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")? = None;
+    clear_selected_profiles()?;
     // Keep the registry lock through jar replacement. Otherwise a concurrent
     // unlock can capture the old account between shutdown and activation.
     action()
@@ -91,16 +92,21 @@ pub async fn browser_sync_lock(
 ) -> Result<(), String> {
     require_main(&webview)?;
     let _lifecycle = browser_lifecycle().write().await;
-    let mut current = session().lock().await;
-    let scope = if let Some(active) = current.as_ref() {
-        require_session(active, &session_id)?;
-        Some(active.scope.clone())
-    } else if forget {
-        return Err("Unlock this vault before removing its remembered key.".into());
-    } else {
-        None
+    // Any of the account's sessions locks them all: one unlock, one lock.
+    let scope = {
+        let current = session_by_id(&session_id).await;
+        if let Some(active) = current.as_ref() {
+            require_session(active, &session_id)?;
+        } else if forget {
+            return Err("Unlock this vault before removing its remembered key.".into());
+        }
+        drop(current);
+        personal_session()
+            .await
+            .as_ref()
+            .map(|active| active.scope.clone())
     };
-    stop(current.take()).await;
+    stop_all().await;
     let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
     if forget {
         if let Some(scope) = scope {

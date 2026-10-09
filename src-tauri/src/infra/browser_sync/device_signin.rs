@@ -188,12 +188,7 @@ pub(super) async fn prepare(app: &tauri::AppHandle, active: &mut Session) -> Res
         logical: logical.clone(),
         physical: binding.physical_id.clone(),
     };
-    if selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")?
-        .as_ref()
-        != Some(&wanted)
-    {
+    if selected_profile(&active.scope.vault_id)?.as_ref() != Some(&wanted) {
         return Ok(Pass::Exclusive);
     }
     active.device_browser = Some(DeviceBrowser {
@@ -379,20 +374,15 @@ fn switch_to(
         workspace: workspace.into(),
         physical: physical.into(),
     };
-    let current = selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")?
-        .clone();
+    let current = selected_profile(&active.scope.vault_id)?;
     if current.as_ref() == Some(&wanted) {
         active.device_browser = Some(browser);
         return Ok(());
     }
     super::super::agent_workspace::stop_account_tasks(app)?;
     active.capture_view = None;
-    super::super::browser::close_account_views_except(app, None)?;
-    *selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")? = Some(wanted);
+    super::super::browser::close_profile_views_except(app, logical, None)?;
+    set_selected_profile(&active.scope.vault_id, Some(wanted))?;
     active.device_browser = Some(browser);
     let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     Ok(())
@@ -442,7 +432,7 @@ async fn load(
     super::super::agent_workspace::stop_account_tasks(app)?;
     active.capture_view = None;
     active.device_browser = None;
-    super::super::browser::close_account_views_except(app, None)?;
+    super::super::browser::close_profile_views_except(app, logical, None)?;
     let physical = binding.physical_id.clone();
     let result = replace(
         app, active, workspace, logical, binding, server, written, target,
@@ -451,12 +441,13 @@ async fn load(
     // Pages open in this device's store either way. After a failed load it is
     // not captured from: its binding still differs from the published slots,
     // so the next pass loads again before anything is published.
-    *selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")? = Some(SelectedProfile {
-        logical: logical.into(),
-        physical: physical.clone(),
-    });
+    set_selected_profile(
+        &active.scope.vault_id,
+        Some(SelectedProfile {
+            logical: logical.into(),
+            physical: physical.clone(),
+        }),
+    )?;
     active.device_browser = Some(DeviceBrowser {
         workspace: workspace.into(),
         physical,

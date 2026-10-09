@@ -116,32 +116,40 @@ pub(super) async fn open_vault_with(
     if reenroll && (password.is_none() || secret.is_none()) {
         return Err("Enter your sync password and secret to reconnect this device.".into());
     }
-    let _lifecycle = browser_lifecycle().write().await;
-    let mut current = session().lock().await;
+    let lifecycle = browser_lifecycle().write().await;
     let api = account_api(&api_base, &account_id)?;
     // Background retries can overlap a manual unlock. Reuse the worker that
     // won that race instead of stopping it and reading the key a second time.
-    if !create
-        && password.is_none()
-        && secret.is_none()
-        && provided_root.is_none()
-        && current.as_ref().is_some_and(|active| {
+    if !create && password.is_none() && secret.is_none() && provided_root.is_none() {
+        let mut current = personal_session().await;
+        if current.as_ref().is_some_and(|active| {
             active.scope.deployment == api.deployment()
                 && active.scope.account_id == account_id
                 && !active.task.is_finished()
-        })
-    {
-        return view(current.as_mut().expect("live session exists")).await;
+        }) {
+            // A retry also reopens Space vaults that failed or stopped.
+            space_vaults::open_all(app.clone());
+            return view(current.as_mut().expect("live session exists")).await;
+        }
     }
-    stop(current.take()).await;
-    let path = database_path(&app, &api.deployment(), &account_id)?;
-    let database_lock = lock_database(&path)?;
-    let previous = Store::read_cached_vault(&path, &api.deployment(), &account_id);
+    stop_all().await;
+    let deployment = api.deployment();
+    // The personal vault opens first; its root opens every Space vault.
+    let known = personal_vault_id(&app, &deployment, &account_id)?;
+    let known_path = known
+        .as_deref()
+        .map(|vault| database_path(&deployment, &account_id, vault))
+        .transpose()?;
+    let known_lock = known_path.as_deref().map(lock_database).transpose()?;
+    let previous = match &known_path {
+        Some(path) => Store::read_cached_vault(path, &deployment, &account_id),
+        None => Ok(None),
+    };
     // A re-enrolling device ignores its rejected local identity and joins the
     // server's current vault as if it were new.
     let (cached, retired_scope) = if reenroll {
         let retired = previous.ok().flatten().map(|vault| VaultScope {
-            deployment: api.deployment(),
+            deployment: deployment.clone(),
             account_id: account_id.clone(),
             vault_id: vault.vault.vault_id,
         });
@@ -167,7 +175,7 @@ pub(super) async fn open_vault_with(
         return Err("Set up browser sync before connecting this device.".into());
     }
     let scope = VaultScope {
-        deployment: api.deployment(),
+        deployment: deployment.clone(),
         account_id,
         vault_id: cached
             .as_ref()
@@ -177,15 +185,15 @@ pub(super) async fn open_vault_with(
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
     };
     scope.validate().map_err(issue)?;
-    let logical = default_profile_id(&scope)?;
-    if selected_profile()
-        .lock()
-        .map_err(|_| "Browser profile state is unavailable")?
-        .as_ref()
-        .is_some_and(|selected| selected.logical != logical)
-    {
+    if profile_selection::selected_for_other_account(&scope)? {
         return Err("Switch the active browser account before opening a different vault.".into());
     }
+    let path = database_path(&scope.deployment, &scope.account_id, &scope.vault_id)?;
+    let (database_lock, retire) = if known_path.as_ref() == Some(&path) {
+        (known_lock.expect("locked with its path"), None)
+    } else {
+        (lock_database(&path)?, known_path.zip(known_lock))
+    };
     let existing_identity = !reenroll
         && Store::belongs_to_account(&path, &scope.deployment, &scope.account_id).map_err(issue)?;
     if create && existing_identity {
@@ -204,7 +212,8 @@ pub(super) async fn open_vault_with(
                 key_epoch: 1,
                 head_sequence: 0,
                 root_public_key: root.public_key()?,
-                key_envelope: wrapper,
+                key_envelope: Some(wrapper),
+                space_key_envelope: None,
             };
             (
                 root,
@@ -227,7 +236,10 @@ pub(super) async fn open_vault_with(
             let root = match (password, secret, provided_root) {
                 (Some(password), Some(secret), None) => VaultRoot::unlock(
                     &native_scope,
-                    &server.key_envelope,
+                    server
+                        .key_envelope
+                        .as_ref()
+                        .ok_or(misty_browser_sync::Error::Identity)?,
                     &password,
                     &secret,
                     &server.root_public_key,
@@ -250,7 +262,10 @@ pub(super) async fn open_vault_with(
                 if let Some(retired) = &retired_scope {
                     secure_store::forget(retired)?;
                 }
-                retire_database(&path)?;
+                match &retire {
+                    Some((old, _lock)) => retire_database(old)?,
+                    None => retire_database(&path)?,
+                }
             }
             (root, vault)
         };
@@ -286,110 +301,26 @@ pub(super) async fn open_vault_with(
     .await
     .map_err(|_| "Could not unlock the native sync vault")?
     .map_err(issue)?;
-    let pending = store
-        .pending_snapshot(&root, document::reduce)
-        .map_err(issue)?;
-    let document: Document = serde_json::from_slice(&pending.snapshot)
-        .map_err(|_| "Could not read the local workspace")?;
-    let mut cached_workspace = document.workspace_view().map_err(issue)?;
-    let committed: Document =
-        serde_json::from_slice(&store.committed_snapshot(&root).map_err(issue)?)
-            .map_err(|_| "Could not read the active device")?;
-    cached_workspace.active_device = committed.active_device;
-    cached_workspace.sequence = pending.committed_sequence;
-    let device_id = store.grant().device_id.clone();
-    let admission_root = root.duplicate();
-    let (worker, handle) = Worker::new(
-        api.clone(),
-        scope.clone(),
-        root,
-        device,
-        store,
-        document::reduce,
+    remember_personal_vault(&scope.deployment, &scope.account_id, &scope.vault_id)?;
+    profile_selection::remember_personal_vault(&scope.vault_id)?;
+    let slot = session_start::start_session(
+        &app,
+        session_start::Opened {
+            scope,
+            api,
+            root,
+            device,
+            store,
+            database_lock,
+            space_id: None,
+        },
     )
-    .map_err(issue)?;
-    let advertise_api = api.clone();
-    let advertise_device = device_id.clone();
-    let advertise_os = tokio::task::spawn_blocking(os_version)
-        .await
-        .unwrap_or_default();
-    let advertise_status = handle.status.clone();
-    let task = tokio::spawn(worker.run());
-    let mut status = handle.status.clone();
-    let mut presence = handle.presence.clone();
-    let mut devices = handle.devices.clone();
-    let mut workspace_changes = handle.workspaces.clone();
-    let notify_workspace = scope.vault_id.clone();
-    let notify_app = app.clone();
-    // The sync socket already carries this account's content-free invalidations.
-    // The main window uses them instead of opening its own event stream while
-    // this connection is up (see `browser_sync_account_feed`).
-    let mut account_events = handle.account_events();
-    let feed_account = scope.account_id.clone();
-    let notifications = tokio::spawn(async move {
-        let advertisement = control_advertisement::advertise(
-            advertise_status,
-            || advertise_api.advertise_controls(&advertise_device, &advertise_os),
-            std::time::Duration::from_secs(30),
-        );
-        tokio::pin!(advertisement);
-        let mut advertised = false;
-        loop {
-            let alive = tokio::select! {
-                _ = &mut advertisement, if !advertised => { advertised = true; continue; },
-                result = status.changed() => result.is_ok(),
-                result = presence.changed() => result.is_ok(),
-                result = devices.changed() => result.is_ok(),
-                result = workspace_changes.changed() => result.is_ok(),
-                event = account_events.recv() => {
-                    let (topic, id) = match event {
-                        Ok(event) => (event.topic, event.id),
-                        // Dropped invalidations: the page re-reads everything.
-                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => ("reset".to_owned(), None),
-                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    };
-                    let _ = crate::infra::space_windows::emit(&notify_app,
-                        "misty:account-event",
-                        serde_json::json!({ "accountId": feed_account, "topic": topic, "id": id }),
-                    );
-                    continue;
-                },
-            };
-            if !alive {
-                break;
-            }
-            let _ = crate::infra::space_windows::emit(&notify_app, "misty:browser-sync-changed", &notify_workspace);
-        }
-    });
-    let session_id = uuid::Uuid::new_v4().to_string();
-    #[cfg(any(target_os = "macos", windows))]
-    let credential_task = Some(capture::spawn(app.clone(), session_id.clone()));
-    #[cfg(not(any(target_os = "macos", windows)))]
-    let credential_task = None;
-    let history_task = Some(history::spawn(app.clone(), session_id.clone()));
-    *current = Some(Session {
-        id: session_id,
-        _database_lock: database_lock,
-        cached_workspace,
-        cached_pending: pending.operation_ids,
-        workspace_projection: Default::default(),
-        scope,
-        device_id,
-        api,
-        handle,
-        task,
-        notifications,
-        credential_task,
-        history_task,
-        credential_issue: None,
-        website_data: Default::default(),
-        device_browser: None,
-        baselines: Default::default(),
-        held: Default::default(),
-        #[cfg(any(target_os = "macos", windows))]
-        capture_view: None,
-        admission_root,
-    });
+    .await?;
+    drop(lifecycle);
+    // Every Space vault opens with the personal root, after the personal
+    // vault is usable; one failing never closes the others.
+    space_vaults::open_all(app.clone());
     let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
-    view(current.as_mut().expect("session was installed")).await
+    let mut current = slot.lock_owned().await;
+    view(current.as_mut().ok_or("The sync session closed.")?).await
 }

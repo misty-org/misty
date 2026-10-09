@@ -10,7 +10,15 @@ pub(crate) use native::{page_host, EXTENSION_SCHEME};
 mod native_windows;
 mod package;
 pub(crate) mod runtime;
+mod spaces;
 mod sync;
+mod tabs;
+pub(crate) use tabs::{
+    agent_action, agent_extension_id, authorize_agent_url, context_menu, has_extensions,
+    is_chrome_store_id, pending_navigation, request_store_install, request_store_remove,
+    store_installation,
+};
+pub(crate) use spaces::{release_space, remove_space};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -129,9 +137,36 @@ async fn cancellable<T>(
     }
     tokio::select! { result=future=>result, _=changed.changed()=>Err("The extension account changed.".into()) }
 }
-fn service() -> &'static Mutex<ExtensionService> {
-    static STATE: OnceLock<Mutex<ExtensionService>> = OnceLock::new();
-    STATE.get_or_init(Default::default)
+/// Each Space keeps its own installations, states and loaded packages, as each
+/// has its own extension host. A Space's entry lives for the process (there are
+/// few); freeing a Space resets it.
+fn service(space: &str) -> &'static Mutex<ExtensionService> {
+    static SPACES: OnceLock<std::sync::Mutex<BTreeMap<String, &'static Mutex<ExtensionService>>>> =
+        OnceLock::new();
+    let mut spaces = SPACES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    spaces
+        .entry(space.to_owned())
+        .or_insert_with(|| &*Box::leak(Box::<Mutex<ExtensionService>>::default()))
+}
+/// The account whose extensions run; empty while signed out.
+fn current_account() -> &'static std::sync::Mutex<String> {
+    static ACCOUNT: OnceLock<std::sync::Mutex<String>> = OnceLock::new();
+    ACCOUNT.get_or_init(Default::default)
+}
+/// Spaces whose extensions this process has started.
+fn running_spaces() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
+    static RUNNING: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> =
+        OnceLock::new();
+    RUNNING.get_or_init(Default::default)
+}
+fn spaces_running() -> Vec<String> {
+    running_spaces()
+        .lock()
+        .map(|spaces| spaces.iter().cloned().collect())
+        .unwrap_or_default()
 }
 // Serializes lifecycle work, while allowing callbacks to acquire the state lock.
 fn lifecycle() -> &'static Mutex<()> {
@@ -141,10 +176,39 @@ fn lifecycle() -> &'static Mutex<()> {
 fn identity(value: &str) -> String {
     hex::encode(Sha256::digest(value.as_bytes()))
 }
-fn origins() -> &'static std::sync::RwLock<std::collections::BTreeSet<String>> {
-    static ORIGINS: OnceLock<std::sync::RwLock<std::collections::BTreeSet<String>>> =
+/// Extension page hosts, with the Spaces that run each extension. The same
+/// extension keeps one host in every Space; each Space's controller serves it.
+fn origins() -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
+    static ORIGINS: OnceLock<std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>>> =
         OnceLock::new();
     ORIGINS.get_or_init(Default::default)
+}
+fn allow_origin(space: &str, host: String) {
+    if let Ok(mut origins) = origins().write() {
+        origins.entry(host).or_default().insert(space.to_owned());
+    }
+}
+fn drop_origin(space: &str, host: &str) {
+    if let Ok(mut origins) = origins().write() {
+        if let Some(spaces) = origins.get_mut(host) {
+            spaces.remove(space);
+            if spaces.is_empty() {
+                origins.remove(host);
+            }
+        }
+    }
+}
+fn drop_space_origins(space: &str) {
+    if let Ok(mut origins) = origins().write() {
+        origins.retain(|_, spaces| {
+            spaces.remove(space);
+            !spaces.is_empty()
+        });
+    }
+}
+/// An installation's extension page host, for its account origin.
+fn installation_origin(account: &str, guid: &str) -> String {
+    uuid_for(&format!("{account}:{guid}"))
 }
 pub(crate) fn is_extension_url(url: &url::Url) -> bool {
     url.scheme() == EXTENSION_SCHEME
@@ -153,19 +217,35 @@ pub(crate) fn is_extension_url(url: &url::Url) -> bool {
         && url.password().is_none()
         && url
             .host_str()
-            .is_some_and(|host| origins().read().is_ok_and(|o| o.contains(host)))
+            .is_some_and(|host| origins().read().is_ok_and(|o| o.contains_key(host)))
 }
 fn uuid_for(value: &str) -> String {
     let hash = Sha256::digest(value.as_bytes());
     uuid::Uuid::from_bytes(hash[..16].try_into().unwrap()).to_string()
 }
-fn root(app: &tauri::AppHandle, account: &str) -> Result<PathBuf, String> {
+/// The extension controller a Space's host uses. The personal Space keeps the
+/// account's controller from before Spaces, and with it every extension's storage.
+fn controller_id(account: &str, space: &str) -> String {
+    if space == crate::infra::space_windows::PERSONAL {
+        uuid_for(account)
+    } else {
+        uuid_for(&format!("{account}:space:{space}"))
+    }
+}
+fn account_root(app: &tauri::AppHandle, account: &str) -> Result<PathBuf, String> {
     Ok(app
         .path()
         .app_local_data_dir()
         .map_err(|e| e.to_string())?
         .join("extensions")
         .join(identity(account)))
+}
+/// A Space's packages: `extensions/<account>/<space>`.
+fn root(app: &tauri::AppHandle, account: &str, space: &str) -> Result<PathBuf, String> {
+    if !crate::infra::space_windows::valid_key(space) {
+        return Err("Unknown Space.".into());
+    }
+    Ok(account_root(app, account)?.join(space))
 }
 #[derive(Default, Serialize, Deserialize)]
 struct PackageSelection {
@@ -241,178 +321,27 @@ pub async fn close_account() {
     advance_epoch();
     let _guard = lifecycle().lock().await;
     sync::reset();
-    for path in service().lock().await.prepared.values() {
-        let _ = std::fs::remove_dir_all(path);
+    for space in spaces_running() {
+        let mut state = service(&space).lock().await;
+        for path in state.prepared.values() {
+            let _ = std::fs::remove_dir_all(path);
+        }
+        *state = ExtensionService::default();
     }
-    *service().lock().await = ExtensionService::default();
+    if let Ok(mut running) = running_spaces().lock() {
+        running.clear();
+    }
+    if let Ok(mut account) = current_account().lock() {
+        account.clear();
+    }
     if let Ok(mut origins) = origins().write() {
         origins.clear();
     }
-    let _ = native::request(json!({"operation":"configure", "account":"", "controllerId":uuid::Uuid::new_v4().to_string()})).await;
+    // An empty account stops every Space's host.
+    let _ = native::request(json!({"operation":"configure", "account":""})).await;
     CLOSING.store(false, std::sync::atomic::Ordering::Release);
 }
 
-/// An extension ID in an agent's tool input. Agents once sent Firefox
-/// Add-ons IDs as numbers; Chrome Web Store IDs are always strings.
-pub(crate) fn agent_extension_id(value: &Value) -> Option<String> {
-    let id = match value {
-        Value::Number(number) => number.as_u64()?.to_string(),
-        Value::String(text) => text.clone(),
-        _ => return None,
-    };
-    catalog::Store::of(&id).map(|_| id)
-}
-
-// Called only after the browser service has validated the agent's live grant.
-pub(crate) async fn agent_action(
-    operation: &str,
-    id: Option<String>,
-    tab: &str,
-    script: Option<String>,
-) -> Result<Value, String> {
-    let state = service().lock().await;
-    if !state.agent_access {
-        return Err("Agent access to extensions is disabled.".into());
-    }
-    let allowed = state
-        .desired
-        .values()
-        .filter(|v| v.installed && v.enabled && v.agent_access)
-        .map(|v| v.id.clone())
-        .collect::<Vec<_>>();
-    if id.as_ref().is_some_and(|id| !allowed.contains(id)) {
-        return Err("Agent access to this extension is disabled.".into());
-    }
-    let account = state.account.clone();
-    drop(state);
-    let mut value = native::request(
-        json!({"operation":operation,"account":account,"id":id,"tabId":tab,"script":script}),
-    )
-    .await?;
-    let state = service().lock().await;
-    if state.account != account
-        || !state.agent_access
-        || id.as_ref().is_some_and(|id| {
-            !state
-                .desired
-                .get(id)
-                .is_some_and(|v| v.installed && v.enabled && v.agent_access)
-        })
-    {
-        return Err("Agent extension access was revoked.".into());
-    }
-    if let Some(actions) = value["actions"].as_array_mut() {
-        actions.retain(|action| {
-            action["id"].as_str().is_some_and(|id| {
-                state
-                    .desired
-                    .get(id)
-                    .is_some_and(|v| v.installed && v.enabled && v.agent_access)
-            })
-        });
-    }
-    Ok(value)
-}
-pub(crate) async fn authorize_agent_url(url: &url::Url) -> Result<(), String> {
-    if url.scheme() != EXTENSION_SCHEME {
-        return Ok(());
-    }
-    let state = service().lock().await;
-    if state.agent_access
-        && state.desired.values().any(|v| {
-            v.installed
-                && v.enabled
-                && v.agent_access
-                && url.host_str().is_some_and(|host| {
-                    page_host(&uuid_for(&format!("{}:{}", state.account, v.guid))).as_deref()
-                        == Some(host)
-                })
-        })
-    {
-        Ok(())
-    } else {
-        Err("Agent access to this extension is disabled.".into())
-    }
-}
-
-pub(crate) fn is_chrome_store_id(value: &str) -> bool {
-    catalog::is_chrome_id(value)
-}
-
-/// "Add to Misty" on a store page: Misty's window opens the install review
-/// for `key`, a Chrome Web Store ID or Firefox Add-ons slug read from the
-/// tab's own address.
-pub(crate) async fn request_store_install(app: &tauri::AppHandle, key: &str) {
-    let account = service().lock().await.account.clone();
-    let _ = crate::infra::space_windows::emit(&app,
-        "misty://extensions",
-        json!({"kind":"store-install","account":account,"id":key}),
-    );
-}
-
-/// The installed extension a store page shows, if any. Firefox Add-ons pages
-/// name a slug, which the store resolves to its ID once per slug.
-pub(crate) async fn store_installation(key: &str) -> Option<String> {
-    fn slugs() -> &'static std::sync::Mutex<BTreeMap<String, String>> {
-        static SLUGS: OnceLock<std::sync::Mutex<BTreeMap<String, String>>> = OnceLock::new();
-        SLUGS.get_or_init(Default::default)
-    }
-    // A statement of its own, so the cache lock is released before any lookup.
-    let cached = slugs().lock().ok()?.get(key).cloned();
-    let id = if catalog::Store::of(key) == Some(catalog::Store::Chrome) {
-        key.to_owned()
-    } else if let Some(id) = cached {
-        id
-    } else {
-        let id = catalog::latest(key).await.ok()?.id;
-        slugs().lock().ok()?.insert(key.to_owned(), id.clone());
-        id
-    };
-    let state = service().lock().await;
-    state
-        .desired
-        .get(&id)
-        .filter(|item| item.installed)
-        .map(|item| item.id.clone())
-}
-
-/// "Remove from Misty" on a store page: Misty's window asks before removing.
-pub(crate) async fn request_store_remove(app: &tauri::AppHandle, key: &str) {
-    let Some(id) = store_installation(key).await else {
-        return;
-    };
-    let account = service().lock().await.account.clone();
-    let _ = crate::infra::space_windows::emit(&app,
-        "misty://extensions",
-        json!({"kind":"store-remove","account":account,"id":id}),
-    );
-}
-
-pub(crate) async fn pending_navigation(tab: &str) -> bool {
-    let account = service().lock().await.account.clone();
-    native::request(json!({"operation":"pending-navigation","account":account,"tabId":tab}))
-        .await
-        .is_ok_and(|v| v["pending"] == true)
-}
-
-pub(crate) fn has_extensions() -> bool {
-    origins().read().is_ok_and(|v| !v.is_empty())
-}
-pub(crate) async fn context_menu(tab: &str, agent: bool) -> Result<Value, String> {
-    let state = service().lock().await;
-    let account = state.account.clone();
-    let allowed: Vec<String> = state
-        .desired
-        .values()
-        .filter(|v| v.installed && v.enabled && (!agent || (state.agent_access && v.agent_access)))
-        .map(|v| v.id.clone())
-        .collect();
-    drop(state);
-    native::request(
-        json!({"operation":"context-menu","account":account,"tabId":tab,"allowedIds":allowed}),
-    )
-    .await
-}
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -436,7 +365,7 @@ pub async fn extensions_layout(
     tabs: Vec<LayoutTab>,
 ) -> Result<(), ExtensionFailure> {
     let result: Result<_, String> = async {
-        native::trusted(&caller)?;
+        let space = native::caller_space(&caller)?;
         if tabs.len() > 10000
             || tabs.iter().any(|t| {
                 t.id.len() > 256
@@ -447,11 +376,12 @@ pub async fn extensions_layout(
         {
             return Err("Invalid extension tab layout.".into());
         }
-        let account = service().lock().await.account.clone();
+        let account = service(&space).lock().await.account.clone();
         if account.is_empty() {
             return Ok(());
         }
-        native::request(json!({"operation":"layout","account":account,"tabs":tabs})).await?;
+        native::request(json!({"operation":"layout","account":account,"space":space,"tabs":tabs}))
+            .await?;
         Ok(())
     }
     .await;
@@ -467,20 +397,21 @@ pub async fn extensions_compat(
     payload: Value,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_, String> = async {
-        native::trusted(&caller)?;
+        let space = native::caller_space(&caller)?;
         if !["compat-reply", "compat-event"].contains(&operation.as_str())
             || !payload.is_object()
             || payload.to_string().len() > 8 * 1024 * 1024
         {
             return Err("Invalid extension compatibility message.".into());
         }
-        let account = service().lock().await.account.clone();
+        let account = service(&space).lock().await.account.clone();
         if account.is_empty() {
             return Ok(Value::Null);
         }
         let mut request = payload;
         request["operation"] = json!(operation);
         request["account"] = json!(account);
+        request["space"] = json!(space);
         native::request(request).await
     }
     .await;

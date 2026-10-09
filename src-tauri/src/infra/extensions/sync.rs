@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 //! Extension storage values stay on this native path. The local outbox is
-//! encrypted with a device key; transport records use the existing sync vault.
+//! encrypted with a device key; transport records use the sync vault of the
+//! Space the extension is installed in.
 use super::*;
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
@@ -20,20 +21,37 @@ use exchange::pass;
 use journal::{ciphers, journal_exists, journal_lock, read, remove_local, write, Journal};
 
 static EPOCH: AtomicU64 = AtomicU64::new(0);
+/// Each Space's running sync loop, by the generation it started with.
+fn loops() -> &'static std::sync::Mutex<BTreeMap<String, u64>> {
+    static LOOPS: OnceLock<std::sync::Mutex<BTreeMap<String, u64>>> = OnceLock::new();
+    LOOPS.get_or_init(Default::default)
+}
 fn ready() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
     static READY: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> = OnceLock::new();
     READY.get_or_init(Default::default)
 }
-fn readiness_key(account: &str, id: &str) -> String {
-    format!("{account}:{id}")
+fn readiness_key(account: &str, space: &str, id: &str) -> String {
+    format!("{account}:{space}:{id}")
 }
-pub fn forget(account: &str, id: &str) {
+/// Where a Space's journal and removals are kept on this device: the account for
+/// the personal Space, as before Spaces, and the account and Space otherwise.
+fn journal_scope(account: &str, space: &str) -> String {
+    if space == crate::infra::space_windows::PERSONAL {
+        account.to_owned()
+    } else {
+        format!("{account}:space:{space}")
+    }
+}
+pub fn forget(account: &str, space: &str, id: &str) {
     if let Ok(mut ready) = ready().lock() {
-        ready.remove(&readiness_key(account, id));
+        ready.remove(&readiness_key(account, space, id));
     }
 }
 pub fn reset() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
+    if let Ok(mut loops) = loops().lock() {
+        loops.clear();
+    }
     if let Ok(mut ready) = ready().lock() {
         ready.clear();
     }
@@ -41,11 +59,23 @@ pub fn reset() {
         ciphers.clear();
     }
 }
+/// Stops one Space's sync loop; its journal stays for when the Space reopens.
+pub fn stop(account: &str, space: &str) {
+    if let Ok(mut loops) = loops().lock() {
+        loops.remove(space);
+    }
+    if let Ok(mut ready) = ready().lock() {
+        let prefix = readiness_key(account, space, "");
+        ready.retain(|key| !key.starts_with(&prefix));
+    }
+}
 pub fn queue_removal(
     _app: &tauri::AppHandle,
     account: &str,
+    space: &str,
     installation: &Installation,
 ) -> Result<(), String> {
+    let account = &journal_scope(account, space);
     let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
         .connect()
@@ -66,18 +96,21 @@ pub fn queue_removal(
 pub async fn clear_local(
     app: &tauri::AppHandle,
     account: &str,
+    space: &str,
     installation: &Installation,
 ) -> Result<(), String> {
     let _guard = journal_lock().lock().await;
-    remove_local(app, account, installation)
+    remove_local(app, &journal_scope(account, space), installation)
 }
 /// A new generation explicitly approved on this device has no remote values to
 /// restore. Journal its writes immediately, even before the sync vault unlocks.
 pub async fn seed_local(
     app: &tauri::AppHandle,
     account: &str,
+    space: &str,
     installation: &Installation,
 ) -> Result<(), String> {
+    let account = &journal_scope(account, space);
     let _guard = journal_lock().lock().await;
     if journal_exists(app, account, installation)? {
         return Err("This extension installation generation already exists.".into());
@@ -108,6 +141,10 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     let Some(account) = event["account"].as_str() else {
         return;
     };
+    let Some(space) = event["space"].as_str() else {
+        return;
+    };
+    let scope = journal_scope(account, space);
     let Some(id) = event["id"]
         .as_str()
         .filter(|v| super::catalog::Store::of(v).is_some())
@@ -116,7 +153,7 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         return;
     };
     let installation = {
-        let state = service().lock().await;
+        let state = service(space).lock().await;
         if state.account != account {
             return;
         }
@@ -131,13 +168,13 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     };
     let _guard = journal_lock().lock().await;
     {
-        let state = service().lock().await;
+        let state = service(space).lock().await;
         if state.account != account || state.desired.get(&id) != Some(&installation) {
             return;
         }
     }
     let result = (|| {
-        let mut journal = read(app, account, &installation)?;
+        let mut journal = read(app, &scope, &installation)?;
         let changes: BTreeMap<String, Value> = if event["kind"] == "sync-ready" {
             let values = event["payload"]["values"]
                 .as_object()
@@ -179,35 +216,41 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         {
             return Err("Extension sync storage exceeds its quota.".into());
         }
-        write(app, account, &installation, &journal)
+        write(app, &scope, &installation, &journal)
     })();
     if result.is_ok() && event["kind"] == "sync-ready" {
         if let Ok(mut ready) = ready().lock() {
-            ready.insert(readiness_key(account, &id));
+            ready.insert(readiness_key(account, space, &id));
         }
         // Previously restored local data remains usable while the vault is locked.
-        if read(app, account, &installation).is_ok_and(|journal| journal.initialized) {
-            let _ = native::request(json!({"operation":"sync-restored","account":account,"id":id}))
-                .await;
+        if read(app, &scope, &installation).is_ok_and(|journal| journal.initialized) {
+            let _ = native::request(
+                json!({"operation":"sync-restored","account":account,"space":space,"id":id}),
+            )
+            .await;
         }
     }
     if result.is_err() {
-        let _ = crate::infra::space_windows::emit(&app,"misty://extensions",json!({"kind":"sync-status","account":account,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}));
+        crate::infra::space_windows::emit_to_space(app,space,"misty://extensions",json!({"kind":"sync-status","account":account,"space":space,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}));
     }
 }
 
-pub fn start(app: tauri::AppHandle, account: String) {
+/// Syncs a Space's extension settings through that Space's vault, every few seconds.
+pub fn start(app: tauri::AppHandle, account: String, space: String) {
     let epoch = EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+    if let Ok(mut loops) = loops().lock() {
+        loops.insert(space.clone(), epoch);
+    }
     tauri::async_runtime::spawn(async move {
         let mut timer = tokio::time::interval(std::time::Duration::from_secs(3));
         timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             timer.tick().await;
-            if EPOCH.load(Ordering::SeqCst) != epoch {
+            if loops().lock().map_or(true, |loops| loops.get(&space) != Some(&epoch)) {
                 break;
             }
             let installations = {
-                let state = service().lock().await;
+                let state = service(&space).lock().await;
                 if state.account != account {
                     break;
                 }
@@ -218,12 +261,13 @@ pub fn start(app: tauri::AppHandle, account: String) {
                     .cloned()
                     .collect::<Vec<_>>()
             };
-            let Some(handle) = crate::infra::browser_sync::extension_sync_handle(&account).await
+            let Some(handle) =
+                crate::infra::browser_sync::extension_sync_handle(&account, &space).await
             else {
                 continue;
             };
             let removed = {
-                let state = service().lock().await;
+                let state = service(&space).lock().await;
                 state
                     .desired
                     .values()
@@ -232,32 +276,34 @@ pub fn start(app: tauri::AppHandle, account: String) {
                     .collect::<Vec<_>>()
             };
             for installation in removed {
-                remove(&account, &installation).await;
+                remove(&account, &space, &installation).await;
             }
-            for installation in queued_removals(&account) {
-                if valid_installation(&installation) && remove(&account, &installation).await {
-                    forget_removal(&account, &installation.generation);
+            let scope = journal_scope(&account, &space);
+            for installation in queued_removals(&scope) {
+                if valid_installation(&installation) && remove(&account, &space, &installation).await {
+                    forget_removal(&scope, &installation.generation);
                 }
             }
             for installation in installations {
-                if pass(&app, &account, &installation, &handle).await.is_err() {
-                    let _ = crate::infra::space_windows::emit(&app,"misty://extensions",json!({"kind":"sync-status","account":account,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}));
+                if pass(&app, &account, &space, &installation, &handle).await.is_err() {
+                    crate::infra::space_windows::emit_to_space(&app,&space,"misty://extensions",json!({"kind":"sync-status","account":account,"space":space,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}));
                 }
             }
         }
     });
 }
 
-async fn current(account: &str, installation: &Installation, epoch: u64) -> bool {
+async fn current(account: &str, space: &str, installation: &Installation, epoch: u64) -> bool {
     if ACCOUNT_EPOCH.load(Ordering::Acquire) != epoch {
         return false;
     }
-    let state = service().lock().await;
+    let state = service(space).lock().await;
     state.account == account && state.desired.get(&installation.id) == Some(installation)
 }
 
-pub async fn remove(account: &str, installation: &Installation) -> bool {
-    let Some(handle) = crate::infra::browser_sync::extension_sync_handle(account).await else {
+pub async fn remove(account: &str, space: &str, installation: &Installation) -> bool {
+    let Some(handle) = crate::infra::browser_sync::extension_sync_handle(account, space).await
+    else {
         return false;
     };
     if !handle

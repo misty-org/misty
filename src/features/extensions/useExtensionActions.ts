@@ -3,7 +3,12 @@ import { useSettingsProfiles } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { extensionsNative } from "./native";
 import { rememberExtensionIcons } from "./extensionIcons";
-import { parseInstallations, reportExtensionError, useExtensionsStore } from "./store";
+import {
+  parseInstallations,
+  spaceInstallationsRaw,
+  reportExtensionError,
+  useExtensionsStore,
+} from "./store";
 import type { ExtensionAction } from "./types";
 
 /**
@@ -15,9 +20,7 @@ export function useExtensionActions(tabId: string, agentOwned: boolean) {
   const supported = useExtensionsStore((s) => s.supported);
   const revision = useExtensionsStore((s) => s.revision);
   const [actions, setActions] = useState<ExtensionAction[]>([]);
-  const installed = parseInstallations(
-    profile ? String(resolveSetting(profile, "extensions.installations").value) : "[]",
-  ).filter((i) => i.installed);
+  const installed = parseInstallations(spaceInstallationsRaw(profile)).filter((i) => i.installed);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;

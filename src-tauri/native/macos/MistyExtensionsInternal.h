@@ -39,6 +39,8 @@ API_AVAILABLE(macos(15.4))
 
 API_AVAILABLE(macos(15.4))
 @interface MistyExtensionHost : NSObject <WKWebExtensionControllerDelegate, WKScriptMessageHandler, WKNavigationDelegate>
+/// The Space this host belongs to. Every event it raises names it.
+@property NSString *space;
 @property NSString *account;
 @property NSString *controllerIdentifier;
 @property WKWebExtensionController *controller;
@@ -63,9 +65,15 @@ API_AVAILABLE(macos(15.4))
 @property NSMutableSet<NSString *> *restored;
 @property NSRect popupAnchor;
 @property (weak) NSView *popupParent;
+/// Navigation and UI delegate of this host's extension popup windows.
+@property id popupWindowDelegate;
 - (void)event:(NSString *)kind data:(NSDictionary *)data;
 - (void)request:(NSDictionary *)request reply:(Reply)reply;
-- (void)configureStore:(WKWebsiteDataStore *)store;
+/// Makes the Space's controller once, over the Space's store. A host never
+/// rebuilds it; the host is freed with the Space's last window instead.
+- (void)startWithStore:(WKWebsiteDataStore *)store;
+/// Unloads everything and forgets the account; the host can be configured again.
+- (void)shutdown;
 - (void)load:(NSDictionary *)descriptor reply:(Reply)reply;
 - (void)unload:(NSString *)identifier;
 - (void)registerOpenTab:(MistyExtensionTab *)tab;
@@ -104,6 +112,9 @@ API_AVAILABLE(macos(15.4))
 /// so the request falls back to Misty's app notifications.
 - (BOOL)handleNotification:(NSString *)method args:(NSArray *)args identifier:(NSString *)identifier reply:(void (^)(id, NSString *))reply;
 @end
+
+/// The live host of a Space, if its window is open.
+API_AVAILABLE(macos(15.4)) MistyExtensionHost *MistyExtensionHostForSpace(NSString *space);
 
 /// Sets WebKit's page-level mute. The same private call backs Misty's own tab
 /// mute control; it is skipped when unavailable.

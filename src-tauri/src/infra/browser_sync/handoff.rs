@@ -161,7 +161,7 @@ fn initial_storage_capture(
 #[cfg(any(target_os = "macos", windows))]
 async fn capture(app: tauri::AppHandle, expected: String) -> Result<SyncView, String> {
     let _lifetime = browser_lifecycle().read().await;
-    let mut current = session().lock().await;
+    let mut current = session_by_id(&expected).await;
     let active = current
         .as_mut()
         .ok_or("Unlock device sync before capturing website sign-ins.")?;
@@ -212,11 +212,10 @@ pub(super) async fn capture_current(
     if binding.staged.is_some() {
         return Err("Finish restoring the browser profile before capturing sign-ins.".into());
     }
-    let physical = binding
-        .active
-        .as_ref()
-        .map(|v| v.physical_id.clone())
-        .unwrap_or_else(super::super::browser_profile::legacy_profile_identity);
+    // Only the personal vault inherits the pre-sync store; a Space starts in its own.
+    let physical = binding.active.as_ref().map(|v| v.physical_id.clone()).unwrap_or_else(|| {
+        active.space_id.as_ref().map_or_else(super::super::browser_profile::legacy_profile_identity, |_| logical.clone())
+    });
     let observer = capture::CaptureView::open(&app, &physical)?;
     let journal = active
         .handle
@@ -324,8 +323,12 @@ pub async fn browser_sync_restore_credentials(
 
 #[cfg(any(target_os = "macos", windows))]
 async fn restore(app: tauri::AppHandle, expected: String) -> Result<SyncView, String> {
-    let _lifetime = browser_lifecycle().write().await;
-    let mut current = session().lock().await;
+    // Restoring replaces one vault's store: only that Space's pages wait.
+    let _lifetime = browser_lifecycle().read().await;
+    let vault = vault_of_session(&expected)
+        .ok_or("The sync session changed. Refresh the workspace before editing.")?;
+    let _store = store_lock(&vault).write_owned().await;
+    let mut current = session_by_id(&expected).await;
     let active = current
         .as_mut()
         .ok_or("Unlock device sync before restoring website sign-ins.")?;
@@ -396,7 +399,9 @@ pub(super) async fn restore_current(
     // The caller holds the lifecycle write lease, so no page can be created
     // between this check and activation. Background recovery must never close
     // or reload a page, even if the incoming restore would succeed.
-    check_restore_mode(mode, app.webviews().keys().map(String::as_str))?;
+    let logical = default_profile_id(&active.scope)?;
+    let labels = super::super::browser::profile_view_labels(app, &logical)?;
+    check_restore_mode(mode, labels.iter().map(String::as_str))?;
     account_api(&active.scope.deployment, &active.scope.account_id)?;
     let status = active.handle.status.borrow().clone();
     if !matches!(status.phase, Phase::CatchingUp | Phase::Ready)
@@ -409,7 +414,6 @@ pub(super) async fn restore_current(
             "Wait for this device's changes to finish syncing before restoring sign-ins.".into(),
         );
     }
-    let logical = default_profile_id(&active.scope)?;
     let document: Document =
         serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
             .map_err(|_| "Could not read the received workspace")?;
@@ -441,7 +445,7 @@ pub(super) async fn restore_current(
         // pages before refreshing cookies so capture cannot echo the old tokens.
         super::super::agent_workspace::stop_account_tasks(app)?;
         active.capture_view = None;
-        super::super::browser::close_account_views_except(app, Some(observer.view.label()))?;
+        super::super::browser::close_profile_views_except(app, &logical, Some(observer.view.label()))?;
         let result = misty_browser_sync::restore::refresh_active_profile(
             &active.handle,
             &logical,
@@ -449,12 +453,8 @@ pub(super) async fn restore_current(
         )
         .await;
         if result.is_ok() {
-            *selected_profile()
-                .lock()
-                .map_err(|_| "Browser profile state is unavailable")? = Some(SelectedProfile {
-                logical: logical.clone(),
-                physical: generation.physical_id.clone(),
-            });
+            let physical = generation.physical_id.clone();
+            set_selected_profile(&active.scope.vault_id, Some(SelectedProfile { logical: logical.clone(), physical }))?;
         }
         if mode == RestoreMode::Explicit {
             let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
@@ -488,13 +488,13 @@ pub(super) async fn restore_current(
         super::super::agent_workspace::stop_account_tasks(&app)?;
         active.capture_view = None;
         closed_live_views = true;
-        super::super::browser::close_account_views_except(&app, Some(staging.view.label()))?;
+        super::super::browser::close_profile_views_except(&app, &logical, Some(staging.view.label()))?;
         active.handle.activate_browser_profile(logical.clone(), staged.revision, generation).await.map_err(issue)?;
         // Verification and activation are separate CAS boundaries; confirm the
         // actual activated store against any changes that arrived meanwhile.
         misty_browser_sync::restore::verify_active_profile(&active.handle, &logical, &mut backend).await
             .map_err(|_| "Newer website sign-in changes arrived during restoration. Retry before continuing.")?;
-        *selected_profile().lock().map_err(|_| "Browser profile state is unavailable")? = Some(SelectedProfile { logical: logical.clone(), physical });
+        set_selected_profile(&active.scope.vault_id, Some(SelectedProfile { logical: logical.clone(), physical }))?;
         Ok(())
     }.await;
     if closed_live_views && mode == RestoreMode::Explicit {
@@ -503,6 +503,7 @@ pub(super) async fn restore_current(
         let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     }
     active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
+    note_issue(&active.scope.vault_id, active.credential_issue.clone());
     let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
     result?;
     Ok(())

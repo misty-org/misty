@@ -90,6 +90,8 @@ export interface SyncStatusInput {
     notRestored?: unknown[];
   };
   vault?: { local: boolean; remote: boolean | null } | null;
+  /** Space names by id, to name a Space whose vault has a problem. */
+  spaceNames?: Record<string, string>;
 }
 /** One ordering and one set of copy for the workspace sync status in settings and the popup. */
 export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
@@ -116,6 +118,12 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
     return attention(
       "Website sign-ins need attention",
       "Misty could not finish syncing website sign-ins. Your workspace remains available.",
+    );
+  const spaceProblem = session?.space_problems?.[0];
+  if (spaceProblem)
+    return attention(
+      `${input.spaceNames?.[spaceProblem.space_id] ?? "A Space"} needs attention`,
+      spaceProblem.issue,
     );
   if (recovery?.notRestored?.length)
     return neutral(

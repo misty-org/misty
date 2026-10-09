@@ -157,7 +157,32 @@ pub struct Vault {
     pub key_epoch: u64,
     pub head_sequence: u64,
     pub root_public_key: String,
-    pub key_envelope: KeyEnvelope,
+    /// The personal vault's root, wrapped by the sync password and secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_envelope: Option<KeyEnvelope>,
+    /// Any other Space vault's root, sealed to the personal root
+    /// (`VaultRoot::open_space_root`). Exactly one of the two is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space_key_envelope: Option<Envelope>,
+}
+
+impl Vault {
+    pub fn is_space(&self) -> bool {
+        self.space_key_envelope.is_some()
+    }
+}
+
+impl From<SpaceVault> for Vault {
+    fn from(vault: SpaceVault) -> Self {
+        Self {
+            vault_id: vault.vault_id,
+            key_epoch: vault.key_epoch,
+            head_sequence: vault.head_sequence,
+            root_public_key: vault.root_public_key,
+            key_envelope: vault.key_envelope,
+            space_key_envelope: vault.space_key_envelope,
+        }
+    }
 }
 
 /// One of the account's vaults, one per Space. The personal vault carries the

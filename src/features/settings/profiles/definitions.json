@@ -722,6 +722,19 @@
     "maxLength": 524288
   },
   {
+    "id": "extensions.space_installations",
+    "label": "Installed extensions in other Spaces",
+    "page": "browser-extensions",
+    "section": "extensions",
+    "key": "space_installations",
+    "default": "[]",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "format": "json",
+    "maxLength": 4194304
+  },
+  {
     "id": "extensions.agent_access",
     "label": "Allow agents to use extensions",
     "page": "browser-extensions",

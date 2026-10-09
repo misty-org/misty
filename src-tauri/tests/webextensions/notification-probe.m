@@ -14,6 +14,9 @@
 #import "compat-channel.h"
 
 static NSString *account, *origin;
+// Probes run as one Space with its own named store.
+static NSString *const ProbeStore = @"6D697374-7900-4000-8000-70726F626573";
+
 static NSWindow *window;
 static WKWebView *page;
 static UNNotification *delivered;
@@ -40,6 +43,7 @@ static void replied(void *pointer, const char *json) {
 static void request(NSDictionary *input, Completion completion) {
     NSMutableDictionary *value = [input mutableCopy];
     value[@"account"] = account;
+    if (!value[@"space"]) value[@"space"] = @"probe";
     NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
     misty_extensions_request([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String, replied, (__bridge_retained void *)[completion copy]);
 }
@@ -113,14 +117,14 @@ int main(int argc, const char *argv[]) {
         origin = NSUUID.UUID.UUIDString.lowercaseString;
         NSString *root = [NSString stringWithUTF8String:argv[1]];
         window = [[NSWindow alloc] initWithContentRect:NSMakeRect(80, 80, 400, 300) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
-        request(@{@"operation":@"configure", @"controllerId":NSUUID.UUID.UUIDString}, ^(NSDictionary *configured) {
+        request(@{@"operation":@"configure", @"controllerId":NSUUID.UUID.UUIDString, @"store":ProbeStore}, ^(NSDictionary *configured) {
             request(@{@"operation":@"load", @"id":@"1", @"guid":@"compat-fixture@misty.test", @"origin":origin, @"runtimePath":root, @"privateAccess":@NO, @"permissions":@[@"notifications"], @"hosts":@[]}, ^(NSDictionary *loaded) {
                 NSString *url = [NSString stringWithFormat:@"webkit-extension://%@/notifications.html", origin];
                 WKWebViewConfiguration *original = [WKWebViewConfiguration new];
-                WKWebViewConfiguration *configuration = CFBridgingRelease(misty_extensions_configuration((__bridge void *)original, url.UTF8String, false));
+                WKWebViewConfiguration *configuration = CFBridgingRelease(misty_extensions_configuration("probe", (__bridge void *)original, url.UTF8String));
                 page = [[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 400, 300) configuration:configuration];
                 [window.contentView addSubview:page];
-                misty_extensions_register_tab((__bridge void *)page, "notifications", false, url.UTF8String);
+                misty_extensions_register_tab("probe", (__bridge void *)page, "notifications", false, url.UTF8String);
                 [page loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]]];
                 after(2, ^{
                     [UNUserNotificationCenter.currentNotificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
