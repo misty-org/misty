@@ -71,7 +71,7 @@ func spacesListToolDescriptor() agenttools.Descriptor {
 		Name: "space.list", Version: 1, Risk: serveragent.RiskRead, Approval: agenttools.ApprovalNone,
 		Description:  "List the Spaces this account can access, including the personal Space, and which ones you are in. Use a Space's name or id as the `space` argument of other tools.",
 		InputSchema:  TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "required": []string{}, "additionalProperties": false}),
-		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
+		OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
 	}
 }
 

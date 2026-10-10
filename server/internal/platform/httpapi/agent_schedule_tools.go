@@ -15,7 +15,7 @@ import (
 // each workflow's schedule; to schedule a plain request, save it as a workflow
 // with memory.workflow.save first. Removing a schedule asks first when the account asks first.
 func (s *SpacesService) scheduleToolRegistrations() []agenttools.Registration {
-	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Approval: agenttools.ApprovalNone}
+	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Approval: agenttools.ApprovalNone}
 	ints := func(low, high int, description string) map[string]any {
 		return map[string]any{"type": "array", "maxItems": 35, "description": description, "items": map[string]any{"type": "integer", "minimum": low, "maximum": high}}
 	}

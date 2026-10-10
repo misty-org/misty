@@ -27,7 +27,7 @@ func (s *SpacesService) deleteToolRegistration() agenttools.Registration {
 				"id":    map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 				"space": map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 			}, []string{"kind", "id"}),
-			OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, AuditEvent: "item.deleted",
+			OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true, AuditEvent: "item.deleted",
 		},
 		Handler: s.executeItemDelete,
 	}

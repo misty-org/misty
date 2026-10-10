@@ -123,7 +123,7 @@ func (s *SpacesService) aiInvocationContext(ctx context.Context, record *db.AIIn
 // conversation, prior write receipts and the request with its context.
 func (s *SpacesService) aiInvocationPrompt(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, resolved []aiResolvedContext) (string, error) {
 	prompt := compileAIInvocationPrompt(body, resolved)
-	memory, err := loadAgentMemoryContext(ctx, s.database, record.UserID, "", body.AgentID)
+	memory, err := loadAgentMemoryContext(ctx, s.database, record.UserID, body.SpaceID, body.AgentID)
 	if err != nil {
 		return "", err
 	}

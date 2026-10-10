@@ -54,6 +54,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.MethodFunc(http.MethodPost, prefix+"/space-invitations/{token}", spaces.SpaceInvitationToken())
 	s.Router.Delete(prefix+"/spaces/{spaceID}/members/{userID}", spaces.RemoveMember())
 	s.Router.Post(prefix+"/spaces/{spaceID}/leave", spaces.LeaveSpace())
+	s.Router.Put(prefix+"/spaces/{spaceID}/items/{kind}/{itemID}/visibility", spaces.SpaceItemVisibility())
 	s.Router.Post(prefix+"/spaces/{spaceID}/transfer", spaces.TransferOwner())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/spaces/{spaceID}/messages", api.ConditionalGET(spaces.Messages()))
 	s.Router.MethodFunc(http.MethodPost, prefix+"/spaces/{spaceID}/messages", spaces.Messages())

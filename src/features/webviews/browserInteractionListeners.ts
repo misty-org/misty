@@ -174,5 +174,10 @@ export function listenBrowserInteractionEvents({
         useBrowserRuntimeStore.getState().setError(tabId, payload.error || "The download failed.");
       });
     }),
+    // Another device finished or removed a download in this Space.
+    listen("misty:space-downloads-changed", () => {
+      if (isDisposed()) return;
+      void useBrowserDownloadsStore.getState().refresh();
+    }),
   ];
 }

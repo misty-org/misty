@@ -38,7 +38,7 @@ func webFetchDescriptor(locality agenttools.Locality) agenttools.Descriptor {
 				"question": map[string]any{"type": "string", "maxLength": 300, "description": "What to find on the page, in plain words."},
 			},
 		}),
-		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: locality,
+		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Layer: agenttools.LayerPublic, Locality: locality,
 		Idempotent: true, AllowCustomAgent: true,
 	}
 }

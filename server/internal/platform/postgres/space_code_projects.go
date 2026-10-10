@@ -23,6 +23,8 @@ type SpaceCodeProject struct {
 	GitHubRepo  string    `json:"github_repo"`
 	LinkedAt    time.Time `json:"linked_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// Visibility is "public" or "private": a private project shows only to its owner.
+	Visibility string `json:"visibility"`
 }
 
 // SpaceCodeProjectInput links one of the caller's projects, or updates the link.
@@ -35,10 +37,10 @@ type SpaceCodeProjectInput struct {
 
 var githubRepoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
 
-const spaceCodeProjectColumns = `p.id,p.space_id,p.owner_user_id,COALESCE(u.name,''),p.project_id,p.device_id,p.name,p.github_repo,p.linked_at,p.updated_at`
+const spaceCodeProjectColumns = `p.id,p.space_id,p.owner_user_id,COALESCE(u.name,''),p.project_id,p.device_id,p.name,p.github_repo,p.linked_at,p.updated_at,p.visibility`
 
 func scanSpaceCodeProject(row interface{ Scan(...any) error }, out *SpaceCodeProject) error {
-	return row.Scan(&out.ID, &out.SpaceID, &out.OwnerUserID, &out.OwnerName, &out.ProjectID, &out.DeviceID, &out.Name, &out.GitHubRepo, &out.LinkedAt, &out.UpdatedAt)
+	return row.Scan(&out.ID, &out.SpaceID, &out.OwnerUserID, &out.OwnerName, &out.ProjectID, &out.DeviceID, &out.Name, &out.GitHubRepo, &out.LinkedAt, &out.UpdatedAt, &out.Visibility)
 }
 
 // LinkSpaceCodeProject links one of the caller's projects to a Space they
@@ -81,7 +83,8 @@ func (db *Database) UnlinkSpaceCodeProject(ctx context.Context, userID, spaceID,
 		if err != nil {
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `DELETE FROM space_code_projects WHERE id=$1 AND space_id=$2 AND (owner_user_id=$3 OR $4)`, linkID, spaceID, userID, role == "owner")
+		// The Space's owner may unlink a public project, never someone's private one.
+		result, err := tx.ExecContext(ctx, `DELETE FROM space_code_projects WHERE id=$1 AND space_id=$2 AND (owner_user_id=$3 OR ($4 AND visibility='public'))`, linkID, spaceID, userID, role == "owner")
 		if err != nil {
 			return err
 		}
@@ -105,7 +108,8 @@ func (db *Database) SpaceCodeProjects(ctx context.Context, userID, spaceID strin
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT `+spaceCodeProjectColumns+` FROM space_code_projects p
-			LEFT JOIN users u ON u.id=p.owner_user_id WHERE p.space_id=$1 ORDER BY p.updated_at DESC,p.id LIMIT 200`, spaceID)
+			LEFT JOIN users u ON u.id=p.owner_user_id WHERE p.space_id=$1 AND (p.visibility='public' OR p.owner_user_id=$2)
+			ORDER BY p.updated_at DESC,p.id LIMIT 200`, spaceID, itemViewer(ctx, userID))
 		if err != nil {
 			return err
 		}

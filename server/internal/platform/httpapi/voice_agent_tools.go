@@ -24,7 +24,7 @@ const (
 func (s *SpacesService) voiceToolRegistrations() []agenttools.Registration {
 	base := agenttools.Descriptor{
 		Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
-		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true,
+		OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true,
 	}
 	id := map[string]any{"type": "string", "minLength": 1, "maxLength": 200}
 	transcribe := base

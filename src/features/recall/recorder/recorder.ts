@@ -13,6 +13,8 @@ export interface ActivePage extends PageCandidate {
   /** The browser runtime id, for reading the page. */
   runtimeId: string;
   title: string;
+  /** The Space of the window the page is in; the moment is kept there. */
+  spaceId?: string;
 }
 
 export interface RecorderDeps {
@@ -26,6 +28,7 @@ export interface RecorderDeps {
     simhash: string;
     dwell_ms: number;
     occurred_at: string;
+    space_id?: string;
   }): Promise<unknown>;
   /** Whether Misty's window is in front and visible. */
   attentive(): boolean;
@@ -106,6 +109,7 @@ export class RecallRecorder {
         simhash: body ? simhash(body) : "",
         dwell_ms: now - since,
         occurred_at: new Date(since).toISOString(),
+        space_id: page.spaceId,
       });
     } catch (error) {
       const status = (error as { status?: number }).status;

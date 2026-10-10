@@ -37,8 +37,19 @@ func (s *SpacesService) memoryUser(w http.ResponseWriter, r *http.Request) (stri
 	return s.appsUser(w, r)
 }
 
-// MemoryEvents records one event from the person's own device (POST) or
-// lists and searches their events (GET ?from&to&site&kind&q&limit).
+// writeMemorySpaceError answers a request for a Space the person isn't in.
+func writeMemorySpaceError(w http.ResponseWriter, err error) {
+	if errors.Is(err, db.ErrSpaceForbidden) || errors.Is(err, db.ErrSpaceNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"code": "memory_space_not_found", "message": "That Space isn't one of yours."})
+		return
+	}
+	writeAgentError(w, err)
+}
+
+// MemoryEvents records one event from the person's own device in the Space
+// of the window it came from (POST, body space_id), or lists their events in
+// one Space (GET ?space_id&from&to&site&kind&limit). With q, GET searches
+// that Space's moments by meaning; there is no word search.
 func (s *SpacesService) MemoryEvents() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.memoryUser(w, r)
@@ -46,15 +57,36 @@ func (s *SpacesService) MemoryEvents() http.HandlerFunc {
 			return
 		}
 		if r.Method == http.MethodGet {
-			query, valid := memoryQueryFrom(r)
+			query, text, valid := memoryQueryFrom(r)
 			if !valid {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_memory_query"})
 				return
+			}
+			space, err := requestMemorySpace(r.Context(), s.database, user, memorySpaceParam(r))
+			if err != nil {
+				writeMemorySpaceError(w, err)
+				return
+			}
+			query.SpaceID = space
+			if text != "" {
+				hits, err := s.searchMemory(r.Context(), user, space, []string{db.MemoryMoments}, text, query.Limit)
+				if err != nil {
+					writeAgentError(w, err)
+					return
+				}
+				query.IDs = memoryHitIDs(hits)
+				if len(query.IDs) == 0 {
+					writeJSON(w, http.StatusOK, map[string]any{"events": []db.MemoryEvent{}})
+					return
+				}
 			}
 			events, err := s.database.MemoryEvents(r.Context(), user, query)
 			if err != nil {
 				writeAgentError(w, err)
 				return
+			}
+			if text != "" {
+				events = eventsInHitOrder(events, query.IDs)
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"events": events})
 			return
@@ -65,7 +97,12 @@ func (s *SpacesService) MemoryEvents() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_memory_event"})
 			return
 		}
-		event.ID = uuid.NewString()
+		space, err := requestMemorySpace(r.Context(), s.database, user, event.SpaceID)
+		if err != nil {
+			writeMemorySpaceError(w, err)
+			return
+		}
+		event.ID, event.SpaceID = uuid.NewString(), space
 		if event.OccurredAt.IsZero() || event.OccurredAt.After(time.Now().Add(5*time.Minute)) {
 			event.OccurredAt = time.Now()
 		}
@@ -83,24 +120,25 @@ func (s *SpacesService) MemoryEvents() http.HandlerFunc {
 	}
 }
 
-func memoryQueryFrom(r *http.Request) (db.MemoryQuery, bool) {
+func memoryQueryFrom(r *http.Request) (db.MemoryQuery, string, bool) {
 	values := r.URL.Query()
-	query := db.MemoryQuery{Site: values.Get("site"), Kind: values.Get("kind"), Text: values.Get("q")}
+	query := db.MemoryQuery{Site: values.Get("site"), Kind: values.Get("kind")}
+	text := strings.TrimSpace(values.Get("q"))
 	for key, target := range map[string]*time.Time{"from": &query.From, "to": &query.To} {
 		if raw := values.Get(key); raw != "" {
 			parsed, err := time.Parse(time.RFC3339, raw)
 			if err != nil {
-				return query, false
+				return query, text, false
 			}
 			*target = parsed
 		}
 	}
 	query.Limit, _ = strconv.Atoi(values.Get("limit"))
-	return query, len(query.Text) <= 500 && len(query.Site) <= 255
+	return query, text, len(text) <= 500 && len(query.Site) <= 255
 }
 
-// MemoryForget deletes everything, one site, or a time range.
-// POST {all} | {site} | {from, to}.
+// MemoryForget deletes everything, one site, or a time range in one Space.
+// POST {space_id, all} | {space_id, site} | {space_id, from, to}.
 func (s *SpacesService) MemoryForget() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.memoryUser(w, r)
@@ -108,17 +146,23 @@ func (s *SpacesService) MemoryForget() http.HandlerFunc {
 			return
 		}
 		var body struct {
-			All  bool      `json:"all"`
-			Site string    `json:"site"`
-			From time.Time `json:"from"`
-			To   time.Time `json:"to"`
+			SpaceID string    `json:"space_id"`
+			All     bool      `json:"all"`
+			Site    string    `json:"site"`
+			From    time.Time `json:"from"`
+			To      time.Time `json:"to"`
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 4096)
 		if decodeAIJSON(w, r, &body) != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_forget"})
 			return
 		}
-		n, err := s.database.ForgetMemory(r.Context(), user, db.MemoryForget{All: body.All, Site: body.Site, From: body.From, To: body.To})
+		space, err := requestMemorySpace(r.Context(), s.database, user, body.SpaceID)
+		if err != nil {
+			writeMemorySpaceError(w, err)
+			return
+		}
+		n, err := s.database.ForgetMemory(r.Context(), user, db.MemoryForget{SpaceID: space, All: body.All, Site: body.Site, From: body.From, To: body.To})
 		if errors.Is(err, db.ErrSpaceInvalid) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_forget", "message": "Choose what to forget: everything, a site, or a time range."})
 			return

@@ -1,4 +1,5 @@
 import { spaceAgentsApi, type SpaceAgent } from "@/api/spaces/space-agents";
+import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
 import { useCallback, useEffect, useState } from "react";
 
 /** The agents in a Space, each under the person who owns it. */
@@ -38,6 +39,12 @@ export function useSpaceAgentMembers(spaceId: string) {
     /** Takes an agent out; its owner or the Space's owner may. */
     remove: (agentId: string) =>
       change(() => spaceAgentsApi.remove(spaceId, agentId), "That agent couldn’t be removed."),
+    /** Makes one of your agents private here (invisible to the rest, can't be @mentioned) or public. */
+    setVisibility: (agentId: string, visibility: ItemVisibility) =>
+      change(
+        () => setItemVisibility(spaceId, "agent", agentId, visibility),
+        `That agent couldn’t be made ${visibility}.`,
+      ),
   };
 }
 

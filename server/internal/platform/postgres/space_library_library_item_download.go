@@ -115,7 +115,7 @@ func (db *Database) ExplicitAgentLibraryItemDownload(ctx context.Context, userID
 	return out, err
 }
 
-const libraryItemSelect = `SELECT i.id,i.space_id,i.file_id,i.contributing_user_id,i.display_name,i.caption,i.tags,i.favorite,i.hidden,i.date_override,COALESCE(i.location_override,'null'::jsonb),i.contributor_information,COALESCE(i.current_edit_version_id,''),i.added_by_user_id,i.lifecycle_state,i.added_at,i.trashed_at,i.recover_until,i.version,i.updated_at,
+const libraryItemSelect = `SELECT i.id,i.space_id,i.file_id,i.contributing_user_id,i.display_name,i.caption,i.tags,i.favorite,i.hidden,i.date_override,COALESCE(i.location_override,'null'::jsonb),i.contributor_information,COALESCE(i.current_edit_version_id,''),i.added_by_user_id,i.lifecycle_state,i.added_at,i.trashed_at,i.recover_until,i.version,i.updated_at,i.visibility,
 	f.id,f.blob_id,f.security_domain_id,f.uploader_user_id,f.original_filename,f.intrinsic_metadata,f.lifecycle_state,f.original_uploaded_at,f.version FROM space_library_items i JOIN library_files f ON f.id=i.file_id`
 
 func loadCompletedLibraryUploadTx(ctx context.Context, tx *sql.Tx, upload *LibraryUpload, result *CompleteLibraryUploadResult) error {
@@ -267,7 +267,7 @@ func scanLibraryFile(scanner interface{ Scan(...any) error }, out *LibraryFile) 
 
 func scanSpaceLibraryItem(scanner interface{ Scan(...any) error }, out *SpaceLibraryItem) error {
 	var tags []byte
-	err := scanner.Scan(&out.ID, &out.SpaceID, &out.FileID, &out.ContributingUserID, &out.DisplayName, &out.Caption, &tags, &out.Favorite, &out.Hidden, &out.DateOverride, &out.LocationOverride, &out.ContributorInformation, &out.CurrentEditVersionID, &out.AddedByUserID, &out.LifecycleState, &out.AddedAt, &out.TrashedAt, &out.RecoverUntil, &out.Version, &out.UpdatedAt,
+	err := scanner.Scan(&out.ID, &out.SpaceID, &out.FileID, &out.ContributingUserID, &out.DisplayName, &out.Caption, &tags, &out.Favorite, &out.Hidden, &out.DateOverride, &out.LocationOverride, &out.ContributorInformation, &out.CurrentEditVersionID, &out.AddedByUserID, &out.LifecycleState, &out.AddedAt, &out.TrashedAt, &out.RecoverUntil, &out.Version, &out.UpdatedAt, &out.Visibility,
 		&out.File.ID, &out.File.BlobID, &out.File.SecurityDomainID, &out.File.UploaderUserID, &out.File.OriginalFilename, &out.File.IntrinsicMetadata, &out.File.LifecycleState, &out.File.OriginalUploadedAt, &out.File.Version)
 	if err == nil {
 		_ = json.Unmarshal(tags, &out.Tags)

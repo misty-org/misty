@@ -35,6 +35,7 @@ pub mod browser_process_ended;
 pub(crate) mod browser_profile_view;
 #[cfg(desktop)]
 mod browser_scripts;
+pub mod browser_search_space;
 pub mod browser_search_suggest;
 pub mod browser_shortcuts;
 #[cfg(desktop)]

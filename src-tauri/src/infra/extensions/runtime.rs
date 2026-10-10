@@ -225,7 +225,9 @@ pub async fn extensions_reconcile(
         service(&space).lock().await.states.insert(installation.id.clone(), status);
     }
     if changed { sync::start(app.clone(), account.clone(), space.clone()); }
-    Ok(service(&space).lock().await.states.values().cloned().collect())
+    let states: Vec<InstalledState> = service(&space).lock().await.states.values().cloned().collect();
+    super::space::reconciled(crate::infra::space_windows::space_id_for_key(&space), installations.clone(), states.clone());
+    Ok(states)
 
     }.await;
     result.map_err(ExtensionFailure::from)

@@ -30,6 +30,9 @@ type aiInvocationInput struct {
 	ThinkingMode      string             `json:"thinking_mode,omitempty"`
 	TaskID            string             `json:"task_id,omitempty"`
 	AgentID           string             `json:"agent_id,omitempty"`
+	// SpaceID is the Space of the window the request came from. Memory tools
+	// read and write that Space's tree; empty is the asker's personal Space.
+	SpaceID string `json:"space_id,omitempty"`
 	ExecutionMode     string             `json:"execution_mode,omitempty"`
 	CollaborationMode string             `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
 	PermissionMode    string             `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission

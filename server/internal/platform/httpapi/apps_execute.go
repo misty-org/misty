@@ -46,6 +46,17 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 	if err != nil {
 		return nil, appsError(err)
 	}
+	// The call runs as an account the run's Space picked, named explicitly, so
+	// Composio never falls back to another of the person's accounts.
+	apps, err := s.loadSpaceApps(ctx, client, invocation)
+	if err != nil {
+		return nil, appsError(err)
+	}
+	account, need := apps.account(info.Toolkit.Slug, call.Account)
+	if need != appsReady {
+		return nil, appsNeedError(apps, info.Toolkit.Slug, need)
+	}
+	call.Account = account
 	kind := composio.Classify(info.Slug, info.Tags)
 	bounded, cancel, err := boundedAgentExecutionContext(ctx, s.database, invocation.UserID, invocation.RunID)
 	if err != nil {

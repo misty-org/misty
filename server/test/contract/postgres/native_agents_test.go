@@ -81,16 +81,23 @@ func TestNativeAgentsPrivacyMemoryAndLeases(t *testing.T) {
 			t.Fatalf("memory escaped owner/agent/Space: %+v", scope)
 		}
 	}
-	if values, err := database.MistyMemoryContext(ctx, owner.ID, secondSpace.ID, 20, agent.ID); err != nil || len(values) != 1 || values[0].ID != memory.ID {
-		t.Fatalf("account memory restricted to a Space: %v %v", values, err)
+	// Memory belongs to the Space it was remembered in.
+	if values, err := database.MistyMemoryContext(ctx, owner.ID, secondSpace.ID, 20, agent.ID); err != nil || len(values) != 0 {
+		t.Fatalf("memory crossed into another Space: %v %v", values, err)
+	}
+	if values, err := database.MistyMemoryContext(ctx, owner.ID, space.ID, 20, agent.ID); err != nil || len(values) != 1 || values[0].ID != memory.ID {
+		t.Fatalf("memory missing from its Space: %v %v", values, err)
 	}
 	if err = database.UpdateAgentMemory(ctx, owner.ID, agent.ID, space.ID, memory.ID, "Use a concise brand voice"); err != nil {
 		t.Fatal(err)
 	}
-	if err = database.ForgetMistyMemory(ctx, owner.ID, memory.ID, misty.ID); err == nil {
+	if err = database.ForgetMistyMemory(ctx, owner.ID, space.ID, memory.ID, misty.ID); err == nil {
 		t.Fatal("another agent forgot memory")
 	}
-	if err = database.ForgetMistyMemory(ctx, owner.ID, memory.ID, agent.ID); err != nil {
+	if err = database.ForgetMistyMemory(ctx, owner.ID, secondSpace.ID, memory.ID, agent.ID); err == nil {
+		t.Fatal("memory forgotten from another Space")
+	}
+	if err = database.ForgetMistyMemory(ctx, owner.ID, space.ID, memory.ID, agent.ID); err != nil {
 		t.Fatal(err)
 	}
 	lease := AgentExecutionLease{AgentID: agent.ID, SpaceID: space.ID, TaskID: "task-native-one", WindowLabel: "misty-agent-one"}

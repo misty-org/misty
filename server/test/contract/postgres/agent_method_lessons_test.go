@@ -52,7 +52,7 @@ func TestAgentMethodLessonsVersionPerOwner(t *testing.T) {
 	if _, err := database.AddAgentMethodLesson(ctx, owner.ID, method.ID, "   ", ""); err == nil {
 		t.Fatal("empty steps were saved")
 	}
-	methods, err := database.AgentMethods(ctx, owner.ID, agent.ID)
+	methods, err := database.AgentMethods(ctx, owner.ID, "", agent.ID)
 	if err != nil || len(methods) != 1 || methods[0].Definition.Instructions != "Summarize the week." {
 		t.Fatalf("learning changed the person's instructions: %+v %v", methods, err)
 	}

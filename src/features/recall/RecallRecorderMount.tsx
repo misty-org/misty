@@ -9,6 +9,7 @@ import { recallSettings } from "./recallSettings";
 import { RecallRecorder, type ActivePage } from "./recorder/recorder";
 import { useRecallStore } from "./useRecallStore";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { windowSpaceId } from "./windowSpace";
 
 /** The browser page in the focused pane of the focused window. */
 function activePage(): ActivePage | null {
@@ -25,6 +26,8 @@ function activePage(): ActivePage | null {
     title: view.title ?? "",
     private: isIncognitoWindow(),
     agentOwned: state.agentOwned,
+    // Private (incognito) pages are skipped before anything is sent.
+    spaceId: windowSpaceId(),
   };
 }
 

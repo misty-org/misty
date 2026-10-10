@@ -15,11 +15,11 @@ func TestAgentToolboxRejectsDuplicateNamesAndAliases(t *testing.T) {
 	handler := func(context.Context, agenttools.Invocation, serveragent.ToolRequest) (json.RawMessage, error) {
 		return json.RawMessage(`{}`), nil
 	}
-	base := agenttools.Registration{Descriptor: agenttools.Descriptor{Name: "task.query", Description: "Query Tasks", Risk: serveragent.RiskRead, Aliases: []string{"tasks.list"}}, Handler: handler}
+	base := agenttools.Registration{Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic, Name: "task.query", Description: "Query Tasks", Risk: serveragent.RiskRead, Aliases: []string{"tasks.list"}}, Handler: handler}
 	if _, err := agenttools.New(base, base); !errors.Is(err, agenttools.ErrInvalidRegistration) {
 		t.Fatalf("duplicate tool error = %v", err)
 	}
-	conflict := agenttools.Registration{Descriptor: agenttools.Descriptor{Name: "tasks.list", Description: "List Tasks", Risk: serveragent.RiskRead}, Handler: handler}
+	conflict := agenttools.Registration{Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic, Name: "tasks.list", Description: "List Tasks", Risk: serveragent.RiskRead}, Handler: handler}
 	if _, err := agenttools.New(base, conflict); !errors.Is(err, agenttools.ErrInvalidRegistration) {
 		t.Fatalf("alias conflict error = %v", err)
 	}
@@ -28,7 +28,7 @@ func TestAgentToolboxRejectsDuplicateNamesAndAliases(t *testing.T) {
 func TestAgentToolboxExposesOwnedToolsAndReauthorizesExecution(t *testing.T) {
 	executions := 0
 	registry := agenttools.MustNew(agenttools.Registration{
-		Descriptor: agenttools.Descriptor{
+		Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic,
 			Name: "spaces.rename", Description: "Rename the current Space", Risk: serveragent.RiskWrite,
 			Approval: agenttools.ApprovalExplicitIntent, RequiredPermission: "spaces.owner", AuditEvent: "space.updated",
 		},
@@ -62,7 +62,7 @@ func TestAgentToolboxExposesOwnedToolsAndReauthorizesExecution(t *testing.T) {
 func TestAgentToolboxAliasesExecuteCanonicalHandler(t *testing.T) {
 	var executedName string
 	registry := agenttools.MustNew(agenttools.Registration{
-		Descriptor: agenttools.Descriptor{Name: "message.search", Description: "Search messages", Risk: serveragent.RiskRead, Aliases: []string{"space.search_messages"}},
+		Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic, Name: "message.search", Description: "Search messages", Risk: serveragent.RiskRead, Aliases: []string{"space.search_messages"}},
 		Handler: func(_ context.Context, _ agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 			executedName = request.Name
 			return json.RawMessage(`{"count":0}`), nil
@@ -77,7 +77,7 @@ func TestAgentToolboxAliasesExecuteCanonicalHandler(t *testing.T) {
 func TestAgentToolboxIgnoresLegacyApprovalModes(t *testing.T) {
 	executions := 0
 	registry := agenttools.MustNew(agenttools.Registration{
-		Descriptor: agenttools.Descriptor{
+		Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic,
 			Name: "task.update", Description: "Update a Task", Risk: serveragent.RiskWrite,
 			Approval:         agenttools.ApprovalExplicitIntent,
 			ApprovalBySource: map[string]agenttools.ApprovalPolicy{"canonical_run": agenttools.ApprovalInteractive},
@@ -112,7 +112,7 @@ func TestAgentToolboxIgnoresLegacyApprovalModes(t *testing.T) {
 
 func TestAgentToolboxEnforcesDeclaredInputAndOutputSchemas(t *testing.T) {
 	registry := agenttools.MustNew(agenttools.Registration{
-		Descriptor: agenttools.Descriptor{
+		Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic,
 			Name: "tasks.lookup", Description: "Look up a Task", Risk: serveragent.RiskRead,
 			InputSchema:  json.RawMessage(`{"type":"object","required":["id"],"properties":{"id":{"type":"string","minLength":1}},"additionalProperties":false}`),
 			OutputSchema: json.RawMessage(`{"type":"object","required":["found"],"properties":{"found":{"type":"boolean"}},"additionalProperties":false}`),
@@ -145,7 +145,7 @@ func TestAgentToolboxEnforcesDeclaredInputAndOutputSchemas(t *testing.T) {
 
 func TestAgentToolboxExecutionMiddlewareWrapsCanonicalValidatedAction(t *testing.T) {
 	registry := agenttools.MustNew(agenttools.Registration{
-		Descriptor: agenttools.Descriptor{
+		Descriptor: agenttools.Descriptor{Layer: agenttools.LayerPublic,
 			Name: "task.update", Description: "Update a Task", Risk: serveragent.RiskWrite,
 			Aliases: []string{"task.edit"}, AuditEvent: "task.updated",
 			InputSchema: json.RawMessage(`{"type":"object","required":["id"]}`), OutputSchema: json.RawMessage(`{"type":"object","required":["ok"],"properties":{"ok":{"type":"boolean"}}}`),

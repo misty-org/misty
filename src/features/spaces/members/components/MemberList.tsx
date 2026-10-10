@@ -1,6 +1,7 @@
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpaceMember } from "@/api/spaces/dto/entities";
 import type { SpaceAgent } from "@/api/spaces/space-agents";
+import type { ItemVisibility } from "@/api/spaces/visibility";
 import { SpaceAgentRow } from "../agents/SpaceAgentRow";
 import { agentsByOwner } from "../agents/useSpaceAgentMembers";
 import type { MemberAction } from "./SpaceMembers";
@@ -33,6 +34,7 @@ export function MemberList({
   currentUserId,
   onAction,
   onRemoveAgent,
+  onAgentVisibility,
 }: {
   members: SpaceMember[];
   agents: SpaceAgent[] | undefined;
@@ -42,6 +44,7 @@ export function MemberList({
   currentUserId: string | undefined;
   onAction: (action: MemberAction) => void;
   onRemoveAgent: (agentId: string) => void;
+  onAgentVisibility: (agentId: string, visibility: ItemVisibility) => void;
 }) {
   const byOwner = agentsByOwner(agents);
   return (
@@ -92,6 +95,11 @@ export function MemberList({
                 onRemove={
                   owner || agent.owner_user_id === currentUserId
                     ? () => onRemoveAgent(agent.agent_id)
+                    : undefined
+                }
+                onVisibilityChange={
+                  agent.owner_user_id === currentUserId
+                    ? (visibility) => onAgentVisibility(agent.agent_id, visibility)
                     : undefined
                 }
               />

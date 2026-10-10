@@ -38,7 +38,7 @@ func TestPlanModeToolsAllowOnlyReads(t *testing.T) {
 		return json.RawMessage(`{}`), nil
 	}
 	tool := func(name, risk string) agenttools.Registration {
-		descriptor := agenttools.Descriptor{Name: name, Version: 1, Description: name, Risk: risk, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, InputSchema: agentToolSchema(map[string]any{}, nil)}
+		descriptor := agenttools.Descriptor{Layer: agenttools.LayerPublic, Name: name, Version: 1, Description: name, Risk: risk, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, InputSchema: agentToolSchema(map[string]any{}, nil)}
 		if risk != serveragent.RiskRead {
 			descriptor.AuditEvent = "test.write"
 		}

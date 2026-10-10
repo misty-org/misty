@@ -42,6 +42,20 @@ pub enum Kind {
     /// The sites a Space claims: links to them from other apps open in its
     /// window (`space_settings` collection). Native-only.
     SpaceSites,
+    /// An extension installed in the Space (`extensions` collection). Native-only.
+    Extension,
+    /// One site's permission choices in the Space (`site_permissions`
+    /// collection). Native-only.
+    SitePermission,
+    /// The Space's default search engine (`search` collection, one record).
+    SearchDefault,
+    /// A search engine the person added (`search` collection).
+    SearchEngine,
+    /// A `!trigger` search shortcut the person added (`search` collection).
+    SearchBang,
+    /// A finished download (`downloads` collection); the file stays on the
+    /// device that downloaded it.
+    Download,
 }
 
 impl Kind {
@@ -63,6 +77,12 @@ impl Kind {
             Self::ExtensionRemoval => "extension_removal",
             Self::Login => "login",
             Self::SpaceSites => "space_sites",
+            Self::Extension => "extension",
+            Self::SitePermission => "site_permission",
+            Self::SearchDefault => "search_default",
+            Self::SearchEngine => "search_engine",
+            Self::SearchBang => "search_bang",
+            Self::Download => "download",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -222,6 +242,105 @@ pub fn login_origin(value: &str) -> Result<()> {
         return Err(Error::Invalid);
     }
     Ok(())
+}
+
+/// An extension installed in a Space. Packages come from the store on each
+/// device; only the identity, version and on/off travel.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Extension {
+    /// The store's id: a Chrome Web Store id or an addons.mozilla.org number.
+    pub store_id: String,
+    pub name: String,
+    /// The version last installed; empty while the first install runs.
+    pub version: String,
+    pub enabled: bool,
+    /// Milliseconds since the Unix epoch.
+    pub updated_at: i64,
+}
+
+/// One answer to a site's request: as the Space's site settings name it.
+#[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum SiteDecision {
+    #[default]
+    Ask,
+    Allow,
+    Block,
+}
+
+/// A site's permission choices in a Space. A site with every choice at Ask
+/// has no record.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SitePermission {
+    /// `scheme://host[:port]`, as `Url::origin` writes it.
+    pub origin: String,
+    pub camera: SiteDecision,
+    pub microphone: SiteDecision,
+    #[serde(default)]
+    pub notifications: SiteDecision,
+    #[serde(default)]
+    pub popups: SiteDecision,
+    pub updated_at: i64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchDefault {
+    /// A built-in engine's id, or the record id of a `SearchEngine`.
+    pub engine: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchEngine {
+    pub name: String,
+    /// `%s` is replaced with the query.
+    pub search: String,
+    pub order: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SearchBang {
+    /// Typed as `!trigger`; lowercase letters, digits, dots and dashes.
+    pub trigger: String,
+    pub name: String,
+    /// `%s` is replaced with the query.
+    pub url: String,
+    pub order: f64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Download {
+    pub url: String,
+    pub file_name: String,
+    /// Bytes; absent when unknown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    /// Milliseconds since the Unix epoch.
+    pub finished_at: i64,
+    /// The device that holds the file.
+    pub device_id: String,
+}
+
+/// A search address with `%s` where the query goes.
+fn search_template(value: &str) -> Result<()> {
+    if !value.contains("%s") {
+        return Err(Error::Invalid);
+    }
+    web_url(&value.replace("%s", "query"))
+}
+
+fn bang_trigger(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    (1..=24).contains(&bytes.len())
+        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
+        && bytes
+            .iter()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'-'))
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -488,6 +607,50 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             {
                 return Err(Error::Invalid);
             }
+        }
+        Kind::Extension => {
+            let v: Extension = serde_json::from_value(value)?;
+            if !valid_id(&v.store_id) || v.store_id.len() > 64 || v.version.len() > 64 {
+                return Err(Error::Invalid);
+            }
+            text(&v.name, 256, true)?;
+            text(&v.version, 64, true)?;
+            added_at(Some(v.updated_at))?;
+        }
+        Kind::SitePermission => {
+            let v: SitePermission = serde_json::from_value(value)?;
+            login_origin(&v.origin)?;
+            added_at(Some(v.updated_at))?;
+        }
+        Kind::SearchDefault => {
+            let v: SearchDefault = serde_json::from_value(value)?;
+            if !valid_id(&v.engine) {
+                return Err(Error::Invalid);
+            }
+        }
+        Kind::SearchEngine => {
+            let v: SearchEngine = serde_json::from_value(value)?;
+            text(&v.name, 60, false)?;
+            search_template(&v.search)?;
+            order(v.order)?;
+        }
+        Kind::SearchBang => {
+            let v: SearchBang = serde_json::from_value(value)?;
+            if !bang_trigger(&v.trigger) {
+                return Err(Error::Invalid);
+            }
+            text(&v.name, 60, false)?;
+            search_template(&v.url)?;
+            order(v.order)?;
+        }
+        Kind::Download => {
+            let v: Download = serde_json::from_value(value)?;
+            web_url(&v.url)?;
+            text(&v.file_name, 1024, false)?;
+            if v.file_name.contains(['/', '\\']) || !valid_id(&v.device_id) {
+                return Err(Error::Invalid);
+            }
+            added_at(Some(v.finished_at))?;
         }
         Kind::ExtensionRemoval => {
             #[derive(Deserialize)]

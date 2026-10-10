@@ -20,6 +20,7 @@ export function downloadStatusText(entry: BrowserDownloadEntry): string {
         ? `${formatBytes(entry.received)} of ${formatBytes(entry.total)}`
         : `${formatBytes(entry.received)} downloaded`;
     case "finished":
+      if (entry.device) return `On ${entry.device} · ${hostOf(entry.url)}`;
       return entry.exists
         ? `${formatBytes(entry.received)} · ${hostOf(entry.url)}`
         : "File moved or deleted";
@@ -126,7 +127,7 @@ function DownloadRow(props: {
           className={cn(
             "block max-w-full truncate text-sm",
             openable ? "text-cream-bright hover:underline" : "text-cream-muted",
-            !openable && entry.state === "finished" && "line-through",
+            !openable && entry.state === "finished" && !entry.device && "line-through",
           )}
           disabled={!openable}
           title={entry.path || entry.url}

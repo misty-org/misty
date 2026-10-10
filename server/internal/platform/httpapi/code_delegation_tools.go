@@ -40,7 +40,7 @@ func codingToolChoice(id string) string {
 
 func codeDelegationDescriptors() []agenttools.Descriptor {
 	return []agenttools.Descriptor{
-		{Name: codeDelegateTool, Version: 1, Risk: serveragent.RiskWrite, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone, AuditEvent: "coding.delegated",
+		{Name: codeDelegateTool, Version: 1, Risk: serveragent.RiskWrite, Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone, AuditEvent: "coding.delegated",
 			Description: "Hand a coding task in an attached project to the person's own coding tool (such as Claude Code or Codex) on the computer that holds the project. State the task fully: the tool does not see this conversation. It works with the chat's Ask or Auto and asks the person before changes that need them. In Plan it only researches and proposes. Waits about four minutes, then returns what is still running so you can call code_wait. Mark the step delegated in your checklist.",
 			InputSchema: TestingMustAPIRawJSON(map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"task"},
@@ -50,7 +50,7 @@ func codeDelegationDescriptors() []agenttools.Descriptor {
 					"mode":    map[string]any{"type": "string", "enum": []string{"edit", "plan"}, "description": "plan researches read-only and proposes; edit (default) does the work."},
 				},
 			}), OutputSchema: agentToolObjectOutputSchema()},
-		{Name: codeWaitTool, Version: 1, Risk: serveragent.RiskRead, Idempotent: true, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone,
+		{Name: codeWaitTool, Version: 1, Risk: serveragent.RiskRead, Idempotent: true, Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone,
 			Description: "Wait up to about four minutes for delegated coding to finish, and return each run's state and answer.",
 			InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema()},
 	}
@@ -154,7 +154,7 @@ func (s *SpacesService) startCodingChild(ctx context.Context, parent *db.AIInvoc
 		collaboration = db.ConversationModePlan
 	}
 	child := aiInvocationInput{
-		Mode: "drawer", SurfaceID: "global", Trigger: "delegated", Prompt: task, Timezone: body.Timezone, AgentID: body.AgentID,
+		Mode: "drawer", SurfaceID: "global", Trigger: "delegated", Prompt: task, Timezone: body.Timezone, AgentID: body.AgentID, SpaceID: body.SpaceID,
 		ExecutionMode: codingExecutionMode, CollaborationMode: collaboration, PermissionMode: body.PermissionMode,
 		IdempotencyKey: "code:" + parent.ID + ":" + callID, DelegatedFrom: parent.ID, CodingProject: project,
 	}

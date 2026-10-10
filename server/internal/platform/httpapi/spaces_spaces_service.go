@@ -66,6 +66,10 @@ func (s *SpacesService) SetInvitationSender(
 }
 
 func NewSpacesService(database *db.Database, agent *serveragent.Service, encryptionKey string) (*SpacesService, error) {
+	// Every agent tool declares its layer; a tool without one stops the server here.
+	if err := validateAgentToolLayers(); err != nil {
+		return nil, err
+	}
 	key, err := parseSpaceEncryptionKey(encryptionKey)
 	if err != nil {
 		return nil, err

@@ -19,7 +19,7 @@ func nativeAgentToolDescriptors() []agenttools.Descriptor {
 		return TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false})
 	}
 	text := map[string]any{"type": "string", "maxLength": 16000}
-	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, Sources: agentToolboxSpaceSources, Triggers: []string{"message"}, AllowCustomAgent: true, Idempotent: true}
+	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, Sources: agentToolboxSpaceSources, Triggers: []string{"message"}, AllowCustomAgent: true, Idempotent: true}
 	list := base
 	list.Name = "agent.list"
 	list.Description = "List this user's personal agents in the browser workspace."

@@ -25,8 +25,9 @@ export function IntegrationsPage(
         <div>
           <h1>Integrations</h1>
           <p>
-            What your agents can reach when you chat. Connected apps belong to your account and
-            every agent can use them. Sends, shares, deletes and payments ask you first.
+            What your agents can reach when you chat. Connect each account once, then choose in each
+            Space's settings which accounts it uses. Sends, shares, deletes and payments ask you
+            first.
           </p>
         </div>
       </header>

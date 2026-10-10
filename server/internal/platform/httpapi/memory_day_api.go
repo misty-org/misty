@@ -14,8 +14,9 @@ import (
 
 const daySummaryMaxOutput = 1200
 
-// MemoryDaySummary summarizes one day of the person's Memory for their
-// Journal. POST {date: "2026-10-14", time_zone: "Europe/Lisbon", language}.
+// MemoryDaySummary summarizes one day of the person's Memory in one Space for
+// their Journal, from that Space's moments only.
+// POST {space_id, date: "2026-10-14", time_zone: "Europe/Lisbon", language}.
 // The summary is returned, not stored; the person may save it as a Note.
 func (s *SpacesService) MemoryDaySummary() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +25,7 @@ func (s *SpacesService) MemoryDaySummary() http.HandlerFunc {
 			return
 		}
 		var body struct {
+			SpaceID  string `json:"space_id"`
 			Date     string `json:"date"`
 			TimeZone string `json:"time_zone"`
 			Language string `json:"language"`
@@ -39,7 +41,12 @@ func (s *SpacesService) MemoryDaySummary() http.HandlerFunc {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_day"})
 			return
 		}
-		events, err := s.database.MemoryEvents(r.Context(), user, db.MemoryQuery{From: day, To: day.AddDate(0, 0, 1), Limit: 200})
+		space, err := requestMemorySpace(r.Context(), s.database, user, body.SpaceID)
+		if err != nil {
+			writeMemorySpaceError(w, err)
+			return
+		}
+		events, err := s.database.MemoryEvents(r.Context(), user, db.MemoryQuery{SpaceID: space, From: day, To: day.AddDate(0, 0, 1), Limit: 200})
 		if err != nil {
 			writeAgentError(w, err)
 			return

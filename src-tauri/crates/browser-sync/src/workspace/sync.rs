@@ -98,6 +98,11 @@ pub struct SyncState {
     pub unsynced: Vec<UnsyncedRecord>,
     /// Edits an older version set aside unsent: kept for recovery, never replayed.
     pub retired_edits: usize,
+    /// Per natively applied collection (`collections::NATIVE_APPLIED`), a
+    /// count that moves when another device's change arrives, so native code
+    /// knows to re-read it. Never sent to a renderer.
+    #[serde(skip)]
+    pub revisions: BTreeMap<String, u64>,
 }
 
 /// One record waiting to sync. Crosses to the renderer as `{kind, id}`, so it

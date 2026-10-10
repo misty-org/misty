@@ -15,6 +15,7 @@ import {
   PopoverContent,
 } from "@/shared/ui";
 import { AgentAvatar } from "./AgentAvatar";
+import { agentsByHomeSpace } from "./agentHomeSpaces";
 
 export function AgentSwitcher({
   agents,
@@ -27,6 +28,7 @@ export function AgentSwitcher({
   onSelect,
   onCreate,
   onSettings,
+  spaces,
 }: {
   agents: AgentProfile[];
   conversations: GlobalAiConversation[];
@@ -38,6 +40,8 @@ export function AgentSwitcher({
   className?: string;
   /** Only the agent's avatar on the trigger, as in the Misty panel's header. */
   iconOnly?: boolean;
+  /** The Agents page groups agents under their home Space; the quick panel just lists them. */
+  spaces?: ReadonlyArray<{ id: string; name: string; is_default?: boolean }>;
   onSelect(agentId: string, startNew?: boolean, conversationId?: string): void;
   onCreate(): void;
   /** Opens the given agent's settings. */
@@ -49,10 +53,7 @@ export function AgentSwitcher({
     action();
   };
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <MenuTrigger
         ref={triggerRef}
         kind="popover"
@@ -75,49 +76,51 @@ export function AgentSwitcher({
       >
         <Command label="Switch agent">
           <CommandList>
-            <CommandGroup heading="Agents">
-              {agents.map((agent) => (
-                <CommandItem
-                  key={agent.id}
-                  value={`agent:${agent.id}`}
-                  disabled={disabled}
-                  className="group"
-                  onSelect={() =>
-                    choose(() => {
-                      if (agent.id !== selectedAgent?.id) onSelect(agent.id);
-                    })
-                  }
-                >
-                  <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
-                    <AgentAvatar agent={agent} />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-                  {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
-                  <span className="relative flex size-6 shrink-0 items-center justify-center">
-                    {agent.id === selectedAgent?.id && (
-                      <Check
-                        aria-label="Current agent"
-                        className="group-hover:invisible group-data-[selected=true]:invisible"
-                      />
-                    )}
-                    <IconButton
-                      label={`${agent.name} settings`}
-                      disabled={disabled}
-                      className={cn(
-                        "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
-                        "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
+            {agentsByHomeSpace(agents, spaces).map((group) => (
+              <CommandGroup key={group.id} heading={group.name}>
+                {group.agents.map((agent) => (
+                  <CommandItem
+                    key={agent.id}
+                    value={`agent:${agent.id}`}
+                    disabled={disabled}
+                    className="group"
+                    onSelect={() =>
+                      choose(() => {
+                        if (agent.id !== selectedAgent?.id) onSelect(agent.id);
+                      })
+                    }
+                  >
+                    <span className="size-6 shrink-0 [&_.agent-avatar]:!size-6">
+                      <AgentAvatar agent={agent} />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{agent.name}</span>
+                    {!agent.enabled && <span className="text-xs text-cream-muted">Disabled</span>}
+                    <span className="relative flex size-6 shrink-0 items-center justify-center">
+                      {agent.id === selectedAgent?.id && (
+                        <Check
+                          aria-label="Current agent"
+                          className="group-hover:invisible group-data-[selected=true]:invisible"
+                        />
                       )}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        choose(() => onSettings(agent.id));
-                      }}
-                    >
-                      <Settings className="size-4" />
-                    </IconButton>
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
+                      <IconButton
+                        label={`${agent.name} settings`}
+                        disabled={disabled}
+                        className={cn(
+                          "absolute inset-0 !h-auto !w-auto opacity-0 focus-visible:opacity-100",
+                          "group-hover:opacity-100 group-data-[selected=true]:opacity-100",
+                        )}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          choose(() => onSettings(agent.id));
+                        }}
+                      >
+                        <Settings className="size-4" />
+                      </IconButton>
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
             <CommandSeparator />
             <CommandGroup>
               <CommandItem disabled={disabled} onSelect={() => choose(onCreate)}>

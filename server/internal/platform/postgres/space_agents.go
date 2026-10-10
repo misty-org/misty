@@ -21,6 +21,9 @@ type SpaceAgent struct {
 	OwnerUserID   string          `json:"owner_user_id"`
 	OwnerName     string          `json:"owner_name"`
 	AddedAt       time.Time       `json:"added_at"`
+	// Visibility is "public" or "private": a private agent is invisible to the
+	// rest of the Space and can't be @mentioned there.
+	Visibility string `json:"visibility"`
 }
 
 var (
@@ -30,7 +33,7 @@ var (
 	ErrAgentRequestLimit   = errors.New("agent request limit reached")
 )
 
-const spaceAgentColumns = `m.space_id,s.name,m.agent_id,a.name,a.role,a.avatar,a.system_managed,m.owner_user_id,COALESCE(u.name,''),m.added_at`
+const spaceAgentColumns = `m.space_id,s.name,m.agent_id,a.name,a.role,a.avatar,a.system_managed,m.owner_user_id,COALESCE(u.name,''),m.added_at,m.visibility`
 
 // Only enabled agents in active Spaces are visible or reachable. The owner is
 // always a member: membership cascades from space_members.
@@ -40,7 +43,7 @@ const spaceAgentJoins = ` FROM space_agents m
 	LEFT JOIN users u ON u.id=m.owner_user_id`
 
 func scanSpaceAgent(row interface{ Scan(...any) error }, out *SpaceAgent) error {
-	return row.Scan(&out.SpaceID, &out.SpaceName, &out.AgentID, &out.AgentName, &out.AgentRole, &out.AgentAvatar, &out.SystemManaged, &out.OwnerUserID, &out.OwnerName, &out.AddedAt)
+	return row.Scan(&out.SpaceID, &out.SpaceName, &out.AgentID, &out.AgentName, &out.AgentRole, &out.AgentAvatar, &out.SystemManaged, &out.OwnerUserID, &out.OwnerName, &out.AddedAt, &out.Visibility)
 }
 
 // AddSpaceAgent brings one of the caller's agents into a Space they belong to.
@@ -78,7 +81,7 @@ func (db *Database) RemoveSpaceAgent(ctx context.Context, userID, spaceID, agent
 		if err != nil {
 			return err
 		}
-		result, err := tx.ExecContext(ctx, `DELETE FROM space_agents WHERE space_id=$1 AND agent_id=$2 AND (owner_user_id=$3 OR $4)`, spaceID, agentID, userID, role == "owner")
+		result, err := tx.ExecContext(ctx, `DELETE FROM space_agents WHERE space_id=$1 AND agent_id=$2 AND (owner_user_id=$3 OR ($4 AND visibility='public'))`, spaceID, agentID, userID, role == "owner")
 		if err != nil {
 			return err
 		}
@@ -105,7 +108,8 @@ func (db *Database) SpaceAgents(ctx context.Context, userID, spaceID string) ([]
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT `+spaceAgentColumns+spaceAgentJoins+`
 			JOIN space_members viewer ON viewer.space_id=m.space_id AND viewer.user_id=$1
-			WHERE ($2='' OR m.space_id=$2) ORDER BY s.name,a.name,m.agent_id LIMIT 500`, userID, spaceID)
+			WHERE ($2='' OR m.space_id=$2) AND (m.visibility='public' OR m.owner_user_id=$1)
+			ORDER BY s.name,a.name,m.agent_id LIMIT 500`, userID, spaceID)
 		if err != nil {
 			return err
 		}

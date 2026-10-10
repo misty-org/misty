@@ -2,6 +2,7 @@ import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "@/api/spaces/dto/entities";
+import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
 import { useAuth } from "@/features/auth";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { usePersonalAgentsStore } from "@/features/agents";
@@ -92,6 +93,17 @@ export function SpaceHome({ space }: { space: Space }) {
     if (next === "all") search.delete("filter");
     else search.set("filter", next);
     navigate({ pathname: location.pathname, search: search.toString() ? `?${search}` : "" });
+  };
+  // Only the owner flips an item; the gallery reloads in the background.
+  const changeVisibility = async (item: GalleryItem, visibility: ItemVisibility) => {
+    if (!item.toggle) return;
+    setOpenError("");
+    try {
+      await setItemVisibility(space.id, item.toggle.kind, item.toggle.id, visibility);
+      gallery.reload();
+    } catch {
+      setOpenError(`Couldn't make ${item.title} ${visibility}. Try again.`);
+    }
   };
   const open = async (item: GalleryItem) => {
     setOpenError("");
@@ -258,6 +270,11 @@ export function SpaceHome({ space }: { space: Space }) {
                 view={view}
                 maker={maker(item.creatorId || undefined)}
                 onOpen={(next) => void open(next)}
+                onVisibilityChange={
+                  item.toggle && item.creatorId === me
+                    ? (next, visibility) => void changeVisibility(next, visibility)
+                    : undefined
+                }
               />
             ))}
           </div>

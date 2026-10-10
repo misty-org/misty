@@ -16,6 +16,8 @@ export interface BrowserDownloadEntry {
   finishedAt: number | null;
   /** Whether a finished file is still where it was saved. */
   exists: boolean;
+  /** The device that holds the file, for a Space download made on another device. */
+  device?: string | null;
 }
 
 export interface BrowserDownloadProgress {

@@ -26,6 +26,9 @@ type AgentProfileInput struct {
 	// Empty keeps the current default, or Ask for a new agent.
 	DefaultRunMode string `json:"default_run_mode,omitempty"`
 	Version        int64  `json:"version,omitempty"`
+	// SpaceID moves the agent's home to a Space its owner belongs to. Empty
+	// keeps the current home, or the personal Space for a new agent.
+	SpaceID string `json:"space_id,omitempty"`
 }
 
 func (db *Database) PersonalAgents(ctx context.Context, userID string) ([]AskIdentity, error) {
@@ -98,6 +101,14 @@ func (db *Database) SavePersonalAgent(ctx context.Context, userID, id string, in
 				if err := cancelPersonalAgentRunsTx(ctx, tx, id, "agent_disabled"); err != nil {
 					return err
 				}
+			}
+		}
+		if home := strings.TrimSpace(input.SpaceID); home != "" && home != out.SpaceID {
+			if _, err := requireSpaceMemberTx(ctx, tx, home, userID); err != nil {
+				return err
+			}
+			if err := scanPersonalAgent(tx.QueryRowContext(ctx, `UPDATE misty_ask_identities SET space_id=$3,updated_at=NOW() WHERE id=$1 AND owner_user_id=$2 RETURNING `+personalAgentColumns, out.ID, userID, home), out); err != nil {
+				return err
 			}
 		}
 		if _, err := insertPersonalAgentVersionTx(ctx, tx, *out, userID); err != nil {

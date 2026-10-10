@@ -1,6 +1,7 @@
-//! Website camera and microphone permissions. Choices are local to this app and
-//! browser profile. Kiri applies them in every engine; this module stores them
-//! and serves Misty's site settings.
+//! Website camera and microphone permissions. Choices belong to the Space whose
+//! pages use the browser store (private sessions keep theirs to themselves).
+//! Kiri applies them in every engine; this module stores them and serves
+//! Misty's site settings.
 use kiri::engine::{self, MediaRequest, StoreScope};
 use kiri::permissions::{canonical_origin, media_verdict, Verdict};
 pub use kiri::permissions::{Decision, MediaPermissions as Permissions};
@@ -138,7 +139,7 @@ async fn inspect(
         .or_else(|| session_scope(app, view.label()))
         .ok_or("This browser tab has closed.")?;
     let sites = {
-        let (scope, origin) = (scope.clone(), origin.clone());
+        let (scope, origin, update) = (scope.clone(), origin.clone(), update.clone());
         with_tab(&view, move || unsafe {
             match update {
                 Some(update) => update_scope(&scope, &origin, update),
@@ -147,6 +148,9 @@ async fn inspect(
         })
         .await??
     };
+    if let (Some(update), StoreScope::Persistent(profile)) = (update, &scope) {
+        space::publish(profile.clone(), [(origin.clone(), update)].into());
+    }
     let profile = match &scope {
         StoreScope::Persistent(profile) => Some(profile.clone()),
         StoreScope::Temporary(_) => None,
@@ -298,6 +302,7 @@ pub async fn browser_site_permissions_reset(
     // Serialize all store read/modify/write operations on the main thread.
     let (tx, rx) = tokio::sync::oneshot::channel();
     let affected_profile = profile.clone();
+    let reset_origin = origin.clone();
     app.run_on_main_thread(move || {
         let mut store = read_store();
         if let Some(sites) = store.get_mut(&profile) {
@@ -308,6 +313,10 @@ pub async fn browser_site_permissions_reset(
     .map_err(|error| error.to_string())?;
     rx.await
         .map_err(|_| "Could not reset website permissions.".to_owned())??;
+    space::publish(
+        affected_profile.clone(),
+        [(reset_origin, Permissions::default())].into(),
+    );
     stop_capture(&app, &StoreScope::Persistent(affected_profile), true, true).await
 }
 
@@ -329,13 +338,14 @@ pub(crate) fn import_decisions(
 ) -> Result<usize, String> {
     let key = profile_key(profile)?;
     let mut store = read_store();
-    let sites = store.entry(key).or_default();
+    let sites = store.entry(key.clone()).or_default();
     let mut added = 0;
+    let mut changed = std::collections::BTreeMap::new();
     for (origin, kind, allow) in decisions {
         let Ok(origin) = canonical_origin(origin) else {
             continue;
         };
-        let entry = sites.entry(origin).or_default();
+        let entry = sites.entry(origin.clone()).or_default();
         let slot = if *kind == "camera" {
             &mut entry.camera
         } else {
@@ -348,15 +358,20 @@ pub(crate) fn import_decisions(
                 Decision::Block
             };
             added += 1;
+            changed.insert(origin, entry.clone());
         }
     }
     sites.retain(|_, permissions| *permissions != Permissions::default());
     write_store(&store)?;
+    space::publish(key, changed);
     Ok(added)
 }
 
 #[path = "browser_site_permissions_db.rs"]
 mod db;
+#[path = "browser_site_permissions_space.rs"]
+mod space;
+pub(crate) use space::{seed_records, space_changed};
 #[cfg(target_os = "macos")]
 #[path = "browser_site_permissions_store.rs"]
 mod store;

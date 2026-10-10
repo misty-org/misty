@@ -31,10 +31,8 @@ import type {
 } from "@/native/ipc";
 import { configureStartupPreference } from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
-import {
-  configureBrowserCustomBangs,
-  configureBrowserSearchSuggestions,
-} from "@/features/workspace/browserSearchEngine";
+import { configureBrowserSearchSuggestions } from "@/features/workspace/browserSearchEngine";
+import { configureDeviceBangs } from "@/features/workspace/spaceSearch";
 import {
   configureWorkspaceDefaultView,
   workspaceDefaultViewIndex,
@@ -282,9 +280,8 @@ function applySettingsSideEffects(
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
-  configureBrowserCustomBangs(
-    settingsString(document, "general", "browser_custom_bangs_json", "[]"),
-  );
+  // Bangs are Space data; the device's own list applies while no Space vault is open.
+  configureDeviceBangs(settingsString(document, "general", "browser_custom_bangs_json", "[]"));
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
   configureBrowserMouseGestures(

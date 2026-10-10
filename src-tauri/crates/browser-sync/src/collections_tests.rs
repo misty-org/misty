@@ -224,3 +224,138 @@ fn an_edit_made_while_a_losing_push_is_in_flight_retries_on_the_servers_copy() {
     assert_eq!(out[0].base_version, 2);
     assert!(out[0].record == Some(bookmark("b1", "Second")));
 }
+
+/// One valid record for each collection a Space adds.
+fn space_records() -> Vec<(&'static str, ViewRecord)> {
+    let record = |kind, id: &str, fields: serde_json::Value| ViewRecord {
+        kind,
+        id: id.into(),
+        fields: serde_json::from_value(fields).unwrap(),
+    };
+    vec![
+        (
+            EXTENSIONS,
+            record(
+                Kind::Extension,
+                "ext:ddkjiahejlhfcafbddmgiahcphecmpfh",
+                json!({"store_id": "ddkjiahejlhfcafbddmgiahcphecmpfh", "name": "uBlock Origin Lite",
+                       "version": "2025.1", "enabled": false, "updated_at": 1_700_000_000_000_i64}),
+            ),
+        ),
+        (
+            SITE_PERMISSIONS,
+            record(
+                Kind::SitePermission,
+                "site:1",
+                json!({"origin": "https://meet.example", "camera": "block", "microphone": "ask",
+                       "notifications": "ask", "popups": "allow", "updated_at": 1_700_000_000_000_i64}),
+            ),
+        ),
+        (
+            SEARCH,
+            record(
+                Kind::SearchBang,
+                "bang:jira",
+                json!({"trigger": "jira", "name": "Jira", "url": "https://jira.example/search?q=%s", "order": 0}),
+            ),
+        ),
+        (
+            SEARCH,
+            record(Kind::SearchDefault, "default", json!({"engine": "google"})),
+        ),
+        (
+            DOWNLOADS,
+            record(
+                Kind::Download,
+                "download:1",
+                json!({"url": "https://files.example/report.pdf", "file_name": "report.pdf",
+                       "size": 1024, "finished_at": 1_700_000_000_000_i64, "device_id": "device-a"}),
+            ),
+        ),
+    ]
+}
+
+#[test]
+fn space_collections_validate_route_and_seal_on_their_own() {
+    use crate::document::entities::validate;
+    use crate::workspace::model::collection_of;
+    let root = VaultRoot::generate();
+    let scope = scope();
+    for (collection, record) in space_records() {
+        validate(record.kind, &record.fields).unwrap();
+        assert_eq!(collection_of(record.kind), Some(collection));
+        let key = record_key(&root, &scope, collection, &record.id).unwrap();
+        // Keyed ids differ per collection, so the server cannot link them.
+        assert_ne!(key, record_key(&root, &scope, BOOKMARKS, &record.id).unwrap());
+        let sealed = seal(&root, &scope, collection, 1, &record).unwrap();
+        assert!(!sealed.windows(4).any(|w| w == b"http"));
+        assert!(open(&root, &scope, collection, &key, 1, &sealed).unwrap() == record);
+        assert!(open(&root, &scope, collection, &key, 2, &sealed).is_err());
+        for other in [EXTENSIONS, SITE_PERMISSIONS, SEARCH, DOWNLOADS] {
+            if other != collection {
+                assert!(open(&root, &scope, other, &key, 1, &sealed).is_err());
+            }
+        }
+    }
+}
+
+#[test]
+fn another_spaces_vault_cannot_open_its_records() {
+    let root = VaultRoot::generate();
+    let (collection, record) = space_records().remove(1);
+    let sealed = seal(&root, &scope(), collection, 1, &record).unwrap();
+    let mut other = scope();
+    other.vault_id = "01951d32-40ac-7000-8000-000000000002".into();
+    let key = record_key(&root, &other, collection, &record.id).unwrap();
+    assert_ne!(key, record_key(&root, &scope(), collection, &record.id).unwrap());
+    assert!(open(&root, &other, collection, &key, 1, &sealed).is_err());
+}
+
+#[test]
+fn space_collections_take_the_last_writer_and_never_recreate_deletes() {
+    for (_, record) in space_records() {
+        let mut theirs = record.clone();
+        theirs.fields.insert("updated_at".into(), json!(1_800_000_000_000_i64));
+        // Lost to another device's write: retried on its copy, mine wins.
+        let mut c = Collection::default();
+        c.pulled("k".into(), 1, Some(record.clone()));
+        c.write("k".into(), Some(record.clone()));
+        let sent = c.outgoing().remove(0);
+        c.answered(
+            "k",
+            &sent.record,
+            false,
+            2,
+            Some(Confirmed {
+                version: 2,
+                record: Some(theirs),
+            }),
+        );
+        let out = c.outgoing();
+        assert_eq!(out[0].base_version, 2);
+        assert!(out[0].record.as_ref() == Some(&record));
+        // Deleted elsewhere: an edit made here does not bring it back.
+        let mut c = Collection::default();
+        c.pulled("k".into(), 1, Some(record.clone()));
+        c.write("k".into(), Some(record));
+        c.pulled("k".into(), 2, None);
+        assert!(c.pending.is_empty() && c.view().is_empty() && c.deleted("k"));
+    }
+}
+
+#[test]
+fn space_records_reject_what_their_collection_does_not_allow() {
+    use crate::document::entities::validate;
+    let invalid = [
+        (Kind::SitePermission, json!({"origin": "https://a.example/path", "camera": "block", "microphone": "ask", "updated_at": 1})),
+        (Kind::SitePermission, json!({"origin": "https://a.example", "camera": "maybe", "microphone": "ask", "updated_at": 1})),
+        (Kind::SearchBang, json!({"trigger": "Jira", "name": "Jira", "url": "https://jira.example/?q=%s", "order": 0})),
+        (Kind::SearchBang, json!({"trigger": "jira", "name": "Jira", "url": "https://jira.example/", "order": 0})),
+        (Kind::SearchEngine, json!({"name": "Local", "search": "file:///%s", "order": 0})),
+        (Kind::Download, json!({"url": "https://a.example/f", "file_name": "../f", "finished_at": 1, "device_id": "d"})),
+        (Kind::Extension, json!({"store_id": "has space", "name": "", "version": "", "enabled": true, "updated_at": 1})),
+    ];
+    for (kind, fields) in invalid {
+        assert!(validate(kind, &serde_json::from_value(fields).unwrap()).is_err());
+    }
+}

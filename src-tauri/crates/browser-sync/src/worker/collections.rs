@@ -31,6 +31,9 @@ pub(super) struct CollectionSync {
     pushing: BTreeMap<String, Push>,
     /// When each collection's pending writes are due; kept across connections.
     batch: Batcher,
+    /// How many times a pull or a lost write brought another device's change
+    /// into each natively applied collection; kept across connections.
+    revisions: BTreeMap<&'static str, u64>,
 }
 
 /// A push awaiting its answer: the records it sent, by keyed id, so an edit
@@ -47,8 +50,10 @@ fn collection_name(name: &str) -> Option<&'static str> {
 impl CollectionSync {
     pub(super) fn connected(&mut self) {
         let batch = std::mem::take(&mut self.batch);
+        let revisions = std::mem::take(&mut self.revisions);
         *self = Self {
             batch,
+            revisions,
             ..Self::default()
         };
         let now = Instant::now();
@@ -91,6 +96,20 @@ impl CollectionSync {
 
     pub(super) fn flush_settled(&mut self) {
         self.batch.settled();
+    }
+
+    /// Another device's change arrived in `collection`.
+    fn changed_elsewhere(&mut self, collection: &'static str) {
+        if collections::NATIVE_APPLIED.contains(&collection) {
+            *self.revisions.entry(collection).or_default() += 1;
+        }
+    }
+
+    pub(super) fn revisions(&self) -> BTreeMap<String, u64> {
+        self.revisions
+            .iter()
+            .map(|(collection, revision)| ((*collection).to_owned(), *revision))
+            .collect()
     }
 }
 
@@ -224,6 +243,9 @@ where
             state.confirmed.clear();
             state.loaded = false;
         }
+        if listing.reset || !listing.records.is_empty() {
+            self.collections.changed_elsewhere(collection);
+        }
         for row in &listing.records {
             if let Some(confirmed) = self.open_row(collection, row) {
                 state.pulled(row.key.clone(), confirmed.version, confirmed.record);
@@ -264,6 +286,9 @@ where
                 .current
                 .as_ref()
                 .and_then(|row| self.open_row(collection, row));
+            if !answer.applied {
+                self.collections.changed_elsewhere(collection);
+            }
             state.answered(
                 &answer.key,
                 record,
@@ -573,15 +598,7 @@ where
     /// on demand (`records_list`): too large to copy into every view.
     pub(super) fn collections_view(&self) -> Result<BTreeMap<String, Vec<ViewRecord>>> {
         let mut out = BTreeMap::new();
-        for collection in COLLECTIONS
-            .into_iter()
-            .filter(|c| {
-                *c != collections::HISTORY
-                    && *c != collections::EXTENSION_SYNC
-                    && *c != collections::PASSWORDS
-                    && *c != collections::SPACE_SETTINGS
-            })
-        {
+        for collection in collections::PROJECTED {
             let state = self.store.collection(&self.root, collection)?;
             if state.loaded || !state.pending.is_empty() {
                 out.insert(

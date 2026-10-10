@@ -73,7 +73,7 @@ func TestAgentMethodVersionsOwnershipAndSchedulePin(t *testing.T) {
 	if err != nil || paused.ID != schedule.ID || paused.NextRunAt != nil || paused.ConversationID != conversation {
 		t.Fatal("one schedule per workflow, paused without a next run", err)
 	}
-	listed, err := database.AgentMethods(ctx, owner.ID, agent.ID)
+	listed, err := database.AgentMethods(ctx, owner.ID, "", agent.ID)
 	if err != nil || len(listed) != 1 || listed[0].Schedule == nil || listed[0].Schedule.ID != schedule.ID {
 		t.Fatal("workflow list lost its schedule", err)
 	}

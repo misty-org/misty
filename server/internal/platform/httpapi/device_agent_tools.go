@@ -80,7 +80,7 @@ func (s *SpacesService) deviceToolRegistrations(ctx context.Context, record *db.
 func deviceToolDescriptor(name, description, risk, audit string, schema json.RawMessage) agenttools.Descriptor {
 	return agenttools.Descriptor{
 		Name: name, Version: 1, Description: description, Risk: risk, Approval: agenttools.ApprovalNone,
-		InputSchema: schema, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityDevice,
+		InputSchema: schema, OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityDevice,
 		AllowCustomAgent: true, Idempotent: risk == serveragent.RiskRead, AuditEvent: audit,
 	}
 }

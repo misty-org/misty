@@ -399,6 +399,20 @@ Space shows up on the same Space on another device, and not in other Spaces.
 brief decided it. Say so in the Settings helper text so it doesn't read as account-synced settings.
 Downloads lists can grow; cap them like history.
 
+**Built 2026-10-17 (unverified in the app).** Record kinds `extension`, `site_permission`,
+`search_default`, `search_engine`, `search_bang`, `download` (`document/entities.rs`); only bookmarks
+and tab groups are projected to the renderer (`collections::PROJECTED`). The worker counts other
+devices' changes per natively applied collection (`SyncState::revisions`, never serialized), and
+`browser_sync/space_data.rs` watches them per vault: site choices replace the `misty.db` cache for
+the vault's selected store, search and downloads emit `misty:space-search-changed` /
+`misty:space-downloads-changed`, extensions call `extensions::space::changed` (the phase 4 hook, a
+no-op today). `space_vault(space)` never falls back to another Space; `window_space(label)` returns
+the personal Space until phase 3 maps window labels. Site choices made while a vault is locked are
+held in memory and sent when it opens. The downloads list caps at 1,000 per Space. The personal
+Space seeds once per vault (`space-collections:<vault>`) once its browser store is selected;
+extensions arrive with the next reconcile. Bangs fall back to the device's settings while no Space
+vault is open.
+
 ## Phase 6. Fold device browser profiles into Spaces
 
 **Goal.** One concept: a Space. Today's device-only browser profiles go away.
@@ -534,6 +548,26 @@ each.
 
 **Risks.** Composio's per-session tool filtering must accept a list of connected accounts per call;
 verify it before building, or filter in the proxy.
+
+**Finding (2026-10-16).** Composio's `POST /tool_router/session` takes `connected_accounts`, a map of
+toolkit to account IDs that pins which accounts the session uses (one per toolkit unless
+multi-account is on). Its docs don't say pinning keeps the person's other accounts out, and pinning
+would need one Composio session per person per Space. So Misty keeps one session per person and
+enforces picks itself (`httpapi/apps_space.go`): `integration.execute` always passes the picked
+account explicitly and refuses any other, `integration.search` and `integration.connected` show only
+the Space's picks, and `integration.connect` shows a pick card (`agent_app_requests.kind = 'pick'`,
+with the request's `space_id`) when the person has accounts the Space doesn't use. Connected
+accounts live in Composio, so the migration can't seed them: the first listing that sees an account
+picks it in the personal Space once (`space_integration_seen`), and an account connected from a
+run's Connect card becomes that Space's pick. The direct proxy callers (inbound +misty email and
+Slack, GitHub repos for code projects) still use the person's first active account; move them onto
+picks with phase 9.
+
+**Built (2026-10-16).** Migration `20271027080000_space_integration_picks.sql`;
+`postgres/space_integration_picks.go`; API `GET /integrations/apps` (each account lists the Spaces
+using it), `PUT /integrations/apps/spaces/{spaceID}`, `POST /me/app-requests/{id}/pick`. Desktop:
+the Integrations page's account card shows each account's Spaces; Space settings › Apps checks the
+accounts that Space uses; the chat card offers "Use <account>" for a pick.
 
 ## Phase 9. Private and public layers; agents belong to a Space
 

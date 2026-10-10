@@ -18,7 +18,7 @@ func collaborationDescriptor(name, description string, properties map[string]any
 	return agenttools.Descriptor{
 		Name: name, Version: 1, Description: description, Risk: serveragent.RiskRead,
 		InputSchema: agentToolSchema(properties, required), OutputSchema: agentToolObjectOutputSchema(),
-		AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true,
+		AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, Idempotent: true,
 	}
 }
 

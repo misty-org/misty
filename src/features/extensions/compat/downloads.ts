@@ -57,7 +57,8 @@ function downloadItem(entry: BrowserDownloadEntry) {
 
 async function currentEntries(): Promise<BrowserDownloadEntry[]> {
   await useBrowserDownloadsStore.getState().refresh();
-  return useBrowserDownloadsStore.getState().entries;
+  // Extensions see the files on this device, not the Space's other devices.
+  return useBrowserDownloadsStore.getState().entries.filter((entry) => !entry.device);
 }
 
 function matches(entry: BrowserDownloadEntry, query: Record<string, unknown>): boolean {
@@ -129,9 +130,11 @@ export const downloadHandlers: Record<string, CompatHandler> = {
 
 /** Reports Misty's download list changes as downloads.onCreated/onChanged/onErased. */
 export function watchDownloads(): () => void {
-  let previous = new Map(useBrowserDownloadsStore.getState().entries.map((e) => [e.id, e]));
+  const local = (entries: BrowserDownloadEntry[]) =>
+    new Map(entries.filter((e) => !e.device).map((e) => [e.id, e]));
+  let previous = local(useBrowserDownloadsStore.getState().entries);
   return useBrowserDownloadsStore.subscribe((state, prior) => {
-    const current = new Map(state.entries.map((e) => [e.id, e]));
+    const current = local(state.entries);
     // The first load lists existing downloads; they are not new.
     if (!prior.loaded) {
       previous = current;

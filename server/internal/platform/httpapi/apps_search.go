@@ -43,19 +43,24 @@ func (s *SpacesService) appsSearch(ctx context.Context, invocation agenttools.In
 		return nil, agenttools.ErrArgumentsInvalid
 	}
 	var result composio.SearchResult
+	var apps spaceApps
 	err := s.withAppsSession(ctx, invocation.UserID, func(client *composio.Client, session string) error {
 		var err error
-		result, err = client.Search(ctx, session, input.Queries)
+		if result, err = client.Search(ctx, session, input.Queries); err != nil {
+			return err
+		}
+		apps, err = s.loadSpaceApps(ctx, client, invocation)
 		return err
 	})
 	if err != nil {
 		return nil, appsError(err)
 	}
-	return json.Marshal(appsSearchView(result, s.searchAppPolicy(ctx, invocation)))
+	return json.Marshal(appsSearchView(result, s.searchAppPolicy(ctx, invocation), apps))
 }
 
-// appsSearchView keeps what the model needs to plan and call tools.
-func appsSearchView(result composio.SearchResult, searchApps searchAppPolicy) map[string]any {
+// appsSearchView keeps what the model needs to plan and call tools. Apps
+// show only the accounts the run's Space picked.
+func appsSearchView(result composio.SearchResult, searchApps searchAppPolicy, space spaceApps) map[string]any {
 	tasks := []map[string]any{}
 	for _, item := range result.Results {
 		task := map[string]any{"task": item.UseCase, "tools": item.PrimaryToolSlugs, "apps": item.Toolkits}
@@ -90,15 +95,19 @@ func appsSearchView(result composio.SearchResult, searchApps searchAppPolicy) ma
 	}
 	apps := []map[string]any{}
 	for _, status := range result.Connections {
-		app := map[string]any{"app": status.Toolkit, "connected": status.HasActiveConnection}
+		picked := space.picked[status.Toolkit]
+		app := map[string]any{"app": status.Toolkit, "connected": len(picked) > 0}
 		accounts := []map[string]any{}
-		for _, account := range status.Accounts {
-			accounts = append(accounts, map[string]any{"account": account.ID, "alias": account.Alias, "status": strings.ToLower(account.Status), "default": account.IsDefault})
+		for _, account := range picked {
+			accounts = append(accounts, map[string]any{"account": account.ID, "alias": account.Alias, "status": strings.ToLower(account.Status), "default": len(picked) == 1})
 		}
 		if len(accounts) > 0 {
 			app["accounts"] = accounts
 		}
-		if !status.HasActiveConnection {
+		switch {
+		case len(picked) == 0 && len(space.active[status.Toolkit]) > 0:
+			app["next"] = "This Space doesn't use any of the user's " + status.Toolkit + " accounts yet. Call integration_connect with app " + status.Toolkit + " so they can pick one."
+		case len(picked) == 0:
 			app["next"] = searchApps.next(status.Toolkit)
 		}
 		apps = append(apps, app)
@@ -130,13 +139,16 @@ func (s *SpacesService) appsConnected(ctx context.Context, invocation agenttools
 	if err != nil {
 		return nil, appsError(err)
 	}
-	accounts, err := client.Accounts(ctx, composio.UserID(invocation.UserID), "")
+	apps, err := s.loadSpaceApps(ctx, client, invocation)
 	if err != nil {
 		return nil, appsError(err)
 	}
+	// Only this Space's picks: the person's other accounts belong to other Spaces.
 	items := []map[string]any{}
-	for _, account := range accounts {
-		items = append(items, map[string]any{"app": account.Toolkit.Slug, "account": account.ID, "alias": account.Alias, "status": strings.ToLower(account.Status)})
+	for toolkit, accounts := range apps.picked {
+		for _, account := range accounts {
+			items = append(items, map[string]any{"app": toolkit, "account": account.ID, "alias": account.Alias, "status": strings.ToLower(account.Status)})
+		}
 	}
 	return json.Marshal(map[string]any{"connected": items})
 }

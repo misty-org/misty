@@ -89,9 +89,9 @@ func (db *Database) createSpaceMessageWithReferences(ctx context.Context, userID
 					var publiclyReferenced bool
 					if err := tx.QueryRowContext(ctx, `SELECT EXISTS(
 						SELECT 1 FROM misty_ask_identities a WHERE a.id=$1 AND a.deleted_at IS NULL AND (
-							EXISTS(SELECT 1 FROM space_agents sa WHERE sa.space_id=$2 AND sa.agent_id=a.id) OR
+							EXISTS(SELECT 1 FROM space_agents sa WHERE sa.space_id=$2 AND sa.agent_id=a.id AND (sa.visibility='public' OR sa.owner_user_id=$3)) OR
 							EXISTS(SELECT 1 FROM space_messages m WHERE m.space_id=$2 AND m.sender_agent_id=a.id)
-						))`, span.AgentID, spaceID).Scan(&publiclyReferenced); err != nil || !publiclyReferenced {
+						))`, span.AgentID, spaceID, userID).Scan(&publiclyReferenced); err != nil || !publiclyReferenced {
 						return ErrSpaceInvalid
 					}
 				}

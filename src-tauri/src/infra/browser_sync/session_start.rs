@@ -28,6 +28,8 @@ pub(super) async fn start_session(app: &tauri::AppHandle, opened: Opened) -> Res
         space_id,
     } = opened;
     let personal = space_id.is_none();
+    let vault_id = scope.vault_id.clone();
+    let space_id_for_data = space_id.clone();
     let pending = store
         .pending_snapshot(&root, document::reduce)
         .map_err(issue)?;
@@ -95,6 +97,8 @@ pub(super) async fn start_session(app: &tauri::AppHandle, opened: Opened) -> Res
     #[cfg(not(any(target_os = "macos", windows)))]
     let credential_task = None;
     let history_task = Some(history::spawn(app.clone(), slot.clone(), session_id));
+    #[cfg(desktop)]
+    space_data::spawn(app.clone(), slot.clone(), vault_id, space_id_for_data);
     if let Some(active) = slot.lock().await.as_mut() {
         active.credential_task = credential_task;
         active.history_task = history_task;

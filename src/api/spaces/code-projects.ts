@@ -13,6 +13,8 @@ const codeProjectSchema = z.object({
   github_repo: z.string(),
   linked_at: z.string(),
   updated_at: z.string(),
+  /** A private project shows only to its owner. */
+  visibility: z.enum(["public", "private"]).optional(),
 });
 export type SpaceCodeProject = z.infer<typeof codeProjectSchema>;
 

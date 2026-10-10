@@ -48,6 +48,8 @@ mod profile_selection;
 mod session_start;
 mod sessions;
 mod space_sites;
+#[cfg(desktop)]
+mod space_data;
 mod space_vaults;
 mod vault_open;
 mod view;
@@ -87,6 +89,8 @@ pub(crate) use space_sites::{
     __tauri_command_name_browser_sync_space_sites,
 };
 pub use space_vaults::browser_sync_space_window;
+#[cfg(desktop)]
+pub(crate) use space_data::{device_name, hashed_id, space_vault, store_vault, window_space, SpaceVault};
 pub(crate) use space_vaults::{
     __cmd__browser_sync_space_window, __tauri_command_name_browser_sync_space_window,
 };

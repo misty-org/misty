@@ -79,7 +79,8 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 	connected = append(connected, s.accountAdminToolRegistrations()...)
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
 		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
-		delegation: delegationHandler, extra: connected,
+		delegation: delegationHandler, extra: connected, memorySearch: s.searchMemory,
+		run: ownRun(run.OwnerUserID),
 	})
 	names := make([]string, 0, len(toolbox.Descriptors()))
 	for _, descriptor := range toolbox.Descriptors() {
@@ -126,6 +127,10 @@ func (s *SpacesService) executePersonalAgentRuntimeTool(ctx context.Context, run
 		}
 		result, err := s.requestAIUserAction(ctx, run.OwnerUserID, run.ID, call)
 		return agentRuntimeToolOutcome{Result: result}, err
+	}
+	if invocation.PublicLayerOnly {
+		// Someone else's ask: no private item of the owner's opens on any read.
+		ctx = db.WithPublicLayerOnly(ctx)
 	}
 	result, err := toolbox.ExecuteWithMiddleware(ctx, invocation, serveragent.ToolRequest{
 		ID: call.CallID, Name: call.Name, Arguments: call.Arguments,

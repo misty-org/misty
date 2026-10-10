@@ -107,7 +107,6 @@ use infra::browser_library::{
     browser_download_cancel, browser_download_open, browser_download_reveal,
     browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
 };
-use infra::browser_search_suggest::browser_search_suggest;
 #[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(desktop)]
@@ -685,7 +684,8 @@ pub fn run() {
                     browser_import_settings,
                     #[cfg(desktop)]
                     browser_import_signins,
-                    browser_search_suggest,
+                    infra::browser_search_suggest::browser_search_suggest,
+                    infra::browser_search_space::browser_space_search,
                     #[cfg(desktop)]
                     browser_download_cancel,
                     #[cfg(desktop)]

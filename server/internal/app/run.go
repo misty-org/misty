@@ -101,6 +101,25 @@ func runAIEmbeddingProcessing(ctx context.Context, server *Server) {
 				return processed, errors.Join(err, retryErr)
 			}
 		}
+		// The memory tree: one batch of one owner's chunks per call.
+		if processed < 32 && ctx.Err() == nil {
+			chunks, err := server.Database.PendingMemoryChunks(ctx, 32)
+			if err != nil {
+				return processed, err
+			}
+			if len(chunks) > 0 {
+				processed += len(chunks)
+				if err := embedMemoryChunks(ctx, server, chunks); err != nil {
+					cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+					var retryErr error
+					for _, chunk := range chunks {
+						retryErr = errors.Join(retryErr, server.Database.RetryMemoryChunk(cleanup, chunk))
+					}
+					cancel()
+					return processed, errors.Join(err, retryErr)
+				}
+			}
+		}
 		return processed, ctx.Err()
 	})
 }

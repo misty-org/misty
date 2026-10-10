@@ -13,11 +13,14 @@ type libraryItemFilter struct {
 }
 
 // newLibraryItemFilter starts a listing scoped to the space and state and visible to the viewer.
-func newLibraryItemFilter(spaceID, state, userID string) *libraryItemFilter {
+// privateViewer is whose private items the listing includes (empty for
+// public-only work).
+func newLibraryItemFilter(spaceID, state, userID, privateViewer string) *libraryItemFilter {
 	filter := &libraryItemFilter{
 		args:       []any{spaceID, state},
 		conditions: []string{"i.space_id=$1", "i.lifecycle_state=$2"},
 	}
+	filter.where("(i.visibility='public' OR i.added_by_user_id=" + filter.add(privateViewer) + ")")
 	viewerPlaceholder := filter.add(userID)
 	filter.where("(i.audience_kind='space' OR EXISTS(SELECT 1 FROM space_conversation_members audience_member WHERE audience_member.conversation_id=i.audience_conversation_id AND audience_member.actor_kind='person' AND audience_member.user_id=" + viewerPlaceholder + "))")
 	return filter
@@ -122,7 +125,7 @@ func (f *libraryItemFilter) applyDateAndCursorFilters(query LibraryItemQuery, so
 // buildLibraryItemsStatement appends the page limit to the arguments and returns the listing query.
 func buildLibraryItemsStatement(filter *libraryItemFilter, limit int, sortExpression, sortDirection string) string {
 	filter.args = append(filter.args, limit)
-	return `SELECT i.id,i.space_id,i.file_id,i.contributing_user_id,i.display_name,i.caption,i.tags,i.favorite,i.hidden,i.date_override,COALESCE(i.location_override,'null'::jsonb),i.contributor_information,COALESCE(i.current_edit_version_id,''),i.added_by_user_id,i.lifecycle_state,i.added_at,i.trashed_at,i.recover_until,i.version,i.updated_at,
+	return `SELECT i.id,i.space_id,i.file_id,i.contributing_user_id,i.display_name,i.caption,i.tags,i.favorite,i.hidden,i.date_override,COALESCE(i.location_override,'null'::jsonb),i.contributor_information,COALESCE(i.current_edit_version_id,''),i.added_by_user_id,i.lifecycle_state,i.added_at,i.trashed_at,i.recover_until,i.version,i.updated_at,i.visibility,
 			f.id,f.blob_id,f.security_domain_id,f.uploader_user_id,f.original_filename,f.intrinsic_metadata,f.lifecycle_state,f.original_uploaded_at,f.version
 			FROM space_library_items i JOIN library_files f ON f.id=i.file_id JOIN library_blobs b ON b.id=f.blob_id
 			WHERE ` + strings.Join(filter.conditions, " AND ") + ` ORDER BY ` + sortExpression + ` ` + sortDirection + `,i.id ` + sortDirection + ` LIMIT $` + strconv.Itoa(len(filter.args))

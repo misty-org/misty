@@ -14,7 +14,7 @@ import (
 // tools, attached browser tools and the agent's connected tools. The runtime
 // context, the MCP server and every tool call use this same resolution.
 func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string, collaboration collaborationState) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID}
+	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID, memorySearch: s.searchMemory}
 	connected := append(s.aiInvocationConnectedTools(ctx, record), s.deviceToolRegistrations(ctx, record)...)
 	connected = append(connected, s.collaborationToolRegistrations(record, collaboration)...)
 	var body aiInvocationInput
@@ -27,6 +27,7 @@ func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIIn
 	connected = withWebFetch(connected)
 	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
 	invocation.PermissionMode = body.PermissionMode
+	invocation.MemorySpaceID = body.SpaceID
 	return toolbox, invocation, manifest, err
 }
 
@@ -43,7 +44,9 @@ func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database,
 	browserTabs, browserCapabilities := aiInvocationBrowserGrants(ctx, database, actor.userID, actor.runID)
 	options := agentToolboxOptions{
 		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
-		extra: append(connected, agentMemberToolRegistrations(database)...),
+		extra: append(connected, agentMemberToolRegistrations(database)...), memorySearch: actor.memorySearch,
+		// A chat run is always its asker's own.
+		run: ownRun(actor.userID),
 	}
 	subagents := false
 	for _, registration := range connected {
@@ -123,4 +126,3 @@ func agentToolNameAllowed(allowed []string, name string) bool {
 	}
 	return false
 }
-

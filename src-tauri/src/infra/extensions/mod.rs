@@ -11,6 +11,7 @@ mod native_windows;
 mod package;
 pub(crate) mod runtime;
 mod spaces;
+pub(crate) mod space;
 mod sync;
 mod tabs;
 pub(crate) use tabs::{

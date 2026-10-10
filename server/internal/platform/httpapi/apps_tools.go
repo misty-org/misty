@@ -42,7 +42,7 @@ func appsDescriptor(name, risk, description string, properties map[string]any, r
 	return agenttools.Descriptor{
 		Name: name, Version: 1, Description: description, Risk: risk,
 		InputSchema:  TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false}),
-		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityProvider,
+		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityProvider,
 		Idempotent: risk == serveragent.RiskRead, AllowCustomAgent: true, AuditEvent: name,
 	}
 }

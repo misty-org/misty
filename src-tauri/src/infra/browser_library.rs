@@ -1,6 +1,6 @@
 //! The browser's durable library: the downloads list and browsing history, in `misty.db`,
-//! so they survive restarts and stay with the local device (downloads are never
-//! synchronized; history syncs only through the encrypted browser sync).
+//! so they survive restarts. Finished downloads also join their Space's encrypted
+//! downloads list (the files stay here); history syncs through the browser sync.
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,9 @@ use tauri_plugin_opener::OpenerExt;
 use super::store::Store;
 #[path = "browser_library_import.rs"]
 mod legacy;
+#[path = "browser_library_space.rs"]
+mod space;
+pub(crate) use space::seed_records as seed_download_records;
 
 static LIBRARY: OnceLock<Mutex<Connection>> = OnceLock::new();
 const MAX_DOWNLOADS: i64 = 1_000;
@@ -75,6 +78,8 @@ pub struct BrowserDownloadEntry {
     finished_at: Option<i64>,
     /// Whether a finished file is still where it was saved.
     exists: bool,
+    /// The device that holds the file, when it is not this one.
+    device: Option<String>,
 }
 
 /// Records a download the user started. Agent downloads are task files and
@@ -113,6 +118,13 @@ pub(crate) fn download_finished(app: &AppHandle, id: &str, success: bool, error:
     );
 }
 
+/// A finished download joins the downloads list of the Space whose pages use
+/// `store_key`. The file stays where it was saved.
+pub(crate) fn download_into_space(app: &AppHandle, store_key: String, id: &str) {
+    let Ok(connection) = library(app) else { return };
+    space::publish(&connection, store_key, id);
+}
+
 pub(crate) fn download_failed(app: &AppHandle, id: &str, url: &str, error: &str) {
     let Ok(connection) = library(app) else { return };
     let now = now_ms();
@@ -142,15 +154,15 @@ fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<BrowserDownloadEntry> {
         total: row.get(6)?,
         started_at: row.get(7)?,
         finished_at: row.get(8)?,
+        device: None,
     })
 }
 
 const DOWNLOAD_COLUMNS: &str =
     "id, url, path, state, error, received, total, started_at, finished_at";
 
-#[tauri::command]
-pub fn browser_downloads_list(app: AppHandle) -> Result<Vec<BrowserDownloadEntry>, String> {
-    let connection = library(&app)?;
+fn local_downloads(app: &AppHandle) -> Result<Vec<BrowserDownloadEntry>, String> {
+    let connection = library(app)?;
     let mut statement = connection
         .prepare(&format!(
             "SELECT {DOWNLOAD_COLUMNS} FROM downloads ORDER BY started_at DESC"
@@ -161,6 +173,20 @@ pub fn browser_downloads_list(app: AppHandle) -> Result<Vec<BrowserDownloadEntry
         .map_err(|error| error.to_string())?
         .filter_map(Result::ok)
         .collect();
+    Ok(rows)
+}
+
+/// This device's downloads, then the window's Space's downloads that other
+/// devices hold, newest first.
+#[tauri::command]
+pub async fn browser_downloads_list(
+    webview: tauri::Webview,
+    app: AppHandle,
+) -> Result<Vec<BrowserDownloadEntry>, String> {
+    let mut rows = local_downloads(&app)?;
+    let space = crate::infra::browser_sync::window_space(webview.window().label());
+    rows.extend(space::remote_entries(space.as_deref()).await);
+    rows.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     Ok(rows)
 }
 
@@ -350,13 +376,22 @@ pub struct BrowserDownloadsRemoveRequest {
     pub since: Option<i64>,
 }
 
-/// Removes entries from the list. Files already saved stay on disk.
+/// Removes entries from the list, here and in the window's Space. Files
+/// already saved stay on disk.
 #[tauri::command]
-pub fn browser_downloads_remove(
+pub async fn browser_downloads_remove(
+    webview: tauri::Webview,
     app: AppHandle,
     request: BrowserDownloadsRemoveRequest,
 ) -> Result<(), String> {
-    let connection = library(&app)?;
+    remove_local(&app, &request)?;
+    let space = crate::infra::browser_sync::window_space(webview.window().label());
+    space::remove(space.as_deref(), &request.ids, request.since).await;
+    Ok(())
+}
+
+fn remove_local(app: &AppHandle, request: &BrowserDownloadsRemoveRequest) -> Result<(), String> {
+    let connection = library(app)?;
     if request.ids.is_empty() {
         connection
             .execute(

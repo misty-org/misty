@@ -12,11 +12,12 @@ func queueMemberRequestRunTx(ctx context.Context, tx *sql.Tx, runID, spaceID, ag
 }
 
 // memberRequestValidTx reports whether both members still share an active
-// Space and the target agent is still in it.
+// Space and the target agent is still in it, and still public to the asker.
 func memberRequestValidTx(ctx context.Context, tx *sql.Tx, runID string) (bool, error) {
 	var valid bool
 	err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM agent_member_requests q
 		JOIN space_agents m ON m.space_id=q.space_id AND m.agent_id=q.target_agent_id AND m.owner_user_id=q.target_owner_user_id
+			AND (m.visibility='public' OR m.owner_user_id=q.requester_user_id)
 		JOIN space_members requester ON requester.space_id=q.space_id AND requester.user_id=q.requester_user_id
 		JOIN spaces s ON s.id=q.space_id AND s.lifecycle_state='active'
 		WHERE q.child_run_id=$1)`, runID).Scan(&valid)

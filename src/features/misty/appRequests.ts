@@ -13,6 +13,8 @@ const continued = new Set<string>();
 function continuationPrompt(request: AppRequest) {
   if (request.kind === "connect")
     return `Continue the request above. ${request.title.replace(/^Connect\s+/, "")} is now connected.`;
+  if (request.kind === "pick")
+    return `Continue the request above. ${request.title.replace(/^Use\s+|\s+in this Space$/g, "")} is now set up in this Space.`;
   return `Continue the request above. The user approved “${request.title}”.`;
 }
 

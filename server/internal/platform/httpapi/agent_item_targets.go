@@ -71,7 +71,7 @@ func (s *SpacesService) renameToolRegistration() agenttools.Registration {
 				"name":  map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 				"space": map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 			}, []string{"kind", "id", "name"}),
-			OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true, AuditEvent: "item.renamed",
+			OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true, AuditEvent: "item.renamed",
 		},
 		Handler: func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 			var input struct{ Kind, ID, Name, Space string }

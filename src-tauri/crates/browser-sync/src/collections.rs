@@ -37,14 +37,35 @@ pub const PASSWORDS: &str = "passwords";
 /// A Space's own settings that travel with its vault (the sites it claims).
 /// Native-only, never projected to a renderer.
 pub const SPACE_SETTINGS: &str = "space_settings";
-pub const COLLECTIONS: [&str; 6] = [
+/// The Space's installed extensions: store id, version and on/off. Each
+/// device fetches the packages from the store itself. Native-only.
+pub const EXTENSIONS: &str = "extensions";
+/// Per-site camera, microphone, notification and pop-up choices. Native-only.
+pub const SITE_PERMISSIONS: &str = "site_permissions";
+/// The default search engine, custom engines and custom bangs.
+pub const SEARCH: &str = "search";
+/// Finished downloads. The file stays on the device that downloaded it.
+pub const DOWNLOADS: &str = "downloads";
+pub const COLLECTIONS: [&str; 10] = [
     BOOKMARKS,
     TAB_GROUPS,
     HISTORY,
     EXTENSION_SYNC,
     PASSWORDS,
     SPACE_SETTINGS,
+    EXTENSIONS,
+    SITE_PERMISSIONS,
+    SEARCH,
+    DOWNLOADS,
 ];
+/// Collections the renderer's sync view carries; the rest are read natively
+/// on demand (history and downloads are too large to copy into every view).
+pub const PROJECTED: [&str; 2] = [BOOKMARKS, TAB_GROUPS];
+/// Collections native code reads on demand and applies itself. The worker
+/// counts pulled rows per collection so it can tell them a pull changed one.
+pub const NATIVE_APPLIED: [&str; 4] = [EXTENSIONS, SITE_PERMISSIONS, SEARCH, DOWNLOADS];
+/// The newest finished downloads a Space keeps, like the local list.
+pub const MAX_DOWNLOADS: usize = 1_000;
 /// The shared clipboard's ring of sealed clips. It is not a record
 /// collection: the worker moves its ciphertext without opening it.
 pub const CLIPBOARD: &str = "clipboard";

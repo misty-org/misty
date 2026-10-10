@@ -122,8 +122,13 @@ func resourceEntityAudienceVisibleTx(ctx context.Context, tx *sql.Tx, userID, sp
 	default:
 		return false, ErrSpaceInvalid
 	}
+	owner := "creator_user_id"
+	if table == "space_library_items" {
+		owner = "added_by_user_id"
+	}
 	var audienceKind, conversationID string
-	err := tx.QueryRowContext(ctx, `SELECT audience_kind,COALESCE(audience_conversation_id,'') FROM `+table+` WHERE id=$1 AND space_id=$2`, entityID, spaceID).Scan(&audienceKind, &conversationID)
+	var private bool
+	err := tx.QueryRowContext(ctx, `SELECT audience_kind,COALESCE(audience_conversation_id,''),visibility='private' AND `+owner+`<>$3 FROM `+table+` WHERE id=$1 AND space_id=$2`, entityID, spaceID, userID).Scan(&audienceKind, &conversationID, &private)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Some event families use upload/source IDs, and connected-calendar rows
 		// do not live in the native table. They are Space-wide by definition.
@@ -131,6 +136,10 @@ func resourceEntityAudienceVisibleTx(ctx context.Context, tx *sql.Tx, userID, sp
 	}
 	if err != nil {
 		return false, err
+	}
+	// Someone else's private item: its events reach only its owner.
+	if private {
+		return false, nil
 	}
 	if audienceKind == SpaceAudienceSpace {
 		return true, nil

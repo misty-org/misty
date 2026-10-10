@@ -1,3 +1,5 @@
+import type { ItemVisibility } from "@/api/spaces/visibility";
+
 export type DrawingRole = "creator" | "editor" | "viewer";
 
 export interface SpaceDrawing {
@@ -12,6 +14,8 @@ export interface SpaceDrawing {
   updated_at: string;
   role: DrawingRole;
   can_delete: boolean;
+  /** A private drawing opens only for its creator. */
+  visibility?: ItemVisibility;
 }
 
 export interface DrawingCollaborationTicket {

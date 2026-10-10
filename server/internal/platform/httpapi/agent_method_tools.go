@@ -17,9 +17,10 @@ import (
 // instructions and follows them in its current run, so a workflow never starts a
 // second run or grants a tool. Each has two owners: the person's request, which
 // changes only when they ask, and the steps the agent learned from running it,
-// kept as versions (agent_method_lessons).
-func methodToolRegistrations(database *db.Database) []agenttools.Registration {
-	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer,
+// kept as versions (agent_method_lessons). Workflows live in a Space's memory
+// tree; a run sees and saves only its own Space's workflows.
+func methodToolRegistrations(database *db.Database, search memorySearchFunc) []agenttools.Registration {
+	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer,
 		AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Risk: serveragent.RiskRead, Idempotent: true}
 	list, use, find := base, base, base
 	list.Name = "memory.workflow.list"
@@ -89,6 +90,10 @@ func methodToolRegistrations(database *db.Database) []agenttools.Registration {
 			if err != nil {
 				return nil, err
 			}
+			if found := findWorkflowsByMeaning(ctx, database, search, invocation, methods, input.Request, 3); len(found) > 0 {
+				return json.Marshal(map[string]any{"workflows": found})
+			}
+			// Vectors for new workflows may still be on their way.
 			return json.Marshal(map[string]any{"workflows": matchWorkflows(methods, input.Request, 3)})
 		}},
 		{Descriptor: learn, Handler: func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
@@ -161,12 +166,17 @@ func methodToolRegistrations(database *db.Database) []agenttools.Registration {
 	}
 }
 
-// agentMethodsFor returns the run's agent's enabled workflow methods.
+// agentMethodsFor returns the run's agent's enabled workflow methods in the
+// run's Space.
 func agentMethodsFor(ctx context.Context, database *db.Database, invocation agenttools.Invocation) ([]db.AgentMethod, error) {
 	if invocation.AgentID == "" {
 		return []db.AgentMethod{}, nil
 	}
-	methods, err := database.AgentMethods(ctx, invocation.UserID, invocation.AgentID)
+	space, err := runMemorySpace(ctx, database, invocation)
+	if err != nil {
+		return nil, err
+	}
+	methods, err := database.AgentMethods(ctx, invocation.UserID, space, invocation.AgentID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +206,16 @@ func saveAgentMethod(ctx context.Context, database *db.Database, invocation agen
 	if input.Inputs == nil {
 		input.Inputs = []db.AgentMethodInput{}
 	}
-	method := db.AgentMethod{AgentID: invocation.AgentID, Kind: "workflow", Enabled: true, Definition: db.AgentMethodDefinition{
+	space, err := runMemorySpace(ctx, database, invocation)
+	if err != nil {
+		return nil, err
+	}
+	method := db.AgentMethod{SpaceID: space, AgentID: invocation.AgentID, Kind: "workflow", Enabled: true, Definition: db.AgentMethodDefinition{
 		Title: input.Title, Description: input.Description, Instructions: input.Instructions, Inputs: input.Inputs, Target: "cloud", RequiredTools: []string{},
 	}}
 	expected := 0
 	if id := strings.TrimSpace(input.ID); id != "" {
-		existing, err := database.AgentMethods(ctx, invocation.UserID, invocation.AgentID)
+		existing, err := database.AgentMethods(ctx, invocation.UserID, space, invocation.AgentID)
 		if err != nil {
 			return nil, err
 		}
@@ -222,6 +236,36 @@ func saveAgentMethod(ctx context.Context, database *db.Database, invocation agen
 		return nil, serveragent.ErrInvalidRequest("the method could not be saved; it may have changed, so read it again with memory_workflow_list")
 	}
 	return json.Marshal(map[string]any{"method": map[string]any{"id": saved.ID, "title": saved.Definition.Title, "version": saved.Version}})
+}
+
+// findWorkflowsByMeaning ranks the run's workflows by how close they are in
+// meaning to the request, best first.
+func findWorkflowsByMeaning(ctx context.Context, database *db.Database, search memorySearchFunc, invocation agenttools.Invocation, methods []db.AgentMethod, request string, limit int) []map[string]any {
+	if search == nil || len(methods) == 0 {
+		return nil
+	}
+	space, err := runMemorySpace(ctx, database, invocation)
+	if err != nil {
+		return nil
+	}
+	hits, err := search(ctx, invocation.UserID, space, []string{db.MemoryWorkflows}, request, 20)
+	if err != nil {
+		return nil
+	}
+	byID := make(map[string]db.AgentMethod, len(methods))
+	for _, method := range methods {
+		byID[method.ID] = method
+	}
+	out := []map[string]any{}
+	for _, hit := range hits {
+		method, ok := byID[hit.RecordID]
+		if !ok || len(out) == limit {
+			continue
+		}
+		out = append(out, map[string]any{"id": method.ID, "title": method.Definition.Title,
+			"description": method.Definition.Description, "inputs": method.Definition.Inputs})
+	}
+	return out
 }
 
 // matchWorkflows ranks saved workflows by how many of the request's words their

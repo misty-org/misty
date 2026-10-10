@@ -97,6 +97,7 @@ impl WorkspaceSync {
             pinned_tabs: false,
             unsynced: unsynced.into_values().collect(),
             retired_edits: store.retired_workspace_count()?,
+            revisions: BTreeMap::new(),
         })
     }
 

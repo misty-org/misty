@@ -70,7 +70,7 @@ func webSearchDescriptor() agenttools.Descriptor {
 				"max_results": map[string]any{"type": "integer", "minimum": 1, "maximum": 10},
 			},
 		}),
-		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityProvider,
+		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Layer: agenttools.LayerPublic, Locality: agenttools.LocalityProvider,
 		Idempotent: true, AllowCustomAgent: true, AuditEvent: webSearchTool,
 	}
 }

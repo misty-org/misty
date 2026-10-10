@@ -26,6 +26,11 @@ type spaceConversationToolActor struct {
 	runID          string
 	sessionID      string
 	conversationID string
+	// memorySpaceID is the Space whose memory tree the run uses (see
+	// agenttools.Invocation.MemorySpaceID).
+	memorySpaceID string
+	// memorySearch ranks memory by meaning; nil lists by recency instead.
+	memorySearch memorySearchFunc
 }
 
 func executeSpaceConversationTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, originalPrompt string, tool serveragent.ToolRequest) (json.RawMessage, error) {

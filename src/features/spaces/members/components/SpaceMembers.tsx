@@ -69,6 +69,9 @@ export function SpaceMembers({
           members={members}
           agents={spaceAgents.agents}
           onRemoveAgent={(agentId) => void spaceAgents.remove(agentId)}
+          onAgentVisibility={(agentId, visibility) =>
+            void spaceAgents.setVisibility(agentId, visibility)
+          }
           loading={state.membersLoading}
           owner={state.canManageMembers}
           canTransferOwnership={state.canTransferOwnership}

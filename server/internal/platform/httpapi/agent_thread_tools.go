@@ -17,7 +17,7 @@ import (
 const threadsReadLimit = 30
 
 func threadToolRegistrations(database *db.Database) []agenttools.Registration {
-	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer,
+	base := agenttools.Descriptor{Version: 1, OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer,
 		AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Sources: agentToolboxSpaceSources}
 	threadID := map[string]any{"type": "string", "minLength": 1, "maxLength": 200, "description": "Thread id from thread_list."}
 	list, read, post, create := base, base, base, base
@@ -68,6 +68,9 @@ func threadToolRegistrations(database *db.Database) []agenttools.Registration {
 			}
 			items := make([]map[string]any, 0, len(threads))
 			for _, thread := range threads {
+				if invocation.PublicLayerOnly && !thread.VisibleToSpace {
+					continue
+				}
 				items = append(items, map[string]any{"id": thread.ID, "title": thread.Title, "kind": thread.Kind,
 					"participants": len(thread.Participants), "updated_at": thread.UpdatedAt.UTC().Format(time.RFC3339)})
 			}
@@ -83,6 +86,9 @@ func threadToolRegistrations(database *db.Database) []agenttools.Registration {
 			}
 			if input.Limit == 0 {
 				input.Limit = 20
+			}
+			if err := requirePublicThread(ctx, database, invocation, input.ThreadID); err != nil {
+				return nil, err
 			}
 			messages, err := database.SpaceConversationMessages(ctx, invocation.UserID, invocation.SpaceID, strings.TrimSpace(input.ThreadID), 0, input.Limit)
 			if err != nil {
@@ -106,6 +112,9 @@ func threadToolRegistrations(database *db.Database) []agenttools.Registration {
 			if invocation.AgentID == "" {
 				return nil, serveragent.ErrInvalidRequest("thread_post is available only to agents")
 			}
+			if err := requirePublicThread(ctx, database, invocation, input.ThreadID); err != nil {
+				return nil, err
+			}
 			message, err := database.CreatePersonalAgentConversationMessageWithContent(ctx, invocation.UserID, invocation.SpaceID,
 				strings.TrimSpace(input.ThreadID), invocation.AgentID, []db.MessageSpan{{Type: "text", Text: input.Message}})
 			if err != nil {
@@ -114,6 +123,25 @@ func threadToolRegistrations(database *db.Database) []agenttools.Registration {
 			return json.Marshal(map[string]any{"posted": message.ID, "thread_id": input.ThreadID})
 		}},
 	}
+}
+
+// requirePublicThread keeps a run the private layer doesn't open for (a
+// teammate's ask) out of the owner's DMs and private threads: it sees only
+// threads the whole Space can.
+func requirePublicThread(ctx context.Context, database *db.Database, invocation agenttools.Invocation, threadID string) error {
+	if !invocation.PublicLayerOnly {
+		return nil
+	}
+	threads, err := database.SpaceConversations(ctx, invocation.UserID, invocation.SpaceID)
+	if err != nil {
+		return err
+	}
+	for _, thread := range threads {
+		if thread.ID == strings.TrimSpace(threadID) && thread.VisibleToSpace {
+			return nil
+		}
+	}
+	return threadError(db.ErrSpaceNotFound)
 }
 
 func messageText(content []db.MessageSpan) string {

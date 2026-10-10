@@ -36,7 +36,7 @@ func (s *SpacesService) spaceAdminToolRegistration() agenttools.Registration {
 				"invitation_id": text(200),
 				"member_id":     text(200),
 			}, []string{"action"}),
-			OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, AuditEvent: "space.managed",
+			OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer, AllowCustomAgent: true, AuditEvent: "space.managed",
 		},
 		Handler: s.executeSpaceAdmin,
 	}

@@ -149,7 +149,9 @@ type SpaceLibraryItem struct {
 	RecoverUntil           *time.Time      `json:"recover_until,omitempty"`
 	Version                int64           `json:"version"`
 	UpdatedAt              time.Time       `json:"updated_at"`
-	File                   LibraryFile     `json:"file"`
+	// Visibility is "public" or "private": a private file opens only for whoever added it.
+	Visibility string      `json:"visibility"`
+	File       LibraryFile `json:"file"`
 }
 
 type MessageAttachment struct {

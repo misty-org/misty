@@ -280,11 +280,13 @@ type memberRequestTarget struct {
 	version                                                                  int64
 }
 
+// memberRequestTargetTx finds the agent asked. A private agent is refused to
+// everyone but its owner, the same way as an agent not in the Space.
 func memberRequestTargetTx(ctx context.Context, tx *sql.Tx, input AgentMemberRequestInput) (memberRequestTarget, error) {
 	var target memberRequestTarget
 	err := tx.QueryRowContext(ctx, `SELECT m.owner_user_id,a.name,a.instructions,a.model_id,a.reasoning_effort,a.default_run_mode,a.version,v.id`+
 		spaceAgentJoins+` JOIN misty_ask_identity_versions v ON v.agent_id=a.id AND v.version=a.version
-		WHERE m.space_id=$1 AND m.agent_id=$2 FOR SHARE OF m`, input.SpaceID, input.TargetAgentID).
+		WHERE m.space_id=$1 AND m.agent_id=$2 AND (m.visibility='public' OR m.owner_user_id=$3) FOR SHARE OF m`, input.SpaceID, input.TargetAgentID, input.RequesterUserID).
 		Scan(&target.ownerUserID, &target.name, &target.instructions, &target.modelID, &target.effort, &target.defaultMode, &target.version, &target.versionID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return target, ErrAgentNotInSpace

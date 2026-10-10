@@ -3,6 +3,7 @@ import type { ServerSpaceNote } from "@/api/notes/api";
 import type { SpaceCodeProject } from "@/api/spaces/code-projects";
 import type { SpaceConversation } from "@/api/spaces/dto/conversationTypes";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { ItemVisibility, VisibilityItemKind } from "@/api/spaces/visibility";
 import { libraryItemMIME } from "@/features/library";
 import { conversationPath } from "../chat/chatRoute";
 
@@ -24,6 +25,10 @@ export interface GalleryItem {
   repo?: string;
   /** Who a chat is with. */
   people?: string[];
+  /** The item's layer; a private item shows a lock and the word "Private". */
+  visibility?: ItemVisibility;
+  /** What its owner flips from the item's menu. Chats have no toggle. */
+  toggle?: { kind: VisibilityItemKind; id: string };
 }
 
 export type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
@@ -101,6 +106,8 @@ export function noteItem(spaceId: string, note: ServerSpaceNote): GalleryItem {
     creatorId: note.creator_user_id,
     href: `${base(spaceId)}/notes?note=${encodeURIComponent(note.id)}`,
     excerpt: text.slice(0, 220),
+    visibility: note.visibility,
+    toggle: { kind: "note", id: note.id },
   };
 }
 
@@ -112,6 +119,8 @@ export function drawingItem(spaceId: string, drawing: SpaceDrawing): GalleryItem
     updatedAt: drawing.updated_at,
     creatorId: drawing.creator_user_id,
     href: `${base(spaceId)}/drawings/${encodeURIComponent(drawing.id)}`,
+    visibility: drawing.visibility,
+    toggle: { kind: "drawing", id: drawing.id },
   };
 }
 
@@ -130,6 +139,8 @@ export function libraryGalleryItem(spaceId: string, item: SpaceLibraryItem): Gal
     creatorId: item.added_by_user_id || item.contributing_user_id,
     href: `${base(spaceId)}/library?item=${encodeURIComponent(item.id)}`,
     libraryItem: item,
+    visibility: item.visibility,
+    toggle: { kind: "library_item", id: item.id },
   };
 }
 
@@ -142,6 +153,8 @@ export function codeItem(spaceId: string, project: SpaceCodeProject): GalleryIte
     creatorId: project.owner_user_id,
     href: `${base(spaceId)}/code`,
     repo: project.github_repo,
+    visibility: project.visibility,
+    toggle: { kind: "code_project", id: project.id },
   };
 }
 

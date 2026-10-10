@@ -77,20 +77,19 @@ func (db *Database) CompleteAIEmbeddingChunk(ctx context.Context, chunk AIEmbedd
 	})
 }
 
-// Memory documents are the person's own browsing and listening. They are
-// searched only through SearchMemoryRetrieval, which recall tools gate.
-const (
-	retrievalWithoutMemory = `AND d.source_kind NOT LIKE 'memory\_%'`
-	retrievalOnlyMemory    = `AND d.source_kind LIKE 'memory\_%' AND d.privacy_class='private'`
-)
-
-// SearchMemoryRetrieval searches only the person's Memory documents.
-func (db *Database) SearchMemoryRetrieval(ctx context.Context, userID, query string, embedding []float64, limit int, embeddingModel string) ([]AIRetrievalHit, error) {
-	if embeddingModel == "" {
-		embeddingModel = "google/gemini-embedding-2"
-	}
-	return db.searchAIRetrieval(ctx, userID, query, embedding, limit, "", embeddingModel, retrievalOnlyMemory)
+// retrievalItemVisible keeps someone else's private notes, drawings and
+// Library files out of search: an indexed item must be public, or the
+// viewer's own. The checks read the item rows under the viewer's RLS.
+func retrievalItemVisible(viewer string) string {
+	return `(d.source_kind NOT IN ('note','drawing','library_item') OR EXISTS(
+		SELECT 1 FROM space_notes item WHERE d.source_kind='note' AND item.id=d.source_id AND (item.visibility='public' OR item.creator_user_id=` + viewer + `)
+		UNION ALL SELECT 1 FROM space_drawings item WHERE d.source_kind='drawing' AND item.id=d.source_id AND (item.visibility='public' OR item.creator_user_id=` + viewer + `)
+		UNION ALL SELECT 1 FROM space_library_items item WHERE d.source_kind='library_item' AND item.id=d.source_id AND (item.visibility='public' OR item.added_by_user_id=` + viewer + `)))`
 }
+
+// Memory lives in memory_chunks (memory_space.go), never in this index; the
+// filter keeps any stray memory document out of Space search.
+const retrievalWithoutMemory = `AND d.source_kind NOT LIKE 'memory\_%'`
 
 func (db *Database) SearchAIRetrieval(ctx context.Context, userID, query string, embedding []float64, limit int, spaceIDs ...string) ([]AIRetrievalHit, error) {
 	spaceID := ""
@@ -131,9 +130,10 @@ func (db *Database) searchAIRetrieval(ctx context.Context, userID, query string,
 				      AND misty_can_access_space_audience(d.space_id,d.audience_kind,d.audience_conversation_id)
 				      AND d.privacy_class='shared')
 				  )
+				  AND `+retrievalItemVisible("$4")+`
 				  AND (c.lexical @@ q.value OR (c.embedding IS NOT NULL AND c.embedding_model=$6))
 				ORDER BY score DESC,d.updated_at DESC,d.id,c.ordinal LIMIT $3
-			`, query, aiVectorLiteral(embedding), limit, userID, spaceID, embeddingModel)
+			`, query, aiVectorLiteral(embedding), limit, itemViewer(ctx, userID), spaceID, embeddingModel)
 		} else {
 			rows, err = tx.QueryContext(ctx, `
 				WITH lexical_query AS (SELECT plainto_tsquery('simple',$1) value)
@@ -147,9 +147,10 @@ func (db *Database) searchAIRetrieval(ctx context.Context, userID, query string,
 				      AND misty_can_access_space_audience(d.space_id,d.audience_kind,d.audience_conversation_id)
 				      AND d.privacy_class='shared')
 				  )
+				  AND `+retrievalItemVisible("$3")+`
 				  AND c.lexical @@ q.value
 				ORDER BY score DESC,d.updated_at DESC,d.id,c.ordinal LIMIT $2
-			`, query, limit, userID, spaceID)
+			`, query, limit, itemViewer(ctx, userID), spaceID)
 		}
 		if err != nil {
 			return err

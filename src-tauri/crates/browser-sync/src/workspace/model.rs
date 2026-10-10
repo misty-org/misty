@@ -64,7 +64,9 @@ fn parent_record(record: &ViewRecord) -> Option<(Kind, String)> {
                 .to_owned(),
         )),
         Kind::Bookmark => Some((Kind::Folder, field(record, "group_id")?.to_owned())),
-        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch | Kind::ExtensionSyncKey | Kind::ExtensionRemoval | Kind::Login | Kind::SpaceSites => {
+        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch | Kind::ExtensionSyncKey | Kind::ExtensionRemoval | Kind::Login | Kind::SpaceSites
+        | Kind::Extension | Kind::SitePermission | Kind::SearchDefault | Kind::SearchEngine
+        | Kind::SearchBang | Kind::Download => {
             None
         }
     }
@@ -83,6 +85,12 @@ pub fn collection_of(kind: Kind) -> Option<&'static str> {
         Kind::ExtensionSyncKey | Kind::ExtensionRemoval => Some(crate::collections::EXTENSION_SYNC),
         Kind::Login => Some(crate::collections::PASSWORDS),
         Kind::SpaceSites => Some(crate::collections::SPACE_SETTINGS),
+        Kind::Extension => Some(crate::collections::EXTENSIONS),
+        Kind::SitePermission => Some(crate::collections::SITE_PERMISSIONS),
+        Kind::SearchDefault | Kind::SearchEngine | Kind::SearchBang => {
+            Some(crate::collections::SEARCH)
+        }
+        Kind::Download => Some(crate::collections::DOWNLOADS),
         _ => None,
     }
 }

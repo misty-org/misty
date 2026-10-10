@@ -99,7 +99,7 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 
 	// Methods: save, update by id, and use.
 	methods := map[string]agenttools.Handler{}
-	for _, registration := range methodToolRegistrations(database) {
+	for _, registration := range methodToolRegistrations(database, nil) {
 		methods[registration.Descriptor.Name] = registration.Handler
 	}
 	var saved struct {

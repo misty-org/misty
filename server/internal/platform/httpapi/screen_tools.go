@@ -68,7 +68,7 @@ func screenDescriptor(name, description string, properties map[string]any, requi
 	return agenttools.Descriptor{
 		Name: name, Version: 1, Description: description, Risk: serveragent.RiskRead,
 		InputSchema:  TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": properties, "required": required, "additionalProperties": false}),
-		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer,
+		OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Layer: agenttools.LayerPrivate, Locality: agenttools.LocalityServer,
 		Idempotent: true, AllowCustomAgent: true, AuditEvent: name,
 	}
 }

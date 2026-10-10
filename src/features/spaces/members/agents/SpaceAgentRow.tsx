@@ -1,4 +1,6 @@
 import type { SpaceAgent } from "@/api/spaces/space-agents";
+import type { ItemVisibility } from "@/api/spaces/visibility";
+import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
 import { AgentAvatar } from "@/features/agents/AgentAvatar";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, cn } from "@/shared/ui";
@@ -9,11 +11,14 @@ export function SpaceAgentRow({
   agent,
   compact = false,
   onRemove,
+  onVisibilityChange,
 }: {
   agent: SpaceAgent;
   compact?: boolean;
   /** Offered to the agent's owner and the Space's owner. */
   onRemove?: () => void;
+  /** Offered to the agent's owner only. */
+  onVisibilityChange?: (visibility: ItemVisibility) => void;
 }) {
   return (
     <div
@@ -42,6 +47,14 @@ export function SpaceAgentRow({
           <p className="m-0 truncate text-xs text-cream-muted">{agent.agent_role}</p>
         ) : null}
       </div>
+      {agent.visibility === "private" ? <PrivateLabel /> : null}
+      {onVisibilityChange ? (
+        <VisibilityMenu
+          label={agent.agent_name}
+          visibility={agent.visibility}
+          onChange={onVisibilityChange}
+        />
+      ) : null}
       {onRemove ? (
         <IconButton
           size="sm"

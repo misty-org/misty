@@ -10,16 +10,21 @@ import (
 )
 
 // memberRequestRuntimeToolbox is the catalog for work someone else asked of an
-// agent. It acts as that agent only in the shared Space and can read its own
-// memory: no other Spaces, memory changes, agent settings, connected apps,
-// screens or further requests. Every call re-checks that the agent is still in
+// agent. It acts as that agent only in the shared Space. A teammate's ask sees
+// the public layer only (privateLayerAllowed); the owner's own ask can also
+// read the agent's memory. Never other Spaces, memory changes, agent
+// settings, connected apps, screens or further requests. Every call re-checks that the agent is still in
 // the Space and both members still share it.
 func (s *SpacesService) memberRequestRuntimeToolbox(ctx context.Context, run *db.SpaceRun, request *db.AgentMemberRequest) (*agenttools.Registry, agenttools.Invocation, agenttools.Authorizer, error) {
-	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{memberRequest: true})
+	// The run is the asker's: the private layer opens only when the agent's
+	// owner asked it themself.
+	layer := layerRun{askerUserID: request.RequesterUserID, agentOwnerUserID: request.TargetOwnerUserID}
+	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{memberRequest: true, run: layer})
 	invocation := agenttools.Invocation{
 		UserID: run.OwnerUserID, SpaceID: request.SpaceID, AgentID: run.AgentID, RunID: run.ID,
 		Source: "space_conversation", Trigger: "message", OriginalInput: request.Message,
 		ConversationScopeKind: db.ConversationScopeEveryone, PermissionMode: serveragent.NormalizePermissionMode(run.EffectiveRunMode),
+		PublicLayerOnly: !privateLayerAllowed(layer, run.OwnerUserID),
 	}
 	spaceAuthorize := authorizeSpaceAgentTool(s.database)
 	authorize := func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {

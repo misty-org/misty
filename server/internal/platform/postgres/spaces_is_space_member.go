@@ -155,6 +155,11 @@ func (db *Database) DeleteSpace(ctx context.Context, userID, spaceID, confirmati
 			memberIDs = append(memberIDs, memberID)
 		}
 		rows.Close()
+		// Every member's private layer goes now; the public layer waits out
+		// the recovery window with the Space.
+		if err := purgeSpaceMembersTx(ctx, tx, spaceID, memberIDs); err != nil {
+			return err
+		}
 		if err := notifySpaceControlTx(ctx, tx, map[string]any{"type": "space.deleted", "space_id": spaceID, "user_ids": memberIDs}); err != nil {
 			return err
 		}

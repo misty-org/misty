@@ -7,6 +7,7 @@ import {
   parseBrowserCustomBangs,
   type BrowserCustomBang,
 } from "@/features/workspace/browserSearchEngine";
+import { saveSpaceBangs, useSpaceSearchStore } from "@/features/workspace/spaceSearch";
 import { DesktopSettingsSection as SettingsSectionBlock } from "../components/DesktopSettingsUI";
 import {
   settingsAssociationRowClass,
@@ -25,15 +26,40 @@ const reserved = new Map(
 );
 const emptyDraft: BrowserCustomBang = { trigger: "", name: "", url: "" };
 
-/** The person's own `!name` search shortcuts, saved to their account. */
+/**
+ * The person's own `!name` search shortcuts. They belong to the window's Space
+ * and travel with its sync vault; while no Space vault is open (sync off or
+ * locked) they are this device's own, kept in its settings.
+ */
 export function BrowserBangsSettings(
   props: Pick<SettingsContentProps, "document" | "working" | "onSettingChange">,
 ) {
-  const bangs = parseBrowserCustomBangs(stringSetting(props.document, "general", key, "[]"));
+  const space = useSpaceSearchStore((state) => state.space);
+  const bangs = space
+    ? space.bangs
+    : parseBrowserCustomBangs(stringSetting(props.document, "general", key, "[]"));
   const [draft, setDraft] = useState(emptyDraft);
   const [problem, setProblem] = useState<string | null>(null);
-  const save = (next: BrowserCustomBang[]) =>
-    props.onSettingChange("general", key, JSON.stringify(next));
+  const [saving, setSaving] = useState(false);
+  const working = props.working || saving;
+  const save = (next: BrowserCustomBang[]) => {
+    if (!space) {
+      props.onSettingChange("general", key, JSON.stringify(next));
+      return;
+    }
+    setSaving(true);
+    saveSpaceBangs(next)
+      .catch((error: unknown) =>
+        setProblem(
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "The shortcut could not be saved. Try again.",
+        ),
+      )
+      .finally(() => setSaving(false));
+  };
 
   const add = () => {
     const bang = {
@@ -58,7 +84,7 @@ export function BrowserBangsSettings(
       aria-label={label}
       placeholder={placeholder}
       value={draft[name]}
-      disabled={props.working}
+      disabled={working}
       spellCheck={false}
       autoComplete="off"
       onChange={(event) => {
@@ -74,7 +100,11 @@ export function BrowserBangsSettings(
   return (
     <SettingsSectionBlock
       title="Search shortcuts"
-      description="Type ! in search to see every shortcut. Yours replace a built-in site with the same name."
+      description={
+        space
+          ? "Type ! in search to see every shortcut. Yours replace a built-in site with the same name, and belong to this window's Space on all its devices."
+          : "Type ! in search to see every shortcut. Yours replace a built-in site with the same name, and stay on this device while sync is off."
+      }
     >
       <div className={settingsReferenceListClass}>
         <div className={`${settingsAssociationRowClass} ${settingsReferenceHeaderClass}`}>
@@ -97,7 +127,7 @@ export function BrowserBangsSettings(
               variant="destructive"
               label={`Remove !${bang.trigger}`}
               className={settingsDisabledControlClass}
-              disabled={props.working}
+              disabled={working}
               onClick={() => save(bangs.filter((item) => item.trigger !== bang.trigger))}
             >
               <Trash2 size={15} />
@@ -111,7 +141,7 @@ export function BrowserBangsSettings(
           {field("trigger", "Shortcut name", "jira")}
           {field("name", "Site name", "Jira")}
           {field("url", "Search address", "https://example.com/search?q=%s")}
-          <Button variant="outline" disabled={props.working} onClick={add}>
+          <Button variant="outline" disabled={working} onClick={add}>
             Add
           </Button>
         </div>

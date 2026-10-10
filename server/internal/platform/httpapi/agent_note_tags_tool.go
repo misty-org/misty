@@ -20,7 +20,7 @@ func noteTagsToolRegistration(database *db.Database) agenttools.Registration {
 				"id":   map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 				"tags": map[string]any{"type": "array", "maxItems": 30, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 60}},
 			}, []string{"id", "tags"}),
-			OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
+			OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
 			AuditEvent: "note.tags.updated", Sources: agentToolboxSpaceSources,
 		},
 		Handler: func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {

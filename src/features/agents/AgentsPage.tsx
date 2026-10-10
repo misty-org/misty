@@ -9,6 +9,7 @@ import { AgentWorkspaceFrame } from "./workspace/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
 import { useAgentsPageState } from "./useAgentsPageState";
+import { useSpacesStore } from "@/features/spaces";
 
 /*
  * THESIS: Agents opens straight into a conversation with the selected agent.
@@ -23,6 +24,8 @@ import { useAgentsPageState } from "./useAgentsPageState";
  */
 export default function NativeAgentsPage() {
   const state = useAgentsPageState();
+  // Agents group by their home Space here; the quick panel just lists them.
+  const spaces = useSpacesStore((store) => store.spaces);
   const actions = createAgentsPageActions(state);
   const view = deriveAgentsPageView(state, actions);
   const {
@@ -79,7 +82,9 @@ export default function NativeAgentsPage() {
           activity={activity.entries}
           conversationId={activeConversationId}
           disabled={view.disabled}
-          identity={<AgentSwitcher {...switcher} className="agent-studio-identity" />}
+          identity={
+            <AgentSwitcher {...switcher} spaces={spaces} className="agent-studio-identity" />
+          }
           onPageChange={(page) =>
             change(() => {
               setWorkspacePage(page);

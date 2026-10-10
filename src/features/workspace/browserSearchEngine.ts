@@ -18,9 +18,16 @@ export interface BrowserSearchEngine {
 
 export const browserSearchEngines: readonly BrowserSearchEngine[] = engineTable;
 
-/** Misty searches with Google only: its suggestions name sites, which gives rows their icons. */
+let engineId = browserSearchEngines[0].id;
+
+/** The Space's search engine; Google until a Space picks another. */
 export function browserSearchEngine(): BrowserSearchEngine {
-  return browserSearchEngines[0];
+  return browserSearchEngines.find((engine) => engine.id === engineId) ?? browserSearchEngines[0];
+}
+
+/** An id the table does not know falls back to the first engine. */
+export function configureBrowserSearchEngine(id: string): void {
+  engineId = id;
 }
 
 let suggestionsEnabled = false;
@@ -65,12 +72,15 @@ export function customBangProblem(bang: BrowserCustomBang): string | null {
 
 /** Anything malformed is dropped, not repaired. */
 export function parseBrowserCustomBangs(raw: string): BrowserCustomBang[] {
-  let value: unknown;
   try {
-    value = JSON.parse(raw);
+    return sanitizeBrowserCustomBangs(JSON.parse(raw));
   } catch {
     return [];
   }
+}
+
+/** Keeps the well-formed shortcuts of a list read from storage or a Space. */
+export function sanitizeBrowserCustomBangs(value: unknown): BrowserCustomBang[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
   return value.flatMap((item) => {
@@ -93,4 +103,8 @@ export function browserCustomBangs(): readonly BrowserCustomBang[] {
 
 export function configureBrowserCustomBangs(raw: string): void {
   customBangs = parseBrowserCustomBangs(raw);
+}
+
+export function setBrowserCustomBangs(bangs: readonly BrowserCustomBang[]): void {
+  customBangs = sanitizeBrowserCustomBangs(bangs);
 }

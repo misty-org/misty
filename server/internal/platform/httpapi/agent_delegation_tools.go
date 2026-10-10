@@ -57,7 +57,7 @@ func delegationToolDescriptors() []agenttools.Descriptor {
 		},
 	}
 	return []agenttools.Descriptor{
-		{Name: toolboxAgentsDelegateTasks, Version: 1, Risk: serveragent.RiskWrite, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone, AuditEvent: "agent.delegated",
+		{Name: toolboxAgentsDelegateTasks, Version: 1, Risk: serveragent.RiskWrite, Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone, AuditEvent: "agent.delegated",
 			Description: "Split independent parts of a large task across up to four sub-agents that work at the same time, each in its own browser tab when this run has a browser. Use it for breadth: researching several companies, products or sources, or filling several separate forms. Each task must stand alone. Sub-agents act with your permissions, write their findings to this task's notebook and return their answers; this call waits for them for up to about four minutes, then returns whatever is still running so you can call agent_wait.",
 			InputSchema: TestingMustAPIRawJSON(map[string]any{
 				"type": "object", "additionalProperties": false, "required": []string{"tasks"},
@@ -66,7 +66,7 @@ func delegationToolDescriptors() []agenttools.Descriptor {
 					"browser": map[string]any{"type": "boolean", "description": "Give each sub-agent its own browser tab. Default true when this run has a browser."},
 				},
 			}), OutputSchema: agentToolObjectOutputSchema()},
-		{Name: toolboxAgentsWait, Version: 1, Risk: serveragent.RiskRead, Idempotent: true, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone,
+		{Name: toolboxAgentsWait, Version: 1, Risk: serveragent.RiskRead, Idempotent: true, Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone,
 			Description: "Wait up to about four minutes for this task's sub-agents to finish, and return each one's state and answer.",
 			InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema()},
 	}
@@ -237,7 +237,7 @@ func (s *SpacesService) startDelegatedInvocation(ctx context.Context, parent *db
 	}
 	child := aiInvocationInput{
 		Mode: "drawer", SurfaceID: "global", Trigger: "delegated", Prompt: delegatedPrompt(task), Timezone: body.Timezone,
-		AgentID: body.AgentID, ExecutionMode: body.ExecutionMode, TaskID: body.TaskID, WindowLabel: body.WindowLabel,
+		AgentID: body.AgentID, SpaceID: body.SpaceID, ExecutionMode: body.ExecutionMode, TaskID: body.TaskID, WindowLabel: body.WindowLabel,
 		CollaborationMode: body.CollaborationMode, PermissionMode: body.PermissionMode, ModelID: model, ReasoningEffort: body.ReasoningEffort,
 		IdempotencyKey: "delegate:" + parent.ID + ":" + callID + ":" + strconv.Itoa(index),
 		NotebookKey:    notebookKey(parent, body), DelegatedFrom: parent.ID,

@@ -13,6 +13,8 @@ const spaceAgentSchema = z.object({
   owner_user_id: z.string(),
   owner_name: z.string(),
   added_at: z.string(),
+  /** A private agent is invisible to the rest of the Space and can't be @mentioned there. */
+  visibility: z.enum(["public", "private"]).default("public"),
 });
 export type SpaceAgent = z.infer<typeof spaceAgentSchema>;
 

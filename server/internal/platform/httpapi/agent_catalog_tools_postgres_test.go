@@ -168,7 +168,7 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	methods := map[string]agenttools.Handler{}
-	for _, registration := range methodToolRegistrations(database) {
+	for _, registration := range methodToolRegistrations(database, nil) {
 		methods[registration.Descriptor.Name] = registration.Handler
 	}
 	if raw, err := call(methods["memory.workflow.list"], `{}`); err != nil || !strings.Contains(string(raw), "Weekly brief") {

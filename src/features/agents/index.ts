@@ -34,7 +34,9 @@ export { AgentAvatar } from "./components/AgentAvatar";
 export { usePersonalAgentsStore } from "./personalAgentsStore";
 export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
 
-export type { AppRequest } from "./apps/api";
+export type { AppRequest, ConnectedApp } from "./apps/api";
+export { appsApi } from "./apps/api";
+export { AppLogo, accountLabels, groupApps } from "./apps/ConnectedAppRows";
 export { AppRequestCard } from "./apps/AppRequestCard";
 export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
 export { codingToolForTurn, useConversationCodingTool } from "./store/useConversationCodingTool";

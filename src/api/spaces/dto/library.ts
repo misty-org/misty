@@ -1,3 +1,4 @@
+import type { ItemVisibility } from "../visibility";
 import type { LibraryEditDefinition } from "./common";
 export type * from "./agentArchitectureTypes";
 export type * from "./memberTypes";
@@ -36,6 +37,8 @@ export interface SpaceLibraryItem {
   recover_until?: string;
   version: number;
   updated_at: string;
+  /** A private file opens only for whoever added it. */
+  visibility?: ItemVisibility;
   file: LibraryFile;
 }
 

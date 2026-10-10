@@ -487,6 +487,7 @@ POST /api/me/agent-plans/{planID}/{action}
 POST /api/me/agent-questions/{questionID}/answer
 POST /api/me/app-requests/{requestID}
 POST /api/me/app-requests/{requestID}/link
+POST /api/me/app-requests/{requestID}/pick
 POST /api/me/coding/{invocationID}/approvals
 POST /api/me/coding/{invocationID}/events
 POST /api/me/coding/{invocationID}/lease
@@ -595,6 +596,7 @@ POST /me/agent-plans/{planID}/{action}
 POST /me/agent-questions/{questionID}/answer
 POST /me/app-requests/{requestID}
 POST /me/app-requests/{requestID}/link
+POST /me/app-requests/{requestID}/pick
 POST /me/coding/{invocationID}/approvals
 POST /me/coding/{invocationID}/events
 POST /me/coding/{invocationID}/lease
@@ -708,6 +710,7 @@ POST /v1/me/agent-plans/{planID}/{action}
 POST /v1/me/agent-questions/{questionID}/answer
 POST /v1/me/app-requests/{requestID}
 POST /v1/me/app-requests/{requestID}/link
+POST /v1/me/app-requests/{requestID}/pick
 POST /v1/me/coding/{invocationID}/approvals
 POST /v1/me/coding/{invocationID}/events
 POST /v1/me/coding/{invocationID}/lease
@@ -798,6 +801,7 @@ PUT /api/ai/settings/keep-awake
 PUT /api/ai/settings/screen-location
 PUT /api/devices/{deviceID}/devices/{targetID}/name
 PUT /api/devices/{deviceID}/policy
+PUT /api/integrations/apps/spaces/{spaceID}
 PUT /api/me/avatar
 PUT /api/me/coding/engines
 PUT /api/me/conversations/{conversationID}/mode
@@ -810,6 +814,7 @@ PUT /api/misty/attachments/{attachmentID}/content
 PUT /api/spaces/{spaceID}/agents/{agentID}
 PUT /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /api/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
+PUT /api/spaces/{spaceID}/items/{kind}/{itemID}/visibility
 PUT /api/spaces/{spaceID}/library/items/{itemID}/versions/current
 PUT /api/spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /api/spaces/{spaceID}/messages/{messageID}
@@ -817,6 +822,7 @@ PUT /api/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/nodes/{nodeID}
 PUT /devices/{deviceID}/devices/{targetID}/name
 PUT /devices/{deviceID}/policy
+PUT /integrations/apps/spaces/{spaceID}
 PUT /me/avatar
 PUT /me/coding/engines
 PUT /me/conversations/{conversationID}/mode
@@ -829,6 +835,7 @@ PUT /misty/attachments/{attachmentID}/content
 PUT /spaces/{spaceID}/agents/{agentID}
 PUT /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
+PUT /spaces/{spaceID}/items/{kind}/{itemID}/visibility
 PUT /spaces/{spaceID}/library/items/{itemID}/versions/current
 PUT /spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /spaces/{spaceID}/messages/{messageID}
@@ -848,6 +855,7 @@ PUT /v1/ai/settings/keep-awake
 PUT /v1/ai/settings/screen-location
 PUT /v1/devices/{deviceID}/devices/{targetID}/name
 PUT /v1/devices/{deviceID}/policy
+PUT /v1/integrations/apps/spaces/{spaceID}
 PUT /v1/me/avatar
 PUT /v1/me/coding/engines
 PUT /v1/me/conversations/{conversationID}/mode
@@ -860,6 +868,7 @@ PUT /v1/misty/attachments/{attachmentID}/content
 PUT /v1/spaces/{spaceID}/agents/{agentID}
 PUT /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}
 PUT /v1/spaces/{spaceID}/conversations/{conversationID}/messages/{messageID}/reactions/{emoji}
+PUT /v1/spaces/{spaceID}/items/{kind}/{itemID}/visibility
 PUT /v1/spaces/{spaceID}/library/items/{itemID}/versions/current
 PUT /v1/spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /v1/spaces/{spaceID}/messages/{messageID}

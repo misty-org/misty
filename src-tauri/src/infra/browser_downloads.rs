@@ -89,6 +89,16 @@ pub(super) fn handle_download_event(app: &AppHandle, tab_id: &str, event: Downlo
                     record.success,
                     record.error.as_deref(),
                 );
+                // Private tabs have no Space store; their downloads stay here.
+                if let (true, Some(kiri::engine::StoreScope::Persistent(store_key))) =
+                    (record.success, session_permission_scope(app, tab_id))
+                {
+                    super::super::browser_library::download_into_space(
+                        app,
+                        store_key,
+                        &record.download_id,
+                    );
+                }
             }
             let _ = app.emit_to(
                 browser_owner_label(app, tab_id),

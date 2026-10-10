@@ -56,7 +56,7 @@ func agentsDirectoryToolDescriptor() agenttools.Descriptor {
 		InputSchema: agentMemberToolSchema(map[string]any{
 			"space": map[string]any{"type": "string", "minLength": 1, "maxLength": 200, "description": "Space name or id. Omit to list every Space you belong to."},
 		}, []string{}),
-		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
+		OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
 	}
 }
 
@@ -74,7 +74,7 @@ func agentsRequestToolDescriptor() agenttools.Descriptor {
 			"message":      map[string]any{"type": "string", "minLength": 1, "maxLength": 16_000},
 			"wait_seconds": agentRequestWaitProperty,
 		}, []string{"agent", "message"}),
-		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true,
+		OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true,
 		Idempotent: true, AuditEvent: "agent.request.created",
 	}
 }
@@ -87,7 +87,7 @@ func agentsRequestStatusToolDescriptor() agenttools.Descriptor {
 			"request_id":   map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
 			"wait_seconds": agentRequestWaitProperty,
 		}, []string{"request_id"}),
-		OutputSchema: agentToolObjectOutputSchema(), Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
+		OutputSchema: agentToolObjectOutputSchema(), Layer: agenttools.LayerPublic, Locality: agenttools.LocalityServer, AllowCustomAgent: true, Idempotent: true,
 	}
 }
 

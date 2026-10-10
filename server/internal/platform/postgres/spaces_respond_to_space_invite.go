@@ -117,6 +117,10 @@ func (db *Database) RemoveSpaceMember(ctx context.Context, ownerID, spaceID, mem
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_members cm USING space_conversations c WHERE cm.conversation_id=c.id AND c.space_id=$1 AND cm.user_id=$2`, spaceID, memberID); err != nil {
 			return err
 		}
+		// Everything of theirs in the Space goes in the same transaction.
+		if err := purgeSpaceMemberTx(ctx, tx, spaceID, memberID); err != nil {
+			return err
+		}
 		result, err := tx.ExecContext(ctx, `DELETE FROM space_members WHERE space_id=$1 AND user_id=$2 AND role='member'`, spaceID, memberID)
 		if err != nil {
 			return err
@@ -154,6 +158,11 @@ func (db *Database) LeaveSpace(ctx context.Context, userID, spaceID string) erro
 			return ErrSpaceInvalid
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_conversation_members cm USING space_conversations c WHERE cm.conversation_id=c.id AND c.space_id=$1 AND cm.user_id=$2`, spaceID, userID); err != nil {
+			return err
+		}
+		// Everything of theirs in the Space goes in the same transaction:
+		// memory, private items, integration picks.
+		if err := purgeSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM space_members WHERE space_id=$1 AND user_id=$2`, spaceID, userID); err != nil {
