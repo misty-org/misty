@@ -13,6 +13,7 @@ import {
   Popover,
   PopoverContent,
 } from "@/shared/ui";
+import { ModelProviderIcon } from "./ModelProviderIcon";
 
 /** The display name for a model ID, from the catalog when it lists it. */
 export function modelName(options: SenseModel[], id: string) {
@@ -56,6 +57,7 @@ export function ModelPicker({
       <MenuTrigger
         kind="popover"
         label={label}
+        icon={<ModelProviderIcon model={value || defaultModel} />}
         value={value ? modelName(options, value) : defaultLabel}
         disabled={disabled}
         className={className}
@@ -67,6 +69,7 @@ export function ModelPicker({
             <CommandEmpty>No models found.</CommandEmpty>
             <CommandGroup>
               <CommandItem value="default" keywords={[defaultLabel]} onSelect={() => choose("")}>
+                <ModelProviderIcon model={defaultModel} />
                 <span className="min-w-0 flex-1 truncate">{defaultLabel}</span>
                 <span className="truncate text-xs text-cream-muted">
                   {modelName(options, defaultModel)}
@@ -84,9 +87,14 @@ export function ModelPicker({
                       key={option.id}
                       value={option.id}
                       keywords={[option.name, provider]}
+                      disabled={option.paid_only}
                       onSelect={() => choose(option.id)}
                     >
+                      <ModelProviderIcon model={option.id} />
                       <span className="min-w-0 flex-1 truncate">{option.name}</span>
+                      {option.paid_only && (
+                        <span className="shrink-0 text-xs text-cream-muted">Paid plans</span>
+                      )}
                       {option.id === value && <Check aria-label="Selected" />}
                     </CommandItem>
                   ))}

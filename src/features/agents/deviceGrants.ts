@@ -11,6 +11,8 @@ export const inboxGrantRef = (deviceId: string) => `inbox:${deviceId}`;
 
 const folderCapabilities = ["files.list", "files.read", "files.send"];
 const workspaceCapabilities = ["tabs.list", "tabs.open", "bookmarks.list", "bookmarks.add"];
+/** On another device the agent may also open its own browser session there. */
+const remoteWorkspaceCapabilities = [...workspaceCapabilities, "browser.session"];
 
 /** Another of the person's devices picked for this chat, as its own signed
  * policy describes it (docs/design/devices/BRIEF.md). */
@@ -35,10 +37,11 @@ export async function desktopDeviceGrants(
   if (!local?.device || local.device.status === "revoked") return [];
   const device = await ensureServerAgentDevice(local.device).catch(() => null);
   if (!device) return [];
-  // Only a device added to the account takes part in agent work.
+  // Agents may always use the computer the person is at. Reaching other
+  // devices needs this one added to the account (with Sync or approval).
   const account = await deviceAccount().catch(() => null);
   const view = account ? await devicesNative.view(account.accountId).catch(() => null) : null;
-  if (!view?.admitted) return [];
+  const targets = view?.admitted ? remote : [];
   const folders = local.scopes
     .filter((scope) => scope.kind === "local_folder" && scope.available)
     .map((scope): AiInvocationDeviceContext => ({
@@ -60,7 +63,7 @@ export async function desktopDeviceGrants(
       metadata: { source: "desktop" },
     },
   ];
-  if (remote.length) {
+  if (targets.length) {
     contexts.push({
       deviceId: device.id,
       kind: "inbox",
@@ -70,7 +73,7 @@ export async function desktopDeviceGrants(
       metadata: { source: "desktop" },
     });
   }
-  for (const target of remote) {
+  for (const target of targets) {
     if (target.deviceId === device.id) continue;
     if (target.agentSurfaces.includes("folders")) {
       for (const folder of target.sharedFolders) {
@@ -90,7 +93,7 @@ export async function desktopDeviceGrants(
         kind: "workspace",
         opaqueRef: workspaceGrantRef(target.deviceId),
         displayName: `Misty browser on ${target.name}`,
-        capabilities: workspaceCapabilities,
+        capabilities: remoteWorkspaceCapabilities,
         metadata: { source: "device" },
       });
     }

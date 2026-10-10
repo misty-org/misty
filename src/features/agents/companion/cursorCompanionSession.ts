@@ -1,3 +1,4 @@
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
 import { effectiveValues, useSettingsProfiles } from "@/features/settings/sync";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
@@ -6,6 +7,7 @@ import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
 import { companionStage } from "./companionStage";
 import { useCompanionState } from "./companionState";
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
+import { withMistyControls } from "./mistyControls";
 import type { DisplayCapture, Presentation } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
@@ -77,7 +79,7 @@ export class CursorCompanionSession {
     return (
       current.accountId === this.accountId &&
       current.activeConversationId === origin.conversationId &&
-      current.selectedAgentId === origin.agentId
+      orDefaultAgent(current.selectedAgentId) === orDefaultAgent(origin.agentId)
     );
   };
 
@@ -259,11 +261,21 @@ export class CursorCompanionSession {
     this.maybeHide();
   };
 
+  /** The screens, with Misty's own visible controls named on the one showing them. */
   capture = (generation: number, signal: AbortSignal) =>
     companionStage(
-      invoke<DisplayCapture[]>("cursor_companion_capture", { turn: generation }),
+      invoke<DisplayCapture[]>("cursor_companion_capture", { turn: generation }).then(
+        withMistyControls,
+      ),
       signal,
       "Screen capture",
       20_000,
     );
+}
+
+/** No selection means Misty's own agent; a prompt fills it in when it starts work. */
+function orDefaultAgent(agentId: string | undefined) {
+  return (
+    agentId || usePersonalAgentsStore.getState().agents.find((agent) => agent.system_managed)?.id
+  );
 }

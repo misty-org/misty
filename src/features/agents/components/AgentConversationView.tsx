@@ -6,14 +6,18 @@ import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-se
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { Button, cn, Spinner } from "@/shared/ui";
+import { AnimatedEllipsis, Button, cn } from "@/shared/ui";
 import { CalendarClock, Flag } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
 import { splitReplyQuote } from "./replyQuote";
-import { AgentSteps, type AgentStep } from "./AgentSteps";
+import { AgentProgress } from "../progress/AgentProgress";
+import { useMessageProgress } from "../progress/useMessageProgress";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
+import { AgentNotebookCard } from "./AgentNotebookCard";
+import { AgentSubagents } from "./AgentSubagents";
+import { continuationEvent } from "../progress/continuationEvent";
 import { Link } from "react-router-dom";
 
 /** Memoized: typing in the composer must not re-render or re-parse the transcript. */
@@ -81,8 +85,9 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
           <div className="agent-message-assistant flex items-start gap-3.5" role="status">
             <MistyAvatar />
             <div className="min-w-0">
-              <div className="agent-message-status gap-2 text-[13px] font-medium text-cream">
-                <Spinner size="sm" label={false} /> Misty is working
+              <div className="agent-message-status text-[13px] font-medium text-cream">
+                Misty is working
+                <AnimatedEllipsis />
               </div>
               <p className="mb-0 text-xs text-cream-muted">
                 You can leave this conversation while the task continues.
@@ -165,10 +170,13 @@ const AgentMessage = memo(AgentMessageView, (previous, next) => {
 
 function AgentMessageView(props: AgentMessageProps) {
   const message = props.message;
+  const progress = useMessageProgress(message);
   const content = visibleConversationContent(message.content, message.role);
   if (
     !content &&
     !message.appRequest &&
+    !message.notebook &&
+    !message.subagents?.length &&
     message.state !== "pending" &&
     message.state !== "streaming"
   )
@@ -182,6 +190,8 @@ function AgentMessageView(props: AgentMessageProps) {
           Continued toward the goal
         </p>
       );
+    const event = continuationEvent(content, message.source);
+    if (event) return <p className="agent-progress-event">{event}</p>;
     const reply = splitReplyQuote(content);
     return (
       <div className="agent-message-user group/message flex flex-col items-end gap-1.5">
@@ -221,19 +231,19 @@ function AgentMessageView(props: AgentMessageProps) {
     >
       <MistyAvatar />
       <div className="min-w-0 flex-1">
-        {props.steps?.length ? (
-          <AgentSteps
-            steps={props.steps.map((step): AgentStep => ({
-              id: step.id,
-              content: visibleConversationContent(step.content, step.role),
-            }))}
-          />
-        ) : null}
+        {props.steps?.map((step) => (
+          <EarlierReply key={step.id} message={step} />
+        ))}
+        {progress?.length ? <AgentProgress items={progress} /> : null}
+        {message.subagents?.length ? <AgentSubagents subagents={message.subagents} /> : null}
+        {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}
         {content ? (
           <div className="misty-markdown-message text-[14px] leading-6 text-cream">
             <MistyMarkdown>{content}</MistyMarkdown>
           </div>
-        ) : message.state === "pending" || message.state === "streaming" ? (
+        ) : (message.state === "pending" || message.state === "streaming") &&
+          // A running tool's row already says what Misty is doing.
+          !progress?.some((item) => item.type === "tool" && item.state === "running") ? (
           <div className="agent-message-status">
             <MistyActivityStatus activity={message.activity} />
           </div>
@@ -269,6 +279,25 @@ function AgentMessageView(props: AgentMessageProps) {
         />
       </div>
     </article>
+  );
+}
+
+/**
+ * An earlier reply in the same turn, such as "Got it, starting…" before a long
+ * task: its own work, then what it said, shown in line before the answer.
+ */
+function EarlierReply({ message }: { message: GlobalAiMessage }) {
+  const progress = useMessageProgress(message);
+  const content = visibleConversationContent(message.content, message.role);
+  return (
+    <>
+      {progress?.length ? <AgentProgress items={progress} /> : null}
+      {content ? (
+        <div className="agent-progress-note misty-markdown-message">
+          <MistyMarkdown>{content}</MistyMarkdown>
+        </div>
+      ) : null}
+    </>
   );
 }
 

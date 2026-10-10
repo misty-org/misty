@@ -30,14 +30,12 @@ export function AgentLanding({
   agentId,
   onConversation,
   onUseTemplate,
-  onActivity,
   onTemplates,
 }: {
   accountId: string;
   agentId: string;
   onConversation(id: string): void;
   onUseTemplate(prompt: string): void;
-  onActivity(): void;
   onTemplates(): void;
 }) {
   const activity = useAgentActivity(accountId, agentId);
@@ -53,9 +51,6 @@ export function AgentLanding({
       <section aria-labelledby="agent-landing-recent">
         <header>
           <h2 id="agent-landing-recent">Pick up where you left off</h2>
-          <Button variant="ghost" size="xs" onClick={onActivity}>
-            View all
-          </Button>
         </header>
         {recent.map((entry) => {
           const Icon = activityStateIcon(entry.state);

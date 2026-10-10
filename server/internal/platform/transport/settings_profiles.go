@@ -66,11 +66,8 @@ func ValidateProfilePatch(values map[string]any, unset []string) error {
 			}
 			if v, ok := value.(string); ok && len(v) <= maxLength {
 				valid = len(d.Enum) == 0
-				if d.ID == "app.appearance.accent" {
-					valid = accentColorPattern.MatchString(v)
-				}
-				if d.ID == "app.appearance.theme_light_start" || d.ID == "app.appearance.theme_dark_start" {
-					valid = themeTimePattern.MatchString(v)
+				if d.ID == "app.appearance.night_light_start" || d.ID == "app.appearance.night_light_end" {
+					valid = clockTimePattern.MatchString(v)
 				}
 				if d.Format == "json" {
 					valid = validStructuredPreference(d.ID, v)
@@ -93,11 +90,8 @@ func ValidateProfilePatch(values map[string]any, unset []string) error {
 	return nil
 }
 
-// accentColorPattern accepts an empty value (no accent) or a lowercase #rrggbb color.
-var accentColorPattern = regexp.MustCompile(`^(#[0-9a-f]{6})?$`)
-
-// themeTimePattern is a local 24-hour "HH:MM" for the scheduled theme.
-var themeTimePattern = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+// clockTimePattern is a local 24-hour "HH:MM" for the night light schedule.
+var clockTimePattern = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 
 func validStructuredPreference(id, raw string) bool {
 	var value any

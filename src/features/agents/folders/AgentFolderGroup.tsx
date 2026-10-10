@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { ChevronRight, Folder, FolderOpen, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { Folder, FolderOpen, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
 import {
   AlertDialog,
@@ -9,14 +9,21 @@ import {
   AlertDialogFooter,
   AlertDialogTitle,
   Button,
+  ContextMenu,
+  ContextMenuAction,
+  ContextMenuContent,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem,
 } from "@/shared/ui";
 import { useAgentFoldersStore, type AgentConversationFolder } from "./agentFoldersStore";
 import { FolderNameDialog } from "./FolderNameDialog";
+import { useConversationDrop, type ConversationDrop } from "./useConversationDrop";
 
 const collapsedKey = (id: string) => `misty:agent-folder-collapsed:${id}`;
 // Open or closed is a per-device convenience; the folder itself is account state.
@@ -36,18 +43,24 @@ const writeCollapsed = (id: string, collapsed: boolean) => {
   }
 };
 
-/** One folder in an agent's sidebar: a collapsible header over its conversations. */
+/** One project (a stored conversation folder) in an agent's sidebar: a collapsible header
+ * over its conversations, and a drop target for conversations dragged onto it, open or
+ * closed. The open or closed folder glyph is its only disclosure cue. */
 export function AgentFolderGroup({
   folder,
   count,
   disabled,
+  drop,
   children,
 }: {
   folder: AgentConversationFolder;
   count: number;
   disabled: boolean;
+  drop: ConversationDrop;
   children: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useConversationDrop(ref, drop, folder.id);
   const [collapsed, setCollapsed] = useState(() => readCollapsed(folder.id));
   const [action, setAction] = useState<"rename" | "delete">();
   const [busy, setBusy] = useState(false);
@@ -71,51 +84,55 @@ export function AgentFolderGroup({
     }
   };
   const Icon = collapsed ? Folder : FolderOpen;
+  const startRename = () => setAction("rename");
+  const startDelete = () => {
+    setError("");
+    setAction("delete");
+  };
+  const keepDialogFocus = (event: Event) => {
+    if (action) event.preventDefault();
+  };
   return (
-    <div className="agent-studio-folder" role="group" aria-label={folder.name}>
-      <div className="agent-studio-recent-row agent-studio-folder-row">
-        <Button
-          variant="ghost"
-          justify="start"
-          aria-expanded={!collapsed}
-          title={folder.name}
-          onClick={toggle}
-        >
-          <span className="agent-studio-recent-status">
-            <Icon aria-hidden="true" />
-          </span>
-          <span className="agent-studio-recent-title">{folder.name}</span>
-          <span className="agent-studio-folder-count" aria-label={`${count} conversations`}>
-            {count || ""}
-          </span>
-          <ChevronRight className="agent-studio-folder-chevron" aria-hidden="true" />
-        </Button>
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <IconButton disabled={disabled} label={`More actions for ${folder.name}`}>
-              <MoreHorizontal />
-            </IconButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setAction("rename")}>
-              <Pencil /> Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                setError("");
-                setAction("delete");
-              }}
+    <div ref={ref} className="agent-studio-folder" role="group" aria-label={folder.name}>
+      <ContextMenu modal={false}>
+        <ContextMenuTrigger asChild disabled={disabled}>
+          <div className="agent-studio-recent-row agent-studio-folder-row">
+            <Button
+              variant="ghost"
+              justify="start"
+              aria-expanded={!collapsed}
+              aria-description={`${count} conversation${count === 1 ? "" : "s"}`}
+              title={folder.name}
+              onClick={toggle}
             >
-              <Trash2 /> Delete folder
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              <Icon aria-hidden="true" />
+              <span className="agent-studio-recent-title">{folder.name}</span>
+            </Button>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <IconButton disabled={disabled} label={`More actions for ${folder.name}`}>
+                  <MoreHorizontal />
+                </IconButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onCloseAutoFocus={keepDialogFocus}>
+                <MenuItem icon={<Pencil />} label="Rename" onSelect={startRename} />
+                <DropdownMenuSeparator />
+                <MenuItem icon={<Trash2 />} label="Delete project" onSelect={startDelete} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent onCloseAutoFocus={keepDialogFocus}>
+          <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={startRename} />
+          <ContextMenuSeparator />
+          <ContextMenuAction icon={<Trash2 />} label="Delete project" onSelect={startDelete} />
+        </ContextMenuContent>
+      </ContextMenu>
       {!collapsed && children}
       <FolderNameDialog
         open={action === "rename"}
-        title="Rename folder"
-        description="Choose a new name for this folder."
+        title="Rename project"
+        description="Choose a new name for this project."
         initialName={folder.name}
         submitLabel="Save"
         onOpenChange={(open) => !open && setAction(undefined)}
@@ -128,7 +145,7 @@ export function AgentFolderGroup({
         <AlertDialogContent>
           <AlertDialogTitle>Delete “{folder.name}”?</AlertDialogTitle>
           <AlertDialogDescription>
-            The folder is removed. Its conversations move back to Recents and are not deleted.
+            The project is removed. Its conversations move back to Recents and are not deleted.
           </AlertDialogDescription>
           {error && (
             <p role="alert" className="text-sm text-cream-muted">
@@ -138,7 +155,7 @@ export function AgentFolderGroup({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button disabled={busy} onClick={() => void remove()}>
-              {busy ? "Deleting…" : "Delete folder"}
+              {busy ? "Deleting…" : "Delete project"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

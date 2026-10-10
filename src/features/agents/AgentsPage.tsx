@@ -20,8 +20,6 @@ import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
 import { AgentLanding } from "./page/AgentLanding";
 import { AgentNewChat } from "./page/AgentNewChat";
 import { AgentProfileSection } from "./page/AgentProfileSection";
-import { AgentDetailsPanel, type AgentDetailsSectionId } from "./page/AgentDetailsPanel";
-import { agentDetailsSections } from "./page/AgentDetailsSections";
 import { useAgentActivity } from "./page/useAgentActivity";
 import { useAgentChangeGuard } from "./page/useAgentChangeGuard";
 import { useAgentFolderSync } from "./folders/useAgentFolderSync";
@@ -48,27 +46,18 @@ export default function NativeAgentsPage() {
   const [newChat, setNewChat] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [params, setParams] = useSearchParams();
-  // Details stays open, on its section and at its width, across conversations until
-  // the person closes it.
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsSection, setDetailsSection] = useState<AgentDetailsSectionId>("task");
-  const [detailsWidth, setDetailsWidth] = useState(320);
   const workspaceRef = useRef<HTMLElement>(null);
   const identityRef = useRef<HTMLButtonElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
-  // Links: ?view=workflows (and the retired scheduled view) open Workflows;
-  // ?view=activity (and automations) open Activity.
+  // Links: ?view=workflows (and the retired scheduled and automations views) open
+  // Workflows; the retired ?view=activity opens the task.
   const linkedView = params.get("view") ?? "";
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsModalTab, setSettingsModalTab] = useState<AgentSettingsTab>("settings");
   const [settingsModalMode, setSettingsModalMode] = useState<"edit" | "create">("edit");
   const [chatRevision, setChatRevision] = useState(0);
   const [workspacePage, setWorkspacePage] = useState<AgentWorkspacePage>(() =>
-    ["workflows", "scheduled"].includes(linkedView)
-      ? "workflows"
-      : ["activity", "automations"].includes(linkedView)
-        ? "activity"
-        : "task",
+    ["workflows", "scheduled", "automations"].includes(linkedView) ? "workflows" : "task",
   );
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const working = useMistyStore((s) => s.working);
@@ -143,7 +132,7 @@ export default function NativeAgentsPage() {
     (c) => c.agentId === profile?.id || (!c.agentId && profile?.system_managed),
   );
   const conversation = agentConversations.find((c) => c.id === activeConversationId);
-  // One subscription feeds both the Task section and the Recents status icons.
+  // Feeds the Recents status dots.
   const activity = useAgentActivity(user?.id ?? "", profile?.id);
   const openSettingsModal = (tab: AgentSettingsTab = "settings") =>
     change(() => {
@@ -190,12 +179,6 @@ export default function NativeAgentsPage() {
       setSettingsModalOpen(false);
     });
   const closeSettings = () => change(() => setSettingsModalOpen(false), false);
-  const toggleDetails = () => change(() => setDetailsOpen((open) => !open), false);
-  const openTaskDetails = () =>
-    change(() => {
-      setDetailsOpen(true);
-      setDetailsSection("task");
-    }, false);
   const saveProfile = async (id: string, companion = false) => {
     await load(user?.id ?? "");
     setSelected(id);
@@ -251,10 +234,6 @@ export default function NativeAgentsPage() {
     change(() => {
       setWorkspacePage("integrations");
     }, false);
-  const openActivity = () =>
-    change(() => {
-      setWorkspacePage("activity");
-    }, false);
   const openTemplates = () =>
     change(() => {
       setWorkspacePage("templates");
@@ -262,20 +241,9 @@ export default function NativeAgentsPage() {
   const taskWorking = Boolean(
     profile && working && (workingAgentId === profile.id || Boolean(conversation)),
   );
-  const showDetails = Boolean(profile) && !newChat && !settingsModalOpen;
-  // Built whenever Details can show, so the closed panel stays mounted to animate.
-  const sections =
-    showDetails &&
-    agentDetailsSections({
-      activity,
-      conversation,
-      working: taskWorking,
-      deviceName: access.device?.device?.displayName,
-    });
   const taskContent = (
     <>
       <div className="agents-main">
-        {/* The header rides in the chat column, so the panels run up beside the title. */}
         <div className="agents-body">
           <div className="agents-chat" data-scroll-root>
             {error && (
@@ -297,16 +265,7 @@ export default function NativeAgentsPage() {
               onRecipientSearch={setRecipientSearch}
               onCloseNewChat={() => setNewChat(false)}
               onNewChat={beginNewChat}
-              details={
-                showDetails
-                  ? {
-                      open: detailsOpen,
-                      working: taskWorking,
-                      onToggle: toggleDetails,
-                      onTask: openTaskDetails,
-                    }
-                  : undefined
-              }
+              working={taskWorking}
             />
             {newChat ? (
               <AgentNewChat
@@ -344,7 +303,6 @@ export default function NativeAgentsPage() {
                         agentId={profile.id}
                         onConversation={(id) => select(profile.id, false, id)}
                         onUseTemplate={(prompt) => select(profile.id, true, undefined, prompt)}
-                        onActivity={openActivity}
                         onTemplates={openTemplates}
                       />
                     </>
@@ -354,17 +312,6 @@ export default function NativeAgentsPage() {
               />
             )}
           </div>
-          {sections && (
-            <AgentDetailsPanel
-              open={detailsOpen}
-              sections={sections}
-              section={detailsSection}
-              width={detailsWidth}
-              onSection={setDetailsSection}
-              onClose={toggleDetails}
-              onWidthChange={setDetailsWidth}
-            />
-          )}
         </div>
       </div>
     </>

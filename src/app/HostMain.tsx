@@ -31,6 +31,18 @@ if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 export const startup = bootstrap();
 async function bootstrap() {
+  if (new URLSearchParams(location.search).has("agent_dock_host") && hasTauriInternals()) {
+    const [{ AgentDockHostRoot }] = await Promise.all([
+      import("@/features/agents/dock/AgentDockHostRoot"),
+      import("@/styles/styles.css"),
+    ]);
+    root.render(
+      <TelemetryErrorBoundary>
+        <AgentDockHostRoot />
+      </TelemetryErrorBoundary>,
+    );
+    return;
+  }
   if (new URLSearchParams(location.search).has("agent_worker") && hasTauriInternals()) {
     const [{ AgentWorkerRoot }] = await Promise.all([
       import("@/features/agents/AgentWorkerRoot"),

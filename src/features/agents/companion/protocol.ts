@@ -16,6 +16,19 @@ export interface DisplayCapture extends AiCaptureAttachment {
   screen: string;
   primary: boolean;
   display: DisplayFrame;
+  /** Misty's own visible controls on this screen, in this capture's pixels. */
+  controls?: ScreenControl[];
+}
+/** A Misty control named by its interface; x and y are its center. */
+export interface ScreenControl {
+  label: string;
+  role: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Present when the control only appears while the pointer is over it. */
+  reveal?: "hover";
 }
 export interface CursorSample {
   /** Activity sequence only; no key identities or typed text leave the native hook. */

@@ -42,7 +42,7 @@ function goalStatus(goal: AgentGoal, state: ConversationCollaboration) {
 }
 
 /**
- * The conversation's goal in the Task drawer: set one, watch its budget and
+ * The conversation's goal, in the Goal dialog: set one, watch its budget and
  * reports, and pause, resume, raise the budget or clear it. Misty keeps working
  * toward a pursued goal on the server, across turns, until it is met with
  * evidence, blocked, paused or out of budget.
@@ -138,7 +138,7 @@ export function AgentGoalSection({
     return (
       <section className="agent-goal-section" aria-label="Goal">
         <h3>Goal</h3>
-        <p className="agent-task-panel-note">
+        <p className="agent-goal-note">
           {conversationId
             ? "Give Misty an objective to keep working toward across turns, within a budget."
             : "Start a conversation, then set a goal. You can also type /goal and the objective."}

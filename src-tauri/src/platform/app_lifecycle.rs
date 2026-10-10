@@ -45,6 +45,7 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if matches!(event, RunEvent::Exit) {
+        crate::infra::browser_sync::flush_before_exit();
         #[cfg(desktop)]
         super::mini_app::shutdown(app);
         crate::telemetry::shutdown();

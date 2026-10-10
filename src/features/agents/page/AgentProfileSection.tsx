@@ -1,10 +1,10 @@
 import type { ComponentProps } from "react";
 import type { GlobalAiConversation } from "@/features/global-search/types";
-import { MistyModelPicker } from "@/features/global-search/MistyModelPicker";
+import { ReasoningPicker } from "../models/ReasoningPicker";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { AgentEditor } from "../components/AgentEditor";
 
-/** The panel's profile section: the agent editor and, mid-conversation, its model. */
+/** The panel's profile section: the agent editor and, mid-conversation, its thinking mode. */
 export function AgentProfileSection({
   conversation,
   working,
@@ -18,10 +18,9 @@ export function AgentProfileSection({
       <AgentEditor {...editor} />
       {conversation && (
         <div className="agent-profile-model">
-          <MistyModelPicker
+          <ReasoningPicker
             inline
             conversationId={conversation.id}
-            modelId={conversation.modelId}
             reasoningEffort={conversation.reasoningEffort}
             disabled={working}
             onChange={(changes) =>

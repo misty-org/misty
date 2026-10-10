@@ -16,6 +16,7 @@ import {
   resumeExecutionAfterWait,
 } from "@/features/agents/executionHandoff";
 import { echoPrompt } from "./promptEcho";
+import { awaitConversationTitle } from "./conversationTitles";
 import {
   finishLocalExecution,
   isAgentWorkerWindow,
@@ -509,6 +510,9 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         ? collaboration.draftMode
         : undefined;
     echo.settle(conversationId);
+    // The server names a new conversation with a separate model call; until then its title is a skeleton.
+    if (startsConversation && !companion?.continuation)
+      awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
     updateConversation(set, get, conversationId, (conversation) => {
       const messages = conversation.messages.filter((message) => !isEcho(message));
       return {
@@ -516,7 +520,16 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         reasoningEffort: thinkingEffort(requestedThinking),
         title: messages.length ? conversation.title : normalized.slice(0, 56),
         updatedAt: userMessage.createdAt,
-        messages: [...messages, ...(echo.echoed ? [userMessage] : []), assistantMessage],
+        messages: [
+          ...messages,
+          ...(echo.echoed
+            ? [userMessage]
+            : // A continuation shows as an event line ("Connected Google Docs"), not as typed text.
+              companion?.continuation
+              ? [{ ...userMessage, source: "continuation" as const }]
+              : []),
+          assistantMessage,
+        ],
       };
     });
     if (presentation === "workspace") announceGlobalPanel(false);
@@ -571,7 +584,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           methodInputs: companion?.methodInputs,
           skillVersionIds: companion?.skillVersionIds,
           surfaceId: handoff?.surfaceId ?? "global",
-          trigger: selection ? "selection" : "message",
+          // Turns sent to carry on after a card read as events, not as typed messages.
+          trigger: selection ? "selection" : companion?.continuation ? "continuation" : "message",
           requestedArtifactKind: handoff?.requestedArtifactKind,
           prompt: normalized,
           context: invocationContext,
@@ -645,7 +659,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             if (get().invocationId !== created.invocationId) return;
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
             if (event.type === "invocation.completed")
-              continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
+              void continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
             if (event.type === "assistant.status" && event.phase === "awaiting_intervention") {
               // The run is suspended until the person acts. It keeps its screen;
               // input and the control ring go back to them, and the request

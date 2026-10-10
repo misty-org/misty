@@ -16,6 +16,7 @@ import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ConversationModelPicker } from "../models/ConversationModelPicker";
+import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
 import { AgentModeToggle } from "../collaboration/AgentModeToggle";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
@@ -397,6 +398,7 @@ export function AgentWorkspaceConversation({
                 disabled={state.working}
                 onError={reportError}
               />
+              <ConversationReasoningPicker conversation={conversation} disabled={state.working} />
               {showControlBar && agent && (
                 <AgentUsageControl
                   draft={draft}
@@ -428,6 +430,7 @@ export function AgentWorkspaceConversation({
           trailingControl={
             state.working ? (
               <IconButton
+                variant="primary"
                 label="Stop response"
                 onClick={() => {
                   void useMistyStore
@@ -436,7 +439,7 @@ export function AgentWorkspaceConversation({
                     .catch((e) => reportError(String(e)));
                 }}
               >
-                <Square size={16} />
+                <Square className="size-3.5" fill="currentColor" />
               </IconButton>
             ) : undefined
           }

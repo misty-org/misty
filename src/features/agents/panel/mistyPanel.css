@@ -1,6 +1,13 @@
-/* Misty panel: a box docked beside the workspace */
+/* Misty panel: the app's dark surface beside the content, split from it by a hairline */
 aside[data-misty-panel] {
-  background: var(--color-charcoal-bg, #131313);
+  --misty-panel-bg: var(--color-charcoal-bg, #131313);
+  background: var(--misty-panel-bg);
+}
+aside[data-misty-panel="right"] {
+  border-left: 1px solid var(--color-charcoal-border);
+}
+aside[data-misty-panel="left"] {
+  border-right: 1px solid var(--color-charcoal-border);
 }
 
 aside[data-misty-panel] .agent-studio,
@@ -11,6 +18,44 @@ aside[data-misty-panel] .agents-body {
   background: transparent;
 }
 
+/* The sticky header and composer paint the panel's own color so the
+   conversation scrolls beneath them instead of showing through. */
 aside[data-misty-panel] .agents-body {
-  --agents-canvas: transparent;
+  --agents-canvas: var(--misty-panel-bg);
+}
+
+/* The hairline is the resize handle: drag it, or focus it and use the arrow keys.
+   It brightens while hovered, focused or dragged. */
+.misty-panel-resizer {
+  position: absolute;
+  inset-block: 0;
+  z-index: 2;
+  width: 12px;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+.misty-panel-resizer[data-side="right"] {
+  left: -6px;
+}
+.misty-panel-resizer[data-side="left"] {
+  right: -6px;
+}
+.misty-panel-resizer::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 5px;
+  width: 2px;
+  background: var(--color-charcoal-active);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.misty-panel-resizer:is(:hover, :focus-visible)::after,
+.misty-panel-resizer[data-dragging]::after {
+  opacity: 1;
+}
+html:has(.misty-panel-resizer[data-dragging]) {
+  cursor: col-resize;
+  user-select: none;
 }

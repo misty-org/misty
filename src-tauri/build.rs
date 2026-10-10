@@ -40,6 +40,7 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentDock.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
@@ -59,6 +60,7 @@ fn main() {
             .file("native/macos/MistyDesktopControl.m")
             .file("native/macos/MistyAgentPointer.m")
             .file("native/macos/MistyAgentRing.m")
+            .file("native/macos/MistyAgentDock.m")
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .file("native/macos/MistyDefaultBrowser.m")
