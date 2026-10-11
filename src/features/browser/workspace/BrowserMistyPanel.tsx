@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
-import { MistyPanelSprite, useMistyPanelStore } from "@/features/agents";
+import { MessagesSquare } from "lucide-react";
+import { useMistyPanelStore } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { IconButton } from "@/shared/ui";
+import { useOpenSpaceChat } from "@/features/spaces/chat/useOpenSpaceChat";
 
 /**
  * Whether the Misty panel is open. The panel is a column of its own beside the workspace's
@@ -15,17 +17,12 @@ export function useBrowserMistyPanel(tabId: string) {
   return { paneId, here: open, open };
 }
 
-/** The toolbar's Chat button: opens the chat panel, or closes it. */
-export function BrowserMistyButton({ tabId }: { tabId: string }) {
-  const { paneId, open } = useBrowserMistyPanel(tabId);
+/** The toolbar's Chat button: opens your Space's chat, where people talk and agents are mentioned. */
+export function BrowserMistyButton() {
+  const openChat = useOpenSpaceChat();
   return (
-    <IconButton
-      label={open ? "Close chat" : "Chat"}
-      tooltip={false}
-      aria-pressed={open}
-      onClick={() => useMistyPanelStore.getState().setOpen(!open, paneId ?? null)}
-    >
-      <MistyPanelSprite size={24} />
+    <IconButton label="Chat" onClick={openChat}>
+      <MessagesSquare aria-hidden className="size-4" />
     </IconButton>
   );
 }

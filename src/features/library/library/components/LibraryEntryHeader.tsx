@@ -18,7 +18,6 @@ import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 
 const sections: { value: LibraryCollectionKind; label: string }[] = [
   { value: "recent", label: "All" },
-  { value: "favorites", label: "Favorites" },
   { value: "deleted", label: "Trash" },
 ];
 

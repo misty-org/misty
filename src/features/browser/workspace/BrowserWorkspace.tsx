@@ -21,6 +21,7 @@ import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
 import { BrowserMenu } from "./BrowserMenu";
 import { BrowserMenuLeadRows } from "./BrowserMenuLeadRows";
+import { BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { useTabAway } from "@/features/agents";
 import { BrowserOmnibox } from "./BrowserOmnibox";
@@ -241,7 +242,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <BrowserMenu
       toolsIcon={sidebarMenu}
       library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
-      account={sidebarMenu ? undefined : chrome?.accountItems}
+      account={chrome?.accountItems}
       lead={
         sidebarMenu ? (
           <BrowserMenuLeadRows
@@ -290,6 +291,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
       )}
       {siteInfo}
+      {chrome?.sync}
       {browserMenu(true)}
     </>
   );
@@ -309,6 +311,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       {hiddenButtons.has("extensions") ? null : (
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
       )}
+      <BrowserMistyButton />
       {hiddenButtons.has("downloads") ? null : (
         <BrowserDownloadsButton
           suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
@@ -321,7 +324,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     </>
   );
   // Vertical tabs: back/forward/reload go beside the sidebar toggle, and the address field,
-  // pinned extensions and a ⋯ menu (bookmark, Misty, extensions, then the browser menu) fill
+  // pinned extensions and a ⋯ menu (bookmark, extensions, then the browser menu) fill
   // the sidebar's top slot.
   const toolbar = (
     <BrowserToolbar nav={navButtons} badges={badges} address={omnibox} tools={toolButtons} />

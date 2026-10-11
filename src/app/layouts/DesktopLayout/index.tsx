@@ -7,7 +7,7 @@ import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
 import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
-import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
+import { BrowserSyncBadge, SyncMenuItem } from "@/features/browser-workspace/BrowserSyncBadge";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
@@ -24,7 +24,7 @@ import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
-import { BrowserProfileButton, StripDownloads } from "./WorkspaceStripDock";
+import { BrowserProfileButton, StripChat, StripDownloads } from "./WorkspaceStripDock";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
@@ -149,20 +149,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         onSettingsClick={openSettingsOverlay}
       />
     ) : null;
-  // The sidebar's bottom edge: downloads and sync together.
+  // The sidebar's bottom edge: downloads on the left, chat on the right.
   const stripFootEnd = (
     <>
-      <div className="flex items-center gap-0.5">
-        <StripDownloads />
-        {/* Sidebar chrome, so it is the same 28px button as downloads and settings. */}
-        <div className="flex shrink-0 items-center" data-browser-toolbar data-sidebar>
-          <BrowserSyncBadge
-            key={user?.id}
-            accountId={user?.id ?? ""}
-            onOpenSettings={openSyncSettings}
-          />
-        </div>
-      </div>
+      <StripDownloads />
+      <StripChat />
     </>
   );
   const browserChrome = {
@@ -171,10 +162,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         key={user?.id}
         accountId={user?.id ?? ""}
         onOpenSettings={openSyncSettings}
+        menuOnly
       />
     ),
     profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
-    accountItems: null,
+    accountItems: <SyncMenuItem accountId={user?.id ?? ""} />,
   };
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>

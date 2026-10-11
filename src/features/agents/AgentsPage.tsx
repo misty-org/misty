@@ -23,6 +23,10 @@ import { useSpacesStore } from "@/features/spaces";
  *   the verdict, DESIGN.md, and every shipping raster carrying its provenance
  */
 export default function NativeAgentsPage() {
+  return <AgentsWorkspacePage />;
+}
+
+function AgentsWorkspacePage() {
   const state = useAgentsPageState();
   // Agents group by their home Space here; the quick panel just lists them.
   const spaces = useSpacesStore((store) => store.spaces);

@@ -7,6 +7,8 @@ import { Fragment, memo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
+import { useChatSidePanel } from "../store/chatSidePanelStore";
+import { AgentTranscriptButton } from "./AgentTranscriptButton";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
@@ -20,6 +22,8 @@ export interface ChatMessageRowProps {
   avatarUrl: string;
   repliedToMessage: SpaceMessage | undefined;
   repliedToAvatarUrl: string;
+  /** How many messages reply to this one; above zero it gets a Show replies button. */
+  replyCount?: number;
   props: SpaceChatMessagesProps;
 }
 
@@ -63,6 +67,7 @@ export const ChatMessageRow = memo(ChatMessageRowView, (previous, next) => {
     previous.avatarUrl !== next.avatarUrl ||
     previous.repliedToMessage !== next.repliedToMessage ||
     previous.repliedToAvatarUrl !== next.repliedToAvatarUrl ||
+    previous.replyCount !== next.replyCount ||
     rowFields.some((field) => previous.props[field] !== next.props[field])
   )
     return false;
@@ -84,10 +89,19 @@ function ChatMessageRowView({
   avatarUrl,
   repliedToMessage,
   repliedToAvatarUrl,
+  replyCount = 0,
   props,
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
   const agentAuthored = isAgentAuthoredMessage(message);
+  // The reply to your own mention carries how it was made; nobody else gets the button.
+  const requestId = message.origin?.agent_request_id;
+  const transcriptRequestId =
+    message.origin?.kind === "agent_member_reply" &&
+    typeof requestId === "string" &&
+    repliedToMessage?.sender_user_id === props.currentUserId
+      ? requestId
+      : undefined;
 
   return (
     <Fragment>
@@ -162,6 +176,18 @@ function ChatMessageRowView({
               ) : null}
             </p>
           )}
+
+          {replyCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 -ml-2"
+              onClick={() => useChatSidePanel.getState().openThread(message.id)}
+            >
+              Show replies ({replyCount})
+            </Button>
+          ) : null}
+          {transcriptRequestId ? <AgentTranscriptButton requestId={transcriptRequestId} /> : null}
 
           {message.local_delivery_state === "failed" ? (
             <div

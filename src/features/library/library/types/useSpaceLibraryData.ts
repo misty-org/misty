@@ -1,6 +1,6 @@
 import type { useSpaceLibraryData } from "../useSpaceLibraryData";
 
-export type LibraryCollectionKind = "recent" | "favorites" | "deleted";
+export type LibraryCollectionKind = "recent" | "deleted";
 
 export type LibraryUploadJob = {
   id: string;

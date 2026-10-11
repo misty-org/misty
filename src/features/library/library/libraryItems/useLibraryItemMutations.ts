@@ -9,7 +9,7 @@ export type LibraryItemPatch = Partial<
 
 /** Single-item edits, trashing and restoring, plus grid selection helpers. */
 export function useLibraryItemMutations(data: SpaceLibraryData) {
-  const { spaceId, canEditLibrary, collection } = data;
+  const { spaceId, canEditLibrary } = data;
   const { setItems, setVisibleItems, setSelectedItemId, setSelectedItemIds } = data;
   const { setSearchInput, setLocalError } = data;
 
@@ -31,9 +31,7 @@ export function useLibraryItemMutations(data: SpaceLibraryData) {
     if (!canEditLibrary) return null;
     try {
       const saved = await spacesApi.updateLibraryItem(spaceId, item, patch);
-      const remainsVisible = collection !== "favorites" || saved.favorite;
-      if (remainsVisible) replaceItem(saved);
-      else removeFromLists(saved.id);
+      replaceItem(saved);
       return saved;
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Library item could not be updated.");

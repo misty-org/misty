@@ -338,6 +338,73 @@ func (db *Database) AgentMemberRequestForUser(ctx context.Context, userID, reque
 	return out, err
 }
 
+// AgentMentionsForUser lists the agent runs the person started by @mentioning
+// an agent in Space chat, newest first. Only the person who mentioned sees them;
+// everyone else in the chat sees just the agent's reply.
+func (db *Database) AgentMentionsForUser(ctx context.Context, userID string, limit int) ([]AgentMemberRequest, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	out := []AgentMemberRequest{}
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		rows, err := tx.QueryContext(ctx, agentMemberRequestSelect+`WHERE q.requester_user_id=$1 AND q.requester_run_id LIKE $2
+			ORDER BY q.created_at DESC LIMIT $3`, userID, MentionRequesterPrefix+"%", limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var item AgentMemberRequest
+			if err := scanAgentMemberRequest(rows, &item); err != nil {
+				return err
+			}
+			out = append(out, item)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// AgentRequestStep is one step of an agent's run, as the person who asked sees
+// it: what it was, how it ended, and when. Inputs and outputs stay out; they can
+// hold the owner's private data.
+type AgentRequestStep struct {
+	Name        string     `json:"name"`
+	State       string     `json:"state"`
+	Error       string     `json:"error,omitempty"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+// AgentRequestTranscript returns the steps of the run behind a request to the
+// person who made it, and to nobody else (not even the agent's owner).
+func (db *Database) AgentRequestTranscript(ctx context.Context, userID, requestID string) ([]AgentRequestStep, error) {
+	steps := []AgentRequestStep{}
+	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
+		var runID string
+		if err := tx.QueryRowContext(ctx, `SELECT child_run_id FROM agent_member_requests WHERE id=$1 AND requester_user_id=$2`, requestID, userID).Scan(&runID); err != nil {
+			return err
+		}
+		rows, err := tx.QueryContext(ctx, `SELECT node_id,state,COALESCE(error_message,''),started_at,completed_at FROM space_run_steps WHERE run_id=$1 ORDER BY COALESCE(started_at,updated_at),node_id`, runID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var step AgentRequestStep
+			if err := rows.Scan(&step.Name, &step.State, &step.Error, &step.StartedAt, &step.CompletedAt); err != nil {
+				return err
+			}
+			steps = append(steps, step)
+		}
+		return rows.Err()
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrSpaceNotFound
+	}
+	return steps, err
+}
+
 // AgentMemberRequestForRun finds the request a delegated run is doing.
 // ErrSpaceNotFound means the run is not a member request.
 func (db *Database) AgentMemberRequestForRun(ctx context.Context, runID string) (*AgentMemberRequest, error) {

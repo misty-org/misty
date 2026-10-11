@@ -31,3 +31,21 @@ export function hasAnyAttachment(message: SpaceMessage | undefined) {
       (message.attachments?.length ?? 0) > 0),
   );
 }
+
+/**
+ * The message a thread hangs from: follow replies upward until one replies to nothing (or to
+ * a message that is no longer loaded). Threads are flat, as in Slack, so a reply to a reply
+ * belongs to its root's thread.
+ */
+export function threadRootOf(
+  message: { id: string; reply_to_message_id?: string },
+  byId: Map<string, { id: string; reply_to_message_id?: string }>,
+): string {
+  let current = message;
+  for (let hops = 0; hops < 100; hops++) {
+    const parent = current.reply_to_message_id ? byId.get(current.reply_to_message_id) : undefined;
+    if (!parent) return current.id;
+    current = parent;
+  }
+  return current.id;
+}

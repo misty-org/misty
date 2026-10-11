@@ -110,7 +110,6 @@ export function SpaceLibrary({
 }
 const collectionTitles: Record<string, string> = {
   recent: "Library",
-  favorites: "Favorites",
   deleted: "Recently deleted",
 };
 function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): string {

@@ -1,188 +1,109 @@
-import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Bot, Hash, MoreHorizontal, Plus, User, Users } from "lucide-react";
-import {
-  Button,
-  CollectionPage,
-  CollectionHeading,
-  CollectionSearch,
-  useCollectionRefinement,
-  CollectionItems,
-  CollectionViewToggle,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  IconButton,
-  CollectionSkeleton,
-  itemTones,
-} from "@/shared/ui";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import type { SpaceConversation } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "../store/useSpacesStore";
-import { useSpaceItemCreator } from "../useSpaceItemCreator";
-import { conversationPath, spaceChatConversationPath, spaceChatPath } from "./chatRoute";
-import { useSpaceConversations } from "./sidebar/useSpaceConversations";
-import { conversationName } from "./sidebar/conversationGroups";
+import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { ChatSidebar } from "./sidebar/ChatSidebar";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
+import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
+import { spacesApi } from "@/api/spaces/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/shared/ui";
+import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { SpaceSocial } from "./SpaceChat";
-import type { SpaceConversation } from "@/api/spaces/dto/entities";
+import { useEffect } from "react";
 
+/**
+ * A Space's chat: a sidebar of channels and conversations with people, and the open chat
+ * beside it. Agents are not in the sidebar; mention one in a message to ask it for work.
+ */
 export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceSocial>) {
-  const location = useLocation();
-  const detail = Boolean(
-    location.pathname.split("/")[4] || new URLSearchParams(location.search).has("conversation"),
-  );
-  if (detail) return <SpaceSocial {...props} />;
-  return <ChatCollection key={props.spaceId} spaceId={props.spaceId} />;
-}
-export function ChatCollection({ spaceId }: { spaceId: string }) {
+  const { spaceId } = props;
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const conversationId = params.get("conversation") ?? "";
+  const data = useSpaceConversations(spaceId);
   const referenceOnly = useSpacesStore((s) => s.referenceOnly);
   const members = useSpacesStore((s) => s.membersBySpace[spaceId]);
   const loadMembers = useSpacesStore((s) => s.loadMembers);
-  const data = useSpaceConversations(spaceId);
-  const creator = useSpaceItemCreator(spaceId);
-  const [query, setQuery] = useState("");
-  const [section, setSection] = useState("All");
-  const [view, setView] = useState<"list" | "grid">("list");
+  const { isOwner } = useSpaceChatAccess(spaceId);
   const [editing, setEditing] = useState<SpaceConversation | null>();
+  const [deleting, setDeleting] = useState<SpaceConversation | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    try {
+      await spacesApi.deleteOrClearConversation(spaceId, deleting.id);
+      data.remove(deleting.id);
+      if (conversationId === deleting.id) navigate(spaceChatPath(spaceId));
+      setDeleting(null);
+    } catch {
+      setDeleteError("The channel couldn't be deleted. Try again.");
+    }
+  };
   useEffect(() => {
     if (!members) void loadMembers(spaceId).catch(() => {});
   }, [members, loadMembers, spaceId]);
-  const rows = data.conversations.map((c) => {
-    const category = c.kind === "direct" ? "Direct" : "Channels";
-    const open = () => navigate(conversationPath(spaceId, c));
-    return {
-      id: c.id,
-      title: conversationName(c, user?.id),
-      category,
-      icon: c.direct_agent_id ? <Bot /> : category === "Channels" ? <Hash /> : <User />,
-      tone: itemTones.chat,
-      creator: creator(c.created_by_user_id),
-      metadata: {
-        Members: c.participants.length,
-        Created: new Date(c.created_at).toLocaleDateString(),
-      },
-      sortValues: { Created: Date.parse(c.created_at) },
-      timestamp: c.updated_at,
-      ownership: c.created_by_user_id === user?.id ? "mine" : "others",
-      updatedAt: c.updated_at,
-      updated: new Date(c.updated_at).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      }),
-      onOpen: open,
-      actions: (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton label={`More actions for ${conversationName(c, user?.id)}`}>
-              <MoreHorizontal />
-            </IconButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={open}>Open</DropdownMenuItem>
-            {c.created_by_user_id === user?.id && c.kind !== "direct" && (
-              <DropdownMenuItem onSelect={() => setEditing(c)}>Edit conversation</DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    };
-  });
-  rows.unshift({
-    id: "everyone",
-    title: "Everyone",
-    category: "Channels",
-    icon: <Users />,
-    tone: itemTones.chat,
-    creator: "Space members",
-    metadata: { Members: members?.length ?? 0, Created: "—" },
-    sortValues: { Created: NaN },
-    timestamp: "",
-    ownership: "others",
-    updatedAt: "",
-    updated: "—",
-    onOpen: () => navigate(spaceChatPath(spaceId)),
-    actions: <></>,
-  });
-  const searched = rows.filter(
-    (r) =>
-      (section === "All" || r.category === section) &&
-      r.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-  );
-  const refinement = useCollectionRefinement(searched, {
-    label: "Filter chats",
-    title: (row) => row.title,
-    date: (row) => row.timestamp,
-    facet: {
-      label: "Created by",
-      value: (row) => row.ownership,
-      options: [
-        { value: "all", label: "Anyone" },
-        { value: "mine", label: "Me" },
-        { value: "others", label: "Others" },
-      ],
-    },
-  });
-  const visible = refinement.items;
+
+  const select = (next: string) =>
+    navigate(
+      next === "everyone" ? spaceChatPath(spaceId) : spaceChatConversationPath(spaceId, next),
+    );
+
   return (
-    <CollectionPage>
-      <CollectionHeading
-        title="Chat"
-        actions={
-          <>
-            <CollectionSearch
-              aria-label="Search chat"
-              placeholder="Search chat"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {!referenceOnly && (
-              <Button variant="primary" className="px-4" onClick={() => setEditing(null)}>
-                <Plus />
-                New chat
-              </Button>
-            )}
-          </>
-        }
+    <div className="flex h-full min-h-0 min-w-0">
+      <ChatSidebar
+        spaceName={props.spaceName}
+        conversations={data.conversations}
+        loading={data.loading}
+        currentUserId={user?.id}
+        selected={conversationId || "everyone"}
+        canWrite={!referenceOnly}
+        isOwner={isOwner}
+        onSelect={select}
+        onEdit={setEditing}
+        onDelete={(conversation) => {
+          setDeleteError("");
+          setDeleting(conversation);
+        }}
+        onNewConversation={() => setEditing(null)}
       />
-      <CollectionFilters
-        collectionId="chat"
-        value={section}
-        options={["All", "Channels", "Direct"].map((label) => ({
-          value: label,
-          label,
-        }))}
-        onChange={setSection}
-        filterControl={refinement.control}
-        actions={<CollectionViewToggle value={view} onChange={setView} />}
-      />
-      {data.error && (
-        <div role="alert" className="flex items-center gap-3 text-sm">
-          {data.error}
-          <Button variant="outline" size="sm" onClick={data.retry}>
-            Retry
-          </Button>
-        </div>
-      )}
-      {data.loading ? (
-        <CollectionSkeleton label="Loading chats" view={view} />
-      ) : (
-        <CollectionItems
-          columnSetId="chats"
-          fields={["Members", "Source", "Created"]}
-          sortResetKey={refinement.sortKey}
-          categoryLabel="Type"
-          view={view}
-          items={visible}
-        />
-      )}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <SpaceSocial {...props} />
+      </div>
+      <AlertDialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete this channel?</AlertDialogTitle>
+          <AlertDialogDescription>
+            The channel and its messages are deleted for everyone in it. This can&apos;t be undone.
+          </AlertDialogDescription>
+          {deleteError ? <p role="alert">{deleteError}</p> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDelete();
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <CreateEditConversationDialog
         spaceId={spaceId}
         open={editing !== undefined}
-        onOpenChange={(open) => !open && setEditing(undefined)}
+        onOpenChange={(isOpen) => !isOpen && setEditing(undefined)}
         members={members ?? []}
         currentUserId={user?.id}
         conversation={editing}
@@ -192,6 +113,6 @@ export function ChatCollection({ spaceId }: { spaceId: string }) {
           navigate(spaceChatConversationPath(spaceId, saved.id));
         }}
       />
-    </CollectionPage>
+    </div>
   );
 }

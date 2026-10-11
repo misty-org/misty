@@ -1,6 +1,6 @@
 import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { Button, DialogClose, IconButton } from "@/shared/ui";
-import { ClipboardCopy, Copy, SlidersHorizontal, Star, Trash2, X } from "lucide-react";
+import { ClipboardCopy, Copy, SlidersHorizontal, Trash2, X } from "lucide-react";
 
 export interface LibraryViewerToolbarProps {
   item: SpaceLibraryItem;
@@ -14,14 +14,13 @@ export interface LibraryViewerToolbarProps {
   onCopyEdit: () => void;
   onSaveAsCopy: () => void;
   onSaveEdit: () => void;
-  onToggleFavorite: () => void;
   onBeginEditing: () => void;
   onCopyItem: () => void;
   onTrash: () => void;
 }
 
 export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
-  const { item, canEdit, canCopy, activeEdit, renditionReady } = props;
+  const { canEdit, canCopy, activeEdit, renditionReady } = props;
   const copyLabel = activeEdit
     ? renditionReady
       ? "Copy edited media"
@@ -52,16 +51,6 @@ export function LibraryViewerToolbar(props: LibraryViewerToolbarProps) {
         <Button size="sm" type="button" disabled={props.editSaving} onClick={props.onSaveEdit}>
           {props.editSaving ? "Saving…" : "Save"}
         </Button>
-      ) : null}
-      {canEdit ? (
-        <IconButton
-          size="md"
-          variant="outline"
-          label={item.favorite ? "Remove favorite" : "Favorite"}
-          onClick={props.onToggleFavorite}
-        >
-          <Star size={15} fill={item.favorite ? "currentColor" : "none"} />
-        </IconButton>
       ) : null}
       {canEdit && props.editingAvailable ? (
         <IconButton size="md" variant="outline" label="Edit" onClick={props.onBeginEditing}>

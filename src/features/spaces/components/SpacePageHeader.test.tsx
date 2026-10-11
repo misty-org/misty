@@ -97,7 +97,9 @@ it("leads back to the Space home in the owning tab after loading it", async () =
   expect(screen.queryByRole("navigation", { name: "Space sections" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Back to Family home" }));
   await waitFor(() =>
-    expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe("/spaces/family/home"),
+    expect(activeLayoutView(useWorkspaceStore.getState().layout)?.route).toBe(
+      "/spaces/family/home",
+    ),
   );
   expect(preload).toHaveBeenCalledWith("home");
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);

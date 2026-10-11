@@ -31,10 +31,10 @@ export function SpaceSettings({ spaceId, section }: { spaceId: string; section: 
   if (!space)
     return (
       <div className="flex h-full min-h-0 overflow-hidden">
-        <div className="h-full w-56 shrink-0 border-r border-charcoal-border p-3">
+        <div className="h-full w-56 shrink-0 border-r border-charcoal-border p-2">
           <SkeletonList label="Settings sections" rows={6} leading="icon" lines={1} />
         </div>
-        <div className="min-w-0 flex-1 p-8">
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-5 pt-3 sm:px-6">
           <SkeletonList
             label="Space settings"
             rows={5}

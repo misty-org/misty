@@ -150,7 +150,10 @@ export function SpaceSectionView(props: {
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {section === "home" ? (
+        {/* The Journal lists are gone: Notes and Drawings without an item show the home. */}
+        {section === "home" ||
+        (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
+        (section === "drawings" && !studioKind) ? (
           <Home space={space} />
         ) : section === "settings" ? (
           <SpaceSettings

@@ -6,7 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { Menu, Repeat2, Waypoints, X, SquarePen } from "lucide-react";
+import { AtSign, Menu, Repeat2, Waypoints, X, SquarePen } from "lucide-react";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
@@ -26,7 +26,7 @@ import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
-export type AgentWorkspacePage = "task" | "workflows" | "integrations";
+export type AgentWorkspacePage = "task" | "workflows" | "mentions" | "integrations";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -163,6 +163,7 @@ export function AgentWorkspaceFrame({
           {(
             [
               ["workflows", "Workflows", Repeat2],
+              ["mentions", "Mentions", AtSign],
               ["integrations", "Integrations", Waypoints],
             ] as const
           ).map(([id, label, Icon]) => (

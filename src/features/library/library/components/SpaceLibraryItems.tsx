@@ -9,7 +9,7 @@ import {
   Skeleton,
   SkeletonList,
 } from "@/shared/ui";
-import { Check, EllipsisVertical, Star, RotateCcw } from "lucide-react";
+import { Check, EllipsisVertical, RotateCcw } from "lucide-react";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import {
   formatBytes,
@@ -287,8 +287,6 @@ function LibraryItemActions({
   item,
   menuOpen,
   onShowMenu,
-  updateItem,
-  canEdit,
 }: {
   item: SpaceLibraryItem;
   menuOpen: boolean;
@@ -315,19 +313,6 @@ function LibraryItemActions({
       ].join(" ")}
       aria-label={`Actions for ${item.display_name}`}
     >
-      {canEdit && (
-        <IconButton
-          label={`${item.favorite ? "Remove from favorites" : "Add to favorites"}: ${item.display_name}`}
-          tooltip={item.favorite ? "Remove favorite" : "Favorite"}
-          onClick={() =>
-            void updateItem(item, {
-              favorite: !item.favorite,
-            })
-          }
-        >
-          <Star size={14} fill={item.favorite ? "currentColor" : "none"} />
-        </IconButton>
-      )}
       <IconButton
         label={`More actions for ${item.display_name}`}
         tooltip={false}

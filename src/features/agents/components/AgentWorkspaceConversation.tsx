@@ -1,3 +1,6 @@
+// Its frame styles travel with it, so any page that hosts the conversation gets them.
+import "../agentsWorkspace.css";
+import "../workspace/agentWorkspaceFrame.css";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";

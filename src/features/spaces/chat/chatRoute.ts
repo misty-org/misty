@@ -17,20 +17,7 @@ export function spaceChatConversationPath(spaceId: string, conversationId: strin
   return spaceChatPath(spaceId, new URLSearchParams({ conversation: conversationId }));
 }
 
-/**
- * Where a conversation opens. A chat with an agent is driven by its runs and
- * opens in the agent view; everything else opens in the Space chat.
- */
-export function conversationPath(
-  spaceId: string,
-  conversation: { id: string; direct_agent_id?: string },
-): string {
-  if (conversation.direct_agent_id) {
-    const params = new URLSearchParams({
-      agent: conversation.direct_agent_id,
-      conversation: conversation.id,
-    });
-    return `/agents?${params}`;
-  }
+/** Where a conversation opens: every chat, with people or agents, lives in the Space's chat. */
+export function conversationPath(spaceId: string, conversation: { id: string }): string {
   return spaceChatConversationPath(spaceId, conversation.id);
 }

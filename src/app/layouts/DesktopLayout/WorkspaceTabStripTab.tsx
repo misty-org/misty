@@ -4,7 +4,7 @@ import { activeLayoutView, tabLabel } from "@/features/workspace/layoutTabs";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { WorkspaceTab, WorkspaceView } from "@/features/workspace/model";
 import type { MistyTabGroup } from "@/features/workspace/tabGroups";
-import { cn, IconButton, OverflowFadeText, Pressable } from "@/shared/ui";
+import { cn, IconButton, OverflowFadeText, Pressable, TreeBranch } from "@/shared/ui";
 import { Blocks, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RefObject } from "react";
 import { BrowserViewAudioButton } from "@/features/browser/workspace";
@@ -18,6 +18,8 @@ import { ViewIcon } from "./WorkspaceViewGroupButton";
 export function WorkspaceTabStripTab({
   tab,
   group,
+  firstInGroup = false,
+  lastInGroup = false,
   active,
   vertical,
   tabs,
@@ -32,6 +34,9 @@ export function WorkspaceTabStripTab({
 }: {
   tab: WorkspaceTab;
   group: MistyTabGroup | undefined;
+  /** The group's first and last tabs, where its vertical branch starts and ends. */
+  firstInGroup?: boolean;
+  lastInGroup?: boolean;
   active: boolean;
   vertical: boolean;
   /** Visible (not collapsed) tabs, in order, for arrow-key navigation. */
@@ -94,6 +99,15 @@ export function WorkspaceTabStripTab({
         )}
       >
         {!vertical && <ConnectedTabShape />}
+        {group && vertical ? (
+          <TreeBranch
+            className="-left-3.5 w-3.5"
+            color="var(--tab-group-color)"
+            last={lastInGroup}
+            reach={firstInGroup ? 3 : undefined}
+            edge={1}
+          />
+        ) : null}
         <Pressable
           role="tab"
           aria-selected={active}

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
+import { MenuItem } from "@/shared/ui";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { Button, cn, Popover, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
+import { Button, cn, Popover, PopoverAnchor, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
 import { LocalSaveStatusList } from "./restore/LocalSaveStatusList";
 import { SyncedTabsStatusList } from "./restore/SyncedTabsStatusList";
@@ -17,20 +18,37 @@ export function openSyncPanel() {
   window.setTimeout(() => window.dispatchEvent(new CustomEvent(openEvent, { detail: {} })), 60);
 }
 
+/** The More menu's Sync row: status in words, opening the sync panel the badge hosts. */
+export function SyncMenuItem({ accountId }: { accountId: string }) {
+  const { status } = useSyncController(accountId);
+  if (!accountId || !nativeWorkspaceRecoveryEnabled()) return null;
+  return (
+    <MenuItem
+      icon={<RefreshCw />}
+      label={status.tone === "attention" ? `Sync: ${status.title}` : "Sync"}
+      onSelect={openSyncPanel}
+    />
+  );
+}
+
+/** With `menuOnly` the badge draws no button: the More menu opens its panel, below the toolbar. */
 export function BrowserSyncBadge({
   accountId,
   onOpenSettings,
+  menuOnly,
 }: {
   accountId: string;
   onOpenSettings(): void;
+  menuOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const onOpen = (event: Event) => {
       const detail = (event as CustomEvent<{ handled?: boolean }>).detail;
       // Every pane has a badge; the first one on screen answers.
-      if (detail.handled || !trigger.current?.offsetParent) return;
+      if (detail.handled || !(trigger.current ?? anchor.current)?.offsetParent) return;
       detail.handled = true;
       setOpen(true);
     };
@@ -42,6 +60,11 @@ export function BrowserSyncBadge({
   if (!accountId || !nativeWorkspaceRecoveryEnabled()) return null;
   return (
     <Popover open={open} onOpenChange={setOpen}>
+      {menuOnly ? (
+        <PopoverAnchor asChild>
+          <span ref={anchor} aria-hidden className="block size-0" />
+        </PopoverAnchor>
+      ) : (
       <PopoverTrigger asChild>
         <IconButton
           ref={trigger}
@@ -65,6 +88,7 @@ export function BrowserSyncBadge({
           )}
         </IconButton>
       </PopoverTrigger>
+      )}
       <PopoverContent
         align="start"
         sideOffset={8}

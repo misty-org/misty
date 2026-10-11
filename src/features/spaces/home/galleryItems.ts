@@ -29,6 +29,8 @@ export interface GalleryItem {
   visibility?: ItemVisibility;
   /** What its owner flips from the item's menu. Chats have no toggle. */
   toggle?: { kind: VisibilityItemKind; id: string };
+  /** Only the people in it can see it (a direct chat), whatever the Space's size. */
+  private?: boolean;
 }
 
 export type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
@@ -74,6 +76,7 @@ export function chatItem(
     creatorId: conversation.created_by_user_id,
     href: conversationPath(spaceId, conversation),
     people,
+    private: conversation.kind === "direct",
   };
 }
 

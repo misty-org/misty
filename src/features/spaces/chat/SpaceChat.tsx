@@ -15,10 +15,9 @@ import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { conversationPath, spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
-import { ConversationSwitcher } from "./components/ConversationSwitcher";
-import { ChatPresencePill } from "./components/ChatPresencePill";
+import { conversationName } from "./sidebar/conversationGroups";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
 import { SpaceChatComposer } from "./components/SpaceChatComposer";
 import { SpaceChatThread } from "./components/SpaceChatThread";
@@ -32,6 +31,9 @@ import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { spaceChatSuggestedActions } from "./spaceChatAiActions";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
+import { ChatThreadColumn } from "./components/ChatThreadColumn";
+import { AgentTranscriptCard } from "./components/AgentTranscriptButton";
+import { useChatSidePanel } from "./store/chatSidePanelStore";
 export function SpaceSocial({
   spaceId,
   spaceName,
@@ -48,6 +50,10 @@ export function SpaceSocial({
   const user = authUser ?? setupUser;
   const conversationId = searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
+  const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
+  const transcriptRequestId = useChatSidePanel((panel) => panel.transcriptRequestId);
+  // Panels belong to the chat they were opened in.
+  useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastReadReceiptRef = useRef("");
   const store = useSpaceChatStore();
@@ -258,11 +264,6 @@ export function SpaceSocial({
     spaceId,
     store.referenceOnly,
   ]);
-  // A chat with an agent lives in the agent view; old links land there.
-  const agentChat = scope.activeConversation?.direct_agent_id ? scope.activeConversation : null;
-  useEffect(() => {
-    if (agentChat) navigate(conversationPath(spaceId, agentChat), { replace: true });
-  }, [agentChat, navigate, spaceId]);
   if (conversationId && conversationChat.error && !scope.activeConversation) {
     return (
       <ErrorState
@@ -311,106 +312,115 @@ export function SpaceSocial({
   return (
     <div
       ref={chatRootRef}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-bg text-cream"
+      className="relative flex h-full min-h-0 overflow-hidden bg-charcoal-bg text-cream"
     >
-      <header
-        className={
-          "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
-        }
-      >
-        <ConversationSwitcher
-          spaceId={spaceId}
-          conversation={scope.activeConversation}
-          currentUserId={user?.id}
-          members={scope.allMembers}
-          canWrite={access.canWriteMessages}
-        />
-        <ChatPresencePill spaceId={spaceId} />
-      </header>
-
-      {!conversationId ? (
-        <SpaceSetupCards
-          spaceId={spaceId}
-          isOwner={access.isOwner}
-          showInvitation={searchParams.get("created") === "1"}
-          dismissible
-        />
-      ) : null}
-
-      <SpaceChatThread
-        spaceId={spaceId}
-        access={access}
-        scope={scope}
-        store={store}
-        editing={editing}
-        actions={actions}
-        suggestions={suggestions}
-        currentUserId={user?.id}
-        error={messagesError}
-        setError={conversationChat.setError}
-        loading={messagesLoading}
-        endRef={endRef}
-        scrollRef={chatScroll.scrollRef}
-        onScroll={chatScroll.onScroll}
-        onOpenPicker={openPicker}
-        onBeginMention={input.beginMention}
-        onReply={(id) => {
-          draft.setReplyToMessageId(id);
-          requestAnimationFrame(() => chatRootRef.current?.querySelector("textarea")?.focus());
-        }}
-        onDelete={(message) => setDeleteTarget({ scope: deleteScope, message })}
-        onReload={() => {
-          if (conversationId) conversationChat.reload();
-          else void store.loadMessages(spaceId);
-        }}
-      />
-
-      {access.canWriteMessages ? (
-        <SpaceChatComposer
-          draft={draft}
-          suggestions={suggestions}
-          input={input}
-          isConversation={Boolean(conversationId)}
-          canUploadAttachments={access.canWriteMessages}
-          canBrowseLibrary={access.canWriteMessages}
-          mentionNames={mentionNames}
-          replyToSenderName={
-            scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
-            "message"
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header
+          className={
+            "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
           }
-          onSubmit={(event) => void actions.submit(event)}
-          onOpenPicker={openPicker}
-        />
-      ) : (
-        <ChatReadOnlyNotice />
-      )}
+        >
+          {/* The chat sidebar switches chats; the header just names this one. */}
+          <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
+            {scope.activeConversation
+              ? conversationName(scope.activeConversation, user?.id)
+              : "Everyone"}
+          </h1>
+        </header>
 
-      {pickerOpen ? (
-        <SpaceChatPicker
+        {!conversationId ? (
+          <SpaceSetupCards
+            spaceId={spaceId}
+            isOwner={access.isOwner}
+            showInvitation={searchParams.get("created") === "1"}
+            dismissible
+          />
+        ) : null}
+
+        <SpaceChatThread
           spaceId={spaceId}
-          source={pickerSource}
-          selectedLibraryIds={draft.selectedLibraryIds}
-          pendingAttachmentCount={draft.pendingAttachments.length}
-          canBrowseLibrary={access.canWriteMessages}
-          canUploadAttachments={access.canWriteMessages}
-          onClose={() => setPickerOpen(false)}
-          onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
-          onChooseLibraryItems={draft.setSelectedLibraryIds}
+          access={access}
+          scope={scope}
+          store={store}
+          editing={editing}
+          actions={actions}
+          suggestions={suggestions}
+          currentUserId={user?.id}
+          error={messagesError}
+          setError={conversationChat.setError}
+          loading={messagesLoading}
+          endRef={endRef}
+          scrollRef={chatScroll.scrollRef}
+          onScroll={chatScroll.onScroll}
+          onOpenPicker={openPicker}
+          onBeginMention={input.beginMention}
+          onReply={(id) => {
+            draft.setReplyToMessageId(id);
+            requestAnimationFrame(() => chatRootRef.current?.querySelector("textarea")?.focus());
+          }}
+          onDelete={(message) => setDeleteTarget({ scope: deleteScope, message })}
+          onReload={() => {
+            if (conversationId) conversationChat.reload();
+            else void store.loadMessages(spaceId);
+          }}
+        />
+
+        {access.canWriteMessages ? (
+          <SpaceChatComposer
+            draft={draft}
+            suggestions={suggestions}
+            input={input}
+            isConversation={Boolean(conversationId)}
+            canUploadAttachments={access.canWriteMessages}
+            canBrowseLibrary={access.canWriteMessages}
+            mentionNames={mentionNames}
+            replyToSenderName={
+              scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
+              "message"
+            }
+            onSubmit={(event) => void actions.submit(event)}
+            onOpenPicker={openPicker}
+          />
+        ) : (
+          <ChatReadOnlyNotice />
+        )}
+
+        {pickerOpen ? (
+          <SpaceChatPicker
+            spaceId={spaceId}
+            source={pickerSource}
+            selectedLibraryIds={draft.selectedLibraryIds}
+            pendingAttachmentCount={draft.pendingAttachments.length}
+            canBrowseLibrary={access.canWriteMessages}
+            canUploadAttachments={access.canWriteMessages}
+            onClose={() => setPickerOpen(false)}
+            onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
+            onChooseLibraryItems={draft.setSelectedLibraryIds}
+          />
+        ) : null}
+
+        <DeleteMessageDialog
+          open={Boolean(messageToDelete)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          onConfirm={() => {
+            if (!messageToDelete) return;
+            void actions.remove(messageToDelete).then((removed) => {
+              if (removed) setDeleteTarget(null);
+            });
+          }}
+        />
+      </div>
+      {threadRootId ? (
+        <ChatThreadColumn
+          rootId={threadRootId}
+          messages={scope.messages}
+          canWrite={access.canWriteMessages}
+          onSend={actions.sendReply}
         />
       ) : null}
-
-      <DeleteMessageDialog
-        open={Boolean(messageToDelete)}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-        onConfirm={() => {
-          if (!messageToDelete) return;
-          void actions.remove(messageToDelete).then((removed) => {
-            if (removed) setDeleteTarget(null);
-          });
-        }}
-      />
+      {transcriptRequestId ? <AgentTranscriptCard requestId={transcriptRequestId} /> : null}
     </div>
   );
 }

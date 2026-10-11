@@ -1,32 +1,27 @@
-import { Code2, MessagesSquare, NotebookText, PenLine, Upload } from "lucide-react";
-import { useState, type ComponentType } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { drawingsApi } from "@/api/drawings/api";
 import { notesApi } from "@/api/notes/api";
+import { spacesApi } from "@/api/spaces/api";
 import { useCodingIncluded } from "@/features/agents";
-import { cn, itemToneClass, itemTones, Pressable, type ItemTone } from "@/shared/ui";
+import { Pressable, cn } from "@/shared/ui";
 import { spaceChatPath } from "../chat/chatRoute";
 import { preloadSpaceSection } from "../SpaceSectionView";
+import { MakeArt } from "./makeArt";
 
-type Tile = {
-  id: "chat" | "note" | "drawing" | "upload" | "code";
-  label: string;
-  Icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
-  tone: ItemTone;
-};
+type Tile = { id: "chat" | "note" | "drawing" | "file" | "code"; label: string };
 
 const tiles: Tile[] = [
-  { id: "chat", label: "Chat", Icon: MessagesSquare, tone: itemTones.chat },
-  { id: "note", label: "Note", Icon: NotebookText, tone: itemTones.note },
-  { id: "drawing", label: "Drawing", Icon: PenLine, tone: itemTones.drawing },
-  { id: "upload", label: "Upload", Icon: Upload, tone: itemTones.sheet },
-  { id: "code", label: "Code project", Icon: Code2, tone: itemTones.code },
+  { id: "chat", label: "Chat" },
+  { id: "note", label: "Note" },
+  { id: "drawing", label: "Drawing" },
+  { id: "file", label: "File" },
+  { id: "code", label: "Code" },
 ];
 
 /**
- * One tile per thing a person can make in a Space. The tiles take a soft wash of
- * their kind's tone, the one place outside an icon glyph where a tone shows
- * (AGENTS.md, Space home exception).
+ * The Space home's first row: one tile per thing a person can make, each with a small
+ * gray drawing of it. File opens the system picker and uploads into the Space in place.
  */
 export function MakeSomethingNew({
   spaceId,
@@ -40,6 +35,27 @@ export function MakeSomethingNew({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const base = `/spaces/${encodeURIComponent(spaceId)}`;
+  const picker = useRef<HTMLInputElement>(null);
+
+  // File uploads right here, into the Space, without leaving the home page.
+  async function upload(files: File[]) {
+    if (!files.length) return;
+    setError("");
+    setBusy("file");
+    try {
+      for (const file of files) await spacesApi.uploadLibraryBlob(spaceId, file, file.name);
+      onCreated();
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message
+          ? cause.message
+          : "Couldn't add that file. Try again.",
+      );
+    } finally {
+      setBusy("");
+      if (picker.current) picker.current.value = "";
+    }
+  }
 
   async function make(tile: Tile) {
     setError("");
@@ -58,10 +74,11 @@ export function MakeSomethingNew({
       } else if (tile.id === "chat") {
         await preloadSpaceSection("social");
         navigate(spaceChatPath(spaceId));
+      } else if (tile.id === "file") {
+        picker.current?.click();
       } else {
-        const section = tile.id === "upload" ? "library" : "code";
-        await preloadSpaceSection(section);
-        navigate(`${base}/${section}`);
+        await preloadSpaceSection("code");
+        navigate(`${base}/code`);
       }
     } catch {
       setError(`Couldn't make a new ${tile.label.toLowerCase()}. Try again.`);
@@ -71,30 +88,32 @@ export function MakeSomethingNew({
   }
 
   return (
-    <section className="mb-7" aria-label="Make something new">
-      <p className="m-0 mb-3 text-xs text-cream-muted">Make something new</p>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
+    <section aria-label="Create" className="flex flex-col gap-3">
+      <h2 className="m-0 text-sm font-normal text-cream-muted">Create</h2>
+      <input
+        ref={picker}
+        type="file"
+        multiple
+        hidden
+        aria-hidden
+        tabIndex={-1}
+        onChange={(event) => void upload(Array.from(event.target.files ?? []))}
+      />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
         {tiles.map((tile) => (
           <Pressable
             key={tile.id}
             disabled={busy !== ""}
             onClick={() => void make(tile)}
-            className={cn(
-              "rounded-xl border border-charcoal-border bg-charcoal-card p-1.5",
-              "hover:border-cream-muted/40",
-            )}
+            className="group/make flex flex-col gap-2 text-left"
           >
-            <span
-              className={cn("grid h-20 place-items-center rounded-lg", itemToneClass(tile.tone))}
-              style={{ backgroundColor: "color-mix(in srgb, currentColor 13%, transparent)" }}
-              aria-hidden
-            >
-              <tile.Icon className="size-7" aria-hidden />
-            </span>
-            <span className="mt-2 flex items-center gap-1.5 px-1 pb-0.5 text-sm text-cream-bright">
+            <Frame>
+              <MakeArt kind={tile.id} />
+            </Frame>
+            <span className="flex items-center gap-2 px-0.5 text-sm text-cream-bright">
               {tile.label}
               {tile.id === "code" && coding === false && (
-                <span className="rounded-md border border-charcoal-border px-1.5 text-[10px] text-cream-muted">
+                <span className="rounded border border-charcoal-border px-1.5 text-[10px] text-cream-muted">
                   Pro
                 </span>
               )}
@@ -103,10 +122,26 @@ export function MakeSomethingNew({
         ))}
       </div>
       {error && (
-        <p role="alert" className="m-0 mt-2 text-sm text-cream">
+        <p role="alert" className="m-0 text-sm text-cream">
           {error}
         </p>
       )}
     </section>
+  );
+}
+
+/** The tile's double frame: an outer rim, then an inset panel holding the drawing. */
+function Frame({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "block rounded-xl border border-charcoal-border bg-charcoal-card p-1.5",
+        "group-hover/make:border-cream-muted/40 group-focus-visible/make:border-cream-muted",
+      )}
+    >
+      <span className="grid h-24 place-items-center rounded-lg border border-charcoal-border bg-charcoal-workspace">
+        {children}
+      </span>
+    </span>
   );
 }

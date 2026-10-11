@@ -46,6 +46,7 @@ import { CircleAlert, RefreshCw } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
+import { threadRootOf } from "./messageHelpers";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
 import { SpaceChatStarters } from "./ChatStarters";
 import { SpaceDirectMessageIntro } from "./DirectMessageIntro";
@@ -58,6 +59,16 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
     [props.messages],
   );
   const rowProps = useStableRowProps(props);
+  const replyCounts = useMemo(() => {
+    // Threads are flat: every reply, however deep, counts toward its root.
+    const counts = new Map<string, number>();
+    for (const message of props.messages) {
+      if (!message.reply_to_message_id) continue;
+      const root = threadRootOf(message, messagesById);
+      if (root !== message.id) counts.set(root, (counts.get(root) ?? 0) + 1);
+    }
+    return counts;
+  }, [props.messages, messagesById]);
 
   const avatarFor = (message: {
     origin?: { author_avatar_url?: string };
@@ -124,6 +135,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
                 avatarUrl={avatarFor(message)}
                 repliedToMessage={repliedToMessage}
                 repliedToAvatarUrl={repliedToMessage ? avatarFor(repliedToMessage) : ""}
+                replyCount={replyCounts.get(message.id) ?? 0}
                 props={rowProps}
               />
             );

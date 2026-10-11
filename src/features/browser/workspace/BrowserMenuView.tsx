@@ -18,8 +18,8 @@ import {
   Eraser,
   ExternalLink,
   FileDown,
+  MoreHorizontal,
   MoreVertical,
-  SlidersHorizontal,
   BookOpenText,
   Languages,
   PictureInPicture2,
@@ -102,7 +102,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
         title="More"
         icon={
           props.toolsIcon ? (
-            <SlidersHorizontal {...toolbarIconProps} />
+            <MoreHorizontal {...toolbarIconProps} />
           ) : (
             <MoreVertical {...toolbarIconProps} />
           )

@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { MessagesSquare } from "lucide-react";
+import { useOpenSpaceChat } from "@/features/spaces/chat/useOpenSpaceChat";
 import { BrowserDownloadsButton } from "@/features/browser/workspace";
 import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
-import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui";
+import { DropdownMenu, DropdownMenuTrigger, IconButton } from "@/shared/ui";
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -23,6 +25,23 @@ export function StripDownloads() {
           useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl("downloads") })
         }
       />
+    </div>
+  );
+}
+
+/** The chat panel's toggle, at a sidebar's bottom-right. */
+export function StripChat() {
+  const openChat = useOpenSpaceChat();
+  return (
+    <div
+      className="flex shrink-0 items-center"
+      data-browser-toolbar
+      data-sidebar
+      data-misty-window-drag-block="true"
+    >
+      <IconButton label="Chat" onClick={openChat}>
+        <MessagesSquare aria-hidden className="size-[18px]" />
+      </IconButton>
     </div>
   );
 }

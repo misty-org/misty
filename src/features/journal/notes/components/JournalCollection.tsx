@@ -3,7 +3,7 @@ import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
 import { JournalDay } from "../../day/JournalDay";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileText, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Button,
   CollectionPage,
@@ -32,12 +32,10 @@ export function JournalCollection(props: {
   onRetry: () => void;
   query: string;
   onQueryChange: (query: string) => void;
-  pinnedIds: Set<string>;
   readOnly: boolean;
   onCreate: () => void;
   onOpen: (note: UnifiedNote) => void;
   onRename: (note: UnifiedNote) => void;
-  onTogglePin: (id: string) => void;
   onDelete: (note: UnifiedNote) => void;
 }) {
   const navigate = useNavigate();
@@ -46,7 +44,6 @@ export function JournalCollection(props: {
   const section = params.get("section");
   const filter =
     section === "notes" ||
-    section === "pinned" ||
     (section === "day" && journalSections.some((s) => s.value === "day"))
       ? section
       : "all";
@@ -63,7 +60,7 @@ export function JournalCollection(props: {
   };
   const [view, setView] = useState<"list" | "grid">("list");
   const refinement = useCollectionRefinement(
-    props.notes.filter((note) => filter !== "pinned" || props.pinnedIds.has(note.id)),
+    props.notes,
     {
       label: "Filter notes",
       title: (note) => note.title || "Untitled note",
@@ -93,7 +90,7 @@ export function JournalCollection(props: {
         }
       />
     );
-  if (filter === "all" || filter === "pinned")
+  if (filter === "all")
     return <JournalAllCollection {...props} section={filter} onSection={selectSection} />;
   return (
     <CollectionPage>
@@ -161,9 +158,6 @@ export function JournalCollection(props: {
               day: "numeric",
             }),
             onOpen: () => props.onOpen(note),
-            marker: props.pinnedIds.has(note.id) ? (
-              <Pin size={13} className="text-cream-muted" aria-label="Pinned" />
-            ) : undefined,
             contextMenu: <NoteActions note={note} props={props} context />,
             actions: (
               <DropdownMenu>
@@ -196,11 +190,6 @@ function NoteActions({
   const Action = context ? ContextMenuAction : MenuItem;
   return (
     <>
-      <Action
-        icon={props.pinnedIds.has(note.id) ? <PinOff /> : <Pin />}
-        label={props.pinnedIds.has(note.id) ? "Unpin" : "Pin"}
-        onSelect={() => props.onTogglePin(note.id)}
-      />
       <Action
         icon={<Pencil />}
         label="Rename"

@@ -100,7 +100,6 @@ export function SpaceLibraryOverlays() {
               itemId: menuItem.id,
             })
           }
-          onToggleFavorite={() => void updateItem(menuItem, { favorite: !menuItem.favorite })}
           onTrash={() => void trashItem(menuItem)}
           onRestore={() => void restoreItem(menuItem)}
         />

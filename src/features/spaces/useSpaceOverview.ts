@@ -36,8 +36,6 @@ export type SpaceOverviewItem = {
   rename?: (title: string) => Promise<unknown>;
   renameRoute?: string;
   remove?: () => Promise<unknown>;
-  favorite?: boolean;
-  toggleFavorite?: () => Promise<unknown>;
 };
 
 /** Pane-scoped reads never change the active editor's global store. */

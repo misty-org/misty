@@ -83,3 +83,42 @@ func (s *SpacesService) AgentMemberRequest() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, map[string]any{"request": request, "state": memberRequestState(request), "view": agentRequestView(request)})
 	}
 }
+
+// AgentMentions lists the caller's own @mentions of agents with how each run
+// went, for the Mentions list on the Agents page.
+func (s *SpacesService) AgentMentions() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		requests, err := s.database.AgentMentionsForUser(r.Context(), userID, 100)
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		mentions := make([]map[string]any, 0, len(requests))
+		for index := range requests {
+			request := &requests[index]
+			mentions = append(mentions, map[string]any{"request": request, "state": memberRequestState(request), "view": agentRequestView(request)})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"mentions": mentions})
+	}
+}
+
+// AgentRequestTranscript shows the steps behind an agent's reply to the person
+// who mentioned it, so they can see how it was done. No one else may.
+func (s *SpacesService) AgentRequestTranscript() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUser(w, r, s.database)
+		if !ok {
+			return
+		}
+		steps, err := s.database.AgentRequestTranscript(r.Context(), userID, chi.URLParam(r, "requestID"))
+		if err != nil {
+			writeSpaceError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"steps": steps})
+	}
+}

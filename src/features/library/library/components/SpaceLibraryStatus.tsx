@@ -1,4 +1,4 @@
-import { ClipboardCopy, Star, Trash2, X } from "lucide-react";
+import { ClipboardCopy, Trash2, X } from "lucide-react";
 import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 
 import { Button, IconButton } from "@/shared/ui";
@@ -29,9 +29,6 @@ export function SpaceLibraryInlineStatus() {
           collection={collection}
           selectedCount={selectedItems.length}
           onCopy={() => void copyItemsToClipboard(selectedItems)}
-          onFavorite={() =>
-            void applyBulkAction(collection === "favorites" ? "unfavorite" : "favorite")
-          }
           onRestore={() => void applyBulkAction("restore")}
           onTrash={() => void applyBulkAction("trash")}
           onClear={() => setSelectedItemIds([])}
@@ -98,7 +95,6 @@ function SpaceLibrarySelectionToolbar({
   collection,
   selectedCount,
   onCopy,
-  onFavorite,
   onRestore,
   onTrash,
   onClear,
@@ -108,7 +104,6 @@ function SpaceLibrarySelectionToolbar({
   collection: string;
   selectedCount: number;
   onCopy: () => void;
-  onFavorite: () => void;
   onRestore: () => void;
   onTrash: () => void;
   onClear: () => void;
@@ -135,16 +130,6 @@ function SpaceLibrarySelectionToolbar({
           </Button>
         ) : (
           <>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              disabled={bulkSaving}
-              onClick={onFavorite}
-            >
-              <Star size={12} />
-              {collection === "favorites" ? "Unfavorite" : "Favorite"}
-            </Button>
             <Button
               size="sm"
               variant="outline"

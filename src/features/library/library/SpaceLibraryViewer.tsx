@@ -150,11 +150,6 @@ function LibraryItemViewerContent(
               onCopyEdit={() => props.onCopyEdit(normalizeLibraryEdit(activeEdit?.edit_definition))}
               onSaveAsCopy={() => void edits.saveAsCopy()}
               onSaveEdit={() => void edits.saveEdit()}
-              onToggleFavorite={() =>
-                void props.onUpdate(item, {
-                  favorite: !item.favorite,
-                })
-              }
               onBeginEditing={() => {
                 if (!canEdit) return;
                 setEditDraft(normalizeLibraryEdit(activeEdit?.edit_definition));

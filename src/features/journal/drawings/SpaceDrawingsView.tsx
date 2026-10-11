@@ -42,11 +42,6 @@ export interface DrawingsViewRuntime {
     user: DrawingUser,
     options?: { publishPresence?: boolean },
   ): ReturnType<typeof useDrawingRoomView>;
-  usePins(
-    key: string,
-    ids: string[],
-    loading: boolean,
-  ): { pinnedIds: string[]; togglePinned(id: string): void };
   renderTitle(title: string, workspaceTabId?: string): ReactNode;
   renderAiRegistration(adapter: AiSurfaceAdapter): ReactNode;
   renderError(error: string, scope: string, title: string): ReactNode;
@@ -75,12 +70,6 @@ export function SpaceDrawingsView(props: {
   const pendingCreation = useRef<string | true | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SpaceDrawing | null>(null);
   const [renameTarget, setRenameTarget] = useState<SpaceDrawing | null>(null);
-  const drawingPinsKey = `misty:drawing-pins:${user?.id ?? "anonymous"}:${props.spaceId}`;
-  const { pinnedIds: pinnedDrawingIds, togglePinned: toggleDrawingPin } = runtime.usePins(
-    drawingPinsKey,
-    drawings.drawings.map((drawing) => drawing.id),
-    drawings.loading,
-  );
   const selected = drawings.drawings.find((drawing) => drawing.id === props.drawingId);
 
   const navigateToDrawing = useCallback(
@@ -132,7 +121,6 @@ export function SpaceDrawingsView(props: {
     if (!q) return orderedDrawings;
     return orderedDrawings.filter((drawing) => drawing.title.toLowerCase().includes(q));
   }, [orderedDrawings, query]);
-  const pinnedDrawingIdSet = useMemo(() => new Set(pinnedDrawingIds), [pinnedDrawingIds]);
   const removeDrawing = useCallback(async () => {
     if (!deleteTarget) return;
     await drawings.remove(deleteTarget.id);
@@ -187,8 +175,6 @@ export function SpaceDrawingsView(props: {
           drawings={filteredDrawings}
           query={query}
           onQuery={setQuery}
-          pinnedIds={pinnedDrawingIdSet}
-          onPin={toggleDrawingPin}
           onOpen={(drawing) => navigateToDrawing(drawing.id, "canvas")}
           onCreate={() => setNewDrawingOpen(true)}
           onDelete={setDeleteTarget}

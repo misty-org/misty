@@ -32,7 +32,6 @@ export function useLibraryItems(options: UseLibraryItemsOptions) {
       direction,
       media_type: mediaType || undefined,
       collection: collection === "deleted" ? "recently-deleted" : undefined,
-      favorite: collection === "favorites",
     }),
     [collection, direction, mediaType, searchQuery, sort],
   );

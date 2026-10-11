@@ -14,7 +14,6 @@ import {
   ClipboardCopy,
   Copy,
   Pencil,
-  Star,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -35,7 +34,6 @@ export function LibraryItemContextMenu(props: {
   onDuplicate: () => void;
   onRename: () => void;
   onEditTags: () => void;
-  onToggleFavorite: () => void;
   onTrash: () => void;
   onRestore: () => void;
   /** Offered for audio and video when voice notes are on. */
@@ -116,11 +114,6 @@ export function LibraryItemContextMenu(props: {
               <>
                 <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={props.onRename} />
                 <ContextMenuAction icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
-                <ContextMenuAction
-                  icon={<Star fill={props.item.favorite ? "currentColor" : "none"} />}
-                  label={props.item.favorite ? "Remove from favorites" : "Add to favorites"}
-                  onSelect={props.onToggleFavorite}
-                />
                 <ContextMenuSeparator />
                 <ContextMenuAction
                   destructive

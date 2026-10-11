@@ -1,5 +1,4 @@
 import { JournalDeleteDialog } from "@/features/journal";
-import type { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
 import { JournalCollection } from "./components/JournalCollection";
 import {
   useCallback,
@@ -34,7 +33,6 @@ export interface NotesViewRuntime {
   }[];
   referenceOnly: boolean;
   useStore: ReturnType<typeof createNotesStore>["useStore"];
-  usePinnedIds: typeof useLocalPinnedIds;
   subscribeChanges(listener: () => void): () => void;
   renameNote(noteId: string): void;
   ReadingPane: ComponentType<NoteReadingPaneProps>;
@@ -140,20 +138,9 @@ export function SpaceNotesView(
     if (!resolved) return;
     actions.selectNote(resolved.id);
   }, [actions, noteTarget, store.notes]);
-  const orderedNotes = useMemo(
-    () => selectVisibleNotes(store.notes, "", Date.now(), props.spaceId),
-    [store.notes, props.spaceId],
-  );
   const visibleNotes = useMemo(
     () => selectVisibleNotes(store.notes, store.query, Date.now(), props.spaceId),
     [store.notes, store.query, props.spaceId],
-  );
-  const notePinsKey = `misty:note-pins:${user?.id ?? "anonymous"}:${props.spaceId}`;
-  const availableNoteIds = useMemo(() => orderedNotes.map((note) => note.id), [orderedNotes]);
-  const { pinnedIdSet, togglePinned } = props.runtime.usePinnedIds(
-    notePinsKey,
-    availableNoteIds,
-    loading,
   );
   const selectedNote = store.notes.find((note) => note.id === store.selectedNoteId);
   const selectedConnector = selectedNote
@@ -189,12 +176,10 @@ export function SpaceNotesView(
           onRetry={() => void actions.refresh()}
           query={store.query}
           onQueryChange={actions.setQuery}
-          pinnedIds={pinnedIdSet}
           readOnly={referenceOnly}
           onCreate={() => setNewNoteOpen(true)}
           onOpen={openNote}
           onRename={(note) => openNote(note, true)}
-          onTogglePin={togglePinned}
           onDelete={(note) => setDeleteNoteId(note.id)}
         />
       ) : (

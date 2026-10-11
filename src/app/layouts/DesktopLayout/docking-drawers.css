@@ -184,7 +184,7 @@
 .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav {
   margin-left: auto;
 }
-/* The sidebar's bottom edge, above the account row: Spaces and Misty on the left, downloads on
+/* The sidebar's bottom edge, above the account row: Downloads on the left, chat on
    the right. */
 .misty-sidebar-foot {
   display: flex;

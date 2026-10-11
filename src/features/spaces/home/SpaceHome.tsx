@@ -1,99 +1,73 @@
-import { LayoutGrid, List, Search, SlidersHorizontal, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Space } from "@/api/spaces/dto/entities";
 import { setItemVisibility, type ItemVisibility } from "@/api/spaces/visibility";
 import { useAuth } from "@/features/auth";
-import { useMistyStore } from "@/features/misty/useMistyStore";
-import { usePersonalAgentsStore } from "@/features/agents";
+import { AccountCollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import {
   Button,
+  CollectionHeading,
+  CollectionItems,
+  CollectionPage,
+  CollectionSearch,
   CollectionSkeleton,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  EmptyState,
-  IconButton,
-  Input,
-  SegmentedControl,
+  CollectionViewToggle,
+  useCollectionRefinement,
 } from "@/shared/ui";
 import { preloadSpaceSection } from "../SpaceSectionView";
 import { useSpaceItemCreator } from "../useSpaceItemCreator";
-import { GalleryCard } from "./GalleryCard";
-import {
-  agentChatItem,
-  galleryFilters,
-  isGalleryFilter,
-  visibleGallery,
-  type GalleryFilter,
-  type GalleryItem,
-  type GalleryMadeBy,
-  type GallerySort,
-} from "./galleryItems";
-import { MakeSomethingNew } from "./MakeSomethingNew";
-import { SpaceHomeMembers } from "./SpaceHomeMembers";
-import { useSpaceGallery } from "./useSpaceGallery";
+import { editedLabel, galleryFilters, type GalleryItem } from "./galleryItems";
+import { GalleryPreview, kindIcon } from "./galleryPreview";
 import { readHomePreference, writeHomePreference } from "./homePreferences";
+import { MakeSomethingNew } from "./MakeSomethingNew";
+import { SpaceItemCard } from "./SpaceItemCard";
+import { useSpaceGallery } from "./useSpaceGallery";
+
+const scopes = [
+  { value: "all", label: "All" },
+  { value: "yours", label: "Yours" },
+];
 
 /**
- * A Space's home: everything people and agents made in it, as one gallery. The tabs
- * filter by kind (the old sections), the toolbar searches, switches grid and list,
- * and filters by maker and order. Items open in their own editors.
+ * A Space's home: everything people and agents made in it, chats included, in Misty's
+ * collection layout. All or Yours picks whose things show; the filter menu narrows by
+ * type and sets the order. Cards preview the item itself, and items open in their own pages.
  */
 export function SpaceHome({ space }: { space: Space }) {
   const { user } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
-  const params = new URLSearchParams(location.search);
-  const requested = params.get("filter");
-  const filter: GalleryFilter = isGalleryFilter(requested) ? requested : "all";
   const me = user?.id ?? "";
   const gallery = useSpaceGallery(space.id, me);
-  // Your agent chats are yours, so they show in your own Space.
-  const own = space.is_default && space.role === "owner";
-  const agentConversations = useMistyStore((state) => state.conversations);
-  const agents = usePersonalAgentsStore((state) => state.agents);
-  useEffect(() => {
-    if (!own || !me) return;
-    const store = useMistyStore.getState();
-    if (store.accountId !== me) store.setAccount(me);
-    void store.loadConversations();
-    void usePersonalAgentsStore.getState().load(me);
-  }, [own, me]);
   const maker = useSpaceItemCreator(space.id);
   const [view, setView] = useState<"grid" | "list">(() => readHomePreference("view", "grid"));
-  const [madeBy, setMadeBy] = useState<GalleryMadeBy>(() => readHomePreference("madeBy", "anyone"));
-  const [sort, setSort] = useState<GallerySort>(() => readHomePreference("sort", "edited"));
-  const [searching, setSearching] = useState(false);
+  const [scope, setScope] = useState(() => readHomePreference<string>("scope", "all"));
   const [query, setQuery] = useState("");
   const [openError, setOpenError] = useState("");
 
-  const items = useMemo(() => {
-    const agentChats = own
-      ? agentConversations
-          .filter((conversation) => conversation.messages.length)
-          .map((conversation) =>
-            agentChatItem(
-              conversation,
-              agents.find((agent) => agent.id === conversation.agentId) ??
-                agents.find((agent) => agent.system_managed),
-              me,
-            ),
-          )
-      : [];
-    return visibleGallery([...gallery.items, ...agentChats], { filter, madeBy, sort, me, query });
-  }, [gallery.items, own, agentConversations, agents, filter, madeBy, sort, me, query]);
+  const searched = useMemo(() => {
+    const words = query.trim().toLocaleLowerCase();
+    return gallery.items.filter(
+      (item) =>
+        (scope !== "yours" || item.creatorId === me) &&
+        (!words ||
+          item.title.toLocaleLowerCase().includes(words) ||
+          item.excerpt?.toLocaleLowerCase().includes(words)),
+    );
+  }, [gallery.items, scope, me, query]);
+  const refinement = useCollectionRefinement(searched, {
+    label: "Filter this Space",
+    title: (item) => item.title,
+    date: (item) => item.updatedAt,
+    facet: {
+      label: "Type",
+      value: (item) => item.kind,
+      options: galleryFilters.map((option) => ({
+        value: option.kind ?? "all",
+        label: option.kind ? option.label : "Everything",
+      })),
+    },
+  });
 
-  const chooseFilter = (next: GalleryFilter) => {
-    const search = new URLSearchParams(location.search);
-    if (next === "all") search.delete("filter");
-    else search.set("filter", next);
-    navigate({ pathname: location.pathname, search: search.toString() ? `?${search}` : "" });
-  };
   // Only the owner flips an item; the gallery reloads in the background.
   const changeVisibility = async (item: GalleryItem, visibility: ItemVisibility) => {
     if (!item.toggle) return;
@@ -105,6 +79,7 @@ export function SpaceHome({ space }: { space: Space }) {
       setOpenError(`Couldn't make ${item.title} ${visibility}. Try again.`);
     }
   };
+
   const open = async (item: GalleryItem) => {
     setOpenError("");
     try {
@@ -117,169 +92,94 @@ export function SpaceHome({ space }: { space: Space }) {
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex max-w-6xl flex-col px-8 pb-10 pt-7">
-        <header className="flex flex-wrap items-center gap-3">
-          <h1 className="m-0 min-w-0 truncate font-serif text-[32px] font-medium leading-tight text-cream-bright">
-            {space.name || "Space"}
-          </h1>
-          <SpaceHomeMembers space={space} />
-        </header>
-
-        <div
-          className="mb-6 mt-5 flex flex-wrap items-center gap-1"
-          role="toolbar"
-          aria-label="Space contents"
-        >
-          <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Kinds">
-            {galleryFilters.map((option) => (
-              <Button
-                key={option.id}
-                variant="chip"
-                size="sm"
-                aria-pressed={filter === option.id}
-                onClick={() => chooseFilter(option.id)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-          <div className="ml-auto flex items-center gap-1">
-            {searching ? (
-              <div className="flex items-center gap-1">
-                <Input
-                  autoFocus
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={`Search ${space.name || "this Space"}`}
-                  aria-label="Search this Space"
-                  className="h-8 w-56"
-                />
-                <IconButton
-                  label="Close search"
-                  onClick={() => (setQuery(""), setSearching(false))}
-                >
-                  <X aria-hidden />
-                </IconButton>
-              </div>
-            ) : (
-              <IconButton label="Search" onClick={() => setSearching(true)}>
-                <Search aria-hidden />
-              </IconButton>
-            )}
-            <SegmentedControl
-              label="View"
-              size="sm"
-              value={view}
-              onChange={(next) => (setView(next), writeHomePreference("view", next))}
-              options={[
-                {
-                  value: "grid",
-                  label: <LayoutGrid aria-hidden className="size-4" />,
-                  ariaLabel: "Grid",
-                },
-                {
-                  value: "list",
-                  label: <List aria-hidden className="size-4" />,
-                  ariaLabel: "List",
-                },
-              ]}
+    <CollectionPage className="bg-charcoal-bg">
+      <CollectionHeading
+        title={space.name || "Space"}
+        actions={
+          <>
+            <CollectionSearch
+              aria-label="Search this Space"
+              placeholder={`Search ${space.name || "this Space"}`}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton label="Filters">
-                  <SlidersHorizontal aria-hidden />
-                </IconButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52" data-misty-layer-portal>
-                <DropdownMenuLabel>Made by</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={madeBy}
-                  onValueChange={(next) => (
-                    setMadeBy(next as GalleryMadeBy),
-                    writeHomePreference("madeBy", next)
-                  )}
-                >
-                  <DropdownMenuRadioItem value="anyone">Anyone</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="me">Me</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="others">Others</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                  value={sort}
-                  onValueChange={(next) => (
-                    setSort(next as GallerySort),
-                    writeHomePreference("sort", next)
-                  )}
-                >
-                  <DropdownMenuRadioItem value="edited">Last edited</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="name">Name</DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {filter === "all" && !query && (
-          <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} />
-        )}
-
-        <p className="m-0 mb-3 text-xs text-cream-muted">
-          {filter === "all"
-            ? "Recent"
-            : galleryFilters.find((option) => option.id === filter)?.label}
-        </p>
-        {openError && (
-          <p role="alert" className="m-0 mb-3 text-sm text-cream">
-            {openError}
-          </p>
-        )}
-        {gallery.failed.length > 0 && (
-          <p role="status" className="m-0 mb-3 text-sm text-cream-muted">
-            Couldn't load {gallery.failed.join(" and ")}. The rest is shown.{" "}
-            <Button type="button" size="sm" variant="outline" onClick={gallery.reload}>
-              Retry
-            </Button>
-          </p>
-        )}
-        {gallery.loading ? (
-          <CollectionSkeleton label="Space contents" view={view} />
-        ) : items.length === 0 ? (
-          <EmptyState
-            title={query ? "Nothing matches" : "Nothing here yet"}
-            description={
-              query
-                ? "Try another word, or clear the search."
-                : "Make something above, or ask an agent in the Space's chat."
-            }
+          </>
+        }
+      />
+      {!query && <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} />}
+      <AccountCollectionFilters
+        collectionId="space"
+        options={scopes}
+        value={scope}
+        onChange={(next) => (setScope(next), writeHomePreference("scope", next))}
+        filterControl={refinement.control}
+        actions={
+          <CollectionViewToggle
+            value={view}
+            onChange={(next) => (setView(next), writeHomePreference("view", next))}
           />
-        ) : (
-          <div
-            className={
-              view === "grid"
-                ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4"
-                : "flex flex-col"
-            }
-          >
-            {items.map((item) => (
-              <GalleryCard
-                key={item.key}
-                item={item}
-                spaceId={space.id}
-                view={view}
-                maker={maker(item.creatorId || undefined)}
-                onOpen={(next) => void open(next)}
-                onVisibilityChange={
-                  item.toggle && item.creatorId === me
-                    ? (next, visibility) => void changeVisibility(next, visibility)
-                    : undefined
-                }
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+        }
+      />
+      {openError && (
+        <p role="alert" className="text-sm text-cream">
+          {openError}
+        </p>
+      )}
+      {gallery.failed.length > 0 && (
+        <div role="status" className="flex items-center gap-3 text-sm text-cream-muted">
+          Couldn't load {gallery.failed.join(" and ")}. The rest is shown.
+          <Button variant="ghost" size="sm" onClick={gallery.reload}>
+            Retry
+          </Button>
+        </div>
+      )}
+      {gallery.loading ? (
+        <CollectionSkeleton label="Space contents" view={view} />
+      ) : view === "grid" ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+          {refinement.items.map((item) => (
+            <SpaceItemCard
+              key={item.key}
+              item={item}
+              spaceId={space.id}
+              solo={space.member_count <= 1}
+              onOpen={() => void open(item)}
+              onVisibilityChange={
+                item.toggle && item.creatorId === me
+                  ? (visibility) => void changeVisibility(item, visibility)
+                  : undefined
+              }
+            />
+          ))}
+        </div>
+      ) : (
+        <CollectionItems
+          columnSetId="space-home"
+          view={view}
+          sortResetKey={refinement.sortKey}
+          categoryLabel="Type"
+          items={refinement.items.map((item) => {
+            const { Icon, tone, label } = kindIcon[item.kind];
+            return {
+              id: item.key,
+              title: item.title,
+              icon: <Icon />,
+              tone,
+              preview: (
+                <span className="block size-full text-left">
+                  <GalleryPreview item={item} spaceId={space.id} />
+                </span>
+              ),
+              category: label,
+              creator: maker(item.creatorId || undefined),
+              updatedAt: item.updatedAt,
+              updated: editedLabel(item.updatedAt),
+              onOpen: () => void open(item),
+            };
+          })}
+        />
+      )}
+    </CollectionPage>
   );
 }
+

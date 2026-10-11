@@ -68,11 +68,31 @@ export function WorkspaceTabStrip(
     tabListRef,
   });
   useEffect(() => {
-    ref.current
+    const list = ref.current;
+    list
       ?.querySelector('[aria-selected="true"]')
       ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [layout.activeTabId, position]);
+    // A vertical list only scrolls down. Branches and indents hang a few pixels past a
+    // tab's box, and any scroll sideways would slide every tab off the strip's edge.
+    if (vertical)
+      for (const box of [list, tabListRef.current]) if (box?.scrollLeft) box.scrollLeft = 0;
+  }, [layout.activeTabId, position, vertical]);
+  useEffect(() => {
+    const boxes = [ref.current, tabListRef.current].filter((box): box is HTMLDivElement =>
+      Boolean(box),
+    );
+    if (!vertical) return;
+    const keepLeft = (event?: Event) => {
+      const box = (event?.currentTarget as HTMLDivElement | undefined) ?? null;
+      for (const item of box ? [box] : boxes) if (item.scrollLeft) item.scrollLeft = 0;
+    };
+    keepLeft();
+    for (const box of boxes) box.addEventListener("scroll", keepLeft, { passive: true });
+    return () => {
+      for (const box of boxes) box.removeEventListener("scroll", keepLeft);
+    };
+  }, [vertical]);
   const newTabButton = vertical ? (
     <Pressable
       type="button"
@@ -132,8 +152,9 @@ export function WorkspaceTabStrip(
         )}
       >
         {vertical && newTabButton}
-        {allTabs.map((tab) => {
+        {allTabs.map((tab, index) => {
           const group = groups.find((g) => g.id === tab.tabGroupId);
+          const lastInGroup = Boolean(group) && allTabs[index + 1]?.tabGroupId !== group?.id;
           const firstInGroup = group && !shownGroups.has(group.id);
           if (group) shownGroups.add(group.id);
           return (
@@ -150,6 +171,8 @@ export function WorkspaceTabStrip(
                 <WorkspaceTabStripTab
                   tab={tab}
                   group={group}
+                  firstInGroup={Boolean(firstInGroup)}
+                  lastInGroup={lastInGroup}
                   active={tab.id === layout.activeTabId}
                   vertical={vertical}
                   tabs={tabs}
