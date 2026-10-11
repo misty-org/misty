@@ -2,7 +2,7 @@ import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWin
 import { desktopDeviceGrants } from "@/features/agents/deviceGrants";
 import { useAgentDeviceTargets } from "@/features/agents/devices";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
-import { resolveSetting, useSettingsProfiles } from "@/features/settings";
+import { awaitConversationTitle, openTurn, planDeepThinking } from "./conversationTurn";
 import { apiRequest } from "@/api/client";
 import {
   runtimeAiApi as aiSurfaceApi,
@@ -16,7 +16,6 @@ import {
   resumeExecutionAfterWait,
 } from "@/features/agents/executionHandoff";
 import { echoPrompt } from "./promptEcho";
-import { awaitConversationTitle } from "./conversationTitles";
 import {
   finishLocalExecution,
   isAgentWorkerWindow,
@@ -51,11 +50,6 @@ import { resetMistyDraftAttachments } from "./draftAttachments";
 import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
-
-const planDeepThinking = () => {
-  const profile = useSettingsProfiles.getState().state;
-  return Boolean(profile && resolveSetting(profile, "agents.plan_deep_thinking").value);
-};
 
 export type { GlobalSearchState } from "@/features/global-search/globalSearchState";
 const uncertainAdmissions = new Map<string, string>();
@@ -513,25 +507,17 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     // The server names a new conversation with a separate model call; until then its title is a skeleton.
     if (startsConversation && !companion?.continuation)
       awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
-    updateConversation(set, get, conversationId, (conversation) => {
-      const messages = conversation.messages.filter((message) => !isEcho(message));
-      return {
-        ...conversation,
+    updateConversation(set, get, conversationId, (conversation) =>
+      openTurn(conversation, {
+        prompt: normalized,
+        userMessage,
+        assistantMessage,
+        isEcho,
+        echoed: echo.echoed,
+        continuation: Boolean(companion?.continuation),
         reasoningEffort: thinkingEffort(requestedThinking),
-        title: messages.length ? conversation.title : normalized.slice(0, 56),
-        updatedAt: userMessage.createdAt,
-        messages: [
-          ...messages,
-          ...(echo.echoed
-            ? [userMessage]
-            : // A continuation shows as an event line ("Connected Google Docs"), not as typed text.
-              companion?.continuation
-              ? [{ ...userMessage, source: "continuation" as const }]
-              : []),
-          assistantMessage,
-        ],
-      };
-    });
+      }),
+    );
     if (presentation === "workspace") announceGlobalPanel(false);
     set({
       panel: presentation === "workspace" ? "closed" : "answer",
