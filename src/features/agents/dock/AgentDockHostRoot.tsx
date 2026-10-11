@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Minimize2, Square, SquareArrowDownLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { applyAppTheme } from "@/features/settings/store/appTheme";
+import { applyAppTheme } from "@/features/settings";
 import { IconButton } from "@/shared/ui";
 
 const parameters = new URLSearchParams(location.search);
