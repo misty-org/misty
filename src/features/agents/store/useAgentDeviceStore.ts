@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { hostname, platform, version } from "@tauri-apps/plugin-os";
+import { platform, version } from "@tauri-apps/plugin-os";
 import { getVersion } from "@tauri-apps/api/app";
 import { resolveApiBase } from "@/api/deployment/api";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
@@ -40,16 +40,6 @@ export async function deviceAccount(): Promise<{ apiBase: string; accountId: str
   return { apiBase: await resolveApiBase(), accountId };
 }
 
-async function defaultDeviceName(): Promise<string> {
-  try {
-    const name = (await hostname())?.replace(/\.local$/i, "").trim();
-    if (name) return name.slice(0, 64);
-  } catch {
-    /* fall back below */
-  }
-  return "This Misty";
-}
-
 /** Registers this device (once per account session) and starts its channel,
  * LAN discovery and trust. Only the main window starts it; other windows read
  * the device the main window registered. */
@@ -64,7 +54,8 @@ export async function ensureDeviceStarted(): Promise<DevicesView> {
   if (started?.key === key) return started.promise;
   const promise = (async () =>
     devicesNative.start(account, {
-      name: await defaultDeviceName(),
+      // Native names the device after the computer ("Matthew's MBP").
+      name: "",
       platform: platform(),
       osVersion: String(version() ?? "").slice(0, 64),
       appVersion: await getVersion().catch(() => ""),

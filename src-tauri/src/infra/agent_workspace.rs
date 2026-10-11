@@ -177,6 +177,7 @@ pub async fn agent_window_open(
         let closed_label = label.clone();
         window.on_window_event(move |event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                super::agent_dock::forget(&closed_app, &closed_label);
                 if let Ok(mut inner) = closed_app.state::<AgentWorkspaceState>().0.lock() {
                     inner.leases.retain(|task, lease| {
                         if lease.window == closed_label {
@@ -190,6 +191,9 @@ pub async fn agent_window_open(
                 }
             }
         });
+        // A separate-window agent works docked in the corner, on screen, and
+        // never behind the person's windows (docs/design/agents-at-cursor/BRIEF.md).
+        super::agent_dock::dock(&app, &label, &request.name)?;
     }
     app.emit_to(&label, "misty://agent-task-queued", ())
         .map_err(|e| e.to_string())?;
@@ -215,6 +219,9 @@ pub fn agent_window_show(
     let window = app
         .get_window(&label)
         .ok_or("No agent window is open. Start a separate-window task first.")?;
+    if super::agent_dock::is_docked(&label) {
+        return super::agent_dock::open(&app, &label);
+    }
     window.show().map_err(|e| e.to_string())?;
     window.unminimize().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())

@@ -12,6 +12,7 @@ function providers(overrides: Partial<OmniboxDeps> = {}) {
     searchSuggestionsEnabled: () => false,
     fetchSearchSuggestions: async () => [],
     historySuggestions: async () => [],
+    recentVisits: async () => [],
     bookmarks: () => [],
     mistyContent: () => [],
     clipboardUrl: async () => null,
@@ -64,7 +65,7 @@ it("searches typed text and does not count it as a typed address", async () => {
   const input = screen.getByLabelText("Search or enter address");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "misty weather" } });
-  await screen.findByText("Search with Google");
+  await screen.findByRole("option", { name: /misty weather/ });
   fireEvent.submit(input.closest("form")!);
   expect(props.onNavigate).toHaveBeenCalledWith("https://www.google.com/search?q=misty%20weather", {
     typed: false,

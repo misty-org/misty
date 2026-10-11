@@ -1,9 +1,13 @@
-/** Browser chrome geometry. Buttons are the shared IconButton; icons use toolbarIconProps. */
+import "./browserToolbar.css";
+
+/** Browser chrome geometry. Buttons are the shared IconButton; icons use toolbarIconProps,
+ * and browserToolbar.css sets both a size up inside the bar. */
 export const browserToolbarStyles = {
-  // Exactly the Browser grid's 44px toolbar row. A taller bar overflows onto
+  // Exactly the Browser grid's 52px toolbar row (`rowHeight`). A taller bar overflows onto
   // the page host; it hides under the native page until a drag raises the UI.
-  bar: "relative z-10 flex h-11 shrink-0 items-center gap-1 border-b px-2",
-  group: "flex shrink-0 items-center gap-1",
+  rowHeight: 52,
+  bar: "relative z-10 flex h-[52px] shrink-0 items-center gap-1.5 border-b px-3",
+  group: "flex shrink-0 items-center gap-1.5",
   // Circular glyphs need a smaller optical size beside arrows and line icons.
   roundIcon: {
     size: 16,

@@ -16,26 +16,26 @@ import {
   ChoiceControl,
   numberSetting,
   SliderControl,
-  SelectControl,
   stringSetting,
   SwitchControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { AccentColorControl } from "./AccentColorControl";
 import { Input } from "@/shared/ui";
-import { validThemeTime } from "../store/appTheme";
+import { validClockTime } from "../store/nightLight";
+import { MAX_PANE_DIM } from "@/features/workspace/paneFocus";
 
 export function AppearanceSection(props: SettingsContentProps) {
   const appZoom = useAppZoomValue();
   const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
   const displayedAppZoom = appZoomDraft ?? appZoom;
+  const nightLight = stringSetting(props.document, "appearance", "night_light_mode", "off");
 
   return (
     <>
       <SettingsSectionBlock title="Theme">
         <SettingsRow
           label="Theme"
-          description="System follows your computer's light or dark appearance. Scheduled switches at the times you choose."
+          description="System follows your computer's light or dark appearance."
         >
           <ChoiceControl
             value={stringSetting(props.document, "appearance", "theme_mode", "dark")}
@@ -44,41 +44,60 @@ export function AppearanceSection(props: SettingsContentProps) {
               { value: "system", label: "System" },
               { value: "dark", label: "Dark" },
               { value: "light", label: "Light" },
-              { value: "scheduled", label: "Scheduled" },
             ]}
             onValueChange={(value) => props.onSettingChange("appearance", "theme_mode", value)}
           />
         </SettingsRow>
-        {stringSetting(props.document, "appearance", "theme_mode", "dark") === "scheduled" ? (
+        <SettingsRow
+          label="Night light"
+          description="Warms the whole window and every page to ease your eyes in the evening."
+        >
+          <ChoiceControl
+            value={nightLight}
+            disabled={props.working}
+            options={[
+              { value: "off", label: "Off" },
+              { value: "on", label: "On" },
+              { value: "scheduled", label: "Scheduled" },
+            ]}
+            onValueChange={(value) =>
+              props.onSettingChange("appearance", "night_light_mode", value)
+            }
+          />
+        </SettingsRow>
+        {nightLight === "scheduled" ? (
           <>
-            <SettingsRow label="Light from" indent>
-              <ThemeTimeControl
-                value={stringSetting(props.document, "appearance", "theme_light_start", "07:00")}
+            <SettingsRow label="Turns on" indent>
+              <ClockTimeControl
+                value={stringSetting(props.document, "appearance", "night_light_start", "21:00")}
                 disabled={props.working}
                 onChange={(value) =>
-                  props.onSettingChange("appearance", "theme_light_start", value)
+                  props.onSettingChange("appearance", "night_light_start", value)
                 }
               />
             </SettingsRow>
-            <SettingsRow label="Dark from" indent>
-              <ThemeTimeControl
-                value={stringSetting(props.document, "appearance", "theme_dark_start", "19:00")}
+            <SettingsRow label="Turns off" indent>
+              <ClockTimeControl
+                value={stringSetting(props.document, "appearance", "night_light_end", "07:00")}
                 disabled={props.working}
-                onChange={(value) => props.onSettingChange("appearance", "theme_dark_start", value)}
+                onChange={(value) => props.onSettingChange("appearance", "night_light_end", value)}
               />
             </SettingsRow>
           </>
         ) : null}
-        <SettingsRow
-          label="Accent color"
-          description="Marks the active tab, switches that are on and selected text. Everything else stays black and white."
-        >
-          <AccentColorControl
-            value={stringSetting(props.document, "appearance", "accent_color", "")}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "accent_color", value)}
-          />
-        </SettingsRow>
+        {nightLight !== "off" ? (
+          <SettingsRow label="Warmth" indent>
+            <SliderControl
+              value={numberSetting(props.document, "appearance", "night_light_warmth", 0.5)}
+              min={0.1}
+              max={1}
+              step={0.05}
+              disabled={props.working}
+              format={(value) => `${Math.round(value * 100)}%`}
+              onCommit={(value) => props.onSettingChange("appearance", "night_light_warmth", value)}
+            />
+          </SettingsRow>
+        ) : null}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Layout">
@@ -128,7 +147,7 @@ export function AppearanceSection(props: SettingsContentProps) {
           <SliderControl
             value={numberSetting(props.document, "appearance", "pane_dim_strength", 0.15)}
             min={0}
-            max={0.4}
+            max={MAX_PANE_DIM}
             step={0.01}
             disabled={
               props.working ||
@@ -138,32 +157,13 @@ export function AppearanceSection(props: SettingsContentProps) {
             onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
           />
         </SettingsRow>
-        <SettingsRow label="Active-pane indicator">
-          <SelectControl
-            value={Math.max(
-              0,
-              ["none", "outline", "border"].indexOf(
-                stringSetting(props.document, "appearance", "pane_focus_indicator", "none"),
-              ),
-            )}
-            options={["None", "Subtle outline", "Border"]}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange(
-                "appearance",
-                "pane_focus_indicator",
-                ["none", "outline", "border"][value],
-              )
-            }
-          />
-        </SettingsRow>
       </SettingsSectionBlock>
     </>
   );
 }
 
-/** A local time for the scheduled theme; only complete times are saved. */
-function ThemeTimeControl(props: {
+/** A local time for the night light schedule; only complete times are saved. */
+function ClockTimeControl(props: {
   value: string;
   disabled: boolean;
   onChange(value: string): void;
@@ -175,7 +175,7 @@ function ThemeTimeControl(props: {
       value={props.value}
       disabled={props.disabled}
       onChange={(event) => {
-        if (validThemeTime(event.target.value)) props.onChange(event.target.value);
+        if (validClockTime(event.target.value)) props.onChange(event.target.value);
       }}
     />
   );

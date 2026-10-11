@@ -1,22 +1,39 @@
-import { useMemo, type ReactNode } from "react";
-import { Activity, LayoutGrid, Plug, SquarePen, Workflow } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { LayoutGrid, Plug, Repeat2, SquarePen } from "lucide-react";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { Button } from "@/shared/ui";
 import { useAgentFoldersStore } from "../folders/agentFoldersStore";
+import { FolderNameDialog } from "../folders/FolderNameDialog";
 import {
   AgentRecentConversations,
   type RecentFolder,
   type RecentStatus,
 } from "./AgentRecentConversations";
-import { AgentActivityPage } from "./AgentActivityPage";
+import { AgentGetStarted } from "./AgentGetStarted";
+import { AgentSidebarResizer, useAgentSidebarWidth } from "./AgentSidebarResizer";
+import { isUnread, markConversationRead } from "./conversationReads";
+import { isRunInProgress } from "./RecentStatusBadge";
 import { AgentWorkspaceCatalog } from "./AgentWorkspaceCatalog";
 import "./agentWorkspaceCatalog.css";
 import "./agentWorkspaceFrame.css";
 
-export type AgentWorkspacePage = "task" | "activity" | "workflows" | "templates" | "integrations";
-type RecentConversation = { id: string; title?: string; folderId?: string; updatedAt: string };
+export type AgentWorkspacePage = "task" | "workflows" | "templates" | "integrations";
+type RecentConversation = {
+  id: string;
+  title?: string;
+  folderId?: string;
+  updatedAt: string;
+  lastReadAt?: string;
+};
 
 /** Presentation only. Existing conversation and account actions remain owned by AgentsPage. */
 export function AgentWorkspaceFrame({
@@ -76,8 +93,9 @@ export function AgentWorkspaceFrame({
     return { folders: groups, recent: unfiled.slice(0, 12).map(row) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the keys capture the shown fields
   }, [listKey, folderKey, agent.id]);
-  // Latest top-level run per conversation, keyed on what the icons show so the memoized
-  // list stays still while a run streams.
+  // Latest top-level run per conversation, and whether it changed since the conversation
+  // was last read, keyed on what the dots show so the memoized list stays still while a
+  // run streams.
   const latestRuns = new Map<string, RecentStatus>();
   for (const entry of activity) {
     if (entry.parent_run_id || !entry.conversation_id) continue;
@@ -85,16 +103,41 @@ export function AgentWorkspaceFrame({
     if (!known || entry.updated_at > known.updatedAt)
       latestRuns.set(entry.conversation_id, { state: entry.state, updatedAt: entry.updated_at });
   }
+  const lastRead = new Map(conversations.map((c) => [c.id, c.lastReadAt]));
+  for (const [id, run] of latestRuns) run.unread = isUnread(run.updatedAt, lastRead.get(id));
   const statusKey = [...latestRuns]
-    .map(([id, run]) => `${id}\u0000${run.state}\u0000${run.updatedAt}`)
+    .map(([id, run]) => `${id}\u0000${run.state}\u0000${run.updatedAt}\u0000${run.unread}`)
     .join("\u0001");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- statusKey captures the shown fields
   const statuses = useMemo(() => Object.fromEntries(latestRuns), [statusKey]);
   const openConversation = useStableCallback(onConversation);
+  // The open conversation is read once its run settles while the window is in view, so
+  // only conversations the user hasn't seen keep a filled dot.
+  const activeId = page === "task" ? conversationId : undefined;
+  const activeRun = activeId ? latestRuns.get(activeId) : undefined;
+  const readable = Boolean(activeRun?.unread && !isRunInProgress(activeRun.state));
+  useEffect(() => {
+    if (!activeId || !readable) return;
+    const read = () => {
+      if (document.visibilityState === "visible") markConversationRead(activeId);
+    };
+    read();
+    document.addEventListener("visibilitychange", read);
+    return () => document.removeEventListener("visibilitychange", read);
+  }, [activeId, readable]);
+  const [sidebarWidth, setSidebarWidth] = useAgentSidebarWidth();
+  const [creatingProject, setCreatingProject] = useState(false);
+  const newProject = useCallback(() => setCreatingProject(true), []);
   return (
     <div className="agent-studio" data-page={page}>
-      <aside className="agent-studio-sidebar" aria-label={`${agent.name} workspace`}>
-        <header>{identity}</header>
+      <aside
+        className="agent-studio-sidebar"
+        aria-label={`${agent.name} workspace`}
+        style={{ "--agent-studio-sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      >
+        {/* A window toolbar, so the shared titlebar code notices when the sidebar
+            meets the native window buttons and the identity drops below them. */}
+        <header data-window-toolbar>{identity}</header>
         <nav aria-label="Agent workspace pages">
           <Button
             data-agent-navigation-control
@@ -110,8 +153,7 @@ export function AgentWorkspaceFrame({
           </Button>
           {(
             [
-              ["activity", "Activity", Activity],
-              ["workflows", "Workflows", Workflow],
+              ["workflows", "Workflows", Repeat2],
               ["templates", "Templates", LayoutGrid],
               ["integrations", "Integrations", Plug],
             ] as const
@@ -135,10 +177,29 @@ export function AgentWorkspaceFrame({
           folders={folders}
           recent={recent}
           statuses={statuses}
-          activeId={page === "task" ? conversationId : undefined}
+          activeId={activeId}
           disabled={disabled}
           onConversation={openConversation}
+          onNewProject={newProject}
         />
+        <AgentGetStarted
+          hasTask={conversations.length > 0}
+          disabled={disabled}
+          onNewTask={onNewTask}
+          onIntegrations={() => onPageChange("integrations")}
+          onWorkflows={() => onPageChange("workflows")}
+        />
+        <FolderNameDialog
+          open={creatingProject}
+          title="New project"
+          description="Group this agent's conversations. Drag conversations into it."
+          submitLabel="Create"
+          onOpenChange={setCreatingProject}
+          onSubmit={async (name) => {
+            await useAgentFoldersStore.getState().create(agent.id, name);
+          }}
+        />
+        <AgentSidebarResizer width={sidebarWidth} onWidthChange={setSidebarWidth} />
       </aside>
       <div className="agent-studio-canvas">
         {/* Keep the live conversation mounted while browsing catalogs; its draft and voice state belong to it. */}
@@ -146,20 +207,16 @@ export function AgentWorkspaceFrame({
           {children}
         </div>
         <div className="agent-studio-catalog-host" hidden={page === "task"}>
-          {page === "activity" ? (
-            <AgentActivityPage />
-          ) : (
-            <AgentWorkspaceCatalog
-              agentId={agent.id}
-              agentName={agent.name}
-              page={page === "task" ? "templates" : page}
-              onNavigate={(p) => (p === "new" ? onNewTask() : onPageChange(p))}
-              onUse={onUseTemplate}
-              onConversation={onConversation}
-              onStartWork={onStartWork}
-              onCompanion={onCompanion}
-            />
-          )}
+          <AgentWorkspaceCatalog
+            agentId={agent.id}
+            agentName={agent.name}
+            page={page === "task" ? "templates" : page}
+            onNavigate={(p) => (p === "new" ? onNewTask() : onPageChange(p))}
+            onUse={onUseTemplate}
+            onConversation={onConversation}
+            onStartWork={onStartWork}
+            onCompanion={onCompanion}
+          />
         </div>
       </div>
     </div>

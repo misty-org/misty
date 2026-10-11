@@ -34,6 +34,25 @@ export interface ClaimedWorkflowNodeJob {
   leaseExpiresAt?: string | null;
 }
 
+/**
+ * The account's sites agents may not act on, as the server put them in the
+ * job. The native side enforces them; a job without them gets its safe default.
+ */
+export function jobSiteBlocks(
+  config: unknown,
+): { sensitive: boolean; sites: string[] } | undefined {
+  const value =
+    config && typeof config === "object" ? (config as { siteBlocks?: unknown }).siteBlocks : null;
+  if (!value || typeof value !== "object") return undefined;
+  const { sensitive, sites } = value as { sensitive?: unknown; sites?: unknown };
+  return {
+    sensitive: sensitive !== false,
+    sites: Array.isArray(sites)
+      ? sites.filter((site): site is string => typeof site === "string")
+      : [],
+  };
+}
+
 export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
   const contextId = job.contextId;
   if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
@@ -56,6 +75,7 @@ export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"])
           ? job.config.taskId
           : undefined,
     },
+    siteBlocks: jobSiteBlocks(job.config),
   };
 }
 

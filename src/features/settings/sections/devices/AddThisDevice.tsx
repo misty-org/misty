@@ -11,6 +11,10 @@ import {
 } from "../../components/DesktopSettingsUI";
 import { SettingsNote } from "../../SettingsControls";
 
+const addThisDeviceHelp =
+  "Agents can already use this computer. Adding it once lets it sync and work with your other " +
+  "devices: agents can reach it from them, and files can move between them on the same network.";
+
 const pollMs = 2000;
 
 /**
@@ -48,12 +52,26 @@ export function AddThisDevice() {
       (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
     );
 
+  // A new account has no vault yet: creating one is what adds its first device.
+  const firstDevice = sync.vault?.remote === false && !sync.vault.local;
+  if (firstDevice)
+    return (
+      <>
+        <Section title="Add this device" description={addThisDeviceHelp}>
+          <SettingsNote>
+            Set up Sync with a password and secret to add this device. Later devices join with them
+            or with approval from this one.
+          </SettingsNote>
+        </Section>
+        {sync.desktop && !sync.session ? (
+          <SyncUnlockForm controller={sync} sectionTitle="Set up Sync" />
+        ) : null}
+      </>
+    );
+
   return (
     <>
-      <Section
-        title="Add this device"
-        description="Adding a device once lets it sync, run agent work and share files with your other devices on the same network."
-      >
+      <Section title="Add this device" description={addThisDeviceHelp}>
         <SettingsNote>
           Use your sync password and secret below, or approve this device from one you already
           added.

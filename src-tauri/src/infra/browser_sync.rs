@@ -143,7 +143,8 @@ pub(crate) async fn is_account_browser_profile(profile: &str) -> bool {
         .ok()
         .and_then(|selected| selected.clone());
     logical.as_deref() == Some(profile)
-        || selected.is_some_and(|selected| selected.logical == profile || selected.physical == profile)
+        || selected
+            .is_some_and(|selected| selected.logical == profile || selected.physical == profile)
 }
 
 /// Saved passwords live in the unlocked vault of the signed-in account. None
@@ -406,8 +407,16 @@ fn issue(error: misty_browser_sync::Error) -> String {
     .into()
 }
 
+/// Lock, sign-out and account switches send batched changes first. Bounded:
+/// a slow server never holds the vault open; what does not make it stays
+/// stored and goes out on the next unlock.
+const STOP_FLUSH: std::time::Duration = std::time::Duration::from_secs(1);
+/// Quitting allows a little longer, since nothing waits on it.
+const EXIT_FLUSH: std::time::Duration = std::time::Duration::from_secs(2);
+
 async fn stop(active: Option<Session>) {
     if let Some(mut active) = active {
+        let _ = tokio::time::timeout(STOP_FLUSH, active.handle.flush()).await;
         if let Some(task) = active.credential_task.take() {
             task.abort();
             let _ = task.await;
@@ -1303,6 +1312,34 @@ pub async fn browser_sync_claim(
         active.handle.clone()
     };
     handle.open_workspace(workspace_id).await.map_err(issue)
+}
+
+/// Sync now: sends batched workspace and collection changes without waiting
+/// for their batch.
+#[tauri::command]
+pub async fn browser_sync_flush(webview: tauri::Webview, session_id: String) -> Result<(), String> {
+    require_main(&webview)?;
+    let handle = {
+        let current = session().lock().await;
+        let active = current.as_ref().ok_or("Connect device sync first.")?;
+        require_session(active, &session_id)?;
+        active.handle.clone()
+    };
+    handle.flush().await.map_err(issue)
+}
+
+/// Called once as the app exits, after windows close.
+pub fn flush_before_exit() {
+    tauri::async_runtime::block_on(async {
+        let handle = session()
+            .lock()
+            .await
+            .as_ref()
+            .map(|active| active.handle.clone());
+        if let Some(handle) = handle {
+            let _ = tokio::time::timeout(EXIT_FLUSH, handle.flush()).await;
+        }
+    });
 }
 
 #[tauri::command]

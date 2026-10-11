@@ -1,6 +1,7 @@
+import "./processShim";
 import { invoke } from "@tauri-apps/api/core";
 import { Agent } from "@midscene/core/agent";
-import { DeviceOperationNotAttempted } from "../workerBrowserJobs";
+import { DeviceOperationNotAttempted, jobSiteBlocks } from "../workerBrowserJobs";
 import { actionContexts } from "./screenActions";
 import { MistyScreenDevice, type ScreenFrame } from "./screenDevice";
 import { screenModelClient, screenModelConfig } from "./screenModel";
@@ -90,6 +91,7 @@ export async function runScreenAct(
           agentId,
           operation,
           input: { ...input, __mistyTaskId: taskId },
+          siteBlocks: jobSiteBlocks(job.config),
         },
       }),
   });

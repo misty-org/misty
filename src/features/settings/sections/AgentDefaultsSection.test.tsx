@@ -51,4 +51,12 @@ describe("AgentDefaultsSection Misty panel controls", () => {
 
     expect(updateSettingSpy).toHaveBeenCalledWith("agents.panel_side", "left");
   });
+
+  it("chooses the web search engine", () => {
+    render(<AgentDefaultsSection />);
+
+    expect(screen.getByText("Web search")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "Perplexity" }));
+    expect(updateSettingSpy).toHaveBeenCalledWith("agents.web_search_engine", "perplexity");
+  });
 });

@@ -9,6 +9,7 @@ import {
 } from "@/api/client";
 import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
 import type {
+  AiProgressItem,
   AiArtifact,
   AiInvocationCreated,
   AiInvocationEvent,
@@ -26,6 +27,12 @@ export interface AiUserSettings {
   app_actions_ask: boolean;
   /** Where agents open a screen when a task needs one. */
   screen_location?: ScreenLocation;
+  /** Agents may read but not act on banking, crypto, payment and adult sites. */
+  agent_block_sensitive?: boolean;
+  /** More sites agents may read but not act on, as hosts such as example.com. */
+  agent_blocked_sites?: string[];
+  /** A computer stays awake while an agent works on it. */
+  keep_awake_for_agents?: boolean;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
@@ -136,6 +143,16 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify({ ask }),
     }),
+  updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {
+      method: "PUT",
+      body: JSON.stringify(change),
+    }),
+  updateKeepAwake: (keepAwake: boolean) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/keep-awake", {
+      method: "PUT",
+      body: JSON.stringify({ keep_awake_for_agents: keepAwake }),
+    }),
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
     apiRequest<void>(`/ai/memories/${encodeURIComponent(memoryId)}`, { method: "DELETE" }),
@@ -179,6 +196,11 @@ export const aiSurfaceApi = {
       body: JSON.stringify(toServerInvocation({ ...input, deviceContexts })),
     });
   },
+  /** How a reply got its answer: notes and tool runs, rebuilt from its stored events. */
+  invocationProgress: (invocationId: string) =>
+    apiRequest<{ items: AiProgressItem[] }>(
+      `/ai/invocations/${encodeURIComponent(invocationId)}/progress`,
+    ),
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",
@@ -280,6 +302,7 @@ function toServerInvocation(input: AiInvocationRequest) {
       captured_at: c.capturedAt,
       display_id: c.display.id,
       source: c.source,
+      controls: c.controls,
     })),
     capture: input.capture
       ? {

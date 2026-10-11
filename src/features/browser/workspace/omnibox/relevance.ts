@@ -28,10 +28,16 @@ export const relevance = {
 export type MatchQuality = "address-prefix" | "title-word-prefix" | "substring" | "none";
 
 /** How well typed text matches a page, best first. */
-export function matchQuality(text: string, url: string, title: string): MatchQuality {
+export function matchQuality(
+  text: string,
+  url: string,
+  title: string,
+  /** `strippedUrl(url)` lowercased, when the caller already has it. */
+  stripped = strippedUrl(url).toLowerCase(),
+): MatchQuality {
   const typed = typedUrlText(text);
   if (!typed) return "none";
-  if (strippedUrl(url).toLowerCase().startsWith(typed)) return "address-prefix";
+  if (stripped.startsWith(typed)) return "address-prefix";
   const query = text.trim().toLowerCase();
   const words = title.toLowerCase().split(/[\s\-–—|:·,/]+/);
   if (words.some((word) => word.startsWith(query)) || title.toLowerCase().startsWith(query))

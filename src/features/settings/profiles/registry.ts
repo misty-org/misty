@@ -93,9 +93,8 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
     (value.length > (d.maxLength ?? 4096) || (d.enum && !d.enum.includes(value)))
   )
     return false;
-  if (d.id === "app.appearance.accent" && !/^(#[0-9a-f]{6})?$/.test(String(value))) return false;
   if (
-    (d.id === "app.appearance.theme_light_start" || d.id === "app.appearance.theme_dark_start") &&
+    (d.id === "app.appearance.night_light_start" || d.id === "app.appearance.night_light_end") &&
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))
   )
     return false;

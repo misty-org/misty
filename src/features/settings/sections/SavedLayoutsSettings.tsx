@@ -35,7 +35,7 @@ export function SavedLayoutsSettings() {
     >
       <DesktopSettingsRow label="Save current layout" description={describe(current)}>
         <form
-          className="flex w-full min-w-0 items-center gap-2"
+          className="flex w-[240px] min-w-0 max-w-full items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             save();

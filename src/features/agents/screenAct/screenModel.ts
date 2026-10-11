@@ -12,6 +12,9 @@ type Completion = {
 const slot = (prefix: string) => ({
   [`${prefix}_NAME`]: "misty-run-model",
   [`${prefix}_API_KEY`]: "misty-pass-through",
+  // Required by Midscene's config check; screenModelClient answers every call,
+  // so nothing is ever sent here.
+  [`${prefix}_BASE_URL`]: "https://misty.invalid/v1",
   [`${prefix}_PROTOCOL`]: "openai-chat",
   [`${prefix}_RETRY_COUNT`]: 1,
 });

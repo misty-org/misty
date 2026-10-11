@@ -105,63 +105,12 @@ pub(crate) async fn evaluate_isolated_javascript(
     webview: Webview,
     function_body: String,
 ) -> Result<String, String> {
-    use block2::RcBlock;
-    use objc2::{rc::Retained, runtime::AnyObject, MainThreadMarker};
-    use objc2_foundation::{NSError, NSString};
-    use objc2_web_kit::{WKContentWorld, WKWebView};
-    use std::{cell::OnceCell, sync::Mutex, time::Duration};
-
-    thread_local! {
-        static WORLD: OnceCell<Retained<WKContentWorld>> = const { OnceCell::new() };
-    }
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    let sender = Mutex::new(Some(sender));
-    let finish = move |result: Result<String, String>| {
-        if let Some(sender) = sender.lock().ok().and_then(|mut s| s.take()) {
-            let _ = sender.send(result);
-        }
-    };
-    let finish = std::sync::Arc::new(finish);
-    let fail = finish.clone();
-    webview
-        .with_webview(move |platform_webview| unsafe {
-            let Some(mtm) = MainThreadMarker::new() else {
-                fail(Err("Page state must run on the main thread.".to_owned()));
-                return;
-            };
-            let view: &WKWebView = &*platform_webview.inner().cast();
-            let world = WORLD.with(|cell| {
-                cell.get_or_init(|| {
-                    WKContentWorld::worldWithName(&NSString::from_str("misty-page-state"), mtm)
-                })
-                .clone()
-            });
-            let done = finish.clone();
-            let handler = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
-                let result = if !error.is_null() {
-                    Err("The page could not run page-state code.".to_owned())
-                } else if value.is_null() {
-                    Ok("null".to_owned())
-                } else if let Some(value) = (&*value).downcast_ref::<NSString>() {
-                    Ok(value.to_string())
-                } else {
-                    Err("The page returned an invalid page state.".to_owned())
-                };
-                done(result);
-            });
-            view.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-                &NSString::from_str(&function_body),
-                None,
-                None,
-                &world,
-                Some(&*handler),
-            );
-        })
-        .map_err(|error| error.to_string())?;
-    tokio::time::timeout(Duration::from_secs(10), receiver)
-        .await
-        .map_err(|_| "Page state timed out.".to_owned())?
-        .map_err(|_| "Page state was canceled.".to_owned())?
+    super::browser_content_world::evaluate_in_content_world(
+        webview,
+        "misty-page-state",
+        function_body,
+    )
+    .await
 }
 
 #[cfg(target_os = "macos")]

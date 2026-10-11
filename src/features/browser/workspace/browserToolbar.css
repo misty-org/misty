@@ -1,0 +1,27 @@
+/* The Browser toolbar runs a size above the shared 32px toolbar controls:
+   36px targets with 20px glyphs, and 28px inline controls inside the address field. */
+[data-browser-toolbar] [data-icon-size="sm"] {
+  width: 36px;
+  height: 36px;
+}
+
+[data-browser-toolbar] [data-icon-size="sm"] > svg:not(.absolute) {
+  width: 20px;
+  height: 20px;
+}
+
+/* Circular glyphs keep their smaller optical size beside arrows and line icons. */
+[data-browser-toolbar] [data-icon-size="sm"] > svg.size-4 {
+  width: 18px;
+  height: 18px;
+}
+
+[data-browser-toolbar] [data-icon-size="xs"] {
+  width: 28px;
+  height: 28px;
+}
+
+[data-browser-toolbar] [data-icon-size="xs"] > svg {
+  width: 18px;
+  height: 18px;
+}

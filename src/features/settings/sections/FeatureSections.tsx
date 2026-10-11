@@ -21,7 +21,9 @@ import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
+import { AgentSitesSection } from "./AgentSitesSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
+import { WebSearchSection } from "./WebSearchSection";
 export function PreferenceRow({ id, description }: { id: string; description?: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
@@ -122,6 +124,7 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
+      <WebSearchSection />
       <Section title="Misty panel">
         <PanelSideRow />
       </Section>
@@ -183,6 +186,7 @@ export function AgentConnectionsSection() {
     <>
       <AppActionsSection />
       <ScreenLocationSection />
+      <AgentSitesSection />
     </>
   );
 }

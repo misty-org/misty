@@ -1,5 +1,4 @@
 import { SystemErrorNotice } from "@/features/support/systemErrors";
-import { useMistyPanelStore } from "@/features/agents";
 import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
 import { useExtensionsStore } from "@/features/extensions/store";
 import {
@@ -21,17 +20,9 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import {
-  Button,
-  cn,
-  DropdownMenuCheckboxItem,
-  IconButton,
-  Notification,
-  toolbarIconProps,
-  Skeleton,
-} from "@/shared/ui";
+import { Button, cn, DropdownMenuCheckboxItem, Notification, Skeleton } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
-import { Pencil, Sparkles, VenetianMask } from "lucide-react";
+import { Pencil, VenetianMask } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserInternalPage } from "../internal/BrowserInternalPage";
 import { normalizeBrowserAddress } from "./browserAddress";
@@ -48,6 +39,7 @@ import { BrowserMenu } from "./BrowserMenu";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
+import { AgentTabAway, useTabAway } from "@/features/agents";
 import { BrowserOmnibox } from "./BrowserOmnibox";
 import { BrowserQrCodeDialog } from "./BrowserQrCodeDialog";
 import {
@@ -61,6 +53,7 @@ import {
   type BrowserMistyPage,
 } from "./browserRuntime";
 import { inspectBrowserPage } from "./browserPageInspection";
+import { BrowserMistyButton, BrowserMistyRow } from "./BrowserMistyPanel";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
 import { browserThemeFromDocument } from "./browserTheme";
 import { browserToolbarStyles } from "./browserToolbarStyles";
@@ -121,7 +114,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const pageHostRef = useRef<HTMLDivElement | null>(null);
   const [browserTheme, setBrowserTheme] = useState<BrowserTheme>(browserThemeFromDocument);
   const [annotationsActive, setAnnotationsActive] = useState(false);
-  const mistyPanelOpen = useMistyPanelStore((s) => s.open);
   const [addressFocusRequest, setAddressFocusRequest] = useState(0);
   const { viewport, setViewport, sizes, setSize, size: viewportSize } = useBrowserViewport();
   const [mistyPage, setMistyPage] = useState<BrowserMistyPage | null>(null);
@@ -150,6 +142,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const browserChromeBackground = "var(--workspace-tab-surface)";
   const annotationSuspensionReason = `browser-annotations:${browserRuntimeId(tab)}`;
+  const away = useTabAway(browserRuntimeId(tab));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const scopeId = browserScopeId(tab);
     const content = mistyPage
@@ -522,11 +515,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const hiddenButtons = useHiddenToolbarButtons();
   return (
     <section
-      className={cn(
-        "grid h-full min-h-0 overflow-hidden",
-        "grid-rows-[44px_auto_minmax(0,1fr)] text-cream",
-      )}
+      className={cn("grid h-full min-h-0 overflow-hidden", "text-cream")}
       style={{
+        gridTemplateRows: `${browserToolbarStyles.rowHeight}px auto minmax(0,1fr)`,
         backgroundColor: browserChromeBackground,
       }}
       data-browser-theme={browserTheme}
@@ -592,16 +583,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         />
 
         <div className={browserToolbarStyles.group}>
-          {hiddenButtons.has("misty") ? null : (
-            <IconButton
-              label="Misty"
-              tooltip={false}
-              aria-pressed={mistyPanelOpen}
-              onClick={() => useMistyPanelStore.getState().toggle()}
-            >
-              <Sparkles {...toolbarIconProps} />
-            </IconButton>
-          )}
+          {hiddenButtons.has("misty") ? null : <BrowserMistyButton tabId={tab.id} />}
           {hiddenButtons.has("extensions") ? null : (
             <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
           )}
@@ -727,68 +709,72 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         </Notification>
       ) : null}
 
-      <div
-        className={cn(
-          "flex min-h-0 min-w-0 items-center justify-center overflow-hidden",
-          viewport === "responsive" ? "p-0" : "p-3",
-          viewport === "responsive" ? undefined : "bg-charcoal-workspace",
-        )}
-        style={{
-          ...browserViewportStageStyle,
-          backgroundColor: viewport === "responsive" ? browserChromeBackground : undefined,
-        }}
-        data-browser-page-stage
-      >
+      <BrowserMistyRow tabId={tab.id}>
         <div
-          ref={pageHostRef}
           className={cn(
-            "relative min-h-0 min-w-0 overflow-hidden transition-[border-radius,box-shadow] duration-200",
-            viewport === "responsive"
-              ? "rounded-none shadow-none"
-              : "rounded-xl shadow-2xl ring-1 ring-black/15",
-            annotationsActive && "bg-transparent",
+            "flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden",
+            viewport === "responsive" ? "p-0" : "p-3",
+            viewport === "responsive" ? undefined : "bg-charcoal-workspace",
           )}
           style={{
-            ...browserViewportFrameStyle(viewportSize),
-            backgroundColor: annotationsActive
-              ? "transparent"
-              : internalPage || isOffline
-                ? browserChromeBackground
-                : `var(--browser-page-background, ${browserChromeBackground})`,
+            ...browserViewportStageStyle,
+            backgroundColor: viewport === "responsive" ? browserChromeBackground : undefined,
           }}
-          data-browser-page-host
-          data-browser-viewport={viewport}
+          data-browser-page-stage
         >
-          {internalPage ? (
-            <BrowserInternalPage
-              page={internalPage}
-              profileId={profileId}
-              navigate={navigateActiveTab}
-              openInNewView={page.commands.openInNewTab}
-              openPage={page.commands.openPage}
-              clearBrowsingData={page.commands.clearBrowsingData}
+          <div
+            ref={pageHostRef}
+            className={cn(
+              "relative min-h-0 min-w-0 overflow-hidden transition-[border-radius,box-shadow] duration-200",
+              viewport === "responsive"
+                ? "rounded-none shadow-none"
+                : "rounded-xl shadow-2xl ring-1 ring-black/15",
+              annotationsActive && "bg-transparent",
+            )}
+            style={{
+              ...browserViewportFrameStyle(viewportSize),
+              backgroundColor: annotationsActive
+                ? "transparent"
+                : internalPage || isOffline
+                  ? browserChromeBackground
+                  : `var(--browser-page-background, ${browserChromeBackground})`,
+            }}
+            data-browser-page-host
+            data-browser-viewport={viewport}
+          >
+            {away ? (
+              <AgentTabAway />
+            ) : internalPage ? (
+              <BrowserInternalPage
+                page={internalPage}
+                profileId={profileId}
+                navigate={navigateActiveTab}
+                openInNewView={page.commands.openInNewTab}
+                openPage={page.commands.openPage}
+                clearBrowsingData={page.commands.clearBrowsingData}
+              />
+            ) : isOffline ? (
+              <BrowserOfflinePage url={state.url} onRetry={handleRetry} onGoHome={handleGoHome} />
+            ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
+              <BrowserNativeRuntimeRequired
+                url={state.url}
+                onOpenExternal={() =>
+                  void openSystemExternalLink(state.url).catch((error: unknown) =>
+                    setBrowserError(tab.id, error),
+                  )
+                }
+              />
+            ) : null}
+            {reader.article && !internalPage ? (
+              <ReaderView article={reader.article} onClose={reader.close} />
+            ) : null}
+            <BrowserAnnotationLayer
+              active={annotationsActive}
+              onClose={() => setAnnotationsActive(false)}
             />
-          ) : isOffline ? (
-            <BrowserOfflinePage url={state.url} onRetry={handleRetry} onGoHome={handleGoHome} />
-          ) : !nativeRuntime && state.url !== blankBrowserUrl ? (
-            <BrowserNativeRuntimeRequired
-              url={state.url}
-              onOpenExternal={() =>
-                void openSystemExternalLink(state.url).catch((error: unknown) =>
-                  setBrowserError(tab.id, error),
-                )
-              }
-            />
-          ) : null}
-          {reader.article && !internalPage ? (
-            <ReaderView article={reader.article} onClose={reader.close} />
-          ) : null}
-          <BrowserAnnotationLayer
-            active={annotationsActive}
-            onClose={() => setAnnotationsActive(false)}
-          />
+          </div>
         </div>
-      </div>
+      </BrowserMistyRow>
     </section>
   );
 }

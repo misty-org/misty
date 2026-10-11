@@ -163,6 +163,7 @@ pub(super) async fn dispatch(
             grant_id: request.grant_id.clone(),
             operation: request.operation.clone(),
             input: request.input.clone(),
+            site_blocks: request.site_blocks.clone(),
         };
         let encoded = std::ffi::CString::new(
             json!({"action": input, "viewport": observed["viewport"], "editable": observed["editable"]}).to_string(),

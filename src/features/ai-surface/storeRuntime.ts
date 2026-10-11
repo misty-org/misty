@@ -105,7 +105,8 @@ export function consumeInvocationEvent(
   if (
     event.type === "tool.started" ||
     event.type === "tool.completed" ||
-    event.type === "tool.failed"
+    event.type === "tool.failed" ||
+    event.type === "tool.detail"
   ) {
     return;
   }

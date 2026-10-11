@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button, cn, IconButton, SuggestionItem } from "@/shared/ui";
 import { AppWindow, FileText, Globe2, History, Search, Settings2, Star, X } from "lucide-react";
 import type { OmniboxMatch } from "./types";
@@ -12,6 +13,26 @@ export function omniboxMatchIcon(match: OmniboxMatch) {
   return Globe2;
 }
 
+/** The site's favicon when one is known, else the row's kind icon (a globe for addresses). */
+function OmniboxMatchIcon({ match }: { match: OmniboxMatch }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const Icon = omniboxMatchIcon(match);
+  const page = ["url", "history", "bookmark", "tab"].includes(match.kind);
+  const src = page ? match.faviconUrl : null;
+  if (src && failed !== src)
+    return (
+      <img
+        alt=""
+        src={src}
+        className="size-4 shrink-0 select-none rounded-sm object-contain"
+        decoding="async"
+        draggable={false}
+        onError={() => setFailed(src)}
+      />
+    );
+  return <Icon strokeWidth={1.7} className="opacity-70" />;
+}
+
 export function OmniboxRow(props: {
   match: OmniboxMatch;
   selected: boolean;
@@ -21,7 +42,6 @@ export function OmniboxRow(props: {
   onRemove?: () => void;
 }) {
   const { match } = props;
-  const Icon = omniboxMatchIcon(match);
   const detail = match.kind === "tab" ? `Switch to tab · ${match.detail}` : match.detail;
   return (
     <SuggestionItem
@@ -30,9 +50,9 @@ export function OmniboxRow(props: {
       onPointerEnter={props.onPoint}
       onClick={props.onChoose}
     >
-      <Icon strokeWidth={1.7} className="opacity-70" />
+      <OmniboxMatchIcon match={match} />
       <span className="min-w-0 flex-1 truncate font-medium">{match.title}</span>
-      <span className="max-w-[48%] truncate text-xs opacity-55">{detail}</span>
+      {detail ? <span className="max-w-[48%] truncate text-xs opacity-55">{detail}</span> : null}
       {match.switchViewId ? (
         <Button
           // The row sits inside the address bar's form: as a submit button,

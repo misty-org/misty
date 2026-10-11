@@ -39,6 +39,7 @@ import { MistySection } from "./sections/MistySection";
 import { PrivacySection } from "./sections/PrivacySection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
+import { UsageSection } from "./sections/UsageSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
@@ -118,6 +119,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("spaces", "spaces-manage", "Manage spaces", ManageSpacesSection, "resource"),
   page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
   page("agents", "models", "Models", ModelsSection, "account"),
+  page("agents", "agents-usage", "Usage", UsageSection, "account"),
   page("agents", "misty", "Misty", MistySection, "account"),
   page(
     "agents",

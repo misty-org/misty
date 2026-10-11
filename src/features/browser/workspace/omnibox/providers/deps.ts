@@ -16,6 +16,11 @@ export interface OmniboxDeps {
     text: string;
     limit: number;
   }): Promise<BrowserHistorySuggestion[]>;
+  /** A profile's most recent page visits, newest first. */
+  recentVisits(request: {
+    profileId?: string;
+    limit: number;
+  }): Promise<{ url: string; title: string }[]>;
   /** Saved websites (bookmarks), from the synced workspace. */
   bookmarks(): { url: string; title: string }[];
   /** Misty content on this device (notes, Spaces, Library items) matching the text. */
