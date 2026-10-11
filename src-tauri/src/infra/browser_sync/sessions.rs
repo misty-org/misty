@@ -64,6 +64,20 @@ pub(super) async fn personal_session() -> SessionGuard {
     lock_slot(slot).await
 }
 
+/// A Space's vault session: the personal vault's for `None`. Empty while that
+/// vault is locked or not open; a Space never falls back to another's vault.
+pub(super) async fn space_session(space_id: Option<&str>) -> SessionGuard {
+    let Some(space) = space_id else {
+        return personal_session().await;
+    };
+    let slot = sessions()
+        .vaults
+        .values()
+        .find(|entry| entry.space_id.as_deref() == Some(space))
+        .map(|entry| entry.slot.clone());
+    lock_slot(slot).await
+}
+
 /// The session a renderer command names. An unknown id falls back to the
 /// personal session so `require_session` reports that the session changed.
 pub(super) async fn session_by_id(session_id: &str) -> SessionGuard {

@@ -3,26 +3,35 @@ use super::*;
 const ID: &str = "01951d32-40ac-7000-8000-000000000001";
 
 #[test]
-fn labels_name_a_space_and_nothing_else() {
+fn labels_name_a_window_and_its_space_is_kept_natively() {
     let key = space_key(ID, false).unwrap();
     assert_eq!(key, "01951d3240ac70008000000000000001");
-    assert_eq!(space_for_window(&space_label(&key)), Some(key.clone()));
-    assert_eq!(space_for_window("space-personal").as_deref(), Some(PERSONAL));
     assert_eq!(space_id_for_key(&key).as_deref(), Some(ID));
     assert_eq!(space_id_for_key(PERSONAL), None);
-    assert!(is_space_window("space-personal"));
-    assert!(!is_incognito_window("space-personal"));
+
+    let label = new_label(false);
+    assert!(is_space_window(&label));
+    assert!(!is_incognito_window(&label));
+    // A window shows no Space until it is given one.
+    assert_eq!(space_for_window(&label), None);
+    set_current(&label, PERSONAL);
+    assert_eq!(space_for_window(&label).as_deref(), Some(PERSONAL));
+    // Switching changes the Space the same window shows.
+    set_current(&label, &key);
+    assert_eq!(space_for_window(&label), Some(key.clone()));
+    assert!(space_is_open(&key));
+    assert_eq!(forget_current(&label), Some(key.clone()));
+    assert_eq!(space_for_window(&label), None);
+
     for unknown in [
         "main",
-        "space-",
-        "space-Personal",
-        "space-01951D3240AC70008000000000000001",
-        "space-01951d32-40ac-7000-8000-000000000001",
-        "space-personal-1",
-        "incognito-personal",
-        "incognito-personal-0",
-        "incognito-personal-01",
-        "incognito-unknown-1",
+        "window-",
+        "window-0",
+        "window-01",
+        "window-x",
+        "space-personal",
+        "incognito-",
+        "incognito-0",
         "misty-agent-01951d32-40ac-7000-8000-000000000001",
         "misty-dock-1",
         "browser-1",
@@ -33,19 +42,41 @@ fn labels_name_a_space_and_nothing_else() {
 }
 
 #[test]
-fn incognito_windows_belong_to_their_space_without_its_trust() {
-    let label = incognito_label(PERSONAL, 2);
-    assert_eq!(label, "incognito-personal-2");
+fn incognito_windows_show_a_space_without_its_trust() {
+    let label = new_label(true);
+    assert!(label.starts_with("incognito-"));
+    set_current(&label, PERSONAL);
     assert_eq!(
         parse(&label),
         Some(SpaceWindow {
             space: PERSONAL.into(),
-            incognito: Some(2)
+            incognito: true
         })
     );
     assert!(is_app_window(&label));
     assert!(is_incognito_window(&label));
     assert!(!is_space_window(&label));
+    forget_current(&label);
+}
+
+#[test]
+fn incognito_sessions_follow_the_space_a_window_shows() {
+    let mut state = Registry::default();
+    join_incognito(&mut state, PERSONAL, "incognito-1");
+    join_incognito(&mut state, PERSONAL, "incognito-2");
+    let personal = state.incognito[PERSONAL].session.clone();
+    // One window switching away leaves the Space's session to the other.
+    assert_eq!(leave_incognito(&mut state, PERSONAL, "incognito-1"), None);
+    join_incognito(&mut state, "01951d3240ac70008000000000000001", "incognito-1");
+    assert_ne!(
+        state.incognito["01951d3240ac70008000000000000001"].session,
+        personal
+    );
+    // The last window leaving ends the session.
+    assert_eq!(
+        leave_incognito(&mut state, PERSONAL, "incognito-2"),
+        Some(personal)
+    );
 }
 
 #[test]

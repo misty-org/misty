@@ -6,10 +6,10 @@ import { isWindowColor, type WindowColor } from "./windowColors";
 import type { WorkspaceScopeKey } from "./model";
 
 /**
- * Every Misty window belongs to one Space, as every Chrome window belongs to one
- * profile. The native side names the window after its Space (`space-<key>`, or
- * `incognito-<key>-<n>` for an incognito window); this module reads that label once,
- * at boot, and never lets the renderer pick another Space.
+ * A Misty window shows one Space at a time and can switch it in place, as Arc does. The
+ * native side keeps which Space each window shows and changes it only through
+ * `space_window_switch`; this module follows it. The window's tabs, the store its pages
+ * open in, its extensions, sync, memory and agents all follow the current Space.
  */
 export const personalSpaceKey = "personal";
 
@@ -37,38 +37,82 @@ function spaceIdFromKey(key: string): string | null {
   return `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}`;
 }
 
-/** The Space a window label names; the personal Space outside the desktop app. */
-export function parseSpaceWindowLabel(label: string | null): SpaceWindowIdentity {
-  const space = label?.match(/^space-(personal|[0-9a-f]{32})$/);
-  const incognito = label?.match(/^incognito-(personal|[0-9a-f]{32})-[1-9][0-9]*$/);
-  const key = space?.[1] ?? incognito?.[1] ?? personalSpaceKey;
+function validKey(key: unknown): key is string {
+  return typeof key === "string" && (key === personalSpaceKey || /^[0-9a-f]{32}$/.test(key));
+}
+
+/** A window label's kind; window labels never name a Space. */
+export function isIncognitoWindowLabel(label: string | null): boolean {
+  return Boolean(label && /^incognito-[1-9][0-9]*$/.test(label));
+}
+
+/** An app window that isn't incognito (not an agent window or an overlay). */
+export function isSpaceWindowLabel(label: string): boolean {
+  return /^window-[1-9][0-9]*$/.test(label);
+}
+
+/** The identity of a window showing a Space. */
+export function spaceWindowIdentity(key: string, incognito: boolean): SpaceWindowIdentity {
+  const valid = validKey(key) ? key : personalSpaceKey;
   return {
-    key,
-    spaceId: spaceIdFromKey(key),
-    personal: key === personalSpaceKey,
-    incognito: Boolean(incognito),
+    key: valid,
+    spaceId: spaceIdFromKey(valid),
+    personal: valid === personalSpaceKey,
+    incognito,
   };
+}
+
+/** The Space the native side opened this window in, set before the app first renders. */
+function openingIdentity(): SpaceWindowIdentity {
+  const opening =
+    typeof window === "undefined"
+      ? undefined
+      : (window as typeof window & { __MISTY_WINDOW_SPACE__?: { key?: unknown } })
+          .__MISTY_WINDOW_SPACE__;
+  return spaceWindowIdentity(
+    validKey(opening?.key) ? opening.key : personalSpaceKey,
+    isIncognitoWindowLabel(currentLabel()),
+  );
 }
 
 /** This window's native label, as agent device contexts name it. */
 export function currentWindowLabel(): string {
-  return currentLabel() ?? `space-${personalSpaceKey}`;
-}
-
-/** A Space's own window (not incognito, an agent window or an overlay). */
-export function isSpaceWindowLabel(label: string): boolean {
-  return /^space-(personal|[0-9a-f]{32})$/.test(label);
+  return currentLabel() ?? "window-1";
 }
 
 let identity: SpaceWindowIdentity | undefined;
+const identityListeners = new Set<
+  (next: SpaceWindowIdentity, previous: SpaceWindowIdentity) => void
+>();
 
-/** This window's Space, fixed for the life of the renderer. */
+/** The Space this window shows now. */
 export function spaceWindow(): SpaceWindowIdentity {
-  identity ??= parseSpaceWindowLabel(currentLabel());
+  identity ??= openingIdentity();
   return identity;
 }
 
-/** The workspace scope of this window's Space: its tabs, panes and tab groups. */
+/** Calls `listener` whenever this window switches to another Space. */
+export function onSpaceWindowSwitch(
+  listener: (next: SpaceWindowIdentity, previous: SpaceWindowIdentity) => void,
+): () => void {
+  identityListeners.add(listener);
+  return () => identityListeners.delete(listener);
+}
+
+/** Follows a switch the native side made (or, in tests, stands in for one). */
+export function followSpaceWindow(key: string) {
+  showSpace(key);
+}
+
+function showSpace(key: string) {
+  const previous = spaceWindow();
+  if (previous.key === key || !validKey(key)) return;
+  identity = spaceWindowIdentity(key, previous.incognito);
+  useSpaceWindowStore.setState({ identity });
+  for (const listener of identityListeners) listener(identity, previous);
+}
+
+/** The workspace scope of the Space this window shows: its tabs, panes and tab groups. */
 export function windowSpaceScope(): WorkspaceScopeKey {
   return `space:${spaceWindow().spaceId ?? personalSpaceKey}`;
 }
@@ -85,8 +129,12 @@ export interface SpaceWindowEntry {
   color?: WindowColor;
 }
 
-/** The Space's name and color, as this device keeps them. */
-export const useSpaceWindowStore = create<{ space: SpaceWindowEntry | null }>(() => ({
+/** The Space this window shows, with its name and color as this device keeps them. */
+export const useSpaceWindowStore = create<{
+  identity: SpaceWindowIdentity;
+  space: SpaceWindowEntry | null;
+}>(() => ({
+  identity: spaceWindow(),
   space: null,
 }));
 
@@ -111,13 +159,48 @@ export function startSpaceWindow() {
   void invoke<{ space: unknown }>("space_window_info")
     .then((info) => {
       const space = entry(info.space);
-      if (space) useSpaceWindowStore.setState({ space });
+      if (!space) return;
+      // After a reload the window may show another Space than it opened in.
+      showSpace(space.key);
+      useSpaceWindowStore.setState({ space });
     })
     .catch(() => undefined);
   void listen<unknown>("misty://space-window", ({ payload }) => {
     const space = entry(payload);
-    if (space && space.key === spaceWindow().key) useSpaceWindowStore.setState({ space });
+    if (!space) return;
+    // The native side sends this window its Space's changes and its own switches.
+    showSpace(space.key);
+    if (space.key === spaceWindow().key) useSpaceWindowStore.setState({ space });
   }).catch(() => undefined);
+}
+
+/** Switches this window to another Space in place; its tabs swap to that Space's. */
+export async function switchSpaceWindow(spaceId: string, personal: boolean) {
+  const space = entry(await invoke<unknown>("space_window_switch", { spaceId, personal }));
+  if (!space) return;
+  showSpace(space.key);
+  useSpaceWindowStore.setState({ space });
+}
+
+/** Whether this window runs the device's own background work (agent jobs). */
+export function isHostWindow(): Promise<boolean> {
+  if (!hasTauriInternals()) return Promise.resolve(false);
+  return invoke<boolean>("space_window_is_host").catch(() => false);
+}
+
+/** Calls `listener` when this window becomes the host after the host closed. */
+export function onHostWindow(listener: () => void): () => void {
+  if (!hasTauriInternals()) return () => undefined;
+  let stop: (() => void) | undefined;
+  let stopped = false;
+  void listen("misty://space-window-host", listener).then((unlisten) => {
+    if (stopped) unlisten();
+    else stop = unlisten;
+  });
+  return () => {
+    stopped = true;
+    stop?.();
+  };
 }
 
 /** Sets this Space's color; every window of the Space takes it. */
@@ -126,12 +209,12 @@ export async function setSpaceColor(color: WindowColor) {
   if (space) useSpaceWindowStore.setState({ space });
 }
 
-/** Opens or focuses a Space's window. */
+/** Opens a new window showing a Space. */
 export function openSpaceWindow(spaceId: string, personal: boolean) {
   return invoke("space_window_open", { spaceId, personal });
 }
 
-/** Opens an incognito window in this window's Space. */
+/** Opens an incognito window showing this window's Space. */
 export function openIncognitoWindow() {
   return invoke("space_incognito_open");
 }

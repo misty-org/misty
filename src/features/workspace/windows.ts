@@ -7,7 +7,13 @@ import {
   activateTab,
 } from "./layoutTabs";
 import { reconcileGroupIdentities } from "./groupIdentity";
-import { capDockLeaves, createDockLeaf, dockLeaves, fillEmptyDockLeaves, normalizeDockNode } from "./dockTree";
+import {
+  capDockLeaves,
+  createDockLeaf,
+  dockLeaves,
+  fillEmptyDockLeaves,
+  normalizeDockNode,
+} from "./dockTree";
 import {
   maxWorkspacePanes,
   type WorkspaceLayout,
@@ -20,14 +26,16 @@ import { useSpaceWindowStore, windowSpaceScope } from "./spaceWindow";
 import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 
 /**
- * One renderer runs one OS window, and that window belongs to one Space. Its tabs and
- * panes are `layout`; `activeWindowId` is the window's stable identity in the sync tree
- * (window → tab → pane → view). Device profiles still keep a layout of their own in
- * `layoutsByScope` until they become Spaces.
+ * One renderer runs one OS window, which shows one Space at a time. The Space on screen
+ * is `activeScopeKey`, its tabs and panes are `layout`, and `activeWindowId` is the
+ * window's identity in that Space's sync tree (window → tab → pane → view). Every Space
+ * the window has shown keeps its layout in `layoutsByScope` and its window identity in
+ * `windowIdsByScope`, so switching back restores them.
  */
 export interface WorkspaceWindowsState {
   activeScopeKey: WorkspaceScopeKey;
   layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>>;
+  windowIdsByScope?: Partial<Record<WorkspaceScopeKey, string>>;
   activeWindowId: string;
   layout: WorkspaceLayout;
   /** Where this window keeps its navigation and tabs; the device default when unset. */
@@ -167,5 +175,24 @@ export function switchWorkspaceScope(
     activeScopeKey: scopeKey,
     layout,
     layoutsByScope: { ...layoutsByScope, [scopeKey]: layout },
+  };
+}
+
+/** Shows another Space in this window: its own tabs, and its own window in its sync tree. */
+export function showSpaceScope(
+  state: WorkspaceWindowsState,
+  scopeKey: WorkspaceScopeKey,
+): WorkspaceWindowsUpdate | null {
+  const update = switchWorkspaceScope(state, scopeKey);
+  if (!update) return null;
+  const windowIdsByScope: Partial<Record<WorkspaceScopeKey, string>> = {
+    ...state.windowIdsByScope,
+    [state.activeScopeKey]: state.activeWindowId,
+  };
+  const activeWindowId = windowIdsByScope[scopeKey] ?? createWorkspaceWindowId();
+  return {
+    ...update,
+    windowIdsByScope: { ...windowIdsByScope, [scopeKey]: activeWindowId },
+    activeWindowId,
   };
 }

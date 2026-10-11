@@ -201,7 +201,9 @@ pub async fn browser_sync_account_feed(
 #[tauri::command]
 pub async fn browser_sync_state(webview: tauri::Webview) -> Result<Option<SyncView>, String> {
     require_main(&webview)?;
-    let mut current = personal_session().await;
+    // The window's tabs are its current Space's: they sync through that Space's vault.
+    let space = space_data::window_space(webview.window().label());
+    let mut current = space_session(space.as_deref()).await;
     match current.as_mut() {
         Some(active) => view(active).await.map(Some),
         None => Ok(None),

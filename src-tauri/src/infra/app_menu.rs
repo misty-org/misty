@@ -39,12 +39,15 @@ extern "C" fn dock_choice(key: *const std::ffi::c_char) {
     }
 }
 
-/// The Spaces with a checkmark beside each one that has a window open.
+/// The Spaces, with a checkmark beside the one the window used last shows. Choosing one
+/// switches that window to it.
 #[cfg(target_os = "macos")]
 fn spaces_menu<R: Runtime>(app: &AppHandle<R>, title: &str) -> tauri::Result<Submenu<R>> {
     let menu = Submenu::new(app, title, true)?;
+    let shown = space_windows::focused(app)
+        .and_then(|window| space_windows::space_for_window(window.label()));
     for space in space_windows::listed_spaces() {
-        let open = app.get_window(&space_windows::space_label(&space.key)).is_some();
+        let open = shown.as_deref() == Some(space.key.as_str());
         menu.append(&CheckMenuItem::with_id(
             app,
             format!("{SPACE_MENU_PREFIX}{}", space.key),
@@ -65,7 +68,7 @@ fn refresh_dock<R: Runtime>(app: &AppHandle<R>) {
             serde_json::json!({
                 "key": space.key,
                 "name": space.name,
-                "open": app.get_window(&space_windows::space_label(&space.key)).is_some(),
+                "open": space_windows::space_is_open(&space.key),
             })
         })
         .collect();
@@ -360,7 +363,7 @@ fn effective_primary(
 #[cfg(target_os = "macos")]
 pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
     if let Some(key) = id.strip_prefix(SPACE_MENU_PREFIX) {
-        let _ = space_windows::open_space(app, key);
+        let _ = space_windows::switch_focused(app, key);
         // A check item toggles itself when chosen; the rebuilt menu shows what is open.
         refresh_spaces(app);
         return true;

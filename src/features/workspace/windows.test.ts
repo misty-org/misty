@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "./dockTree";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { currentWindows } from "./windows";
-import { migrateWorkspaceStore } from "./workspaceStorePersistence";
+import { followSpaceWindow } from "./spaceWindow";
+import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { allLayoutViews } from "./layoutTabs";
 
-describe("one workspace window per Space", () => {
+describe("a window showing one Space at a time", () => {
   beforeEach(() => {
     useWorkspaceStore.persist.clearStorage();
     useWorkspaceStore.getState().reset();
@@ -136,5 +137,63 @@ describe("one workspace window per Space", () => {
     expect(findDockLeaf(useWorkspaceStore.getState().layout.root, second)?.activeViewId).toBe(
       files.id,
     );
+  });
+});
+
+describe("switching a window's Space", () => {
+  const workKey = "01951d3240ac70008000000000000001";
+  // The bridge does this when the native side switches the window.
+  const show = (
+    key: string,
+    scope: Parameters<ReturnType<typeof useWorkspaceStore.getState>["showSpace"]>[0],
+  ) => {
+    followSpaceWindow(key);
+    useWorkspaceStore.getState().showSpace(scope);
+  };
+  beforeEach(() => {
+    followSpaceWindow("personal");
+    useWorkspaceStore.persist.clearStorage();
+    useWorkspaceStore.getState().reset();
+  });
+
+  it("shows the other Space's own tabs and window, and restores both on the way back", () => {
+    const work = "space:01951d32-40ac-7000-8000-000000000001" as const;
+    const personalTab = useWorkspaceStore
+      .getState()
+      .openBrowserView({ url: "https://personal.example" });
+    const personalWindow = useWorkspaceStore.getState().activeWindowId;
+
+    show(workKey, work);
+    const inWork = useWorkspaceStore.getState();
+    expect(inWork.activeScopeKey).toBe(work);
+    expect(inWork.activeWindowId).not.toBe(personalWindow);
+    expect(allLayoutViews(inWork.layout).map((view) => view.id)).not.toContain(personalTab.id);
+    const workTab = inWork.openBrowserView({ url: "https://work.example" });
+    const workWindow = useWorkspaceStore.getState().activeWindowId;
+
+    show("personal", "space:personal");
+    const back = useWorkspaceStore.getState();
+    expect(back.activeWindowId).toBe(personalWindow);
+    expect(allLayoutViews(back.layout).map((view) => view.id)).toContain(personalTab.id);
+    expect(allLayoutViews(back.layout).map((view) => view.id)).not.toContain(workTab.id);
+
+    show(workKey, work);
+    expect(useWorkspaceStore.getState().activeWindowId).toBe(workWindow);
+    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toContain(
+      workTab.id,
+    );
+  });
+
+  it("keeps every Space's layout through a save and restore", () => {
+    const work = "space:01951d32-40ac-7000-8000-000000000001" as const;
+    show(workKey, work);
+    const workTab = useWorkspaceStore.getState().openBrowserView({ url: "https://work.example" });
+    show("personal", "space:personal");
+    const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState())));
+    const restored = migrateWorkspaceStore(saved, 0);
+    expect(allLayoutViews(restored.layoutsByScope[work]!).map((view) => view.id)).toContain(
+      workTab.id,
+    );
+    expect(restored.windowIdsByScope?.[work]).toBeDefined();
   });
 });

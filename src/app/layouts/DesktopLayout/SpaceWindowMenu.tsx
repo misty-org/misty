@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AppWindow, Palette, VenetianMask, X } from "lucide-react";
+import { AppWindow, AppWindowMac, Palette, VenetianMask, X } from "lucide-react";
 import { useSpacesStore } from "@/features/spaces/core";
 import { preferredDefaultSpace } from "@/features/spaces/defaultSpace";
 import {
@@ -8,7 +8,7 @@ import {
   openIncognitoWindow,
   openSpaceWindow,
   setSpaceColor,
-  spaceWindow,
+  switchSpaceWindow,
   useSpaceWindowStore,
 } from "@/features/workspace/spaceWindow";
 import { windowColorHex, windowColorNames } from "@/features/workspace/windowColors";
@@ -28,21 +28,22 @@ const spaceColorLabel = "Space color";
 const colorLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 /**
- * The window's Space menu: the account's Spaces (each opens in its own window, with
- * a checkmark on this one), a new incognito window, this Space's color and Close window.
- * The rows go inside any dropdown content.
+ * The window's Space menu: the account's Spaces (choosing one switches this window to it,
+ * with a checkmark on the one it shows), the current Space in a new window, a new
+ * incognito window, this Space's color and Close window. The rows go inside any dropdown
+ * content.
  */
 export function useSpaceWindowMenu() {
   const [error, setError] = useState("");
   const spaces = useSpacesStore((state) => state.spaces);
   const space = useSpaceWindowStore((state) => state.space);
-  const current = spaceWindow();
+  const current = useSpaceWindowStore((state) => state.identity);
   const personal = preferredDefaultSpace(spaces);
   const incognito = isIncognitoWindow();
   const report = (action: Promise<unknown>) =>
     void action.then(
       () => setError(""),
-      () => setError("That window couldn't open. Try again."),
+      () => setError("That Space couldn't open. Try again."),
     );
   const items = (
     <>
@@ -53,7 +54,9 @@ export function useSpaceWindowMenu() {
           <DropdownMenuCheckboxItem
             key={item.id}
             checked={here}
-            onSelect={() => report(openSpaceWindow(item.id, isPersonal))}
+            onSelect={() => {
+              if (!here) report(switchSpaceWindow(item.id, isPersonal));
+            }}
           >
             <span className="min-w-0 flex-1 truncate">{item.name}</span>
           </DropdownMenuCheckboxItem>
@@ -65,6 +68,13 @@ export function useSpaceWindowMenu() {
         </p>
       )}
       <DropdownMenuSeparator />
+      <MenuItem
+        icon={<AppWindowMac className="size-4" />}
+        label="Open in new window"
+        onSelect={() =>
+          report(openSpaceWindow(current.spaceId ?? personal?.id ?? "", current.personal))
+        }
+      />
       <MenuItem
         icon={<VenetianMask className="size-4" />}
         label="New incognito window"

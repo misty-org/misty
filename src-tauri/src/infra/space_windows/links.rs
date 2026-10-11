@@ -58,19 +58,22 @@ fn targets<R: Runtime>(
     out
 }
 
-/// Queues links for a Space and brings its window forward, opening it if needed.
+/// Queues links for a Space and brings forward a window showing it, opening one if
+/// none does.
 fn deliver<R: Runtime>(app: &AppHandle<R>, key: &str, urls: Vec<String>) {
     if let Ok(mut pending) = PENDING.lock() {
         pending.entry(key.into()).or_default().extend(urls);
     }
-    let label = space_label(key);
-    let open = app.get_window(&label).is_some();
+    let shown = windows_for_space(app, key)
+        .into_iter()
+        .find(|window| is_space_window(window.label()))
+        .map(|window| window.label().to_owned());
     if let Err(error) = open_space(app, key) {
         eprintln!("Could not open a Space for a link: {error}");
         return;
     }
     // A window that just opened takes its links as it starts.
-    if open {
+    if let Some(label) = shown {
         let _ = app.emit_to(label.as_str(), LINKS_EVENT, ());
     }
 }
@@ -84,7 +87,7 @@ pub fn route_links<R: Runtime>(app: &AppHandle<R>, label: &str, urls: Vec<String
     let urls: Vec<_> = urls.into_iter().filter(|url| link_host(url).is_some()).collect();
     let mut mine = Vec::new();
     for (key, urls) in targets(app, urls, Some(&here.space)) {
-        if key == here.space && here.incognito.is_none() {
+        if key == here.space && !here.incognito {
             mine.extend(urls);
         } else {
             deliver(app, &key, urls);
@@ -104,7 +107,7 @@ pub fn route_app_links<R: Runtime>(app: &AppHandle<R>, urls: Vec<String>) {
 /// The links waiting for this Space window.
 pub fn take_links(label: &str) -> Vec<String> {
     let Some(key) = parse(label)
-        .filter(|window| window.incognito.is_none())
+        .filter(|window| !window.incognito)
         .map(|window| window.space)
     else {
         return Vec::new();

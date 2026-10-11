@@ -16,7 +16,7 @@ import { isAuthPath } from "@/features/app-shell";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
-import { spaceWindow } from "@/features/workspace/spaceWindow";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
 
 const DesktopLayout = lazy(() =>
@@ -30,12 +30,11 @@ export function AppFrameLayout() {
   const isAuthRoute = isAuthPath(location.pathname);
   const isInviteRoute = location.pathname.startsWith("/invite/");
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
-  // An incognito window keeps nothing and never syncs. Until each Space has its own
-  // vault on this device, only the personal Space's window syncs.
-  const { incognito, personal } = spaceWindow();
+  // An incognito window keeps nothing and never syncs. Any other window syncs the tabs
+  // of the Space it shows, through that Space's vault; switching restarts the bridge.
+  const { incognito, key: spaceKey } = useSpaceWindowStore((state) => state.identity);
   const syncAllowed =
     !incognito &&
-    personal &&
     (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready));
 
   // Keep hook order stable as identity changes, and let account transitions
@@ -78,7 +77,7 @@ export function AppFrameLayout() {
           </ConnectedDevicesProvider>
         </Suspense>
       </BrowserSyncStartup>
-      <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
+      <BrowserSyncBridge key={spaceKey} accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />

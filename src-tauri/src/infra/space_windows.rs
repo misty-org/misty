@@ -1,16 +1,16 @@
-//! Every Misty window belongs to one Space, as every Chrome window belongs to one
-//! profile. This module owns the window labels and is the only place that names
-//! them; no other native code may spell a window label.
+//! Every Misty window shows one Space at a time and can switch it in place, as Arc
+//! does. This module owns the window labels and each window's current Space; it is the
+//! only place that names a window, and no other native code may spell a label.
 //!
-//! - `space-<key>`: the Space's window. Its key is `personal` for the personal Space
-//!   and the Space id's 32 hex digits for every other Space.
-//! - `incognito-<key>-<n>`: an incognito window of that Space. All of a Space's
-//!   incognito windows share one temporary session, erased when the last one closes.
+//! - `window-<n>`: an app window. It shows its current Space's tabs, opens pages in that
+//!   Space's store and works with its extensions, sync, memory and agents.
+//! - `incognito-<n>`: an incognito window. It also shows one Space at a time; all of a
+//!   Space's incognito windows share one temporary session, erased when the last closes.
 //!
-//! Which Spaces exist, their names and colors come from the Space windows (the
-//! renderer lists them once it has the account's Spaces) and are kept on this device
-//! with the Spaces that were open at quit. The Space itself is always read from the
-//! window's label, never from anything a renderer sends.
+//! The current Space is kept here, natively, and changes only through
+//! [`switch_space`]; it is never taken from anything a renderer sends. Which Spaces exist,
+//! their names and colors come from the renderer's account Spaces and are kept on this
+//! device with the Spaces that were open at quit.
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -31,17 +31,25 @@ mod tests;
 /// The personal Space's key. It has a vault (and store) before the account's Spaces
 /// are known, so it never waits for a Space id.
 pub const PERSONAL: &str = "personal";
-const SPACE_PREFIX: &str = "space-";
+const WINDOW_PREFIX: &str = "window-";
 const INCOGNITO_PREFIX: &str = "incognito-";
-/// Emitted to a Space's windows when its name or color changes.
+/// Emitted to a window's app when its current Space's name or color changes, or when
+/// the window switches to another Space.
 pub const SPACE_CHANGED_EVENT: &str = "misty://space-window";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpaceWindow {
+    /// The Space the window shows now.
     pub space: String,
-    /// The incognito window's number within its Space; `None` for the Space window.
-    pub incognito: Option<u32>,
+    /// Whether this is an incognito window.
+    pub incognito: bool,
 }
+
+/// Each open window's current Space, by label. Its own lock, never held while the
+/// registry's is taken.
+static CURRENT: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
+/// The number the next window label takes.
+static NEXT_WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 /// A Space's key from its id: `personal`, or the id's 32 lowercase hex digits.
 pub fn space_key(space_id: &str, personal: bool) -> Result<String, String> {
@@ -70,52 +78,96 @@ pub fn space_id_for_key(key: &str) -> Option<String> {
         .map(|id| id.hyphenated().to_string())
 }
 
-pub fn space_label(key: &str) -> String {
-    format!("{SPACE_PREFIX}{key}")
-}
-
-pub fn incognito_label(key: &str, number: u32) -> String {
-    format!("{INCOGNITO_PREFIX}{key}-{number}")
-}
-
-/// The Space window or incognito window a label names; `None` for every other label.
-pub fn parse(label: &str) -> Option<SpaceWindow> {
-    if let Some(key) = label.strip_prefix(SPACE_PREFIX) {
-        return valid_key(key).then(|| SpaceWindow {
-            space: key.into(),
-            incognito: None,
-        });
+fn label_number(label: &str, prefix: &str) -> Option<u32> {
+    let number = label.strip_prefix(prefix)?;
+    if number.starts_with('0') {
+        return None;
     }
-    let rest = label.strip_prefix(INCOGNITO_PREFIX)?;
-    let (key, number) = rest.rsplit_once('-')?;
-    let number = number
-        .parse::<u32>()
-        .ok()
-        .filter(|n| *n > 0 && !number.starts_with('0'))?;
-    valid_key(key).then(|| SpaceWindow {
-        space: key.into(),
-        incognito: Some(number),
-    })
+    number.parse::<u32>().ok().filter(|n| *n > 0)
 }
 
-/// The Space a window belongs to. Unknown labels belong to none.
+/// A new label for an app window or an incognito window.
+pub(super) fn new_label(incognito: bool) -> String {
+    let number = NEXT_WINDOW.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let prefix = if incognito { INCOGNITO_PREFIX } else { WINDOW_PREFIX };
+    format!("{prefix}{number}")
+}
+
+/// Sets the Space a window shows. Only window creation and [`switch_space`] call this.
+pub(super) fn set_current(label: &str, key: &str) {
+    if let Ok(mut current) = CURRENT.lock() {
+        current.insert(label.to_owned(), key.to_owned());
+    }
+}
+
+/// Forgets a closed window's Space.
+pub(super) fn forget_current(label: &str) -> Option<String> {
+    CURRENT.lock().ok()?.remove(label)
+}
+
+/// Every open window with the Space it shows, in the order the windows opened.
+pub(super) fn current_windows() -> Vec<(String, String)> {
+    let mut windows: Vec<_> = CURRENT
+        .lock()
+        .map(|current| current.iter().map(|(l, k)| (l.clone(), k.clone())).collect())
+        .unwrap_or_default();
+    windows.sort_by_key(|(label, _)| {
+        label_number(label, WINDOW_PREFIX)
+            .or_else(|| label_number(label, INCOGNITO_PREFIX))
+            .unwrap_or(u32::MAX)
+    });
+    windows
+}
+
+/// The app window or incognito window a label names, with the Space it shows now;
+/// `None` for every other label.
+pub fn parse(label: &str) -> Option<SpaceWindow> {
+    let incognito = if label_number(label, WINDOW_PREFIX).is_some() {
+        false
+    } else if label_number(label, INCOGNITO_PREFIX).is_some() {
+        true
+    } else {
+        return None;
+    };
+    let space = CURRENT.lock().ok()?.get(label).cloned()?;
+    Some(SpaceWindow { space, incognito })
+}
+
+/// The Space a window shows now. Unknown labels show none.
 pub fn space_for_window(label: &str) -> Option<String> {
     parse(label).map(|window| window.space)
 }
 
-/// A Space's own window: the full workspace, with sync, recovery, history, memory and
-/// agents. Trust checks for account data accept these and nothing else.
+/// An app window (not incognito): the full workspace, with sync, recovery, history,
+/// memory and agents. Trust checks for account data accept these and nothing else.
 pub fn is_space_window(label: &str) -> bool {
-    parse(label).is_some_and(|window| window.incognito.is_none())
+    label_number(label, WINDOW_PREFIX).is_some()
 }
 
 pub fn is_incognito_window(label: &str) -> bool {
-    parse(label).is_some_and(|window| window.incognito.is_some())
+    label_number(label, INCOGNITO_PREFIX).is_some()
 }
 
 /// Any Misty app window, incognito included: the bundled app runs in it.
 pub fn is_app_window(label: &str) -> bool {
-    parse(label).is_some()
+    is_space_window(label) || is_incognito_window(label)
+}
+
+/// Emitted to the window that becomes the host after the host closes.
+pub const HOST_EVENT: &str = "misty://space-window-host";
+
+/// The window that runs this device's own background work (agent jobs): the oldest
+/// open app window. Incognito windows never host it.
+pub fn host_window() -> Option<String> {
+    current_windows()
+        .into_iter()
+        .map(|(label, _)| label)
+        .find(|label| is_space_window(label))
+}
+
+/// Whether any open window shows the Space now.
+pub fn space_is_open(key: &str) -> bool {
+    current_windows().iter().any(|(_, shown)| shown == key)
 }
 
 /// Every open app window, incognito included.
@@ -150,7 +202,11 @@ pub fn primary<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
     let last = registry::last_focused_space();
     last.and_then(|label| app.get_window(&label))
         .filter(|window| is_space_window(window.label()))
-        .or_else(|| app.get_window(&space_label(PERSONAL)))
+        .or_else(|| {
+            windows_for_space(app, PERSONAL)
+                .into_iter()
+                .find(|window| is_space_window(window.label()))
+        })
         .or_else(|| space_windows(app).into_iter().next())
 }
 

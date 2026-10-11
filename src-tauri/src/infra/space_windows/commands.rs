@@ -1,5 +1,5 @@
-//! The renderer's view of its Space window: its Space, the account's Spaces, opening
-//! and closing windows, the Space color and removing a deleted Space.
+//! The renderer's view of its window: the Space it shows, switching it, the account's
+//! Spaces, opening and closing windows, the Space color and removing a deleted Space.
 use super::*;
 use serde::Deserialize;
 
@@ -20,7 +20,7 @@ pub fn space_window_info(webview: tauri::Webview) -> Result<SpaceWindowInfo, Str
     let space = entry(&window.space).ok_or("Spaces are unavailable.")?;
     Ok(SpaceWindowInfo {
         personal: window.space == PERSONAL,
-        incognito: window.incognito.is_some(),
+        incognito: window.incognito,
         label,
         space,
     })
@@ -54,7 +54,27 @@ pub fn space_windows_set_spaces(
     Ok(())
 }
 
-/// Opens or focuses a Space's window.
+/// Switches the calling window to another Space in place.
+#[tauri::command]
+pub fn space_window_switch(
+    webview: tauri::Webview,
+    app: AppHandle,
+    space_id: String,
+    personal: bool,
+) -> Result<SpaceEntry, String> {
+    if !is_app_window(webview.label()) {
+        return Err("Only a Misty window can switch Spaces.".into());
+    }
+    switch_space(&app, webview.label(), &space_key(&space_id, personal)?)
+}
+
+/// Whether the calling window runs this device's own background work.
+#[tauri::command]
+pub fn space_window_is_host(webview: tauri::Webview) -> bool {
+    host_window().as_deref() == Some(webview.label())
+}
+
+/// Opens a new window showing a Space.
 #[tauri::command]
 pub fn space_window_open(
     webview: tauri::Webview,
@@ -65,7 +85,7 @@ pub fn space_window_open(
     if !is_app_window(webview.label()) {
         return Err("Only a Misty window can open a Space.".into());
     }
-    open_space(&app, &space_key(&space_id, personal)?)
+    open_space_window(&app, &space_key(&space_id, personal)?)
 }
 
 /// Opens an incognito window in the calling window's Space.
@@ -132,10 +152,6 @@ pub fn space_window_remove(
     if !is_space_window(webview.label()) {
         return Err("Only a Space window can remove a Space.".into());
     }
-    let key = space_key(&space_id, false)?;
-    if space_for_window(webview.label()).as_deref() == Some(key.as_str()) {
-        // The caller is going away with its Space; the personal Space takes over.
-        open_space(&app, PERSONAL)?;
-    }
-    delete_space(&app, &key)
+    // Windows showing the Space switch to the personal Space.
+    delete_space(&app, &space_key(&space_id, false)?)
 }

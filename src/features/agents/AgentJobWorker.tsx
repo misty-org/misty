@@ -1,19 +1,35 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { readAccountAuthToken } from "@/features/auth";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { DesktopAgentJobWorker } from "./worker";
 import { endAllHostedSessions } from "./hostedSessions";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "./localExecution";
-import { isSpaceWindowLabel, spaceWindow } from "@/features/workspace/spaceWindow";
+import { isHostWindow, onHostWindow } from "@/features/workspace/spaceWindow";
+
+/** Whether this window runs the device's agent jobs: the oldest open window does, and the
+ * next one takes over when it closes. */
+function useHostWindow() {
+  const [host, setHost] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void isHostWindow().then((value) => active && setHost(value));
+    const stop = onHostWindow(() => active && setHost(true));
+    return () => {
+      active = false;
+      stop();
+    };
+  }, []);
+  return host;
+}
 
 export function AgentJobWorker() {
   const { user } = useAuth();
+  const host = useHostWindow();
 
   useEffect(() => {
-    if (!hasTauriInternals() || !isSpaceWindowLabel(getCurrentWindow().label) || !spaceWindow().personal || !user?.id) return;
+    if (!hasTauriInternals() || !host || !user?.id) return;
     let canceled = false;
     let worker: DesktopAgentJobWorker | null = null;
     void readAccountAuthToken().then((token) => {
@@ -39,7 +55,7 @@ export function AgentJobWorker() {
       // Sessions for other devices end with this account here.
       void endAllHostedSessions();
     };
-  }, [user?.id]);
+  }, [host, user?.id]);
   // Sessions it hosts show in the control island.
   return null;
 }

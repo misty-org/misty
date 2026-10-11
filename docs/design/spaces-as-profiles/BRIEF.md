@@ -22,10 +22,31 @@ profile is also the boundary for AI.
   passwords, extensions' synced settings). The vault key already carries a `vault_id`,
   so a Space is a new `vault_id`, not new sync code.
 - **One sync password unlocks every Space's vault.**
-- **Windows.** Virtual windows are removed. Opening a Space opens a new OS window in that
-  profile, as Chrome does with profiles; every window belongs to one Space. The Space
-  takes over the window's chosen color (`windowColors.ts`) and its AGENTS.md color
-  exception.
+- **Windows.** Virtual windows are removed. An OS window shows one Space at a time and
+  can switch in place, as Arc does (decided 2026-10-17, replacing one fixed Space per
+  window). Switching swaps the tab strip to that Space's own tabs; the other Space's
+  tabs stay as they were and come back when you switch back. Everything in the window
+  follows its current Space: the website store new pages open in, extensions, sync,
+  memory, agents and the window's color (`windowColors.ts`, under its AGENTS.md color
+  exception). The native side keeps each window's current Space and only its switch
+  command changes it; a page never picks its Space. "Open in new window" shows a Space
+  in a second window, for two Spaces side by side.
+
+### The Space row
+
+The Space's controls live in the sidebar, not in a page (decided 2026-10-17):
+
+- **Row 1** stays as it is: window controls, sidebar toggle, back, forward, reload.
+- **Row 2, the Space row:** the Space's avatar and name with a ⌄ menu on the left, and the
+  Space's Home, Chat and People buttons on the right. The bar that sat inside the Space
+  home page goes away, so the window gains no bar.
+- **The ⌄ menu** lists your Spaces with a checkmark on the current one, then Open in new
+  window, New Space, Rename, Color, and Leave or Delete Space.
+- **No Space settings page.** It only held a name and the members list: the name, color,
+  leave and delete move into the ⌄ menu, and members (invite, remove, their agents) move
+  to the People button.
+- **Collapsed sidebar:** the Space's avatar and name sit at the left end of the tab strip,
+  and its Home, Chat and People move into its ⌄ menu.
 
 ### Joining the sync tree
 
@@ -73,15 +94,16 @@ and sees public items and nothing else; so does anyone else's agent.
 
 ## Incognito windows
 
-Incognito is a window, as in Chrome, not a tab. Each Space can open incognito windows; they
-share one temporary session for that Space, which is erased when its last incognito
-window closes. Incognito is entirely local: nothing in it syncs, reaches the server, enters
-memory or is seen by agents, and Misty does nothing with it.
+Incognito is a window, as in Chrome, not a tab. An incognito window shows one Space at a
+time like any other window, with one temporary session per Space shared by that Space's
+incognito windows and erased when the last of them closes. Incognito is entirely local:
+nothing in it syncs, reaches the server, enters memory or is seen by agents, and Misty does
+nothing with it.
 
 ## Agents
 
 Agents belong to a Space and to the person who made them. The quick agent panel still
-just lists agents; whatever you ask runs in the current window's Space. The full Agents
+just lists agents; whatever you ask runs in the window's current Space. The full Agents
 page groups agents by Space.
 
 ## The memory tree

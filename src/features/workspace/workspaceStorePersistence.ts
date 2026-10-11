@@ -6,7 +6,11 @@ import {
 import { layoutTabs, activateTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import { createWorkspaceWindowId, initialWorkspaceLayout, normalizeWorkspaceLayout } from "./windows";
+import {
+  createWorkspaceWindowId,
+  initialWorkspaceLayout,
+  normalizeWorkspaceLayout,
+} from "./windows";
 import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
 import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
 import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
@@ -24,21 +28,22 @@ type LegacyWindows = {
   closedWindowsByScope?: unknown;
 };
 
-/** The scope this window keeps for what was saved under a legacy scope key: the
- * default workspace and Space scopes become this window's. Device browser profiles
- * are gone (they became Spaces); their layouts are dropped, `null`. */
+/** The scope kept for what was saved under a scope key: each Space keeps its own, and
+ * the legacy `global` workspace becomes the Space this window opens in. Device browser
+ * profiles are gone (they became Spaces); their layouts are dropped, `null`. */
 function currentScope(scope: string | undefined): WorkspaceScopeKey | null {
-  return scope === undefined || scope === "global" || scope.startsWith("space:")
-    ? windowSpaceScope()
-    : null;
+  if (scope?.startsWith("space:")) return scope as WorkspaceScopeKey;
+  return scope === undefined || scope === "global" ? windowSpaceScope() : null;
 }
 
 /**
- * Virtual windows are gone: each Space has one OS window. A scope's active virtual
+ * Virtual windows are gone: a window shows one Space at a time. A scope's active virtual
  * window becomes its layout (its other windows are dropped; there are no users), and the
- * `global` workspace becomes this Space window's own.
+ * `global` workspace becomes the Space this window opens in.
  */
-function dropVirtualWindows(state: Partial<WorkspaceStore> & LegacyWindows): Partial<WorkspaceStore> {
+function dropVirtualWindows(
+  state: Partial<WorkspaceStore> & LegacyWindows,
+): Partial<WorkspaceStore> {
   const { windowsByScope, activeWindowIdByScope, closedWindowsByScope: _closed, ...rest } = state;
   const savedActive = state.activeScopeKey as string | undefined;
   const layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>> = {};
@@ -61,17 +66,24 @@ function dropVirtualWindows(state: Partial<WorkspaceStore> & LegacyWindows): Par
     }
   }
   const activeScopeKey = windowSpaceScope();
-  // A device profile's layout on screen at quit is dropped with the profile.
-  const layout = (savedOwn ? state.layout : undefined) ?? layoutsByScope[activeScopeKey];
-  if (layout) layoutsByScope[activeScopeKey] = layout;
+  const savedScope = currentScope(savedActive);
+  // The layout on screen at save belongs to its own Space; a device profile's is dropped.
+  if (savedScope && state.layout) layoutsByScope[savedScope] = state.layout;
+  const layout = layoutsByScope[activeScopeKey];
+  // Each Space keeps its own window in its sync tree.
+  const windowIdsByScope: Partial<Record<WorkspaceScopeKey, string>> = {
+    ...state.windowIdsByScope,
+    ...(savedScope && windowId ? { [savedScope]: windowId } : {}),
+  };
   const { browserProfiles, ...kept } = rest as typeof rest & { browserProfiles?: unknown };
   eraseRetiredBrowserProfiles(browserProfiles);
   return {
     ...kept,
     activeScopeKey,
-    layout: layoutsByScope[activeScopeKey] ?? initialWorkspaceLayout(activeScopeKey),
+    layout: layout ?? initialWorkspaceLayout(activeScopeKey),
     layoutsByScope,
-    activeWindowId: windowId ?? createWorkspaceWindowId(),
+    windowIdsByScope,
+    activeWindowId: windowIdsByScope[activeScopeKey] ?? createWorkspaceWindowId(),
     dockingLayout,
     tabGroups: (state.tabGroups as (MistyTabGroup & { scopeKey: string })[] | undefined)?.flatMap(
       (group) => {
@@ -181,6 +193,7 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
     layout: state.layout,
     layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },
     activeWindowId: state.activeWindowId,
+    windowIdsByScope: { ...state.windowIdsByScope, [state.activeScopeKey]: state.activeWindowId },
     dockingLayout: state.dockingLayout,
     lastUsedViewByGroup: state.lastUsedViewByGroup,
     closedItems: state.closedItems,

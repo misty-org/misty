@@ -68,7 +68,7 @@ import {
   mapAllWorkspaceWindowViews,
   mapAllWorkspaceWindowLayouts,
   normalizeWorkspaceLayout,
-  switchWorkspaceScope,
+  showSpaceScope,
   withActiveWindowLayout,
   type WorkspaceWindowsState,
 } from "./windows";
@@ -115,6 +115,8 @@ export interface WorkspaceStore
   renameTab: (id: string, title: string) => void;
   reorderTabs: (ids: string[]) => void;
   setScope: (scopeKey: WorkspaceScopeKey) => void;
+  /** Shows another Space in this window (after the native side switched it). */
+  showSpace: (scopeKey: WorkspaceScopeKey) => void;
   openSurface: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   openDestination: (request: OpenWorkspaceSurfaceRequest) => WorkspaceView;
   commitPlaceholder: (tabId: string) => void;
@@ -168,8 +170,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...initialTabGroups(),
       lastUsedViewByGroup: {},
       closedItems: [],
+      // Every scope is a Space now, so a scope change is a Space change with its window id.
       setScope: (scopeKey) => {
-        const update = switchWorkspaceScope(get(), scopeKey);
+        const update = showSpaceScope(get(), scopeKey);
+        if (update) set(update);
+      },
+      showSpace: (scopeKey) => {
+        const update = showSpaceScope(get(), scopeKey);
         if (update) set(update);
       },
       ...tabGroupActions(set, get),

@@ -136,13 +136,14 @@ mod tests {
             "browser_recovery_write",
             "browser_recovery_forget",
         ] {
-            assert!(allows("space-personal", command));
+            assert!(allows("window-1", command));
             for label in [
                 "browser-a",
                 "misty-agent-01951d32-40ac-7000-8000-000000000001",
                 "misty-main",
-                "space-personal-spoof",
-                "incognito-personal-1",
+                "space-personal",
+                "window-1-spoof",
+                "incognito-1",
             ] {
                 assert!(!allows(label, command));
             }

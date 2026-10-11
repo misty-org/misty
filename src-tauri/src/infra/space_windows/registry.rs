@@ -1,5 +1,6 @@
-//! The Spaces this device knows (names and colors), the ones open at quit, the window
-//! used last and each Space's incognito session. Kept in `~/.misty/space-windows.json`.
+//! The Spaces this device knows (names and colors), the Spaces its windows showed at
+//! quit, the window used last and each Space's incognito session. Kept in
+//! `~/.misty/space-windows.json`.
 use super::*;
 use serde::Deserialize;
 use std::collections::BTreeSet;
@@ -26,7 +27,7 @@ pub struct SpaceEntry {
 struct Saved {
     #[serde(default)]
     pub(super) spaces: Vec<SpaceEntry>,
-    /// Space keys whose windows were open at quit, in the order they opened.
+    /// The Space each app window showed at quit, in the order the windows opened.
     #[serde(default)]
     pub(super) open: Vec<String>,
     #[serde(default)]
@@ -36,6 +37,7 @@ struct Saved {
 #[derive(Default)]
 pub(super) struct Registry {
     pub(super) spaces: BTreeMap<String, SpaceEntry>,
+    /// What the last launch left open; the windows this launch restores.
     pub(super) open: Vec<String>,
     pub(super) last_focused: Option<String>,
     /// Incognito windows per Space, and the session their pages share.
@@ -43,7 +45,8 @@ pub(super) struct Registry {
 }
 
 pub(super) struct IncognitoSession {
-    pub(super) windows: BTreeSet<u32>,
+    /// The incognito windows showing this Space, by label.
+    pub(super) windows: BTreeSet<String>,
     pub(super) session: String,
 }
 
@@ -98,17 +101,24 @@ pub(super) fn load() -> Registry {
             .map(|entry| (entry.key.clone(), entry))
             .collect(),
         open: saved.open.into_iter().filter(|key| valid_key(key)).collect(),
-        last_focused: saved.last_focused.filter(|label| is_space_window(label)),
+        // Labels are numbered per launch, so the last one means nothing now.
+        last_focused: None,
         incognito: BTreeMap::new(),
     }
 }
 
 pub(super) fn save(state: &Registry) {
     let Some(path) = saved_path() else { return };
+    let open: Vec<String> = current_windows()
+        .into_iter()
+        .filter(|(label, _)| is_space_window(label))
+        .map(|(_, key)| key)
+        .collect();
     let saved = Saved {
         spaces: state.spaces.values().cloned().collect(),
-        open: state.open.clone(),
-        last_focused: state.last_focused.clone(),
+        // Before any window opens (or after the last closed), keep what was saved.
+        open: if open.is_empty() { state.open.clone() } else { open },
+        last_focused: None,
     };
     if let Ok(bytes) = serde_json::to_vec_pretty(&saved) {
         let temporary = path.with_extension("json.tmp");
@@ -195,31 +205,51 @@ pub fn listed_spaces() -> Vec<SpaceEntry> {
 
 /// The temporary session an incognito window's pages share. `None` for other windows.
 pub fn incognito_session(label: &str) -> Option<String> {
-    let window = parse(label)?;
-    let number = window.incognito?;
+    let window = parse(label).filter(|window| window.incognito)?;
     let state = lock_registry().ok()?;
     state
         .incognito
         .get(&window.space)
-        .filter(|session| session.windows.contains(&number))
+        .filter(|session| session.windows.contains(label))
         .map(|session| session.session.clone())
 }
 
-/// Forgets a closed incognito window. Returns the session to erase when it was the
-/// Space's last incognito window.
-pub(super) fn forget_incognito(label: &str) -> Option<String> {
-    let window = parse(label)?;
-    let number = window.incognito?;
-    let mut state = lock_registry().ok()?;
-    let session = state.incognito.get_mut(&window.space)?;
-    session.windows.remove(&number);
+/// Adds an incognito window to its Space's temporary session, starting a fresh session
+/// when the Space has no incognito window open.
+pub(super) fn join_incognito(state: &mut Registry, key: &str, label: &str) {
+    state
+        .incognito
+        .entry(key.into())
+        .or_insert_with(|| IncognitoSession {
+            windows: BTreeSet::new(),
+            session: format!(
+                "{key}#{}",
+                INCOGNITO_GENERATION.fetch_add(1, Ordering::Relaxed) + 1
+            ),
+        })
+        .windows
+        .insert(label.into());
+}
+
+/// Takes an incognito window out of a Space's session. Returns the session to erase
+/// when it was the Space's last incognito window.
+pub(super) fn leave_incognito(state: &mut Registry, key: &str, label: &str) -> Option<String> {
+    let session = state.incognito.get_mut(key)?;
+    session.windows.remove(label);
     if session.windows.is_empty() {
-        return state.incognito.remove(&window.space).map(|ended| ended.session);
+        return state.incognito.remove(key).map(|ended| ended.session);
     }
     None
 }
 
-/// The Space window used last, as saved.
+/// Forgets a closed incognito window. Returns the session to erase when it was the
+/// Space's last incognito window.
+pub(super) fn forget_incognito(label: &str, key: &str) -> Option<String> {
+    let mut state = lock_registry().ok()?;
+    leave_incognito(&mut state, key, label)
+}
+
+/// The app window used last in this launch.
 pub(super) fn last_focused_space() -> Option<String> {
     lock_registry().ok().and_then(|state| state.last_focused.clone())
 }

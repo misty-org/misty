@@ -39,6 +39,7 @@ These are the single-Space assumptions the plan removes, with where they live to
 | 1. Vaults per Space on the server | API that lists, creates and opens one vault per person per Space | — | 0, 8 |
 | 2. Sync per vault on the desktop | One password opens every vault; one sync loop per open vault | 1 | 3 |
 | 3. One OS window per Space | Space windows with their own store; virtual windows removed | 1 | 2 |
+| 3b. Switch Spaces in a window; Space row | Arc-style switching in place; Space controls in the sidebar | 3 | — |
 | 4. One extension host per Space | Extensions installed and running per Space | 3 | 5, 6, 7 |
 | 5. New sync-tree collections | Extensions list, site permissions, search engines and bangs, downloads list sync per Space | 2 (apply side of extensions: 4) | 4, 6, 7 |
 | 6. Device profiles folded into Spaces | `profile:` scopes and their menu gone; site routing moves to Spaces | 3 | 4, 5, 7 |
@@ -328,6 +329,59 @@ forgets everything when the last one closes.
 does nothing. The contract gate catches literals; a grep for `get_webview_window(` catches the rest.
 WebKit keeps a store alive briefly after its last view closes, so Space deletion removes the store in
 a later step (`removeDataStoreForIdentifier:`), as `browser_profile_cleanup.rs` does.
+
+## Phase 3b. Switch Spaces in a window; the Space row
+
+Decided 2026-10-17, after phases 0–9 were built and merged: a window is no longer tied to one
+Space for its life. It shows one Space at a time and switches in place, Arc-style; see the brief's
+"Windows" and "The Space row".
+
+**Goal.** Switching a window's Space swaps its tab strip, and the store, extension host, sync vault,
+memory, agents and color follow. The Space's controls move into a sidebar row; the Space settings
+page goes away.
+
+**Touches.**
+- `src-tauri/src/infra/space_windows*`: labels stop naming a Space (`window-<n>`,
+  `incognito-<n>`). The registry keeps each window's current Space, saved with the open windows at
+  quit; `space_for_window(label)` reads it, so its callers keep working. A
+  `space_window_switch` command (Space checked against the account's listed Spaces) changes it and
+  tells that window. `space_window_open` always opens a new window. Incognito sessions stay per
+  Space; a switching incognito window moves to that Space's session.
+- `browser_sync/view.rs` and the edit commands: a window's sync view and edits use its current
+  Space's vault, not always the personal one.
+- `src/features/workspace/spaceWindow.ts`: the window's Space becomes state that changes on switch.
+  `windows.ts` and `browser-workspace/source.ts` keep one layout and one sync-tree window id per
+  Space scope (`layoutsByScope`), so switching shows that Space's tabs and back restores them.
+- Pages of the Space switched away from stay alive briefly, then suspend, as background tabs do.
+- The Space row in the sidebar (`DesktopLayout`), its ⌄ menu (Spaces with checkmarks, Open in new
+  window, New Space, Rename, Color, Leave or Delete), and Home, Chat, People. The collapsed
+  sidebar puts the avatar and name at the start of the tab strip.
+- Remove the Space settings page (`SpaceSettings.tsx`, General and Members); members move to People.
+- AGENTS.md: the Space color applies to the window's current Space; the Space row is allowed beside
+  the tab strip.
+
+**Migrations.** None.
+
+**Tests.** Rust: switching changes `space_for_window`, a page opened after a switch uses the new
+Space's store, a switch to an unknown Space is refused. Vitest: switching swaps layouts and back;
+the sync view follows the switch.
+
+**Done.** In one window, switch from Work to Family: Family's tabs appear signed in as Family; switch
+back and Work's tabs are where they were.
+
+**Risks.** Pages of several Spaces alive in one window cost memory; suspend them. The Spaces UI is
+being redesigned in another session; the Space row replaces its in-page header, so the two meet at
+merge.
+
+**Built 2026-10-17 (unverified in the app): the switching, not the Space row.** Window labels are
+`window-<n>` and `incognito-<n>`; the native registry keeps each window's current Space (saved per
+window at quit) and `space_window_switch` changes it. A window's sync view uses its current Space's
+vault, and the sync bridge restarts on a switch. The workspace keeps a layout and a sync-tree window
+id per Space (`layoutsByScope`, `windowIdsByScope`); a Space the window hasn't shown brings back its
+last saved tabs from recovery. The Window menu, ⌘⇧N and the window's Space menu switch the window;
+"Open in new window" opens another. Agent jobs run in the oldest open window and move when it
+closes. Waiting for the Spaces redesign to land: the Space row, removing the Space settings page,
+and suspending pages of a Space switched away from.
 
 ## Phase 4. One extension host per Space
 
