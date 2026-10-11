@@ -1,10 +1,11 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { Button, Input, SuggestionList } from "@/shared/ui";
+import { Button, cn, Input, SuggestionList } from "@/shared/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { OmniboxRow } from "./omnibox/OmniboxRow";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./omnibox/types";
 import { inlineCompletion } from "./omnibox/urlText";
 import { useOmniboxAutocomplete } from "./omnibox/useOmniboxAutocomplete";
+import { warmOmniboxCaches } from "./omnibox/liveDeps";
 import { useBrowserOverlay } from "./useBrowserOverlay";
 
 export type OmniboxContext = Omit<OmniboxInput, "text" | "currentUrl">;
@@ -43,6 +44,9 @@ export function BrowserOmniboxView(props: {
     [focused, props.context, props.currentUrl, text],
   );
   const results = useOmniboxAutocomplete(input, props.providers);
+  // Ready the address bar's caches before it is used, and again on focus in case
+  // bookmarks or Spaces changed meanwhile.
+  useEffect(() => warmOmniboxCaches(), [focused]);
   const matches = useMemo(
     () => results.filter((match) => !removedIds.has(match.id)),
     [removedIds, results],
@@ -121,7 +125,7 @@ export function BrowserOmniboxView(props: {
           type="button"
           variant="ghost"
           size="sm"
-          className="w-full justify-center overflow-hidden text-[13px] text-cream-muted"
+          className="h-9 w-full justify-center overflow-hidden text-sm text-cream-muted"
           aria-label="Show current address"
           title="Show current address"
           onClick={() => {
@@ -191,10 +195,13 @@ export function BrowserOmniboxView(props: {
         autoComplete="off"
         spellCheck={false}
         variant="toolbar"
-        className={props.trailing && !focused ? "pr-9 text-left" : "text-left"}
+        className={cn(
+          "h-9 rounded-lg px-3 text-sm",
+          props.trailing && !focused ? "pr-10 text-left" : "text-left",
+        )}
       />
       {props.trailing && !focused ? (
-        <div className="absolute inset-y-0 right-0.5 flex items-center">{props.trailing}</div>
+        <div className="absolute inset-y-0 right-1 flex items-center">{props.trailing}</div>
       ) : null}
       {focused && overlay.open && matches.length ? (
         <SuggestionList
