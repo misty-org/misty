@@ -3,7 +3,6 @@ import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 import { useSpacesStore } from "./store/useSpacesStore";
 
@@ -153,14 +152,10 @@ export function SpaceSectionView(props: {
         {/* The Journal lists are gone: Notes and Drawings without an item show the home. */}
         {section === "home" ||
         (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
-        (section === "drawings" && !studioKind) ? (
+        (section === "drawings" && !studioKind) ||
+        // There is no settings page: its links land on the home, and the Space menu has the rest.
+        section === "settings" ? (
           <Home space={space} />
-        ) : section === "settings" ? (
-          <SpaceSettings
-            key={`settings:${spaceId}:${studioKind}`}
-            spaceId={spaceId}
-            section={studioKind}
-          />
         ) : section === "notes" ? (
           <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : section === "drawings" ? (

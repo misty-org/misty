@@ -17,7 +17,6 @@ import {
 } from "@/shared/ui";
 import { Settings, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { SpaceAgentRow } from "../agents/SpaceAgentRow";
 import { agentsByOwner, useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
@@ -33,13 +32,15 @@ export function SpaceMembersPopover({
   space,
   trigger,
   side,
+  onManage,
 }: {
   space: Space;
   trigger?: ReactElement;
   side?: "bottom" | "right";
+  /** Opens the People window: to invite someone, or to manage who is in the Space. */
+  onManage: (invite: boolean) => void;
 }) {
   const { user } = useAuth();
-  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { members, viewers, loadMembers } = useSpacesStore(
@@ -77,10 +78,6 @@ export function SpaceMembersPopover({
     ...groupedMembers.idle,
     ...groupedMembers.offline,
   ];
-  const managePath = `/spaces/${encodeURIComponent(space.id)}/settings/members`;
-  const settingsState = {
-    spaceSettingsReturnTo: `${location.pathname}${location.search}${location.hash}`,
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -128,26 +125,26 @@ export function SpaceMembersPopover({
         {space.role === "owner" ? (
           <div className="grid grid-cols-2 gap-1 border-t border-charcoal-border/60 px-1 py-1.5">
             <Button
-              asChild
               className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onManage(true);
+              }}
             >
-              <Link to={`${managePath}?invite=1`} state={settingsState}>
-                <UserPlus size={14} />
-                Invite
-              </Link>
+              <UserPlus size={14} />
+              Invite
             </Button>
             <Button
-              asChild
               className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onManage(false);
+              }}
             >
-              <Link to={managePath} state={settingsState}>
-                <Settings size={14} />
-                Manage
-              </Link>
+              <Settings size={14} />
+              Manage
             </Button>
           </div>
         ) : null}

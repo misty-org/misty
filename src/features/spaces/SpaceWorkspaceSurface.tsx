@@ -12,7 +12,6 @@ import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
 import { useSpacesStore } from "./store/useSpacesStore";
 import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 import { SpacePageHeader } from "./components/SpacePageHeader";
-import { SpacePanel } from "./components/SpacePanel";
 import { SpaceInvitationsNotice } from "./spacesShell/SpaceInvitationsNotice";
 /** Each Space pane owns its navigation and content. */
 export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
@@ -115,15 +114,14 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         data-space-workspace={route.activeSpaceId}
         aria-label={`${space?.name ?? "Space"} workspace`}
       >
-        {/* The panel sits flat on the page, sectioned off by a hairline; no nested containers. */}
+        {/* The Space row in the sidebar carries the Space's controls; the page has no bar. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <SpacePageHeader space={space} section={route.section} />
-          <SpacePanel space={space} />
           <div className="min-h-0 flex-1 overflow-hidden">
             <SpaceSectionView
               spaceId={route.activeSpaceId}
               section={route.section}
-              studioKind={route.section === "settings" ? route.settingsSection : route.drawingId}
+              studioKind={route.drawingId}
               workspaceTabId={tab.id}
             />
           </div>

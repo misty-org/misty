@@ -18,13 +18,16 @@ import { useSpaceMembers } from "./useSpaceMembers";
 export function SpaceMembers({
   spaceId,
   embedded = false,
+  invite = false,
 }: {
   spaceId: string;
   embedded?: boolean;
+  /** Opens the invite dialog straight away (People's Invite). */
+  invite?: boolean;
 }) {
   const { user } = useAuth();
   const state = useSpaceMembers(spaceId);
-  const dialogs = useMemberDialogs(spaceId, state);
+  const dialogs = useMemberDialogs(spaceId, state, invite);
   const { space, members, error } = state;
   const spaceAgents = useSpaceAgentMembers(spaceId);
 

@@ -380,8 +380,14 @@ vault, and the sync bridge restarts on a switch. The workspace keeps a layout an
 id per Space (`layoutsByScope`, `windowIdsByScope`); a Space the window hasn't shown brings back its
 last saved tabs from recovery. The Window menu, ⌘⇧N and the window's Space menu switch the window;
 "Open in new window" opens another. Agent jobs run in the oldest open window and move when it
-closes. Waiting for the Spaces redesign to land: the Space row, removing the Space settings page,
-and suspending pages of a Space switched away from.
+closes.
+
+**Space row built 2026-10-17 (unverified in the app).** `SpaceRow` sits under the sidebar's window
+controls and starts the tab strip when the sidebar is collapsed. Its menu switches Spaces and holds
+Open in new window, New Space, Rename, Color, Apps, Sites that open here, and Leave or Delete, each
+a small dialog. People's Invite and Manage open the members dialog. The Space settings page and the
+bar inside Space pages are gone; `/settings` links land on the Space home. Still open: suspending
+pages of a Space switched away from.
 
 ## Phase 4. One extension host per Space
 

@@ -43,7 +43,6 @@ vi.mock("./chat/SpaceChatEntry", async () => {
     },
   };
 });
-vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
 vi.mock("./home/SpaceHome", () => ({
   SpaceHome: ({ space }: { space: { id: string } }) => <div>Home in {space.id}</div>,
 }));

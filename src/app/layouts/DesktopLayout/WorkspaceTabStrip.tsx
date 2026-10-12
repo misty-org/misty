@@ -19,6 +19,7 @@ import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
+import { SpaceRow } from "@/features/spaces/components/spaceRow/SpaceRow";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
 import { dockingMetrics } from "./dockingGeometry";
 
@@ -225,6 +226,7 @@ export function WorkspaceTabStrip(
                 <SidebarNavFallback />
               </div>
             </div>
+            <SpaceRow />
             {cardBody}
             <SidebarNowPlaying />
             <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
@@ -232,7 +234,11 @@ export function WorkspaceTabStrip(
             </div>
           </div>
         ) : (
-          cardBody
+          <>
+            {/* With the sidebar collapsed the Space starts the tab strip. */}
+            <SpaceRow compact />
+            {cardBody}
+          </>
         )}
         {vertical ? props.account : null}
         {hoverCards.card}
