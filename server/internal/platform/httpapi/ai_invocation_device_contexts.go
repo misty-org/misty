@@ -23,7 +23,7 @@ func validateAIInvocationDeviceContexts(references []aiContextReference, context
 			return errors.New("browser workspace identity is invalid")
 		}
 		seen[deviceContext.OpaqueRef] = true
-		if deviceContext.Kind == "local_folder" || deviceContext.Kind == "workspace" || deviceContext.Kind == "inbox" {
+		if deviceContext.Kind == "local_folder" || deviceContext.Kind == "project_folder" || deviceContext.Kind == "workspace" || deviceContext.Kind == "inbox" {
 			// Folders, the Misty browser and the device's inbox are granted on
 			// the device itself; they never come from page content, so no page
 			// reference applies.

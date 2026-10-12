@@ -379,6 +379,20 @@ pub fn run() {
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
+                    #[cfg(unix)]
+                    app::code_commands::code_execute,
+                    #[cfg(unix)]
+                    app::code_commands::code_choose_project,
+                    #[cfg(unix)]
+                    app::code_commands::code_set_project_installs,
+                    #[cfg(unix)]
+                    app::code_commands::code_allow_project_changes,
+                    #[cfg(unix)]
+                    app::code_commands::code_remove_project,
+                    #[cfg(unix)]
+                    app::code_commands::code_checkpoints,
+                    #[cfg(unix)]
+                    app::code_commands::code_undo,
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]

@@ -93,6 +93,16 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
+    /// Misty's own data root (never shareable with agents).
+    pub fn misty_dir(&self) -> PathBuf {
+        self.inner.misty_dir.clone()
+    }
+
+    /// Undo copies, command homes and scratch folders for code projects.
+    pub fn agent_code_dir(&self) -> PathBuf {
+        self.inner.misty_dir.join("agent-code")
+    }
+
     pub fn workspaces_path(&self) -> PathBuf {
         self.inner.workspaces_path.clone()
     }

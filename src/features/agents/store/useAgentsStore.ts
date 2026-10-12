@@ -6,16 +6,51 @@ export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
   return invoke<AgentDeviceSnapshot>("agents_device_snapshot");
 }
 
-export async function agentsRevokeFolderScope(scopeId: string): Promise<void> {
-  await invoke("agents_revoke_folder_scope", { scopeId });
-  await republishDeviceFolders();
-}
-
-/** Shares a folder with agents on this device, chosen in the system picker. */
-export async function agentsChooseFolderScope(): Promise<unknown> {
-  const result = await invoke("agents_choose_folder_scope");
+/** Shares a folder as a project, chosen in the system picker: agents may edit
+ * it and run sandboxed commands in it, on this computer only. */
+export async function codeChooseProject(): Promise<{ id: string; displayName: string } | null> {
+  const result = await invoke<{ id: string; displayName: string } | null>("code_choose_project");
   await republishDeviceFolders();
   return result;
+}
+
+/** Stops sharing a project and deletes its undo copies. The folder stays. */
+export async function codeRemoveProject(scopeId: string): Promise<void> {
+  await invoke("code_remove_project", { scopeId });
+  await republishDeviceFolders();
+  const { useConversationProject } = await import("./useConversationProject");
+  useConversationProject.getState().forget(scopeId);
+}
+
+/** Lets agents change a folder that was shared read-only before projects. */
+export async function codeAllowProjectChanges(scopeId: string): Promise<void> {
+  await invoke("code_allow_project_changes", { scopeId });
+}
+
+export async function codeSetProjectInstalls(scopeId: string, allow: boolean): Promise<void> {
+  await invoke("code_set_project_installs", { scopeId, allow });
+}
+
+export interface CodeCheckpoint {
+  runId: string;
+  /** Seconds since the epoch. */
+  createdAt: number;
+  complete: boolean;
+  files: number;
+}
+
+/** Agent runs in a project whose changes can still be undone, newest first. */
+export async function codeCheckpoints(scopeId: string): Promise<CodeCheckpoint[]> {
+  const result = await invoke<{ checkpoints: CodeCheckpoint[] }>("code_checkpoints", { scopeId });
+  return result.checkpoints;
+}
+
+/** Puts a project back the way it was before one agent run. */
+export async function codeUndo(
+  scopeId: string,
+  runId: string,
+): Promise<{ restored: number; removed: number }> {
+  return invoke("code_undo", { scopeId, runId });
 }
 
 /** This device's signed policy lists its shared folders (names only, never

@@ -37,9 +37,11 @@ agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund -
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
 clipboard_worker() { (cd server/apps/clipboard && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
-rust_desktop() { parallel desktop-crate browser-sync-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate browser-sync-crate agent-code-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }
 browser_sync_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
+# Code projects: file tools, the Seatbelt sandbox and its escape tests (macOS).
+agent_code_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/agent-code/Cargo.toml; }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
 kiri_crate() { cargo test --locked --quiet --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {

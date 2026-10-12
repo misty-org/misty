@@ -1,6 +1,8 @@
 pub mod agent_dock;
 pub mod agent_workspace;
 pub mod agents;
+#[cfg(unix)]
+pub mod agent_projects;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;

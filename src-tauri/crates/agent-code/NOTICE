@@ -1,0 +1,14 @@
+misty-agent-code
+
+The Seatbelt profiles in src/seatbelt/ (base.sbpl, platform_defaults.sbpl,
+network.sbpl) are copied from OpenAI Codex, codex-rs/sandboxing/src, at commit
+9f3d25588b3f0bdf452d4eda919f2c2365a89bba:
+
+  OpenAI Codex
+  Copyright 2025 OpenAI
+  Licensed under the Apache License, Version 2.0 (LICENSE-codex).
+
+The profile assembly in src/sandbox.rs follows the structure of
+codex-rs/sandboxing/src/seatbelt.rs. Misty's changes: reads are limited to the
+system, toolchains and the project instead of the whole disk, and network
+access is limited to loopback servers and Misty's package proxy.

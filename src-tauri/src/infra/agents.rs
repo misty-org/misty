@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AgentService {
-    database_path: PathBuf,
+    pub(crate) database_path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -189,7 +189,7 @@ impl AgentService {
     }
 }
 
-async fn run_db<T, F>(path: PathBuf, operation: F) -> ApiResult<T>
+pub(crate) async fn run_db<T, F>(path: PathBuf, operation: F) -> ApiResult<T>
 where
     T: Send + 'static,
     F: FnOnce(&mut Connection) -> Result<T, rusqlite::Error> + Send + 'static,
@@ -237,22 +237,41 @@ fn ensure_schema(connection: &Connection) -> rusqlite::Result<()> {
         DROP TABLE IF EXISTS local_agent_approvals;
         DROP TABLE IF EXISTS local_agent_jobs;
         DROP TABLE IF EXISTS local_agent_definitions;",
-    )
+    )?;
+    // Code projects (docs/plans/agent-code-projects.md): a scope with write
+    // access is a project; installs open the package proxy for it.
+    let columns: Vec<String> = connection
+        .prepare("PRAGMA table_info(local_agent_scopes)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<_, _>>()?;
+    if !columns.iter().any(|column| column == "access") {
+        connection.execute_batch(
+            "ALTER TABLE local_agent_scopes ADD COLUMN access TEXT NOT NULL DEFAULT 'read'",
+        )?;
+    }
+    if !columns.iter().any(|column| column == "allow_installs") {
+        connection.execute_batch(
+            "ALTER TABLE local_agent_scopes ADD COLUMN allow_installs INTEGER NOT NULL DEFAULT 0",
+        )?;
+    }
+    Ok(())
 }
 
 fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> {
     let device_id = device_id(connection)?;
     let scopes = {
         let mut statement = connection.prepare(
-            "SELECT id,device_id,display_name FROM local_agent_scopes ORDER BY created_at",
+            "SELECT id,device_id,display_name,access,allow_installs FROM local_agent_scopes ORDER BY created_at",
         )?;
         let rows = statement
             .query_map([], |row| {
+                let project = row.get::<_, String>(3)? == "write";
                 Ok(json!({
                     "id": row.get::<_, String>(0)?,
                     "deviceId": row.get::<_, String>(1)?,
                     "displayName": row.get::<_, String>(2)?,
-                    "kind": "local_folder",
+                    "kind": if project { "project_folder" } else { "local_folder" },
+                    "allowInstalls": project && row.get::<_, i64>(4)? != 0,
                     "relativePath": Value::Null,
                     "available": true,
                 }))
@@ -308,7 +327,7 @@ fn scoped_file_path_sync(
     Ok(target)
 }
 
-fn device_id(connection: &Connection) -> rusqlite::Result<String> {
+pub(crate) fn device_id(connection: &Connection) -> rusqlite::Result<String> {
     if let Some(value) = connection
         .query_row(
             "SELECT value FROM local_agent_settings WHERE key='device_id'",
@@ -327,11 +346,11 @@ fn device_id(connection: &Connection) -> rusqlite::Result<String> {
     Ok(value)
 }
 
-fn io_error(error: std::io::Error) -> rusqlite::Error {
+pub(crate) fn io_error(error: std::io::Error) -> rusqlite::Error {
     rusqlite::Error::ToSqlConversionFailure(Box::new(error))
 }
 
-fn validation_error(message: &str) -> rusqlite::Error {
+pub(crate) fn validation_error(message: &str) -> rusqlite::Error {
     rusqlite::Error::InvalidParameterName(message.to_owned())
 }
 

@@ -1,7 +1,7 @@
 export { default as AgentsPage } from "./AgentsPage";
 export * from "./flags";
 export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
-export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
+export { agentsDeviceSnapshot, codeRemoveProject } from "./store/useAgentsStore";
 export {
   deviceAccount,
   ensureDeviceStarted,

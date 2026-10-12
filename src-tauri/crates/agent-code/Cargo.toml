@@ -1,0 +1,22 @@
+[package]
+name = "misty-agent-code"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Code projects (docs/plans/agent-code-projects.md): file tools, the sandboxed
+# command runner, undo checkpoints, the package proxy and the preview server.
+[dependencies]
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+globset = "0.4"
+ignore = "0.4"
+libc = "0.2"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["io-std"] }

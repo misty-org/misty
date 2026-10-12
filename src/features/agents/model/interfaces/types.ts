@@ -2,7 +2,10 @@ export interface AgentScope {
   id: string;
   deviceId: string;
   displayName: string;
-  kind: "local_folder";
+  /** A project is shared with write access: agents edit it and run commands. */
+  kind: "local_folder" | "project_folder";
+  /** Projects only: commands may install packages through Misty's proxy. */
+  allowInstalls?: boolean;
   relativePath?: string | null;
   available: boolean;
 }

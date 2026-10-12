@@ -36,6 +36,9 @@ var deviceAgentCapabilities = map[string]bool{
 	"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true,
 	// Opens an agent session in another device's browser (docs/design/agents-on-devices/BRIEF.md).
 	"browser.session": true,
+	// Code projects on the chat's own computer (docs/plans/agent-code-projects.md).
+	"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.write": true, "code.edit": true,
+	"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true,
 }
 
 // deviceContextCapabilities are what each kind of desktop grant may allow.
@@ -44,6 +47,13 @@ var deviceContextCapabilities = map[string]map[string]bool{
 	// A chat's own device accepts files another of the person's devices sends.
 	"inbox":     {"files.receive": true},
 	"workspace": {"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true, "browser.session": true},
+	// A project: the code tools, plus reading documents and sending files
+	// the way read-only folders do.
+	"project_folder": {
+		"files.list": true, "files.read": true, "files.send": true,
+		"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.write": true, "code.edit": true,
+		"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true,
+	},
 }
 
 // DeviceContextCapabilitiesAllowed reports whether a desktop grant asks only

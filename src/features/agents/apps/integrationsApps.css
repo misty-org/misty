@@ -86,6 +86,10 @@
   gap: 5px;
   color: var(--color-cream-bright);
 }
+/* A project's settings explain consequences, so their help text wraps. */
+.agent-integrations-row-text .agent-code-projects-help {
+  white-space: normal;
+}
 .agent-integrations-add {
   justify-self: start;
   margin-top: 4px;
