@@ -1,12 +1,14 @@
 use super::*;
 
-const ID: &str = "01951d32-40ac-7000-8000-000000000001";
+const ID: &str = "space_01951d32-40ac-7000-8000-000000000001";
 
 #[test]
 fn labels_name_a_window_and_its_space_is_kept_natively() {
     let key = space_key(ID, false).unwrap();
-    assert_eq!(key, "01951d3240ac70008000000000000001");
+    assert_eq!(key, ID);
     assert_eq!(space_id_for_key(&key).as_deref(), Some(ID));
+    assert!(space_key("personal", false).is_err());
+    assert!(space_key("space_1/..", false).is_err());
     assert_eq!(space_id_for_key(PERSONAL), None);
 
     let label = new_label(false);
@@ -67,9 +69,9 @@ fn incognito_sessions_follow_the_space_a_window_shows() {
     let personal = state.incognito[PERSONAL].session.clone();
     // One window switching away leaves the Space's session to the other.
     assert_eq!(leave_incognito(&mut state, PERSONAL, "incognito-1"), None);
-    join_incognito(&mut state, "01951d3240ac70008000000000000001", "incognito-1");
+    join_incognito(&mut state, ID, "incognito-1");
     assert_ne!(
-        state.incognito["01951d3240ac70008000000000000001"].session,
+        state.incognito[ID].session,
         personal
     );
     // The last window leaving ends the session.
@@ -83,7 +85,7 @@ fn incognito_sessions_follow_the_space_a_window_shows() {
 fn each_space_has_its_own_store_and_personal_keeps_the_vault_store() {
     let a = space_store_identity(&space_key(ID, false).unwrap()).unwrap();
     let b = space_store_identity(
-        &space_key("01951d32-40ac-7000-8000-000000000002", false).unwrap(),
+        &space_key("space_01951d32-40ac-7000-8000-000000000002", false).unwrap(),
     )
     .unwrap();
     assert_eq!(a.len(), 64);

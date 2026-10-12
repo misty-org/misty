@@ -90,7 +90,11 @@ export function SpaceRow({ compact = false }: { compact?: boolean }) {
         )}
       </GlobalCreateSpaceDialog>
       {error && (
-        <p role="alert" className="sr-only">
+        <p
+          role="alert"
+          className="m-0 min-w-0 truncate px-1 text-xs text-cream-muted"
+          title={error}
+        >
           {error}
         </p>
       )}

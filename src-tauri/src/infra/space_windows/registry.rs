@@ -88,6 +88,11 @@ pub(super) fn saved_path() -> Option<std::path::PathBuf> {
     Some(home.join(name))
 }
 
+/// Keys saved before Space keys became Space ids were the id's bare 32 hex digits.
+fn current_key(key: &str) -> bool {
+    valid_key(key) && !(key.len() == 32 && key.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
 pub(super) fn load() -> Registry {
     let saved: Saved = saved_path()
         .and_then(|path| std::fs::read(path).ok())
@@ -97,10 +102,10 @@ pub(super) fn load() -> Registry {
         spaces: saved
             .spaces
             .into_iter()
-            .filter(|entry| valid_key(&entry.key))
+            .filter(|entry| current_key(&entry.key))
             .map(|entry| (entry.key.clone(), entry))
             .collect(),
-        open: saved.open.into_iter().filter(|key| valid_key(key)).collect(),
+        open: saved.open.into_iter().filter(|key| current_key(key)).collect(),
         // Labels are numbered per launch, so the last one means nothing now.
         last_focused: None,
         incognito: BTreeMap::new(),

@@ -51,31 +51,32 @@ static CURRENT: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
 /// The number the next window label takes.
 static NEXT_WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
-/// A Space's key from its id: `personal`, or the id's 32 lowercase hex digits.
+/// A Space's key: `personal` for the personal Space, otherwise the Space's id itself
+/// (`space_<uuid>`). Keys never appear in window labels.
 pub fn space_key(space_id: &str, personal: bool) -> Result<String, String> {
     if personal {
         return Ok(PERSONAL.into());
     }
-    uuid::Uuid::parse_str(space_id)
-        .map(|id| id.simple().to_string())
-        .map_err(|_| "Unknown Space.".into())
+    if space_id != PERSONAL && valid_key(space_id) {
+        Ok(space_id.to_owned())
+    } else {
+        Err("Unknown Space.".into())
+    }
 }
 
 pub(crate) fn valid_key(key: &str) -> bool {
     key == PERSONAL
-        || (key.len() == 32
+        || (!key.is_empty()
+            && key.len() <= 100
             && key
                 .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'))
 }
 
 /// The Space id a key stands for; `None` for the personal Space, whose id the
 /// registry learns from the renderer.
 pub fn space_id_for_key(key: &str) -> Option<String> {
-    (key != PERSONAL)
-        .then(|| uuid::Uuid::parse_str(key).ok())
-        .flatten()
-        .map(|id| id.hyphenated().to_string())
+    (key != PERSONAL && valid_key(key)).then(|| key.to_owned())
 }
 
 fn label_number(label: &str, prefix: &str) -> Option<u32> {

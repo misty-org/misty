@@ -14,7 +14,7 @@ import type { WorkspaceScopeKey } from "./model";
 export const personalSpaceKey = "personal";
 
 export interface SpaceWindowIdentity {
-  /** `personal`, or the Space id's 32 hex digits. */
+  /** `personal`, or the Space's id. */
   key: string;
   /** The Space's id; unknown for the personal Space until the account's Spaces load. */
   spaceId: string | null;
@@ -32,13 +32,13 @@ function currentLabel(): string | null {
   return internals?.metadata?.currentWindow?.label ?? null;
 }
 
+/** A Space's key is its id, except `personal` for the personal Space. */
 function spaceIdFromKey(key: string): string | null {
-  if (!/^[0-9a-f]{32}$/.test(key)) return null;
-  return `${key.slice(0, 8)}-${key.slice(8, 12)}-${key.slice(12, 16)}-${key.slice(16, 20)}-${key.slice(20)}`;
+  return key === personalSpaceKey ? null : key;
 }
 
 function validKey(key: unknown): key is string {
-  return typeof key === "string" && (key === personalSpaceKey || /^[0-9a-f]{32}$/.test(key));
+  return typeof key === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(key);
 }
 
 /** A window label's kind; window labels never name a Space. */

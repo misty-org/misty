@@ -623,7 +623,7 @@ run's Connect card becomes that Space's pick. The direct proxy callers (inbound 
 Slack, GitHub repos for code projects) still use the person's first active account; move them onto
 picks with phase 9.
 
-**Built (2026-10-16).** Migration `20271027080000_space_integration_picks.sql`;
+**Built (2026-10-16).** Migration `20271028050000_space_integration_picks.sql`;
 `postgres/space_integration_picks.go`; API `GET /integrations/apps` (each account lists the Spaces
 using it), `PUT /integrations/apps/spaces/{spaceID}`, `POST /me/app-requests/{id}/pick`. Desktop:
 the Integrations page's account card shows each account's Spaces; Space settings › Apps checks the
