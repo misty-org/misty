@@ -303,7 +303,7 @@ static NSInteger Offset(NSInteger index) {
   }
   self.dragged = YES;
   // The stack moves together.
-  [docked enumerateObjectsUsingBlock:^(MistyDockEntry *entry, NSUInteger index, BOOL *stop) {
+  [docked enumerateObjectsUsingBlock:^(MistyDockEntry *entry, NSUInteger index, BOOL *__unused stop) {
     if (index >= self.downFrames.count) return;
     NSRect frame = self.downFrames[index].rectValue;
     [entry.window setFrameOrigin:NSMakePoint(frame.origin.x + dx, frame.origin.y + dy)];
@@ -596,7 +596,7 @@ static void ShowCarousel(BOOL show) {
   if (carousel) {
     // A click elsewhere, in Misty or another app, folds the carousel.
     if (!outsideMonitor)
-      outsideMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown handler:^(NSEvent *event) {
+      outsideMonitor = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown | NSEventMaskRightMouseDown handler:^(NSEvent *__unused event) {
         ShowCarousel(NO);
       }];
     if (!localOutsideMonitor)
@@ -689,10 +689,10 @@ static void Vanish(BOOL gone) {
 
 static void WatchApp(void) {
   NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
-  [center addObserverForName:NSApplicationWillHideNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+  [center addObserverForName:NSApplicationWillHideNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *__unused note) {
     Vanish(YES);
   }];
-  [center addObserverForName:NSApplicationDidUnhideNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+  [center addObserverForName:NSApplicationDidUnhideNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *__unused note) {
     Vanish(NO);
   }];
   [center addObserverForName:NSWindowWillMiniaturizeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
@@ -712,7 +712,7 @@ static void Setup(void) {
   WatchApp();
   allEntries = [NSMutableArray array];
   docked = [NSMutableArray array];
-  [NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+  [NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidChangeScreenParametersNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *__unused note) {
     Animate();
   }];
 }

@@ -82,6 +82,18 @@ export const browserLibrary = {
   }) => invoke<void>("browser_clear_website_data", { request }),
 };
 
+export interface BrowserMediaInfo {
+  title: string;
+  artist: string;
+  /** An https image from the page, or "". */
+  artwork: string;
+  duration: number | null;
+  position: number | null;
+  paused: boolean;
+  canPrevious: boolean;
+  canNext: boolean;
+}
+
 export const browserPageTools = {
   stop: (id: string) => invoke<void>("browser_webview_stop", { request: { id } }),
   find: (id: string, query: string, direction: "next" | "previous" | "clear") =>
@@ -95,6 +107,12 @@ export const browserPageTools = {
     invoke<unknown>("browser_webview_reader_article", { request: { id } }),
   mediaPlayback: (id: string, action: "pause" | "play") =>
     invoke<void>("browser_webview_media_playback", { request: { id, action } }),
+  /** What the page is playing: its own title, artist and artwork, and its position. */
+  mediaInfo: (id: string) =>
+    invoke<BrowserMediaInfo>("browser_webview_media_info", { request: { id } }),
+  /** Runs the page's own media control, falling back to its media element for play and pause. */
+  mediaAction: (id: string, action: "play" | "pause" | "previoustrack" | "nexttrack") =>
+    invoke<void>("browser_webview_media_action", { request: { id, action } }),
   pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit") =>
     invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

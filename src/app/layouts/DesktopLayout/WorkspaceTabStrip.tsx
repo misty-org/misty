@@ -52,7 +52,6 @@ import { ViewIcon } from "./WorkspaceViewGroupButton";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 import { TabPageMenu } from "./PinnedTabMenu";
 import { FavoritesStrip } from "./FavoritesStrip";
-import { NowPlayingMenu } from "./NowPlayingMenu";
 import { useTabHoverCards } from "./TabHoverCard";
 import { useWindowSwipe } from "./useWindowSwipe";
 import { navigatorMotionClass } from "./styles";
@@ -443,7 +442,6 @@ export function WorkspaceTabStrip(
         )}
         {!props.windowsTitlebarControls && (
           <div className="misty-workspace-tab-actions">
-            <NowPlayingMenu onOpen={props.onOpen} />
             <IconButton
               size="xs"
               tooltip={false}

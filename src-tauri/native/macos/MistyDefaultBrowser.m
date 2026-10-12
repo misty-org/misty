@@ -23,7 +23,7 @@ void misty_default_browser_request(void) {
             for (NSString *scheme in @[@"http", @"https"]) {
                 [[NSWorkspace sharedWorkspace] setDefaultApplicationAtURL:bundle
                                                toOpenURLsWithScheme:scheme
-                                                  completionHandler:^(NSError *error) {}];
+                                                  completionHandler:^(NSError *__unused error) {}];
             }
         } else {
             LSSetDefaultHandlerForURLScheme(CFSTR("http"), (__bridge CFStringRef)own);
