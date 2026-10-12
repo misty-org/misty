@@ -69,11 +69,11 @@ class Bridge {
     return new Bridge(spawn(binary, args, { stdio: ["pipe", "pipe", "pipe"] }) as ChildProcessWithoutNullStreams);
   }
 
-  call(operation: string, input: unknown): Promise<{ result?: unknown; error?: string }> {
+  call(operation: string, input: unknown, git = false): Promise<{ result?: unknown; error?: string }> {
     const id = ++this.next;
     return new Promise((resolveReply) => {
       this.waiting.set(id, resolveReply);
-      this.child.stdin.write(`${JSON.stringify({ id, operation, input })}\n`);
+      this.child.stdin.write(`${JSON.stringify({ id, operation, input, git })}\n`);
     });
   }
 
@@ -112,6 +112,12 @@ async function runTask(task: CodeEvalTask, model: string, binary: string): Promi
   if (task.fixture) cpSync(join(here, "fixtures", task.fixture), root, { recursive: true });
   for (const [path, content] of Object.entries(task.files ?? {})) writeFileSync(join(root, path), content);
   const bridge = Bridge.start(binary, root, join(workspace, "data"), Boolean(task.installs));
+  // Commits are by the person's account, which Misty sets, never the agent.
+  const author = { name: "Eval", email: "eval@example.com" };
+  if (task.git) {
+    await bridge.call("init", {}, true);
+    await bridge.call("commit", { message: "Start", author }, true);
+  }
   const report: TaskReport = {
     taskId: task.id, model, passed: false, finished: false, checks: {}, modelTurns: 0, toolCalls: 0,
     seconds: 0, dollars: null, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, trace: [],
@@ -122,7 +128,13 @@ async function runTask(task: CodeEvalTask, model: string, binary: string): Promi
     const toolSet = {
       ...catalogTools(tools, async (_callId, name, input) => {
         report.toolCalls++;
-        const reply = await bridge.call(name, input);
+        // Pushing is off for eval projects, as it is by default in Misty.
+        if (["git.push", "git.pull", "git.pull_request"].includes(name)) {
+          const refused = { status: "failure", tool_error: { message: "Agents can't push this project. The person can turn on \"Agents can push\" for it in Integrations › Projects." } };
+          report.trace.push(`${name} ${JSON.stringify(input).slice(0, 400)} → refused`);
+          return refused;
+        }
+        const reply = await bridge.call(name, name === "git.commit" ? { ...(input as object), author } : input);
         const output = reply.error ? { status: "failure", tool_error: { message: reply.error } } : reply.result;
         const url = (output as { url?: unknown } | undefined)?.url;
         if (name === "code.preview" && typeof url === "string") previewUrl = url;

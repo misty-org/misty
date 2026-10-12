@@ -6,6 +6,11 @@ export interface AgentScope {
   kind: "local_folder" | "project_folder";
   /** Projects only: commands may install packages through Misty's proxy. */
   allowInstalls?: boolean;
+  /** Projects only: agents may push branches, and the default branch. */
+  allowPush?: boolean;
+  allowPushDefault?: boolean;
+  /** Projects only: the folder is a Git repository. */
+  git?: boolean;
   relativePath?: string | null;
   available: boolean;
 }

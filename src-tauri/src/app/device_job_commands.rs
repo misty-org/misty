@@ -93,7 +93,7 @@ fn surface_for(operation: &str, scope_id: &str) -> &'static str {
         "folders"
     } else if operation.starts_with("terminal.") {
         "terminal"
-    } else if operation.starts_with("code.") {
+    } else if operation.starts_with("code.") || operation.starts_with("git.") {
         // Code projects are local-only: no device policy grants this surface
         // to another device, so only this device's own grants pass.
         "code"

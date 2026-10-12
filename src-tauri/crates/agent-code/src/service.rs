@@ -9,7 +9,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 
 use crate::{
-    beneath, checkpoint::Checkpoints, exec, files, io_fix, preview::Previews, processes,
+    beneath, checkpoint::Checkpoints, exec, files, git, io_fix, preview::Previews, processes,
     proxy, sandbox, CodeError,
 };
 
@@ -53,6 +53,29 @@ pub const OPERATIONS: &[&str] = &[
     "code.processes",
     "code.stop",
     "code.preview",
+    "git.status",
+    "git.diff",
+    "git.log",
+    "git.commit",
+    "git.branch",
+];
+
+/// Git operations the desktop runs around a transfer with GitHub (push, pull,
+/// clone, publish) and for its own Git views. Not agent tools themselves.
+pub const GIT_TRANSFER_OPERATIONS: &[&str] = &[
+    "init",
+    "status",
+    "diff",
+    "run_diff",
+    "push_plan",
+    "read_blobs",
+    "record_push",
+    "missing",
+    "write_objects",
+    "update_branch",
+    "set_origin",
+    "prepare_clone",
+    "commit",
 ];
 
 fn parse<T: DeserializeOwned>(input: Value) -> Result<T, CodeError> {
@@ -284,6 +307,33 @@ impl CodeService {
                 self.processes.stop(&project.scope_id, &request.id).await
             }
             "code.preview" => self.preview(project, input).await,
+            "git.status" => blocking(Box::new({
+                let path = root_path.clone();
+                move |_| git::status(&path)
+            }))
+            .await,
+            "git.diff" => {
+                let request: git::DiffRequest = parse(input)?;
+                let path = root_path.clone();
+                blocking(Box::new(move |_| Ok(serde_json::to_value(git::diff(&path, request)?).unwrap_or_default()))).await
+            }
+            "git.log" => {
+                let request: git::LogRequest = parse(input)?;
+                let path = root_path.clone();
+                blocking(Box::new(move |_| git::log(&path, request))).await
+            }
+            "git.commit" | "git.branch" => {
+                // The run's undo copy records where the branch was first.
+                self.checkpointed(project, run_id).await?;
+                let path = root_path.clone();
+                if operation == "git.commit" {
+                    let request: git::CommitRequest = parse(input)?;
+                    blocking(Box::new(move |_| git::commit(&path, request))).await
+                } else {
+                    let request: git::BranchRequest = parse(input)?;
+                    blocking(Box::new(move |_| git::branch(&path, request))).await
+                }
+            }
             _ => Err(CodeError::Scope(format!("unsupported operation {operation}"))),
         }
     }
@@ -348,6 +398,61 @@ impl CodeService {
             "url": format!("http://127.0.0.1:{port}/{path}"),
             "siteFolder": if site.as_os_str().is_empty() { ".".to_owned() } else { site.display().to_string() },
         }))
+    }
+
+    /// What one answer changed in a project.
+    pub fn run_diff(&self, project: &Project, run_id: &str) -> Result<Value, CodeError> {
+        self.check_root(&project.root)?;
+        let set = crate::run_diff::run_diff(&self.checkpoints, &project.scope_id, run_id, &project.root)?;
+        Ok(serde_json::to_value(set).unwrap_or_default())
+    }
+
+    /// One step of a Git transfer or a Git view (`GIT_TRANSFER_OPERATIONS`).
+    pub fn git_transfer(&self, project: &Project, operation: &str, input: Value) -> Result<Value, CodeError> {
+        use git::transfer;
+        self.check_root(&project.root)?;
+        let root = project.root.as_path();
+        let text = |key: &str| input[key].as_str().unwrap_or_default().to_owned();
+        let list = |key: &str| -> Vec<String> {
+            input[key]
+                .as_array()
+                .map(|items| items.iter().filter_map(|item| item.as_str().map(str::to_owned)).collect())
+                .unwrap_or_default()
+        };
+        match operation {
+            "init" => git::init(root),
+            "status" => {
+                if git::is_repository(root) {
+                    git::status(root)
+                } else {
+                    Ok(serde_json::json!({ "repository": false }))
+                }
+            }
+            "diff" => Ok(serde_json::to_value(git::diff(root, parse(input)?)?).unwrap_or_default()),
+            "commit" => git::commit(root, parse(input)?),
+            "push_plan" => {
+                let remote = input["remoteHead"].as_str().filter(|sha| !sha.is_empty());
+                Ok(serde_json::to_value(transfer::push_plan(root, remote)?).unwrap_or_default())
+            }
+            "read_blobs" => transfer::read_blobs(root, &list("shas")),
+            "record_push" => transfer::record_push(root, &text("branch"), &text("sha")).map(|_| serde_json::json!({})),
+            "missing" => Ok(serde_json::json!({ "missing": transfer::missing(root, &list("shas"))? })),
+            "write_objects" => transfer::write_objects(root, parse(input)?),
+            "update_branch" => transfer::update_branch(root, &text("branch"), &text("sha"), &list("boundary")),
+            "set_origin" => {
+                let github = git::GitHubRepo { owner: text("owner"), name: text("name") };
+                git::set_origin(root, &github)?;
+                git::set_default_branch(root, &text("defaultBranch"))?;
+                git::status(root)
+            }
+            "prepare_clone" => {
+                let github = git::GitHubRepo { owner: text("owner"), name: text("name") };
+                git::prepare_clone(root, &github, &text("branch"))?;
+                git::set_default_branch(root, &text("branch"))?;
+                Ok(serde_json::json!({}))
+            }
+            _ => Err(CodeError::Scope(format!("unsupported Git operation {operation}"))),
+        }
     }
 
     /// Runs that can be undone in a project.

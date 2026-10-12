@@ -10,18 +10,21 @@
 
 pub mod beneath;
 pub mod checkpoint;
+pub mod diff;
 pub mod exec;
 pub mod files;
+pub mod git;
 pub mod output;
 pub mod preview;
 pub mod processes;
 pub mod proxy;
+pub mod run_diff;
 pub mod sandbox;
 mod service;
 pub mod tree;
 mod walk;
 
-pub use service::{CodeService, Project, OPERATIONS};
+pub use service::{CodeService, Project, GIT_TRANSFER_OPERATIONS, OPERATIONS};
 
 use serde_json::{json, Value};
 

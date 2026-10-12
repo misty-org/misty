@@ -91,6 +91,68 @@ impl AgentService {
         .await
     }
 
+    /// Whether agents may push this project's branches, and its default branch.
+    pub async fn set_project_push(&self, scope_id: String, allow: bool, allow_default: bool) -> ApiResult<()> {
+        run_db(self.database_path.clone(), move |connection| {
+            let changed = connection.execute(
+                "UPDATE local_agent_scopes SET allow_push=?2, allow_push_default=?3 WHERE id=?1 AND access='write'",
+                rusqlite::params![scope_id, allow as i64, (allow && allow_default) as i64],
+            )?;
+            if changed == 0 {
+                return Err(validation_error("That project no longer exists."));
+            }
+            Ok(())
+        })
+        .await
+    }
+
+    /// (agents may push, agents may push the default branch)
+    pub async fn push_settings(&self, scope_id: String) -> ApiResult<(bool, bool)> {
+        run_db(self.database_path.clone(), move |connection| {
+            connection.query_row(
+                "SELECT allow_push,allow_push_default FROM local_agent_scopes WHERE id=?1 AND access='write'",
+                [&scope_id],
+                |row| Ok((row.get::<_, i64>(0)? != 0, row.get::<_, i64>(1)? != 0)),
+            )
+        })
+        .await
+    }
+
+    /// Creates `<parent>/<name>` as a new project (a Git repository when
+    /// `git_init`), for New project and From GitHub.
+    pub async fn create_project_folder(
+        &self,
+        parent: PathBuf,
+        name: &str,
+        code: &CodeService,
+    ) -> ApiResult<(Value, PathBuf)> {
+        let name = name.trim();
+        let valid = !name.is_empty()
+            && name.len() <= 100
+            && !name.starts_with('.')
+            && !name.contains(['/', '\\', ':', '\0'])
+            && name.chars().all(|c| !c.is_control());
+        if !valid {
+            return Err(ApiError::Message("Use a short folder name without slashes.".into()));
+        }
+        let parent = fs::canonicalize(&parent)
+            .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
+        let folder = parent.join(name);
+        if folder.exists() {
+            return Err(ApiError::Message(format!("{name} already exists there. Pick another name or place.")));
+        }
+        code.check_root(&folder)
+            .map_err(|error| ApiError::Message(error.to_string()))?;
+        fs::create_dir(&folder)
+            .map_err(|error| ApiError::Message(format!("Could not create the folder: {error}")))?;
+        let registered = self.register_project_scope(folder.clone(), code).await;
+        if registered.is_err() {
+            let _ = fs::remove_dir(&folder);
+        }
+        let folder = fs::canonicalize(&folder).unwrap_or(folder);
+        Ok((registered?, folder))
+    }
+
     /// Lets a project's commands install packages through the proxy, or not.
     pub async fn set_project_installs(&self, scope_id: String, allow: bool) -> ApiResult<()> {
         run_db(self.database_path.clone(), move |connection| {

@@ -1,4 +1,4 @@
-import { FolderPlus } from "lucide-react";
+import { FolderGit2, FolderOpen, FolderPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -13,6 +13,7 @@ import {
 import type { AgentScope } from "../model/interfaces/types";
 import { agentsDeviceSnapshot, codeChooseProject } from "../store/useAgentsStore";
 import { useConversationProject } from "../store/useConversationProject";
+import { FromGitHubDialog, NewProjectDialog } from "./ProjectDialogs";
 
 const none = "none";
 
@@ -31,6 +32,7 @@ export function AgentProjectMenu({
 }) {
   const [projects, setProjects] = useState<AgentScope[]>([]);
   const [failed, setFailed] = useState("");
+  const [dialog, setDialog] = useState<"new" | "github" | null>(null);
   const chosen = useConversationProject((s) =>
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
@@ -58,7 +60,13 @@ export function AgentProjectMenu({
       setFailed(text && !text.includes("_") ? text : "That folder couldn’t be added.");
     }
   };
-  return (
+  /** A project made from a dialog becomes this conversation's project. */
+  const picked = (project: { id: string }) => {
+    setDialog(null);
+    void load();
+    setProject(conversationId, project.id);
+  };
+  const menu = (
     <DropdownMenu onOpenChange={(open) => open && void load()}>
       <MenuTrigger
         label="Project"
@@ -98,10 +106,26 @@ export function AgentProjectMenu({
           ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void add()}>
+        <DropdownMenuItem onSelect={() => setDialog("new")}>
           <FolderPlus aria-hidden="true" />
           <span className="grid min-w-0 gap-0.5">
-            <span>Add a project…</span>
+            <span>New project…</span>
+            <span className="text-xs text-cream-muted">
+              A new folder with Git, on this computer
+            </span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setDialog("github")}>
+          <FolderGit2 aria-hidden="true" />
+          <span className="grid min-w-0 gap-0.5">
+            <span>From GitHub…</span>
+            <span className="text-xs text-cream-muted">Clone one of your repositories</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void add()}>
+          <FolderOpen aria-hidden="true" />
+          <span className="grid min-w-0 gap-0.5">
+            <span>Add an existing folder…</span>
             <span className="text-xs text-cream-muted">
               {failed || "Choose a folder on this computer"}
             </span>
@@ -109,5 +133,20 @@ export function AgentProjectMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+  return (
+    <>
+      {menu}
+      <NewProjectDialog
+        open={dialog === "new"}
+        onOpenChange={(open) => setDialog(open ? "new" : null)}
+        onCreated={picked}
+      />
+      <FromGitHubDialog
+        open={dialog === "github"}
+        onOpenChange={(open) => setDialog(open ? "github" : null)}
+        onCreated={picked}
+      />
+    </>
   );
 }

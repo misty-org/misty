@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Switch } from "@/shared/ui";
 import type { AgentDevice, AgentScope } from "../model/interfaces/types";
+import { ProjectGitRows } from "./ProjectGitRows";
 import {
   agentsDeviceSnapshot,
   codeAllowProjectChanges,
@@ -10,6 +11,7 @@ import {
   codeChooseProject,
   codeRemoveProject,
   codeSetProjectInstalls,
+  codeSetProjectPush,
   codeUndo,
   type CodeCheckpoint,
 } from "../store/useAgentsStore";
@@ -87,6 +89,11 @@ export function useCodeProjects() {
         () => codeAllowProjectChanges(project.id),
         "That folder couldn’t be made a project.",
         `Agents can now change ${project.displayName}.`,
+      ),
+    setPush: (project: AgentScope, allow: boolean, allowDefault: boolean) =>
+      void run(
+        () => codeSetProjectPush(project.id, allow, allowDefault),
+        "That setting couldn’t be saved.",
       ),
     setInstalls: (project: AgentScope, allow: boolean) =>
       void run(() => codeSetProjectInstalls(project.id, allow), "That setting couldn’t be saved."),
@@ -166,6 +173,13 @@ export function CodeProjectsSection({
                     onCheckedChange={(allow) => state.setInstalls(project, allow)}
                   />
                 </label>
+              ) : null}
+              {project.kind === "project_folder" ? (
+                <ProjectGitRows
+                  project={project}
+                  busy={state.busy}
+                  onPush={(allow, allowDefault) => state.setPush(project, allow, allowDefault)}
+                />
               ) : null}
               {(state.checkpoints[project.id] ?? []).slice(0, 5).map((checkpoint) => (
                 <div

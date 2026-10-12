@@ -163,6 +163,9 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 		}
 		guidance.WriteString(" before you finish. Change only what the task needs, never write secrets into files, and tell the user they can undo a chat's changes in Integrations › Projects.")
 	}
+	if has("git.commit") {
+		guidance.WriteString("\n\nGit: in a project that is a Git repository (git_status says so), commit with git_commit when a piece of work is done and checked, with a short message that says what changed. Run git commands only through the git_ tools; shell commands can't change .git. Never rewrite history. To share work on GitHub, use git_push only if the person allowed it: create a branch with git_branch first unless they allowed pushing the default branch, push it, then open a pull request with git_pull_request and give the person its link. If a push is refused, tell the person why instead of retrying.")
+	}
 	if has("browser.request_user_action") {
 		guidance.WriteString("\n\nWaiting for the user: when the screen needs the person (a sign-in, a password or code, a CAPTCHA or verification, choosing an account, a permission dialog), or browser_act stops for one, call browser_request_user_action with that screen's scopeId and say in the reason exactly what they need to do. Misty hands them control, shows a Waiting for you card in the conversation and continues this run when they are done; do not end your response or ask in text instead. Afterwards look at the screen again before acting.")
 	}

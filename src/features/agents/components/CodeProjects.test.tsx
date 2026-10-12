@@ -6,6 +6,7 @@ const store = vi.hoisted(() => ({
   codeCheckpoints: vi.fn(),
   codeChooseProject: vi.fn(),
   codeAllowProjectChanges: vi.fn(),
+  codeSetProjectPush: vi.fn(),
   codeRemoveProject: vi.fn(),
   codeSetProjectInstalls: vi.fn(),
   codeUndo: vi.fn(),
@@ -20,6 +21,8 @@ function Harness() {
 }
 
 const project = {
+  git: true,
+  allowPush: false,
   id: "scope_site",
   deviceId: "device_1",
   displayName: "bakery-site",
@@ -62,7 +65,8 @@ afterEach(() => {
 it("lists projects with their install switch and undoable chats", async () => {
   render(<Harness />);
   expect(await screen.findByText("bakery-site")).toBeTruthy();
-  expect(screen.getAllByRole("switch")).toHaveLength(1);
+  // Package installs, and (for a Git project) agents pushing.
+  expect(screen.getAllByRole("switch")).toHaveLength(2);
   const installs = screen.getByRole("switch", { name: "Allow package installs in bakery-site" });
   expect(installs.getAttribute("aria-checked")).toBe("false");
   expect(screen.getByText(/could be sent out through those sites/)).toBeTruthy();
@@ -113,4 +117,14 @@ it("lists folders shared read-only before projects until the person allows chang
   fireEvent.click(screen.getByRole("button", { name: "Allow agents to change Docs" }));
   await waitFor(() => expect(store.codeAllowProjectChanges).toHaveBeenCalledWith("scope_docs"));
   expect(await screen.findByText("Agents can now change Docs.")).toBeTruthy();
+});
+
+it("lets agents push a Git project, then separately its default branch", async () => {
+  store.codeSetProjectPush.mockResolvedValue(undefined);
+  render(<Harness />);
+  fireEvent.click(await screen.findByRole("switch", { name: "Let agents push bakery-site" }));
+  await waitFor(() =>
+    expect(store.codeSetProjectPush).toHaveBeenCalledWith("scope_site", true, false),
+  );
+  expect(screen.queryByRole("switch", { name: /default branch/ })).toBeNull();
 });

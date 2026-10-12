@@ -393,6 +393,18 @@ pub fn run() {
                     app::code_commands::code_checkpoints,
                     #[cfg(unix)]
                     app::code_commands::code_undo,
+                    #[cfg(unix)]
+                    app::code_commands::code_new_project,
+                    #[cfg(unix)]
+                    app::code_commands::code_clone_project,
+                    #[cfg(unix)]
+                    app::code_commands::code_set_project_push,
+                    #[cfg(unix)]
+                    app::code_commands::code_run_diff,
+                    #[cfg(unix)]
+                    app::code_commands::code_git,
+                    #[cfg(unix)]
+                    app::code_commands::code_git_job,
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]

@@ -14,7 +14,6 @@ import {
   Volume2,
 } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { changedProject, UndoProjectAction } from "./UndoProjectAction";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -68,9 +67,7 @@ export function AgentMessageActions(props: {
       {!user && message.invocationId ? (
         <FeedbackActions invocationId={message.invocationId} />
       ) : null}
-      {!user && message.invocationId && changedProject(message.progress) ? (
-        <UndoProjectAction runId={message.invocationId} />
-      ) : null}
+
       {!user && props.text ? <ReadAloudAction text={props.text} /> : null}
       {canRetry ? (
         <Action

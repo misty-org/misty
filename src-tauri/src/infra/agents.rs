@@ -249,10 +249,18 @@ fn ensure_schema(connection: &Connection) -> rusqlite::Result<()> {
             "ALTER TABLE local_agent_scopes ADD COLUMN access TEXT NOT NULL DEFAULT 'read'",
         )?;
     }
-    if !columns.iter().any(|column| column == "allow_installs") {
-        connection.execute_batch(
-            "ALTER TABLE local_agent_scopes ADD COLUMN allow_installs INTEGER NOT NULL DEFAULT 0",
-        )?;
+    for (column, definition) in [
+        ("allow_installs", "INTEGER NOT NULL DEFAULT 0"),
+        // Git (docs/plans/agent-git-projects.md): agents may push branches,
+        // and separately the default branch.
+        ("allow_push", "INTEGER NOT NULL DEFAULT 0"),
+        ("allow_push_default", "INTEGER NOT NULL DEFAULT 0"),
+    ] {
+        if !columns.iter().any(|existing| existing == column) {
+            connection.execute_batch(&format!(
+                "ALTER TABLE local_agent_scopes ADD COLUMN {column} {definition}"
+            ))?;
+        }
     }
     Ok(())
 }
@@ -261,7 +269,7 @@ fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> 
     let device_id = device_id(connection)?;
     let scopes = {
         let mut statement = connection.prepare(
-            "SELECT id,device_id,display_name,access,allow_installs FROM local_agent_scopes ORDER BY created_at",
+            "SELECT id,device_id,display_name,access,allow_installs,allow_push,allow_push_default,local_path FROM local_agent_scopes ORDER BY created_at",
         )?;
         let rows = statement
             .query_map([], |row| {
@@ -272,6 +280,9 @@ fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> 
                     "displayName": row.get::<_, String>(2)?,
                     "kind": if project { "project_folder" } else { "local_folder" },
                     "allowInstalls": project && row.get::<_, i64>(4)? != 0,
+                    "allowPush": project && row.get::<_, i64>(5)? != 0,
+                    "allowPushDefault": project && row.get::<_, i64>(6)? != 0,
+                    "git": project && Path::new(&row.get::<_, String>(7)?).join(".git").is_dir(),
                     "relativePath": Value::Null,
                     "available": true,
                 }))

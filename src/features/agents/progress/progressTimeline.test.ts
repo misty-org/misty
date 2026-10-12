@@ -93,6 +93,9 @@ describe("progress timeline", () => {
     expect(toolLabel("code.run", true)).toBe("Running a command");
     expect(toolLabel("code_edit", false)).toBe("Edited a file");
     expect(toolLabel("code_preview", false)).toBe("Opened a preview");
+    expect(toolLabel("git_commit", false)).toBe("Committed changes");
+    expect(toolLabel("git.push", true)).toBe("Pushing to GitHub");
+    expect(toolLabel("git_pull_request", false)).toBe("Opened a pull request");
   });
 
   it("names tools in plain words", () => {

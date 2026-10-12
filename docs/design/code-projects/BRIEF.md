@@ -32,3 +32,16 @@ These come from AGENTS.md:
 ## Other devices
 
 Projects are offered to the person's other devices read-only, as shared folders were: list, read and send files. Editing and commands happen only on the computer the project is on, since no device policy can grant the `code` surface.
+
+## Git and diffs (2026-10-11, docs/plans/agent-git-projects.md)
+
+- **Composer Project menu:**
+  - **New project…** asks for a name, then where to put it, and creates a Git repository there.
+  - **From GitHub…** lists the connected account's repositories and clones one.
+  - **Add an existing folder…** shares a folder that already exists.
+- **Changes under an answer**, like Claude Code and Codex: "Changed N files in <project>" with +/− counts, each file opening to its diff, and **Review** and **Undo**. Added lines are tinted green and removed lines red. This is the diff exception in AGENTS.md.
+- **Review panel**, a sheet on the right:
+  - the branch and GitHub repository;
+  - **Pull** and **Push**, with counts, or **Publish to GitHub** (name, private by default);
+  - **Changes** (uncommitted, with a commit box) and **History** (each commit's diff) as a segmented control.
+- **Projects tab:** a Git row with **Review changes** (or **Set up Git**), **Agents can push** (off by default), and under it **Including the default branch**.

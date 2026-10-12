@@ -32,18 +32,18 @@ func TestProjectFolderGrantsOnlyCodeTools(t *testing.T) {
 
 func TestCodeToolsMatchTheProjectGrant(t *testing.T) {
 	descriptors := api.TestingProjectToolDescriptors("site")
-	if len(descriptors) != 12 {
-		t.Fatalf("got %d code tools, want 12", len(descriptors))
+	if len(descriptors) != 20 {
+		t.Fatalf("got %d code and git tools, want 20", len(descriptors))
 	}
 	for _, descriptor := range descriptors {
 		capability, _ := json.Marshal([]string{descriptor.Name})
-		if !strings.HasPrefix(descriptor.Name, "code.") || !db.DeviceContextCapabilitiesAllowed("project_folder", capability) {
+		if !(strings.HasPrefix(descriptor.Name, "code.") || strings.HasPrefix(descriptor.Name, "git.")) || !db.DeviceContextCapabilitiesAllowed("project_folder", capability) {
 			t.Errorf("%s is not grantable by a project folder", descriptor.Name)
 		}
 		if strings.Contains(string(descriptor.InputSchema), `"project"`) {
 			t.Errorf("%s asks which project when there is only one", descriptor.Name)
 		}
-		readOnly := map[string]bool{"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.logs": true, "code.processes": true}
+		readOnly := map[string]bool{"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.logs": true, "code.processes": true, "git.status": true, "git.diff": true, "git.log": true}
 		if readOnly[descriptor.Name] != (descriptor.Risk == serveragent.RiskRead) {
 			t.Errorf("%s has risk %s", descriptor.Name, descriptor.Risk)
 		}

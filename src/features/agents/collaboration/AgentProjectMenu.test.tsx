@@ -40,6 +40,6 @@ it("starts with no project and picks one for this conversation", async () => {
 it("adds a project from the menu and picks it", async () => {
   render(<AgentProjectMenu />);
   await open();
-  fireEvent.click(await screen.findByRole("menuitem", { name: /Add a project/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Add an existing folder/ }));
   await waitFor(() => expect(useConversationProject.getState().draft).toBe("scope_new"));
 });

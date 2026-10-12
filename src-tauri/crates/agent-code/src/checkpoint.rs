@@ -26,12 +26,12 @@ const KEEP_DAYS: u64 = 14;
 const KEEP_PER_PROJECT: usize = 20;
 
 #[derive(Serialize, Deserialize, Clone)]
-struct FileRecord {
-    path: PathBuf,
+pub(crate) struct FileRecord {
+    pub(crate) path: PathBuf,
     mode: u32,
-    size: u64,
-    modified_ns: i128,
-    inode: u64,
+    pub(crate) size: u64,
+    pub(crate) modified_ns: i128,
+    pub(crate) inode: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -41,18 +41,21 @@ struct LinkRecord {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Manifest {
+pub(crate) struct Manifest {
     version: u32,
-    run_id: String,
-    created_at: u64,
-    complete: bool,
+    pub(crate) run_id: String,
+    pub(crate) created_at: u64,
+    pub(crate) complete: bool,
     #[serde(default)]
     reason: Option<String>,
-    files: Vec<FileRecord>,
+    pub(crate) files: Vec<FileRecord>,
     links: Vec<LinkRecord>,
+    /// The branch and commit when the run started, in a Git project.
+    #[serde(default)]
+    git: Option<crate::git::Head>,
 }
 
-enum Item {
+pub(crate) enum Item {
     File(PathBuf, fs::Metadata),
     Link(PathBuf),
 }
@@ -64,12 +67,12 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
-fn modified_ns(metadata: &fs::Metadata) -> i128 {
+pub(crate) fn modified_ns(metadata: &fs::Metadata) -> i128 {
     metadata.mtime() as i128 * 1_000_000_000 + metadata.mtime_nsec() as i128
 }
 
 /// The project's tracked files and symlinks, as undo sees them.
-fn items(root: &Path) -> Vec<Item> {
+pub(crate) fn items(root: &Path) -> Vec<Item> {
     let walker = WalkBuilder::new(root)
         .hidden(false)
         .follow_links(false)
@@ -155,6 +158,7 @@ impl Checkpoints {
             reason: None,
             files: Vec::new(),
             links: Vec::new(),
+            git: crate::git::record_head(root_path),
         };
         let mut bytes = 0u64;
         for item in items(root_path) {
@@ -297,8 +301,36 @@ impl Checkpoints {
                 current = path.parent();
             }
         }
+        // Commits the run made go too, unless they already reached GitHub.
+        let (commits_removed, commits_on_github) = manifest
+            .git
+            .as_ref()
+            .map(|head| crate::git::rewind(root_path, head).unwrap_or((0, 0)))
+            .unwrap_or((0, 0));
         let _ = fs::remove_dir_all(&run_dir);
-        Ok(json!({ "restored": restored, "removed": removed }))
+        Ok(json!({
+            "restored": restored,
+            "removed": removed,
+            "commitsRemoved": commits_removed,
+            "commitsOnGitHub": commits_on_github,
+        }))
+    }
+
+    /// A run's manifest and its copied files folder.
+    pub(crate) fn manifest(&self, scope_id: &str, run_id: &str) -> Option<(PathBuf, Manifest)> {
+        let run_dir = self.run_dir(scope_id, run_id).ok()?;
+        let manifest = serde_json::from_slice(&fs::read(run_dir.join("manifest.json")).ok()?).ok()?;
+        Some((run_dir.join("files"), manifest))
+    }
+
+    /// The first run in a project that started after `created_at`.
+    pub(crate) fn next_after(&self, scope_id: &str, run_id: &str, created_at: u64) -> Option<(PathBuf, Manifest)> {
+        let entries = fs::read_dir(self.dir.join(scope_id)).ok()?;
+        entries
+            .flatten()
+            .filter_map(|entry| self.manifest(scope_id, &entry.file_name().to_string_lossy()))
+            .filter(|(_, manifest)| manifest.run_id != run_id && manifest.created_at >= created_at)
+            .min_by_key(|(_, manifest)| manifest.created_at)
     }
 
     /// Runs that can be undone in a project, newest first.

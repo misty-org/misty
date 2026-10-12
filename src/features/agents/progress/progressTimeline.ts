@@ -126,6 +126,18 @@ const codePhrases: Record<string, [running: string, done: string, subject: strin
   preview: ["Opening", "Opened", "a preview"],
 };
 
+/** Git tools in a project (docs/plans/agent-git-projects.md). */
+const gitPhrases: Record<string, [running: string, done: string, subject: string]> = {
+  status: ["Checking", "Checked", "Git status"],
+  diff: ["Reviewing", "Reviewed", "changes"],
+  log: ["Reading", "Read", "history"],
+  commit: ["Committing", "Committed", "changes"],
+  branch: ["Switching", "Switched", "branches"],
+  push: ["Pushing", "Pushed", "to GitHub"],
+  pull: ["Pulling", "Pulled", "from GitHub"],
+  pull_request: ["Opening", "Opened", "a pull request"],
+};
+
 /** A tool name split into its verb and what it acts on, such as "Searched" and "web". */
 export function toolParts(name: string, running: boolean): { verb: string; subject: string } {
   if (/finish[._]task$/.test(name))
@@ -133,6 +145,11 @@ export function toolParts(name: string, running: boolean): { verb: string; subje
   const code = /^code[._](\w+)$/.exec(name)?.[1];
   if (code && codePhrases[code]) {
     const [ing, ed, subject] = codePhrases[code];
+    return { verb: running ? ing : ed, subject };
+  }
+  const git = /^git[._](\w+)$/.exec(name)?.[1];
+  if (git && gitPhrases[git]) {
+    const [ing, ed, subject] = gitPhrases[git];
     return { verb: running ? ing : ed, subject };
   }
   const parts = name

@@ -8,6 +8,19 @@ const views = [
   { id: "n", surfaceId: "notes", state: {} },
 ];
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
+const push = vi.fn(async () => ({ branch: "feature", sha: "c2", commits: 1, upToDate: false }));
+vi.mock("./git/gitSync", () => ({
+  push: () => push(),
+  pull: vi.fn(),
+  openPullRequest: vi.fn(),
+}));
+vi.mock("./git/projectGit", () => ({
+  projectGit: vi.fn(() => ({})),
+  commitAuthor: vi.fn(async () => ({
+    name: "Matt",
+    email: "1+kannachi323@users.noreply.github.com",
+  })),
+}));
 vi.mock("@/features/workspace/windows", () => ({
   mapAllWorkspaceWindowViews: (_state: unknown, visit: (view: (typeof views)[number]) => unknown) =>
     views.forEach(visit),
@@ -31,6 +44,7 @@ const job = (operation: string, input: unknown = {}) => ({
 });
 
 beforeEach(() => {
+  push.mockClear();
   invoke.mockReset();
   openBrowserView.mockClear();
   focusView.mockClear();
@@ -82,7 +96,55 @@ it("never opens an address that isn't Misty's loopback preview", async () => {
   expect(openBrowserView).not.toHaveBeenCalled();
 });
 
-it("covers exactly the code tools", () => {
-  expect([...codeProjectOperations].every((name) => name.startsWith("code."))).toBe(true);
-  expect(codeProjectOperations.size).toBe(12);
+it("covers exactly the code and Git tools", () => {
+  expect([...codeProjectOperations].every((name) => /^(code|git)\./.test(name))).toBe(true);
+  expect(codeProjectOperations.size).toBe(20);
+});
+
+it("commits as the person's account, whatever the agent sent", async () => {
+  invoke.mockResolvedValue({ sha: "c1" });
+  await runCodeProjectOperation(
+    job("git.commit", { message: "Add page", author: { name: "Agent", email: "x@evil.example" } }),
+    new AbortController().signal,
+  );
+  expect(invoke).toHaveBeenCalledWith("code_execute", {
+    request: expect.objectContaining({
+      operation: "git.commit",
+      input: {
+        message: "Add page",
+        author: { name: "Matt", email: "1+kannachi323@users.noreply.github.com" },
+      },
+    }),
+  });
+});
+
+it("pushes only after the native check allows it, and explains a refusal", async () => {
+  invoke.mockResolvedValueOnce({ allowed: false, reason: "Agents can't push this project." });
+  const refused = await runCodeProjectOperation(job("git.push"), new AbortController().signal);
+  expect(refused).toEqual({
+    status: "failure",
+    tool_error: { message: "Agents can't push this project." },
+  });
+  expect(push).not.toHaveBeenCalled();
+  expect(invoke).toHaveBeenCalledWith("code_git_job", {
+    request: {
+      operation: "git.push",
+      scopeId: "scope_site",
+      config: { runGrant: { payload: "p", signature: "s" } },
+    },
+  });
+
+  invoke.mockResolvedValueOnce({ allowed: true });
+  const pushed = await runCodeProjectOperation(job("git.push"), new AbortController().signal);
+  expect(pushed).toMatchObject({ branch: "feature", commits: 1 });
+
+  invoke.mockResolvedValueOnce({ allowed: true });
+  push.mockRejectedValueOnce(
+    new Error("GitHub has commits on feature that this project doesn't. Pull first, then push."),
+  );
+  const stale = await runCodeProjectOperation(job("git.push"), new AbortController().signal);
+  expect(stale).toMatchObject({
+    status: "failure",
+    tool_error: { message: expect.stringMatching(/Pull first/) },
+  });
 });

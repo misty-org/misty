@@ -5,6 +5,7 @@
 //!   code_eval_bridge --project DIR --data DIR [--installs]
 //!   {"id":1,"operation":"code.read","input":{"path":"index.html"}}
 //!   {"id":1,"result":{...}}  or  {"id":1,"error":"..."}
+//!   {"id":2,"git":true,"operation":"status","input":{}}  (a Git step)
 use std::path::PathBuf;
 
 use misty_agent_code::{outcome, CodeService, Project};
@@ -36,6 +37,12 @@ async fn main() {
         let request: Value = serde_json::from_str(&line).unwrap_or(Value::Null);
         let id = request["id"].clone();
         let reply = match request["operation"].as_str() {
+            Some(operation) if request["git"].as_bool() == Some(true) => {
+                match outcome(service.git_transfer(&project, operation, request["input"].clone())) {
+                    Ok(result) => json!({ "id": id, "result": result }),
+                    Err(error) => json!({ "id": id, "error": error }),
+                }
+            }
             Some("undo") => match service.undo(&project, request["runId"].as_str().unwrap_or("run_eval")) {
                 Ok(result) => json!({ "id": id, "result": result }),
                 Err(error) => json!({ "id": id, "error": error.to_string() }),

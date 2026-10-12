@@ -28,6 +28,14 @@ export const projectCapabilities = [
   "code.processes",
   "code.stop",
   "code.preview",
+  "git.status",
+  "git.diff",
+  "git.log",
+  "git.commit",
+  "git.branch",
+  "git.push",
+  "git.pull",
+  "git.pull_request",
 ];
 const workspaceCapabilities = ["tabs.list", "tabs.open", "bookmarks.list", "bookmarks.add"];
 /** On another device the agent may also open its own browser session there. */

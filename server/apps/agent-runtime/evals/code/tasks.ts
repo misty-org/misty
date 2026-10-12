@@ -1,5 +1,6 @@
 // Code eval tasks. Each starts from an empty folder or a fixture project, and
 // passes when every check holds on the files and the preview afterwards.
+import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -22,6 +23,8 @@ export interface CodeEvalTask {
   files?: Record<string, string>;
   /** Commands need package installs (and the internet). */
   installs?: boolean;
+  /** The project starts as a Git repository with one commit. */
+  git?: boolean;
   maxSteps?: number;
   /** Paths to fetch from the preview server when the agent called code_preview. */
   previewPaths?: string[];
@@ -129,6 +132,24 @@ export const tasks: CodeEvalTask[] = [
       { name: "built", ok: (run) => existsSync(join(run.root, "dist/index.html")) },
       { name: "build has change", ok: (run) => allText(join(run.root, "dist"), [".js", ".html"]).includes("Hello Misty") },
       { name: "previewed build", ok: (run) => run.trace.some((line) => line.startsWith("code.preview") && line.includes("dist")) },
+    ],
+  },
+  {
+    id: "commit-fix",
+    fixture: "small-site",
+    git: true,
+    prompt: "The home page says 'Hand-thrown ceramics from Asheville' but we moved to Boone. Fix it and commit the change.",
+    checks: [
+      { name: "text fixed", ok: (run) => read(run.root, "index.html").includes("Boone") && !read(run.root, "index.html").includes("Asheville") },
+      { name: "committed", ok: (run) => run.trace.some((line) => line.startsWith("git.commit") && line.includes('"sha"')) },
+      {
+        name: "nothing left uncommitted",
+        ok: (run) => {
+          const status = spawnSync("git", ["status", "--porcelain"], { cwd: run.root, encoding: "utf8" });
+          return status.status === 0 && status.stdout.trim() === "";
+        },
+      },
+      { name: "no push attempted", ok: (run) => !run.trace.some((line) => line.startsWith("git.push")) },
     ],
   },
   {

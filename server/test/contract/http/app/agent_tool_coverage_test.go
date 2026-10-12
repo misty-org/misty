@@ -38,6 +38,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /ai/senses`, why: "model choices are account settings"},
 	{pattern: `^\S+ /(ai/settings|settings/|me/settings$|ai/preferences/|ai/recaps/)`, why: "account settings change in Settings, never by an agent"},
 	{pattern: `^POST /integrations/apps/connect$`, tool: "apps.connect"},
+	{pattern: `^POST /integrations/github/git$`, why: "the desktop's half of the git.push, git.pull and git.pull_request device tools: it moves commits the device checked against the project's grant and push switches"},
 	{pattern: `^\S+ /(connections|integrations/apps/connections|provider-callbacks|oauth)/`, why: "connecting an account needs the person to sign in"},
 	{pattern: `^\S+ /(me/app-requests|me/agent-interventions)/`, why: "a person's answer to an agent's card"},
 	{pattern: `^\S+ /me/(agent-questions|agent-plans|agent-goals)/|^\S+ /me/conversations/\{conversationID\}/(mode|goal)$`,
