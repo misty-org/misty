@@ -3,6 +3,15 @@
 use super::*;
 use super::super::space_windows;
 
+/// Debug builds only: with `MISTY_EVAL_EPHEMERAL_PAGES=1` every page opens in one temporary
+/// session for this run of the app, so benchmarks browse the live web with no saved
+/// sign-ins while the app itself stays signed in (docs/plans/odysseys-campaign.md).
+fn eval_ephemeral_session() -> Option<String> {
+    let enabled = cfg!(debug_assertions)
+        && std::env::var("MISTY_EVAL_EPHEMERAL_PAGES").is_ok_and(|value| value == "1");
+    enabled.then(|| format!("eval-ephemeral#{}", std::process::id()))
+}
+
 #[tauri::command]
 // Keep this command asynchronous. WebView2 child creation needs the Windows
 // event loop to remain free while `add_child` finishes initializing the view.
@@ -29,6 +38,7 @@ pub async fn browser_webview_create(
     let space = space_windows::space_for_owner(&owner)
         .ok_or("Only a Space window can open pages.")?;
     let incognito = space_windows::incognito_session(&owner)
+        .or_else(eval_ephemeral_session)
         .map(|session| space_windows::incognito_store_id(&session));
     request.private = incognito.is_some();
     // On Windows each Space keeps its pages' data in its own folder, incognito included.
