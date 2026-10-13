@@ -1,7 +1,4 @@
-import type {
-  FileTableColumn,
-  FileTableColumnWidths,
-} from "../../model/types/components/FileBrowser";
+import type { FileTableColumn, FileTableColumnWidths } from "../../model/FileBrowser";
 import {
   defaultColumnWidths,
   fileTableColumns,

@@ -1,6 +1,6 @@
 import type { MountedDevice, SavedSearchRule } from "@/native/ipc";
 
-import type { SmartFolderMatchMode } from "../../types/components/ExplorerSidebarSupport";
+export type SmartFolderMatchMode = "all" | "any";
 
 export interface DeviceCustomizationState {
   nameOverrides: Record<string, string>;
@@ -26,3 +26,5 @@ export interface SmartFolderDraft {
   matchMode: SmartFolderMatchMode;
   rules: SavedSearchRule[];
 }
+
+export type SmartFolderDialogState = { draft: SmartFolderDraft } | null;

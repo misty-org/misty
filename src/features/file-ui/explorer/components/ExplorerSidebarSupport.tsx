@@ -9,17 +9,11 @@ import {
   navigationTreeRowClass,
   navigationTreeSurfaceClass,
 } from "@/shared/ui";
-import type {
-  DeviceCustomizationState,
-  SidebarDeviceEntry,
-} from "../model/interfaces/components/ExplorerSidebarSupport";
+import type { DeviceCustomizationState, SidebarDeviceEntry } from "../model/ExplorerSidebarSupport";
 import { explorerPathName, joinExplorerPath } from "@/shared/lib/pathNormalization";
 import { normalizeSidebarPath } from "./explorerSidebarStorage";
 export * from "./explorerSidebarStorage";
-export type {
-  DeviceCustomizationState,
-  SidebarDeviceEntry,
-} from "../model/interfaces/components/ExplorerSidebarSupport";
+export type { DeviceCustomizationState, SidebarDeviceEntry } from "../model/ExplorerSidebarSupport";
 export const sidebarStyles = {
   root: cn(
     "misty-transient-scrollbar h-full min-h-0 min-w-0 overflow-x-hidden",

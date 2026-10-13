@@ -1,7 +1,5 @@
 import type { ExplorerLocation } from "@/native/ipc";
 
-import type { DropAction, ExplorerDragPhase } from "../../types/drag/types";
-
 export interface ExplorerDragItem {
   entryId?: string;
   name: string;
@@ -49,3 +47,8 @@ export interface ExplorerDragViewState {
   preparing: boolean;
   error: string | null;
 }
+
+export type ExplorerDragPhase =
+  "idle" | "internal" | "external" | "preparing-egress" | "native-egress" | "dropping";
+
+export type DropAction = "transfer" | "trash" | "library" | "invalid";

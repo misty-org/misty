@@ -5,7 +5,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { ExplorerDragItem, ExplorerDropZoneSpec } from "../model/interfaces/drag/types";
+import type { ExplorerDragItem, ExplorerDropZoneSpec } from "../model/drag";
 import { ExplorerDragContext } from "./ExplorerDragState";
 export function useExplorerDragSource(items: ExplorerDragItem[]) {
   const context = useContext(ExplorerDragContext);

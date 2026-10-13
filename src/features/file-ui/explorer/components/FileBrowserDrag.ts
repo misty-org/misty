@@ -1,10 +1,6 @@
 import type { FileEntry } from "@/native/ipc";
 import { invalidTransferReason, storageIdForPath } from "../drag/operations";
-import type {
-  DropAcceptance,
-  ExplorerDragItem,
-  ExplorerDragPayload,
-} from "../model/interfaces/drag/types";
+import type { DropAcceptance, ExplorerDragItem, ExplorerDragPayload } from "../model/drag";
 export function dragItemsForEntry(
   entry: FileEntry,
   entries: FileEntry[],
