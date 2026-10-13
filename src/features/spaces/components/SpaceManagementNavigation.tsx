@@ -1,8 +1,7 @@
 import { SpaceMembersPopover } from "@/features/spaces/members";
 import type { Space } from "@/api/spaces/dto/interfaces/types";
 import { IconButton } from "@/shared/ui";
-import { Gauge, UsersRound } from "lucide-react";
-import { SpaceUsagePopover } from "./SpaceUsagePopover";
+import { UsersRound } from "lucide-react";
 
 /** Compact management actions beside the Space title. */
 export function SpaceManagementNavigation({ space }: { space: Space | undefined }) {
@@ -16,15 +15,6 @@ export function SpaceManagementNavigation({ space }: { space: Space | undefined 
         trigger={
           <IconButton label="Members">
             <UsersRound aria-hidden="true" />
-          </IconButton>
-        }
-      />
-      <SpaceUsagePopover
-        space={space}
-        side="bottom"
-        trigger={
-          <IconButton label="Usage">
-            <Gauge aria-hidden="true" />
           </IconButton>
         }
       />

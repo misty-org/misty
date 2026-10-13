@@ -137,11 +137,8 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(
     management.closest("header")?.contains(screen.getByRole("heading", { name: "Family" })),
   ).toBe(true);
-  fireEvent.click(within(management).getByRole("button", { name: "Usage" }));
-  expect(await screen.findByRole("dialog")).toBeTruthy();
-  expect(screen.getByText("Cloud storage")).toBeTruthy();
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // Usage is the account's, in the profile menu, not the Space's.
+  expect(within(management).queryByRole("button", { name: "Usage" })).toBeNull();
   fireEvent.click(within(management).getByRole("button", { name: "Members" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
   expect(useSpacesStore.getState().loadMembers).toHaveBeenCalledWith("family");

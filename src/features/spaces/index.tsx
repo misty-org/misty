@@ -1,4 +1,5 @@
 export { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
+export { AccountUsagePanel } from "./components/AccountUsagePanel";
 export { SpaceAvatar } from "./components/SpaceAvatar";
 export { SpaceManagementNavigation } from "./components/SpaceManagementNavigation";
 export { preferredDefaultSpace } from "./defaultSpace";

@@ -23,8 +23,10 @@ export type ScreenLocation = "separate" | "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
   memory_enabled: boolean;
-  /** Sends, shares, deletes and payments in connected apps wait for approval. */
+  /** Agents pause before sending, sharing, deleting and paying. Off by default. */
   app_actions_ask: boolean;
+  /** Agents pause before paying while they otherwise act on their own. */
+  payments_ask?: boolean;
   /** Where agents open a screen when a task needs one. */
   screen_location?: ScreenLocation;
   /** Agents may read but not act on banking, crypto, payment and adult sites. */
@@ -138,10 +140,10 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify({ location }),
     }),
-  updateAppActionsAsk: (ask: boolean) =>
+  updateAppActionsAsk: (change: { ask?: boolean; payments?: boolean }) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
       method: "PUT",
-      body: JSON.stringify({ ask }),
+      body: JSON.stringify(change),
     }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {

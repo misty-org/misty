@@ -1,8 +1,8 @@
-//! Stop before paying, sending, deleting or posting (roadmap C2). When an
-//! agent's page step would do one of those, it waits here, natively, until the
-//! person allows or refuses it in the control island. The model's flags and
-//! the account's "Ask before acting" setting can't skip this, and nobody
-//! answering means no.
+//! Stop before paying, sending, deleting or posting when the account asks
+//! first (roadmap C2). Agents act on their own by default; with "Ask before
+//! acting" on, or "Ask before paying" for payments, the agent's page step waits
+//! here, natively, until the person allows or refuses it in the control island.
+//! The model's flags can't skip this, and nobody answering means no.
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -14,8 +14,18 @@ use tokio::sync::oneshot;
 
 use super::BrowserAgentExecuteRequest;
 
-/// Kinds of page action that always ask the person.
+/// Kinds of page action the person can be asked about.
 pub(super) const KINDS: [&str; 4] = ["payment", "send", "delete", "publish"];
+
+/// Whether this kind of step waits for the person. A job without the
+/// account's choice asks about every kind.
+pub(super) fn asks(request: &BrowserAgentExecuteRequest, kind: &str) -> bool {
+    KINDS.contains(&kind)
+        && request
+            .confirm_kinds
+            .as_ref()
+            .is_none_or(|kinds| kinds.iter().any(|asked| asked == kind))
+}
 
 /// How long a step waits for an answer. A scheduled run with nobody at the
 /// computer stops here and says so.

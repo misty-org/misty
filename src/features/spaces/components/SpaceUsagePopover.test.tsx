@@ -53,10 +53,9 @@ describe("Account usage from a Space", () => {
     expect(api.request.mock.calls[0][0]).toBe("/billing/usage");
     expect(screen.getByText("Cloud storage")).toBeDefined();
     expect(screen.queryByText("Sync transfer")).toBeNull();
-    expect(screen.getByText(/300 weighted tokens temporarily reserved/)).toBeDefined();
-    fireEvent.click(screen.getByText("Recent AI commands"));
-    expect(screen.getByText("750 weighted tokens used")).toBeDefined();
-    expect(screen.getByText("Ceiling: 1,000,000 weighted tokens")).toBeDefined();
+    expect(screen.getByText("1.5 MB of 5 GB")).toBeDefined();
+    expect(screen.getAllByText("<1%").length).toBe(2);
+    expect(screen.queryByText("Recent AI commands")).toBeNull();
   });
   it("shows a recoverable error rather than fabricated zero usage", async () => {
     api.request.mockRejectedValue(new Error("offline"));

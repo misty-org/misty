@@ -160,10 +160,14 @@ Grok Bot do". The IDs come from `ai-browser-comparison.md`.
   - Today scheduled runs get no device (`workflow_schedules.go`).
   - A missed run waits until the computer is back and says so. It never runs in
     the cloud.
-- **C2 Stop before paying, sending, deleting or posting.**
-  - A narrow check at the native boundary: before a page action that submits a
-    payment, sends a message, deletes, or publishes, the agent pauses and the
-    person confirms in the control island.
+- **C2 Stop before paying, sending, deleting or posting, when the person wants that.**
+  - Agents act on their own by default (decided 2026-10-12): the person
+    watches, and safety comes from site blocks, the sandbox, untrusted page
+    content and no typed secrets, not from stops.
+  - A narrow check at the native boundary: with "Ask before acting for you"
+    on, a page action that pays, sends, deletes or publishes pauses until the
+    person confirms in the control island. "Ask before paying" (on by default)
+    pauses payments alone.
   - It applies to Misty's agents.
   - It's a small, specific check, not a revival of the retired general approval
     system.
@@ -175,12 +179,14 @@ Grok Bot do". The IDs come from `ai-browser-comparison.md`.
 ### Built (2026-10-12, uncommitted)
 - **C2:** the page runtime sorts the control a step acts on into payment,
   send, delete or publish (`P.consequenceKind` in `page_core.js`). For those
-  four, `run_step_checked` in Rust always waits in `browser_action_confirm.rs`
-  for "Allow once" or "Don't allow" in the control island. Neither the
-  model's `allowConsequential` nor the account setting can skip it, and no
-  answer in 3 minutes means no. Desktop-control steps the model marks
-  consequential ask the same question (`askPerson`). The optional "Ask before
-  acting" chat card still exists on top.
+  four, `run_step_checked` in Rust waits in `browser_action_confirm.rs` for
+  "Allow once" or "Don't allow" in the control island when the job's
+  `confirmKinds` (from `app_actions_ask` and `payments_ask`, migration
+  `20271012050000_autonomous_agents`) name that kind; a job without them asks
+  about all four. The model's `allowConsequential` can't skip a pause, and no
+  answer in 3 minutes means no. Other consequential steps run when the agent
+  sets `allowConsequential` for a step that's part of the person's task.
+  Desktop-control steps follow the same kinds (`askPerson`).
 - **C1:** a schedule can name a computer (`workflow_schedules.device_id`,
   migration `20271012030000_scheduled_device_runs`). When it's due, the server
   parks it (`awaiting_device`) instead of running it. Misty on that computer

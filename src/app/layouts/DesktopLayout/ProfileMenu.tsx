@@ -1,6 +1,7 @@
 import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
 import { reportSystemError } from "@/features/support/systemErrors";
 import { routes } from "@/features/app-shell";
+import { AccountUsagePanel } from "@/features/spaces";
 import { useNativeSessionStore } from "@/features/native-session";
 import {
   DropdownMenuContent,
@@ -9,7 +10,7 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import { Check, ExternalLink, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
+import { Check, ExternalLink, Gauge, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -98,6 +99,11 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
             shortcut={<ExternalLink className="size-3.5" aria-hidden="true" />}
             onSelect={props.onOpenAccountSettings}
           />
+          <MenuSubmenu icon={<Gauge />} label="Usage" width="lg">
+            <div className="px-2 py-1.5">
+              <AccountUsagePanel />
+            </div>
+          </MenuSubmenu>
           <MenuSubmenu
             icon={<Repeat2 />}
             label="Switch accounts"

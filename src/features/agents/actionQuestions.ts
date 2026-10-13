@@ -43,7 +43,7 @@ export function listenForActionQuestions() {
 const local = new Map<string, (allow: boolean) => void>();
 const localWaitMs = 180_000;
 
-function kindOf(description: string): ActionQuestion["kind"] {
+export function kindOf(description: string): ActionQuestion["kind"] {
   if (
     /\b(pay|buy|purchase|order|checkout|check out|donate|transfer|subscribe)\b/i.test(description)
   )

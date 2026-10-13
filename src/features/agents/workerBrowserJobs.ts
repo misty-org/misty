@@ -53,6 +53,20 @@ export function jobSiteBlocks(
   };
 }
 
+/**
+ * The page actions the account asks about first, as the server put them in
+ * the job. A job without them gets the safe default: every kind asks.
+ */
+export function jobConfirmKinds(config: unknown): string[] | undefined {
+  const value =
+    config && typeof config === "object"
+      ? (config as { confirmKinds?: unknown }).confirmKinds
+      : undefined;
+  return Array.isArray(value)
+    ? value.filter((kind): kind is string => typeof kind === "string")
+    : undefined;
+}
+
 export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
   const contextId = job.contextId;
   if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
@@ -76,6 +90,7 @@ export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"])
           : undefined,
     },
     siteBlocks: jobSiteBlocks(job.config),
+    confirmKinds: jobConfirmKinds(job.config),
   };
 }
 

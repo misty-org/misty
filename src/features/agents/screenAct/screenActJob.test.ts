@@ -9,7 +9,10 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/client", () => ({ apiRequest: vi.fn() }));
-vi.mock("../actionQuestions", () => ({ askPerson: mocks.askPerson }));
+vi.mock("../actionQuestions", () => ({
+  askPerson: mocks.askPerson,
+  kindOf: (description: string) => (/\b(pay|buy)\b/i.test(description) ? "payment" : "send"),
+}));
 // Midscene's Agent plans; these tests script its plans against the real device.
 vi.mock("@midscene/core/agent", () => ({
   Agent: class {
@@ -57,6 +60,7 @@ beforeEach(() => {
   frames = 0;
   changing = true;
   mocks.invoke.mockReset();
+  mocks.askPerson.mockClear();
   mocks.invoke.mockImplementation(
     async (name: string, args: { request: { operation: string } }) => {
       if (name === "browser_runtime_for_scope") return "runtime";
@@ -118,6 +122,25 @@ it("stops before a consequential action unless the user allowed it", async () =>
   expect(allowed.status).toBe("done");
   expect(mocks.askPerson).toHaveBeenCalledWith(expect.objectContaining({ description: "Send" }));
   expect(calls("browser.interact")[0][1].request.input.consequential).toBe(true);
+});
+
+it("acts without asking when the account doesn't ask first", async () => {
+  const send = { x: 0.9, y: 0.9, consequential: true, description: "Send" };
+  mocks.script = async (device) => {
+    await act(device, "click", send);
+    return "Sent.";
+  };
+  const result = await runScreenAct(
+    {
+      ...job,
+      config: { ...job.config, confirmKinds: ["payment"] },
+      input: { goal: "Send it", allowConsequential: true },
+    },
+    new AbortController().signal,
+  );
+  expect(result.status).toBe("done");
+  expect(mocks.askPerson).not.toHaveBeenCalled();
+  expect(calls("browser.interact")).toHaveLength(1);
 });
 
 it("does nothing when the person refuses the action in the island", async () => {

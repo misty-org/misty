@@ -5,14 +5,14 @@ import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { Pressable } from "@/shared/ui";
 
 /**
- * The run's notebook: its plan and the findings it and its sub-agents wrote,
- * open by default so the person can follow a long task as it works.
+ * The run's notebook: the findings it and its sub-agents wrote, open by
+ * default so the person can follow a long task as it works. The agent's own
+ * checklist stays out of it; people see a plan only in Plan mode.
  */
 export function AgentNotebookCard({ notebook }: { notebook: AgentNotebook }) {
   const [open, setOpen] = useState(true);
-  const plan = notebook.plan.trim();
   const findings = notebook.findings.trim();
-  if (!plan && !findings) return null;
+  if (!findings) return null;
   return (
     <section
       aria-label="Notebook"
@@ -29,26 +29,9 @@ export function AgentNotebookCard({ notebook }: { notebook: AgentNotebook }) {
       </Pressable>
       {open ? (
         <div className="mt-2 grid gap-3">
-          {plan ? (
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-cream-muted">
-                Plan
-              </p>
-              <div className="misty-markdown-message text-[13px] leading-5 text-cream">
-                <MistyMarkdown>{plan}</MistyMarkdown>
-              </div>
-            </div>
-          ) : null}
-          {findings ? (
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-wide text-cream-muted">
-                Findings
-              </p>
-              <div className="misty-markdown-message text-[13px] leading-5 text-cream">
-                <MistyMarkdown>{findings}</MistyMarkdown>
-              </div>
-            </div>
-          ) : null}
+          <div className="misty-markdown-message text-[13px] leading-5 text-cream">
+            <MistyMarkdown>{findings}</MistyMarkdown>
+          </div>
           {notebook.noteId ? (
             <p className="text-[11px] text-cream-muted">
               Also saved as a note in your personal Space.

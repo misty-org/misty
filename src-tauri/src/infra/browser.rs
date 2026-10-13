@@ -436,6 +436,10 @@ pub struct BrowserAgentExecuteRequest {
     /// Absent means the safe default: sensitive categories blocked.
     #[serde(default)]
     pub site_blocks: Option<page_agent::SiteBlocks>,
+    /// The page actions the account asks about first, from the job's server
+    /// config. Absent means the safe default: all of them.
+    #[serde(default)]
+    pub confirm_kinds: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -3233,6 +3237,7 @@ pub(super) fn authorize_workspace_dispatch(
         operation: "browser.workspace.interact".into(),
         input: json!({}),
         site_blocks: None,
+        confirm_kinds: None,
     };
     validate_browser_grant(session, &request)?;
     Ok(())

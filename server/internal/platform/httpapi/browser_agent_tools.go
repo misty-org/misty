@@ -54,6 +54,7 @@ func (s *SpacesService) executeBrowserAgentToolInvocation(
 	// The device refuses to act on these sites before any input is sent.
 	if settings, _, err := s.database.AISettings(ctx, invocation.UserID); err == nil {
 		configData["siteBlocks"] = map[string]any{"sensitive": settings.AgentBlockSensitive, "sites": settings.AgentBlockedSites}
+		configData["confirmKinds"] = browserConfirmKinds(settings)
 	}
 	if isAIInvocationRuntimeID(invocation.RunID) {
 		record, lookupErr := s.database.AIInvocationByID(ctx, invocation.UserID, invocation.RunID)
@@ -316,4 +317,17 @@ func (s *SpacesService) stopBrowserDeviceTool(userID, jobID, operation string) (
 		}
 		return nil, db.ErrAgentToolboxActionUnknown
 	}
+}
+
+// browserConfirmKinds are the page actions the device pauses on until the
+// person allows them in the island. Agents act on their own unless the account
+// asks first; paying has its own switch.
+func browserConfirmKinds(settings db.AIUserSettings) []string {
+	if settings.AppActionsAsk {
+		return []string{"payment", "send", "delete", "publish"}
+	}
+	if settings.PaymentsAsk {
+		return []string{"payment"}
+	}
+	return []string{}
 }
