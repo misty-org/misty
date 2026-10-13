@@ -1,61 +1,22 @@
-import {
-  groupName,
-  groupStyle,
-  TabGroupEditor,
-  TabGroupHeader,
-  TabGroupTabMenu,
-} from "./MistyTabGroups";
+import { TabGroupEditor, TabGroupHeader } from "./MistyTabGroups";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { BrowserViewAudioButton } from "@/features/browser/workspace";
-import { dockPaneCloseDirection } from "@/features/workspace/dockTree";
-import {
-  cn,
-  OverlaySideProvider,
-  inwardSide,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  IconButton,
-  MenuTrigger,
-  OverflowFadeText,
-  Pressable,
-} from "@/shared/ui";
-import {
-  Blocks,
-  ChevronDown,
-  PanelBottomDashed,
-  PanelRightDashed,
-  PanelTopClose,
-  PanelBottomClose,
-  PanelLeftClose,
-  PanelRightClose,
-  Plus,
-  X,
-} from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Renameable } from "@/features/navigation-names/Renameable";
-import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import {
-  activeLayoutView,
-  isEmptyTab,
-  layoutTabs,
-  tabLabel,
-  paneViewLabel,
-} from "@/features/workspace/layoutTabs";
-import { canFitDockSplit, dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { ConnectedTabShape } from "./ConnectedTabShape";
+import { cn, OverlaySideProvider, inwardSide, IconButton } from "@/shared/ui";
+import { PanelBottomDashed, PanelRightDashed, Plus } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { isEmptyTab, layoutTabs } from "@/features/workspace/layoutTabs";
+import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { useTabPresenceMotion } from "./useTabPresenceMotion";
-import { usePaneBounds, useTabStripFade } from "./useTabStripGeometry";
+import { useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
-import { minimumForWorkspaceViews } from "./WorkspaceDockTree";
-import { ViewIcon } from "./WorkspaceViewGroupButton";
 import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
-import { TabPageMenu } from "./PinnedTabMenu";
 import { FavoritesStrip } from "./FavoritesStrip";
 import { useTabHoverCards } from "./TabHoverCard";
 import { useWindowSwipe } from "./useWindowSwipe";
 import { navigatorMotionClass } from "./styles";
 import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
+import { useTabStripReorder } from "./useTabStripReorder";
+import { useFocusedPaneSplit } from "./useFocusedPaneSplit";
+import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
 
 export function WorkspaceTabStrip(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
@@ -87,72 +48,14 @@ export function WorkspaceTabStrip(
   const hoverCards = useTabHoverCards();
   useWindowSwipe(ref, tabListRef, props.windows, props.activeWindowId, props.onSelectWindow);
   useTabStripFade(tabListRef, !vertical, tabs.length);
-  const pane =
-    dockLeaves(layout.root).find((pane) => pane.id === layout.focusedPaneId) ??
-    dockLeaves(layout.root)[0];
-  const bounds = usePaneBounds(pane.id, layout.root);
-  const ClosePaneIcon = {
-    up: PanelTopClose,
-    down: PanelBottomClose,
-    left: PanelLeftClose,
-    right: PanelRightClose,
-  }[dockPaneCloseDirection(layout.root, pane.id) ?? "up"];
-  const canSplit = dockLeaves(layout.root).length < 4;
-  const canRight =
-    canSplit &&
-    canFitDockSplit(bounds, "right", minimumForWorkspaceViews(pane.views), {
-      width: 280,
-      height: 180,
-    });
-  const canDown =
-    canSplit &&
-    canFitDockSplit(bounds, "down", minimumForWorkspaceViews(pane.views), {
-      width: 280,
-      height: 180,
-    });
-  const reorder = usePointerReorder({
-    scope: "workspace-layout-tabs",
-    animate: true,
-    axis: vertical ? "y" : "x",
-    getDrag: (id) => {
-      if (id.startsWith("group-header:")) {
-        const group = groups.find((g) => `group-header:${g.id}` === id);
-        return group
-          ? {
-              id,
-              label: groupName(group),
-              ids: [id, ...tabs.filter((tab) => tab.tabGroupId === group.id).map((tab) => tab.id)],
-            }
-          : null;
-      }
-      const tab = allTabs.find((tab) => tab.id === id);
-      return tab ? { id, label: tabLabel(tab) } : null;
-    },
-    onDrop: (drag, target, after) =>
-      useWorkspaceStore.getState().moveTabGroupItem(drag.id, target, after),
-    onKeyboardMove: (id, direction) => {
-      const items = Array.from(
-        tabListRef.current?.querySelectorAll<HTMLElement>("[data-reorder-item]") ?? [],
-      ).map((item) => item.dataset.reorderItem!);
-      const members = new Set(
-        id.startsWith("group-header:")
-          ? allTabs.filter((tab) => `group-header:${tab.tabGroupId}` === id).map((tab) => tab.id)
-          : [],
-      );
-      let index = items.indexOf(id) + direction;
-      while (members.has(items[index])) index += direction;
-      const target = items[index];
-      if (target) useWorkspaceStore.getState().moveTabGroupItem(id, target, direction > 0);
-    },
+  const { pane, ClosePaneIcon, canRight, canDown } = useFocusedPaneSplit(layout);
+  const { reorder, bindTabList } = useTabStripReorder({
+    vertical,
+    groups,
+    tabs,
+    allTabs,
+    tabListRef,
   });
-  const reorderRef = reorder.ref;
-  const bindTabList = useCallback(
-    (node: HTMLDivElement | null) => {
-      tabListRef.current = node;
-      reorderRef(node);
-    },
-    [reorderRef],
-  );
   useEffect(() => {
     ref.current
       ?.querySelector('[aria-selected="true"]')
@@ -225,12 +128,6 @@ export function WorkspaceTabStrip(
             const group = groups.find((g) => g.id === tab.tabGroupId);
             const firstInGroup = group && !shownGroups.has(group.id);
             if (group) shownGroups.add(group.id);
-            const active = tab.id === layout.activeTabId,
-              view = activeLayoutView(tab),
-              label = tabLabel(tab),
-              panes = dockLeaves(tab.root),
-              pinned = Boolean(tab.pinnedUrl),
-              iconOnly = pinned && !vertical;
             return (
               <Fragment key={tab.id}>
                 {firstInGroup && (
@@ -242,188 +139,23 @@ export function WorkspaceTabStrip(
                   />
                 )}
                 {!group?.collapsed && (
-                  <Renameable
-                    menuItems={
-                      <>
-                        <TabPageMenu tab={tab} />
-                        {!pinned && (
-                          <TabGroupTabMenu
-                            tab={tab}
-                            onEdit={(id) => {
-                              pendingGroupEditor.current = id;
-                            }}
-                            onOpen={props.onOpen}
-                          />
-                        )}
-                      </>
-                    }
-                    onMenuCloseAutoFocus={(event) => {
-                      if (!pendingGroupEditor.current) return;
-                      event.preventDefault();
-                      setEditingGroup(pendingGroupEditor.current);
-                      pendingGroupEditor.current = null;
+                  <WorkspaceTabStripTab
+                    tab={tab}
+                    group={group}
+                    active={tab.id === layout.activeTabId}
+                    vertical={vertical}
+                    tabs={tabs}
+                    stripRef={ref}
+                    pendingGroupEditor={pendingGroupEditor}
+                    hoverCards={hoverCards}
+                    onSelect={select}
+                    onEditGroupLater={(id) => {
+                      pendingGroupEditor.current = id;
                     }}
-                    nameKey={`layout-tab:${tab.id}`}
-                    automatic={tabLabel({ ...tab, title: undefined })}
-                    customName={tab.title}
-                    onRename={(name) => useWorkspaceStore.getState().renameTab(tab.id, name ?? "")}
-                    resetLabel="Use active pane title"
-                  >
-                    <div
-                      style={group ? groupStyle(group) : undefined}
-                      data-active={active}
-                      {...hoverCards.bind(view, label, active)}
-                      data-reorder-item={tab.id}
-                      data-reorder-preview="true"
-                      data-misty-window-drag-block="true"
-                      data-pinned={pinned || undefined}
-                      className={cn(
-                        group && "misty-tab-group-member",
-                        iconOnly && "misty-workspace-tab-pinned",
-                        "misty-workspace-tab group/tab flex items-center rounded-md border text-xs transition-colors",
-                        "duration-150 select-none focus-within:ring-1",
-                        "focus-within:ring-cream-muted/50",
-                        active
-                          ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
-                          : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
-                      )}
-                    >
-                      {!vertical && <ConnectedTabShape />}
-                      <Pressable
-                        role="tab"
-                        aria-selected={active}
-                        tabIndex={active ? 0 : -1}
-                        title={label}
-                        data-reorder-handle="true"
-                        className={cn(
-                          "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden",
-                          iconOnly ? "justify-center px-0" : "justify-start pl-2 pr-1",
-                        )}
-                        onClick={() => select(tab.id)}
-                        onKeyDown={(event) => {
-                          const index = tabs.findIndex((item) => item.id === tab.id);
-                          const next =
-                            event.key === (vertical ? "ArrowDown" : "ArrowRight")
-                              ? (index + 1) % tabs.length
-                              : event.key === (vertical ? "ArrowUp" : "ArrowLeft")
-                                ? (index + tabs.length - 1) % tabs.length
-                                : event.key === "Home"
-                                  ? 0
-                                  : event.key === "End"
-                                    ? tabs.length - 1
-                                    : -1;
-                          if (event.altKey || event.ctrlKey || event.metaKey || next < 0) return;
-                          event.preventDefault();
-                          select(tabs[next].id);
-                          requestAnimationFrame(() => {
-                            const buttons =
-                              ref.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
-                            buttons?.item(next)?.focus();
-                          });
-                        }}
-                      >
-                        <ViewIcon
-                          tab={view?.placeholder ? undefined : (view ?? undefined)}
-                          icon={Blocks}
-                          isActive={active}
-                        />
-                        {iconOnly ? (
-                          <span className="sr-only">{label}, pinned</span>
-                        ) : (
-                          <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-                            {label}
-                          </OverflowFadeText>
-                        )}
-                        {panes.length > 1 ? (
-                          <span
-                            aria-hidden="true"
-                            className="shrink-0 text-[10px] text-cream-muted tabular-nums"
-                          >
-                            {panes.length}
-                          </span>
-                        ) : null}
-                      </Pressable>
-                      {!iconOnly && (
-                        <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
-                      )}
-                      {pinned ? null : panes.length > 1 ? (
-                        <DropdownMenu modal={false}>
-                          <MenuTrigger
-                            iconOnly
-                            size="xs"
-                            className="mr-0.5"
-                            label={`Show panes in ${label}`}
-                            aria-description={`${panes.length} panes`}
-                            icon={<ChevronDown className="size-3" size={12} />}
-                          />
-                          <DropdownMenuContent
-                            align="start"
-                            width="md"
-                            className="max-w-[calc(100vw-24px)]"
-                          >
-                            {panes.map((item) => {
-                              const itemView = item.views[0];
-                              if (!itemView) return null;
-                              const focused = item.id === tab.focusedPaneId;
-                              return (
-                                <div key={item.id} className="flex items-center gap-1">
-                                  <DropdownMenuItem
-                                    className={cn(
-                                      "min-w-0 flex-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cream-muted",
-                                      focused && [
-                                        "bg-charcoal-active text-cream-bright hover:bg-charcoal-active",
-                                        "focus:bg-charcoal-active focus-visible:bg-charcoal-active",
-                                        "data-highlighted:bg-charcoal-active",
-                                      ],
-                                    )}
-                                    aria-current={focused ? "true" : undefined}
-                                    aria-label={`${paneViewLabel(itemView)}${focused ? ", active pane" : ""}`}
-                                    onSelect={() => {
-                                      useWorkspaceStore.getState().focusView(itemView.id);
-                                      props.onOpen(itemView);
-                                    }}
-                                  >
-                                    <ViewIcon
-                                      tab={itemView.placeholder ? undefined : itemView}
-                                      icon={Blocks}
-                                    />
-                                    <span className="min-w-0 flex-1 truncate">
-                                      {paneViewLabel(itemView)}
-                                    </span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    aria-label={`Close pane ${paneViewLabel(itemView)}`}
-                                    className="w-8 shrink-0 justify-center px-0"
-                                    onSelect={() => {
-                                      if (!useWorkspaceStore.getState().closeView(itemView.id))
-                                        return;
-                                      const current = activeLayoutView(
-                                        useWorkspaceStore.getState().layout,
-                                      );
-                                      if (current) props.onOpen(current);
-                                    }}
-                                  >
-                                    <X size={14} aria-hidden />
-                                  </DropdownMenuItem>
-                                </div>
-                              );
-                            })}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      ) : (
-                        <IconButton
-                          size="xs"
-                          tooltip={false}
-                          label={`Close tab ${label}`}
-                          title={`Close tab ${label}`}
-                          className="misty-workspace-tab-close mr-0.5"
-                          onClick={() => props.onCloseLayoutTab(tab.id)}
-                        >
-                          <X className="size-3.5" size={14} />
-                        </IconButton>
-                      )}
-                    </div>
-                  </Renameable>
+                    onEditGroup={setEditingGroup}
+                    onOpen={props.onOpen}
+                    onCloseLayoutTab={props.onCloseLayoutTab}
+                  />
                 )}
               </Fragment>
             );
