@@ -39,7 +39,6 @@ async-stream = "0.3"
 arboard = "3.6.1"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-ciborium = "0.2"
 dirs = "6.0.0"
 hex = "0.4"
 misty-credential-store = { path = "vendor/misty-credential-store" }
@@ -57,7 +56,6 @@ sha2 = "0.10"
 ring = "0.17"
 hkdf = "0.12"
 # Signs the local HS256 access token (hkdf already depends on it).
-hmac = "0.12"
 tempfile = "3"
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
 tauri-plugin-dialog = "2"
@@ -80,7 +78,6 @@ ed25519-dalek = "2"
 # approved device, the control channel socket, and LAN discovery.
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 futures-util = { version = "0.3", features = ["sink"] }
-mdns-sd = "0.13"
 # Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
