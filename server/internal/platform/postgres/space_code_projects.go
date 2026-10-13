@@ -37,7 +37,7 @@ type SpaceCodeProjectInput struct {
 
 var githubRepoPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$`)
 
-const spaceCodeProjectColumns = `p.id,p.space_id,p.owner_user_id,COALESCE(u.name,''),p.project_id,p.device_id,p.name,p.github_repo,p.linked_at,p.updated_at,p.visibility`
+const spaceCodeProjectColumns = `p.id,p.space_id,p.owner_user_id,COALESCE(u.username,''),p.project_id,p.device_id,p.name,p.github_repo,p.linked_at,p.updated_at,p.visibility`
 
 func scanSpaceCodeProject(row interface{ Scan(...any) error }, out *SpaceCodeProject) error {
 	return row.Scan(&out.ID, &out.SpaceID, &out.OwnerUserID, &out.OwnerName, &out.ProjectID, &out.DeviceID, &out.Name, &out.GitHubRepo, &out.LinkedAt, &out.UpdatedAt, &out.Visibility)

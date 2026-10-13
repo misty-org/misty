@@ -1,17 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { Space } from "@/api/spaces/dto/entities";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Input,
-} from "@/shared/ui";
+import { Button, cn, Input, PopoverContent } from "@/shared/ui";
+import { SpaceColorPanel } from "./SpaceColorPanel";
 import { SpaceMembers } from "../../members";
-import { SpaceSettingsApps } from "../SpaceSettingsApps";
 import { SpaceSettingsDangerDialogs } from "../SpaceSettingsDangerDialogs";
 import { SpaceSiteLinks } from "../SpaceSiteLinks";
 import { useSpaceSettingsController } from "../useSpaceSettingsController";
@@ -19,7 +10,7 @@ import { useSpacesStore } from "../../store/useSpacesStore";
 
 /** The small windows the Space menu and People open, in place of a settings page. */
 export type SpaceDialog =
-  "rename" | "apps" | "sites" | "members" | "invite" | "leave" | "delete" | null;
+  "rename" | "color" | "sites" | "members" | "invite" | "leave" | "delete" | null;
 
 export function SpaceDialogs({
   space,
@@ -43,43 +34,44 @@ export function SpaceDialogs({
     }
     onClose();
   }, [open, clearError, setLeaveOpen, setDeleteOpen, setDeleteConfirmation, onClose]);
-  const dismiss = (next: boolean) => {
-    if (!next) onClose();
-  };
+  const wide = open === "sites" || open === "members" || open === "invite";
   return (
     <>
-      <Dialog open={open === "rename"} onOpenChange={dismiss}>
-        <DialogContent className="max-w-sm">
-          <RenameSpace space={space} onDone={onClose} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={open === "apps"} onOpenChange={dismiss}>
-        <DialogContent className="max-h-[80vh] max-w-xl overflow-y-auto">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Apps {space.name} uses</DialogTitle>
-          </DialogHeader>
-          <SpaceSettingsApps spaceId={space.id} spaceName={space.name} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={open === "sites"} onOpenChange={dismiss}>
-        <DialogContent className="max-h-[80vh] max-w-xl overflow-y-auto">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Sites that open in {space.name}</DialogTitle>
-          </DialogHeader>
-          <SpaceSiteLinks spaceId={space.id} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={open === "members" || open === "invite"} onOpenChange={dismiss}>
-        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>People in {space.name}</DialogTitle>
-          </DialogHeader>
-          <SpaceMembers embedded spaceId={space.id} invite={open === "invite"} />
-        </DialogContent>
-      </Dialog>
+      {isSpacePanel(open) && (
+        <PopoverContent
+          align="start"
+          sideOffset={8}
+          aria-label={panelLabel(open, space.name)}
+          className={cn(
+            "max-h-[80vh] max-w-[calc(100vw-24px)] overflow-y-auto p-4",
+            wide ? "w-[40rem]" : "w-72",
+          )}
+          // The menu hands focus back as it closes; only a press outside leaves the panel.
+          onFocusOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={onClose}
+        >
+          {open === "rename" && <RenameSpace space={space} onDone={onClose} />}
+          {open === "color" && <SpaceColorPanel />}
+          {open === "sites" && <SpaceSiteLinks spaceId={space.id} />}
+          {(open === "members" || open === "invite") && (
+            <SpaceMembers embedded spaceId={space.id} invite={open === "invite"} />
+          )}
+        </PopoverContent>
+      )}
       <SpaceSettingsDangerDialogs spaceName={space.name} controller={controller} />
     </>
   );
+}
+
+/** The dialogs that open as a panel beside the Space row; leave and delete stay confirmations. */
+export const isSpacePanel = (dialog: SpaceDialog) =>
+  dialog !== null && dialog !== "leave" && dialog !== "delete";
+
+function panelLabel(dialog: SpaceDialog, name: string) {
+  if (dialog === "rename") return `Rename ${name}`;
+  if (dialog === "color") return "Space color";
+  if (dialog === "sites") return `Sites that open in ${name}`;
+  return `People in ${name}`;
 }
 
 function RenameSpace({ space, onDone }: { space: Space; onDone: () => void }) {
@@ -104,15 +96,13 @@ function RenameSpace({ space, onDone }: { space: Space; onDone: () => void }) {
   };
   return (
     <form onSubmit={(event) => void submit(event)}>
-      <DialogHeader>
-        <DialogTitle>Rename {space.name}</DialogTitle>
-        <DialogDescription>Everyone in the Space sees the new name.</DialogDescription>
-      </DialogHeader>
+      <p className="m-0 text-sm font-medium text-cream">Rename {space.name}</p>
+      <p className="mb-0 mt-1 text-xs text-cream-muted">Everyone in the Space sees the new name.</p>
       <Input
         autoFocus
         aria-label="Space name"
         maxLength={80}
-        className="mt-5"
+        className="mt-3"
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
@@ -121,14 +111,14 @@ function RenameSpace({ space, onDone }: { space: Space; onDone: () => void }) {
           The name wasn't saved. Try again.
         </p>
       )}
-      <DialogFooter className="mt-5">
+      <div className="mt-3 flex justify-end gap-2">
         <Button variant="outline" type="button" onClick={onDone}>
           Cancel
         </Button>
         <Button type="submit" disabled={saving || !name.trim()}>
           Rename
         </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 }

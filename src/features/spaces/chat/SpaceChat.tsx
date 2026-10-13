@@ -38,17 +38,26 @@ export function SpaceSocial({
   spaceId,
   spaceName,
   workspaceTabId,
+  conversationId: openConversationId,
+  panel = false,
+  onBack,
 }: {
   spaceId: string;
   spaceName: string;
   workspaceTabId?: string;
+  /** The chat to show instead of the page's `conversation` parameter, as the side panel does. */
+  conversationId?: string;
+  /** In the side panel the header switcher names the chat, so no title row is drawn. */
+  panel?: boolean;
+  /** Where "Back to Chat" goes when the open chat is gone; defaults to the chat page. */
+  onBack?: () => void;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const setupUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
-  const conversationId = searchParams.get("conversation") ?? "";
+  const conversationId = openConversationId ?? searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
   const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
   const transcriptRequestId = useChatSidePanel((panel) => panel.transcriptRequestId);
@@ -122,7 +131,7 @@ export function SpaceSocial({
     currentUser: user
       ? {
           id: user.id,
-          name: user.name,
+          name: user.username,
         }
       : undefined,
     activeConversation: scope.activeConversation,
@@ -298,9 +307,11 @@ export function SpaceSocial({
             type="button"
             variant="outline"
             onClick={() =>
-              navigate(spaceChatPath(spaceId), {
-                replace: true,
-              })
+              onBack
+                ? onBack()
+                : navigate(spaceChatPath(spaceId), {
+                    replace: true,
+                  })
             }
           >
             Back to Chat
@@ -315,18 +326,16 @@ export function SpaceSocial({
       className="relative flex h-full min-h-0 overflow-hidden bg-charcoal-bg text-cream"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header
-          className={
-            "flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg px-3 py-1.5"
-          }
-        >
-          {/* The chat sidebar switches chats; the header just names this one. */}
-          <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
-            {scope.activeConversation
-              ? conversationName(scope.activeConversation, user?.id)
-              : "Everyone"}
-          </h1>
-        </header>
+        {panel ? null : (
+          <header className="flex min-h-11 shrink-0 items-center gap-2 bg-charcoal-bg px-3 py-1.5">
+            {/* The chat sidebar switches chats; the header just names this one. */}
+            <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
+              {scope.activeConversation
+                ? conversationName(scope.activeConversation, user?.id)
+                : "Everyone"}
+            </h1>
+          </header>
+        )}
 
         {!conversationId ? (
           <SpaceSetupCards

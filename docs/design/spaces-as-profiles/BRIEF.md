@@ -77,9 +77,8 @@ start public in a shared Space and private in a Space only you belong to.
 - the sync tree: tabs, windows, sign-ins, history, bookmarks, passwords, extensions, site
   permissions, search engines and bangs, downloads
 - the memory tree (below)
-- the integrations tree: a person connects each account once, and each Space lists which
-  of their accounts it uses (work Gmail in Work, personal Gmail in Personal). Composio
-  holds the tokens, so the server keeps this owner-only list
+- the integrations tree: a person connects each account once, and agents use all of their
+  own accounts in every Space. Composio holds the tokens; there is no per-Space choice
 - private chats, including DMs with their agents, and the runs inside them
 - what lives only on their devices: shared folders, code project files, open tabs
 - an agent's instructions and settings

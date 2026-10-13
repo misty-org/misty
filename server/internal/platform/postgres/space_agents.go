@@ -33,7 +33,7 @@ var (
 	ErrAgentRequestLimit   = errors.New("agent request limit reached")
 )
 
-const spaceAgentColumns = `m.space_id,s.name,m.agent_id,a.name,a.role,a.avatar,a.system_managed,m.owner_user_id,COALESCE(u.name,''),m.added_at,m.visibility`
+const spaceAgentColumns = `m.space_id,s.name,m.agent_id,a.name,a.role,a.avatar,a.system_managed,m.owner_user_id,COALESCE(u.username,''),m.added_at,m.visibility`
 
 // Only enabled agents in active Spaces are visible or reachable. The owner is
 // always a member: membership cascades from space_members.

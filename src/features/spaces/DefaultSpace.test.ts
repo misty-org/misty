@@ -51,7 +51,7 @@ describe("default Space", () => {
           is_default: true,
         }),
       ),
-    ).toBe("Personal (default)");
+    ).toBe("Personal");
     expect(
       spaceNavigationName(
         spaceFixture({

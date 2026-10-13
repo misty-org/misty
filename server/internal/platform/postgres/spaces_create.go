@@ -106,13 +106,13 @@ type SpacePerson struct {
 func (db *Database) SpacePeople(ctx context.Context, userID string) ([]SpacePerson, error) {
 	people := []SpacePerson{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT u.id,u.name,u.email
+		rows, err := tx.QueryContext(ctx, `SELECT u.id,u.username,u.email
 			FROM space_members mine
 			JOIN spaces s ON s.id=mine.space_id AND s.lifecycle_state='active'
 			JOIN space_members other ON other.space_id=mine.space_id AND other.user_id<>mine.user_id
 			JOIN users u ON u.id=other.user_id
 			WHERE mine.user_id=$1
-			GROUP BY u.id,u.name,u.email
+			GROUP BY u.id,u.username,u.email
 			ORDER BY max(other.joined_at) DESC, u.id
 			LIMIT 24`, userID)
 		if err != nil {

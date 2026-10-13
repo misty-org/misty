@@ -66,7 +66,6 @@ func (s *Server) mountPublicSyncRoutes(prefix string, deps *mountDeps) {
 // mountPublicProfileRoutes registers profile, avatar, device, settings, space,
 // agent intervention, and telemetry preference routes.
 func (s *Server) mountPublicProfileRoutes(prefix string, deps *mountDeps) {
-	s.Router.Put(prefix+"/me/profile", api.UpdateProfile(s.Database))
 	s.Router.Post(prefix+"/me/export", s.Spaces.AccountExportManifest())
 	s.Router.Post(prefix+"/me/deletion", s.Spaces.BeginAccountDeletion())
 	s.Router.MethodFunc(http.MethodGet, prefix+"/me/avatar", api.UserAvatar(s.Database, s.LibraryStore))

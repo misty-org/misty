@@ -9,15 +9,12 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Get(prefix+"/integrations/apps/catalog", spaces.AppCatalog())
 	s.Router.Post(prefix+"/integrations/apps/connect", spaces.ConnectApp())
 	s.Router.Delete(prefix+"/integrations/apps/connections/{accountID}", spaces.DisconnectApp())
-	// The integrations tree: which of the person's accounts each Space uses.
-	s.Router.Put(prefix+"/integrations/apps/spaces/{spaceID}", spaces.SpaceAppPicks())
 	// Projects from and to GitHub: the code itself moves with the device's git.
 	s.Router.Get(prefix+"/integrations/github/repos", spaces.GitHubRepos())
 	s.Router.Post(prefix+"/integrations/github/repos", spaces.GitHubRepos())
 	s.Router.Get(prefix+"/me/app-requests/{requestID}", spaces.AppRequestControl())
 	s.Router.Post(prefix+"/me/app-requests/{requestID}", spaces.AppRequestControl())
 	s.Router.Post(prefix+"/me/app-requests/{requestID}/link", spaces.AppRequestLink())
-	s.Router.Post(prefix+"/me/app-requests/{requestID}/pick", spaces.AppRequestPick())
 	// Remembered approvals: listed and revoked in Settings › Agents › Permissions.
 	s.Router.Get(prefix+"/me/agent-grants", spaces.AgentGrants())
 	s.Router.Delete(prefix+"/me/agent-grants", spaces.AgentGrants())

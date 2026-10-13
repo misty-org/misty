@@ -183,11 +183,11 @@ func (db *Database) SpaceMembers(ctx context.Context, userID, spaceID string) ([
 		if _, err := requireSpaceMemberTx(ctx, tx, spaceID, userID); err != nil {
 			return err
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT m.space_id,m.user_id,u.name,u.email,m.role,m.joined_at,m.read_message_seq
+		rows, err := tx.QueryContext(ctx, `SELECT m.space_id,m.user_id,u.username,u.email,m.role,m.joined_at,m.read_message_seq
 			FROM space_members m
 			JOIN users u ON u.id=m.user_id
 			WHERE m.space_id=$1
-			ORDER BY CASE m.role WHEN 'owner' THEN 0 ELSE 1 END,u.name`, spaceID)
+			ORDER BY CASE m.role WHEN 'owner' THEN 0 ELSE 1 END,u.username`, spaceID)
 		if err != nil {
 			return err
 		}

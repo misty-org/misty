@@ -87,8 +87,8 @@ type AgentMemberRequest struct {
 	Replay               bool   `json:"-"`
 }
 
-const agentMemberRequestSelect = `SELECT q.id,q.space_id,s.name,q.requester_user_id,COALESCE(ru.name,''),q.requester_agent_id,q.requester_run_id,
-	q.target_agent_id,COALESCE(a.name,''),q.target_owner_user_id,COALESCE(ou.name,''),q.child_run_id,q.message,q.created_at,
+const agentMemberRequestSelect = `SELECT q.id,q.space_id,s.name,q.requester_user_id,COALESCE(ru.username,''),q.requester_agent_id,q.requester_run_id,
+	q.target_agent_id,COALESCE(a.name,''),q.target_owner_user_id,COALESCE(ou.username,''),q.child_run_id,q.message,q.created_at,
 	r.state,r.result,COALESCE(r.error_message,''),COALESCE(q.source_message_id,''),COALESCE(q.source_conversation_id,'')
 	FROM agent_member_requests q JOIN spaces s ON s.id=q.space_id JOIN space_runs r ON r.id=q.child_run_id
 	LEFT JOIN misty_ask_identities a ON a.id=q.target_agent_id

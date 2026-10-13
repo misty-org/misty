@@ -585,6 +585,11 @@ server, readable by the service, and private to you within each Space.
 
 ## Phase 8. The integrations tree
 
+**Superseded 2026-10-17.** Per-Space picks were removed: agents use all of a person's own
+connected accounts in every Space, and the picks table, endpoints, pick card and Space-menu "Apps"
+item are gone (`20271031010000_drop_space_integration_picks.sql`). What follows is the original
+plan, kept for history.
+
 **Goal.** Connect each account once; each Space picks which of your accounts it uses.
 
 **Touches.**

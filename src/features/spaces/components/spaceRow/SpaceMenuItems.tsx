@@ -6,7 +6,6 @@ import {
   MessagesSquare,
   Palette,
   Pencil,
-  Plug,
   Plus,
   Trash2,
   UsersRound,
@@ -14,19 +13,10 @@ import {
 import type { Space } from "@/api/spaces/dto/entities";
 import {
   openSpaceWindow,
-  setSpaceColor,
   switchSpaceWindow,
   useSpaceWindowStore,
 } from "@/features/workspace/spaceWindow";
-import { windowColorHex, windowColorNames } from "@/features/workspace/windowColors";
-import {
-  DropdownMenuCheckboxItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  MenuItem,
-} from "@/shared/ui";
+import { DropdownMenuCheckboxItem, DropdownMenuSeparator, MenuItem } from "@/shared/ui";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,
@@ -36,12 +26,10 @@ import { useSpacesStore } from "../../store/useSpacesStore";
 import { SpaceAvatar } from "../SpaceAvatar";
 import type { SpaceDialog } from "./SpaceDialogs";
 
-const colorLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
-
 /**
  * The Space menu: your Spaces (choosing one switches this window, with a checkmark on the
  * one it shows), the Space in a new window, a new Space, then this Space's name, color,
- * apps, sites and leaving or deleting it. In the collapsed sidebar it also carries Home,
+ * sites and leaving or deleting it. In the collapsed sidebar it also carries Home,
  * Chat and People.
  */
 export function SpaceMenuItems(props: {
@@ -54,35 +42,14 @@ export function SpaceMenuItems(props: {
 }) {
   const { space, onDialog } = props;
   const spaces = useSpacesStore((state) => state.spaces);
-  const color = useSpaceWindowStore((state) => state.space?.color);
   const incognito = useSpaceWindowStore((state) => state.identity.incognito);
   const personal = preferredDefaultSpace(spaces);
   const isOwner = space.role === "owner";
   const report = (action: Promise<unknown>) =>
     void action.catch(() => props.onError("That Space couldn't open. Try again."));
   const later = (run: () => void) => () => window.setTimeout(run, 0);
-  return (
+  const spaceList = (
     <>
-      {props.compact && (
-        <>
-          <MenuItem
-            icon={<House className="size-4" />}
-            label="Home"
-            onSelect={() => props.onPage("home")}
-          />
-          <MenuItem
-            icon={<MessagesSquare className="size-4" />}
-            label="Chat"
-            onSelect={() => props.onPage("chat")}
-          />
-          <MenuItem
-            icon={<UsersRound className="size-4" />}
-            label="People"
-            onSelect={later(() => onDialog("members"))}
-          />
-          <DropdownMenuSeparator />
-        </>
-      )}
       {spaces.map((item) => {
         const isPersonal = item.id === personal?.id;
         const here = item.id === space.id;
@@ -103,7 +70,10 @@ export function SpaceMenuItems(props: {
           </DropdownMenuCheckboxItem>
         );
       })}
-      <DropdownMenuSeparator />
+    </>
+  );
+  const windowItems = (
+    <>
       <MenuItem
         icon={<AppWindowMac className="size-4" />}
         label="Open in new window"
@@ -114,7 +84,10 @@ export function SpaceMenuItems(props: {
         label="New Space"
         onSelect={later(props.onCreate)}
       />
-      <DropdownMenuSeparator />
+    </>
+  );
+  const settings = (
+    <>
       {isOwner && canManageSpaceLifecycle(space, "rename") && (
         <MenuItem
           icon={<Pencil className="size-4" />}
@@ -123,34 +96,12 @@ export function SpaceMenuItems(props: {
         />
       )}
       {!incognito && (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Palette className="size-4" />
-            <span className="min-w-0 flex-1 truncate">Color</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-48 max-w-[calc(100vw-16px)]">
-            {windowColorNames.map((name) => (
-              <DropdownMenuCheckboxItem
-                key={name}
-                checked={color === name}
-                onSelect={() => report(setSpaceColor(name))}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: windowColorHex(name) }}
-                />
-                <span className="min-w-0 flex-1 truncate">{colorLabel(name)}</span>
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+        <MenuItem
+          icon={<Palette className="size-4" />}
+          label="Color"
+          onSelect={later(() => onDialog("color"))}
+        />
       )}
-      <MenuItem
-        icon={<Plug className="size-4" />}
-        label="Apps"
-        onSelect={later(() => onDialog("apps"))}
-      />
       <MenuItem
         icon={<Globe className="size-4" />}
         label="Sites that open here"
@@ -175,6 +126,35 @@ export function SpaceMenuItems(props: {
           />
         </>
       ) : null}
+    </>
+  );
+  return (
+    <>
+      {props.compact && (
+        <>
+          <MenuItem
+            icon={<House className="size-4" />}
+            label="Home"
+            onSelect={() => props.onPage("home")}
+          />
+          <MenuItem
+            icon={<MessagesSquare className="size-4" />}
+            label="Chat"
+            onSelect={() => props.onPage("chat")}
+          />
+          <MenuItem
+            icon={<UsersRound className="size-4" />}
+            label="People"
+            onSelect={later(() => onDialog("members"))}
+          />
+          <DropdownMenuSeparator />
+        </>
+      )}
+      {spaceList}
+      <DropdownMenuSeparator />
+      {windowItems}
+      <DropdownMenuSeparator />
+      {settings}
     </>
   );
 }

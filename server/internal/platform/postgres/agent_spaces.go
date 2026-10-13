@@ -108,7 +108,7 @@ func (db *Database) SpaceAgentArtifacts(ctx context.Context, userID, spaceID, ag
 			return err
 		}
 		rows, err := tx.QueryContext(ctx, `SELECT x.item_id,x.space_id,i.display_name,COALESCE(b.server_detected_mime_type,''),COALESCE(b.byte_size,0),
-			COALESCE(x.agent_id,''),COALESCE(a.name,x.agent_name),x.owner_user_id,COALESCE(u.name,''),x.kind,x.created_at,
+			COALESCE(x.agent_id,''),COALESCE(a.name,x.agent_name),x.owner_user_id,COALESCE(u.username,''),x.kind,x.created_at,
 			CASE WHEN x.owner_user_id=$1 THEN x.conversation_id ELSE '' END,CASE WHEN x.owner_user_id=$1 THEN x.run_id ELSE '' END
 			FROM space_agent_artifacts x
 			JOIN space_library_items i ON i.id=x.item_id AND i.lifecycle_state='ready' AND i.hidden=FALSE AND i.audience_kind='space'

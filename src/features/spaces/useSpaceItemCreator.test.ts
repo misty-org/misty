@@ -2,7 +2,7 @@ import { renderHook, cleanup } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useSpaceItemCreator } from "./useSpaceItemCreator";
 
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "me", name: "Alex" } }) }));
+vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "me", username: "Alex" } }) }));
 vi.mock("./store/useSpacesStore", () => ({
   useSpacesStore: (selector: (state: unknown) => unknown) =>
     selector({ membersBySpace: { family: [{ user_id: "sam", name: "Sam" }] } }),

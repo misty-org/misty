@@ -112,7 +112,7 @@ var memoryTreeTables = [][2]string{
 // purgeSpaceMemberTx deletes everything of one person's in a Space, in the
 // transaction that takes them out of it: their memory rows and chunks, their
 // private notes, drawings, files and links, and (through the membership's
-// cascades) their code projects, integration picks and agents' memberships.
+// cascades) their code projects and agents' memberships.
 // Their public items stay with the Space. Their vault in the Space is the
 // sync tree's (phase 1) and goes through its own object deletion.
 func purgeSpaceMemberTx(ctx context.Context, tx *sql.Tx, spaceID, userID string) error {
@@ -175,8 +175,7 @@ func purgeSpaceMembersTx(ctx context.Context, tx *sql.Tx, spaceID string, member
 			return err
 		}
 	}
-	_, err := tx.ExecContext(ctx, `DELETE FROM space_integration_picks WHERE space_id=$1`, spaceID)
-	return err
+	return nil
 }
 
 func privateItemIDsTx(ctx context.Context, tx *sql.Tx, query, spaceID, userID string) ([]string, error) {

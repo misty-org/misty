@@ -20,6 +20,7 @@ export function canManageSpaceLifecycle(
   return space.role === "owner";
 }
 
-export function spaceNavigationName(space: Pick<Space, "name" | "is_default">): string {
-  return space.is_default ? `${space.name} (default)` : space.name;
+/** The name a Space goes by in menus and tabs. */
+export function spaceNavigationName(space: Pick<Space, "name">): string {
+  return space.name;
 }

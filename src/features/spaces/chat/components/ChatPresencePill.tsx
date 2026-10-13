@@ -51,7 +51,7 @@ export function ChatPresencePill({ spaceId }: { spaceId: string }) {
     if (user && !seen.has(user.id)) {
       list.push({
         user_id: user.id,
-        name: user.name || "You",
+        name: user.username || "You",
       });
     }
 

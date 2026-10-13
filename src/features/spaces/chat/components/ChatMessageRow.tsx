@@ -7,6 +7,7 @@ import { Fragment, memo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
+import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
 import { useChatSidePanel } from "../store/chatSidePanelStore";
 import { AgentTranscriptButton } from "./AgentTranscriptButton";
 import { MessageEditForm } from "./MessageEditForm";
@@ -176,6 +177,9 @@ function ChatMessageRowView({
               ) : null}
             </p>
           )}
+          {props.editingMessageId === message.id ? null : (
+            <LinkPreviews text={messageText(message.content)} />
+          )}
 
           {replyCount > 0 ? (
             <Button
@@ -255,6 +259,11 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
       </time>
     </div>
   );
+}
+
+/** The message's words and link addresses as one string, for finding links to preview. */
+function messageText(spans: MessageSpan[]): string {
+  return spans.map((span) => (span.type === "text" ? span.text : span.type === "link" ? ` ${span.url} ` : "")).join("");
 }
 
 function MessageContent({

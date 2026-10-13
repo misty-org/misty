@@ -1,4 +1,4 @@
-import { ChevronDown, House, MessagesSquare, UsersRound } from "lucide-react";
+import { House, MessagesSquare, UsersRound } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
@@ -7,14 +7,18 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   IconButton,
+  MenuChevron,
+  Popover,
+  PopoverAnchor,
   Pressable,
   Skeleton,
+  toolbarIconProps,
 } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "../../GlobalCreateSpaceDialog";
 import { spaceNavigationName } from "../../defaultSpace";
 import { SpaceMembersPopover } from "../../members";
 import { SpaceAvatar } from "../SpaceAvatar";
-import { SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
+import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
 import { SpaceMenuItems } from "./SpaceMenuItems";
 import { useWindowSpace } from "./useWindowSpace";
 
@@ -29,8 +33,9 @@ function openSpaceRoute(route: string) {
 
 /**
  * The Space row: the Space this window shows, with its menu, and its Home, Chat and People.
- * It sits under the sidebar's window controls; with the sidebar collapsed it starts the
- * tab strip as `compact`, and Home, Chat and People move into its menu.
+ * It sits under the sidebar's window controls; with the sidebar collapsed it ends the
+ * tab strip as `compact`, a tab hanging from the window's top edge (so it doesn't read as
+ * another browser tab), and Home, Chat and People move into its menu.
  */
 export function SpaceRow({ compact = false }: { compact?: boolean }) {
   const space = useWindowSpace();
@@ -49,81 +54,94 @@ export function SpaceRow({ compact = false }: { compact?: boolean }) {
     openSpaceRoute(to === "home" ? `${base}/home` : `${base}/social/misty`);
   const name = spaceNavigationName(space);
   return (
-    <div
-      role="toolbar"
-      aria-label={`${space.name || "Space"} controls`}
-      data-misty-window-drag-block="true"
-      className={cn("flex min-w-0 shrink-0 items-center gap-0.5", compact ? "pr-1" : "h-9 px-1")}
-    >
-      <GlobalCreateSpaceDialog>
-        {(create) => (
-          <DropdownMenu onOpenChange={() => setError("")}>
-            <DropdownMenuTrigger asChild>
-              <Pressable
-                aria-label={`${name}, Space menu`}
-                className={cn(
-                  "flex h-8 min-w-0 items-center gap-2 rounded-md px-1.5 text-sm text-cream-bright",
-                  "hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover",
-                  compact ? "max-w-48" : "max-w-full",
-                )}
-              >
-                <SpaceAvatar
-                  space={space}
-                  className="size-5 shrink-0 rounded-md"
-                  fallbackClassName="text-[9px] font-semibold"
-                />
-                <span className="min-w-0 truncate font-medium">{name}</span>
-                <ChevronDown aria-hidden className="size-3.5 shrink-0 text-cream-muted" />
-              </Pressable>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-16px)]">
-              <SpaceMenuItems
-                space={space}
-                compact={compact}
-                onPage={page}
-                onDialog={setDialog}
-                onCreate={create}
-                onError={setError}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </GlobalCreateSpaceDialog>
-      {error && (
-        <p
-          role="alert"
-          className="m-0 min-w-0 truncate px-1 text-xs text-cream-muted"
-          title={error}
+    <Popover open={isSpacePanel(dialog)} onOpenChange={(next) => !next && close()}>
+      <PopoverAnchor asChild>
+        <div
+          role="toolbar"
+          aria-label={`${space.name || "Space"} controls`}
+          data-misty-window-drag-block="true"
+          className={cn(
+            "flex min-w-0 shrink-0 items-center gap-0.5",
+            compact ? "misty-workspace-space self-stretch pl-2" : "h-9",
+          )}
         >
-          {error}
-        </p>
-      )}
-      {!compact && (
-        <>
-          <span className="flex-1" />
-          <IconButton
-            size="xs"
-            label={`${space.name || "Space"} home`}
-            onClick={() => page("home")}
-          >
-            <House aria-hidden className="size-4" />
-          </IconButton>
-          <IconButton size="xs" label="Chat" onClick={() => page("chat")}>
-            <MessagesSquare aria-hidden className="size-4" />
-          </IconButton>
-          <SpaceMembersPopover
-            space={space}
-            side="bottom"
-            onManage={(invite) => setDialog(invite ? "invite" : "members")}
-            trigger={
-              <IconButton size="xs" label="People">
-                <UsersRound aria-hidden className="size-4" />
-              </IconButton>
-            }
-          />
-        </>
-      )}
-      <SpaceDialogs space={space} open={dialog} onClose={close} />
-    </div>
+          <GlobalCreateSpaceDialog>
+            {(create) => (
+              <DropdownMenu onOpenChange={() => setError("")}>
+                <DropdownMenuTrigger asChild>
+                  <Pressable
+                    aria-label={`${name}, Space menu`}
+                    className={cn(
+                      "flex min-w-0 items-center gap-2 text-sm text-cream-bright",
+                      compact
+                        ? "h-8 max-w-56 self-center rounded-lg px-2 hover:bg-control-hover data-[state=open]:bg-control-hover"
+                        : "h-8 max-w-full rounded-md px-1.5 hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover",
+                    )}
+                  >
+                    <SpaceAvatar
+                      space={space}
+                      className="size-5 shrink-0 rounded-md"
+                      fallbackClassName="text-[9px] font-semibold"
+                    />
+                    <span className="min-w-0 truncate font-medium">{name}</span>
+                    {!compact && <MenuChevron className="size-5 text-cream-muted" />}
+                  </Pressable>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side={compact ? undefined : "bottom"}
+                  align={compact ? "end" : "start"}
+                  className="w-56 max-w-[calc(100vw-16px)]"
+                >
+                  <SpaceMenuItems
+                    space={space}
+                    compact={compact}
+                    onPage={page}
+                    onDialog={setDialog}
+                    onCreate={create}
+                    onError={setError}
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </GlobalCreateSpaceDialog>
+          {error && (
+            <p
+              role="alert"
+              className="m-0 min-w-0 truncate px-1 text-xs text-cream-muted"
+              title={error}
+            >
+              {error}
+            </p>
+          )}
+          {!compact && (
+            <>
+              <span className="flex-1" />
+              {/* Sidebar chrome, like the back and forward buttons above: the same button size,
+                  glyph size and spacing, from browserToolbar.css. These glyphs fill their box,
+                  so they take the full-glyph size (`size-4`), like reload. */}
+              <div className="flex items-center gap-1.5" data-browser-toolbar data-sidebar>
+                <IconButton label={`${space.name || "Space"} home`} onClick={() => page("home")}>
+                  <House {...toolbarIconProps} className="size-4" />
+                </IconButton>
+                <IconButton label="Chat" onClick={() => page("chat")}>
+                  <MessagesSquare {...toolbarIconProps} className="size-4" />
+                </IconButton>
+                <SpaceMembersPopover
+                  space={space}
+                  side="bottom"
+                  onManage={(invite) => setDialog(invite ? "invite" : "members")}
+                  trigger={
+                    <IconButton label="People">
+                      <UsersRound {...toolbarIconProps} className="size-4" />
+                    </IconButton>
+                  }
+                />
+              </div>
+            </>
+          )}
+          <SpaceDialogs space={space} open={dialog} onClose={close} />
+        </div>
+      </PopoverAnchor>
+    </Popover>
   );
 }

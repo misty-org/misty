@@ -58,7 +58,7 @@ func (db *Database) SpaceInvitationPreview(
 ) (*SpaceInvitationPreview, error) {
 	out := &SpaceInvitationPreview{}
 	err := db.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
-		return tx.QueryRowContext(ctx, `SELECT s.name,u.name,i.invited_email,i.expires_at
+		return tx.QueryRowContext(ctx, `SELECT s.name,u.username,i.invited_email,i.expires_at
 			FROM space_invitations i
 			JOIN spaces s ON s.id=i.space_id
 			JOIN users u ON u.id=i.invited_by_user_id

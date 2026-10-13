@@ -7,8 +7,8 @@ import (
 // Private and public layers (docs/design/spaces-as-profiles/BRIEF.md#private-and-public)
 // are the only permission system. Every agent tool declares the layer it
 // touches (agenttools.Layer). Private tools reach a person's own trees:
-// memory, devices (folders, tabs, bookmarks, screens), connected apps and
-// their Space picks, private chats and agent settings.
+// memory, devices (folders, tabs, bookmarks, screens), connected apps,
+// private chats and agent settings.
 
 // layerRun is who a run works for.
 type layerRun struct {
