@@ -552,7 +552,6 @@ mod tests {
         let stored = StoredSession {
             user: Some(CurrentUser {
                 id: "a".into(),
-                name: "A".into(),
                 username: "a".into(),
                 email: "a@example.test".into(),
             }),
