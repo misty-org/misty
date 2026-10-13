@@ -69,13 +69,7 @@ function percent(value: number): string {
 }
 
 /** AI and storage in the plan-limits style: label, detail and percent over one bar. */
-export function UsageMeters({
-  account,
-  loaded,
-}: {
-  account: AccountUsage["account"];
-  loaded: boolean;
-}) {
+function UsageMeters({ account, loaded }: { account: AccountUsage["account"]; loaded: boolean }) {
   const storage = account?.cloud_storage;
   const meters: Array<{ label: string; meter?: Meter; detail: (meter: Meter) => string }> = [
     {

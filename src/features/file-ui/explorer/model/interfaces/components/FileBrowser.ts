@@ -9,8 +9,6 @@ import type {
 } from "../../../store/index";
 import type { ExplorerDragModifiers, ExplorerDragPayload } from "../drag/types";
 
-import type { GridThumbnailSubscriber } from "../../types/components/FileBrowser";
-
 export interface FileBrowserProps {
   paneId: string;
   selectionOnly?: boolean;
@@ -43,13 +41,4 @@ export interface FileBrowserProps {
   onInlineEditChange: (value: string) => void;
   onInlineEditCommit: () => void;
   onInlineEditCancel: () => void;
-}
-
-export interface GridThumbnailJob {
-  key: string;
-  entry: FileEntry;
-  maxDimension: number;
-  subscribers: Set<GridThumbnailSubscriber>;
-  processing: boolean;
-  background: boolean;
 }

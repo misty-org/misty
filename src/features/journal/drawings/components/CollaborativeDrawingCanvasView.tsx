@@ -22,7 +22,7 @@ import { buildFigmaReferenceElements, hasFigmaReference } from "../figma/figmaCa
 import type { FigmaCanvasReference } from "../figma/figmaCanvasReference";
 import "./collaborativeDrawingCanvas.css";
 
-export interface DrawingCanvasRuntime {
+interface DrawingCanvasRuntime {
   theme: "light" | "dark";
   openLink?(url: string): Promise<void>;
   upload(space: string, drawing: string, file: BinaryFileData): Promise<DrawingAssetReference>;

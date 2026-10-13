@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-export const BrowserOverlayAvailability = createContext(true);
+const BrowserOverlayAvailability = createContext(true);
 
 export function useBrowserOverlay(
   reason: string,

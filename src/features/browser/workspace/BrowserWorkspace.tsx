@@ -73,8 +73,6 @@ import { profileDataIdForView } from "@/features/workspace/browserProfiles";
 import { PasswordOfferNotice } from "./PasswordOfferNotice";
 import { ReaderView } from "./ReaderView";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
-export { normalizeBrowserAddress } from "./browserAddress";
-export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);

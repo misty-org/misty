@@ -371,7 +371,7 @@ function ReadingPaneSkeleton() {
     </div>
   );
 }
-export interface NoteContentDraft {
+interface NoteContentDraft {
   body: string;
   bodyFormat: NoteBodyFormat;
   bodyMarkdown?: string;

@@ -4,7 +4,7 @@ import { invoke } from "./invoke";
 // control channel stay native; these only drive them. Everything between a
 // person's devices goes through the server.
 
-export interface PeerPresence {
+interface PeerPresence {
   deviceId: string;
   online: boolean;
 }
@@ -15,7 +15,7 @@ export interface ChannelSnapshot {
   peers: PeerPresence[];
 }
 
-export interface SharedFolder {
+interface SharedFolder {
   scopeId: string;
   name: string;
 }

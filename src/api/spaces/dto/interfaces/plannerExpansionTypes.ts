@@ -1,6 +1,6 @@
 import type { SpaceTask } from "./types";
 
-export type SpaceAgendaEntryKind = "task" | "event" | "goal" | "milestone" | "roadmap_node";
+type SpaceAgendaEntryKind = "task" | "event" | "goal" | "milestone" | "roadmap_node";
 
 export interface SpaceAgendaEntry {
   id: string;
@@ -102,7 +102,7 @@ export interface SpaceRoadmapEdge {
   updated_at: string;
 }
 
-export type SpaceRoadmapEndpointKind = "milestone" | "goal" | "node";
+type SpaceRoadmapEndpointKind = "milestone" | "goal" | "node";
 export type SpaceRoadmapEdgeType =
   "depends_on" | "blocks" | "enables" | "contributes_to" | "measures" | "documents" | "related";
 

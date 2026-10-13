@@ -53,7 +53,7 @@ const browserBlockingOverlaySelector = [
 export function browserBlockingOverlayOpen(root: ParentNode = document): boolean {
   return root.querySelector(browserBlockingOverlaySelector) !== null;
 }
-export function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
+function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
     const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId);
     return activeTab?.surfaceId === "browser";
@@ -91,7 +91,7 @@ interface BrowserPointerEvent {
 interface BrowserFocusEvent {
   id: string;
 }
-export function focusBrowserRuntimeTab(runtimeId: string): boolean {
+function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
   return tabId ? focusBrowserTab(tabId) : false;
 }

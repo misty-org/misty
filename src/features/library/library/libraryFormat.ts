@@ -1,7 +1,7 @@
 import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 
-export const LIBRARY_ITEM_SCALE_MIN = 0;
-export const LIBRARY_ITEM_SCALE_MAX = 2;
+const LIBRARY_ITEM_SCALE_MIN = 0;
+const LIBRARY_ITEM_SCALE_MAX = 2;
 
 export function normalizeLibraryItemScale(scale: number | undefined) {
   if (!Number.isFinite(scale)) return 1;

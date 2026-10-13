@@ -1,6 +1,6 @@
 import definitions from "./definitions.json";
 export type SettingOwnership = "account" | "resource";
-export type SettingsPlatform = "desktop";
+type SettingsPlatform = "desktop";
 export type PreferenceValue = string | number | boolean;
 export type PreferenceValues = Record<string, PreferenceValue>;
 export interface SettingDefinition {

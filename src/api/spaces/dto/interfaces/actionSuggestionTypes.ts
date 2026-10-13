@@ -1,11 +1,11 @@
-export type SpaceActionSuggestionKind =
+type SpaceActionSuggestionKind =
   | "task.create"
   | "calendar.event.create"
   | "journal.note.create"
   | "roadmap.item.create"
   | "conversation.follow_up.schedule";
 
-export interface SpaceActionSuggestionItem {
+interface SpaceActionSuggestionItem {
   id: string;
   batch_id: string;
   action_kind: SpaceActionSuggestionKind;

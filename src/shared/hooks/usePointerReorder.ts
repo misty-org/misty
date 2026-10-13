@@ -11,8 +11,6 @@ import {
   type RefObject,
 } from "react";
 
-export { createDragPreview } from "./pointerDragPreview";
-
 export type ReorderDrag = {
   id: string;
   label: string;
@@ -20,7 +18,7 @@ export type ReorderDrag = {
   paneId?: string;
   ids?: string[];
 };
-export type ReorderHit = {
+type ReorderHit = {
   id: string;
   after: boolean;
   rect: DOMRect;

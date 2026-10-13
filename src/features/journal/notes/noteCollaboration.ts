@@ -3,7 +3,6 @@ import { notesApi } from "@/api/notes/api";
 import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
 import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
-export type { NoteCollaborationTicket } from "@/api/notes/api";
 export interface NoteCollaborationSession {
   key: string;
   spaceId: string;
@@ -23,9 +22,9 @@ type NoteCollaborationCacheEntry = {
   promise?: Promise<NoteCollaborationSession>;
 };
 export const noteCollaborationIdleMs = 5 * 60 * 1000;
-export const closeAllNoteCollaborationSessionsEvent = "misty:note-collaboration-close-all";
+const closeAllNoteCollaborationSessionsEvent = "misty:note-collaboration-close-all";
 const sessions = new Map<string, NoteCollaborationCacheEntry>();
-export function createNoteCollaborationTicket(
+function createNoteCollaborationTicket(
   spaceId: string,
   noteId: string,
 ): Promise<NoteCollaborationTicket> {

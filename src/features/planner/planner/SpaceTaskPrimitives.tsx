@@ -137,7 +137,7 @@ export function toLocalInput(value: string) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-export function memberInitials(name: string) {
+function memberInitials(name: string) {
   return (
     name
       .trim()

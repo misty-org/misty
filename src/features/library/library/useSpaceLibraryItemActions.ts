@@ -1,5 +1,3 @@
-export type { SpaceLibraryItemActions } from "./types/useSpaceLibraryItemActions";
-
 import { useLibraryAssetStacks } from "./libraryItems/useLibraryAssetStacks";
 import { useLibraryBulkActions } from "./libraryItems/useLibraryBulkActions";
 import { useLibraryClipboard } from "./libraryItems/useLibraryClipboard";

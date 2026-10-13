@@ -13,11 +13,7 @@ export interface SpaceMember {
   joined_at: string;
   read_message_seq: number;
 }
-
-export type SpaceActor =
-  { kind: "person"; id: string } | { kind: "agent"; id: string } | { kind: "system" };
-
-export type SpaceTaskSourceRefKind = "library_item" | "task_attachment" | "chat_attachment";
+type SpaceTaskSourceRefKind = "library_item" | "task_attachment" | "chat_attachment";
 
 export interface SpaceTaskSourceRef {
   kind: SpaceTaskSourceRefKind;
@@ -25,18 +21,4 @@ export interface SpaceTaskSourceRef {
   display_name?: string;
   version?: number;
   [key: string]: unknown;
-}
-
-export interface SpaceTaskActivity {
-  id: string;
-  space_id: string;
-  task_id: string;
-  actor_kind: SpaceActor["kind"];
-  actor_user_id?: string;
-  actor_agent_id?: string;
-  run_id?: string;
-  kind: "assigned" | "progress" | "result" | "failure" | "completed" | "status";
-  message: string;
-  metadata: Record<string, unknown>;
-  created_at: string;
 }

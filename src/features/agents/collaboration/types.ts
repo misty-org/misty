@@ -1,12 +1,12 @@
 /** Plan mode researches and proposes; Act mode does the work. */
 export type ConversationMode = "act" | "plan";
 
-export interface AgentQuestionOption {
+interface AgentQuestionOption {
   label: string;
   description?: string;
 }
 
-export interface AgentQuestion {
+interface AgentQuestion {
   header: string;
   question: string;
   multiSelect: boolean;
@@ -65,10 +65,9 @@ export interface AgentPlan {
   updatedAt: string;
 }
 
-export type GoalStatus =
-  "pursuing" | "paused" | "achieved" | "unmet" | "budget_limited" | "cleared";
+type GoalStatus = "pursuing" | "paused" | "achieved" | "unmet" | "budget_limited" | "cleared";
 
-export interface GoalReport {
+interface GoalReport {
   status: string;
   summary: string;
   evidence?: Array<{ criterion: string; proof: string }> | null;

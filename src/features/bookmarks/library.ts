@@ -66,7 +66,7 @@ function placement(parentId: string): { parent_id?: string } {
   return { parent_id: parentId };
 }
 
-export function ensureBookmarkRoot(id: BookmarkRootId) {
+function ensureBookmarkRoot(id: BookmarkRootId) {
   const state = useWorkspaceStore.getState();
   if (state.bookmarkFolders.some((folder) => folder.id === id)) return id;
   const index = bookmarkRoots.findIndex((root) => root.id === id);

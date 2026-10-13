@@ -8,7 +8,7 @@ import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/ap
 import { platform as osPlatform } from "@tauri-apps/plugin-os";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-export const WINDOW_DRAG_SUPPRESS_SELECTOR = [
+const WINDOW_DRAG_SUPPRESS_SELECTOR = [
   "button",
   "a",
   "input",

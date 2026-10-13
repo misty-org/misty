@@ -66,11 +66,3 @@ export function connectedDevicesErrorMessage(cause: unknown): string {
   }
   return cause instanceof Error ? cause.message : String(cause || "Your devices are unavailable.");
 }
-
-export function connectedDevicePlatform(): "macos" | "windows" | "linux" | "unknown" {
-  const value = navigator.userAgent.toLowerCase();
-  if (value.includes("mac")) return "macos";
-  if (value.includes("win")) return "windows";
-  if (value.includes("linux")) return "linux";
-  return "unknown";
-}

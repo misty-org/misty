@@ -7,7 +7,7 @@ import { useAgentDeviceTargets } from "./store/useAgentDeviceTargets";
 import { useConversationProject } from "./store/useConversationProject";
 
 /** Each device's Misty browser has its own grant reference. */
-export const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
+const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
 
 const folderCapabilities = ["files.list", "files.read", "files.send"];
 /** Projects: the code tools, on this computer only, plus reading documents

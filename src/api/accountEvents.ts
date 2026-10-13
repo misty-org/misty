@@ -10,7 +10,7 @@ import {
 import { readDeploymentScope, resolveApiBase } from "./deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
-export interface AccountEvent {
+interface AccountEvent {
   topic: string;
   id?: string;
 }
@@ -302,7 +302,7 @@ async function followNativeFeed(accountId: string, signal: AbortSignal, deliver:
   });
 }
 
-export function waitForEventRetry(ms: number, signal: AbortSignal): Promise<void> {
+function waitForEventRetry(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     if (signal.aborted) return resolve();
     const finish = () => {

@@ -11,7 +11,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function buildMentionPattern(names: string[]): RegExp | undefined {
+function buildMentionPattern(names: string[]): RegExp | undefined {
   const unique = [...new Set(names.map((name) => name.trim()).filter(Boolean))].sort(
     (a, b) => b.length - a.length,
   );

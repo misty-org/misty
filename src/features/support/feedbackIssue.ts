@@ -1,7 +1,7 @@
 export const publicFeedbackRepository = "https://github.com/misty-org/misty";
 
 export type FeedbackKind = "bug" | "idea" | "confusing" | "accessibility";
-export type FeedbackFrequency = "once" | "sometimes" | "always" | "unknown";
+type FeedbackFrequency = "once" | "sometimes" | "always" | "unknown";
 
 export interface FeedbackDraft {
   kind: FeedbackKind;

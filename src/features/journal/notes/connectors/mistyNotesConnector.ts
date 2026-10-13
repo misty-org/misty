@@ -120,7 +120,7 @@ export function createMistyNotesConnector(
   };
 }
 
-export async function listMistySpaceNotesWithApi(
+async function listMistySpaceNotesWithApi(
   notesApi: NativeNotesApi,
   spaceId: string,
   spaceName: string,

@@ -1,4 +1,4 @@
-export interface GlobalImageMarkupElement {
+interface GlobalImageMarkupElement {
   kind: "stroke" | "highlight" | "rectangle" | "text" | "cleanup";
   points?: Array<{ x: number; y: number }>;
   x?: number;

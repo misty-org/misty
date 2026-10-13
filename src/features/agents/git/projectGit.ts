@@ -59,12 +59,6 @@ export async function commitAuthor(): Promise<GitIdentity> {
   if (!me?.email) throw new Error("Sign in to Misty to commit.");
   return { name: me.name || me.username || me.email, email: me.email };
 }
-
-/** Forget the cached author, after connecting or disconnecting GitHub. */
-export function resetCommitAuthor() {
-  identity = null;
-}
-
 export async function githubRepos(): Promise<
   (GitHubRepo & {
     private: boolean;

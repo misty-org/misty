@@ -2,7 +2,7 @@ import { z } from "zod";
 import { apiRequest } from "@/api/client";
 
 /** How an agent takes requests from the other members of its Space. */
-export const acceptPolicies = ["ask", "auto", "off"] as const;
+const acceptPolicies = ["ask", "auto", "off"] as const;
 export type AcceptPolicy = (typeof acceptPolicies)[number];
 
 const listingSchema = z.object({
@@ -34,8 +34,6 @@ const requestSchema = z.object({
   /** Set when a person @mentioned the agent in Space chat rather than their agent asking. */
   source_message_id: z.string().optional(),
 });
-export type AgentMemberRequest = z.infer<typeof requestSchema>;
-
 const spacePath = (spaceId: string, agentId = "") =>
   `/spaces/${encodeURIComponent(spaceId)}/agent-listings${agentId ? `/${encodeURIComponent(agentId)}` : ""}`;
 

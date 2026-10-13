@@ -4,13 +4,7 @@ import { browserImport, type ImportedExtension, type ImportSourceRequest } from 
 import { applyImportedSettings } from "./settings";
 
 export type ImportKind = "bookmarks" | "history" | "settings" | "signins" | "extensions";
-export const importKinds: ImportKind[] = [
-  "bookmarks",
-  "history",
-  "settings",
-  "signins",
-  "extensions",
-];
+const importKinds: ImportKind[] = ["bookmarks", "history", "settings", "signins", "extensions"];
 
 export interface ImportOutcome {
   kind: ImportKind;
@@ -24,7 +18,7 @@ const plural = (count: number, one: string, many = `${one}s`) =>
   `${count.toLocaleString()} ${count === 1 ? one : many}`;
 
 /** The Misty browser profile new pages open in: the focused tab's, else the default. */
-export function currentBrowserProfile(): string | undefined {
+function currentBrowserProfile(): string | undefined {
   const workspace = useWorkspaceStore.getState();
   const panes = dockLeaves(workspace.layout.root);
   const pane = panes.find((p) => p.id === workspace.layout.focusedPaneId) ?? panes[0];

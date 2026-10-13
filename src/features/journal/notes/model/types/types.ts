@@ -2,7 +2,7 @@ export type NoteSource = "misty";
 
 export type NoteBodyFormat = "markdown" | "tiptap-json" | "html";
 
-export type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
+type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
 
 /**
  * Mirrors the connection lifecycle already used by Misty provider remotes so a

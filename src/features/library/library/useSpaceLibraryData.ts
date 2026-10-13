@@ -1,8 +1,4 @@
-export type {
-  LibraryCollectionKind,
-  LibraryUploadJob,
-  SpaceLibraryData,
-} from "./types/useSpaceLibraryData";
+export type { LibraryUploadJob } from "./types/useSpaceLibraryData";
 
 import { useLibrarySpaces as useSpacesStore } from "./LibraryRuntime";
 import { useCallback, useState } from "react";

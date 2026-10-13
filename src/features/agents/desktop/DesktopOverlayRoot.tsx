@@ -50,7 +50,7 @@ interface IslandState {
   waiting: boolean;
 }
 
-export function DesktopIsland() {
+function DesktopIsland() {
   const island = useOverlayState<IslandState>("misty://desktop-island", {
     status: "Misty is working with its own cursor",
     meta: "",
@@ -123,7 +123,7 @@ interface Pointer {
   y: number;
 }
 
-export function DesktopMist() {
+function DesktopMist() {
   const mist = useOverlayState<{ waiting: boolean }>("misty://desktop-mist", { waiting: false });
   const [pointer, setPointer] = useState<(Pointer & { pulse: number }) | null>(null);
   useEffect(() => {
@@ -168,7 +168,7 @@ interface DockCard {
   height: number;
 }
 
-export function DockStack() {
+function DockStack() {
   const [cards, setCards] = useState<DockCard[]>([]);
   useEffect(() => {
     const remove = getCurrentWindow().listen<{ cards: DockCard[] }>(

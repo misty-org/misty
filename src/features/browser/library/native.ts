@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type BrowserDownloadState =
-  "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
+type BrowserDownloadState = "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
 
 export interface BrowserDownloadEntry {
   id: string;

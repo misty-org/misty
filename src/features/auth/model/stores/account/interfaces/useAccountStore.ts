@@ -1,6 +1,1 @@
-export type {
-  AccountAuthUser,
-  AccountHandoffPath,
-  AccountMeResponse,
-  LoginResponse,
-} from "@/api/account/types";
+export type { AccountMeResponse } from "@/api/account/types";

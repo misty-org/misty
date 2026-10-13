@@ -1,4 +1,4 @@
-export function joinPath(parent: string, child: string): string {
+function joinPath(parent: string, child: string): string {
   const separator = parent.includes("\\") && !parent.includes("/") ? "\\" : "/";
   return `${parent.replace(/[\\/]+$/, "")}${separator}${child}`;
 }

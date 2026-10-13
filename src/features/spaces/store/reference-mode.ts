@@ -53,7 +53,7 @@ export async function referenceSpaceSnapshotState(
   };
 }
 
-export function canUseSpaceReferenceFallback(error: unknown): boolean {
+function canUseSpaceReferenceFallback(error: unknown): boolean {
   if (!(error instanceof SpaceRequestError)) return true;
   return error.status === 429 || error.status >= 500;
 }

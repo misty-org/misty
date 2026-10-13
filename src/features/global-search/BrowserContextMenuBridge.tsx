@@ -78,7 +78,7 @@ const suspensionReason = "browser-context-menu";
  * anything the renderer draws there itself (internal pages, annotations,
  * notifications, the menu) keeps its own click.
  */
-export function browserPageAtPoint(
+function browserPageAtPoint(
   target: EventTarget | null,
   clientX: number,
   clientY: number,

@@ -2,7 +2,7 @@ import { blankBrowserUrl } from "@/features/workspace/model";
 import { resolveDirectAddress } from "../browserAddress";
 
 /** An http(s) page address, or null for anything the address bar should not list. */
-export function webUrl(value: string): URL | null {
+function webUrl(value: string): URL | null {
   if (!value || value === blankBrowserUrl) return null;
   try {
     const url = new URL(value);
@@ -70,11 +70,49 @@ export function describeUrl(
 // Sites that certainly live at `name.com`. Only these are fetched for a typed word, so a
 // draft that is not one of them never becomes a request to a host the person did not pick.
 const KNOWN_COM_SITES = new Set([
-  "airbnb", "amazon", "apple", "bing", "canva", "cnn", "discord", "dropbox", "ebay", "etsy",
-  "expedia", "facebook", "figma", "github", "gitlab", "gmail", "google", "hulu", "imdb",
-  "instagram", "linkedin", "medium", "microsoft", "netflix", "notion", "paypal", "pinterest",
-  "reddit", "slack", "spotify", "stackoverflow", "stripe", "target", "tiktok", "twitch",
-  "twitter", "uber", "vimeo", "walmart", "wikipedia", "yahoo", "youtube", "zoom",
+  "airbnb",
+  "amazon",
+  "apple",
+  "bing",
+  "canva",
+  "cnn",
+  "discord",
+  "dropbox",
+  "ebay",
+  "etsy",
+  "expedia",
+  "facebook",
+  "figma",
+  "github",
+  "gitlab",
+  "gmail",
+  "google",
+  "hulu",
+  "imdb",
+  "instagram",
+  "linkedin",
+  "medium",
+  "microsoft",
+  "netflix",
+  "notion",
+  "paypal",
+  "pinterest",
+  "reddit",
+  "slack",
+  "spotify",
+  "stackoverflow",
+  "stripe",
+  "target",
+  "tiktok",
+  "twitch",
+  "twitter",
+  "uber",
+  "vimeo",
+  "walmart",
+  "wikipedia",
+  "yahoo",
+  "youtube",
+  "zoom",
 ]);
 
 /**

@@ -3,7 +3,7 @@ import { Field, OptionSelect } from "@/shared/ui";
 import { useEffect, useMemo } from "react";
 
 /** The account's personal Space: its protected default, which it owns. */
-export function personalSpaceId(spaces: { id: string; is_default: boolean; role: string }[]) {
+function personalSpaceId(spaces: { id: string; is_default: boolean; role: string }[]) {
   return spaces.find((space) => space.is_default && space.role === "owner")?.id ?? "";
 }
 

@@ -40,12 +40,6 @@ function stripWindowsVerbatimPrefix(path: string): string {
   const rest = driveMatch[2] ?? "";
   return rest ? `${drive}/${rest}` : `${drive}/`;
 }
-
-export function explorerPathKey(path: string): string {
-  const normalized = normalizeExplorerPath(path);
-  return isWindowsExplorerPath(normalized) ? normalized.toLocaleLowerCase() : normalized;
-}
-
 export function isWindowsExplorerPath(path: string): boolean {
   return windowsDrivePathPattern.test(path) || windowsUncPathPattern.test(path);
 }

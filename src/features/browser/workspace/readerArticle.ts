@@ -1,5 +1,5 @@
 /** A page's article as reader mode shows it: plain blocks, never page markup. */
-export type ReaderBlock =
+type ReaderBlock =
   | { type: "heading"; level: 2 | 3 | 4; text: string }
   | { type: "paragraph" | "quote" | "code"; text: string }
   | { type: "list"; ordered: boolean; items: string[] }

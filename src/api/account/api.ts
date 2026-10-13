@@ -298,7 +298,7 @@ export class AccountApiError extends Error {
     super(message);
   }
 }
-export class AccountSessionChangedError extends Error {
+class AccountSessionChangedError extends Error {
   name = "AccountSessionChangedError";
   constructor() {
     super("The active Misty account changed before this request finished. Please try again.");

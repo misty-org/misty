@@ -14,7 +14,7 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "../components/DesktopSettingsUI";
-import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
+import { definitionById, fromLegacy } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
 import { ChoiceControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
@@ -248,4 +248,3 @@ export function AboutSection(props: SettingsContentProps) {
     </Section>
   );
 }
-export type { SettingDefinition };

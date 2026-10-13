@@ -354,13 +354,13 @@ function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Misty could not update this note.";
 }
 
-export interface UpdateNoteContentInput {
+interface UpdateNoteContentInput {
   body: string;
   bodyFormat: NoteBodyFormat;
   bodyMarkdown?: string;
 }
 
-export interface NotesStoreState {
+interface NotesStoreState {
   registry: NotesConnectorRegistry;
   phase: NotesLoadPhase;
   notes: UnifiedNote[];
@@ -380,7 +380,7 @@ export interface NotesStoreState {
   connectorRevision: number;
 }
 
-export interface NotesStoreActions {
+interface NotesStoreActions {
   load: (accountId: string, spaceId: string, spaceName: string) => Promise<void>;
   refresh: () => Promise<void>;
   syncAll: () => Promise<void>;

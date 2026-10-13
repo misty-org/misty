@@ -2,7 +2,6 @@
 // this package owns presentation, drag mechanics, and the types they share.
 export type { ExplorerSortState } from "./explorer/store";
 export * from "./explorer/components/ExplorerPickerToolbar";
-export * from "./explorer/components/ExplorerSidebarDialogs";
 export * from "./explorer/components/ExplorerSidebarSupport";
 export * from "./explorer/components/ExplorerToolbarSupport";
 export * from "./explorer/components/FileBrowserDrag";

@@ -62,7 +62,7 @@ export const syncIssues: Record<string, SyncStatus> = {
     "Misty could not finish exchanging changes with the server.",
   ),
 };
-export function syncIssueStatus(issue: string): SyncStatus {
+function syncIssueStatus(issue: string): SyncStatus {
   return (
     syncIssues[issue] ??
     attention(

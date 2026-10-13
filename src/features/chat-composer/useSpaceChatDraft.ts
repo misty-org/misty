@@ -4,8 +4,6 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { readApiSessionGeneration } from "@/api/client/session";
 import type { Dispatch, SetStateAction } from "react";
 import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
-export { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
-
 type DraftState = {
   text: string;
   selectedFileIds: string[];

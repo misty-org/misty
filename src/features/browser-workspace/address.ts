@@ -63,7 +63,7 @@ export function parseAuthority(authority: string): ParsedAuthority | null {
   return null;
 }
 
-export function isLocalOrIpAddress(parsed: ParsedAuthority): boolean {
+function isLocalOrIpAddress(parsed: ParsedAuthority): boolean {
   const { host, port, isIpv6Bracketed } = parsed;
   if (isLocalHostOrDomain(host)) return true;
   if (isIpv4Address(host)) return true;

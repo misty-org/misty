@@ -70,7 +70,7 @@ export interface BrowserCustomBang {
   url: string;
 }
 
-export const customBangTriggerPattern = /^[a-z0-9][a-z0-9.-]{0,23}$/;
+const customBangTriggerPattern = /^[a-z0-9][a-z0-9.-]{0,23}$/;
 
 /** Why a custom shortcut is unusable, or null when it is fine. */
 export function customBangProblem(bang: BrowserCustomBang): string | null {

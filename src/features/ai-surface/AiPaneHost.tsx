@@ -172,7 +172,7 @@ export function useAiSurfaceActions(adapter?: AiSurfaceAdapter | null) {
   );
 }
 
-export function aiContextBoundary(adapter: AiSurfaceAdapter | null) {
+function aiContextBoundary(adapter: AiSurfaceAdapter | null) {
   if (!adapter) return "none";
   let context;
   try {

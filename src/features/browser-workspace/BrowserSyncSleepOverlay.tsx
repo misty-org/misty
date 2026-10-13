@@ -7,7 +7,7 @@ import misty from "@/assets/branding/misty-icon.png?inline";
 import { activateNativeDevice, activeDeviceEpoch, readNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
 
-export function SyncSleepScreen({
+function SyncSleepScreen({
   busy,
   error,
   onWake,

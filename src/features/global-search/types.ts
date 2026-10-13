@@ -10,7 +10,7 @@ import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask";
 
-export type GlobalSearchKind =
+type GlobalSearchKind =
   | "space"
   | "task"
   | "note"
@@ -49,8 +49,8 @@ export interface GlobalSearchResult extends GlobalSearchDocument {
 }
 
 export type UnifiedMistyPanel = "closed" | "results" | "answer" | "agent";
-export type GlobalSearchSourceFilter = "all" | "device" | "cloud";
-export type GlobalSearchIntentFilter = "all" | "misty" | "agent";
+type GlobalSearchSourceFilter = "all" | "device" | "cloud";
+type GlobalSearchIntentFilter = "all" | "misty" | "agent";
 
 export interface GlobalSearchFilters {
   kinds: GlobalSearchKind[];

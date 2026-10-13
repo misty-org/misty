@@ -36,16 +36,16 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-export type SpaceIntegrationProvider = "google";
+type SpaceIntegrationProvider = "google";
 
-export interface SpaceTemplateSeedSummary {
+interface SpaceTemplateSeedSummary {
   task_count: number;
   note_count: number;
   collection_count: number;
 }
 
 /** Exactly what a template creates, shown before anything exists. */
-export interface SpaceTemplateSeedPreview {
+interface SpaceTemplateSeedPreview {
   tasks: string[];
   notes: string[];
   collections: string[];
@@ -220,7 +220,7 @@ export interface SpaceMessage {
   };
   created_at: string;
 }
-export interface SpaceMessageReaction {
+interface SpaceMessageReaction {
   emoji: string;
   count: number;
   reacted_by_me?: boolean;

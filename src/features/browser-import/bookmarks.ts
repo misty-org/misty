@@ -46,7 +46,7 @@ export function needsNestedFolders(roots: ImportedBookmarkRoots) {
  * place reused, and links already in that folder skipped, so importing twice
  * changes nothing.
  */
-export function mergeImportedBookmarks(
+function mergeImportedBookmarks(
   current: { folders: Folders; bookmarks: Links },
   roots: ImportedBookmarkRoots,
 ): BookmarkMergeResult {

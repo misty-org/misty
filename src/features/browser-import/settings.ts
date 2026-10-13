@@ -18,10 +18,7 @@ function host(url: string) {
 }
 
 /** Misty's engine for an imported one, by its search address or its name. */
-export function matchSearchEngine(engine: {
-  name: string;
-  url: string;
-}): BrowserSearchEngine | undefined {
+function matchSearchEngine(engine: { name: string; url: string }): BrowserSearchEngine | undefined {
   const target = host(engine.url);
   return (
     browserSearchEngines.find((candidate) => target && host(candidate.search) === target) ??

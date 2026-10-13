@@ -7,19 +7,14 @@ import { blankBrowserUrl } from "./browserUrl";
 export { blankBrowserUrl } from "./browserUrl";
 export * from "./browserInternalUrl";
 import { browserInternalPage, browserInternalPages } from "./browserInternalUrl";
-export {
-  browserHomeUrl,
-  configureBrowserHomeUrl,
-  defaultBrowserHomeUrl,
-  normalizeBrowserHomeUrl,
-} from "./browserHome";
+export { browserHomeUrl, defaultBrowserHomeUrl, normalizeBrowserHomeUrl } from "./browserHome";
 
 export type WorkspaceSurfaceId = "space" | "browser" | "agents" | "scheduled" | "extensions";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
-export type WorkspaceInstancePolicy = "multiple" | "single";
+type WorkspaceInstancePolicy = "multiple" | "single";
 export type WorkspaceScopeKey = "global" | `space:${string}` | `profile:${string}`;
-export type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
+type DockMountPolicy = "keep-alive" | "suspend" | "unmount";
 export type DockSplitDirection = "left" | "right" | "up" | "down";
 export type DockDropZone = "center" | DockSplitDirection;
 
@@ -70,7 +65,7 @@ export function parseBrowserViewState(value: unknown): BrowserViewState {
   };
 }
 
-export function isPlaceholderBrowserTitle(title?: string): boolean {
+function isPlaceholderBrowserTitle(title?: string): boolean {
   if (!title) return true;
   const normalized = title.trim().toLowerCase();
   if (!normalized) return true;
@@ -158,7 +153,7 @@ export interface WorkspacePane {
   history?: { entries: WorkspaceView[]; index: number };
 }
 
-export interface WorkspaceSplit {
+interface WorkspaceSplit {
   type: "split";
   id: string;
   direction: "horizontal" | "vertical";

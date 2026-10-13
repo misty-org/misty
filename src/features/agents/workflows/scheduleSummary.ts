@@ -39,7 +39,7 @@ function list(items: string[]) {
 }
 
 /** "09:30" as the viewer's clock, such as "9:30 AM". */
-export function formatClock(value: string) {
+function formatClock(value: string) {
   const [hour, minute] = value.split(":").map(Number);
   return new Date(2000, 0, 1, hour, minute).toLocaleTimeString(undefined, {
     hour: "numeric",
@@ -47,7 +47,7 @@ export function formatClock(value: string) {
   });
 }
 
-export function formatDate(value: string, withYear = false) {
+function formatDate(value: string, withYear = false) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, {
     month: "short",
@@ -92,7 +92,7 @@ function onDays(rule: ScheduleRule) {
 }
 
 /** One rule in plain words, such as "Every 2 weeks on Mon and Thu at 9:00 AM". */
-export function describeRule(rule: ScheduleRule) {
+function describeRule(rule: ScheduleRule) {
   const at = rule.times?.length ? ` at ${list(rule.times.map(formatClock))}` : "";
   const until = rule.end_date ? `, until ${formatDate(rule.end_date, true)}` : "";
   switch (rule.frequency) {

@@ -18,7 +18,7 @@ import {
   type ShortcutScope,
 } from "./registry";
 
-export interface ShortcutInvocation {
+interface ShortcutInvocation {
   command: ShortcutCommandDefinition;
   event: KeyboardEvent;
   scope: ShortcutScope;
@@ -232,7 +232,7 @@ export function effectiveShortcut(commandId: string): {
     : { primary: null, alternate: null };
 }
 
-export function useEffectiveShortcut(commandId: string) {
+function useEffectiveShortcut(commandId: string) {
   useSettingsStore((state) => state.shortcuts);
   return effectiveShortcut(commandId);
 }

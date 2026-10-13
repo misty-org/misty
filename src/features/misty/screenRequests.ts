@@ -164,7 +164,7 @@ export async function openScreenAndContinue(
  * (docs/design/agents-on-devices/BRIEF.md). Its tab arrives with a grant that
  * device signed; every step runs there.
  */
-export async function continueOnRemoteDevice(
+async function continueOnRemoteDevice(
   set: GlobalSearchSet,
   get: GlobalSearchGet,
   conversationId: string,

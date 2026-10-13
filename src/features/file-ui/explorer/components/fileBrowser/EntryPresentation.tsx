@@ -18,7 +18,7 @@ export function formatEntrySize(
   return formatBytes(null);
 }
 
-export function DirectorySizeDots() {
+function DirectorySizeDots() {
   return (
     <span className={fileBrowserStyles.directorySizeDots} aria-label="Calculating folder size">
       {[0, 1, 2].map((index) => (

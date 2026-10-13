@@ -10,7 +10,7 @@ export function uniqueGlobalMistyContext(context: GlobalAiContextRef[]): GlobalA
   });
 }
 
-export function globalMistyContextIdentity(item: GlobalAiContextRef): string {
+function globalMistyContextIdentity(item: GlobalAiContextRef): string {
   if (item.kind === "route") {
     if (item.spaceId) return `route:space:${item.spaceId}`;
     return `route:${item.href?.split(/[?#]/)[0] ?? item.title}`;
