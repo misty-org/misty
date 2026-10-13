@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { MenuItem } from "@/shared/ui";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { Button, cn, Popover, PopoverAnchor, PopoverContent, PopoverTrigger, IconButton } from "@/shared/ui";
+import {
+  Button,
+  cn,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+  IconButton,
+} from "@/shared/ui";
 import { RestoreStatusList } from "./restore/RestoreStatusList";
 import { LocalSaveStatusList } from "./restore/LocalSaveStatusList";
 import { SyncedTabsStatusList } from "./restore/SyncedTabsStatusList";
@@ -65,29 +73,29 @@ export function BrowserSyncBadge({
           <span ref={anchor} aria-hidden className="block size-0" />
         </PopoverAnchor>
       ) : (
-      <PopoverTrigger asChild>
-        <IconButton
-          ref={trigger}
-          data-misty-window-drag-block="true"
-          data-sync-status={status.tone}
-          label={`Sync: ${status.title}`}
-          className="misty-navigator-icon-target relative"
-        >
-          <RefreshCw aria-hidden className="size-4" />
-          {status.tone === "attention" && (
-            <span
-              aria-hidden
-              data-sync-issue-badge="true"
-              className={cn(
-                "absolute right-px top-px grid size-2.5 place-items-center rounded-full bg-cream text-[7px] font-bold",
-                "leading-none text-charcoal-bg ring-1 ring-charcoal-workspace",
-              )}
-            >
-              !
-            </span>
-          )}
-        </IconButton>
-      </PopoverTrigger>
+        <PopoverTrigger asChild>
+          <IconButton
+            ref={trigger}
+            data-misty-window-drag-block="true"
+            data-sync-status={status.tone}
+            label={`Sync: ${status.title}`}
+            className="misty-navigator-icon-target relative"
+          >
+            <RefreshCw aria-hidden className="size-4" />
+            {status.tone === "attention" && (
+              <span
+                aria-hidden
+                data-sync-issue-badge="true"
+                className={cn(
+                  "absolute right-px top-px grid size-2.5 place-items-center rounded-full bg-cream text-[7px] font-bold",
+                  "leading-none text-charcoal-bg ring-1 ring-charcoal-workspace",
+                )}
+              >
+                !
+              </span>
+            )}
+          </IconButton>
+        </PopoverTrigger>
       )}
       <PopoverContent
         align="start"

@@ -18,7 +18,6 @@ import { AgentConversationView } from "./AgentConversationView";
 import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
-import { ConversationModelPicker } from "../models/ConversationModelPicker";
 import { ComposerStrip } from "./ComposerStrip";
 import { AgentModeMenu } from "../collaboration/AgentModeToggle";
 import { AgentDeviceMenu } from "../page/AgentDeviceMenu";
@@ -126,8 +125,7 @@ export function AgentWorkspaceConversation({
       void store.loadConversations();
   }, [accountId]);
   useEffect(() => {
-    // On the Agents page the chat column scrolls, so follow that instead of the transcript.
-    const view = scrollRef.current?.closest<HTMLElement>("[data-scroll-root]") ?? scrollRef.current;
+    const view = scrollRef.current;
     if (
       conversation?.messages.length &&
       view &&
@@ -443,13 +441,6 @@ export function AgentWorkspaceConversation({
             />
           }
           code={<AgentCodingToolMenu conversationId={conversation?.id} disabled={state.working} />}
-          model={
-            <ConversationModelPicker
-              conversation={conversation}
-              disabled={state.working}
-              onError={reportError}
-            />
-          }
           usage={
             showControlBar && agent ? (
               <AgentUsageControl working={state.working} />

@@ -14,6 +14,9 @@ import { windowSurfaceBackground } from "./windowSurfaceBackground";
  */
 export function DesktopWindowReady() {
   useEffect(() => {
+    // Modals keep clear of the macOS traffic lights, which float above every web layer.
+    if (hasTauriInternals() && platform() === "macos")
+      document.documentElement.style.setProperty("--misty-modal-inset-top", "44px");
     if (!hasTauriInternals() || !["macos", "windows"].includes(platform())) return;
     let disposed = false;
     // Color the native window behind the renderer without making the renderer

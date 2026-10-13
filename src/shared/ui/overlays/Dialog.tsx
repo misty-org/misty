@@ -121,7 +121,10 @@ const DialogContent = React.forwardRef<
           container ? "absolute" : "fixed",
           "inset-0 layer-dialog pointer-events-none flex justify-center",
           placement === "top" ? "items-start" : "items-center",
-          placement === "top" && backdrop && "pt-[12vh]",
+          !container && placement !== "top" && "pt-[var(--misty-modal-inset-top,0px)]",
+          placement === "top" &&
+            backdrop &&
+            (container ? "pt-[12vh]" : "pt-[max(12vh,var(--misty-modal-inset-top,0px))]"),
           !backdrop && "justify-start",
         )}
       >
@@ -130,7 +133,7 @@ const DialogContent = React.forwardRef<
           data-slot="dialog-content"
           className={cn(
             "pointer-events-auto relative grid",
-            "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
+            "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)] max-w-lg",
             "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
             "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
             "data-[state=closed]:pointer-events-none",

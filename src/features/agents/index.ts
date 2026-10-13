@@ -22,7 +22,11 @@ export { CursorCompanionController } from "./companion/CursorCompanionController
 export { MistyPanel, type MistyPanelSide } from "./panel/MistyPanel";
 export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { mistyPanelHost, useMistyPanelHost, useMistyPanelSide } from "./panel/mistyPanelHost";
-export { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./panel/mistyPanelStore";
+export {
+  MISTY_PANEL_WIDTH,
+  useMistyPanelStore,
+  type MistyPanelView,
+} from "./panel/mistyPanelStore";
 export { MistyPanelSprite, useMistyPanelAgentName } from "./panel/MistyPanelSprite";
 export { AgentTabAway, useTabAway } from "./dock/AgentTabAway";
 
@@ -41,8 +45,6 @@ export { AppRequestCard } from "./apps/AppRequestCard";
 export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
 export { codingToolForTurn, useConversationCodingTool } from "./store/useConversationCodingTool";
 
-export { ModelPicker } from "./models/ModelPicker";
-export { ReasoningPicker } from "./models/ReasoningPicker";
 export { settleProgress, withToolEvent } from "./progress/progressTimeline";
 export { describeNextRun } from "./workflows/scheduleSummary";
 export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";

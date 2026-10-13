@@ -100,7 +100,7 @@ export function WorkspaceTabStrip(
       className="misty-workspace-new-tab misty-workspace-new-tab-row"
       onClick={props.onNewTab}
     >
-      <Plus className="size-4" aria-hidden="true" />
+      <Plus className="size-5" aria-hidden="true" />
       New Tab
     </Pressable>
   ) : (
@@ -235,9 +235,10 @@ export function WorkspaceTabStrip(
           </div>
         ) : (
           <>
-            {/* With the sidebar collapsed the Space starts the tab strip. */}
-            <SpaceRow compact />
             {cardBody}
+            {/* With the sidebar collapsed the Space ends the tab strip, sized like a tab. */}
+            <SpaceRow compact />
+            {props.account}
           </>
         )}
         {vertical ? props.account : null}

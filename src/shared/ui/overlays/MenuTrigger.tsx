@@ -1,8 +1,8 @@
-import { ChevronDown } from "lucide-react";
 import * as React from "react";
 import { Button, type ButtonProps } from "../controls/Button";
 import { IconButton, type IconButtonProps } from "../controls/IconButton";
 import { cn } from "../utils";
+import { MenuChevron } from "./MenuChevron";
 import { DropdownMenuTrigger } from "./DropdownMenu";
 import { PopoverTrigger } from "./Popover";
 
@@ -62,12 +62,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             {...props}
           >
             {icon}
-            {showChevron && (
-              <ChevronDown
-                aria-hidden
-                className="size-4 shrink-0 transition-transform duration-150 group-data-[state=open]/button:rotate-180"
-              />
-            )}
+            {showChevron && <MenuChevron className="size-4" />}
           </IconButton>
         </Trigger>
       );
@@ -85,12 +80,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
         >
           {icon}
           <span className="min-w-0 truncate">{value ?? label}</span>
-          {chevron && (
-            <ChevronDown
-              aria-hidden
-              className="size-3.5 shrink-0 text-cream-muted transition-transform duration-150 group-data-[state=open]/button:rotate-180"
-            />
-          )}
+          {chevron && <MenuChevron className="text-cream-muted" />}
         </Button>
       </Trigger>
     );

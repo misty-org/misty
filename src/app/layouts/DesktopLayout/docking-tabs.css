@@ -56,10 +56,11 @@
   .misty-workspace-tab:not([data-active="true"])::before {
   content: "";
   position: absolute;
-  /* A 28px pill, set to the tab content's measured center. */
-  inset: 3px 0 5px;
+  /* The active tab's own body and 8px corners, ending a hair above the pane seam so the
+     seam stays visible. */
+  inset: 0 0 3px;
   z-index: -1;
-  border-radius: 999px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--workspace-tab-text) 10%, transparent);
   opacity: 0;
   pointer-events: none;
@@ -91,8 +92,8 @@
 }
 .misty-workspace-tabs[data-tab-position="bottom"]
   .misty-workspace-tab:not([data-active="true"])::before {
-  inset: 4px 0 0;
-  border-radius: 8px 8px var(--tab-shoulder) var(--tab-shoulder);
+  inset: 3px 0 0;
+  border-radius: 8px;
 }
 /* The tab fills the strip minus the --tab-inset gap, and its content is centered on the tab. */
 .misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab,
@@ -230,10 +231,10 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 36px
+/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 40px
    rounded rows with hover-only close buttons, and the window actions sit in a footer. */
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
-  --shell-tab-height: 36px;
+  --shell-tab-height: 40px;
   gap: 0;
   padding-bottom: 8px;
 }
@@ -263,7 +264,7 @@
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab-list {
-  gap: 4px;
+  gap: 8px;
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab {
@@ -308,7 +309,7 @@
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab-actions {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
   justify-content: space-between;
   flex-wrap: nowrap;
 }

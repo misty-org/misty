@@ -7,7 +7,9 @@ import { SpaceOverviewProvider } from "./useSpaceOverview";
 import { Button, CollectionSkeleton, Skeleton } from "@/shared/ui";
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
-import { preferredDefaultSpace } from "./defaultSpace";
+import { preferredDefaultSpace, windowSpace } from "./defaultSpace";
+import { openSpaceWindow } from "@/features/workspace/spaceWindow";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
 import { useSpacesStore } from "./store/useSpacesStore";
 import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
@@ -28,13 +30,26 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const invitations = useSpacesStore((state) => state.invitations);
   const respondInvite = useSpacesStore((state) => state.respondInvite);
   const space = spaces.find((item) => item.id === route.activeSpaceId);
-  const fallback = preferredDefaultSpace(spaces);
+  // A window shows only its own Space; another Space opens in its own window.
+  const fallback = hasTauriInternals() ? windowSpace(spaces) : preferredDefaultSpace(spaces);
+  const elsewhere = Boolean(
+    ready && fallback && route.activeSpaceId && route.activeSpaceId !== fallback.id,
+  );
   const [inviteError, setInviteError] = useState("");
   useEffect(() => {
     if (!route.activeSpaceId && ready && fallback) {
       navigate(defaultSpaceRoute(fallback.id), { replace: true });
     }
   }, [fallback, ready, route.activeSpaceId, navigate]);
+  useEffect(() => {
+    if (!elsewhere || !fallback || !hasTauriInternals()) return;
+    const other = spaces.find((item) => item.id === route.activeSpaceId);
+    if (other)
+      void openSpaceWindow(other.id, other.id === preferredDefaultSpace(spaces)?.id).catch(
+        () => undefined,
+      );
+    navigate(defaultSpaceRoute(fallback.id), { replace: true });
+  }, [elsewhere, fallback, spaces, route.activeSpaceId, navigate]);
   useEffect(() => {
     if (!route.activeSpaceId) return;
     const base = `/spaces/${encodeURIComponent(route.activeSpaceId)}`;
@@ -66,7 +81,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <Button onClick={() => void load({ force: true })}>Retry</Button>
       </div>
     );
-  if (!ready)
+  if (!ready || (elsewhere && hasTauriInternals()))
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-charcoal-workspace">
         <div className="flex h-11 shrink-0 items-center gap-3 border-b border-charcoal-border px-3">

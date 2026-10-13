@@ -29,7 +29,7 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
   // The actual active publisher is distinct from the workspace being viewed.
   const publisherId = session ? publishingDeviceId(session) : null;
   const publisher =
-    session && deviceRows(session, user?.name).find((d) => d.device_id === publisherId);
+    session && deviceRows(session, user?.username).find((d) => d.device_id === publisherId);
   return (
     <>
       <Section title="Overview">

@@ -113,6 +113,58 @@ pub fn browser_webviews_hide_except(
     }
 }
 
+/// Closes every tab page in the caller's window whose tab no longer exists. Pages outlive the
+/// renderer on purpose, so a reload can hand each tab its live page back; a page whose tab was
+/// closed or lost meanwhile would otherwise stay alive (and audible) until the app quits. Popups
+/// still waiting for a tab to adopt them, agent pages and previews are left alone.
+/// Async for the same reason as `browser_webview_close`: never close on the UI thread.
+#[tauri::command]
+pub async fn browser_webviews_close_except(
+    caller: Webview,
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewsHideExceptRequest,
+) -> Result<(), String> {
+    let keep: HashSet<String> = request
+        .keep
+        .iter()
+        .filter_map(|id| webview_label(id).ok())
+        .collect();
+    let pending: HashSet<String> = state
+        .pending_popups
+        .lock()
+        .map_err(|_| "Browser popup state is unavailable.")?
+        .iter()
+        .cloned()
+        .collect();
+    let orphans: Vec<String> = app
+        .webviews()
+        .into_iter()
+        .filter(|(label, webview)| {
+            label.starts_with("misty-browser-tab-")
+                && !keep.contains(label)
+                && webview.window().label() == caller.window().label()
+        })
+        .filter_map(|(label, _)| label.strip_prefix("misty-browser-").map(str::to_owned))
+        .filter(|id| !pending.contains(id))
+        .collect();
+    let mut errors = Vec::new();
+    for id in orphans {
+        if let Err(error) = close_browser_webview(
+            app.clone(),
+            app.state::<BrowserSessionState>(),
+            BrowserWebviewIdRequest { id },
+        ) {
+            errors.push(error);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
 #[tauri::command]
 pub fn browser_webviews_park_all(caller: Webview, app: AppHandle) -> Result<(), String> {
     // Inactive pages must be hidden, not merely stacked below the renderer.

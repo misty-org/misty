@@ -162,6 +162,13 @@
   .misty-popup-motion[data-state="closed"] {
     animation: misty-overlay-fade-out 100ms ease-in forwards;
   }
+  /* The chevron on a menu trigger turns over while the menu is open. */
+  .misty-menu-chevron {
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-state="open"] > .misty-menu-chevron {
+    transform: rotate(180deg);
+  }
   /* Dialogs and full-page overlays fade in place. */
   .misty-dialog-motion:not([data-state="closed"]) {
     animation: misty-overlay-fade-in 160ms ease-out;
@@ -185,6 +192,8 @@
 
 @theme inline {
   --color-charcoal-workspace: var(--misty-theme-workspace);
+  /* The title bar's own colour; signed-out pages paint everything in it. */
+  --color-window-chrome: var(--misty-window-chrome, var(--misty-theme-workspace));
   --color-charcoal-bg: var(--misty-theme-bg);
   --color-charcoal-sidebar: var(--misty-theme-sidebar);
   --color-charcoal-card: var(--misty-theme-card);

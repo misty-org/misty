@@ -98,7 +98,12 @@ function startGesture(
     source.querySelector<HTMLElement>("[data-reorder-preview]") ??
     source;
   const surfaceRect = surface.getBoundingClientRect();
-  const offset = { x: event.clientX - surfaceRect.left, y: event.clientY - surfaceRect.top };
+  // A pane's label rides just below the pointer; a pane is far larger than its label, so the
+  // press point on the pane says nothing about where the label belongs.
+  const offset =
+    drag.scope === "workspace-panes"
+      ? { x: -12, y: -12 }
+      : { x: event.clientX - surfaceRect.left, y: event.clientY - surfaceRect.top };
   const pointerId = event.pointerId;
   const origin = { x: event.clientX, y: event.clientY };
   let point = origin,
@@ -232,6 +237,8 @@ function startGesture(
                 height: `${r.height}px`,
                 opacity: "0.2",
                 border: "1px solid currentColor",
+                // Matches the panes' own corners.
+                borderRadius: drag.scope === "workspace-panes" ? "12px" : "",
               }
             : axis === "x"
               ? {

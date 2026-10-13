@@ -17,6 +17,7 @@ import { splitReplyQuote } from "./replyQuote";
 import { AgentProgress } from "../progress/AgentProgress";
 import { useMessageProgress } from "../progress/useMessageProgress";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
+import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
 import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { splitUnfinished } from "../progress/unfinished";
@@ -254,6 +255,10 @@ function AgentMessageView(props: AgentMessageProps) {
         {content ? (
           <div className="misty-markdown-message text-[14px] leading-6 text-cream">
             <MistyMarkdown>{content}</MistyMarkdown>
+            <LinkPreviews
+              text={content}
+              enabled={message.state !== "pending" && message.state !== "streaming"}
+            />
           </div>
         ) : (message.state === "pending" || message.state === "streaming") &&
           // A running tool's row already says what Misty is doing.

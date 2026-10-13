@@ -53,63 +53,7 @@ describe("browser search submission", () => {
   });
 });
 
-describe("bangs", () => {
-  it("lists shortcuts for a bare exclamation mark, grouped", () => {
-    fireEvent.change(renderDialog(), { target: { value: "!" } });
-    expect(screen.getByText("Misty")).toBeTruthy();
-    expect(screen.getByText("Web")).toBeTruthy();
-    expect(screen.getByRole("option", { name: /!bookmarks/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /!yt/ })).toBeTruthy();
-  });
-
-  it("turns a leading shortcut into a chip and searches that site", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!yt " } });
-    expect(screen.getByText("!yt")).toBeTruthy();
-    expect(input.getAttribute("placeholder")).toBe("Search YouTube");
-    fireEvent.change(input, { target: { value: "lo fi" } });
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(openedUrl()).toBe("https://www.youtube.com/results?search_query=lo%20fi");
-  });
-
-  it("reads a trailing shortcut on submit", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "misty !gh" } });
-    expect(screen.getByRole("option", { name: /GitHub/ })).toBeTruthy();
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(openedUrl()).toBe("https://github.com/search?q=misty");
-  });
-
-  it("leaves a slash command as plain text", async () => {
-    fireEvent.change(renderDialog(), { target: { value: "/files report" } });
-    expect(screen.queryByText("!files")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Search or enter a URL" })).toBeTruthy();
-  });
-
-  it("shows bookmark actions for !b and clears the chip on Backspace", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!b " } });
-    expect(await screen.findByRole("option", { name: /Open bookmark manager/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /Bookmark all tabs/ })).toBeTruthy();
-    fireEvent.keyDown(input, { key: "Backspace" });
-    expect(screen.queryByText("!bookmarks")).toBeNull();
-  });
-
-  it("opens the bookmark manager from !bookmarks", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!bookmarks " } });
-    await screen.findByRole("option", { name: /Open bookmark manager/ });
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(
-      parseBrowserViewState(activeLayoutView(useWorkspaceStore.getState().layout)!.state).url,
-    ).toBe("misty://bookmarks");
-  });
-});
-
-describe("asking an agent", () => {
+describe("internal Misty items excluded", () => {
   const agent = (id: string, name: string, system = false) =>
     ({
       id,
@@ -128,17 +72,17 @@ describe("asking an agent", () => {
 
   const optionNames = () => screen.getAllByRole("option").map((option) => option.textContent ?? "");
 
-  it("leads with asking your agent when the text is a request or question", () => {
+  it("never offers asking an agent for requests or questions", () => {
     fireEvent.change(renderDialog(), { target: { value: "summarize this page for me" } });
-    expect(optionNames()[0]).toContain("summarize this page for me");
-    expect(optionNames()[0]).toContain("Misty");
+    expect(optionNames().some((name) => name.includes("Misty"))).toBe(false);
+    expect(optionNames()[0]).toBe("summarize this page for me");
   });
 
-  it("offers asking second when the text reads as a search", () => {
+  it("never offers asking an agent for search queries", () => {
     fireEvent.change(renderDialog(), { target: { value: "pizza brooklyn" } });
     const names = optionNames();
-    expect(names[0]).not.toContain("Misty");
-    expect(names[1]).toContain("Misty");
+    expect(names.some((name) => name.includes("Misty"))).toBe(false);
+    expect(names[0]).toBe("pizza brooklyn");
   });
 
   it("does not offer asking for an address", () => {
@@ -146,11 +90,10 @@ describe("asking an agent", () => {
     expect(optionNames().some((name) => name.includes("Misty"))).toBe(false);
   });
 
-  it("picks the agent named after @", () => {
+  it("does not treat @ as an agent mention", () => {
     fireEvent.change(renderDialog(), { target: { value: "@res find the launch date" } });
     const names = optionNames();
-    expect(names).toHaveLength(1);
-    expect(names[0]).toContain("find the launch date");
-    expect(names[0]).toContain("Researcher");
+    expect(names.some((name) => name.includes("Researcher"))).toBe(false);
+    expect(names[0]).toBe("@res find the launch date");
   });
 });

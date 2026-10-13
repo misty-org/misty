@@ -30,14 +30,27 @@ export interface MistyHandoff {
 }
 let handoffRevision = 0;
 
-/** Misty's conversations live on the Agents page; open it on the current one. */
-export function showMistyConversation() {
+function currentConversationRoute() {
   const { selectedAgentId, activeConversationId } = useMistyStore.getState();
   const params = new URLSearchParams();
   if (selectedAgentId) params.set("agent", selectedAgentId);
   if (selectedAgentId && activeConversationId) params.set("conversation", activeConversationId);
   const query = params.toString();
-  const route = `/agents${query ? `?${query}` : ""}`;
+  return `/agents${query ? `?${query}` : ""}`;
+}
+
+/**
+ * The panel's "Open full chat": the current conversation in a new tab. The tab that asked keeps
+ * its side panels.
+ */
+export function openMistyConversationInNewTab() {
+  const surface = workspaceSurfaceFromRoute(currentConversationRoute());
+  if (surface) useWorkspaceStore.getState().addSurface(surface);
+}
+
+/** Misty's conversations live on the Agents page; open it on the current one. */
+export function showMistyConversation() {
+  const route = currentConversationRoute();
   const surface = workspaceSurfaceFromRoute(route);
   if (!surface) return;
   const workspace = useWorkspaceStore.getState();

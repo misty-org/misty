@@ -9,19 +9,9 @@ export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "New tab", {
     description:
-      "Open a new tab: open an address, search the web, ask an agent or jump to any page. Type ! to search one place, or @ to pick an agent.",
+      "Open a new tab: open an address, search the web, ask an agent or jump to any page. Type @ to pick an agent.",
     category: "Navigation",
-    aliases: [
-      "new tab",
-      "search",
-      "url",
-      "website",
-      "google",
-      "bangs",
-      "shortcuts",
-      "ask",
-      "agent",
-    ],
+    aliases: ["new tab", "search", "url", "website", "google", "ask", "agent"],
     mac: "Cmd+T",
     windows: "Ctrl+T",
     allowInEditable: true,
@@ -126,7 +116,10 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
       "Choose a pane with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
     category: "Windows",
     scope: "workspace",
-    aliases: ["reorder panes", "move pane"],
+    aliases: ["reorder panes", "move pane", "drag pane"],
+    mac: "Cmd+Option+M",
+    windows: "Ctrl+Alt+M",
+    allowInEditable: true,
   }),
   command("workspace.new_tab", "New tab", {
     description: "Open the keyboard-first New Tab picker.",

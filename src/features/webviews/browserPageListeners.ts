@@ -5,6 +5,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   browserPageTools,
   browserViewUrl,
+  recordBrowserVisit,
   recordBrowserVisitTitle,
   useBrowserMediaStore,
   type BrowserMediaInfo,
@@ -118,6 +119,7 @@ export function listenBrowserPageEvents({
       if (payload.phase === "finished") {
         useBrowserRuntimeStore.getState().setLoading(tabId, false);
         useBrowserRuntimeStore.getState().pushHistory(tabId, payload.url);
+        recordBrowserVisit(tabId, payload.url);
         // Page completion can race a layout transition that hid the native
         // child. Ask the geometry owner to reconcile bounds and visibility.
         requestBrowserWebviewLayoutByRuntimeId(payload.id);

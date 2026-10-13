@@ -29,6 +29,19 @@ function historyTarget(tabId: string): { profileId?: string } | null {
   if (state.agentOwned || isIncognitoWindow() || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
+/**
+ * Records a finished page load as a visit, so the address bar's recent pages and history
+ * have something to show. The title usually arrives later and updates this visit.
+ */
+export function recordBrowserVisit(tabId: string, url: string): void {
+  if (!/^https?:\/\//i.test(url)) return;
+  const target = historyTarget(tabId);
+  if (!target) return;
+  const tab = findWorkspaceView(tabId);
+  const title = tab?.title ?? "";
+  void browserLibrary.recordVisit({ ...target, url, title }).catch(() => undefined);
+}
+
 export function recordBrowserVisitTitle(tabId: string, url: string, title: string): void {
   if (!/^https?:\/\//i.test(url) || !title.trim()) return;
   const target = historyTarget(tabId);

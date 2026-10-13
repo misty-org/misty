@@ -27,14 +27,11 @@ import { AgentAvatar } from "@/features/agents/AgentAvatar";
 import type { AgentProfile } from "@/shared/schemas";
 import mistyIcon from "@/assets/branding/misty-icon.png?inline";
 import { omniboxMatchIcon, type OmniboxMatch } from "@/features/browser/omnibox";
-import type { Bang, SearchScope } from "./bangs/types";
 import type { ScopedSearchKind, ScopedSearchResult } from "./scopedSearchSources";
 
 export type SearchListItem =
   /** Sends the text to an agent: a new chat with it. */
   | { type: "ask"; agent: AgentProfile; prompt: string }
-  /** `query` carries text typed before a trailing `!name`. */
-  | { type: "bang"; bang: Bang; query?: string }
   | { type: "match"; match: OmniboxMatch }
   | { type: "result"; result: ScopedSearchResult };
 
@@ -59,58 +56,12 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   action: ChevronRight,
 };
 
-const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
-  files: Folder,
-  spaces: LayoutGrid,
-  notes: NotebookPen,
-  drawings: PenTool,
-  code: FileCode2,
-  chat: MessageSquare,
-  agents: Bot,
-  ask: Bot,
-  bookmarks: Bookmark,
-  history: History,
-  tabs: AppWindow,
-  downloads: Download,
-  settings: Settings,
-  extensions: Puzzle,
-};
-
-/** The site's icon for a website shortcut, the globe when it has none. */
-function WebBangIcon({ home }: { home: string }) {
-  const [failed, setFailed] = useState(false);
-  let src: string | null = null;
-  try {
-    src = `${new URL(home).origin}/favicon.ico`;
-  } catch {
-    // No usable home page.
-  }
-  if (!src || failed)
-    return <Globe2 size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
-  return (
-    <img
-      src={src}
-      alt=""
-      className="size-4 shrink-0 rounded-sm object-contain"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-const groupLabels: Record<Bang["group"], string> = {
-  misty: "Misty",
-  custom: "Your shortcuts",
-  web: "Web",
-};
-
 function itemKey(item: SearchListItem): string {
-  if (item.type === "bang") return `bang:${item.bang.trigger}`;
   if (item.type === "ask") return `ask:${item.agent.id}`;
   return item.type === "match" ? item.match.id : item.result.id;
 }
 
 function formatDetail(item: SearchListItem): string {
-  if (item.type === "bang") return item.query ? item.bang.label : item.bang.description;
   if (item.type === "ask") return item.agent.name;
   if (item.type === "result") {
     return item.result.subtitle;
@@ -142,22 +93,6 @@ function ItemIcon({ item }: { item: SearchListItem }) {
       </span>
     );
 
-  if (item.type === "bang") {
-    const { bang } = item;
-    // A shortcut on its own is shown as text, without an icon.
-    if (!item.query) return null;
-    const Icon = bang.kind === "scope" ? scopeIcons[bang.scope] : Search;
-    return (
-      <div className="relative flex size-4 shrink-0 items-center justify-center">
-        {bang.kind === "web" ? (
-          <WebBangIcon home={bang.home} />
-        ) : (
-          <Icon size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />
-        )}
-      </div>
-    );
-  }
-
   if (item.type === "result") {
     const Icon = resultIcons[item.result.kind] ?? Globe2;
     return (
@@ -182,8 +117,7 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
   const isMisty =
     host.includes("mistysys.com") ||
-    host.includes("misty.local") ||
-    match.title.toLowerCase().includes("misty");
+    host.includes("misty.local");
   const isOpenAi = host.includes("chatgpt.com") || host.includes("openai.com");
   const isYouTube = [host, match.faviconUrl ?? ""].some((value) =>
     /youtube\.com|youtu\.be/.test(value.toLowerCase()),
@@ -233,14 +167,11 @@ function ItemIcon({ item }: { item: SearchListItem }) {
 function Row(props: { item: SearchListItem }) {
   const { item } = props;
   const title =
-    item.type === "bang"
-      ? item.query || `!${item.bang.trigger}`
-      : item.type === "ask"
-        ? item.prompt || `Ask ${item.agent.name}`
-        : item.type === "match"
-          ? item.match.title
-          : item.result.title;
-  const bangOnly = item.type === "bang" && !item.query;
+    item.type === "ask"
+      ? item.prompt || `Ask ${item.agent.name}`
+      : item.type === "match"
+        ? item.match.title
+        : item.result.title;
 
   const detail = formatDetail(item);
 
@@ -248,9 +179,7 @@ function Row(props: { item: SearchListItem }) {
     <>
       <ItemIcon item={item} />
       <div className="flex min-w-0 flex-1 items-center text-sm">
-        <span className={cn("truncate font-normal text-zinc-100", bangOnly && "font-mono")}>
-          {title}
-        </span>
+        <span className="truncate font-normal text-zinc-100">{title}</span>
         {detail && (
           <span className="ml-3 min-w-0 truncate text-xs font-normal text-zinc-500 sm:text-sm">
             {detail}
@@ -280,24 +209,8 @@ export function SearchResultList(props: {
       className="max-h-[360px] space-y-0.5 overflow-y-auto p-1.5"
     >
       {props.items.map((item, index) => {
-        const previous = props.items[index - 1];
-        // Shortcut lists are grouped; a single carried-over shortcut is not.
-        const header =
-          item.type === "bang" &&
-          !item.query &&
-          (previous?.type !== "bang" || previous.bang.group !== item.bang.group)
-            ? groupLabels[item.bang.group]
-            : null;
         return (
           <Fragment key={itemKey(item)}>
-            {header && (
-              <li
-                role="presentation"
-                className="px-3 pb-1 pt-2 text-[11px] font-medium text-zinc-400"
-              >
-                {header}
-              </li>
-            )}
             <li
               role="option"
               aria-selected={index === props.activeIndex}

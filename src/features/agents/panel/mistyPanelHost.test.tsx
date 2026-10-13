@@ -65,7 +65,7 @@ describe("Misty panel width", () => {
   });
 
   it("follows the pointer: dragging toward the page widens the panel", async () => {
-    render(<MistyPanelDock open side="right" />);
+    render(<MistyPanelDock views={["agents"]} side="right" />);
     // Let the opening slide finish; only opening and closing animate.
     await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
     const edge = screen.getByRole("separator", { name: "Resize Misty panel" });
@@ -92,7 +92,7 @@ describe("Misty panel width", () => {
   });
 
   it("resizes from the panel's inner edge", () => {
-    render(<MistyPanelDock open side="right" />);
+    render(<MistyPanelDock views={["agents"]} side="right" />);
     const edge = screen.getByRole("separator", { name: "Resize Misty panel" });
     // On the right, the edge faces left: moving it left widens the panel.
     act(() => {

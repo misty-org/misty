@@ -407,7 +407,7 @@ describe("desktop dock store", () => {
       route: "/spaces/one/notes",
     });
     expect(tabs.find((tab) => tab.id === home.id)).toMatchObject({
-      groupKey: "space:one:social",
+      groupKey: "space:one:space",
       route: "/spaces/one/home",
     });
   });

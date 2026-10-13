@@ -8,6 +8,7 @@ import {
 } from "@/features/workspace";
 import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
+import { FlyingMisty } from "@/features/welcome/FlyingMisty";
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const current = migrateRetiredWorkspaceView(tab);
@@ -32,10 +33,12 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   );
 }
 
+/** An empty pane: Misty flies around it, as on the welcome screen, behind a line. */
 export function EmptyWorkspacePane() {
   return (
-    <div className="grid h-full place-items-center bg-charcoal-bg px-6 text-center">
-      <p className="m-0 text-base font-medium text-cream">A little quiet here...</p>
+    <div className="relative grid h-full place-items-center bg-charcoal-bg px-6 text-center">
+      <FlyingMisty />
+      <p className="relative z-10 m-0 text-base font-medium text-cream">A little quiet here...</p>
     </div>
   );
 }

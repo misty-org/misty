@@ -24,6 +24,7 @@ export function BrowserMenu(props: {
   url: string;
   commands?: BrowserPageCommands;
   tools?: ReactNode;
+  layout?: ReactNode;
   lead?: ReactNode;
   toolsIcon?: boolean;
   library?: ReactNode;

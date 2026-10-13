@@ -17,10 +17,14 @@ export function BrowserOmnibox(
       leading={props.leading}
       hostOnly={props.hostOnly}
       onOpenPanel={(field) =>
-        useBrowserSearchStore.getState().show(undefined, {
+        useBrowserSearchStore.getState().show({
           left: field.left,
           top: field.top,
-          width: Math.min(Math.max(field.width, 480), window.innerWidth - 16),
+          // The sidebar's field is narrow; the panel matches it instead of widening to a desktop-sized box.
+          width: Math.min(
+            Math.max(field.width, props.hostOnly ? 320 : 480),
+            window.innerWidth - 16,
+          ),
           openUrl: (url) => props.onNavigate(url),
         })
       }

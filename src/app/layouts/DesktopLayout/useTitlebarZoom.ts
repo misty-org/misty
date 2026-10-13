@@ -4,6 +4,7 @@ import { PhysicalPosition, PhysicalSize } from "@tauri-apps/api/dpi";
 import { currentMonitor, getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useRef } from "react";
+import { isSignedOutWindowLocked } from "./useSignedOutWindow";
 import { windowRectsMatch } from "./windowChromeHelpers";
 
 export function useTitlebarZoom(
@@ -69,7 +70,7 @@ export function useTitlebarZoom(
     [desktopPlatform],
   );
   const togglePseudoMaximize = useCallback(async () => {
-    if (!hasTauriInternals()) return;
+    if (!hasTauriInternals() || isSignedOutWindowLocked()) return;
     if (customZoomAnimatingRef.current) return;
     const window = getCurrentWindow();
     if (await window.isFullscreen()) {
@@ -120,7 +121,7 @@ export function useTitlebarZoom(
     setIsWindowMaximized(false);
   }, [animateWindowRect, setIsWindowMaximized]);
   const toggleTitlebarMaximize = useCallback(async () => {
-    if (!hasTauriInternals()) return;
+    if (!hasTauriInternals() || isSignedOutWindowLocked()) return;
     if (desktopPlatform === "windows" || desktopPlatform === "linux") {
       const window = getCurrentWindow();
       await window.toggleMaximize();

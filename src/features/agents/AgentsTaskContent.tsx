@@ -32,7 +32,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
     <>
       <div className="agents-main">
         <div className="agents-body">
-          <div className="agents-chat" data-scroll-root>
+          <div className="agents-chat">
             {error && (
               <div role="alert" className="agents-notice">
                 <p>{error}</p>

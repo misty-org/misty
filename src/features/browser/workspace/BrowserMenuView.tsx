@@ -16,6 +16,7 @@ import {
   Copy,
   Download,
   Eraser,
+  KeyRound,
   ExternalLink,
   FileDown,
   MoreHorizontal,
@@ -54,7 +55,7 @@ export interface BrowserMenuViewProps {
   overlayReason?: string;
   /** Favorites and Bookmarks, as panels beside the History row. */
   library?: ReactNode;
-  /** Rows closing the menu, under Settings: sync and the profile. */
+  /** Rows closing the menu: sync. */
   account?: ReactNode;
   /** Rows above the browser's own, such as the sidebar's bookmark, Misty and extensions. */
   lead?: ReactNode;
@@ -62,6 +63,8 @@ export interface BrowserMenuViewProps {
   toolsIcon?: boolean;
   /** Page tools that used to sit in the toolbar; they lead the More tools submenu. */
   tools?: ReactNode;
+  /** The pane layout submenu, after the window rows, where the toolbar has no button for it. */
+  layout?: ReactNode;
   /** Installing and opening site apps; omitted where the menu has no page. */
   app?: { title: string; bookmarkId?: string; installable: boolean };
 }
@@ -135,6 +138,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="workspace.new_incognito_window"
               onSelect={commands.newIncognitoWindow}
             />
+            {props.layout}
             <DropdownMenuSeparator />
             <BrowserHistoryMenu
               openHistory={() => commands.openPage("history")}
@@ -147,6 +151,11 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               label="Downloads"
               shortcut="browser.downloads"
               onSelect={() => commands.openPage("downloads")}
+            />
+            <Item
+              icon={<KeyRound />}
+              label="Passwords"
+              onSelect={() => commands.openPage("passwords")}
             />
             {props.app ? <SiteAppsMenu {...props.app} url={props.url} /> : null}
             <DropdownMenuSeparator />
@@ -217,24 +226,16 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               />
               <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
             </MenuSubmenu>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        {commands ? (
-          <>
             <Item
               icon={<Settings />}
               label="Settings"
-              onSelect={() =>
-                // Settings is a modal over the page, not a tab of its own.
-                window.dispatchEvent(
-                  new CustomEvent("misty:open-settings", { detail: { section: "browser" } }),
-                )
-              }
+              shortcut="app.open_settings"
+              onSelect={() => window.dispatchEvent(new CustomEvent("misty:open-settings"))}
             />
-            {props.account}
+            <DropdownMenuSeparator />
           </>
         ) : null}
+        {commands ? props.account : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

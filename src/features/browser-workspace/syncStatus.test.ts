@@ -138,8 +138,12 @@ it("shows one account state and names a Space only when its vault has the proble
   });
   // An account-wide problem is the account's, whichever Space also struggles.
   expect(
-    selectSyncStatus({ ...base, session: view, issue: "sign_in_required", spaceNames: { s1: "Studio" } })
-      .title,
+    selectSyncStatus({
+      ...base,
+      session: view,
+      issue: "sign_in_required",
+      spaceNames: { s1: "Studio" },
+    }).title,
   ).toBe(syncIssues.sign_in_required.title);
   expect(selectSyncStatus(base).title).toBe("Up to date");
 });

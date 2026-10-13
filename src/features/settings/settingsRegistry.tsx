@@ -1,4 +1,3 @@
-import { PasswordsSettings } from "./sections/PasswordsSettings";
 import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
@@ -32,7 +31,6 @@ import {
   CompanionSection,
   DevicesSection,
   ManageSpacesSection,
-  ModelsSection,
   SpaceDefaultsSection,
 } from "./sections/FeatureSections";
 import { GeneralSection } from "./sections/GeneralSection";
@@ -114,7 +112,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "resource",
     true,
   ),
-  page("browser", "browser-passwords", "Passwords", PasswordsSettings, "resource", true),
   page("browser", "browser-extensions", "Extensions", ExtensionsSettings, "resource", true),
   page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
   page(
@@ -127,7 +124,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
   page("spaces", "spaces-manage", "Manage spaces", ManageSpacesSection, "resource"),
   page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
-  page("agents", "models", "Models", ModelsSection, "account"),
   page("agents", "agents-usage", "Usage", UsageSection, "account"),
   page("agents", "misty", "Misty", MistySection, "account"),
   page(

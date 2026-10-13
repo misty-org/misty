@@ -30,7 +30,7 @@ vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
 }));
 
 vi.mock("@/features/misty/handoff", () => ({
-  showMistyConversation: vi.fn(),
+  openMistyConversationInNewTab: vi.fn(),
 }));
 
 const mockAgent = {

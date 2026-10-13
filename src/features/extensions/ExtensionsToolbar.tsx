@@ -61,7 +61,8 @@ export function ExtensionsToolbar({
             />
           );
         })}
-      {pinnedOnly ? null : (
+      {/* With nothing installed there is nothing to list: no button (Settings manages them). */}
+      {pinnedOnly || installed.length === 0 ? null : (
         <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
           <PopoverTrigger asChild>
             <IconButton ref={trigger} label="Extensions" tooltip={false}>
@@ -69,11 +70,6 @@ export function ExtensionsToolbar({
             </IconButton>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-80 p-1">
-            {installed.length === 0 && (
-              <p className="px-2 py-2 text-sm text-cream-muted">
-                Add extensions from the Chrome Web Store or Firefox Add-ons.
-              </p>
-            )}
             <ul className="max-h-80 overflow-y-auto">
               {installed.map((item) => {
                 const action = actions.find((a) => a.id === item.id);

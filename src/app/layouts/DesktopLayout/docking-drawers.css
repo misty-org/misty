@@ -184,6 +184,11 @@
 .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav {
   margin-left: auto;
 }
+/* Its buttons sit 6px apart, like the Space row's below, so the two columns line up. */
+.misty-sidebar-nav [data-browser-toolbar],
+.misty-sidebar-nav [data-browser-toolbar] > div {
+  gap: 6px;
+}
 /* The sidebar's bottom edge, above the account row: Downloads on the left, chat on
    the right. */
 .misty-sidebar-foot {
@@ -212,7 +217,8 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 2px;
+  /* Agents and Settings sit 6px apart, like the header's and the Space row's buttons. */
+  gap: 6px;
   margin-top: 8px;
   /* The avatar and the settings button are both 28px boxes with the same 10px inset from their
      edges, so their centers sit on the same two columns as the downloads and sync buttons above. */
@@ -370,9 +376,7 @@
 .misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id])::after {
   display: none;
 }
-.misty-docking-frame
-  .misty-pane-frame:has([data-panel-resize-handle-id])
-  [data-workspace-pane] {
+.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id]) [data-workspace-pane] {
   border: 1px solid var(--color-charcoal-border);
   border-radius: 12px;
 }
@@ -397,12 +401,12 @@
   z-index: 30;
   pointer-events: none;
   background:
-    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px)
-      top left / 12px 12px no-repeat,
-    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px)
-      top right / 12px 12px no-repeat,
-    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px)
-      bottom left / 12px 12px no-repeat,
-    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px)
-      bottom right / 12px 12px no-repeat;
+    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
+      left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
+      right / 12px 12px no-repeat,
+    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
+      left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
+      right / 12px 12px no-repeat;
 }

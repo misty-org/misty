@@ -18,8 +18,10 @@ export const popupSurfaceClass =
  */
 export const popupMotionClass = "misty-popup-motion";
 
-/** Padding and row rhythm shared by every list of menu rows. */
-export const menuListClass = "grid gap-1 p-1";
+/** Padding and row rhythm shared by every list of menu rows. The one column may shrink to the
+ * menu's width: a truncating label doesn't wrap, so an `auto` column would grow to fit the
+ * longest one and push every row's right side (shortcuts, controls) out of view. */
+export const menuListClass = "grid grid-cols-[minmax(0,1fr)] gap-1 p-1";
 
 export const menuContentClass = cn(
   "relative layer-menu max-h-[min(24rem,calc(100dvh-2rem))] w-auto min-w-32",

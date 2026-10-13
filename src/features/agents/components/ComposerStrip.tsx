@@ -3,7 +3,7 @@ import "./agentComposerStrip.css";
 
 /**
  * The composer's controls in one row under the message box, in the order a task is set up:
- * where it runs (device, project), how it works (mode, code), then the model and the usage
+ * where it runs (device, project), how it works (mode, code), then the usage
  * ring at the far end. Every control is a quiet chip; in a narrow
  * panel the chips show only their icons (see agentComposerStrip.css).
  */
@@ -12,7 +12,6 @@ export function ComposerStrip(props: {
   project?: ReactNode;
   mode: ReactNode;
   code?: ReactNode;
-  model: ReactNode;
   usage?: ReactNode;
 }) {
   return (
@@ -22,7 +21,6 @@ export function ComposerStrip(props: {
       {props.mode}
       {props.code}
       <span className="agent-composer-strip-end">
-        {props.model}
         {props.usage}
       </span>
     </div>

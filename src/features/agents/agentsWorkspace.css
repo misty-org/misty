@@ -552,32 +552,18 @@ button.agent-progress-row:hover {
   flex-direction: column;
   min-width: 360px;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
 }
 /* Rows keep their content height so the column overflows and scrolls instead of squeezing. */
 .agents-chat > * {
   flex-shrink: 0;
 }
-/* The conversation fills a short column and grows past a long one. */
+/* The conversation fills the chat column. */
 .agents-chat > .agent-conversation {
-  flex: 1 0 auto;
-  min-height: auto;
+  flex: 1;
+  min-height: 0;
 }
 .agents-chat > .agent-conversation-heading {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--agents-canvas);
-}
-.agents-body .agent-conversation-scroll {
-  flex: 1 0 auto;
-  min-height: auto;
-  overflow: visible;
-}
-.agents-body .agent-conversation:not([data-empty="true"]) .agent-compose-area {
-  position: sticky;
-  bottom: 0;
   background: var(--agents-canvas);
 }
 

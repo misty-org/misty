@@ -14,7 +14,6 @@ import {
   TextControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { BrowserBangsSettings } from "./BrowserBangsSettings";
 import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
 import { parseSiteZoomLevels } from "@/features/webviews/siteZoom";
@@ -69,6 +68,18 @@ export function BrowserSection(
                 disabled={props.working}
                 onChange={(value) =>
                   props.onSettingChange("general", "browser_search_suggestions", value)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Link previews"
+              description="Show a card with a picture and title under links in replies and chats. Misty fetches each page from this device, without cookies or sign-ins, so the site sees your address."
+            >
+              <SwitchControl
+                checked={booleanSetting(props.document, "general", "browser_link_previews", true)}
+                disabled={props.working}
+                onChange={(value) =>
+                  props.onSettingChange("general", "browser_link_previews", value)
                 }
               />
             </SettingsRow>
@@ -178,7 +189,6 @@ export function BrowserSection(
         )}
       </SettingsSectionBlock>
       {props.page !== "downloads" && <BrowserToolbarSettings {...props} />}
-      {props.page !== "downloads" && <BrowserBangsSettings {...props} />}
     </>
   );
 }

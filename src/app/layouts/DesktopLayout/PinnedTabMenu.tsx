@@ -34,7 +34,7 @@ export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
 function PinnedTabMenu({ tab }: { tab: WorkspaceTab }) {
   // Synced workspaces keep pins only once every device understands them.
   const session = useBrowserSyncStore((state) => state.session);
-  const ownerName = useUserStore((state) => state.me?.name);
+  const ownerName = useUserStore((state) => state.me?.username);
   const blockedReason = pinnedTabsBlockedReason(session, ownerName);
   if (tab.pinnedUrl) {
     const view = activeLayoutView(tab);

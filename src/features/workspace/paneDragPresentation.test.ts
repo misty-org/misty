@@ -17,7 +17,7 @@ it("fills the lifted pane's gap and restores both panes exactly", () => {
   document.body.append(host);
   try {
     const restore = liftPanePresentation(root, b.id);
-    expect(bottom.style.visibility).toBe("hidden");
+    expect(bottom.style.display).toBe("none");
     expect(top.style.height).toBe("800px");
     expect(root.type).toBe("split");
     restore();

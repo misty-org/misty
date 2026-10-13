@@ -52,6 +52,7 @@ import { errorText } from "@/shared/lib/format";
 import { invoke } from "@/native/invoke";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
+import { configureLinkPreviews } from "@/features/link-preview/settings";
 import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
 export type { SettingsSection, SettingValue } from "../types/store";
 export * from "./preferences";
@@ -289,6 +290,7 @@ function applySettingsSideEffects(
   );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
+  configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
   );

@@ -1,6 +1,6 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useAuth } from "@/features/auth";
-import { showMistyConversation } from "@/features/misty/handoff";
+import { openMistyConversationInNewTab } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useSettingsStore } from "@/features/settings";
 import { IconButton } from "@/shared/ui";
@@ -63,8 +63,8 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
       (c.agentId === profile?.id || (!c.agentId && profile?.system_managed)),
   );
   const close = () => useMistyPanelStore.getState().setOpen(false);
-  // The panel stays open beside the Agents page.
-  const openInAgents = () => showMistyConversation();
+  // The full page opens in a new tab; this panel stays as it is.
+  const openInAgents = () => openMistyConversationInNewTab();
   const select = (id: string, startNew = false, conversationId?: string, prompt = "") => {
     setChatRevision((n) => n + 1);
     setSelected(id);
@@ -100,7 +100,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
           <div className="agent-studio-task flex h-full min-h-0 flex-1 flex-col">
             <div className="agents-main h-full">
               <div className="agents-body h-full">
-                <div className="agents-chat" data-scroll-root>
+                <div className="agents-chat">
                   <AgentConversationHeading
                     conversation={conversation}
                     switcher={{

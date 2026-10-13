@@ -40,7 +40,6 @@ export function WorkspaceCanvas(props: {
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
   browserChrome?: {
     sync: ReactNode;
-    profile: ReactNode;
     accountItems: ReactNode;
   };
 }) {

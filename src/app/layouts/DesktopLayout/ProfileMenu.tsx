@@ -10,7 +10,18 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import { Check, ExternalLink, Gauge, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
+import { ShortcutText } from "@/features/shortcuts/runtime";
+import {
+  Check,
+  ExternalLink,
+  Gauge,
+  LogIn,
+  LogOut,
+  Plus,
+  Repeat2,
+  Settings,
+  UserCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -24,17 +35,24 @@ function Initials(props: { children: string }) {
   );
 }
 
-/** The profile menu's rows: account actions, and a submenu to switch saved accounts. */
+/** The profile menu's rows: this device's Settings, account actions, and a submenu to switch
+ * saved accounts. */
 export function ProfileMenuItems(props: {
   onClose: () => void;
   onOpenAccountSettings: () => void;
+  /** Opens Settings; the avatar holds it so the window's corner needs no gear of its own. */
+  onOpenSettings?: () => void;
 }) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount, logout } = useAuth();
   const me = useUserStore(
-    useShallow((state) => ({ id: state.me?.id, email: state.me?.email, name: state.me?.name })),
+    useShallow((state) => ({
+      id: state.me?.id,
+      email: state.me?.email,
+      username: state.me?.username,
+    })),
   );
   const [switchingAccountId, setSwitchingAccountId] = useState("");
   const [switchError, setSwitchError] = useState("");
@@ -87,6 +105,14 @@ export function ProfileMenuItems(props: {
         {email || "Not signed in"}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
+      {props.onOpenSettings ? (
+        <MenuItem
+          icon={<Settings />}
+          label="Settings"
+          shortcut={<ShortcutText commandId="app.open_settings" />}
+          onSelect={props.onOpenSettings}
+        />
+      ) : null}
       {!account ? (
         <MenuItem icon={<LogIn />} label="Sign in" onSelect={() => navigate(routes.signIn)} />
       ) : (
@@ -124,8 +150,10 @@ export function ProfileMenuItems(props: {
                 key={saved.id}
                 title={saved.email}
                 disabled={busy}
-                icon={<Initials>{initialsForProfile(saved.name, saved.email)}</Initials>}
-                label={switchingAccountId === saved.id ? "Switching…" : saved.name || saved.email}
+                icon={<Initials>{initialsForProfile(saved.username, saved.email)}</Initials>}
+                label={
+                  switchingAccountId === saved.id ? "Switching…" : saved.username || saved.email
+                }
                 shortcut={
                   saved.id === account?.id ? (
                     <Check className="size-3.5 text-sage-fg" aria-label="Active account" />
@@ -148,7 +176,7 @@ export function ProfileMenuItems(props: {
               label="Add another account"
               disabled={busy}
               onSelect={() =>
-                navigate("/signin", { state: { from: currentPath, addingAccount: true } })
+                navigate(routes.welcome, { state: { from: currentPath, addingAccount: true } })
               }
             />
           </MenuSubmenu>
@@ -160,7 +188,11 @@ export function ProfileMenuItems(props: {
 }
 
 /** The profile button's menu. */
-export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
+export function ProfileMenu(props: {
+  onClose: () => void;
+  onOpenAccountSettings: () => void;
+  onOpenSettings?: () => void;
+}) {
   return (
     <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
       <ProfileMenuItems {...props} />

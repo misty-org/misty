@@ -147,9 +147,9 @@ describe("omnibox ranking", () => {
     expect(matches.some((match) => match.kind === "tab")).toBe(false);
   });
 
-  it("offers Misty's own pages by name", async () => {
+  it("does not offer Misty's own pages by name", async () => {
     const matches = await suggest("downloads");
-    expect(matches.some((match) => match.target.url === "misty://downloads")).toBe(true);
+    expect(matches.some((match) => match.target.url?.startsWith("misty://"))).toBe(false);
   });
 });
 
@@ -236,7 +236,7 @@ describe("search suggestions", () => {
 });
 
 describe("Misty content and copied links", () => {
-  it("offers matching notes that open inside Misty", async () => {
+  it("never includes internal misty content in suggestions", async () => {
     const matches = await suggest(
       "trip",
       deps({
@@ -245,9 +245,8 @@ describe("Misty content and copied links", () => {
         ],
       }),
     );
-    const note = matches.find((match) => match.kind === "content");
-    expect(note?.target).toEqual({ type: "open-in-app", url: "/spaces/s1/journal" });
-    expect(note?.allowedToBeDefault).toBe(false);
+    expect(matches.some((match) => match.kind === "content")).toBe(false);
+    expect(matches.some((match) => match.target.type === "open-in-app")).toBe(false);
   });
 
   it("offers a copied web link before typing, but not in private tabs", async () => {
@@ -275,27 +274,21 @@ describe("places", () => {
     ],
   });
 
-  it("jumps to a place typed in full, ahead of searching for it", async () => {
+  it("searches plain text for place names instead of navigating internally", async () => {
     const [first] = await suggest("launch team", places);
-    expect(first.target).toEqual({ type: "open-in-app", url: "/spaces/s1/chat" });
+    expect(first.kind).toBe("search");
     expect(first.allowedToBeDefault).toBe(true);
+    expect(first.target).toEqual({
+      type: "navigate",
+      url: "https://www.google.com/search?q=launch%20team",
+    });
   });
 
-  it("lists sections and agents by a word of their name, below what was typed", async () => {
+  it("does not list internal sections or agents", async () => {
     const matches = await suggest("notes", places);
-    const section = matches.find((match) => match.title === "Launch team · Notes");
-    expect(section?.allowedToBeDefault).toBe(false);
-    expect(matches[0].kind).toBe("search");
+    expect(matches.some((match) => match.title === "Launch team · Notes")).toBe(false);
     expect((await suggest("resea", places)).some((match) => match.title === "Researcher")).toBe(
-      true,
+      false,
     );
-  });
-
-  it("shows no places in private tabs", async () => {
-    expect(
-      (await suggest("launch team", places, { private: true })).some((match) =>
-        match.id.startsWith("place:"),
-      ),
-    ).toBe(false);
   });
 });

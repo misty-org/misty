@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { cn } from "@/shared/ui";
 import { MistyPanel, type MistyPanelSide } from "./MistyPanel";
@@ -14,6 +15,7 @@ import {
   MISTY_PANEL_MIN_WIDTH,
   MISTY_PANEL_WIDTH,
   useMistyPanelStore,
+  type MistyPanelView,
 } from "./mistyPanelStore";
 
 // Matches the dock's width transition below; the closing panel unmounts after it.
@@ -32,8 +34,25 @@ const geometryChanged = () => window.dispatchEvent(new Event("misty:workspace-ge
  * The Misty panel's column beside a content area. It widens from zero to slide the panel
  * in from the edge, pushing the content aside, and its inner edge resizes it.
  */
-export function MistyPanelDock({ open, side }: { open: boolean; side: MistyPanelSide }) {
+export function MistyPanelDock({
+  views,
+  side,
+  chat,
+}: {
+  /** The panels to show, top first; both split the column in half. Empty closes the dock. */
+  views: MistyPanelView[];
+  side: MistyPanelSide;
+  /** The chat panel, supplied by the host so this feature doesn't depend on Spaces. */
+  chat?: ReactNode;
+}) {
+  const open = views.length > 0;
   const width = useMistyPanelStore((s) => s.width);
+  // While the dock slides shut it keeps showing what it last showed.
+  const [shown, setShown] = useState(views);
+  const key = views.join(",");
+  useEffect(() => {
+    if (key) setShown(key.split(",") as MistyPanelView[]);
+  }, [key]);
   // The panel stays mounted while it slides out, then leaves the tree.
   const [mounted, setMounted] = useState(open);
   const [expanded, setExpanded] = useState(open);
@@ -63,10 +82,11 @@ export function MistyPanelDock({ open, side }: { open: boolean; side: MistyPanel
     // Browser pages follow the dock through their ResizeObserver; settle them once it stops.
     const timer = window.setTimeout(geometryChanged, slideMs + 20);
     return () => window.clearTimeout(timer);
-  }, [expanded, mounted, side]);
+  }, [expanded, mounted, side, key]);
   // The conversation does not re-render as the width changes: the panel reads the width
-  // from a custom property, so a drag only restyles this column.
-  const panel = useMemo(() => <MistyPanel side={side} />, [side]);
+  // from a custom property, so a drag only restyles this column. It also stays mounted when
+  // the chat panel opens or closes beside it.
+  const agents = useMemo(() => <MistyPanel side={side} />, [side]);
   if (!mounted) return null;
   return (
     <div
@@ -93,7 +113,14 @@ export function MistyPanelDock({ open, side }: { open: boolean; side: MistyPanel
           side === "left" ? "justify-end pr-2" : "justify-start pl-2",
         )}
       >
-        {panel}
+        {/* One panel fills the column; two split it in half, each its own rounded panel. */}
+        <div className="flex h-full min-h-0 flex-col" style={{ gap: panelGap }}>
+          {(open ? views : shown).map((view) => (
+            <div key={view} className="flex min-h-0 flex-1">
+              {view === "chat" ? chat : agents}
+            </div>
+          ))}
+        </div>
       </div>
       {open ? <MistyPanelResizer side={side} width={width} /> : null}
     </div>
@@ -122,7 +149,7 @@ function MistyPanelResizer({ side, width }: { side: MistyPanelSide; width: numbe
       // Pulled well past the narrowest it goes, in the closing direction, it closes.
       if (dragged < MISTY_PANEL_MIN_WIDTH - closeDistance) {
         end();
-        useMistyPanelStore.getState().setOpen(false);
+        useMistyPanelStore.getState().closeAll();
         return;
       }
       setWidth(dragged);

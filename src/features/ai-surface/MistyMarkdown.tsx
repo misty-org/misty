@@ -57,7 +57,11 @@ function rehypeCallouts() {
 }
 
 // Module constants, so memoized messages never see new plugin arrays.
-const remarkPlugins = [remarkGfm, remarkMath];
+// Single dollars are prices in replies ("$24 or $12"), never math; math takes $$ blocks.
+const remarkPlugins: ComponentProps<typeof ReactMarkdown>["remarkPlugins"] = [
+  remarkGfm,
+  [remarkMath, { singleDollarTextMath: false }],
+];
 const rehypePlugins = [rehypeKatex, rehypeHighlight, rehypeCallouts] as unknown as ComponentProps<
   typeof ReactMarkdown
 >["rehypePlugins"];

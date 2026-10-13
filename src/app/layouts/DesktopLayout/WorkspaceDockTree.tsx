@@ -5,7 +5,7 @@ import { panePlacement } from "@/features/workspace/panePlacement";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { PaneToolbarHostProvider } from "@/features/browser/workspace";
 import { PaneToolbarFallback } from "./PaneToolbarFallback";
-import { WorkspacePaneControls } from "./WorkspacePaneControls";
+import { usePaneToolbarDrag } from "./usePaneToolbarDrag";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { browserRuntimeId } from "@/features/webviews/browserRuntime";
 import { useBrowserPaneDim } from "@/features/webviews/useBrowserPaneDim";
@@ -350,6 +350,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const horizontalTabs = !isSideDock(useWindowDockingLayout().tabs);
   const showToolbar = horizontalTabs && Boolean(activeTab);
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
+  usePaneToolbarDrag(pane, toolbarHost);
   return (
     <section
       ref={sectionRef}
@@ -419,7 +420,6 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
           style={{ opacity: dim }}
         />
       ) : null}
-      <WorkspacePaneControls pane={pane} onClose={() => props.onClosePane(pane.id)} />
       {dropZone ? <DockDropPreview zone={dropZone} /> : null}
     </section>
   );

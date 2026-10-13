@@ -31,6 +31,7 @@ export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";
 export * from "./overlays/DropdownMenu";
 export * from "./overlays/MenuItem";
+export * from "./overlays/MenuChevron";
 export * from "./overlays/MenuTrigger";
 export * from "./overlays/SplitMenuPill";
 export * from "./display/AvatarShuffleStack";

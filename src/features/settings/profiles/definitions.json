@@ -346,6 +346,18 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "browser.linkPreviews",
+    "label": "Link previews",
+    "keywords": ["thumbnail", "unfurl", "embed", "link card", "images in chat"],
+    "page": "browser",
+    "section": "general",
+    "key": "browser_link_previews",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "browser.statusBubble",
     "label": "Link and loading status",
     "page": "browser",

@@ -43,13 +43,16 @@
   width: 28px;
   height: 28px;
 }
+/* Sidebar glyphs share one optical size. Thin glyphs (arrows, ⋯) draw at 20px; glyphs that
+   fill their box (reload, site info, the gear, pane layout, the Space row's Home, Chat and
+   People: marked `.size-4`) draw at 18px so they read the same. */
 [data-browser-toolbar][data-sidebar] [data-icon-size="sm"] > svg:not(.absolute) {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 [data-browser-toolbar][data-sidebar] [data-icon-size="sm"] > svg.size-4 {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 /* The sidebar's address field is a filled pill, like Zen's: no outline, a quiet lift on focus. */

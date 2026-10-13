@@ -67,7 +67,6 @@ export function ManageSpacesSection(props: SettingsContentProps) {
     </Section>
   );
 }
-export { ModelSensesSection as ModelsSection } from "./ModelSensesSection";
 
 export function AgentDefaultsSection() {
   return (

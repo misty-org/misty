@@ -49,7 +49,9 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
             ? "Journal"
             : tool === "library"
               ? "Files"
-              : "Spaces",
+              : spaceId
+                ? "Home"
+                : "Spaces",
         pathname,
         spaceId ? `${spaceId}:${tool}` : "spaces",
         "single",
@@ -109,8 +111,9 @@ function request(
   };
 }
 
+/** Which of a Space's tabs a section opens in. Home is the bare Space (its gallery); it never
+ * shares Chat's tab, or opening one would swap the other's page under the wrong name. */
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
-  if (section === "home") return "social";
   if (section === "notes" || section === "drawings") return "journal";
   if (section === "chat" || section === "social") return "social";
   if (section === "library") return section;

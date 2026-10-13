@@ -152,10 +152,13 @@ describe("BrowserWorkspace", () => {
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
-    expect(container.querySelector('[aria-label="Extensions"]')).not.toBeNull();
-    // Site information sits inside the address field, the pane layout in the toolbar beside it; no star.
+    // No extensions installed, so no Extensions button; Agents sits beside Chat.
+    expect(container.querySelector('[aria-label="Extensions"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Agents"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Chat"]')).not.toBeNull();
+    // Site information sits inside the address field and pane layout in the ⋯ menu; no star.
     expect(container.querySelector('[aria-label="Bookmark this page"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Pane layout"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Pane layout"]')).toBeNull();
     expect(container.querySelector('[aria-label="Annotate page"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Viewport"]')).toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();

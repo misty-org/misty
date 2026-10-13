@@ -63,7 +63,6 @@ export function PaneToolbarFallback({ tab }: { tab: WorkspaceView }) {
             />
           )}
           {chrome?.sync}
-          {chrome?.profile}
           <BrowserMenuView
             url=""
             library={<BrowserLibraryMenus />}

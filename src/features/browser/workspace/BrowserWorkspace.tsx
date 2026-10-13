@@ -21,12 +21,12 @@ import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
 import { BrowserMenu } from "./BrowserMenu";
 import { BrowserMenuLeadRows } from "./BrowserMenuLeadRows";
-import { BrowserMistyButton } from "./BrowserMistyPanel";
+import { BrowserAgentsButton, BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { useTabAway } from "@/features/agents";
 import { BrowserOmnibox } from "./BrowserOmnibox";
 import { BrowserLibraryMenus } from "./BrowserLibraryMenus";
-import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
+import { BrowserPaneLayoutMenu, BrowserPaneLayoutSubmenu } from "./BrowserPaneLayoutMenu";
 import { useBrowserChromeSlot } from "./browserChromeSlot";
 import { BrowserQrCodeDialog } from "./BrowserQrCodeDialog";
 import {
@@ -242,6 +242,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <BrowserMenu
       toolsIcon={sidebarMenu}
       library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
+      layout={sidebarMenu ? undefined : <BrowserPaneLayoutSubmenu tabId={tab.id} />}
       account={chrome?.accountItems}
       lead={
         sidebarMenu ? (
@@ -305,12 +306,14 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       trailing={sidebar ? sidebarTrailing : undefined}
     />
   );
+  // Tools for this page: extensions (when any are installed), then Agents beside Chat. Pane
+  // layout lives in the ⋯ menu here; the sidebar keeps its button beside back and forward.
   const toolButtons = (
     <>
-      {paneLayout}
       {hiddenButtons.has("extensions") ? null : (
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
       )}
+      <BrowserAgentsButton />
       <BrowserMistyButton />
       {hiddenButtons.has("downloads") ? null : (
         <BrowserDownloadsButton
@@ -319,7 +322,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         />
       )}
       {chrome?.sync}
-      {chrome?.profile}
       {browserMenu(false)}
     </>
   );

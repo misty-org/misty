@@ -394,6 +394,8 @@ html:has(.agent-studio-resizer[data-dragging]) {
 .agent-studio .agent-conversation[data-empty="true"] {
   justify-content: flex-start;
   padding-top: clamp(40px, 18vh, 210px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .agent-studio .agents-body {
   --agents-canvas: var(--color-charcoal-bg);

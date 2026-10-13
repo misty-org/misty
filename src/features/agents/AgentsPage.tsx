@@ -37,8 +37,6 @@ function AgentsWorkspacePage() {
     spaceId,
     loading,
     profile,
-    conversation,
-    working,
     access,
     guard,
     workspacePage,
@@ -62,8 +60,6 @@ function AgentsWorkspacePage() {
       <AgentProfileSection
         key={`${user?.id}:${profile.id}:${spaceId}`}
         profile={profile}
-        conversation={conversation}
-        working={working}
         onStatusChange={setEditorStatus}
         onTalk={onDone}
         spaceId={spaceId}

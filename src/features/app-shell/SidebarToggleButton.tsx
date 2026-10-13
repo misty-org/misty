@@ -11,6 +11,7 @@ export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right"
     <IconButton
       label={collapsed ? "Show sidebar" : "Hide sidebar"}
       size="xs"
+      className="size-7"
       tooltip={false}
       onClick={() => {
         // Native pages sit above the app, so they step aside while the drawer slides.
@@ -19,7 +20,7 @@ export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right"
         useSidebarCollapsedStore.getState().toggle();
       }}
     >
-      <Icon {...toolbarIconProps} size={18} />
+      <Icon {...toolbarIconProps} size={20} />
     </IconButton>
   );
 }

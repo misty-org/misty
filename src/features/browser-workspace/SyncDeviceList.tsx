@@ -27,7 +27,7 @@ export function SyncDeviceList({
   session: NativeSyncView;
   compact?: boolean;
 }) {
-  const ownerName = useUserStore((s) => s.me?.name);
+  const ownerName = useUserStore((s) => s.me?.username);
   const rows = deviceRows(session, ownerName);
   const [editing, setEditing] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);

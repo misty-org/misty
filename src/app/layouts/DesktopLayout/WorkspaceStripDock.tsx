@@ -1,11 +1,6 @@
-import { useState } from "react";
-import { MessagesSquare } from "lucide-react";
-import { useOpenSpaceChat } from "@/features/spaces/chat/useOpenSpaceChat";
 import { BrowserDownloadsButton } from "@/features/browser/workspace";
+import { BrowserMistyButton } from "@/features/browser/workspace/BrowserMistyPanel";
 import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
-import { DropdownMenu, DropdownMenuTrigger, IconButton } from "@/shared/ui";
-import { ProfileNavButton } from "./NavRail";
-import { ProfileMenu } from "./ProfileMenu";
 
 /** Downloads, at a sidebar's bottom-right: a progress ring while something downloads. */
 export function StripDownloads() {
@@ -29,9 +24,8 @@ export function StripDownloads() {
   );
 }
 
-/** The chat panel's toggle, at a sidebar's bottom-right. */
+/** The chat panel's toggle, at a sidebar's bottom-right: your Space's chat beside the page. */
 export function StripChat() {
-  const openChat = useOpenSpaceChat();
   return (
     <div
       className="flex shrink-0 items-center"
@@ -39,29 +33,7 @@ export function StripChat() {
       data-sidebar
       data-misty-window-drag-block="true"
     >
-      <IconButton label="Chat" onClick={openChat}>
-        <MessagesSquare aria-hidden className="size-[18px]" />
-      </IconButton>
+      <BrowserMistyButton />
     </div>
-  );
-}
-
-/** The profile avatar in the browser toolbar, opening the profile menu. */
-export function BrowserProfileButton(props: { onOpenAccountSettings: () => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
-      <DropdownMenuTrigger asChild>
-        <ProfileNavButton
-          open={open}
-          className="grid size-9 shrink-0 place-items-center rounded-md p-0 hover:bg-charcoal-hover"
-          avatarClassName="size-6"
-        />
-      </DropdownMenuTrigger>
-      <ProfileMenu
-        onClose={() => setOpen(false)}
-        onOpenAccountSettings={props.onOpenAccountSettings}
-      />
-    </DropdownMenu>
   );
 }

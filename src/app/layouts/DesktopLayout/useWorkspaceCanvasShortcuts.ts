@@ -115,7 +115,9 @@ export function useWorkspaceCanvasShortcuts(actions: {
         () => canCloseWorkspaceView(),
       ),
       registerShortcutHandler("workspace.swap_panel_next", () => {
-        usePaneSwapMode.getState().start();
+        const mode = usePaneSwapMode.getState();
+        if (mode.sourceId) mode.cancel();
+        else mode.start();
       }),
     ];
     return () => unregister.forEach((remove) => remove());

@@ -33,7 +33,6 @@ pub struct PathProbe {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentUser {
     id: String,
-    name: String,
     #[serde(default)]
     username: String,
     email: String,

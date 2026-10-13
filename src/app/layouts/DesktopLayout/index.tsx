@@ -23,8 +23,8 @@ import { isTopEdgeDragPress } from "./windowChromeHelpers";
 import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { AccountIsland } from "./AccountIsland";
-import { BrowserProfileButton, StripChat, StripDownloads } from "./WorkspaceStripDock";
+import { AccountIsland, AccountTab } from "./AccountIsland";
+import { StripChat, StripDownloads } from "./WorkspaceStripDock";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
@@ -37,6 +37,8 @@ import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
+import { useOtherWindowsHiddenWhileAddingAccount, useSignedOutWindow } from "./useSignedOutWindow";
+import { useStrayBrowserPages } from "./useStrayBrowserPages";
 import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
@@ -53,6 +55,7 @@ export type {
 
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
+  useStrayBrowserPages();
   const { user, refreshUser, transitioning } = useAuth();
   const { location, navigate, settingsLoad, lastAppRoute, lastNonSettingsRouteRef, routeId } =
     useDesktopBootstrap({ getRouteId: props.getRouteId });
@@ -119,10 +122,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     shouldShowWindowsControls,
     appZoom,
   });
-  // The window takes its Space's color, which tints everything around the content region.
-  const windowChrome = useSpaceWindowStore((state) =>
-    windowChromeBackground(state.space?.color),
+  useSignedOutWindow(isAuthRoute);
+  useOtherWindowsHiddenWhileAddingAccount(
+    isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
+  // The window takes its Space's color, which tints everything around the content region.
+  const windowChrome = useSpaceWindowStore((state) => windowChromeBackground(state.space?.color));
   useEffect(() => {
     const shell = shellRef.current;
     if (windowChrome && !isAuthRoute)
@@ -133,22 +138,22 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useSettingsStore.getState().setActiveSection("sync");
     openSettingsOverlay();
   };
-  const stripAccount =
-    !isAuthRoute && isSideDock(docking.tabs) ? (
-      <AccountIsland
-        open={profileOpen}
-        onOpenChange={(open) => {
-          if (open) {
-            if (blockIfUnsaved()) return;
-            setSettingsOpen(false);
-          }
-          setProfileOpen(open);
-        }}
-        onOpenAccountSettings={openAccountSettings}
-        settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-        onSettingsClick={openSettingsOverlay}
-      />
-    ) : null;
+  const AccountStrip = isSideDock(docking.tabs) ? AccountIsland : AccountTab;
+  const stripAccount = !isAuthRoute ? (
+    <AccountStrip
+      open={profileOpen}
+      onOpenChange={(open) => {
+        if (open) {
+          if (blockIfUnsaved()) return;
+          setSettingsOpen(false);
+        }
+        setProfileOpen(open);
+      }}
+      onOpenAccountSettings={openAccountSettings}
+      settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+      onSettingsClick={openSettingsOverlay}
+    />
+  ) : null;
   // The sidebar's bottom edge: downloads on the left, chat on the right.
   const stripFootEnd = (
     <>
@@ -165,7 +170,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         menuOnly
       />
     ),
-    profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
     accountItems: <SyncMenuItem accountId={user?.id ?? ""} />,
   };
   return (
@@ -237,7 +241,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         </header>
 
         <section
-          className="route-shell relative z-10 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
+          className={cn(
+            "route-shell relative z-10 min-h-0 min-w-0 overflow-hidden",
+            isAuthRoute ? "bg-window-chrome" : "bg-charcoal-bg",
+          )}
           style={isAuthRoute ? { gridColumn: 1, gridRow: 2 } : geometry.content}
           data-misty-route-shell
         >

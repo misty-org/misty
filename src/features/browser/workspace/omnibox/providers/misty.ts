@@ -9,6 +9,7 @@ const keywords: Record<keyof typeof browserInternalPages, string[]> = {
   scheduled: ["scheduled", "schedule", "reminders"],
   history: ["history", "recent", "visited"],
   downloads: ["downloads", "files"],
+  passwords: ["passwords", "logins", "sign-ins", "credentials"],
   bookmarks: ["bookmarks", "saved", "favorites"],
   extensions: ["extensions", "add-ons"],
   settings: ["settings", "preferences", "search engine", "clear browsing data", "privacy"],
