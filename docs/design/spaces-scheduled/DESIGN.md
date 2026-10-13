@@ -62,7 +62,7 @@ components:
 
 The visual direction is a quiet monochrome workspace: named navigation, aligned collection rows, restrained metadata, and sparse copy. Production composition is owned by [CollectionWorkspace.tsx](../../../src/shared/ui/patterns/CollectionWorkspace.tsx), feature components, and the existing shared theme. This document does not replace Misty's root design authority.
 
-Historical `mockups/spaces.jpg`, `mockups/journal.jpg`, and `mockups/scheduled.jpg` are approved composition references with synthetic data. Their `mockups/preview.tsx` and bespoke `mockups/preview.css` remain isolated preview artifacts, not production styling or proof of working account behavior. Their earlier widths and radii are superseded here by the implemented shared patterns.
+Historical `mockups/spaces.jpg`, `mockups/journal.jpg`, and `mockups/scheduled.jpg` are approved composition references with synthetic data. The isolated preview code that rendered them was removed; it was never production styling or proof of working account behavior. Their earlier widths and radii are superseded here by the implemented shared patterns.
 
 ## Colors
 

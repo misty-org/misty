@@ -315,7 +315,7 @@
       "parent": "Server Architecture & Service Boundaries",
       "page_notes": [
         {
-          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, server/scripts/release.sh, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, native desktop app, and external account website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
+          "content": "Read server/deploy/README.md, server/docs/environment-audit.md, server/compose.dev.yml, server/compose.prod.yml, server/scripts/prod-backup.sh, server/scripts/prod-restore.sh, server/deploy/observability/, cli/src/server.rs, cli/src/environment.rs, and cli/src/cloudflare.rs. Separate the Go API/MCP host, workflow execution world, collaboration host, native desktop app, and external account website. Explain first-use secret generation and key preservation, service-specific environment precedence, explicit Worker deployment, database/blob backups, and documented operational gaps. Do not imply that container health alone verifies sync, voice, or agent workflows."
         }
       ]
     }

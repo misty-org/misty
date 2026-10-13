@@ -6,20 +6,7 @@ Production code is implemented, but no deployment or live database migration was
 
 ## Run and review
 
-From the repository root, with dependencies installed:
-
-```sh
-node node_modules/vite/bin/vite.js --config docs/design/spaces-chat/mockups/vite.config.mjs
-```
-
-| Preview | Link and scope |
-| --- | --- |
-| Production components | [Chat and Space navigation](http://127.0.0.1:5217/production.html). Open All in the sidebar to review Yours, Suggested, and Favorites. |
-| Original approved prototype | [Chat](http://127.0.0.1:5217/), [Yours](http://127.0.0.1:5217/?view=all), [Suggested](http://127.0.0.1:5217/?view=all&filter=Suggested), [Favorites](http://127.0.0.1:5217/?view=all&filter=Favorites). Historical layout and interaction reference. |
-| Original prototype states | [Empty](http://127.0.0.1:5217/?state=empty), [loading](http://127.0.0.1:5217/?state=loading), [read only](http://127.0.0.1:5217/?state=read-only), [failed send](http://127.0.0.1:5217/?state=failed). |
-| Screenshot gallery | [Gallery](http://127.0.0.1:5217/gallery.html). Foregrounds the desktop production captures and labels earlier screenshots as historical design studies. |
-
-Both previews are isolated from live accounts. `mockups/production.tsx` mounts the real message row, composer, conversation switcher, All collection, and sidebar inside a fixture wrapper; `productionData.ts` supplies adapters. Preview mutations affect memory only. The original prototype also keeps messages, drafts, attachments, favorites, recents, and new items in memory; reload or **Reset** restores its fixture.
+The runnable React/Vite previews were removed from the repository. They remain in git history (before the dead-code cleanup of 2026-10-13); this document keeps the decisions and captured evidence.
 
 ## Implemented behavior
 
@@ -59,7 +46,5 @@ The original prototype's earlier browser review and bounded six-repair SHIP verd
 - `src/features/spaces/`: production chat, sidebar, collections, personal-item reads, and suggestion signals.
 - `src/features/chat-composer/useSpaceChatDraft.ts`: account-session-scoped per-conversation draft state.
 - `server/internal/platform/{postgres,httpapi}/space_personal_item_state.go`: personal metadata storage and API.
-- `mockups/production.tsx` and `productionData.ts`: isolated production component fixture.
-- `mockups/App.tsx`, `Chat.tsx`, `Collection.tsx`, `controls.tsx`, `model.ts`, and `preview.css`: original approved prototype.
 
 Shared UI and semantic tokens remain the visual authority. This refinement does not change settings navigation or the server-account settings model.
