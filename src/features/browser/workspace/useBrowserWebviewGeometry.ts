@@ -9,7 +9,7 @@ import {
   useBrowserRuntimeStore,
 } from "./browserRuntime";
 import type { BrowserBounds, BrowserTheme } from "./types";
-import type { WorkspaceView } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
 
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
@@ -160,7 +160,9 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       // The native page is a sibling of the React renderer, so unmounting the
       // Browser workspace does not remove it. Explicitly release this tab's
       // layer before the next active tab is presented.
-      void hideBrowserWebview(effectTab);
+      // Another browser tab taking this one's place presents itself within a
+      // frame or two; keep this page up until then instead of flashing empty.
+      void hideBrowserWebview(effectTab, browserSurfaceStillActive() ? 120 : 0);
     };
   }, [
     input.hostRef,
@@ -278,4 +280,12 @@ function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
     height: Math.max(1, quantize(bounds.height)),
     ...(bounds.cornerRadii ? { cornerRadii: bounds.cornerRadii } : {}),
   };
+}
+
+/** Whether some pane still shows a browser tab, as when switching between them. */
+function browserSurfaceStillActive(): boolean {
+  return dockLeaves(useWorkspaceStore.getState().layout.root).some(
+    (pane) =>
+      pane.views.find((view) => view.id === pane.activeViewId)?.surfaceId === "browser",
+  );
 }

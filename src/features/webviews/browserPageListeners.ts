@@ -57,6 +57,11 @@ export function listenBrowserPageEvents({
       pageBackgrounds.set(payload.id, payload.color);
       restorePageBackgrounds(pageBackgrounds);
     }),
+    // A newly created page stays parked until it paints; this brings it in.
+    listen<{ id: string }>("misty://browser-reveal", ({ payload }) => {
+      if (isDisposed()) return;
+      requestBrowserWebviewLayoutByRuntimeId(payload.id);
+    }),
     listen<BrowserPageEvent>("misty://browser-page", ({ payload }) => {
       if (isDisposed()) return;
       const tabId = browserTabIdForRuntime(payload.id);

@@ -554,11 +554,28 @@ export async function browserOverlayReady(): Promise<void> {
   await browserOverlayQueue;
 }
 
-export function hideBrowserWebview(tab: BrowserRuntimeTab): Promise<void> {
+/**
+ * `graceMs` keeps the page on screen briefly when another browser tab is about
+ * to take its place, so a switch never shows an empty frame between them. The
+ * new page is presented on top; the old one is parked once that has settled.
+ */
+export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
   const id = registerBrowserRuntime(tab);
   desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
   releaseDeferredNavigation(id);
+  if (graceMs > 0) {
+    return new Promise<void>((resolve) => {
+      window.setTimeout(() => {
+        // The tab was shown again, or its runtime closed, while waiting.
+        if (desiredVisibleRuntimeIds.has(id)) return resolve();
+        void enqueue(id, async () => {
+          if (desiredVisibleRuntimeIds.has(id)) return;
+          await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
+        }).then(resolve);
+      }, graceMs);
+    });
+  }
   // Always enqueue the hide. A create/reconcile operation may still be in
   // flight even when the frontend has not marked this runtime visible yet.
   // The native command safely no-ops when no child exists.

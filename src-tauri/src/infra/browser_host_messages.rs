@@ -220,6 +220,11 @@ impl HostChannel for Channel {
             if let Some(webview) = app.get_webview(message.webview) {
                 set_under_page_background(&webview, background.background.clone());
             }
+            // Before a page's styles apply, its color reads as the default
+            // white. Only a real color, or the page finishing, shows the view.
+            if !background.background.eq_ignore_ascii_case("#ffffff") {
+                super::release_first_paint(app, id);
+            }
             if let Ok(mut values) = page_backgrounds().lock() {
                 values.insert(id.to_owned(), background.background.clone());
             }
