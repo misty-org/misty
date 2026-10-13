@@ -75,7 +75,7 @@ pub(super) fn seed_existing(
     let ledger: Ledger = installations
         .iter()
         .filter(|item| {
-            item.installed && selected_package(&packages.join(item.id.to_string()), false).is_ok()
+            item.installed && selected_package(&packages.join(&item.id), false).is_ok()
         })
         .map(|item| (item.guid.clone(), approval_of(item)))
         .collect();
@@ -117,7 +117,7 @@ mod tests {
 
     fn installation(permissions: &[&str], hosts: &[&str], private_access: bool) -> Installation {
         Installation {
-            id: 1,
+            id: "1".into(),
             guid: "addon@example.com".into(),
             generation: uuid::Uuid::new_v4().to_string(),
             name: "Addon".into(),

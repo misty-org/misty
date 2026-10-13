@@ -132,14 +132,6 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
             entry.css.length <= 32768 &&
             typeof entry.dark === "boolean",
         );
-      if (d.id === "browser.contentBlockingAllowedSites")
-        return parsed.every(
-          (entry) =>
-            entry &&
-            typeof entry.host === "string" &&
-            entry.host.length > 0 &&
-            entry.host.length <= 253,
-        );
       if (d.id === "browser.siteZoom")
         return parsed.every(
           (entry) =>

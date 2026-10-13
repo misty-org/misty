@@ -23,6 +23,19 @@ import { SearchResultList, type SearchListItem } from "./SearchResultList";
 import { openInNewBrowserTab, openMatch, openResult } from "./searchTargets";
 import { useSearchItems } from "./useSearchItems";
 
+/** Margins that move the centered panel onto the page area, not the whole window. */
+function centerOnPage(open: boolean) {
+  const rect = open
+    ? document.querySelector("[data-browser-page-host]")?.getBoundingClientRect()
+    : undefined;
+  if (!rect?.width) return { marginLeft: 84, marginTop: 40 };
+  return {
+    marginLeft: Math.round(rect.left + rect.right - window.innerWidth),
+    // Lifted 8% of the page height: a tall palette reads as low at the exact middle.
+    marginTop: Math.round(rect.top + rect.bottom - window.innerHeight - rect.height * 0.16),
+  };
+}
+
 const close = () => useBrowserSearchStore.getState().close();
 
 export function BrowserSearchDialog() {
@@ -140,9 +153,10 @@ export function BrowserSearchDialog() {
       onOpenChange={(next) => (next ? useBrowserSearchStore.getState().show() : close())}
     >
       <DialogContent
-        placement="top"
+        placement="center"
+        style={centerOnPage(open)}
         className={cn(
-          "max-w-[620px] gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
+          "max-w-[700px] gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
           "ring-0 shadow-[0_24px_70px_rgba(0,0,0,0.65)] [&>[data-slot=dialog-close]]:hidden",
         )}
       >
@@ -169,7 +183,7 @@ export function BrowserSearchDialog() {
               <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
             )}
             {bang && (
-              <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white/80">
+              <span className="shrink-0 text-base text-zinc-400">
                 !{bang.trigger}
               </span>
             )}

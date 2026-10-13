@@ -101,7 +101,7 @@ async function run(
         kind,
         ok: true,
         message: extensions.length
-          ? "Find the same extensions in Misty's catalog."
+          ? "Add them from their stores: open each one and choose Add to Misty."
           : "No extensions to bring across.",
         extensions,
       };

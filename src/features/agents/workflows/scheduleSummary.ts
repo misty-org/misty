@@ -133,6 +133,9 @@ export function describeSchedule(timing: ScheduleTiming) {
 /** "Next Tue 9:00 AM", or why there is none. */
 export function describeNextRun(schedule: WorkflowSchedule) {
   if (!schedule.enabled) return "Paused";
+  // A run that came due while its computer was away waits for it (roadmap C1).
+  if (schedule.state === "awaiting_device") return "Waiting for its computer";
+  if (schedule.state === "device_claimed") return "Starting on its computer";
   if (!schedule.next_run_at) return "No upcoming runs";
   const next = new Date(schedule.next_run_at);
   const soon = next.getTime() - Date.now() < 6 * 24 * 60 * 60 * 1000;

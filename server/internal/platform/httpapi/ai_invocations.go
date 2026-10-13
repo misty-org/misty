@@ -1,11 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +59,10 @@ type aiInvocationInput struct {
 	// CurrentTab is the Misty browser tab in front of the user when they wrote,
 	// so "this page" has a referent. Its title and address are untrusted page data.
 	CurrentTab *aiCurrentTab `json:"current_tab,omitempty"`
+	// ScheduleID and ScheduleClaim are sent by the computer starting a
+	// scheduled run it claimed (roadmap C1). The claim is never stored.
+	ScheduleID    string `json:"schedule_id,omitempty"`
+	ScheduleClaim string `json:"schedule_claim,omitempty"`
 }
 
 type aiCurrentTab struct {
@@ -156,6 +159,21 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 		}
 		// Only the server links a run to a parent's notebook or delegation.
 		body.NotebookKey, body.DelegatedFrom = "", ""
+		var scheduled *deviceScheduledRunAdmission
+		if strings.TrimSpace(body.Trigger) == scheduledRunTrigger || body.ScheduleClaim != "" {
+			admitted, err := s.admitDeviceScheduledRun(r.Context(), userID, &body)
+			if err != nil {
+				writeJSON(w, http.StatusConflict, map[string]any{"code": "schedule_not_waiting", "message": err.Error()})
+				return
+			}
+			scheduled = admitted
+		}
+		admittedRun := false
+		defer func() {
+			if scheduled != nil && !admittedRun {
+				scheduled.release(context.WithoutCancel(r.Context()), s.database, errors.New("the scheduled run couldn't start on its computer"))
+			}
+		}()
 		if _, err := resolveInvocationMethod(r.Context(), s.database, userID, &body); err != nil {
 			writeAgentMethodError(w, err)
 			return
@@ -351,10 +369,15 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		now := time.Now().UTC()
+		recordTrigger := body.Trigger
+		if scheduled != nil {
+			// Stored like the server's own scheduled runs, and billed the same way.
+			recordTrigger = "schedule"
+		}
 		stored, created, err := s.database.CreateAIInvocationRecord(r.Context(), db.AIInvocationRecord{
 			DispatchRuntime: true, ModelTurnLimit: planTurnLimit(r.Context(), s.database, userID),
 			ID: "invocation_" + uuid.NewString(), UserID: userID, SpaceID: spaceID, ConversationID: conversationID,
-			SurfaceID: body.SurfaceID, Mode: body.Mode, Trigger: body.Trigger, State: "queued",
+			SurfaceID: body.SurfaceID, Mode: body.Mode, Trigger: recordTrigger, State: "queued",
 			IdempotencyKey: body.IdempotencyKey, RequestPayload: requestPayload, ExpiresAt: now.Add(aiInvocationTTL),
 		})
 		if err != nil {
@@ -368,10 +391,22 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 				return
 			}
 		}
+		if scheduled != nil {
+			if err := s.database.BindWorkflowScheduleRun(r.Context(), *scheduled.schedule, conversationID, stored.ID); err != nil {
+				TestingWriteAIError(w, err)
+				return
+			}
+			admittedRun = true
+		}
 		record, err := s.invocations.restoreDurable(r.Context(), stored)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "load invocation stream"})
 			return
+		}
+		if scheduled != nil && created {
+			if notice := scheduled.lateNotice(now); notice != "" {
+				s.invocations.append(stored.ID, aiInvocationEvent{Type: "assistant.status", Text: notice, Phase: "schedule_late"})
+			}
 		}
 		if created {
 			titleNewConversation(s.database, s.runtime, userID, conversationID, body)
@@ -395,42 +430,6 @@ func writeAIInvocationCreated(w http.ResponseWriter, record *aiInvocationRecord)
 		"state":          record.State,
 		"eventsUrl":      "/ai/invocations/" + record.ID + "/events",
 	})
-}
-
-func (s *AIService) InvocationEvents() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		user, ok := s.requireUser(w, r)
-		if !ok {
-			return
-		}
-		id := strings.TrimSpace(chi.URLParam(r, "invocationID"))
-		stored, err := s.database.AIInvocationByID(r.Context(), user, id)
-		if err != nil || time.Now().After(stored.ExpiresAt) {
-			http.Error(w, "invocation not found", http.StatusNotFound)
-			return
-		}
-		if _, ok := w.(http.Flusher); !ok {
-			http.Error(w, "streaming unavailable", http.StatusInternalServerError)
-			return
-		}
-		// Preserve recovery for interrupted non-durable legacy runs.
-		if !aiInvocationTerminal(stored.State) && stored.State != "queued" && stored.RuntimeRunID == "" && stored.AgentRunID == "" {
-			if _, err := s.invocations.restoreDurable(r.Context(), *stored); err != nil {
-				return
-			}
-			if err := s.invocations.fail(id, "Misty was interrupted before finishing. Please retry the request."); err != nil {
-				return
-			}
-		}
-		cursor, _ := strconv.ParseInt(strings.TrimSpace(r.Header.Get("Last-Event-ID")), 10, 64)
-		cursor = max(cursor, 0)
-		stream, release := s.streams.acquire(user, id, cursor)
-		defer release()
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache, no-transform")
-		w.Header().Set("X-Accel-Buffering", "no")
-		serveInvocationStream(r.Context(), w, stream, cursor, 15*time.Second)
-	}
 }
 
 func (s *AIService) CancelInvocation() http.HandlerFunc {
@@ -474,17 +473,4 @@ func (s *AIService) CancelInvocation() http.HandlerFunc {
 		_ = s.database.SetAgentQuestionState(r.Context(), userID, "", stored.ID, "canceled")
 		writeJSON(w, http.StatusAccepted, map[string]any{"state": state, "runtime_cancel_pending": !aiInvocationTerminal(stored.State) && stored.RuntimeRunID != "", "message": "Stop requested. Previously completed or uncertain actions remain in history."})
 	}
-}
-
-// Each SSE write is bounded, but a healthy event stream must outlive the JSON
-// middleware's original 60-second deadline. Heartbeats refresh this deadline.
-func writeAIInvocationSSE(w http.ResponseWriter, frame string) error {
-	controller := http.NewResponseController(w)
-	if err := controller.SetWriteDeadline(time.Now().Add(30 * time.Second)); err != nil && !errors.Is(err, http.ErrNotSupported) {
-		return err
-	}
-	if _, err := fmt.Fprint(w, frame); err != nil {
-		return err
-	}
-	return controller.Flush()
 }

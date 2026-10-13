@@ -9,6 +9,7 @@ import { routes, useAppStore, type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
+import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
 import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
 import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
@@ -154,7 +155,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   }, [user?.id, transitioning]);
 
   useEffect(() => {
-    if (!location.pathname.startsWith("/settings")) return;
+    // Extensions are managed in Settings; old /extensions links open them there.
+    const extensions = /^\/extensions(?:\/|$)/.test(location.pathname);
+    if (!location.pathname.startsWith("/settings") && !extensions) return;
+    if (extensions) useSettingsStore.getState().setActiveSection("browser-extensions");
     openSettingsOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
@@ -355,6 +359,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <ExtensionPermissionRequest />
+      <ExtensionInstallRequest />
       <main
         ref={shellRef}
         className={cn(

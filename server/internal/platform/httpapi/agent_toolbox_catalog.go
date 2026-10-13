@@ -215,7 +215,7 @@ func browserAgentToolSchema(kind string) json.RawMessage {
 	required := []string{"scopeId"}
 	switch kind {
 	case "inspect":
-		properties["extensionId"] = map[string]any{"type": "integer", "minimum": 1, "description": "Inspect an open extension popup on the granted tab. Omit to inspect the page and discover available extension actions."}
+		properties["extensionId"] = map[string]any{"type": "string", "pattern": "^([1-9][0-9]{0,19}|[a-p]{32})$", "description": "Inspect an open extension popup on the granted tab, by the id browser_inspect lists for the extension. Omit to inspect the page and discover available extension actions."}
 	case "request_user_action":
 		properties["action"] = map[string]any{"type": "string", "enum": []string{"sign_in", "account_confirmation", "challenge", "open_target", "review"}}
 		properties["reason"] = map[string]any{"type": "string", "minLength": 1, "maxLength": 1000}

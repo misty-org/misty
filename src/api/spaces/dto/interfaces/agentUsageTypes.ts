@@ -72,22 +72,11 @@ export interface BillingSpaceUsage {
   storage?: SpaceStorageUsage;
 }
 
-export interface TransferQuotaUsage {
-  used: number;
-  reserved: number;
-  limit: number;
-  remaining: number;
-  percentage_used: number;
-  reset_at?: string;
-  policy_version?: string;
-}
-
 export interface BillingUsage {
   account?: {
     ai?: AiQuotaUsage;
     cloud_storage?: StorageQuotaDimension;
     storage?: StorageQuotaDimension;
-    sync?: TransferQuotaUsage;
   };
   plan?: string;
   entitlements?: BillingEntitlements;

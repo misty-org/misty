@@ -146,11 +146,6 @@ func validStructuredPreference(id, raw string) bool {
 			if host == "" || len(host) > 253 || !cssOK || len(css) > 32768 || !darkOK {
 				return false
 			}
-		case "browser.contentBlockingAllowedSites":
-			host, _ := item["host"].(string)
-			if host == "" || len(host) > 253 {
-				return false
-			}
 		case "browser.siteZoom":
 			host, _ := item["host"].(string)
 			factor, ok := item["factor"].(float64)

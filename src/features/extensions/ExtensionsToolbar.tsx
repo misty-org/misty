@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Puzzle } from "lucide-react";
 import {
   Button,
@@ -7,16 +6,35 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Switch,
   toolbarIconProps,
 } from "@/shared/ui";
 import { useSettingsProfiles } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { useBrowserOverlayControl } from "@/features/browser";
 import { extensionsNative } from "./native";
-import { parseInstallations, reportExtensionError, useExtensionsStore } from "./store";
-import type { ExtensionAction } from "./types";
+import { openStorePage } from "./openStorePage";
+import {
+  parseInstallations,
+  reportExtensionError,
+  storeHomes,
+  storeNames,
+  updateInstallation,
+  useExtensionsStore,
+} from "./store";
+import type { ExtensionAction, ExtensionStore } from "./types";
 
-/** One toolbar button listing the installed extensions; each row runs that extension's action. */
+function openExtensionSettings() {
+  window.dispatchEvent(
+    new CustomEvent("misty:open-settings", { detail: { section: "browser-extensions" } }),
+  );
+}
+
+/**
+ * One toolbar button listing the installed extensions: each row runs that
+ * extension's action and has its on/off switch. Extensions are added from
+ * their stores' own sites.
+ */
 export function ExtensionsToolbar({
   tabId,
   agentOwned = false,
@@ -24,7 +42,6 @@ export function ExtensionsToolbar({
   tabId: string;
   agentOwned?: boolean;
 }) {
-  const navigate = useNavigate();
   const profile = useSettingsProfiles((s) => s.state);
   const supported = useExtensionsStore((s) => s.supported);
   const revision = useExtensionsStore((s) => s.revision);
@@ -52,7 +69,7 @@ export function ExtensionsToolbar({
       current = false;
     };
   }, [tabId, revision, supported, profile]);
-  function invoke(id: number) {
+  function invoke(id: string) {
     const bounds = trigger.current?.getBoundingClientRect();
     if (!bounds) return;
     overlay.onOpenChange(false);
@@ -67,8 +84,8 @@ export function ExtensionsToolbar({
         .catch(reportExtensionError);
     });
   }
-  const usable = (id: number) =>
-    actions.find((a) => Number(a.id) === id)?.enabled &&
+  const usable = (id: string) =>
+    actions.find((a) => a.id === id)?.enabled &&
     (!agentOwned || (agentAccess && installed.find((i) => i.id === id)?.agentAccess));
   return (
     <Popover open={overlay.open} onOpenChange={overlay.onOpenChange}>
@@ -78,15 +95,20 @@ export function ExtensionsToolbar({
         </IconButton>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-1">
+        {installed.length === 0 && (
+          <p className="px-2 py-2 text-sm text-cream-muted">
+            Add extensions from the Chrome Web Store or Firefox Add-ons.
+          </p>
+        )}
         <ul className="max-h-80 overflow-y-auto">
           {installed.map((item) => {
-            const action = actions.find((a) => Number(a.id) === item.id);
+            const action = actions.find((a) => a.id === item.id);
             return (
-              <li key={item.id}>
+              <li key={item.id} className="flex items-center gap-1 pr-2">
                 <Button
                   variant="ghost"
-                  className="w-full min-w-0 justify-start"
-                  disabled={!usable(item.id)}
+                  className="min-w-0 flex-1 justify-start"
+                  disabled={!item.enabled || !usable(item.id)}
                   onClick={() => invoke(item.id)}
                 >
                   {action?.icon ? (
@@ -94,18 +116,42 @@ export function ExtensionsToolbar({
                   ) : (
                     <Puzzle size={16} aria-hidden="true" />
                   )}
-                  <span className="truncate">{action?.title || item.name}</span>
+                  {/* The extension's own name, as its store lists it; the button's
+                      tooltip text is only a description. */}
+                  <span className="truncate" title={action?.title || undefined}>
+                    {item.name}
+                  </span>
                 </Button>
+                <Switch
+                  aria-label={`${item.name} on`}
+                  checked={item.enabled}
+                  onCheckedChange={(enabled) =>
+                    void updateInstallation(item.id, { enabled }).catch(reportExtensionError)
+                  }
+                />
               </li>
             );
           })}
         </ul>
+        {(["chrome", "firefox"] as ExtensionStore[]).map((store) => (
+          <Button
+            key={store}
+            variant="ghost"
+            className="w-full justify-start"
+            onClick={() => {
+              overlay.onOpenChange(false);
+              openStorePage(storeHomes[store]);
+            }}
+          >
+            {storeNames[store]}
+          </Button>
+        ))}
         <Button
           variant="ghost"
           className="w-full justify-start"
           onClick={() => {
             overlay.onOpenChange(false);
-            navigate("/extensions/installed");
+            openExtensionSettings();
           }}
         >
           Manage extensions

@@ -12,8 +12,10 @@ const missingRouteFallback: Partial<Record<string, string>> = {
   space: "/spaces",
   agents: "/agents",
   scheduled: "/scheduled",
-  extensions: "/extensions",
 };
+/** Extensions are added from their stores' own sites now; a saved Extensions
+ * page reopens as the Chrome Web Store. */
+const extensionsMovedUrl = "https://chromewebstore.google.com/";
 /** A saved view restore could not carry forward. Its original stays in the
  * archived copy of the saved workspace. */
 export interface UnrestoredView {
@@ -81,7 +83,6 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
       route: `/agents?${params}`,
     };
   }
-  if (tab.surfaceId === "extensions" && /^\/extensions(?:\/|$)/.test(route.pathname)) return tab;
   if (tab.surfaceId === "space" && /^\/spaces(?:\/|$)/.test(tab.route)) return tab;
   // Files and Transfers moved to Kura, a separate app; their saved views
   // become new browser tabs below.
@@ -98,7 +99,9 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
     };
   }
   const wasBrowser = tab.surfaceId === "browser" || tab.groupKey === "app:browser";
-  const state = wasBrowser ? parseBrowserViewState(tab.state) : createBrowserViewState();
+  const state = wasBrowser
+    ? parseBrowserViewState(tab.state)
+    : createBrowserViewState(tab.surfaceId === "extensions" ? extensionsMovedUrl : undefined);
   return {
     ...tab,
     surfaceId: "browser",

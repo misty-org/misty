@@ -32,7 +32,6 @@ type AccountUsage = {
         maximum: number;
       }>;
     };
-    sync?: Meter;
     cloud_storage?: {
       used_bytes: number;
       reserved_bytes: number;
@@ -103,7 +102,6 @@ export function SpaceUsagePopover({
         : undefined,
       format: formatStorageBytes,
     },
-    { label: "Sync transfer", meter: account?.sync, format: formatStorageBytes },
   ];
   return (
     <Popover open={open} onOpenChange={setOpen}>

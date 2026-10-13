@@ -1,6 +1,7 @@
 import "./processShim";
 import { invoke } from "@tauri-apps/api/core";
 import { Agent } from "@midscene/core/agent";
+import { askPerson } from "../actionQuestions";
 import { DeviceOperationNotAttempted, jobSiteBlocks } from "../workerBrowserJobs";
 import { actionContexts } from "./screenActions";
 import { MistyScreenDevice, type ScreenFrame } from "./screenDevice";
@@ -83,6 +84,7 @@ export async function runScreenAct(
     adapter,
     allowConsequential,
     controller,
+    confirm: (description) => askPerson({ description, agentId, taskId: taskId ?? "" }),
     execute: (operation, input) =>
       invoke("browser_agent_execute", {
         request: {

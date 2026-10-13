@@ -8,6 +8,9 @@ use kiri::channel::{HostChannel, HostMessage};
 // Saved passwords answer the page script's sign-in messages, which arrive here.
 #[path = "browser_passwords.rs"]
 pub(crate) mod passwords;
+// "Add to Misty" on the Chrome Web Store and Firefox Add-ons.
+#[path = "browser_extension_store.rs"]
+mod extension_store;
 use std::sync::OnceLock;
 
 #[derive(serde::Deserialize)]
@@ -58,7 +61,7 @@ fn navigate_message(raw: &str) -> Option<Url> {
     let url = Url::parse(&message.navigate).ok()?;
     matches!(
         url.scheme(),
-        "misty-shortcut" | "misty-context-menu" | "misty-passwords"
+        "misty-shortcut" | "misty-context-menu" | "misty-passwords" | "misty-extension-store"
     )
     .then_some(url)
 }
@@ -177,6 +180,7 @@ impl HostChannel for Channel {
             if message.main_frame
                 && !super::forward_navigation(app, id, &url)
                 && !passwords::forward(app, id, &url)
+                && !extension_store::forward(app, id, &url)
             {
                 super::context_menu::forward(app, id, &url);
             }

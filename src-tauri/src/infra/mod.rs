@@ -1,4 +1,5 @@
 pub mod agent_dock;
+pub mod extension_popup;
 pub mod agent_workspace;
 pub mod agents;
 #[cfg(unix)]
@@ -158,9 +159,6 @@ pub mod browser_site_permissions;
 
 #[cfg(desktop)]
 pub mod browser_site_zoom;
-
-#[cfg(desktop)]
-pub mod browser_content_blocking;
 
 #[cfg(desktop)]
 pub mod browser_site_style;

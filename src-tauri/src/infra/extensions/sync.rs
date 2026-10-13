@@ -24,10 +24,10 @@ fn ready() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
     static READY: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> = OnceLock::new();
     READY.get_or_init(Default::default)
 }
-fn readiness_key(account: &str, id: u64) -> String {
+fn readiness_key(account: &str, id: &str) -> String {
     format!("{account}:{id}")
 }
-pub fn forget(account: &str, id: u64) {
+pub fn forget(account: &str, id: &str) {
     if let Ok(mut ready) = ready().lock() {
         ready.remove(&readiness_key(account, id));
     }
@@ -105,7 +105,11 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     let Some(account) = event["account"].as_str() else {
         return;
     };
-    let Some(id) = event["id"].as_str().and_then(|v| v.parse::<u64>().ok()) else {
+    let Some(id) = event["id"]
+        .as_str()
+        .filter(|v| super::catalog::Store::of(v).is_some())
+        .map(str::to_owned)
+    else {
         return;
     };
     let installation = {
@@ -176,12 +180,12 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     })();
     if result.is_ok() && event["kind"] == "sync-ready" {
         if let Ok(mut ready) = ready().lock() {
-            ready.insert(readiness_key(account, id));
+            ready.insert(readiness_key(account, &id));
         }
         // Previously restored local data remains usable while the vault is locked.
         if read(app, account, &installation).is_ok_and(|journal| journal.initialized) {
             let _ = native::request(
-                json!({"operation":"sync-restored","account":account,"id":id.to_string()}),
+                json!({"operation":"sync-restored","account":account,"id":id}),
             )
             .await;
         }

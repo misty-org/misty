@@ -70,7 +70,11 @@ export function SpaceOverview({ space }: { space: Space }) {
       : data.items.filter(
           (item) =>
             filter === "all" ||
-            (filter === "favorites" ? item.favorite : item.creatorUserId === user?.id),
+            (filter === "favorites"
+              ? item.favorite
+              : filter === "agents"
+                ? Boolean(item.creatorAgentId)
+                : item.creatorUserId === user?.id),
         );
   const searched = filtered.filter((item) =>
     item.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
@@ -115,6 +119,7 @@ export function SpaceOverview({ space }: { space: Space }) {
         options={[
           { value: "all", label: "All" },
           { value: "yours", label: "Yours" },
+          { value: "agents", label: "From agents" },
           { value: "suggested", label: "Suggested" },
           { value: "favorites", label: "Favorites" },
         ]}
@@ -190,11 +195,11 @@ export function SpaceOverview({ space }: { space: Space }) {
               creator:
                 filter === "suggested"
                   ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : creatorName(item.creatorUserId, item.creatorAgentId),
+                  : creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName),
               creatorDescription:
                 filter === "suggested"
                   ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : `${item.kind === "file" ? "Added" : "Created"} by ${creatorName(item.creatorUserId, item.creatorAgentId)}`,
+                  : `${item.kind === "file" ? "Added" : "Created"} by ${creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName)}`,
               updated: item.updatedAt
                 ? new Date(item.updatedAt).toLocaleDateString(undefined, {
                     month: "short",

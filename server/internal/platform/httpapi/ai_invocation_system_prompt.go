@@ -104,7 +104,7 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 	}
 	var guidance strings.Builder
 	if has("spaces.list") {
-		guidance.WriteString("\n\nSpaces: the user's notes, tasks, calendar, drawings, roadmaps, Library and messages live in Spaces. Those tools take an optional `space` (name or id). Reads without one cover every Space the user can access; creates without one use the personal Space; changes to an existing item pass the space returned with it. Use spaces_list to name destinations.")
+		guidance.WriteString("\n\nSpaces: the user's notes, tasks, calendar, drawings, roadmaps, Library and messages live in Spaces. Those tools take an optional `space` (name or id). Reads without one cover every Space the user can access; creates without one use the Space you live in (spaces_list marks it as yours); changes to an existing item pass the space returned with it. Use spaces_list to name destinations.")
 	}
 	if has("notebook.write") {
 		guidance.WriteString("\n\nNotebook: on a task with several steps, write a short plan with notebook_write (section plan) as a checklist and keep it current, and add findings with their source URLs as you learn them. The person sees it in the conversation. After earlier steps were summarized, read it again with notebook_read before continuing.")

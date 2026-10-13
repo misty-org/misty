@@ -213,7 +213,9 @@ pub(super) fn browser_viewport_script(
             concat!(
                 include_str!("browser_context_menu.js"),
                 "\n",
-                include_str!("browser_passwords.js")
+                include_str!("browser_passwords.js"),
+                "\n",
+                include_str!("browser_extension_store.js")
             ),
         )
         .replace(

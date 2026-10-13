@@ -1,4 +1,5 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
+import { isNewTabOverrideUrl } from "@/features/workspace/browserHome";
 import { Button, cn, Input, SuggestionList } from "@/shared/ui";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { OmniboxRow } from "./omnibox/OmniboxRow";
@@ -229,10 +230,10 @@ export function BrowserOmniboxView(props: {
 }
 
 function displayBrowserAddress(value: string): string {
-  return value === blankBrowserUrl ? "" : value;
+  return value === blankBrowserUrl || isNewTabOverrideUrl(value) ? "" : value;
 }
 
 /** The full address at rest, protocol included, so where a page lives is never hidden. */
 function toolbarAddress(value: string): string {
-  return value === blankBrowserUrl ? "Search or enter URL" : value;
+  return value === blankBrowserUrl || isNewTabOverrideUrl(value) ? "Search or enter URL" : value;
 }

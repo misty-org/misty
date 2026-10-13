@@ -62,6 +62,7 @@ use infra::browser::page_tools::media_tools::{
     browser_webview_reader_article,
 };
 #[cfg(desktop)]
+use infra::browser::action_confirm::agent_action_confirm;
 use infra::browser::pane_dim::browser_webview_set_pane_dim;
 #[cfg(desktop)]
 use infra::browser::profile_cleanup::browser_device_profile_delete;
@@ -309,9 +310,6 @@ pub fn run() {
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
-                    crate::infra::extensions::extensions_search,
-                    crate::infra::extensions::extensions_categories,
-                    crate::infra::extensions::extensions_detail,
                     crate::infra::extensions::install::extensions_prepare,
                     crate::infra::extensions::install::extensions_commit,
                     crate::infra::extensions::install::extensions_approve,
@@ -404,6 +402,8 @@ pub fn run() {
                     #[cfg(unix)]
                     app::code_commands::code_undo,
                     #[cfg(unix)]
+                    app::code_snapshots::code_project_snapshot,
+                    #[cfg(unix)]
                     app::code_commands::code_new_project,
                     #[cfg(unix)]
                     app::code_commands::code_clone_project,
@@ -485,6 +485,8 @@ pub fn run() {
                     infra::agent_dock::agent_dock_host_action,
                     infra::agent_dock::agent_tab_detach,
                     infra::agent_dock::agent_tab_attach,
+                    infra::extension_popup::extension_popup_open,
+                    infra::extension_popup::extension_popup_close,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_configure,
                     #[cfg(any(target_os = "macos", windows))]
@@ -537,6 +539,7 @@ pub fn run() {
                     browser_webview_set_theme,
                     #[cfg(desktop)]
                     browser_webview_set_pane_dim,
+                    agent_action_confirm,
                     #[cfg(desktop)]
                     browser_webview_navigate,
                     #[cfg(desktop)]
@@ -555,8 +558,6 @@ pub fn run() {
                     infra::browser_site_permissions::browser_site_permissions_reset,
                     #[cfg(desktop)]
                     infra::browser_site_zoom::browser_set_site_zoom_levels,
-                    #[cfg(desktop)]
-                    infra::browser_content_blocking::browser_set_content_blocking,
                     #[cfg(desktop)]
                     infra::browser_site_style::browser_set_site_styles,
                     #[cfg(desktop)]

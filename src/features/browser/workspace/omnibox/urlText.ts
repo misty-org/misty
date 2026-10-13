@@ -66,3 +66,23 @@ export function describeUrl(
     faviconUrl: `${url.origin}/favicon.ico`,
   };
 }
+
+// Sites that certainly live at `name.com`. Only these are fetched for a typed word, so a
+// draft that is not one of them never becomes a request to a host the person did not pick.
+const KNOWN_COM_SITES = new Set([
+  "airbnb", "amazon", "apple", "bing", "canva", "cnn", "discord", "dropbox", "ebay", "etsy",
+  "expedia", "facebook", "figma", "github", "gitlab", "gmail", "google", "hulu", "imdb",
+  "instagram", "linkedin", "medium", "microsoft", "netflix", "notion", "paypal", "pinterest",
+  "reddit", "slack", "spotify", "stackoverflow", "stripe", "target", "tiktok", "twitch",
+  "twitter", "uber", "vimeo", "walmart", "wikipedia", "yahoo", "youtube", "zoom",
+]);
+
+/**
+ * The icon of `word.com` when the typed word names a well-known site ("youtube"), else none.
+ * Callers show it only on the row that is exactly the typed text, and the row keeps its search
+ * icon when the image does not load.
+ */
+export function guessedSiteFavicon(text: string): string | undefined {
+  const word = text.toLowerCase();
+  return KNOWN_COM_SITES.has(word) ? `https://${word}.com/favicon.ico` : undefined;
+}

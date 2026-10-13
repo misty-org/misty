@@ -1,3 +1,4 @@
+import { browserNewTabUrl } from "./browserHome";
 import {
   browserViewTitle,
   createBrowserViewState,
@@ -34,7 +35,7 @@ function createTab(index: number, placeholder: boolean): WorkspaceView {
   const now = Date.now();
   const id = `tab:${crypto.randomUUID()}`;
   const surfaceId = defaultViewSurfaces[index] ?? "browser";
-  const state = surfaceId === "browser" ? createBrowserViewState() : {};
+  const state = surfaceId === "browser" ? createBrowserViewState(browserNewTabUrl()) : {};
   return {
     id,
     surfaceId,

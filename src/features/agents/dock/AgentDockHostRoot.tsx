@@ -13,6 +13,11 @@ const parameters = new URLSearchParams(location.search);
  * task itself runs in the person's window, which sends the status here.
  */
 export function AgentDockHostRoot() {
+  // An extension's popup window holds only the extension's page; nothing draws here.
+  return parameters.has("popup") ? null : <AgentDockBar />;
+}
+
+function AgentDockBar() {
   const title = parameters.get("title") ?? "";
   const agent = parameters.get("agent") || "Misty";
   const [status, setStatus] = useState("");

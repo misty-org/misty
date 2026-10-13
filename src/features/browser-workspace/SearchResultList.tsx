@@ -24,7 +24,7 @@ import {
 import { BrandIcon, brandIconAsset, cn } from "@/shared/ui";
 import mistyIcon from "@/assets/branding/misty-icon.png?inline";
 import { omniboxMatchIcon, type OmniboxMatch } from "@/features/browser/omnibox";
-import type { Bang } from "./bangs/types";
+import type { Bang, SearchScope } from "./bangs/types";
 import type { ScopedSearchKind, ScopedSearchResult } from "./scopedSearchSources";
 
 export type SearchListItem =
@@ -53,6 +53,41 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   action: ChevronRight,
 };
 
+const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
+  files: Folder,
+  spaces: LayoutGrid,
+  notes: NotebookPen,
+  tasks: SquareCheck,
+  chat: MessageSquare,
+  agents: Bot,
+  bookmarks: Bookmark,
+  history: History,
+  tabs: AppWindow,
+  downloads: Download,
+  settings: Settings2,
+  extensions: Puzzle,
+};
+
+/** The site's icon for a website shortcut, the globe when it has none. */
+function WebBangIcon({ home }: { home: string }) {
+  const [failed, setFailed] = useState(false);
+  let src: string | null = null;
+  try {
+    src = `${new URL(home).origin}/favicon.ico`;
+  } catch {
+    // No usable home page.
+  }
+  if (!src || failed) return <Globe2 size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
+  return (
+    <img
+      src={src}
+      alt=""
+      className="size-4 shrink-0 rounded-sm object-contain"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 const groupLabels: Record<Bang["group"], string> = {
   misty: "Misty",
   custom: "Your shortcuts",
@@ -66,7 +101,7 @@ function itemKey(item: SearchListItem): string {
 
 function formatDetail(item: SearchListItem): string {
   if (item.type === "bang") {
-    return item.bang.aliases.map((alias) => `!${alias}`).join(" ");
+    return item.bang.kind === "scope" && !item.query ? item.bang.description : "";
   }
   if (item.type === "result") {
     return item.result.subtitle;
@@ -92,9 +127,15 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   const [imgError, setImgError] = useState(false);
 
   if (item.type === "bang") {
+    const { bang } = item;
+    const Icon = bang.kind === "scope" ? scopeIcons[bang.scope] : Search;
     return (
       <div className="relative flex size-4 shrink-0 items-center justify-center">
-        <Search size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />
+        {bang.kind === "web" ? (
+          <WebBangIcon home={bang.home} />
+        ) : (
+          <Icon size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />
+        )}
       </div>
     );
   }
@@ -126,7 +167,9 @@ function ItemIcon({ item }: { item: SearchListItem }) {
     host.includes("misty.local") ||
     match.title.toLowerCase().includes("misty");
   const isOpenAi = host.includes("chatgpt.com") || host.includes("openai.com");
-  const isYouTube = host.includes("youtube.com") || host.includes("youtu.be");
+  const isYouTube = [host, match.faviconUrl ?? ""].some((value) =>
+    /youtube\.com|youtu\.be/.test(value.toLowerCase()),
+  );
 
   let content: React.ReactNode = null;
 
@@ -134,6 +177,8 @@ function ItemIcon({ item }: { item: SearchListItem }) {
     content = <img src={mistyIcon} alt="" className="size-4 shrink-0 rounded-sm object-contain" />;
   } else if (isOpenAi) {
     content = <BrandIcon brand="openai" size={16} className="shrink-0" />;
+  } else if (isYouTube && brandIconAsset("youtube")) {
+    content = <BrandIcon brand="youtube" size={16} className="shrink-0" />;
   } else if (match.faviconUrl && !imgError) {
     content = (
       <img
@@ -143,8 +188,6 @@ function ItemIcon({ item }: { item: SearchListItem }) {
         onError={() => setImgError(true)}
       />
     );
-  } else if (isYouTube && brandIconAsset("youtube")) {
-    content = <BrandIcon brand="youtube" size={16} className="shrink-0" />;
   } else if (isLocalhost) {
     content = <span className="size-4 shrink-0" aria-hidden="true" />;
   } else if (match.kind === "search" || match.kind === "suggestion") {
@@ -185,21 +228,16 @@ function Row(props: { item: SearchListItem }) {
     <>
       <ItemIcon item={item} />
       <div className="flex min-w-0 flex-1 items-center text-sm">
-        {item.type === "bang" && (
-          <span className="mr-2.5 shrink-0 font-mono text-xs text-zinc-400">
-            !{item.bang.trigger}
-          </span>
-        )}
         <span className="truncate font-normal text-zinc-100">{title}</span>
         {detail && (
-          <>
-            <span className="mx-2 shrink-0 select-none text-zinc-500">—</span>
-            <span className="shrink-0 truncate text-xs font-normal text-zinc-400 sm:text-sm">
-              {detail}
-            </span>
-          </>
+          <span className="ml-3 min-w-0 truncate text-xs font-normal text-zinc-500 sm:text-sm">
+            {detail}
+          </span>
         )}
       </div>
+      {item.type === "bang" && !item.query && (
+        <span className="shrink-0 text-xs text-zinc-500 sm:text-sm">!{item.bang.trigger}</span>
+      )}
     </>
   );
 }
@@ -220,7 +258,7 @@ export function SearchResultList(props: {
       ref={list}
       role="listbox"
       aria-label="Search results"
-      className="max-h-[380px] space-y-0.5 overflow-y-auto p-1.5"
+      className="max-h-[520px] space-y-0.5 overflow-y-auto p-1.5"
     >
       {props.items.map((item, index) => {
         const previous = props.items[index - 1];

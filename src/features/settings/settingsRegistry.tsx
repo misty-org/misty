@@ -1,4 +1,5 @@
 import { PasswordsSettings } from "./sections/PasswordsSettings";
+import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
   Globe,
@@ -106,6 +107,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     true,
   ),
   page("browser", "browser-passwords", "Passwords", PasswordsSettings, "resource", true),
+  page("browser", "browser-extensions", "Extensions", ExtensionsSettings, "resource", true),
   page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
   page(
     "browser",

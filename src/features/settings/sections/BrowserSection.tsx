@@ -24,10 +24,8 @@ import { definitionById, runtimeAdapters } from "../profiles/registry";
 import { BrowserBangsSettings } from "./BrowserBangsSettings";
 import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
-import { PreferenceRow } from "./FeatureSections";
 import { parseSiteZoomLevels } from "@/features/webviews/siteZoom";
 import { parseSiteStyles } from "@/features/webviews/siteStyles";
-import { parseContentBlockingAllowedSites } from "@/features/webviews/contentBlocking";
 import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 
 const archiveOptions = [
@@ -215,24 +213,6 @@ export function BrowserSection(
         )}
         {props.page !== "downloads" && (
           <>
-            <SettingsRow
-              label="Block ads and trackers"
-              description="Stops known ad and tracking services that other sites load. You can turn it off for a site from its site information."
-            >
-              <SwitchControl
-                checked={booleanSetting(
-                  props.document,
-                  "general",
-                  "browser_content_blocking",
-                  true,
-                )}
-                disabled={props.working}
-                onChange={(value) =>
-                  props.onSettingChange("general", "browser_content_blocking", value)
-                }
-              />
-            </SettingsRow>
-            <ContentBlockingSitesRow document={props.document} />
             <SiteZoomRow document={props.document} />
             <CustomizedSitesRow document={props.document} />
             <SettingsRow
@@ -311,14 +291,6 @@ export function BrowserSection(
           </>
         )}
       </SettingsSectionBlock>
-      {props.page !== "downloads" && (
-        <SettingsSectionBlock title="Extensions">
-          <PreferenceRow
-            id="extensions.agent_access"
-            description="Individual extensions can also be turned off for agents in Extensions."
-          />
-        </SettingsSectionBlock>
-      )}
       {props.page !== "downloads" && <BrowserToolbarSettings {...props} />}
       {props.page !== "downloads" && <BrowserBangsSettings {...props} />}
     </>
@@ -337,26 +309,6 @@ function SiteZoomRow(props: { document: SettingsContentProps["document"] }) {
     >
       <span className="text-sm text-cream-muted">
         {count === 0 ? "No sites zoomed" : count === 1 ? "1 site" : `${count} sites`}
-      </span>
-    </SettingsRow>
-  );
-}
-
-/** Sites where blocking was turned off; Reset turns it back on everywhere. */
-function ContentBlockingSitesRow(props: { document: SettingsContentProps["document"] }) {
-  const sites = parseContentBlockingAllowedSites(
-    stringSetting(props.document, "general", "browser_content_blocking_allowed_json", "[]"),
-  );
-  return (
-    <SettingsRow
-      label="Sites without blocking"
-      indent
-      description={
-        sites.length ? sites.slice(0, 3).join(", ") + (sites.length > 3 ? "…" : "") : undefined
-      }
-    >
-      <span className="text-sm text-cream-muted">
-        {sites.length === 0 ? "None" : sites.length === 1 ? "1 site" : `${sites.length} sites`}
       </span>
     </SettingsRow>
   );

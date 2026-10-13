@@ -2,10 +2,17 @@ import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useTaskArtifacts } from "./taskArtifacts";
 import { Button } from "@/shared/ui";
-export function TaskArtifacts({ agentId, spaceId }: { agentId: string; spaceId: string }) {
-  const items = useTaskArtifacts((s) => s.items).filter(
-    (item) => item.agentId === agentId && item.spaceId === spaceId,
-  );
+
+const status = {
+  downloading: "Downloading",
+  saving: "Saving to the Space",
+  saved: "",
+  failed: "Didn’t download",
+} as const;
+
+/** This task's downloads, and whether each reached the agent's Space. */
+export function TaskArtifacts({ taskId }: { taskId: string }) {
+  const items = useTaskArtifacts((s) => s.items).filter((item) => item.taskId === taskId);
   const [error, setError] = useState("");
   if (!items.length) return null;
   return (
@@ -17,17 +24,22 @@ export function TaskArtifacts({ agentId, spaceId }: { agentId: string; spaceId: 
       {items.map((item) => (
         <div key={item.id} className="flex items-center gap-2 py-1">
           <span className="min-w-0 flex-1 truncate">{item.name}</span>
-          {item.state === "ready" ? (
+          <span className="shrink-0 text-cream-muted">
+            {item.state === "saved"
+              ? `Saved to ${item.spaceName ?? "the Space"}`
+              : item.state === "failed" && item.downloaded
+                ? "Not saved to the Space"
+                : status[item.state]}
+          </span>
+          {item.downloaded ? (
             <Button
               variant="link"
-              className="h-auto p-0 underline text-xs"
+              className="h-auto p-0 text-xs underline"
               onClick={() => void openPath(item.path).catch((reason) => setError(String(reason)))}
             >
               Open
             </Button>
-          ) : (
-            <span>{item.state === "pending" ? "Downloading…" : "Failed"}</span>
-          )}
+          ) : null}
         </div>
       ))}
       {error && <p role="alert">{error}</p>}

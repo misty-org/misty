@@ -110,8 +110,7 @@ extern "C" fn event(pointer: *const c_char) {
                 if event["account"].as_str() == Some(&state.account) {
                     if let Some(status) = event["id"]
                         .as_str()
-                        .and_then(|id| id.parse::<u64>().ok())
-                        .and_then(|id| state.states.get_mut(&id))
+                        .and_then(|id| state.states.get_mut(id))
                     {
                         status.detail = event["detail"]
                             .as_str()

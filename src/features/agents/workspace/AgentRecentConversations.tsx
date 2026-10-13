@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FolderPlus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
 import {
@@ -220,7 +220,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
       <div className="agent-studio-recents-heading">
         <h2>Projects</h2>
         <IconButton label="New project" disabled={disabled} onClick={onNewProject}>
-          <FolderPlus size={15} />
+          <Plus size={14} />
         </IconButton>
       </div>
       {folders.map(({ folder, conversations }) => (

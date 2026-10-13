@@ -6,7 +6,7 @@ import type {
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import "../SocialRuntime";
 import { socialApi as spacesApi } from "../SocialRuntime";
-import { buildMessageSpans } from "../store/useSpaceMessageSpansStore";
+import { buildMessageSpans, type MentionableAgent } from "../store/useSpaceMessageSpansStore";
 import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { mergeSpaceMessages } from "../store/useSpaceMessageSpansStore";
@@ -22,6 +22,8 @@ export interface SpaceChatMessageActionsOptions {
     | undefined;
   activeConversation: SpaceConversation | undefined;
   members: SpaceMember[];
+  /** Agent members people can @mention to ask for help. */
+  agents?: MentionableAgent[];
   draft: SpaceChatDraft;
   editing: MessageEditingState;
   setGroupMessages: Dispatch<SetStateAction<SpaceMessage[]>>;
@@ -69,7 +71,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     event.preventDefault();
     if (draft.isEmpty) return;
     const value = draft.text.trim();
-    const content = buildMessageSpans(value, members);
+    const content = buildMessageSpans(value, members, options.agents);
     const clientNonce = createClientNonce();
     const optimisticMessage: SpaceMessage = {
       seq: Date.now(),
@@ -167,7 +169,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           spaceId,
           conversationId,
           message.id,
-          buildMessageSpans(value, members),
+          buildMessageSpans(value, members, options.agents),
           message.file_node_ids,
         );
         setGroupMessages((current) => mergeSpaceMessages(current, [saved]));

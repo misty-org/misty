@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { useSettingsProfiles } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
-import type { ExtensionEvent, ExtensionReview, Installation, InstalledState } from "./types";
+import type {
+  ExtensionEvent,
+  ExtensionReview,
+  ExtensionStore,
+  Installation,
+  InstalledState,
+} from "./types";
 import { extensionsNative } from "./native";
 
 export const useExtensionsStore = create<{
@@ -12,6 +18,10 @@ export const useExtensionsStore = create<{
   error: string;
   revision: number;
   permissionRequests: ExtensionEvent[];
+  /** "Add to Misty" on a store page: the extension ID or Firefox slug to review. */
+  installRequest: string | null;
+  /** "Remove from Misty" on a store page: the installed extension to confirm removing. */
+  removeRequest: string | null;
 }>(() => ({
   account: "",
   ready: false,
@@ -20,8 +30,14 @@ export const useExtensionsStore = create<{
   error: "",
   revision: 0,
   permissionRequests: [],
+  installRequest: null,
+  removeRequest: null,
 }));
 
+/** Opens the install review for an extension ID or Firefox Add-ons slug. */
+export function requestInstall(key: string) {
+  useExtensionsStore.setState({ installRequest: key });
+}
 export function enqueuePermission(request: ExtensionEvent) {
   useExtensionsStore.setState((state) =>
     request.account !== state.account ||
@@ -43,16 +59,56 @@ export function preference<T>(key: string, fallback: T): T {
   const state = useSettingsProfiles.getState().state;
   return state ? (resolveSetting(state, `extensions.${key}`).value as T) : fallback;
 }
+const chromeId = /^[a-p]{32}$/;
+const firefoxId = /^[1-9][0-9]{0,15}$/;
+/** Firefox Add-ons IDs are digits; Chrome Web Store IDs are 32 letters a–p. */
+export function extensionStore(id: string): ExtensionStore | null {
+  return chromeId.test(id) ? "chrome" : firefoxId.test(id) ? "firefox" : null;
+}
+export const storeNames: Record<ExtensionStore, string> = {
+  chrome: "Chrome Web Store",
+  firefox: "Firefox Add-ons",
+};
+export const storeHomes: Record<ExtensionStore, string> = {
+  chrome: "https://chromewebstore.google.com/",
+  firefox: "https://addons.mozilla.org/firefox/",
+};
+/** An extension's page on its store. */
+export function storePage(item: Pick<Installation, "id" | "guid">): string {
+  return extensionStore(item.id) === "chrome"
+    ? `https://chromewebstore.google.com/detail/${item.id}`
+    : `https://addons.mozilla.org/firefox/addon/${encodeURIComponent(item.guid)}/`;
+}
+/** Older versions of Misty read Firefox IDs as numbers, so they are stored that way. */
+function storedInstallations(items: Installation[]): string {
+  return JSON.stringify(
+    items.map((item) =>
+      extensionStore(item.id) === "firefox" ? { ...item, id: Number(item.id) } : item,
+    ),
+  );
+}
+/** Settings written before Chrome Web Store support hold Firefox IDs as numbers. */
+function withTextId(item: unknown): unknown {
+  if (typeof item !== "object" || item === null) return item;
+  const id = (item as { id?: unknown }).id;
+  return typeof id === "number" && Number.isSafeInteger(id) && id > 0
+    ? { ...item, id: String(id) }
+    : item;
+}
 export function parseInstallations(raw: string): Installation[] {
   try {
     const value: unknown = JSON.parse(raw);
     if (!Array.isArray(value)) return [];
-    return value.filter(
+    const items: typeof value = value.map(withTextId);
+    return items.filter(
       (item): item is Installation =>
         typeof item === "object" &&
         item !== null &&
-        Number.isSafeInteger(item.id) &&
+        typeof item.id === "string" &&
+        extensionStore(item.id) !== null &&
         typeof item.guid === "string" &&
+        // A Chrome extension's identity is its ID; Firefox identities never look like one.
+        (extensionStore(item.id) === "chrome" ? item.guid === item.id : !chromeId.test(item.guid)) &&
         typeof item.generation === "string" &&
         typeof item.name === "string" &&
         typeof item.installed === "boolean" &&
@@ -90,13 +146,13 @@ function changeControls(work: () => Promise<void>) {
   controlQueue = next;
   return next;
 }
-export async function updateInstallation(id: number, patch: Partial<Installation>) {
+export async function updateInstallation(id: string, patch: Partial<Installation>) {
   await changeControls(async () => {
     const next = installations().map((item) => (item.id === id ? { ...item, ...patch } : item));
-    await setPreference("installations", JSON.stringify(next));
+    await setPreference("installations", storedInstallations(next));
   });
 }
-export async function revokePermissions(id: number, permissions: string[], hosts: string[]) {
+export async function revokePermissions(id: string, permissions: string[], hosts: string[]) {
   await changeControls(async () => {
     const next = installations().map((item) =>
       item.id === id
@@ -107,7 +163,7 @@ export async function revokePermissions(id: number, permissions: string[], hosts
           }
         : item,
     );
-    const raw = JSON.stringify(next);
+    const raw = storedInstallations(next);
     if (raw !== preference("installations", "[]")) await setPreference("installations", raw);
   });
 }
@@ -141,7 +197,7 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
     };
     await setPreference(
       "installations",
-      JSON.stringify([...current.filter((i) => i.id !== next.id), next]),
+      storedInstallations([...current.filter((i) => i.id !== next.id), next]),
     );
   });
 }

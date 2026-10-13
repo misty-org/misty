@@ -1,6 +1,6 @@
 import { relevance } from "../relevance";
 import type { OmniboxMatch, OmniboxProvider } from "../types";
-import { describeUrl, directWebUrl } from "../urlText";
+import { describeUrl, directWebUrl, guessedSiteFavicon } from "../urlText";
 import type { OmniboxDeps } from "./deps";
 
 /**
@@ -39,6 +39,7 @@ export function typedProvider(deps: OmniboxDeps): OmniboxProvider {
         target: { type: "navigate", url: deps.searchUrl(text) },
         relevance: address ? relevance.typedSearchForAddress : relevance.typedSearch,
         allowedToBeDefault: true,
+        faviconUrl: input.private ? undefined : guessedSiteFavicon(text),
       });
       return matches;
     },

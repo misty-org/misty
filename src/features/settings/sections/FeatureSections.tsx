@@ -16,47 +16,16 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
+import { ChoiceControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
+import { InboundTasksSection } from "./InboundTasksSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { WebSearchSection } from "./WebSearchSection";
-export function PreferenceRow({ id, description }: { id: string; description?: string }) {
-  const d = definitionById.get(id)!;
-  const store = useSettingsStore();
-  const ready = useSettingsProfiles((s) => s.ready);
-  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
-  const value = fromLegacy(d, section?.[d.key]);
-  const update = (next: string | number | boolean) =>
-    store.updateSetting(
-      d.section,
-      d.key,
-      d.legacyValues ? d.legacyValues.indexOf(String(next)) : next,
-    );
-  return (
-    <Row label={d.label} description={description}>
-      {d.type === "boolean" ? (
-        <SwitchControl
-          checked={Boolean(value)}
-          disabled={store.working || !ready}
-          onChange={update}
-        />
-      ) : d.enum ? (
-        <ChoiceControl
-          disabled={store.working || !ready}
-          value={String(value)}
-          onValueChange={update}
-          options={d.enum.map((v) => ({ value: v, label: v || "Model default" }))}
-        />
-      ) : (
-        <TextControl value={String(value)} disabled={store.working || !ready} onCommit={update} />
-      )}
-    </Row>
-  );
-}
+import { PreferenceRow } from "./PreferenceRow";
 export function SpaceDefaultsSection() {
   return (
     <Section
@@ -187,6 +156,7 @@ export function AgentConnectionsSection() {
       <AppActionsSection />
       <ScreenLocationSection />
       <AgentSitesSection />
+      <InboundTasksSection />
     </>
   );
 }

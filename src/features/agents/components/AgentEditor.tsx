@@ -1,4 +1,5 @@
 import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { AgentSpaceField } from "./AgentSpaceField";
 import { AgentSpaceSharing } from "./AgentSpaceSharing";
 import { openMisty } from "@/features/misty/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
@@ -98,6 +99,7 @@ export function AgentEditor({
         model_id,
         reasoning_effort,
         enabled,
+        space_id,
       } = draft;
       const saved = await personalAgentsApi.save(
         {
@@ -111,6 +113,7 @@ export function AgentEditor({
           model_id,
           reasoning_effort,
           enabled,
+          space_id: space_id || undefined,
           version: profile?.version,
         },
         profile?.id,
@@ -265,6 +268,12 @@ export function AgentEditor({
           onChange={(e) => update("description", e.target.value)}
         />
       </Field>
+      <AgentSpaceField
+        value={draft.space_id ?? ""}
+        locked={Boolean(profile?.system_managed)}
+        moving={Boolean(profile?.space_id && draft.space_id && draft.space_id !== profile.space_id)}
+        onChange={(spaceId) => update("space_id", spaceId)}
+      />
       <details className="agent-advanced-settings">
         <summary>Instructions and memory</summary>
         <div>
@@ -285,7 +294,9 @@ export function AgentEditor({
               onChange={(e) => update("instructions", e.target.value)}
             />
           </Field>
-          {profile && !profile.system_managed ? <AgentSpaceSharing agentId={profile.id} /> : null}
+          {profile?.space_id ? (
+            <AgentSpaceSharing agentId={profile.id} spaceId={profile.space_id} />
+          ) : null}
           {!!memories.length && (
             <section className="border-t border-charcoal-border pt-5">
               <h3 className="mb-2 text-sm font-medium">Remembered preferences</h3>

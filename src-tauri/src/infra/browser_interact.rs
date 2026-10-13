@@ -28,7 +28,10 @@ pub(super) async fn interact_browser(
     {
         return Err("An inspected element reference is required.".to_owned());
     }
-    let extension_id = request.input.get("extensionId").and_then(Value::as_u64);
+    let extension_id = request
+        .input
+        .get("extensionId")
+        .and_then(super::super::extensions::agent_extension_id);
     if kind == "native" {
         if extension_id.is_some() {
             return Err("Native input is only available for the granted website viewport.".into());
@@ -95,7 +98,7 @@ pub(super) async fn interact_browser(
         "({})({encoded_target}, {encoded_action}, {encoded_origin}, {encoded_document})",
         include_str!("browser_inspection_interact.js")
     );
-    let result = if let Some(extension) = extension_id {
+    let result = if let Some(extension) = extension_id.clone() {
         // Evaluate inside the actual popup; it never receives renderer IPC.
         super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
             ["result"]
@@ -128,7 +131,7 @@ pub(super) async fn interact_browser(
     if kind == "extension" {
         let extension = action
             .get("extensionId")
-            .and_then(Value::as_u64)
+            .and_then(super::super::extensions::agent_extension_id)
             .ok_or("An extension action ID is required.")?;
         super::super::extensions::agent_action("invoke", Some(extension), id, None).await?;
     }

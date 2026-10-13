@@ -264,4 +264,31 @@
     if (submits && paymentForm(form)) return "This submits a payment form.";
     return "";
   };
+
+  // The four kinds that always stop for the person in Misty, whatever the
+  // model asked for (roadmap C2). Other consequential steps keep the
+  // allowConsequential rule.
+  const kindWords = [
+    ["payment", /\b(pay|pay now|buy|buy now|purchase|place (your )?order|order now|submit order|complete (your )?(order|purchase|payment)|confirm (and pay|payment|purchase|order)|checkout|check out|donate|transfer|withdraw|send money|subscribe|start (my )?(subscription|membership|trial))\b/i],
+    ["delete", /\b(delete|remove|erase|destroy|discard|empty trash|permanently|cancel (my )?(subscription|membership|account|order)|close (my )?account)\b/i],
+    ["publish", /\b(publish|make public|go live|post|tweet|share publicly|share)\b/i],
+    ["send", /\b(send|reply|reply all|forward|comment|message)\b/i],
+  ];
+  const kindOfName = (name) => kindWords.find(([, words]) => words.test(name || ""))?.[0] ?? "";
+
+  /** "payment", "send", "delete", "publish" or "" for acting on el. */
+  P.consequenceKind = (el, action) => {
+    if (!el) return "";
+    const form = el.form || el.closest?.("form");
+    if (action === "key") {
+      if (!form) return "";
+      if (paymentForm(form)) return "payment";
+      const submit = form.querySelector('button:not([type]),button[type=submit],input[type=submit],input[type=image]');
+      return submit ? kindOfName(P.name(submit)) : "";
+    }
+    const named = kindOfName(P.name(el));
+    if (named) return named;
+    const submits = el.matches?.('button:not([type]),button[type=submit],input[type=submit],input[type=image]') && form;
+    return submits && paymentForm(form) ? "payment" : "";
+  };
 })(globalThis.__mistyAgentPageV1 ??= {});

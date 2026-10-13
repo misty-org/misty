@@ -48,6 +48,37 @@ async function speech(method, args) {
   }
 }
 
+/** Chrome's offscreen document: one hidden frame in this page, in the extension's origin. */
+let offscreen = null;
+async function offscreenDocument(method, args) {
+  switch (method) {
+    case "offscreen.create": {
+      if (offscreen) throw new Error("Only a single offscreen document may be created.");
+      const target = new URL(String(args[0] ?? ""), location.href);
+      if (target.origin !== location.origin)
+        throw new Error("An offscreen document must be one of the extension's own pages.");
+      const frame = document.createElement("iframe");
+      frame.src = target.href;
+      offscreen = frame;
+      const loaded = new Promise((resolve) => frame.addEventListener("load", resolve, { once: true }));
+      document.documentElement.appendChild(frame);
+      await loaded;
+      return null;
+    }
+    case "offscreen.close":
+      if (!offscreen) throw new Error("No offscreen document exists.");
+      offscreen.remove();
+      offscreen = null;
+      return null;
+    case "offscreen.has":
+      return Boolean(offscreen);
+    case "offscreen.get":
+      return offscreen ? offscreen.src : null;
+    default:
+      throw new Error("Unknown offscreen request.");
+  }
+}
+
 channel.onmessage = async ({ data }) => {
   if (!data || typeof data !== "object") return;
   if (data.hello) {
@@ -59,7 +90,9 @@ channel.onmessage = async ({ data }) => {
   try {
     const result = data.method.startsWith("tts.")
       ? await speech(data.method, args)
-      : await native.postMessage({ method: data.method, args });
+      : data.method.startsWith("offscreen.")
+        ? await offscreenDocument(data.method, args)
+        : await native.postMessage({ method: data.method, args });
     channel.postMessage({ reply: data.request, result: result ?? null });
   } catch (error) {
     channel.postMessage({ reply: data.request, error: String(error?.message ?? error) });

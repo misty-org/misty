@@ -40,17 +40,10 @@ const usage = {
       remaining_bytes: 4998500000,
       percentage_used: 0.03,
     },
-    sync: {
-      used: 100,
-      reserved: 0,
-      limit: 20000000000,
-      remaining: 19999999900,
-      percentage_used: 0.0000005,
-    },
   },
 };
 describe("Account usage from a Space", () => {
-  it("loads all three account meters only when opened, without a Space request", async () => {
+  it("loads the AI and storage meters only when opened, without a Space request", async () => {
     api.request.mockResolvedValue(usage);
     render(<SpaceUsagePopover space={space} />);
     expect(api.request).not.toHaveBeenCalled();
@@ -59,7 +52,7 @@ describe("Account usage from a Space", () => {
     });
     expect(api.request.mock.calls[0][0]).toBe("/billing/usage");
     expect(screen.getByText("Cloud storage")).toBeDefined();
-    expect(screen.getByText("Sync transfer")).toBeDefined();
+    expect(screen.queryByText("Sync transfer")).toBeNull();
     expect(screen.getByText(/300 weighted tokens temporarily reserved/)).toBeDefined();
     fireEvent.click(screen.getByText("Recent AI commands"));
     expect(screen.getByText("750 weighted tokens used")).toBeDefined();

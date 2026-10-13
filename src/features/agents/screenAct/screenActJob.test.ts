@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   script: undefined as unknown as Script,
   options: undefined as unknown,
+  askPerson: vi.fn(async () => true),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/client", () => ({ apiRequest: vi.fn() }));
+vi.mock("../actionQuestions", () => ({ askPerson: mocks.askPerson }));
 // Midscene's Agent plans; these tests script its plans against the real device.
 vi.mock("@midscene/core/agent", () => ({
   Agent: class {
@@ -114,7 +116,23 @@ it("stops before a consequential action unless the user allowed it", async () =>
     new AbortController().signal,
   );
   expect(allowed.status).toBe("done");
+  expect(mocks.askPerson).toHaveBeenCalledWith(expect.objectContaining({ description: "Send" }));
   expect(calls("browser.interact")[0][1].request.input.consequential).toBe(true);
+});
+
+it("does nothing when the person refuses the action in the island", async () => {
+  const send = { x: 0.9, y: 0.9, consequential: true, description: "Send" };
+  mocks.script = async (device) => {
+    await act(device, "click", send);
+    return "Sent.";
+  };
+  mocks.askPerson.mockResolvedValueOnce(false);
+  const result = await runScreenAct(
+    { ...job, input: { goal: "Send it", allowConsequential: true } },
+    new AbortController().signal,
+  );
+  expect(result.status).toBe("needs_confirmation");
+  expect(calls("browser.interact")).toHaveLength(0);
 });
 
 it("reports a failure before any input as not attempted", async () => {

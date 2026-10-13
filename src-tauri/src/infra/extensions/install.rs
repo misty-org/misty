@@ -4,10 +4,10 @@ use super::*;
 pub(super) async fn prepare(
     app: &tauri::AppHandle,
     account: &str,
-    id: u64,
+    id: &str,
 ) -> Result<package::Review, String> {
     let epoch = ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire);
-    let entry = cancellable(epoch, catalog::detail(id)).await?;
+    let entry = cancellable(epoch, catalog::latest(id)).await?;
     {
         let state = service().lock().await;
         if state.account != account {
@@ -15,7 +15,7 @@ pub(super) async fn prepare(
         }
         for path in state.prepared.values() {
             if let Ok(review) = read_review(path) {
-                if review.entry.id == id && review.entry.digest == entry.digest {
+                if review.entry.id == entry.id && review.entry.digest == entry.digest {
                     return Ok(review);
                 }
             }
@@ -86,7 +86,7 @@ pub(super) async fn prepare(
 pub async fn extensions_prepare(
     caller: tauri::Webview,
     app: tauri::AppHandle,
-    id: u64,
+    id: String,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
         native::trusted(&caller)?;
@@ -94,7 +94,7 @@ pub async fn extensions_prepare(
         if account.is_empty() {
             return Err("Sign in to install extensions.".into());
         }
-        prepare(&app, &account, id).await
+        prepare(&app, &account, &id).await
     }
     .await;
     result.map_err(ExtensionFailure::from)
@@ -117,7 +117,7 @@ pub(super) async fn commit(app: &tauri::AppHandle, token: &str) -> Result<packag
     }
     let package = root(app, &account)?
         .join("packages")
-        .join(review.entry.id.to_string());
+        .join(&review.entry.id);
     std::fs::create_dir_all(&package).map_err(|e| e.to_string())?;
     let digest = review
         .entry
@@ -234,7 +234,7 @@ pub async fn extensions_commit(
                     &app,
                     &account,
                     &Installation {
-                        id: review.entry.id,
+                        id: review.entry.id.clone(),
                         guid: review.entry.guid.clone(),
                         generation,
                         name: review.entry.name.clone(),

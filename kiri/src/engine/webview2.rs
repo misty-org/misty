@@ -23,7 +23,6 @@ use windows::Win32::System::Com::CoTaskMemFree;
 // fail, are dropped as new ones are added. Used on the UI thread only.
 thread_local! {
     static MEDIA_HANDLED: RefCell<Vec<ICoreWebView2>> = RefCell::default();
-    static FILTERED: RefCell<Vec<ICoreWebView2>> = RefCell::default();
 }
 
 /// Records `core` in `views`; false when it was already there.
@@ -177,64 +176,3 @@ pub(super) fn edit(webview: &Webview, command: super::EditCommand) -> Result<(),
         .map_err(|error| error.to_string())
 }
 
-/// WebView2 has no rule lists, so every request is checked against the
-/// content filter as it starts. The handler reads the live configuration, so
-/// installing it once per view is enough.
-pub(super) fn install_content_filter(webview: &Webview) -> Result<(), String> {
-    use webview2_com::{
-        Microsoft::Web::WebView2::Win32::{
-            ICoreWebView2_2, COREWEBVIEW2_WEB_RESOURCE_CONTEXT,
-            COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
-        },
-        WebResourceRequestedEventHandler,
-    };
-    webview
-        .with_webview(move |platform| unsafe {
-            let Ok(core) = platform.controller().CoreWebView2() else {
-                return;
-            };
-            if !first_install(&FILTERED, &core) {
-                return;
-            }
-            let Ok(environment) = core.cast::<ICoreWebView2_2>().and_then(|core| core.Environment())
-            else {
-                return;
-            };
-            if core
-                .AddWebResourceRequestedFilter(
-                    &HSTRING::from("*"),
-                    COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
-                )
-                .is_err()
-            {
-                return;
-            }
-            let handler = WebResourceRequestedEventHandler::create(Box::new(move |sender, args| {
-                let Some(args) = args else { return Ok(()) };
-                let mut context = COREWEBVIEW2_WEB_RESOURCE_CONTEXT::default();
-                args.ResourceContext(&mut context)?;
-                let Some(url) = args.Request().ok().and_then(|request| take_string(|p| request.Uri(p)))
-                else {
-                    return Ok(());
-                };
-                let page = sender.and_then(|view| take_string(|p| view.Source(p)));
-                if crate::content_filter::should_block(
-                    &url,
-                    page.as_deref(),
-                    context == COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
-                ) {
-                    let response = environment.CreateWebResourceResponse(
-                        None::<&windows::Win32::System::Com::IStream>,
-                        403,
-                        &HSTRING::from("Blocked"),
-                        &HSTRING::from(""),
-                    )?;
-                    args.SetResponse(&response)?;
-                }
-                Ok(())
-            }));
-            let mut token = 0i64;
-            let _ = core.add_WebResourceRequested(&handler, &mut token);
-        })
-        .map_err(|error| error.to_string())
-}

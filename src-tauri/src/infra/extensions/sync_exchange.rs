@@ -12,7 +12,7 @@ pub(super) async fn pass(
     if !ready()
         .lock()
         .map_err(|_| "The extension sync bridge is unavailable.")?
-        .contains(&readiness_key(account, installation.id))
+        .contains(&readiness_key(account, &installation.id))
     {
         return Ok(());
     }
@@ -48,8 +48,8 @@ pub(super) async fn pass(
     }) {
         // Removal records have their own IDs and are never extension-writable.
         // A stale settings update or offline storage edit cannot erase them.
-        forget(account, installation.id);
-        let _=native::request(json!({"operation":"remove","account":account,"id":installation.id.to_string(),"guid":installation.guid})).await;
+        forget(account, &installation.id);
+        let _=native::request(json!({"operation":"remove","account":account,"id":installation.id,"guid":installation.guid})).await;
         if !current(account, installation, epoch).await {
             return Ok(());
         }
@@ -156,7 +156,7 @@ pub(super) async fn pass(
         }
     });
     if !remote.is_empty() {
-        native::request(json!({"operation":"sync-apply","account":account,"id":installation.id.to_string(),"changes":remote})).await?;
+        native::request(json!({"operation":"sync-apply","account":account,"id":installation.id,"changes":remote})).await?;
         if !current(account, installation, epoch).await {
             return Ok(());
         }
@@ -174,7 +174,7 @@ pub(super) async fn pass(
         write(app, account, installation, &journal)?;
     }
     native::request(
-        json!({"operation":"sync-restored","account":account,"id":installation.id.to_string()}),
+        json!({"operation":"sync-restored","account":account,"id":installation.id}),
     )
     .await?;
     Ok(())

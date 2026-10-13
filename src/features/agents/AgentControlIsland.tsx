@@ -8,6 +8,8 @@ import { releasePendingWait } from "@/features/agent-interventions/WaitingForYou
 import type { GlobalAiMessage } from "@/features/global-search/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { cn, IconButton, MessageComposer, MessageComposerSend } from "@/shared/ui";
+import { AgentActionQuestions } from "./AgentActionQuestions";
+import { listenForActionQuestions, useActionQuestions } from "./actionQuestions";
 import { AgentDockControls } from "./dock/AgentDockControls";
 import { useAgentDockSync } from "./dock/agentDock";
 import { endHostedSession } from "./hostedSessions";
@@ -89,6 +91,8 @@ function statusText(
 
 export function AgentControlIsland() {
   const execution = useLocalExecution((state) => state.execution);
+  const questions = useActionQuestions((state) => state.items.length);
+  useEffect(() => listenForActionQuestions(), []);
   const hosted = useHostedSessions((state) => state.sessions);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const step = useMistyStore(liveStep);
@@ -111,7 +115,11 @@ export function AgentControlIsland() {
   const waiting = wait
     ? `${interventionLabels[wait.action]}${wait.targetLabel ? ` · ${wait.targetLabel}` : ""}`
     : "";
-  const status = execution ? statusText(execution, name, step, waiting, stopped) : "";
+  const status = questions
+    ? `${name} is waiting for your OK`
+    : execution
+      ? statusText(execution, name, step, waiting, stopped)
+      : "";
   const meta = helpers ? `${helpers} ${helpers === 1 ? "helper" : "helpers"}` : "";
 
   useEffect(() => {
@@ -223,9 +231,13 @@ export function AgentControlIsland() {
     if (!desktop || !taskId) return;
     void invoke("agent_control_island", {
       taskId,
-      island: { status, meta, waiting: execution?.state === "waiting" ? status : "" },
+      island: {
+        status,
+        meta,
+        waiting: execution?.state === "waiting" || questions ? status : "",
+      },
     }).catch(() => {});
-  }, [desktop, taskId, status, meta, execution?.state]);
+  }, [desktop, taskId, status, meta, execution?.state, questions]);
   const handlers = { resume, takeOver, send };
   useEffect(() => {
     if (!desktop || !taskId) return;
@@ -245,9 +257,10 @@ export function AgentControlIsland() {
   }, [desktop, taskId]);
 
   if (!execution) {
-    if (!hosted.length) return null;
+    if (!hosted.length && !questions) return null;
     return (
       <aside aria-label="Agents working here" className={islandClass}>
+        <AgentActionQuestions />
         {hosted.map((session) => (
           <div key={session.taskId} className="flex items-center gap-2 pl-2">
             <p className="min-w-0 flex-1 truncate text-sm" role="status">
@@ -270,6 +283,7 @@ export function AgentControlIsland() {
   const takesMessages = !execution.method && execution.state !== "waiting";
   return (
     <aside aria-label="Agent control" className={islandClass}>
+      <AgentActionQuestions />
       <div className="flex min-w-0 items-center gap-2 px-2 pt-1">
         <p className="min-w-0 flex-1 truncate text-sm" role="status">
           {status}

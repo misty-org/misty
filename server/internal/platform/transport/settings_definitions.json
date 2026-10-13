@@ -306,32 +306,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.contentBlocking",
-    "label": "Block ads and trackers",
-    "keywords": ["ad blocker", "adblock", "tracking", "privacy", "ublock"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_content_blocking",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.contentBlockingAllowedSites",
-    "label": "Sites without blocking",
-    "keywords": ["ad blocker", "exceptions", "allow ads", "whitelist"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_content_blocking_allowed_json",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 16384,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.autoArchiveHours",
     "label": "Archive idle tabs",
     "keywords": ["archive", "auto close", "clean up", "tabs"],
@@ -809,7 +783,7 @@
   {
     "id": "extensions.installations",
     "label": "Installed extensions",
-    "page": "browser",
+    "page": "browser-extensions",
     "section": "extensions",
     "key": "installations",
     "default": "[]",
@@ -822,7 +796,7 @@
   {
     "id": "extensions.agent_access",
     "label": "Allow agents to use extensions",
-    "page": "browser",
+    "page": "browser-extensions",
     "section": "extensions",
     "key": "agent_access",
     "default": true,

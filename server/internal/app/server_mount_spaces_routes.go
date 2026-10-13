@@ -59,6 +59,7 @@ func (s *Server) mountSpacesRoutes(prefix string, spaces *api.SpacesService, rea
 	s.Router.Patch(prefix+"/spaces/{spaceID}/roadmaps/{roadmapID}/layout", spaces.SpaceRoadmapLayout())
 	s.Router.Get(prefix+"/spaces/{spaceID}/members", spaces.Members())
 	s.Router.Get(prefix+"/spaces/{spaceID}/agent-listings", spaces.AgentListings())
+	s.Router.Get(prefix+"/spaces/{spaceID}/agent-artifacts", spaces.AgentArtifacts())
 	s.Router.MethodFunc(http.MethodPut, prefix+"/spaces/{spaceID}/agent-listings/{agentID}", spaces.AgentListing())
 	s.Router.MethodFunc(http.MethodDelete, prefix+"/spaces/{spaceID}/agent-listings/{agentID}", spaces.AgentListing())
 	s.Router.Get(prefix+"/agent-requests/{requestID}", spaces.AgentMemberRequest())

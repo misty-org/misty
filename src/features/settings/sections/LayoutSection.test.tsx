@@ -62,8 +62,8 @@ it("hides a navigation destination through account settings", () => {
   const edit = vi.fn(async () => {});
   useSettingsProfiles.setState({ ready: true, syncing: false, edit });
   render(<LayoutSection />);
-  fireEvent.click(screen.getByRole("switch", { name: "Extensions" }));
-  expect(edit).toHaveBeenCalledWith("app.navigation.hidden", JSON.stringify(["extensions"]));
+  fireEvent.click(screen.getByRole("switch", { name: "Spaces" }));
+  expect(edit).toHaveBeenCalledWith("app.navigation.hidden", JSON.stringify(["spaces"]));
 });
 it("edits the current virtual window and restores its arrangement when switching", () => {
   const firstId = useWorkspaceStore.getState().activeWindowId;

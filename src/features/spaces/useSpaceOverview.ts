@@ -8,6 +8,7 @@ import { conversationName } from "./chat/sidebar/conversationGroups";
 import { notesApi } from "@/api/notes/api";
 import { drawingsApi } from "@/api/drawings/api";
 import { spacesApi } from "@/api/spaces/api";
+import { agentArtifactCredit, agentArtifactsApi } from "@/api/spaces/agent-artifacts";
 import type { Space, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
 import {
   createContext,
@@ -32,6 +33,8 @@ export type SpaceOverviewItem = {
   libraryItem?: SpaceLibraryItem;
   creatorUserId?: string;
   creatorAgentId?: string;
+  /** Who made an item an agent saved, e.g. "Researcher, Bob’s agent". */
+  creatorAgentName?: string;
   route: string;
   rename?: (title: string) => Promise<unknown>;
   renameRoute?: string;
@@ -231,16 +234,28 @@ function useSpaceOverviewData(
         );
       if (canRead)
         requests.push(
-          readAllLibraryItems(space.id).then(({ items }) =>
+          Promise.all([
+            readAllLibraryItems(space.id),
+            // Files agents saved keep who made them; the list itself still loads without it.
+            Promise.resolve()
+              .then(() => agentArtifactsApi.list(space.id))
+              .catch(() => ({ artifacts: [] })),
+          ]).then(([{ items }, { artifacts }]) =>
             items
               .filter((i) => !i.hidden && !i.trashed_at)
-              .map((i) => ({
+              .map((i) => {
+                const madeBy = artifacts.find((artifact) => artifact.item_id === i.id);
+                return { i, madeBy };
+              })
+              .map(({ i, madeBy }) => ({
                 id: `file:${i.id}`,
                 libraryItem: i,
                 title: i.display_name,
                 area: "Library",
                 kind: "file",
                 creatorUserId: i.added_by_user_id,
+                creatorAgentId: madeBy?.agent_id ?? (madeBy ? "agent" : undefined),
+                creatorAgentName: madeBy ? agentArtifactCredit(madeBy, accountId) : undefined,
                 createdAt: i.added_at,
                 updatedAt: i.updated_at,
                 route: `${base}/library?item=${encodeURIComponent(i.id)}`,
