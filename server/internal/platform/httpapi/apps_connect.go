@@ -12,11 +12,10 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// appsConnect makes sure the run's Space uses one of the person's accounts
-// for an app. With no account at all it shows a Connect card; with accounts
-// the Space doesn't use, a card to pick one. It waits briefly for the person;
-// if they haven't answered by then, the run hands off: the card stays in the
-// chat and Misty continues the conversation once the Space has the app.
+// appsConnect makes sure the person has an account for an app. With none it
+// shows a Connect card and waits briefly for the person; if they haven't
+// answered by then, the run hands off: the card stays in the chat and Misty
+// continues the conversation once the app is connected.
 func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 	var input struct {
 		App string `json:"app"`
@@ -32,23 +31,17 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	if err != nil {
 		return nil, appsError(err)
 	}
-	apps, err := s.loadSpaceApps(ctx, client, invocation)
-	if err != nil || len(apps.picked[app]) > 0 {
+	apps, err := s.loadRunApps(ctx, client, invocation)
+	if err != nil || len(apps.active[app]) > 0 {
 		return appsConnectResult(app, err == nil, err)
 	}
 	name := s.appsName(ctx, invocation.UserID, app)
-	known := map[string]bool{}
-	for _, account := range apps.active[app] {
-		known[account.ID] = true
+	if policy := s.searchAppPolicy(ctx, invocation); !policy.mayConnect(app) {
+		return nil, serveragent.ErrInvalidRequest(policy.refusal(name))
 	}
 	card := db.AgentAppRequest{
-		OwnerUserID: invocation.UserID, RunID: invocation.RunID, Kind: "connect", Subject: app, SpaceID: apps.SpaceID,
+		OwnerUserID: invocation.UserID, RunID: invocation.RunID, Kind: "connect", Subject: app,
 		Title: "Connect " + name, Summary: "Sign in to " + name + " so Misty can continue.",
-	}
-	if len(known) > 0 {
-		card.Kind, card.Title, card.Summary = "pick", "Use "+name+" in this Space", "Choose which of your "+name+" accounts this Space uses."
-	} else if policy := s.searchAppPolicy(ctx, invocation); !policy.mayConnect(app) {
-		return nil, serveragent.ErrInvalidRequest(policy.refusal(name))
 	}
 	pending, err := s.database.OpenAgentAppRequest(ctx, card, appsRequestTTL)
 	if err != nil {
@@ -61,7 +54,7 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	s.showAppRequest(ctx, invocation.UserID, invocation.RunID, pending)
 	ready := false
 	_, err = appsWaitFor(ctx, appsWait, 2*time.Second, func() (bool, error) {
-		if ok, err := s.appPickedIn(ctx, client, invocation.UserID, apps.SpaceID, app, card.Kind == "connect", known); err != nil || ok {
+		if ok, err := appsAccountActive(ctx, client, invocation.UserID, app); err != nil || ok {
 			ready = ok
 			return ok, err
 		}
@@ -84,13 +77,9 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	if pending.State == "declined" {
 		return nil, declined
 	}
-	action := "connects " + name
-	if card.Kind == "pick" {
-		action = "picks a " + name + " account for this Space"
-	}
 	return TestingMustAPIRawJSON(map[string]any{
 		"app": app, "status": "waiting_for_user",
-		"message":      "A " + card.Title + " card is showing in the chat. This run ends here and Misty continues once the user " + action + ".",
+		"message":      "A " + card.Title + " card is showing in the chat. This run ends here and Misty continues once the user connects " + name + ".",
 		"user_message": card.Summary + " Use the card above; Misty continues once it's done.",
 	}), nil
 }
@@ -105,26 +94,17 @@ func appsAccountActive(ctx context.Context, client *composio.Client, userID, app
 	return false, err
 }
 
-// refreshConnectRequest marks a pending Connect or pick card done once its
-// Space uses the app, so a card left after the run ended can continue the
-// conversation. An account connected from a Connect card becomes the Space's
-// pick.
+// refreshConnectRequest marks a pending Connect card done once the person has
+// the app, so a card left after the run ended can continue the conversation.
 func (s *SpacesService) refreshConnectRequest(ctx context.Context, user string, request *db.AgentAppRequest) *db.AgentAppRequest {
-	if (request.Kind != "connect" && request.Kind != "pick") || request.State != "pending" || !time.Now().Before(request.ExpiresAt) {
+	if request.Kind != "connect" || request.State != "pending" || !time.Now().Before(request.ExpiresAt) {
 		return request
 	}
 	client, err := composioClient()
 	if err != nil {
 		return request
 	}
-	var ok bool
-	if request.SpaceID == "" {
-		// Cards from before Spaces had picks.
-		ok, err = appsAccountActive(ctx, client, user, request.Subject)
-	} else {
-		ok, err = s.appPickedIn(ctx, client, user, request.SpaceID, request.Subject, request.Kind == "connect", nil)
-	}
-	if err != nil || !ok {
+	if ok, err := appsAccountActive(ctx, client, user, request.Subject); err != nil || !ok {
 		return request
 	}
 	if resolved, _ := s.database.ResolveAgentAppRequest(ctx, user, request.ID, "pending", "connected"); resolved {

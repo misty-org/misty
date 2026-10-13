@@ -1,7 +1,6 @@
 export interface AccountAuthUser {
   provider?: "misty" | "google";
   id: string;
-  name: string;
   username: string;
   email: string;
 }
@@ -9,7 +8,6 @@ export interface AccountAuthUser {
 export interface AccountMeResponse {
   provider?: "misty" | "google";
   id: string;
-  name: string;
   username: string;
   email: string;
   avatar_version?: number;
@@ -40,7 +38,6 @@ export interface LoginResponse {
   provider?: "misty" | "google";
   id?: string;
   user_id?: string;
-  name: string;
   username: string;
   email: string;
 }

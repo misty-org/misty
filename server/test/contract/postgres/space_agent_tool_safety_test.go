@@ -15,9 +15,7 @@ import ()
 func TestSpaceAgentWriteCallbacksAreIdempotent(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser(
-		"Idempotent Tool Owner",
-		"idempotent-tool-owner@example.com",
+	owner, err := database.CreateUser("idempotent-tool-owner@example.com",
 		"password123",
 	)
 	if err != nil {
@@ -74,9 +72,7 @@ func TestSpaceAgentWriteCallbacksAreIdempotent(t *testing.T) {
 func TestSpaceAgentCannotReadContentFromAnotherSpace(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser(
-		"Isolation Tool Owner",
-		"isolation-tool-owner@example.com",
+	owner, err := database.CreateUser("isolation-tool-owner@example.com",
 		"password123",
 	)
 	if err != nil {

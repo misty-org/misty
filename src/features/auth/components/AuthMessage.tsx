@@ -1,16 +1,20 @@
-import { Alert, AlertDescription, cn } from "@/shared/ui";
+import { cn } from "@/shared/ui";
 
 const toneClasses: Record<AuthMessageProps["tone"], string> = {
-  error: "border-charcoal-active/30 bg-charcoal-active text-cream-bright",
-  success: "border-charcoal-border bg-charcoal-card text-cream",
-  muted: "border-charcoal-border bg-charcoal-card text-cream-muted",
+  error: "text-cream",
+  success: "text-cream",
+  muted: "text-cream-muted",
 };
 
+/** A short status line under a form: small text, no box, so it never pushes the layout wide. */
 export default function AuthMessage({ tone, message }: AuthMessageProps) {
   return (
-    <Alert className={cn(toneClasses[tone])} variant={tone === "error" ? "destructive" : "default"}>
-      <AlertDescription className="text-current">{message}</AlertDescription>
-    </Alert>
+    <p
+      role={tone === "error" ? "alert" : "status"}
+      className={cn("break-words text-center text-xs leading-5", toneClasses[tone])}
+    >
+      {message}
+    </p>
   );
 }
 

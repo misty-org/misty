@@ -14,11 +14,11 @@ import ()
 func TestAgentMethodVersionsOwnershipAndSchedulePin(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := t.Context()
-	owner, err := database.CreateUser("Method owner", "method-"+uuid.NewString()+"@example.test", "password123")
+	owner, err := database.CreateUser("method-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := database.CreateUser("Other", "method-"+uuid.NewString()+"@example.test", "password123")
+	other, err := database.CreateUser("method-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

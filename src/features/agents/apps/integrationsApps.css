@@ -54,26 +54,6 @@
 .agent-integrations-account {
   padding: 8px 8px;
 }
-/* The integrations tree: an account's Spaces hang under it. */
-.agent-integrations-spaces {
-  display: grid;
-  gap: 2px;
-  margin: 4px 0 0;
-  padding: 0 0 0 10px;
-  border-left: 1px solid var(--color-charcoal-border);
-  list-style: none;
-}
-.agent-integrations-spaces li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--color-cream-muted);
-  font-size: 12.5px;
-}
-.agent-integrations-spaces li > svg {
-  flex-shrink: 0;
-}
 .agent-integrations-row > svg {
   flex-shrink: 0;
   color: var(--color-cream-muted);

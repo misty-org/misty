@@ -44,12 +44,9 @@ type connectedApp struct {
 	Account   string `json:"account,omitempty"`
 	Status    string `json:"status"`
 	CreatedAt string `json:"created_at"`
-	// Spaces are the person's Spaces that use this account.
-	Spaces []appSpace `json:"spaces"`
 }
 
-// ConnectedApps lists the account's connected apps, each with the Spaces that
-// use it: the integrations tree.
+// ConnectedApps lists the account's connected apps.
 func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.appsUser(w, r)
@@ -82,12 +79,6 @@ func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 			writeAppsError(w, err)
 			return
 		}
-		s.seedAppPicks(r.Context(), user, accounts)
-		spaces, err := s.appSpacesByAccount(r.Context(), user)
-		if err != nil {
-			writeAppsError(w, err)
-			return
-		}
 		apps := []connectedApp{}
 		for _, account := range accounts {
 			status := "needs_attention"
@@ -103,7 +94,7 @@ func (s *SpacesService) ConnectedApps() http.HandlerFunc {
 			if name == "" {
 				name = account.Toolkit.Slug
 			}
-			apps = append(apps, connectedApp{ID: account.ID, App: account.Toolkit.Slug, Name: name, Alias: account.Alias, Account: identities[account.ID], Status: status, CreatedAt: account.CreatedAt, Spaces: spaces.of(account.ID)})
+			apps = append(apps, connectedApp{ID: account.ID, App: account.Toolkit.Slug, Name: name, Alias: account.Alias, Account: identities[account.ID], Status: status, CreatedAt: account.CreatedAt})
 		}
 		sort.SliceStable(apps, func(i, j int) bool { return strings.ToLower(apps[i].Name) < strings.ToLower(apps[j].Name) })
 		writeJSON(w, http.StatusOK, map[string]any{"available": true, "apps": apps})
@@ -199,7 +190,6 @@ func (s *SpacesService) DisconnectApp() http.HandlerFunc {
 		}
 		// The account is gone from Composio, so a failure here only leaves picks
 		// that runs already ignore.
-		_ = s.database.ForgetIntegrationAccount(r.Context(), user, chi.URLParam(r, "accountID"))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

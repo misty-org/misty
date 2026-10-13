@@ -7,21 +7,18 @@ import SignIn from "./SignInPage";
 const mocks = vi.hoisted(() => {
   const accountA = {
     id: "account-a",
-    name: "Account A",
     username: "account-a",
     email: "a@example.test",
     lastUsedAt: "2026-07-20T00:00:00.000Z",
   };
   const accountB = {
     id: "account-b",
-    name: "Account B",
     username: "account-b",
     email: "b@example.test",
     lastUsedAt: "2026-07-21T00:00:00.000Z",
   };
   const meA = {
     id: accountA.id,
-    name: accountA.name,
     username: accountA.username,
     email: accountA.email,
     created_at: "2026-01-01T00:00:00.000Z",
@@ -32,7 +29,7 @@ const mocks = vi.hoisted(() => {
   const meB = {
     ...meA,
     id: accountB.id,
-    name: accountB.name,
+    username: accountB.username,
     email: accountB.email,
   };
   const userState = {
@@ -348,7 +345,6 @@ describe("AuthProvider account switching", () => {
     });
     const refreshedMe = {
       ...mocks.meA,
-      name: "Updated Account",
       username: "updated-account",
       avatar_version: 3,
       tier: "pro",
@@ -360,7 +356,6 @@ describe("AuthProvider account switching", () => {
     expect(mocks.userStore.setMe).toHaveBeenLastCalledWith(refreshedMe);
     expect(auth?.user).toMatchObject({
       id: mocks.accountA.id,
-      name: "Updated Account",
       username: "updated-account",
       avatarVersion: 3,
       currentPlan: "pro",

@@ -52,7 +52,6 @@ describe("native session account isolation", () => {
     const native: NativeSession = {
       current_user: {
         id: "account-b",
-        name: "Account B",
         username: "account-b",
         email: "b@example.test",
       },

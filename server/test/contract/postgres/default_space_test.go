@@ -12,13 +12,13 @@ import ()
 func TestEveryAccountStartsWithAProtectedPersonalSpace(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Default owner", "default-owner@example.com", "password123")
+	owner, err := database.CreateUser("default-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	spaces, err := database.ListSpaces(ctx, owner.ID)
-	if err != nil || len(spaces) != 1 || !spaces[0].IsDefault || spaces[0].Role != "owner" || spaces[0].Name != "Default's Space" {
+	if err != nil || len(spaces) != 1 || !spaces[0].IsDefault || spaces[0].Role != "owner" || spaces[0].Name != owner.Username+"'s Space" {
 		t.Fatalf("new account Spaces = %#v, %v, want one personal Space named after them", spaces, err)
 	}
 
@@ -48,11 +48,11 @@ func TestEveryAccountStartsWithAProtectedPersonalSpace(t *testing.T) {
 func TestDefaultSpaceCannotBeTransferred(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Transfer owner", "default-transfer-owner@example.com", "password123")
+	owner, err := database.CreateUser("default-transfer-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := database.CreateUser("Transfer member", "default-transfer-member@example.com", "password123")
+	member, err := database.CreateUser("default-transfer-member@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

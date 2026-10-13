@@ -19,11 +19,11 @@ func TestNativeAgentsPrivacyMemoryAndLeases(t *testing.T) {
 	t.Setenv("MISTY_AGENT_MODEL_API_KEY", "")
 	t.Setenv("MISTY_AGENT_MODEL_BASE_URL", "")
 	ctx := context.Background()
-	owner, err := database.CreateUser("Agent owner", "native-owner@example.com", "password123")
+	owner, err := database.CreateUser("native-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := database.CreateUser("Other owner", "native-other@example.com", "password123")
+	other, err := database.CreateUser("native-other@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

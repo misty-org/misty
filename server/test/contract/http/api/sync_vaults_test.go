@@ -30,7 +30,7 @@ func TestSyncVaultsPerSpace(t *testing.T) {
 	database := openPresenceTestDatabase(t)
 	ctx := context.Background()
 	newUser := func(name string) (string, string) {
-		user, err := database.CreateUserWithUsername(name, "sv"+strings.ReplaceAll(uuid.NewString()[:13], "-", ""), uniqueTestEmail("sv"), "password123")
+		user, err := database.CreateUserWithUsername("sv"+strings.ReplaceAll(uuid.NewString()[:13], "-", ""), uniqueTestEmail("sv"), "password123")
 		if err != nil {
 			t.Fatal(err)
 		}

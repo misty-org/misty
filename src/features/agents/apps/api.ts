@@ -1,14 +1,7 @@
 import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
-/** A Space in the integrations tree. */
-export interface AppSpace {
-  id: string;
-  name: string;
-  personal: boolean;
-}
-
-/** An app account connected once to the Misty account; each Space picks the accounts it uses. */
+/** An app account connected once to the Misty account; agents use it in every Space. */
 export interface ConnectedApp {
   id: string;
   app: string;
@@ -18,8 +11,6 @@ export interface ConnectedApp {
   account?: string;
   status: "active" | "pending" | "needs_attention";
   created_at: string;
-  /** Your Spaces that use this account. Private to you, even in a shared Space. */
-  spaces: AppSpace[];
 }
 
 export interface CatalogApp {
@@ -30,12 +21,11 @@ export interface CatalogApp {
 }
 
 /**
- * What an agent needs from the user to continue: connect an app, pick which of their accounts
- * the run's Space uses, or approve one action.
+ * What an agent needs from the user to continue: connect an app or approve one action.
  */
 export interface AppRequest {
   id: string;
-  kind: "connect" | "pick" | "approve";
+  kind: "connect" | "approve";
   subject: string;
   title: string;
   summary: string;
@@ -81,18 +71,6 @@ export const appsApi = {
   request: (id: string) => apiRequest<{ request: AppRequest }>(requestPath(id)),
   requestLink: (id: string) =>
     apiRequest<{ url: string }>(`${requestPath(id)}/link`, { method: "POST" }),
-  /** Answers a pick card: the account becomes one the run's Space uses. */
-  pick: (id: string, account: string) =>
-    apiRequest<{ request: AppRequest }>(`${requestPath(id)}/pick`, {
-      method: "POST",
-      body: JSON.stringify({ account }),
-    }),
-  /** Replaces which of your accounts one Space uses. */
-  setSpacePicks: (spaceId: string, accounts: string[]) =>
-    apiRequest<{ accounts: { id: string; app: string }[] }>(
-      `/integrations/apps/spaces/${encodeURIComponent(spaceId)}`,
-      { method: "PUT", body: JSON.stringify({ accounts }) },
-    ),
   decide: (id: string, decision: AppRequestDecision) =>
     apiRequest<{ request: AppRequest }>(requestPath(id), {
       method: "POST",

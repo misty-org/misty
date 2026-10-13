@@ -55,8 +55,8 @@ func TestAgentMemberRequestToolsAndBillingPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	alice, _ := database.CreateUser("Alice", "alice-members@example.test", "password123")
-	bob, _ := database.CreateUser("Bob", "bob-members@example.test", "password123")
+	alice, _ := database.CreateUser("alice-members@example.test", "password123")
+	bob, _ := database.CreateUser("bob-members@example.test", "password123")
 	space, err := database.TestingCreateSpace(ctx, alice.ID, "Launch team")
 	if err != nil {
 		t.Fatal(err)

@@ -31,7 +31,6 @@ export function resetAccountScopedState(previousAccountId?: string): void {
 export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSession): AuthUser {
   return {
     id: me.id || fallback.id,
-    name: me.name || fallback.name,
     username: me.username || fallback.username,
     email: me.email || fallback.email,
     avatarVersion: me.avatar_version,
@@ -102,8 +101,7 @@ export function clearStoredUser(): void {
 }
 export interface AuthUser {
   id: string;
-  name: string;
-  username?: string;
+  username: string;
   email: string;
   avatarVersion?: number;
   accountCreatedAt?: string;

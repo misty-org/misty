@@ -29,9 +29,9 @@ func TestA2AEndpointPostgres(t *testing.T) {
 	t.Cleanup(func() { a2aStreamPoll = restorePoll })
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	alice, _ := database.CreateUser("Alice", "a2a-alice@example.test", "password123")
-	bob, _ := database.CreateUser("Bob", "a2a-bob@example.test", "password123")
-	outsider, _ := database.CreateUser("Outsider", "a2a-outsider@example.test", "password123")
+	alice, _ := database.CreateUser("a2a-alice@example.test", "password123")
+	bob, _ := database.CreateUser("a2a-bob@example.test", "password123")
+	outsider, _ := database.CreateUser("a2a-outsider@example.test", "password123")
 	space, err := database.TestingCreateSpace(ctx, alice.ID, "Launch team")
 	if err != nil {
 		t.Fatal(err)

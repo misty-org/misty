@@ -5,23 +5,18 @@ import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
-import { PickAccountActions } from "./PickAccountActions";
 
 function stateLabel(request: AppRequest, expired: boolean) {
   if (expired) return "Expired";
   switch (request.state) {
     case "connected":
-      return request.kind === "pick" ? "Added to this Space" : "Connected";
+      return "Connected";
     case "approved":
       return "Accepted";
     case "used":
       return "Accepted and done";
     case "declined":
-      return request.kind === "connect"
-        ? "Not connected"
-        : request.kind === "pick"
-          ? "Not added"
-          : "Denied";
+      return request.kind === "connect" ? "Not connected" : "Denied";
     default:
       return "Expired";
   }
@@ -31,9 +26,9 @@ function stateLabel(request: AppRequest, expired: boolean) {
 const connectPollMs = 3_000;
 
 /**
- * In-chat card for something the agent needs: connect an app, pick which account
- * the Space uses, or approve one action. `onResolved` hears every answer, including a sign-in finished in the
- * browser, so the conversation can continue.
+ * In-chat card for something the agent needs: connect an app or approve one action.
+ * `onResolved` hears every answer, including a sign-in finished in the browser, so the
+ * conversation can continue.
  */
 export function AppRequestCard({
   request,
@@ -91,8 +86,6 @@ export function AppRequestCard({
       await openExternalLink(url);
       setOpened(true);
     });
-  const pick = (account: string) =>
-    act(async () => answered((await appsApi.pick(current.id, account)).request));
   const decide = (decision: AppRequestDecision) =>
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
@@ -116,13 +109,6 @@ export function AppRequestCard({
           Not now
         </Button>
       </>
-    ) : current.kind === "pick" ? (
-      <PickAccountActions
-        app={current.subject}
-        busy={busy}
-        onPick={(account) => void pick(account)}
-        onDismiss={() => void decide("deny")}
-      />
     ) : (
       <ApprovalActions
         request={current}

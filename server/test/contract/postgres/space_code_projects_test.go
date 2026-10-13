@@ -14,7 +14,7 @@ func TestCodeProjectsAreLinkedToSpacesByTheirOwner(t *testing.T) {
 	ctx := context.Background()
 	link := SpaceCodeProjectInput{ProjectID: "scope_site", DeviceID: "device_mac", Name: "Website", GitHubRepo: "bob/site"}
 	project, err := f.database.LinkSpaceCodeProject(ctx, f.bob.ID, f.space.ID, link)
-	if err != nil || project.OwnerName != "Bob" || project.GitHubRepo != "bob/site" {
+	if err != nil || project.OwnerName != f.bob.Username || project.GitHubRepo != "bob/site" {
 		t.Fatalf("linked project = %#v, %v", project, err)
 	}
 	link.Name = "Marketing site"
@@ -31,7 +31,7 @@ func TestCodeProjectsAreLinkedToSpacesByTheirOwner(t *testing.T) {
 	}
 
 	// Another member can't unlink it; the Space's owner can.
-	carol, err := f.database.CreateUser("Carol", "carol-code-projects@example.com", "password123")
+	carol, err := f.database.CreateUser("carol-code-projects@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

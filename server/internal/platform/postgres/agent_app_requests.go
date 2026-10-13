@@ -37,7 +37,7 @@ type AgentAppRequest struct {
 	Rememberable     bool            `json:"rememberable"`
 	// PermissionMode is the run's Ask or Auto when it paused.
 	PermissionMode string `json:"permission_mode,omitempty"`
-	// SpaceID is the Space a connect or pick card completes the picks of.
+	// SpaceID is unused now that accounts aren't chosen per Space; it stays for old rows.
 	SpaceID string `json:"space_id,omitempty"`
 }
 
@@ -54,7 +54,7 @@ func scanAgentAppRequest(row scanner, out *AgentAppRequest) error {
 // again.
 func (db *Database) OpenAgentAppRequest(ctx context.Context, request AgentAppRequest, ttl time.Duration) (*AgentAppRequest, error) {
 	request.Title, request.Summary = strings.TrimSpace(request.Title), strings.TrimSpace(request.Summary)
-	if request.OwnerUserID == "" || request.RunID == "" || (request.Kind != "connect" && request.Kind != "approve" && request.Kind != "pick") || len(request.Subject) < 2 || len(request.Subject) > 128 ||
+	if request.OwnerUserID == "" || request.RunID == "" || (request.Kind != "connect" && request.Kind != "approve") || len(request.Subject) < 2 || len(request.Subject) > 128 ||
 		request.Title == "" || len(request.Title) > 200 || len(request.Summary) > 4000 || ttl < time.Minute || ttl > time.Hour || len(request.SpaceID) > 200 ||
 		len(request.RememberLabel) > 300 || (request.Rememberable && (request.AgentID == "" || request.GrantAction == "" || request.GrantScopeKind == "" || request.GrantScopeID == "")) {
 		return nil, ErrSpaceInvalid

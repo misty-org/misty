@@ -15,7 +15,7 @@ import ()
 func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Note Tool Owner", "note-tool-owner@example.com", "password123")
+	owner, err := database.CreateUser("note-tool-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestSpaceAgentCreatesReadsAndUpdatesNativeNote(t *testing.T) {
 func TestSpaceAgentReadsAnEmptyNoteAsEmpty(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Empty Note Owner", "empty-note-owner@example.com", "password123")
+	owner, err := database.CreateUser("empty-note-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

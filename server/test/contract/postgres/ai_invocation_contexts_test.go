@@ -20,7 +20,7 @@ import ()
 func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Browser Context Owner", "browser-context-owner@example.com", "password123")
+	user, err := database.CreateUser("browser-context-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestUnifiedMistyInvocationOwnsAndExecutesItsBrowserContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := database.CreateUser("Family Member", "browser-context-member@example.com", "password123")
+	member, err := database.CreateUser("browser-context-member@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

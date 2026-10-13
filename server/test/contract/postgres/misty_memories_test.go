@@ -13,11 +13,11 @@ import ()
 func TestMistyMemoryIsExplicitPrivateScopedAndControllable(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Memory Owner", "memory-owner@example.com", "password123")
+	owner, err := database.CreateUser("memory-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := database.CreateUser("Memory Other", "memory-other@example.com", "password123")
+	other, err := database.CreateUser("memory-other@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

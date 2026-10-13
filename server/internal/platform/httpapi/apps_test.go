@@ -35,7 +35,7 @@ func TestAppsSearchViewSpeaksMistyToolNames(t *testing.T) {
 		"tool_schemas":{"GOOGLEDRIVE_CREATE_FILE_FROM_TEXT":{"toolkit":"googledrive","description":"Create a file","input_schema":{"type":"object"},"hasFullSchema":true},"GOOGLEDRIVE_FIND_FOLDER":{"toolkit":"googledrive","hasFullSchema":false}}}`), &result); err != nil {
 		t.Fatal(err)
 	}
-	encoded, _ := json.Marshal(appsSearchView(result, searchAppPolicy{}, spaceApps{}))
+	encoded, _ := json.Marshal(appsSearchView(result, searchAppPolicy{}, runApps{}))
 	text := string(encoded)
 	for _, want := range []string{"integration_execute after integration_schemas", `"input_schema":{"type":"object"}`, "Call integration_schemas for this tool", "Call integration_connect with app googledrive"} {
 		if !strings.Contains(text, want) {

@@ -46,7 +46,7 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	}
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "catalog-owner@example.test", "password123")
+	owner, _ := database.CreateUser("catalog-owner@example.test", "password123")
 	work, err := database.TestingCreateSpace(ctx, owner.ID, "Work")
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +125,7 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	}
 
 	// Threads: list, post as the agent, and read the post back.
-	teammate, _ := database.CreateUser("Teammate", "catalog-teammate@example.test", "password123")
+	teammate, _ := database.CreateUser("catalog-teammate@example.test", "password123")
 	if err := database.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO space_members(space_id,user_id,role) VALUES($1,$2,'member')`, work.ID, teammate.ID)
 		return err

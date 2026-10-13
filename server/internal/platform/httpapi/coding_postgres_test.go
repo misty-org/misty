@@ -19,7 +19,7 @@ import (
 func TestCodingDelegationPostgres(t *testing.T) {
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "coding-owner@example.test", "password123")
+	owner, _ := database.CreateUser("coding-owner@example.test", "password123")
 	device := "device_" + uuid.NewString()
 	// The device that holds the project was last seen an hour ago: offline.
 	if err := database.TestingSpaceTx(ctx, func(tx *sql.Tx) error {

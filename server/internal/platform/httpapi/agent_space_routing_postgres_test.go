@@ -22,11 +22,11 @@ func TestRoutedSpaceToolsPostgres(t *testing.T) {
 	}
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, err := database.CreateUser("Global owner", "global-owner@example.test", "password123")
+	owner, err := database.CreateUser("global-owner@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := database.CreateUser("Other owner", "global-other@example.test", "password123")
+	other, err := database.CreateUser("global-other@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -153,7 +153,7 @@ func TestPrivateAgentCantBeMentionedBySomeoneElse(t *testing.T) {
 func TestItemsStartPrivateInASoloSpace(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Solo", "solo-layers@example.com", "password123")
+	user, err := database.CreateUser("solo-layers@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

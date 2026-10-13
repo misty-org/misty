@@ -112,7 +112,6 @@ export function useStartupSessionValidation(
         setUserState((current) => ({
           ...(current ?? activeUser),
           id: me.id,
-          name: me.name,
           username: me.username,
           email: me.email,
           accountCreatedAt: me.created_at,

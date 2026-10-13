@@ -21,8 +21,8 @@ func TestAgentItemToolsPostgres(t *testing.T) {
 	}
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "items-owner@example.test", "password123")
-	teammate, _ := database.CreateUser("Teammate", "items-teammate@example.test", "password123")
+	owner, _ := database.CreateUser("items-owner@example.test", "password123")
+	teammate, _ := database.CreateUser("items-teammate@example.test", "password123")
 	work, err := database.TestingCreateSpace(ctx, owner.ID, "Work")
 	if err != nil {
 		t.Fatal(err)

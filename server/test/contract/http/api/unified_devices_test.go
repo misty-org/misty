@@ -45,7 +45,7 @@ func (d testDevice) public() string {
 
 func newDeviceFixture(t *testing.T) *deviceFixture {
 	database := openPresenceTestDatabase(t)
-	user, err := database.CreateUserWithUsername("Device owner", "dev"+strings.ReplaceAll(uuid.NewString()[:13], "-", ""), uniqueTestEmail("dev"), "password123")
+	user, err := database.CreateUserWithUsername("dev"+strings.ReplaceAll(uuid.NewString()[:13], "-", ""), uniqueTestEmail("dev"), "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,6 +3,7 @@ import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { routes } from "@/features/app-shell";
 import { useAuth } from "./AuthContext";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import AuthCard from "./components/AuthCard";
@@ -32,9 +33,12 @@ export default function SignIn() {
       : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount);
   const reauthenticateEmail = routeState?.reauthenticateEmail ?? "";
+  // Saved accounts come first, even when adding one; with none, straight to the login form.
   const [mode, setMode] = useState<"chooser" | "login" | "forgot">(
-    accounts.length > 0 && !addingAccount ? "chooser" : "login",
+    accounts.length > 0 && !reauthenticateEmail ? "chooser" : "login",
   );
+  const back = () =>
+    user ? navigate(from, { replace: true }) : navigate(routes.welcome, { replace: true });
   const [email, setEmail] = useState(reauthenticateEmail);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(
@@ -104,32 +108,29 @@ export default function SignIn() {
 
   if (mode === "chooser") {
     return (
-      <AuthShell
-        title="Choose an account"
-        onBack={user ? () => navigate(from, { replace: true }) : undefined}
-      >
+      <AuthShell title="Choose an account" onBack={back}>
         <AuthCard>
           <div className="flex flex-col gap-2">
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="group flex items-center gap-2 rounded-lg border border-charcoal-border p-1 transition hover:border-charcoal-active"
+                className="group flex items-center gap-1 rounded-lg border border-charcoal-border p-1 transition-colors hover:bg-white/5 focus-within:bg-white/5"
               >
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-auto min-w-0 flex-1 justify-start gap-3 p-1.5 text-left font-normal"
+                  className="h-auto min-w-0 flex-1 justify-start gap-3 p-1.5 text-left font-normal hover:bg-transparent"
                   onClick={() => void handleSelect(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
                 >
                   <Avatar className="size-9 shrink-0">
                     <AvatarFallback className="text-xs font-semibold">
-                      {accountInitials(account.name || account.email)}
+                      {accountInitials(account.username || account.email)}
                     </AvatarFallback>
                   </Avatar>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-cream">
-                      {account.name || account.email}
+                      {account.username || account.email}
                     </span>
                     <span className="block truncate text-xs text-cream-muted">{account.email}</span>
                   </span>
@@ -140,7 +141,7 @@ export default function SignIn() {
                 <IconButton
                   label={`Remove ${account.email}`}
                   title="Remove from this device"
-                  className="mr-1 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                  className="mr-1 shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                   onClick={() => void handleRemove(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
                 >
@@ -200,14 +201,12 @@ export default function SignIn() {
             : "Welcome back"
       }
       onBack={
-        addingAccount
-          ? () => navigate(from, { replace: true })
-          : accounts.length > 0
-            ? () => {
-                setError("");
-                setMode("chooser");
-              }
-            : undefined
+        accounts.length > 0
+          ? () => {
+              setError("");
+              setMode("chooser");
+            }
+          : back
       }
     >
       <AuthCard
@@ -221,13 +220,7 @@ export default function SignIn() {
           </NavLink>
         }
       >
-        <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-          <GoogleSignInButton
-            disabled={loading || transitioning}
-            onBusy={setLoading}
-            onError={setError}
-            onSuccess={() => navigate(from, { replace: true })}
-          />
+        <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
           <AuthField
             id="signin-email"
             label="Email"
@@ -269,6 +262,17 @@ export default function SignIn() {
             loadingLabel="Signing in..."
             loading={loading}
             disabled={transitioning}
+          />
+          <div className="flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
+            <span className="h-px flex-1 bg-charcoal-border" />
+            or
+            <span className="h-px flex-1 bg-charcoal-border" />
+          </div>
+          <GoogleSignInButton
+            disabled={loading || transitioning}
+            onBusy={setLoading}
+            onError={setError}
+            onSuccess={() => navigate(from, { replace: true })}
           />
         </form>
       </AuthCard>

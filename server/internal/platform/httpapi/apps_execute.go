@@ -46,9 +46,9 @@ func (s *SpacesService) appsExecute(ctx context.Context, invocation agenttools.I
 	if err != nil {
 		return nil, appsError(err)
 	}
-	// The call runs as an account the run's Space picked, named explicitly, so
+	// The call runs as one of the person's own accounts, named explicitly, so
 	// Composio never falls back to another of the person's accounts.
-	apps, err := s.loadSpaceApps(ctx, client, invocation)
+	apps, err := s.loadRunApps(ctx, client, invocation)
 	if err != nil {
 		return nil, appsError(err)
 	}

@@ -29,7 +29,7 @@ func TestDeviceAgentToolsPostgres(t *testing.T) {
 		t.Setenv("DB_"+name, os.Getenv("TEST_DB_"+name))
 	}
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "device-tools-owner@example.test", "password123")
+	owner, _ := database.CreateUser("device-tools-owner@example.test", "password123")
 	publicKey, _, _ := ed25519.GenerateKey(rand.Reader)
 	device, err := database.RegisterTrustedDevice(owner.ID, "Studio Mac", base64.RawURLEncoding.EncodeToString(publicKey), "macos", "", json.RawMessage(`[]`), json.RawMessage(`{}`))
 	if err != nil {

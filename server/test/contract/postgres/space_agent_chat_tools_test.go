@@ -14,7 +14,7 @@ import ()
 func TestPrivateSpaceAgentSendsExactMessageThroughServerOwnedToolbox(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Space Message Owner", "space-message-owner@example.com", "password123")
+	owner, err := database.CreateUser("space-message-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,11 +54,11 @@ func TestPrivateSpaceAgentSendsExactMessageThroughServerOwnedToolbox(t *testing.
 func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Matthew Chen", "private-message-owner@example.com", "password123")
+	owner, err := database.CreateUser("private-message-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := database.CreateUser("Melissa Chen", "private-message-member@example.com", "password123")
+	member, err := database.CreateUser("private-message-member@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 	result, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
 		"Tell Melissa Chen to please finish the laundry by tonight", "message.send",
-		json.RawMessage(`{"message":"@Melissa Chen, please finish the laundry by tonight.","audience":"auto","recipientUserId":"`+member.ID+`"}`),
+		json.RawMessage(`{"message":"@`+member.Username+`, please finish the laundry by tonight.","audience":"auto","recipientUserId":"`+member.ID+`"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -104,14 +104,14 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 	if json.Unmarshal(messages[0].Origin, &origin) != nil || messages[0].SenderKind != "system" || origin.Kind != "misty_assistant" {
 		t.Fatalf("Misty identity provenance = %#v", messages[0])
 	}
-	if len(messages[0].Content) < 2 || messages[0].Content[0].Type != "mention" || messages[0].Content[0].UserID != member.ID || messages[0].Content[0].Label != member.Name {
+	if len(messages[0].Content) < 2 || messages[0].Content[0].Type != "mention" || messages[0].Content[0].UserID != member.ID || messages[0].Content[0].Label != member.Username {
 		t.Fatalf("structured mention content = %#v", messages[0].Content)
 	}
 
 	groupResult, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
 		"Post in the group chat that Melissa Chen will finish the laundry tonight", "message.send",
-		json.RawMessage(`{"message":"@Melissa Chen will finish the laundry tonight.","audience":"space","recipientUserId":"`+member.ID+`"}`),
+		json.RawMessage(`{"message":"@`+member.Username+` will finish the laundry tonight.","audience":"space","recipientUserId":"`+member.ID+`"}`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Family Research Owner", "family-research-owner@example.com", "password123")
+	owner, err := database.CreateUser("family-research-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

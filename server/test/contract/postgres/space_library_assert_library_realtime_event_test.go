@@ -45,7 +45,7 @@ func TestMissingDeduplicationObjectCanBeReplacedByNewUpload(t *testing.T) {
 	database := openTestDatabase(t)
 	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Library Repair Owner", "library-repair-owner@example.com", "password123")
+	owner, err := database.CreateUser("library-repair-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,8 +126,8 @@ func TestLibraryQuotaReservationsDrawOnEachAccountsAllowance(t *testing.T) {
 	database := openTestDatabase(t)
 	useResourceAdapterFixture(t, database)
 	ctx := context.Background()
-	owner, _ := database.CreateUser("Quota Owner", "quota-owner@example.com", "password123")
-	member, _ := database.CreateUser("Quota Member", "quota-member@example.com", "password123")
+	owner, _ := database.CreateUser("quota-owner@example.com", "password123")
+	member, _ := database.CreateUser("quota-member@example.com", "password123")
 	spaceID := createTestSpace(t, database, ctx, owner.ID, "Quota").ID
 	invite, err := database.TestingInviteToSpace(ctx, owner.ID, spaceID, member.Email)
 	if err != nil {

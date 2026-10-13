@@ -22,7 +22,6 @@ function authenticatedUser(data: LoginResponse, operation: string): AccountAuthU
   if (!id) throw new AccountApiError(`${operation} response did not include a user id.`);
   return {
     id,
-    name: data.name,
     username: data.username,
     email: data.email,
     provider: data.provider,
@@ -113,12 +112,11 @@ export async function accountForgotPassword(email: string): Promise<void> {
 }
 
 export async function accountRegister(
-  name: string,
   username: string,
   email: string,
   password: string,
 ): Promise<AccountAuthUser> {
-  const body = { name, username, email, password };
+  const body = { username, email, password };
   return persistLogin(await accountApi.register(body), "Registration");
 }
 

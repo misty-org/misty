@@ -15,11 +15,11 @@ import ()
 func TestSpaceContextRevisionTracksVisibleChanges(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Revision Owner", "revision-owner@example.com", "password123")
+	owner, err := database.CreateUser("revision-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	member, err := database.CreateUser("Revision Member", "revision-member@example.com", "password123")
+	member, err := database.CreateUser("revision-member@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

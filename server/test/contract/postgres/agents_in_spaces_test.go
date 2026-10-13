@@ -13,16 +13,16 @@ import (
 func TestAgentsAreMembersUnderTheirOwner(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	alice, err := database.CreateUser("Alice Lee", "alice-agent-home@example.com", "password123")
+	alice, err := database.CreateUser("alice-agent-home@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	bob, err := database.CreateUser("Bob", "bob-agent-home@example.com", "password123")
+	bob, err := database.CreateUser("bob-agent-home@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
 	home := personalSpace(t, database, ctx, alice.ID)
-	if home.Name != "Alice's Space" {
+	if home.Name != alice.Username+"'s Space" {
 		t.Fatalf("personal Space name = %q", home.Name)
 	}
 	if _, err := database.EnsureAskIdentity(ctx, alice.ID, "google/gemini-2.5-flash-lite"); err != nil {
@@ -52,7 +52,7 @@ func TestAgentsAreMembersUnderTheirOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	agents, err = database.SpaceAgents(ctx, bob.ID, shared.ID)
-	if err != nil || len(agents) != 1 || agents[0].AgentID != writer.ID || agents[0].OwnerName != "Alice Lee" {
+	if err != nil || len(agents) != 1 || agents[0].AgentID != writer.ID || agents[0].OwnerName != alice.Username {
 		t.Fatalf("Studio's agents = %#v, %v", agents, err)
 	}
 	// An agent can be in many Spaces at once.
@@ -60,7 +60,7 @@ func TestAgentsAreMembersUnderTheirOwner(t *testing.T) {
 		t.Fatalf("Writer's Spaces = %v, %v", ids, err)
 	}
 	// Only its owner or the Space's owner can take it out.
-	carol, err := database.CreateUser("Carol", "carol-agent-home@example.com", "password123")
+	carol, err := database.CreateUser("carol-agent-home@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +178,7 @@ func TestAgentArtifactsSaveToSpacesTheAgentIsIn(t *testing.T) {
 		t.Fatalf("owner's view = %#v, %v", mine, err)
 	}
 	theirs, err := f.database.SpaceAgentArtifacts(ctx, f.alice.ID, f.space.ID, f.bobAgent.ID, 0)
-	if err != nil || len(theirs) != 1 || theirs[0].OwnerName != "Bob" || theirs[0].ConversationID != "" || theirs[0].RunID != "" {
+	if err != nil || len(theirs) != 1 || theirs[0].OwnerName != f.bob.Username || theirs[0].ConversationID != "" || theirs[0].RunID != "" {
 		t.Fatalf("another member's view = %#v, %v, want the item without Bob's private conversation", theirs, err)
 	}
 }

@@ -8,7 +8,7 @@ import (
 func TestVerifyUserPassword(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, _ := database.CreateUser("Password Owner", "password-owner@example.com", "password123")
+	owner, _ := database.CreateUser("password-owner@example.com", "password123")
 	if valid, err := database.VerifyUserPassword(ctx, owner.ID, "password123"); err != nil || !valid {
 		t.Fatalf("VerifyUserPassword(valid) = %v, %v", valid, err)
 	}

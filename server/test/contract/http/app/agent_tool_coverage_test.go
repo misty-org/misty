@@ -46,7 +46,6 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /ai/senses`, why: "model choices are account settings"},
 	{pattern: `^\S+ /(ai/settings|settings/|me/settings$|ai/preferences/|ai/recaps/)`, why: "account settings change in Settings, never by an agent"},
 	{pattern: `^POST /integrations/apps/connect$`, tool: "integration.connect"},
-	{pattern: `^PUT /integrations/apps/spaces/`, why: "which accounts a Space uses is its owner's choice; a run asks with integration.connect's pick card"},
 	{pattern: `^\S+ /(connections|integrations/apps/connections|provider-callbacks|oauth)/`, why: "connecting an account needs the person to sign in"},
 	{pattern: `^POST /integrations/github/repos$`, why: "publishing a project is the person's choice; agents push through their coding tool, which asks first"},
 	{pattern: `^\S+ /(me/app-requests|me/agent-interventions)/`, why: "a person's answer to an agent's card"},

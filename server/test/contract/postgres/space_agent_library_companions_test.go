@@ -16,7 +16,7 @@ import ()
 func TestSpaceAgentReadsUpdatesAndPromotesLibraryItems(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Library Tool Owner", "library-tool-owner@example.com", "password123")
+	owner, err := database.CreateUser("library-tool-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

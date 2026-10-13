@@ -9,7 +9,7 @@ import { accountLogout } from "../store/useAccountStore";
 import { deactivateActiveAccount, listSavedAccountSessions } from "../store/useAuthTokenStore";
 import type { AccountStateSetters } from "./providerTypes";
 
-// Signs out the active account and returns to the sign-in chooser without
+// Signs out the active account and returns to Welcome, ahead of the chooser, without
 // silently jumping to another saved account. Every account stays listed.
 // Saving the workspace and clearing native identity are best-effort: a failed
 // cleanup step is reported, but never leaves the person signed in.
@@ -44,7 +44,7 @@ export function useDeactivateToChooser(
       resetAccountScopedState(accountId);
       setUserState(null);
       setAccounts(listSavedAccountSessions());
-      navigate("/signin", {
+      navigate("/welcome", {
         replace: true,
       });
       for (const error of failures) {

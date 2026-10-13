@@ -182,7 +182,7 @@ func (db *Database) CompleteAccountDeletion(
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE users
-			SET name='Deleted user',username=$1,email=$2,
+			SET username=$1,email=$2,
 			    password_hash=CASE WHEN provider='google' THEN '' ELSE $3 END,
 			    provider_subject=NULL,
 			    email_updates_enabled=FALSE,analytics_enabled=FALSE,

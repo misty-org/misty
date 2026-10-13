@@ -87,7 +87,9 @@ DELETE /v1/spaces/{spaceID}/notes/{noteID}
 DELETE /v1/spaces/{spaceID}/notes/{noteID}/assets/{assetID}
 GET /a2a/push
 GET /a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /agent-mentions
 GET /agent-requests/{requestID}
+GET /agent-requests/{requestID}/transcript
 GET /agent-runs/{runID}
 GET /agent-voice/realtime
 GET /ai/activity
@@ -108,7 +110,9 @@ GET /ai/workflow-schedules
 GET /ai/workflow-schedules/device-runs
 GET /api/a2a/push
 GET /api/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /api/agent-mentions
 GET /api/agent-requests/{requestID}
+GET /api/agent-requests/{requestID}/transcript
 GET /api/agent-runs/{runID}
 GET /api/agent-voice/realtime
 GET /api/ai/activity
@@ -289,7 +293,9 @@ GET /sync/vaults
 GET /sync/ws
 GET /v1/a2a/push
 GET /v1/a2a/spaces/{spaceID}/agents/{agentID}/.well-known/agent-card.json
+GET /v1/agent-mentions
 GET /v1/agent-requests/{requestID}
+GET /v1/agent-requests/{requestID}/transcript
 GET /v1/agent-runs/{runID}
 GET /v1/agent-voice/realtime
 GET /v1/ai/activity
@@ -487,7 +493,6 @@ POST /api/me/agent-plans/{planID}/{action}
 POST /api/me/agent-questions/{questionID}/answer
 POST /api/me/app-requests/{requestID}
 POST /api/me/app-requests/{requestID}/link
-POST /api/me/app-requests/{requestID}/pick
 POST /api/me/coding/{invocationID}/approvals
 POST /api/me/coding/{invocationID}/events
 POST /api/me/coding/{invocationID}/lease
@@ -596,7 +601,6 @@ POST /me/agent-plans/{planID}/{action}
 POST /me/agent-questions/{questionID}/answer
 POST /me/app-requests/{requestID}
 POST /me/app-requests/{requestID}/link
-POST /me/app-requests/{requestID}/pick
 POST /me/coding/{invocationID}/approvals
 POST /me/coding/{invocationID}/events
 POST /me/coding/{invocationID}/lease
@@ -710,7 +714,6 @@ POST /v1/me/agent-plans/{planID}/{action}
 POST /v1/me/agent-questions/{questionID}/answer
 POST /v1/me/app-requests/{requestID}
 POST /v1/me/app-requests/{requestID}/link
-POST /v1/me/app-requests/{requestID}/pick
 POST /v1/me/coding/{invocationID}/approvals
 POST /v1/me/coding/{invocationID}/events
 POST /v1/me/coding/{invocationID}/lease
@@ -801,12 +804,10 @@ PUT /api/ai/settings/keep-awake
 PUT /api/ai/settings/screen-location
 PUT /api/devices/{deviceID}/devices/{targetID}/name
 PUT /api/devices/{deviceID}/policy
-PUT /api/integrations/apps/spaces/{spaceID}
 PUT /api/me/avatar
 PUT /api/me/coding/engines
 PUT /api/me/conversations/{conversationID}/mode
 PUT /api/me/device
-PUT /api/me/profile
 PUT /api/me/settings
 PUT /api/me/telemetry
 PUT /api/misty/agents/{agentID}
@@ -822,12 +823,10 @@ PUT /api/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/nodes/{nodeID}
 PUT /devices/{deviceID}/devices/{targetID}/name
 PUT /devices/{deviceID}/policy
-PUT /integrations/apps/spaces/{spaceID}
 PUT /me/avatar
 PUT /me/coding/engines
 PUT /me/conversations/{conversationID}/mode
 PUT /me/device
-PUT /me/profile
 PUT /me/settings
 PUT /me/telemetry
 PUT /misty/agents/{agentID}
@@ -855,12 +854,10 @@ PUT /v1/ai/settings/keep-awake
 PUT /v1/ai/settings/screen-location
 PUT /v1/devices/{deviceID}/devices/{targetID}/name
 PUT /v1/devices/{deviceID}/policy
-PUT /v1/integrations/apps/spaces/{spaceID}
 PUT /v1/me/avatar
 PUT /v1/me/coding/engines
 PUT /v1/me/conversations/{conversationID}/mode
 PUT /v1/me/device
-PUT /v1/me/profile
 PUT /v1/me/settings
 PUT /v1/me/telemetry
 PUT /v1/misty/agents/{agentID}

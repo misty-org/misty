@@ -23,11 +23,11 @@ func newMemberRequestFixture(t *testing.T) memberRequestFixture {
 	t.Helper()
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	alice, err := database.CreateUser("Alice", "alice-member-request@example.com", "password123")
+	alice, err := database.CreateUser("alice-member-request@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	bob, err := database.CreateUser("Bob", "bob-member-request@example.com", "password123")
+	bob, err := database.CreateUser("bob-member-request@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestAgentMemberRequestRunsAsTargetOwnerAtOnce(t *testing.T) {
 		t.Fatalf("bringing someone else's agent = %v", err)
 	}
 	agents, err := f.database.SpaceAgents(ctx, f.alice.ID, f.space.ID)
-	if err != nil || len(agents) != 1 || agents[0].AgentID != f.bobAgent.ID || agents[0].OwnerName != "Bob" {
+	if err != nil || len(agents) != 1 || agents[0].AgentID != f.bobAgent.ID || agents[0].OwnerName != f.bob.Username {
 		t.Fatalf("Space agents = %#v, %v", agents, err)
 	}
 
@@ -119,7 +119,7 @@ func TestAgentMemberRequestRunsAsTargetOwnerAtOnce(t *testing.T) {
 		t.Fatalf("delegated work billing command = %q, %v", command, err)
 	}
 	found, err := f.database.AgentMemberRequestForRun(ctx, child.ID)
-	if err != nil || found.ID != request.ID || found.RequesterName != "Alice" {
+	if err != nil || found.ID != request.ID || found.RequesterName != f.alice.Username {
 		t.Fatalf("request for run = %#v, %v", found, err)
 	}
 	if err := f.database.ValidateAgentMemberRequestRun(ctx, child.ID); err != nil {

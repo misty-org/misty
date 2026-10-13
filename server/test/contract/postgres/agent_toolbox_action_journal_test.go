@@ -14,7 +14,7 @@ import (
 func TestAgentEffectClaimIsExclusiveAcrossWorkers(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := t.Context()
-	user, err := database.CreateUser("Concurrent", "concurrent-effects@example.invalid", "password123")
+	user, err := database.CreateUser("concurrent-effects@example.invalid", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestAgentEffectClaimIsExclusiveAcrossWorkers(t *testing.T) {
 func TestAgentToolboxActionJournalReplaysSuccessAndRetriesOnlyReads(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Toolbox Journal", "toolbox-journal@example.com", "correct horse battery staple")
+	user, err := database.CreateUser("toolbox-journal@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestAgentToolboxActionJournalReplaysSuccessAndRetriesOnlyReads(t *testing.T
 func TestAgentToolboxActionJournalNeverRetriesUncertainWrite(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Uncertain", "uncertain@example.com", "correct horse battery staple")
+	user, err := database.CreateUser("uncertain@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestAgentToolboxActionJournalNeverRetriesUncertainWrite(t *testing.T) {
 func TestAgentToolboxActionJournalResumesUndispatchedDeviceAction(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	user, err := database.CreateUser("Device", "device-journal@example.com", "correct horse battery staple")
+	user, err := database.CreateUser("device-journal@example.com", "correct horse battery staple")
 	if err != nil {
 		t.Fatal(err)
 	}

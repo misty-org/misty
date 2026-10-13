@@ -135,11 +135,14 @@ export function listSavedAccountSessions(): SavedAccountSession[] {
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     if (!Array.isArray(parsed)) return [];
     const activeId = readActiveAccountId();
-    return parsed.filter(isSavedAccountSession).sort((left, right) => {
-      if (left.id === activeId) return -1;
-      if (right.id === activeId) return 1;
-      return right.lastUsedAt.localeCompare(left.lastUsedAt);
-    });
+    return parsed
+      .map(savedAccountSession)
+      .filter(isPresent)
+      .sort((left, right) => {
+        if (left.id === activeId) return -1;
+        if (right.id === activeId) return 1;
+        return right.lastUsedAt.localeCompare(left.lastUsedAt);
+      });
   } catch {
     return [];
   }
@@ -313,7 +316,8 @@ function parseSecureVault(raw: string | null): {
       const value = JSON.parse(raw) as Partial<SecureAccountVault>;
       if (value.version === 1 && Array.isArray(value.sessions)) {
         const sessions = value.sessions
-          .filter(isSecureAccountSession)
+          .map(secureAccountSession)
+          .filter(isPresent)
           .filter((session) => session.token.startsWith("cookie-session:"));
         return {
           vault: {
@@ -432,8 +436,7 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
     if (!value.id || !value.email) return null;
     return {
       id: value.id,
-      name: value.name || value.email,
-      username: value.username,
+      username: value.username || usernameFromEmail(value.email),
       email: value.email,
       accountCreatedAt: value.accountCreatedAt,
       currentPlan: value.currentPlan,
@@ -442,20 +445,32 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
     return null;
   }
 }
-function isSavedAccountSession(value: unknown): value is SavedAccountSession {
-  if (!value || typeof value !== "object") return false;
-  const item = value as Partial<SavedAccountSession>;
-  return Boolean(item.id && item.email && item.name && item.lastUsedAt);
+function usernameFromEmail(email: string): string {
+  return email.split("@")[0] ?? email;
 }
-function isSecureAccountSession(value: unknown): value is SecureAccountSession {
-  if (!value || typeof value !== "object") return false;
+const isPresent = <T>(value: T | null): value is T => value !== null;
+/** Accounts saved before usernames replaced display names carry a `name` and no username. */
+function savedAccountSession(value: unknown): SavedAccountSession | null {
+  if (!value || typeof value !== "object") return null;
+  const { name: _name, ...item } = value as Partial<SavedAccountSession> & { name?: unknown };
+  if (!item.id || !item.email || !item.lastUsedAt) return null;
+  return {
+    ...item,
+    username: item.username || usernameFromEmail(item.email),
+  } as SavedAccountSession;
+}
+function secureAccountSession(value: unknown): SecureAccountSession | null {
+  if (!value || typeof value !== "object") return null;
   const item = value as Partial<SecureAccountSession>;
-  return Boolean(
-    typeof item.token === "string" &&
-    item.token.length > 0 &&
-    isSavedAccountSession(item.account) &&
-    (item.deploymentScope === undefined || typeof item.deploymentScope === "string"),
-  );
+  const account = savedAccountSession(item.account);
+  if (
+    typeof item.token !== "string" ||
+    item.token.length === 0 ||
+    !account ||
+    (item.deploymentScope !== undefined && typeof item.deploymentScope !== "string")
+  )
+    return null;
+  return { ...item, account } as SecureAccountSession;
 }
 function sessionDeploymentScope(session: SecureAccountSession): string {
   return session.deploymentScope || "hosted";

@@ -1,4 +1,4 @@
-import { CircleAlert, LayoutGrid, Plug, Plus } from "lucide-react";
+import { CircleAlert, Plug, Plus } from "lucide-react";
 import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
 import type { ConnectedApp } from "./api";
 
@@ -74,7 +74,6 @@ export function AppAccountsCard({
           <div className="agent-integrations-row-text">
             <strong>{labels[index]}</strong>
             <AccountStatus item={item} />
-            <AccountSpaces item={item} />
           </div>
           <AccountActions
             item={item}
@@ -98,23 +97,6 @@ export function AppAccountsCard({
         Add account
       </Button>
     </div>
-  );
-}
-
-/** The integrations tree: the Spaces under each account that use it. */
-function AccountSpaces({ item }: { item: ConnectedApp }) {
-  const spaces = item.spaces ?? [];
-  if (item.status === "pending") return null;
-  if (spaces.length === 0) return <span>Not used in any Space</span>;
-  return (
-    <ul className="agent-integrations-spaces" aria-label="Used in">
-      {spaces.map((space) => (
-        <li key={space.id}>
-          <LayoutGrid size={12} aria-hidden="true" />
-          <span>{space.name}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
 

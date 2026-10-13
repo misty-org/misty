@@ -28,11 +28,11 @@ func newMemoryTestFixture(t *testing.T) memoryTestFixture {
 	t.Helper()
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Tree Owner", "tree-"+uuid.NewString()+"@example.test", "password123")
+	owner, err := database.CreateUser("tree-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	teammate, err := database.CreateUser("Tree Teammate", "tree-"+uuid.NewString()+"@example.test", "password123")
+	teammate, err := database.CreateUser("tree-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

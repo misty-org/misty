@@ -49,9 +49,9 @@ func planBilling(t *testing.T, plans map[string]db.Tier) {
 func TestCodingPlanGatePostgres(t *testing.T) {
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	basic, _ := database.CreateUser("Basic", "coding-basic@example.test", "password123")
-	pro, _ := database.CreateUser("Pro", "coding-pro@example.test", "password123")
-	ultra, _ := database.CreateUser("Ultra", "coding-ultra@example.test", "password123")
+	basic, _ := database.CreateUser("coding-basic@example.test", "password123")
+	pro, _ := database.CreateUser("coding-pro@example.test", "password123")
+	ultra, _ := database.CreateUser("coding-ultra@example.test", "password123")
 	planBilling(t, map[string]db.Tier{basic.ID: db.TierBasic, pro.ID: db.TierPro, ultra.ID: db.TierUltraPlus})
 
 	service := &SpacesService{database: database, aiInvocations: newAIInvocationHub(database)}

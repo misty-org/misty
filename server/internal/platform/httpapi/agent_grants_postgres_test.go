@@ -61,8 +61,8 @@ type gateOutcome struct {
 func TestAgentGrantsPostgres(t *testing.T) {
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "grants-owner@example.test", "password123")
-	other, _ := database.CreateUser("Other", "grants-other@example.test", "password123")
+	owner, _ := database.CreateUser("grants-owner@example.test", "password123")
+	other, _ := database.CreateUser("grants-other@example.test", "password123")
 	helper, err := database.SavePersonalAgent(ctx, owner.ID, "", db.AgentProfileInput{Name: "Helper", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestAgentGrantsPostgres(t *testing.T) {
 func TestAgentPermissionModeAdmissionPostgres(t *testing.T) {
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "modes-owner@example.test", "password123")
+	owner, _ := database.CreateUser("modes-owner@example.test", "password123")
 	helper, _ := database.SavePersonalAgent(ctx, owner.ID, "", db.AgentProfileInput{Name: "Helper", Enabled: true, DefaultRunMode: "auto"})
 	if helper.DefaultRunMode != "auto" {
 		t.Fatalf("default run mode = %q", helper.DefaultRunMode)

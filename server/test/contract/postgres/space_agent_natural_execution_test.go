@@ -16,7 +16,7 @@ import ()
 func TestSpaceAgentPersistsFinishedFiveParagraphJournalEssay(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := context.Background()
-	owner, err := database.CreateUser("Essay Note Owner", "essay-note-owner@example.com", "password123")
+	owner, err := database.CreateUser("essay-note-owner@example.com", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}

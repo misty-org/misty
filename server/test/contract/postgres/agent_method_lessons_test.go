@@ -13,11 +13,11 @@ import (
 func TestAgentMethodLessonsVersionPerOwner(t *testing.T) {
 	database := openTestDatabase(t)
 	ctx := t.Context()
-	owner, err := database.CreateUser("Lesson owner", "lesson-"+uuid.NewString()+"@example.test", "password123")
+	owner, err := database.CreateUser("lesson-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := database.CreateUser("Other", "lesson-"+uuid.NewString()+"@example.test", "password123")
+	other, err := database.CreateUser("lesson-"+uuid.NewString()+"@example.test", "password123")
 	if err != nil {
 		t.Fatal(err)
 	}
