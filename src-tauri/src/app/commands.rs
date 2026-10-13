@@ -3,7 +3,6 @@ use std::{
     env,
     path::Path,
     process::Command,
-    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -147,46 +146,9 @@ pub async fn agents_list_scoped_files(
     state.agents.list_scoped_files(request).await
 }
 
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn agents_prepare_scoped_document(
-    webview: tauri::Webview,
-    instance: String,
-    request: PrepareScopedAgentDocumentRequest,
-    state: State<'_, MistyRuntime>,
-    native: State<'_, crate::platform::mini_app::MiniAppState>,
-) -> ApiResult<PreparedAgentDocument> {
-    if webview.label() != "main" {
-        return Err(crate::error::ApiError::Message(
-            "Only the Host can process approved device scopes.".into(),
-        ));
-    }
-    let lease = Arc::new(
-        crate::infra::document_intelligence::ServiceLease::acquire(&native, &instance, "files")
-            .await
-            .map_err(crate::error::ApiError::Message)?,
-    );
-    let _cancel = lease.cancel_on_drop();
-    let target = state.agents.scoped_document_path(request).await?;
-    let worker = lease.clone();
-    let result = tokio::task::spawn_blocking(move || worker.process(&target, "document"))
-        .await
-        .map_err(|_| crate::error::ApiError::Message("Document worker failed.".into()))?;
-    lease
-        .validate(&native, &instance)
-        .map_err(crate::error::ApiError::Message)?;
-    let response = result.map_err(crate::error::ApiError::Message)?;
-    serde_json::from_value(
-        response
-            .get("document")
-            .cloned()
-            .ok_or_else(|| crate::error::ApiError::Message("No document returned.".into()))?,
-    )
-    .map_err(|_| crate::error::ApiError::Message("Invalid document response.".into()))
-}
-/// Windows parses the document in the confined worker; the shared folder's
-/// file is copied in, never opened by the worker in place.
-#[cfg(windows)]
+/// The document is parsed in the bundled worker, confined by the operating
+/// system; the shared folder's file is copied in, never opened in place.
+#[cfg(any(windows, target_os = "macos"))]
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
     webview: tauri::Webview,

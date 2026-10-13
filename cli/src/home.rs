@@ -53,10 +53,6 @@ pub fn generate(destination: Option<&Path>) -> Result<()> {
     }
 
     write_if_missing(&destination.join("home.json"), &manifest_bytes()?)?;
-    write_if_missing(
-        &destination.join("config/misty.json"),
-        b"{\n  \"server\": {\n    \"mode\": \"hosted\"\n  }\n}\n",
-    )?;
     secure_known_files(&destination)?;
 
     println!("Misty home is ready at {}.", destination.display());

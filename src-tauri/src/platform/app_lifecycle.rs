@@ -50,8 +50,6 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         if let Some(runtime) = app.try_state::<crate::app::runtime::MistyRuntime>() {
             runtime.code.shutdown();
         }
-        #[cfg(desktop)]
-        super::mini_app::shutdown(app);
         crate::telemetry::shutdown();
     }
 }

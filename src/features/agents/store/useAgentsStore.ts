@@ -1,4 +1,3 @@
-import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffSet } from "../components/changes/diffTypes";
 import type { AgentDeviceSnapshot, PreparedAgentDocument } from "../model/types";
@@ -103,26 +102,11 @@ async function republishDeviceFolders(): Promise<void> {
 }
 
 export async function agentsPrepareScopedDocument(
-  request: {
-    scopeId: string;
-    relativePath: string;
-    spaceId: string;
-  },
+  request: { scopeId: string; relativePath: string },
   signal?: AbortSignal,
 ): Promise<PreparedAgentDocument> {
-  if (!supportsBundledDocumentWorkers())
-    return invoke("agents_prepare_scoped_document", {
-      request: { scopeId: request.scopeId, relativePath: request.relativePath },
-    });
-  const { withBuiltinService } = await import("@/features/builtin-services");
-  return withBuiltinService(
-    "files",
-    request.spaceId,
-    (instance) =>
-      invoke<PreparedAgentDocument>("agents_prepare_scoped_document", {
-        instance,
-        request: { scopeId: request.scopeId, relativePath: request.relativePath },
-      }),
-    signal,
-  );
+  signal?.throwIfAborted();
+  return invoke<PreparedAgentDocument>("agents_prepare_scoped_document", {
+    request: { scopeId: request.scopeId, relativePath: request.relativePath },
+  });
 }

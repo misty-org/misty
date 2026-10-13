@@ -2,25 +2,15 @@
   "layoutVersion": 2,
   "directories": [
     ".auth",
-    ".cache",
-    ".cache/remotes",
-    ".cache/search",
-    ".cache/thumbnails",
-    ".cache/trash",
-    ".local/bin",
     "config",
-    "db",
-    "tmp/downloads",
-    "tmp/transfers"
+    "db"
   ],
   "privateFiles": [
-    "config/jwt.secret",
-    "config/misty.json",
     "config/settings.json",
     "config/workspaces.json",
     "db/data.db",
-    "db/token.key",
-    "home.json"
+    "home.json",
+    "session.json"
   ],
   "retired": [
     ".cache/mail",

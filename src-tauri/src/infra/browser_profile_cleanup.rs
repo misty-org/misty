@@ -19,7 +19,7 @@ pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), Str
             .collect::<Vec<_>>()
     };
     for id in ids {
-        browser_webview_close(
+        close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             BrowserWebviewIdRequest { id },

@@ -376,7 +376,7 @@ pub(crate) async fn run(app: AppHandle) -> bool {
         report(stage, result);
         passed &= result.is_ok();
     }
-    let _ = browser_webview_close(
+    let _ = close_browser_webview(
         app.clone(),
         app.state::<BrowserSessionState>(),
         BrowserWebviewIdRequest { id: ID.into() },

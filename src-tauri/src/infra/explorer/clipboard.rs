@@ -5,55 +5,19 @@ impl ExplorerService {
         &self,
         request: PasteItemsRequest,
     ) -> ApiResult<ExplorerOperationResult> {
-        self.paste_items_impl(request, None, None).await
+        self.paste_items_impl(request, None).await
     }
 
     pub(super) async fn paste_items_impl(
         &self,
         request: PasteItemsRequest,
         cancellation: Option<&AtomicBool>,
-        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled_if(cancellation)?;
         self.validate_paste_paths(&request)?;
-        let mut transfer_ids = Vec::with_capacity(request.sources.len());
-        for item in &request.sources {
-            let file_name = request
-                .target_name
-                .as_deref()
-                .filter(|_| request.sources.len() == 1)
-                .unwrap_or_else(|| {
-                    Path::new(&item.path)
-                        .file_name()
-                        .and_then(|value| value.to_str())
-                        .unwrap_or(&item.path)
-                })
-                .to_string();
-            let mut record = FileTransferRecord::new(
-                match request.operation {
-                    crate::domain::explorer::ClipboardOperation::Copy => FileTransferType::Copy,
-                    crate::domain::explorer::ClipboardOperation::Move => FileTransferType::Move,
-                },
-                FileTransferItemType::Local,
-                &file_name,
-            );
-            record.local_source_path = item.path.clone();
-            record.local_dest_path =
-                display_path(&Path::new(&request.destination_directory).join(file_name));
-            record.total_bytes = local_item_size(Path::new(&item.path), item.is_directory).await;
-            record.detail_message = "Transferring local item".to_string();
-            if let Some(id) = if existing_transfer_id.is_some() {
-                existing_transfer_id
-            } else {
-                self.begin_transfer(record).await
-            } {
-                transfer_ids.push(id);
-            }
-        }
-        let result = tokio::task::spawn_blocking(move || paste_items(request))
+        tokio::task::spawn_blocking(move || paste_items(request))
             .await
-            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?;
-        self.finish_transfers(&transfer_ids, result).await
+            .map_err(|err| ApiError::Message(format!("Explorer worker failed: {err}")))?
     }
 
     pub async fn paste_items_with_cancellation(
@@ -63,32 +27,14 @@ impl ExplorerService {
     ) -> ApiResult<ExplorerOperationResult> {
         ensure_not_canceled(cancellation.as_ref())?;
 
-        self.paste_local_items_with_cancellation(request, cancellation.as_ref(), None)
+        self.paste_local_items_with_cancellation(request, cancellation.as_ref())
             .await
-    }
-
-    pub async fn paste_items_with_cancellation_transfer(
-        &self,
-        request: PasteItemsRequest,
-        cancellation: Arc<AtomicBool>,
-        transfer_id: u64,
-    ) -> ApiResult<ExplorerOperationResult> {
-        ensure_not_canceled(cancellation.as_ref())?;
-        let existing_transfer_id = nonzero_transfer_id(transfer_id);
-
-        self.paste_local_items_with_cancellation(
-            request,
-            cancellation.as_ref(),
-            existing_transfer_id,
-        )
-        .await
     }
 
     pub(super) async fn paste_local_items_with_cancellation(
         &self,
         request: PasteItemsRequest,
         cancellation: &AtomicBool,
-        existing_transfer_id: Option<u64>,
     ) -> ApiResult<ExplorerOperationResult> {
         if request.sources.is_empty() {
             return Err(ApiError::Message("Copy or cut an item first.".to_string()));
@@ -108,7 +54,6 @@ impl ExplorerService {
         };
         let mut affected_paths = Vec::new();
         self.validate_paste_paths(&request)?;
-        let mut transfer_ids = Vec::with_capacity(request.sources.len());
 
         for item in &request.sources {
             self.validate_paste_paths(&request)?;
@@ -135,69 +80,20 @@ impl ExplorerService {
                 ));
             }
 
-            let file_name = file_name.to_string_lossy().to_string();
-            let mut record = FileTransferRecord::new(
-                match request.operation {
-                    crate::domain::explorer::ClipboardOperation::Copy => FileTransferType::Copy,
-                    crate::domain::explorer::ClipboardOperation::Move => FileTransferType::Move,
-                },
-                FileTransferItemType::Local,
-                &file_name,
-            );
-            record.local_source_path = display_path(&source);
-            record.local_dest_path = display_path(&destination);
-            let total_bytes = local_item_size(&source, item.is_directory).await;
-            record.total_bytes = total_bytes;
-            record.detail_message = "Transferring local item".to_string();
-            if let Some(id) = if existing_transfer_id.is_some() {
-                existing_transfer_id
-            } else {
-                self.begin_transfer(record).await
-            } {
-                transfer_ids.push(id);
-            }
-
-            let mut progress = transfer_ids.last().map(|id| {
-                super::transfer_progress::LocalTransferProgress::new(
-                    self.transfers.clone(),
-                    *id,
-                    total_bytes,
-                )
-            });
-            if let Some(id) = transfer_ids.last() {
-                let _ = self.transfers.reset_local_progress(*id, total_bytes).await;
-            }
             let result = match request.operation {
                 crate::domain::explorer::ClipboardOperation::Copy => {
-                    copy_local_path_with_progress(
-                        &source,
-                        &destination,
-                        cancellation,
-                        progress.as_mut(),
-                    )
-                    .await
+                    copy_local_path_cancellable(&source, &destination, cancellation).await
                 }
                 crate::domain::explorer::ClipboardOperation::Move => {
-                    move_local_path_with_progress(
-                        &source,
-                        &destination,
-                        cancellation,
-                        progress.as_mut(),
-                    )
-                    .await
+                    move_local_path_cancellable(&source, &destination, cancellation).await
                 }
             };
-            if let Some(progress) = progress.as_mut() {
-                progress.flush().await;
-            }
-            let result = cleanup_partial_destination_on_cancel(
+            cleanup_partial_destination_on_cancel(
                 &destination,
                 source_metadata.is_dir() && !source_metadata.file_type().is_symlink(),
                 result,
             )
-            .await;
-            self.finish_transfers(&transfer_ids, result).await?;
-            transfer_ids.clear();
+            .await?;
             affected_paths.push(display_path(&destination));
         }
 

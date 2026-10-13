@@ -398,11 +398,7 @@ async function executeWorkflowNodeOnDevice(
   }
   const ref = deviceContentReference(job.input, job.scopeId);
   const document = await agentsPrepareScopedDocument(
-    {
-      scopeId: ref.scopeId,
-      relativePath: ref.relativePath,
-      spaceId: job.spaceId ?? "",
-    },
+    { scopeId: ref.scopeId, relativePath: ref.relativePath },
     signal,
   );
   const content = {

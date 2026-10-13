@@ -39,10 +39,6 @@ Found **63 declarations in 50 files**. Multiple declarations in a file are liste
 | [src-tauri/src/infra/browser_sync/history.rs:98](../../src-tauri/src/infra/browser_sync/history.rs#L98) | Local history scan; queues changed records | 60s | History dirty/collection events + retention deadline | T23 |
 | [src-tauri/src/infra/connected_devices.rs:1683](../../src-tauri/src/infra/connected_devices.rs#L1683) | Disk scan -> peer invalidation on change | 1s | Shared OS directory watches | T25 |
 | [src-tauri/src/infra/space_peer_files.rs:89](../../src-tauri/src/infra/space_peer_files.rs#L89) | Disk scan -> peer invalidation on change | 1s | Shared OS directory watches | T25 |
-| [src-tauri/src/platform/mini_app_file_index.rs:188](../../src-tauri/src/platform/mini_app_file_index.rs#L188) | Local worker authority checks | 100ms while operation active | Cancellation notification + deadline | T36 |
-| [src-tauri/src/platform/mini_app_peer.rs:243](../../src-tauri/src/platform/mini_app_peer.rs#L243) | Local authority checks around peer work | 100ms at three sites | Cancellation/revocation channels and exact lease deadlines; preserve checks | T36 |
-| [src-tauri/src/platform/mini_app_peer.rs:255](../../src-tauri/src/platform/mini_app_peer.rs#L255) | Local authority checks around peer work | 100ms at three sites | Cancellation/revocation channels and exact lease deadlines; preserve checks | T36 |
-| [src-tauri/src/platform/mini_app_peer.rs:591](../../src-tauri/src/platform/mini_app_peer.rs#L591) | Local authority checks around peer work | 100ms at three sites | Cancellation/revocation channels and exact lease deadlines; preserve checks | T36 |
 | [src/app/layouts/AppPagesLayout.tsx:37](../../src/app/layouts/AppPagesLayout.tsx#L37) | Credential refresh path | 10min | Use token expiry/auth transitions; avoid unconditional refresh | T05/T36 |
 | [src/app/layouts/DesktopLayout/useDesktopBootstrap.ts:81](../../src/app/layouts/DesktopLayout/useDesktopBootstrap.ts#L81) | Local discovery; possible index/upload work | Account-configured discovery interval | File/provider notifications; documented unsupported-provider fallback | T25/T36 |
 | [src/features/activity/useOperationActivity.ts:26](../../src/features/activity/useOperationActivity.ts#L26) | Local IPC | 5s | Native operation queue events | T24 |
@@ -85,7 +81,7 @@ Found **63 declarations in 50 files**. Multiple declarations in a file are liste
 | `src/api/client/cookie-session.ts` | Per-generation single-flight refresh with cached failure | Preserve; coordinate all request families and window generation changes (T05) |
 | `src/features/spaces/store/createSpacesRealtimeActions.ts` | Exponential retry; attempt resets immediately on open | Stable-success reset, full jitter, terminal-auth stop and listener-outage reset (T16/T19) |
 | `src/features/ai-surface/invocationStream.ts` | Three linear retries; resumes Last-Event-ID | Exponential jitter, retain cursor and no replay of task creation (T19) |
-| `src/features/connected-devices/useConnectedDevices.ts` | Fixed 30s builtin-service restart | Backoff/jitter and terminal-error classification (T19) |
+| `src/features/connected-devices/useConnectedDevices.ts` | Fixed 30s service restart | Backoff/jitter and terminal-error classification (T19) |
 | `src/features/browser-workspace/BrowserSyncStartup.tsx` | Healthy native worker inspected every 30s; failed workers reopened at capped 30s–5min delay without jitter | Subscribe to worker terminal-state changes; preserve failure cooldown and add jitter (T05/T19/T24) |
 | `src/features/browser-workspace/controller.ts` | Debounced capture, deadline and failed-write retry | Keep event-triggered batching; semantic dirty checks and idempotent capped failure retries (T22) |
 | `src/features/workspace/useWorkspaceRecoveryRetry.ts`, `nativeWorkspaceRecovery.ts` | Recovery/retry timers on main; PR #212 changes this area | Reconcile with #212 before editing; retain durable local saving and backoff |
@@ -118,8 +114,8 @@ Found **63 declarations in 50 files**. Multiple declarations in a file are liste
 | Observability sampling / health probes | `metrics.go`, domain gauges, Docker `/health` | Keep low-rate bounded operations monitoring; eliminate redundant count queries |
 | Scheduled jobs, retention and lease expiry | Time passage emits no notification | Use next-deadline timers, bounded indexed cleanup and distributed ownership |
 | External file/cloud providers without change streams | Generic file-sync remote scanner; actual provider support still needs validation | Prefer push; only keep jittered adaptive polling with a written provider-specific reason |
-| Native authority/cancellation watchdogs | `mini_app_peer`, `mini_app_file_index`, document/file/process workers | Replace with channels/deadlines; preserve revocation and cancellation guarantees |
-| Native process I/O waits | `mini_app_download_process`, `mini_app_media_process`, `mini_app_document_processing`, `mini_app_download_proxy`, `operation_queue`, `media_search` | Evented I/O/process completion where possible; bounded active-operation waits are not server traffic |
+| Native authority/cancellation watchdogs | Document and process workers | Replace with channels/deadlines; preserve revocation and cancellation guarantees |
+| Native process I/O waits | `operation_queue`, `media_search` | Evented I/O/process completion where possible; bounded active-operation waits are not server traffic |
 | Native browser readiness/action verification | `browser_website_storage`, frontend agent restore/normal-tabs helpers | Event callbacks where available; bounded post-action observations may remain because readiness is asynchronous |
 | Clipboard, tray and local companion observations | `native_clipboard` 500ms, `tray` 3s, companion platform/host waits | OS notifications or bounded local fallback; no automatic server-byte claim |
 | Browser action reconciliation | `server/internal/browseractions/executor.go`, `agents/tier.go` | Bounded verification retries are tied to a user/agent action; do not replay uncertain effects |

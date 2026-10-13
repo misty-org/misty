@@ -297,12 +297,12 @@ mod tests {
         let base = temp("recreate");
         let root = base.join(".misty");
         ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
-        fs::remove_dir_all(root.join("tmp")).unwrap();
+        fs::remove_dir_all(root.join("db")).unwrap();
 
         let report = ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
 
-        assert!(report.created.contains(&"tmp/downloads".to_owned()));
-        assert!(root.join("tmp/transfers").is_dir());
+        assert!(report.created.contains(&"db".to_owned()));
+        assert!(root.join("db").is_dir());
         let _ = fs::remove_dir_all(base);
     }
 }

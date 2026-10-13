@@ -68,6 +68,8 @@ pub mod devices;
 #[cfg(windows)]
 mod devices_windows;
 pub mod document_intelligence;
+#[cfg(target_os = "macos")]
+pub(crate) mod document_worker_macos;
 #[cfg(windows)]
 pub(crate) mod document_worker_windows;
 pub mod environment;
@@ -85,7 +87,6 @@ pub mod settings;
 mod settings_migration;
 #[cfg(desktop)]
 pub mod system_dependencies;
-pub mod transfers;
 #[cfg(desktop)]
 pub mod tray;
 #[cfg(windows)]

@@ -9,7 +9,7 @@ use crate::infra::{
     agents::AgentService, commands::CommandService, devices::DeviceService,
     environment::AppEnvironmentService, explorer::ExplorerService,
     explorer_library::ExplorerLibraryService, settings::SettingsService,
-    transfers::TransferService, workspaces::WorkspaceService,
+    workspaces::WorkspaceService,
 };
 
 pub struct MistyRuntime {
@@ -59,16 +59,11 @@ impl MistyRuntime {
             cloud_clipboard.set_handler(receive);
             let _ = clipboard.start();
         }
-        let transfers = TransferService::new(environment.clone());
         let settings = SettingsService::new(environment.clone());
         let commands = CommandService::new(environment.clone());
         let devices = DeviceService::new();
         let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(
-            environment.clone(),
-            transfers.clone(),
-            explorer_library.clone(),
-        );
+        let explorer = ExplorerService::new(environment.clone(), explorer_library.clone());
         let agents = AgentService::new(environment.clone());
         let code = Arc::new(
             misty_agent_code::CodeService::new(environment.agent_code_dir(), dirs::home_dir())

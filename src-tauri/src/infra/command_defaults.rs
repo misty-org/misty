@@ -186,10 +186,6 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
                 shortcut: "Cmd+Shift+P",
             },
             DefaultCommandEntry {
-                id: "app.toggle_transfers",
-                shortcut: "Cmd+Shift+Y",
-            },
-            DefaultCommandEntry {
                 id: "clipboard.publish_shared",
                 shortcut: "Cmd+Alt+C",
             },
@@ -383,10 +379,6 @@ pub(super) fn default_command_entries() -> &'static [DefaultCommandEntry] {
             DefaultCommandEntry {
                 id: "app.toggle_plugin_launcher",
                 shortcut: "Ctrl+Shift+P",
-            },
-            DefaultCommandEntry {
-                id: "app.toggle_transfers",
-                shortcut: "Ctrl+Shift+Y",
             },
             DefaultCommandEntry {
                 id: "clipboard.publish_shared",

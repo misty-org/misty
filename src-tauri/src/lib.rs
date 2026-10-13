@@ -104,10 +104,7 @@ use infra::browser_search_suggest::browser_search_suggest;
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(desktop)]
 use infra::browser_site_style::browser_set_mouse_gestures;
-use infra::misty::{
-    check_system, ensure_local_access_token, save_authenticated_user, save_verified_license,
-    sign_out_misty,
-};
+use infra::misty::{check_system, save_authenticated_user, save_verified_license, sign_out_misty};
 #[cfg(desktop)]
 use infra::tray;
 use platform::plugins::mac_rounded_corners;
@@ -261,9 +258,6 @@ pub fn run() {
         });
 
     #[cfg(desktop)]
-    let builder = builder.manage(platform::mini_app::MiniAppState::default());
-
-    #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
         let id = event.id().as_ref();
         #[cfg(target_os = "macos")]
@@ -365,10 +359,6 @@ pub fn run() {
                     #[cfg(windows)]
                     crate::infra::window_snap_windows::window_show_snap_layouts,
                     crate::infra::default_browser::app_take_launch_urls,
-                    #[cfg(desktop)]
-                    platform::mini_app::builtin_service_open,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_close,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
                     app_snapshot,
@@ -449,7 +439,6 @@ pub fn run() {
                     #[cfg(desktop)]
                     #[cfg(desktop)]
                     check_system,
-                    ensure_local_access_token,
                     save_authenticated_user,
                     save_verified_license,
                     sign_out_misty,

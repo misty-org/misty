@@ -19,7 +19,7 @@ Legend: ✓ done · ◐ done with a stated Windows limit · — not needed on Wi
 | Browser and Kiri | 27 | 2 | 1 | 30 |
 | Extensions | 14 | 9 | 0 | 23 |
 | Agents and desktop control | 19 | 1 | 2 | 22 |
-| Files, mini apps and local services | 16 | 0 | 6 | 22 |
+| Files and the document worker | 2 | 0 | 0 | 2 |
 
 Verified on Windows 11 (x64):
 
@@ -260,37 +260,16 @@ React UI need no Windows-specific code:
 | A-21 | Microphone denied message | ✓ | Plain message with the Settings path. |
 | A-22 | Companion hold, hooks, overlay, keep awake | ✓ | Already worked. |
 
-## Files, mini apps and local services
+## Files and the document worker
 
-Apps' installed-tool services share one sandbox (`platform/mini_app_tool_sandbox.rs`): `sandbox-exec`
-on macOS, and on Windows an AppContainer and job holding the `mistyHostTools` capability. Only the
-tool itself and the libraries beside it are shared, never its folder, so a tool exploited by a
-hostile file can't read whatever folder it sits in.
+Third-party app hosting and its host services were removed from Misty on every platform, so the app-facing rows of
+this section (permissions, downloads, media, archives, folder grants and the shared tool sandbox) no
+longer exist. Only the bundled document worker remains, for agent document preparation.
 
 | ID | Capability | State | What was done |
 | --- | --- | --- | --- |
 | M-1 | Bundled confined workers | ✓ | The document worker is built as an `.exe` and runs in an AppContainer (F2). |
-| M-2 | App document processing and image preview | ✓ | Through the confined worker (`document_worker_windows::run_file`). |
-| M-3 | Agent document prep | ✓ | In the worker. |
-| M-4 | App archive preview | ✓ | Zip in-process. Tar through Windows' `tar.exe`; 7z and RAR through 7-Zip, or UnRAR for RAR, in the tool sandbox. |
-| M-5 | Media conversion | ✓ | FFmpeg in the tool sandbox, with the same arguments as macOS (tested with a real FFmpeg). |
-| M-6 | Media downloads | ✓ | yt-dlp in an AppContainer holding only `internetClient`, its workspace mapped to its own drive letter so yt-dlp can create folders. A real `yt-dlp.exe` inspects and downloads a public video (`MISTY_TEST_PUBLIC_MEDIA=1`). See Known Windows limits. |
-| M-7 | Encrypted backups | — | Removed on macOS too (`5a9c6e76`), along with the host code. `backups.status` reports unavailable; other `backups.*` calls return a not-available error. |
-| M-8 | App file transfers and prepared copies | — | Removed on macOS too (`5a9c6e76`), along with the host code. `files.transferStart` and `files.transferPrepared` return a not-available error; Host-started transfers still report status. |
-| M-9 | App folder scans | — | As M-8. |
-| M-11 | Code LSP processes and tree drafts | — | LSP removed on macOS too (`5a9c6e76`), along with the host code; `code.lsp.*` returns a not-available error. Tree drafts remain macOS-only. |
-| M-12 | LAN device transport | — | The LAN layer is gone. |
-| M-13 | Directory observation | ✓ | `ReadDirectoryChangesW` with F3 identity. |
-| M-14 | Open a granted file | ✓ | `ShellExecuteExW`. |
-| M-15 | Host native-path resolve | ✓ | F3. |
-| M-16 | Remembered folders | ✓ | Volume serial, 128-bit file ID and creation time, sealed in the DPAPI store. Moved folders are found again by `OpenFileById`, and a replacement at the old path is refused. Local NTFS or ReFS drives only. |
-| M-17 | Exclusive rename | ✓ | `FileRenameInfoEx` without replace. |
-| M-18 | App Trash | ✓ | Platform-neutral. |
-| M-19 | Clipboard file copy and paste | ✓ | `CF_HDROP`. |
-| M-20 | Explorer previews for Office and video | — | The built-in file manager moved to Kura. |
-| M-22 | Synced download folder validation | ✓ | Other local fixed and removable drives are allowed. The system drive outside the home folder, and hidden or system folders, are refused. |
-| M-23 | Clipboard change detection | ✓ | Polling, as before. |
-| M-24 | Frontend gates | ✓ | Windows uses the same paths as macOS. |
+| M-3 | Agent document prep | ✓ | In the worker (`document_worker_windows`); macOS uses `document_worker_macos` under `sandbox-exec`. |
 
 ## Cleanup, not parity
 

@@ -49,3 +49,16 @@ test("release builds and help do not use development signing", () => {
     assert.deepEqual(prepareTauriDevelopment(args), args);
   }
 });
+
+test("Windows dev runs a copy of the executable so Cargo can relink", () => {
+  const platform = Object.getOwnPropertyDescriptor(process, "platform")!;
+  Object.defineProperty(process, "platform", { value: "win32" });
+  try {
+    const args = prepareTauriDevelopment(["dev"]);
+    const runner = JSON.parse(args[2]).build.runner;
+    assert.match(runner.args[1], /x86_64-pc-windows-msvc/);
+    assert.match(runner.args[1], /run-windows-desktop\.ts/);
+  } finally {
+    Object.defineProperty(process, "platform", platform);
+  }
+});

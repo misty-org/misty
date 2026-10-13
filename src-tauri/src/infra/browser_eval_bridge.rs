@@ -258,7 +258,7 @@ async fn open(bridge: &Bridge, body: OpenTab) -> Result<Value, String> {
     }
     .await;
     if let Err(error) = created {
-        let _ = browser_webview_close(
+        let _ = close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             serde_json::from_value(json!({ "id": id })).map_err(|e| e.to_string())?,
@@ -404,7 +404,7 @@ async fn close(AxumState(bridge): AxumState<Bridge>, headers: HeaderMap, body: B
     let closed = serde_json::from_value(json!({ "id": tab.id }))
         .map_err(|e| e.to_string())
         .and_then(|close| {
-            browser_webview_close(app.clone(), app.state::<BrowserSessionState>(), close)
+            close_browser_webview(app.clone(), app.state::<BrowserSessionState>(), close)
         });
     if let Ok(view) = main_view(app) {
         let _ = agent_workspace::agent_workspace_release(

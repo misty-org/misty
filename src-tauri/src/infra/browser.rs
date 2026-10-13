@@ -1902,9 +1902,21 @@ pub fn browser_webview_set_theme(
         if label.starts_with("misty-browser-") && webview.window().label() == window.label() {
             // Update reused views as well as newly created ones. A transparent
             // document must not inherit Misty's dark toolbar canvas.
-            webview
-                .set_background_color(Some(browser_background(&request.theme)))
-                .map_err(|error| error.to_string())?;
+            // A page that already reported its color keeps it; resetting it to
+            // the default canvas flashes white when the tab is shown again.
+            #[cfg(any(target_os = "macos", windows))]
+            let reported = label
+                .strip_prefix("misty-browser-")
+                .and_then(host_messages::reported_page_background);
+            #[cfg(not(any(target_os = "macos", windows)))]
+            let reported: Option<String> = None;
+            match reported {
+                #[cfg(any(target_os = "macos", windows))]
+                Some(hex) => host_messages::apply_page_background(&webview, hex),
+                _ => webview
+                    .set_background_color(Some(browser_background(&request.theme)))
+                    .map_err(|error| error.to_string())?,
+            }
             webview
                 .eval("document.getElementById('__misty_pane_dim__')?.remove();")
                 .map_err(|error| error.to_string())?;
@@ -2223,7 +2235,7 @@ pub(super) fn close_account_views_except(
         {
             continue;
         }
-        browser_webview_close(
+        close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             BrowserWebviewIdRequest { id },
@@ -2232,8 +2244,20 @@ pub(super) fn close_account_views_except(
     Ok(())
 }
 
+/// Async so it never runs on the UI thread. While the UI thread builds another
+/// webview it holds Tauri's webview-context lock and pumps messages, which can
+/// deliver this very request; closing there would take the lock again and
+/// freeze the app. A worker thread just waits its turn.
 #[tauri::command]
-pub fn browser_webview_close(
+pub async fn browser_webview_close(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewIdRequest,
+) -> Result<(), String> {
+    close_browser_webview(app, state, request)
+}
+
+pub fn close_browser_webview(
     app: AppHandle,
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
@@ -2257,7 +2281,7 @@ pub fn browser_webview_close(
         (children, private_session_ended)
     };
     for id in children {
-        browser_webview_close(
+        close_browser_webview(
             app.clone(),
             app.state::<BrowserSessionState>(),
             BrowserWebviewIdRequest { id },
