@@ -13,14 +13,14 @@ Tabs: each tab is a layout of one page, or several panes split side by side. Rig
 
 Panes (the parts of a split tab):
 - "Pane layout" (the layout icon beside the site information button) opens a menu with "Split right", "Split down" and "Close pane". "Close pane" closes the focused pane and is grayed out when the tab has only one pane.
-- A pane also has a small tray at its top-right corner that stays invisible until the pointer moves there. Hovering reveals "Drag pane" (drag to an edge to move the pane, or to the center to swap) and a small x, "Close pane", which closes that pane.
-- If the user cannot see the small x, that is expected: tell them to hover over the pane's top-right corner, or use the "Pane layout" menu instead.
+- With two or more panes, pressing and dragging the empty space of a pane's toolbar picks the pane up: drag it to an edge to move it, or to the center to swap. Cmd+Option+M starts the same move from the keyboard (arrow keys choose, Enter confirms, Escape cancels), and then a press anywhere on a pane drags it.
+- To close a pane, use "Close pane" in the "Pane layout" menu.
 - Closing a pane leaves the tab and its other panes open.
 
 Windows and Spaces:
 - Every Misty window belongs to one Space, with that Space's own sign-ins and tabs; a Space has one window. Opening another Space opens its own window, as Chrome does with profiles.
 - The window takes its Space's color, which tints its frame and tabs.
-- "Spaces" (the window icon in the pane layout menu) lists the account's Spaces with a checkmark on this window's, then "New incognito window", "Space color" and "Close window". Cmd+Shift+N shows the same list of Spaces.
+- "Spaces" (the Space name at the top of the window) lists the account's Spaces with a checkmark on this window's, then "New incognito window", "Space color" and "Close window". Cmd+Shift+N shows the same list of Spaces.
 - An incognito window (Cmd+Option+N) belongs to its Space and keeps nothing: no history, sign-ins or site data after its Space's last incognito window closes. Agents never see it.
 
 Browser:
@@ -35,4 +35,4 @@ Misty panel and Agents:
 
 Settings:
 - Open with "Settings" in the account panel or Cmd+,. Areas in the sidebar: General, Appearance, Layout, Shortcuts, Browser, Spaces, Agents, Sync, Devices, Privacy and About. Each area is one scrolling page; the search field at the top finds any setting.
-- Layout switches the tabs between horizontal and vertical and keeps saved layouts. Agents › Models picks the AI models. Agents › Companion sets up this cursor companion. Shortcuts lists and changes every keyboard shortcut.
+- Layout switches the tabs between horizontal and vertical and keeps saved layouts. Agents › Companion sets up this cursor companion. Shortcuts lists and changes every keyboard shortcut.

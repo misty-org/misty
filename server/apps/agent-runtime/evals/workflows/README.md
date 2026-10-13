@@ -64,6 +64,7 @@ MISTY_WORKFLOW_EVAL=1 npm run eval:workflows
 | Variable | Meaning |
 |---|---|
 | `MISTY_WORKFLOW_EVAL` | `1` to run; the suite never runs with the unit tests. |
+| `MISTY_ALLOW_MODEL_OVERRIDE` | Set on the local API (`1`) so the runner's per-model requests take effect. Everyone else runs the house model and effort, and production ignores the switch. |
 | `MISTY_WORKFLOW_EVAL_MODELS` | Models to compare. Defaults to `anthropic/claude-haiku-5.5`, `openai/gpt-6-luna`, `google/gemini-3.5-flash-lite`. |
 | `MISTY_WORKFLOW_EVAL_JUDGE` | The rubric judge. Defaults to `anthropic/claude-haiku-5.5`. |
 | `MISTY_WORKFLOW_EVAL_TASKS` | Task ids, categories or sources (`polar`, `misty`) to run. |

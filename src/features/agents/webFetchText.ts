@@ -1,31 +1,68 @@
 /**
  * Readable text from a fetched page, for `web.fetch` (docs/plans/agent-harness.md,
  * phase 1). The HTML is parsed into an inert document: nothing in it runs or
- * loads. Navigation, scripts and page chrome are dropped; headings, paragraphs,
- * lists and table rows become plain Markdown-like lines. A long page returns the
- * parts that best match what the agent asked for, in page order.
+ * loads. Navigation, scripts and page chrome are dropped; every other visible
+ * text becomes one plain line per block (headings and list items keep their
+ * Markdown marks, table rows join their cells with "|"), so prices that sit in
+ * plain divs and spans, as on most pricing pages, are kept. A long page returns
+ * the parts that best match what the agent asked for, in page order.
  */
 const dropped = [
-  "script,style,noscript,template,svg,canvas,iframe,form",
-  "nav,header,footer,aside,button,select,[hidden],[aria-hidden=true]",
+  "script,style,noscript,template,svg,canvas,iframe",
+  "nav,header,footer,aside,select,[hidden]",
   "[role=navigation],[role=banner],[role=contentinfo]",
 ].join(",");
 const blocks = new Set([
+  "ADDRESS",
+  "ARTICLE",
+  "BLOCKQUOTE",
+  "BR",
+  "BUTTON",
+  "CAPTION",
+  "DD",
+  "DETAILS",
+  "DIV",
+  "DL",
+  "DT",
+  "FIELDSET",
+  "FIGCAPTION",
+  "FIGURE",
+  "FORM",
   "H1",
   "H2",
   "H3",
   "H4",
   "H5",
   "H6",
-  "P",
+  "HR",
+  "LABEL",
+  "LEGEND",
   "LI",
-  "TR",
+  "MAIN",
+  "OL",
+  "P",
   "PRE",
-  "BLOCKQUOTE",
-  "DT",
-  "DD",
-  "FIGCAPTION",
+  "SECTION",
+  "SUMMARY",
+  "TABLE",
+  "TBODY",
+  "THEAD",
+  "TR",
+  "UL",
 ]);
+
+/**
+ * Pricing pages draw one billing period (usually yearly) until a toggle is switched, and a
+ * fetch can't switch it. When the text has prices and names a billing period, say so.
+ */
+export function billingNote(text: string): string | undefined {
+  if (
+    !/[$€£]\s?\d/.test(text) ||
+    !/\b(annual(ly)?|yearly|per year|billed monthly|month-to-month|monthly)\b/i.test(text)
+  )
+    return undefined;
+  return "Prices here show the billing period the page opens on (often yearly) and the page's monthly/yearly toggle cannot be switched by a fetch. State which period each price is for. To read the other period, open the page in the browser and switch the toggle.";
+}
 
 export interface ReadablePage {
   title: string;
@@ -36,30 +73,43 @@ export interface ReadablePage {
 
 function lines(root: Element): string[] {
   const out: string[] = [];
-  const walk = (element: Element) => {
-    if (blocks.has(element.tagName)) {
-      const text = (element.textContent ?? "").replace(/\s+/g, " ").trim();
-      if (!text) return;
-      if (/^H[1-6]$/.test(element.tagName))
-        out.push(`${"#".repeat(Number(element.tagName[1]))} ${text}`);
-      else if (element.tagName === "LI") out.push(`- ${text}`);
-      else if (element.tagName === "TR")
-        out.push(
-          Array.from(element.children)
-            .map((cell) => (cell.textContent ?? "").replace(/\s+/g, " ").trim())
-            .join(" | "),
-        );
-      else out.push(text);
+  let buffer = "";
+  let prefix = "";
+  const flush = () => {
+    const text = buffer
+      .replace(/\s+/g, " ")
+      .replace(/(\s*\|)+\s*$/, "")
+      .trim();
+    buffer = "";
+    if (!text || /^[\s|\-–—•·]*$/.test(text)) {
+      prefix = "";
       return;
     }
-    for (const child of Array.from(element.children)) walk(child);
+    if (out[out.length - 1] !== prefix + text) out.push(prefix + text);
+    prefix = "";
+  };
+  const walk = (node: Node) => {
+    if (node.nodeType === 3) {
+      buffer += node.textContent ?? "";
+      return;
+    }
+    if (node.nodeType !== 1) return;
+    const element = node as Element;
+    // Text a script hides from view but keeps for screen readers (prices drawn by a counter)
+    // lives in a sibling that stays; the drawn copy is the one marked aria-hidden.
+    if (element.getAttribute("aria-hidden") === "true") return;
+    const tag = element.tagName;
+    const block = blocks.has(tag);
+    if (block) {
+      flush();
+      if (/^H[1-6]$/.test(tag)) prefix = `${"#".repeat(Number(tag[1]))} `;
+      else if (tag === "LI") prefix = "- ";
+    }
+    for (const child of Array.from(element.childNodes)) walk(child);
+    if (tag === "TD" || tag === "TH") buffer += " | ";
+    if (block) flush();
   };
   walk(root);
-  // Pages with no block markup still have text.
-  if (!out.length) {
-    const text = (root.textContent ?? "").replace(/\s+/g, " ").trim();
-    if (text) out.push(text);
-  }
   return out;
 }
 
@@ -102,8 +152,12 @@ export function readablePage(
   }
   const document = new DOMParser().parseFromString(html, "text/html");
   for (const element of Array.from(document.querySelectorAll(dropped))) element.remove();
-  const root =
-    document.querySelector("main,article,[role=main]") ?? document.body ?? document.documentElement;
+  const body = document.body ?? document.documentElement;
+  // The page's main area, unless it holds only a small part of the text (pricing cards often
+  // sit beside it, in plain sections).
+  const main = document.querySelector("main,article,[role=main]");
+  const size = (element: Element) => (element.textContent ?? "").replace(/\s+/g, " ").length;
+  const root = main && size(main) >= size(body) * 0.6 ? main : body;
   const all = lines(root);
   const full = all.join("\n");
   if (full.length <= limit) return { title: document.title.trim(), text: full, truncated: false };

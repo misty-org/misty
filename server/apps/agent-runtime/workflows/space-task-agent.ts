@@ -26,6 +26,8 @@ import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolMonitor } from "../src/tool-monitor.js";
 import { agentTools, toolLoadTool, toolState, toolUseTool } from "../src/toolsets.js";
 import { modelFamilyNote } from "../src/model-family.js";
+import { citationInstructions, citationRefusal, unreadCitations } from "../src/citation-check.js";
+import { closedResearchTools, researchNote, researchUse } from "../src/research-budget.js";
 import { executionInstructions, finalText, incompleteToolResultText, unfinishedModelResult } from "../src/tool-outcomes.js";
 import type { SpaceTaskContext } from "../src/types.js";
 
@@ -98,6 +100,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   // agent.tool: answer by default; browse, desktop, code and loaded families on request.
   const toolsets = agentTools(catalog);
   let finishRefused = false;
+  let citationRefused = false;
   const tools: ToolSet = {
     ...catalogTools(catalog, async (callId, name, value) => {
       guard(callId);
@@ -111,6 +114,15 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         guard(options.toolCallId);
         // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
         const messages = options.messages ?? [];
+        // Refused once when it cites a page the run never read (src/citation-check.ts).
+        if (!citationRefused) {
+          const unread = unreadCitations(report.summary, messages, researchTools);
+          if (unread.length) {
+            citationRefused = true;
+            const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
+            return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
+          }
+        }
         if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
         const refusal = unbackedCompletion(report, messages, catalog.readOnly);
         if (refusal) {
@@ -122,7 +134,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     }),
   };
   const toolNames = Object.keys(tools);
-  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions, modelFamilyNote(context.model_id)].filter(Boolean));
+  const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch") };
+  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, citationInstructions, toolsets.instructions, modelFamilyNote(context.model_id)].filter(Boolean));
   // Recomputed from the transcript before every model call.
   let visibleTools = toolNames;
   let modelTurn = 0;
@@ -219,6 +232,13 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       const observed = toolState(messages, toolsets.initial);
       if (observed.seen || !toolsetState.seen) toolsetState = observed;
       visibleTools = toolsets.visible(toolNames, toolsetState);
+      // Research budget (src/research-budget.ts): a run that keeps searching is told what it
+      // has spent, then loses search and fetch so its next turn can only answer.
+      const research = researchUse(messages, researchTools);
+      const closed = closedResearchTools(research, researchTools);
+      if (closed.size) visibleTools = visibleTools.filter((name) => !closed.has(name));
+      const researchWarning = researchNote(research, messages);
+      if (researchWarning) messages.push({ role: "user", content: researchWarning });
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
       // Admission (billing's hold for this turn) happens before the model call and
@@ -247,6 +267,18 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         // The model plans again from the failure or stale screen it just saw.
         if (monitor.requiredInspection) messages.push({ role: "user", content: browserReinspectionInstruction(monitor.requiredInspection) });
         continue;
+      }
+      // A plain-text final answer is held to the same rule as agent_finish: refused once when
+      // it cites a page the run only saw in search results (src/citation-check.ts).
+      const plainAnswer = finalText(current.steps);
+      if (!citationRefused && plainAnswer && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults)) {
+        const unread = unreadCitations(plainAnswer, messages, researchTools);
+        if (unread.length) {
+          citationRefused = true;
+          const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
+          messages.push({ role: "user", content: citationRefusal(unread, canFetch, "give your answer again") });
+          continue;
+        }
       }
       if (finalTaskCompletion(current.steps, current.toolResults) || current.finishReason !== "tool-calls" || current.steps.length !== 1) {
         const finalSteering = await takeSteering(identity, `${modelTurn}:finish`, true);

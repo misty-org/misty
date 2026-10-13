@@ -38,6 +38,9 @@ export interface RoutingResult {
   runs: number;
 }
 
+/** Searches and page reads, the calls the research budget (src/research-budget.ts) governs. */
+export const researchCalls = (tools: string[]) => tools.filter((name) => name === "web_search" || name === "web_fetch").length;
+
 export function routing(task: WorkflowTask, tools: string[], screenRequests: string[]): RoutingResult {
   const rules = task.tools ?? {};
   const broken: string[] = [];
@@ -54,6 +57,8 @@ export function routing(task: WorkflowTask, tools: string[], screenRequests: str
     if (hit) broken.push(`called ${hit}`);
   }
   if (rules.maxCalls !== undefined && tools.length > rules.maxCalls) broken.push(`${tools.length} tool calls, at most ${rules.maxCalls}`);
+  if (rules.maxResearchCalls !== undefined && researchCalls(tools) > rules.maxResearchCalls)
+    broken.push(`${researchCalls(tools)} searches and page reads, at most ${rules.maxResearchCalls}`);
   const runs = 1 + screenRequests.length;
   if (rules.maxRuns !== undefined && runs > rules.maxRuns) broken.push(`${runs} runs (screen hand-offs), at most ${rules.maxRuns}`);
   return { passed: broken.length === 0, broken, unavailable, runs };
@@ -84,6 +89,8 @@ interface Summary {
   answerPassed: number;
   answerGraded: number;
   toolCalls: Spread;
+  /** Searches and page reads per run. */
+  researchCalls: Spread;
   seconds: Spread;
   costUsd: number;
   handoffs: number;
@@ -110,6 +117,7 @@ function summarize(runs: WorkflowRun[]): Summary {
     answerPassed: graded.filter((run) => run.answerPassed).length,
     answerGraded: graded.length,
     toolCalls: spread(runs.map((run) => run.tools.length)),
+    researchCalls: spread(runs.map((run) => researchCalls(run.tools))),
     seconds: spread(runs.map((run) => round(run.ms / 1000, 1))),
     costUsd: round(runs.reduce((sum, run) => sum + run.costUsd, 0)),
     handoffs: runs.reduce((sum, run) => sum + run.screenRequests.length, 0),
@@ -134,10 +142,10 @@ export function table(runs: WorkflowRun[]): string {
   const lines: string[] = [];
   for (const model of models) {
     const all = summaries[model]!;
-    lines.push(`${model}: ${all.passed}/${all.runs} passed (${Math.round(all.passRate * 100)}%), median ${all.toolCalls.median} calls and ${all.seconds.median}s, $${all.costUsd.toFixed(3)}, ${Math.round(all.cachedShare * 100)}% of input cached (saved $${all.cacheSavedUsd.toFixed(3)})`);
+    lines.push(`${model}: ${all.passed}/${all.runs} passed (${Math.round(all.passRate * 100)}%), median ${all.toolCalls.median} calls (${all.researchCalls.median} research) and ${all.seconds.median}s, $${all.costUsd.toFixed(3)}, ${Math.round(all.cachedShare * 100)}% of input cached (saved $${all.cacheSavedUsd.toFixed(3)})`);
     for (const task of [...new Set(runs.filter((run) => run.model === model).map((run) => run.taskId))]) {
       const one = summaries[`${model} · ${task}`]!;
-      lines.push(`  ${task}: ${one.passed}/${one.runs}, calls ${one.toolCalls.min}–${one.toolCalls.max}, ${one.seconds.min}–${one.seconds.max}s`);
+      lines.push(`  ${task}: ${one.passed}/${one.runs}, calls ${one.toolCalls.min}–${one.toolCalls.max} (research ${one.researchCalls.min}–${one.researchCalls.max}), ${one.seconds.min}–${one.seconds.max}s`);
     }
   }
   return lines.join("\n");

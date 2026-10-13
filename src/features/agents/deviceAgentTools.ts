@@ -1,14 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { uploadLibraryBlob } from "@/api/spaces/library-upload";
 import { bookmarks, bookmarkUrl, saveBookmark } from "@/features/bookmarks/library";
-import {
-  parseBrowserViewState,
-  useWorkspaceStore,
-} from "@/features/workspace";
+import { parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
-import { readablePage } from "./webFetchText";
+import { billingNote, readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
@@ -135,6 +132,7 @@ export async function runDeviceAgentOperation(
         title: readable.title,
         text: readable.text,
         truncated: readable.truncated || page.truncated,
+        note: billingNote(readable.text),
       };
     }
     case "bookmark.add": {

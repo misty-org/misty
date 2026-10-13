@@ -245,7 +245,8 @@ func modelRoute(routes []aimodels.Route, role string) aimodels.Route {
 }
 
 func (s *AIService) accountAgentModel(ctx context.Context, user string) (string, string, bool, error) {
-	if s.providerSettings == nil {
+	// An account's own model choice applies only where the instance allows choosing (agent.ClientModelChoice).
+	if s.providerSettings == nil || !agent.ClientModelChoice() {
 		return "", "", false, nil
 	}
 	routes, err := s.database.AIModelRoutes(ctx, user)

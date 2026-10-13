@@ -19,6 +19,7 @@
     "eval:voice": "vitest run --config evals/voice/vitest.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.40",
     "@ai-sdk/elevenlabs": "3.0.30",
     "@ai-sdk/openai": "4.0.46",
     "@ai-sdk/provider": "4.0.7",

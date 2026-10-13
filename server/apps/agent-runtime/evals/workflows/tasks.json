@@ -229,6 +229,7 @@
           "browser_act"
         ],
         "maxCalls": 10,
+        "maxResearchCalls": 12,
         "maxRuns": 1
       },
       "rubric": [

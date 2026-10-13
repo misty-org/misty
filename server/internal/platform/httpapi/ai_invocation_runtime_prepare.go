@@ -7,7 +7,6 @@ import (
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
-	"github.com/kannachi323/misty/server/internal/aimodels"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
@@ -162,18 +161,11 @@ func (s *SpacesService) aiInvocationPrompt(ctx context.Context, record *db.AIInv
 // aiInvocationModel freezes the run's model at admission; changing a
 // conversation must not change an in-flight turn.
 func aiInvocationModel(body aiInvocationInput) (string, string) {
-	modelID := serveragent.FrontierDefaultModelID()
-	if body.ModelID != "" {
-		modelID = body.ModelID
+	modelID := serveragent.HouseModel(body.ModelID)
+	if body.Mode == "companion" {
+		modelID = serveragent.HouseModel(body.CompanionModel)
 	}
-	if body.Mode == "companion" && body.CompanionModel != "" {
-		modelID = body.CompanionModel
-	}
-	reasoning := serveragent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
-	if body.ModelID != "" && aimodels.ValidReasoning(body.ReasoningEffort) {
-		reasoning = body.ReasoningEffort
-	}
-	return modelID, reasoning
+	return modelID, serveragent.HouseEffort(body.ReasoningEffort)
 }
 
 func aiInvocationModelID(body aiInvocationInput) string {

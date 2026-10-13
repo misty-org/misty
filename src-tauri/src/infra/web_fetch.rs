@@ -36,6 +36,39 @@ pub async fn agents_web_fetch(webview: tauri::Webview, url: String) -> Result<Fe
 }
 
 pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
+    let raw = fetch_raw(
+        address,
+        "text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.5",
+        MAX_BYTES,
+        readable,
+    )
+    .await?;
+    Ok(FetchedPage {
+        final_url: raw.final_url.to_string(),
+        status: raw.status,
+        content_type: raw.content_type,
+        body: String::from_utf8_lossy(&raw.body).into_owned(),
+        truncated: raw.truncated,
+    })
+}
+
+/// One response as bytes, after the same checks on every hop.
+pub struct RawResponse {
+    pub final_url: url::Url,
+    pub status: u16,
+    pub content_type: String,
+    pub body: Vec<u8>,
+    pub truncated: bool,
+}
+
+/// Fetches a public address with every hop checked. `allowed` decides from the content type
+/// whether the body is read at all; at most `max_bytes` of it are kept.
+pub async fn fetch_raw(
+    address: &str,
+    accept: &str,
+    max_bytes: usize,
+    allowed: fn(&str) -> bool,
+) -> Result<RawResponse, String> {
     let mut current = url::Url::parse(address.trim()).map_err(|_| "invalid_url".to_string())?;
     for _ in 0..=MAX_REDIRECTS {
         let target = public_target(&current).await?;
@@ -49,7 +82,7 @@ pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
             .map_err(|_| "fetch_failed".to_string())?;
         let response = client
             .get(current.clone())
-            .header("Accept", "text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.5")
+            .header("Accept", accept)
             .send()
             .await
             .map_err(|error| if error.is_timeout() { "fetch_timeout".to_string() } else { "fetch_failed".to_string() })?;
@@ -69,7 +102,7 @@ pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
             .and_then(|value| value.to_str().ok())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if !readable(&content_type) {
+        if !allowed(&content_type) {
             return Err("unsupported_content".into());
         }
         let mut body = Vec::new();
@@ -77,7 +110,7 @@ pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|_| "fetch_failed".to_string())?;
-            let room = MAX_BYTES - body.len();
+            let room = max_bytes - body.len();
             if chunk.len() >= room {
                 body.extend_from_slice(&chunk[..room]);
                 truncated = true;
@@ -85,11 +118,11 @@ pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
             }
             body.extend_from_slice(&chunk);
         }
-        return Ok(FetchedPage {
-            final_url: current.to_string(),
+        return Ok(RawResponse {
+            final_url: current,
             status: status.as_u16(),
             content_type,
-            body: String::from_utf8_lossy(&body).into_owned(),
+            body,
             truncated,
         });
     }

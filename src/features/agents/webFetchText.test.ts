@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { readablePage } from "./webFetchText";
+import { billingNote, readablePage } from "./webFetchText";
 
 const page = (body: string) =>
   `<!doctype html><html><head><title> Pricing </title><script>alert(1)</script></head><body>${body}</body></html>`;
@@ -23,6 +23,35 @@ describe("readablePage", () => {
     expect(read.truncated).toBe(false);
   });
 
+  it("keeps prices that sit in plain divs and spans, as pricing pages draw them", () => {
+    const read = readablePage(
+      page(
+        '<div class="toggle"><button>Monthly</button><button>Yearly</button></div>' +
+          '<section><div class="card"><h3>Basic</h3><div class="price"><span class="sr-only">$10 per user/month</span>' +
+          '<span aria-hidden="true"><i>$</i><i>10</i> per user/month</span></div><div>Billed annually</div></div>' +
+          '<div class="card"><h3>Business</h3><div class="price">$16 <span>per user/month</span></div></div></section>' +
+          "<nav><div>Docs</div></nav>",
+      ),
+      "text/html",
+      "",
+    );
+    expect(read.text).toBe(
+      "Monthly\nYearly\n### Basic\n$10 per user/month\nBilled annually\n### Business\n$16 per user/month",
+    );
+  });
+
+  it("uses the whole page when the main area holds only a little of it", () => {
+    const read = readablePage(
+      page(
+        "<main><p>Intro</p></main><div><div>Team</div><div>$12 a month</div></div><div><div>Pro</div><div>$30 a month</div></div>",
+      ),
+      "text/html",
+      "",
+    );
+    expect(read.text).toContain("$12 a month");
+    expect(read.text).toContain("$30 a month");
+  });
+
   it("returns the parts of a long page that match the question", () => {
     const filler = Array.from(
       { length: 400 },
@@ -43,5 +72,11 @@ describe("readablePage", () => {
 
   it("passes plain text through", () => {
     expect(readablePage('{"ok":true}', "application/json", "").text).toBe('{"ok":true}');
+  });
+
+  it("notes the billing period only when a page has prices and names one", () => {
+    expect(billingNote("Plus $10 per seat/month, billed annually")).toMatch(/billing period/);
+    expect(billingNote("Plus $10 per seat/month")).toBeUndefined();
+    expect(billingNote("Billed monthly or yearly, ask sales")).toBeUndefined();
   });
 });

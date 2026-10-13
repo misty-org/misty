@@ -71,49 +71,78 @@ function concat(chunks: Uint8Array[]): Uint8Array {
   return out;
 }
 
-const skipped = "script,style,noscript,template,svg,iframe,form,nav,header,footer,aside,button,select";
-const blockTags = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "tr", "pre", "blockquote", "dt", "dd", "figcaption"];
+const skipped = "script,style,noscript,template,svg,canvas,iframe,nav,header,footer,aside,select";
+const blockTags = new Set([
+  "address", "article", "blockquote", "br", "button", "caption", "dd", "details", "div", "dl", "dt", "fieldset", "figcaption",
+  "figure", "form", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "label", "legend", "li", "main", "ol", "p", "pre", "section",
+  "summary", "table", "tbody", "thead", "tr", "ul",
+]);
+const voidTags = new Set(["br", "hr", "img", "input", "meta", "link", "source", "wbr"]);
 
-/** Headings, paragraphs, list items and table rows as plain lines, through the streaming HTML rewriter. */
+/**
+ * Every visible text as one plain line per block (headings and list items keep their Markdown
+ * marks, table rows join their cells with "|"), through the streaming HTML rewriter. Prices
+ * that sit in plain divs and spans, as on most pricing pages, are kept; text marked
+ * aria-hidden is a drawn copy of text a screen reader gets elsewhere, so it is skipped.
+ */
 async function readableLines(html: string): Promise<{ title: string; lines: string[] }> {
   const lines: string[] = [];
   let title = "";
   let skipDepth = 0;
-  let current: { prefix: string; text: string; cell: boolean } | null = null;
+  let buffer = "";
+  let prefix = "";
+  const flush = () => {
+    const text = buffer.replace(/\s+/g, " ").replace(/(\s*\|)+\s*$/, "").trim();
+    buffer = "";
+    if (!text || /^[\s|\-–—•·]*$/.test(text)) {
+      prefix = "";
+      return;
+    }
+    if (lines[lines.length - 1] !== prefix + text) lines.push(prefix + text);
+    prefix = "";
+  };
   const rewriter = new HTMLRewriter()
     // The document's own title only: inline SVGs carry <title> elements too.
     .on("head > title", { text: (chunk) => void (title += chunk.text) })
-    .on(skipped, {
+    .on("*", {
       element: (element) => {
-        skipDepth++;
-        element.onEndTag(() => void skipDepth--);
-      },
-    })
-    .on(blockTags.join(","), {
-      element: (element) => {
-        if (skipDepth) return;
         const tag = element.tagName.toLowerCase();
-        const prefix = /^h[1-6]$/.test(tag) ? `${"#".repeat(Number(tag[1]))} ` : tag === "li" ? "- " : "";
-        current = { prefix, text: "", cell: tag === "tr" };
-        element.onEndTag(() => {
-          const text = current?.text.replace(/\s+/g, " ").replace(/\s*\|\s*$/, "").trim();
-          if (current && text) lines.push(current.prefix + text);
-          current = null;
-        });
+        const hidden = element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true";
+        const skip = hidden || skipped.split(",").includes(tag);
+        if (voidTags.has(tag)) {
+          if (!skip && blockTags.has(tag)) flush();
+          return;
+        }
+        const block = blockTags.has(tag);
+        if (!skip && block) {
+          flush();
+          if (/^h[1-6]$/.test(tag)) prefix = `${"#".repeat(Number(tag[1]))} `;
+          else if (tag === "li") prefix = "- ";
+        }
+        try {
+          element.onEndTag(() => {
+            if (skip) skipDepth--;
+            else if (tag === "td" || tag === "th") buffer += " | ";
+            if (!skip && block) flush();
+          });
+          if (skip) skipDepth++;
+        } catch {
+          // An element with no end tag (self-closed or left open) has nothing to skip or close.
+        }
       },
       text: (chunk) => {
-        if (current && !skipDepth) current.text += chunk.text;
-      },
-    })
-    .on("td,th", {
-      element: (element) => {
-        element.onEndTag(() => {
-          if (current?.cell) current.text += " | ";
-        });
+        if (!skipDepth) buffer += chunk.text;
       },
     });
   await rewriter.transform(new Response(html)).text();
+  flush();
   return { title: title.replace(/\s+/g, " ").trim(), lines };
+}
+
+/** Pricing pages draw one billing period until a toggle is switched, and a fetch can't switch it. */
+function billingNote(text: string): string | undefined {
+  if (!/[$€£]\s?\d/.test(text) || !/\b(annual(ly)?|yearly|per year|billed monthly|month-to-month|monthly)\b/i.test(text)) return undefined;
+  return "Prices here show the billing period the page opens on (often yearly) and the page's monthly/yearly toggle cannot be switched by a fetch. State which period each price is for. To read the other period, open the page in the browser and switch the toggle.";
 }
 
 const words = (text: string) => new Set(text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []);
@@ -179,7 +208,7 @@ async function fetchPage(address: string, question: string): Promise<Response> {
       text = text.slice(0, textLimit);
       truncated = true;
     }
-    return Response.json({ url: url.toString(), status: response.status, title, text, truncated });
+    return Response.json({ url: url.toString(), status: response.status, title, text, truncated, note: billingNote(text) });
   }
   return failure("too_many_redirects");
 }

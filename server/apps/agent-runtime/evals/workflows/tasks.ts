@@ -18,7 +18,7 @@ export interface WorkflowTask {
   requires?: string[];
   expect?: string[];
   rubric?: string[];
-  tools?: { required?: string[]; forbidden?: string[]; maxCalls?: number; maxRuns?: number };
+  tools?: { required?: string[]; forbidden?: string[]; maxCalls?: number; maxResearchCalls?: number; maxRuns?: number };
   /** What to read back after the run, for the judge (state.ts). */
   state?: StateCheck[];
   /** The answer key the judge checks the rubric against. */

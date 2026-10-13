@@ -231,7 +231,7 @@ func (s *SpacesService) spawnChildTabs(ctx context.Context, record *db.AIInvocat
 
 func (s *SpacesService) startDelegatedInvocation(ctx context.Context, parent *db.AIInvocationRecord, body aiInvocationInput, callID string, index int, task delegatedTask, tab *aiInvocationDeviceContext) (string, error) {
 	model := strings.TrimSpace(body.ModelID)
-	if route, err := s.database.AIModelBrowsingRoute(ctx, parent.UserID, parent.ID); err == nil && route.Model != "" {
+	if route, err := s.database.AIModelBrowsingRoute(ctx, parent.UserID, parent.ID); err == nil && route.Model != "" && serveragent.ClientModelChoice() {
 		// Children navigate on the account's Browsing model.
 		model = route.Model
 	}

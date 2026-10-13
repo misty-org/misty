@@ -16,7 +16,7 @@ import (
 func TestLiveChecklistPostgres(t *testing.T) {
 	database := testkit.OpenDatabase(t)
 	ctx := t.Context()
-	owner, _ := database.CreateUser("Owner", "checklist-owner@example.test", "password123")
+	owner, _ := database.CreateUser("checklist-owner@example.test", "password123")
 	conversation := "conversation_" + uuid.NewString()
 	if err := database.TestingSpaceTx(ctx, func(tx *sql.Tx) error {
 		_, err := tx.ExecContext(ctx, `INSERT INTO misty_ask_conversations(id,user_id) VALUES($1,$2)`, conversation, owner.ID)

@@ -126,6 +126,13 @@ func (s *AIService) resolveInvocationAgent(w http.ResponseWriter, r *http.Reques
 // and the reasoning setting for the run.
 func (s *AIService) chooseInvocationModel(w http.ResponseWriter, r *http.Request, userID string, body *aiInvocationInput, st *aiInvocationAdmitState) bool {
 	st.modelID = agent.FrontierDefaultModelID()
+	st.reasoning = agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
+	st.modelOverrides = map[string]string{}
+	// Everyone runs on the house model and effort (agent.HouseModel). Only a development
+	// stack with MISTY_ALLOW_MODEL_OVERRIDE lets an account or a request choose, for evals.
+	if !agent.ClientModelChoice() {
+		return true
+	}
 	selectedModel, _, accountModel, selectErr := s.accountAgentModel(r.Context(), userID)
 	if selectErr != nil {
 		writeAIProviderError(w, selectErr)
@@ -142,8 +149,6 @@ func (s *AIService) chooseInvocationModel(w http.ResponseWriter, r *http.Request
 		}
 		st.modelID = body.CompanionModel
 	}
-	st.reasoning = agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
-	st.modelOverrides = map[string]string{}
 	return true
 }
 
@@ -167,7 +172,7 @@ func (s *AIService) bindConversationModel(w http.ResponseWriter, r *http.Request
 	}
 	// The conversation's own pick beats the account's Thinking choice.
 	// A model the Gateway retired falls back with a notice.
-	if override := bound.ModelOverride; override != "" {
+	if override := bound.ModelOverride; override != "" && agent.ClientModelChoice() {
 		if agent.SenseModelRetired(r.Context(), "thinking", override) {
 			_ = s.database.SetMistyConversationModelOverride(r.Context(), userID, st.conversationID, "")
 			st.modelFallbackNotice = true
@@ -187,7 +192,7 @@ func (s *AIService) bindConversationModel(w http.ResponseWriter, r *http.Request
 
 // applyRequestedModelOverride pins the model the request asked for, if any.
 func (s *AIService) applyRequestedModelOverride(w http.ResponseWriter, r *http.Request, body *aiInvocationInput, st *aiInvocationAdmitState) bool {
-	if requested := strings.TrimSpace(body.ModelOverride); requested != "" {
+	if requested := strings.TrimSpace(body.ModelOverride); requested != "" && agent.ClientModelChoice() {
 		if !agent.SenseModelAvailable(r.Context(), "thinking", requested) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_model", "message": "Choose an available model."})
 			return false
@@ -252,7 +257,7 @@ func (s *AIService) createInvocationConversation(w http.ResponseWriter, r *http.
 
 // saveConversationModelOverride stores the request's model override on its conversation.
 func (s *AIService) saveConversationModelOverride(w http.ResponseWriter, r *http.Request, userID string, body *aiInvocationInput, st *aiInvocationAdmitState) bool {
-	if body.ModelOverride != "" && st.conversationID != "" {
+	if body.ModelOverride != "" && st.conversationID != "" && agent.ClientModelChoice() {
 		if err := s.database.SetMistyConversationModelOverride(r.Context(), userID, st.conversationID, body.ModelOverride); err != nil {
 			TestingWriteAIError(w, err)
 			return false
@@ -264,7 +269,7 @@ func (s *AIService) saveConversationModelOverride(w http.ResponseWriter, r *http
 // checkInvocationModelAvailable confirms the chosen model and reasoning are
 // offered, then applies the companion's admission reasoning rule.
 func checkInvocationModelAvailable(w http.ResponseWriter, r *http.Request, body *aiInvocationInput, st *aiInvocationAdmitState) bool {
-	if !st.accountModel && len(st.modelOverrides) == 0 && (!agent.FrontierModelAvailable(r.Context(), st.modelID) || !agent.FrontierModelReasoningAvailable(r.Context(), st.modelID, st.reasoning)) {
+	if !st.accountModel && len(st.modelOverrides) == 0 && !agent.FrontierModelAvailable(r.Context(), st.modelID) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
 		return false
 	}
