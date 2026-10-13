@@ -40,8 +40,8 @@ export async function deviceAccount(): Promise<{ apiBase: string; accountId: str
   return { apiBase: await resolveApiBase(), accountId };
 }
 
-/** Registers this device (once per account session) and starts its channel,
- * LAN discovery and trust. Only the main window starts it; other windows read
+/** Registers this device (once per account session) and starts its channel
+ * and trust. Only the main window starts it; other windows read
  * the device the main window registered. */
 export async function ensureDeviceStarted(): Promise<DevicesView> {
   const account = await deviceAccount();
@@ -190,7 +190,6 @@ export interface ServerTrustedDevice {
   publicKey?: string;
   revokedAt?: string | null;
   platform?: string;
-  p2pEndpointId?: string;
   protocolVersions?: string[];
 }
 

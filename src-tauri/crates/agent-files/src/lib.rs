@@ -1,17 +1,18 @@
 //! Folder organization authority lives on the device. Models receive opaque item IDs and
 //! relative names; they cannot select a root, overwrite, delete, or execute code.
-#![cfg(unix)]
+#![cfg(any(unix, windows))]
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    ffi::CString,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
-    os::{
-        fd::{AsRawFd, FromRawFd},
-        unix::fs::{MetadataExt, OpenOptionsExt},
-    },
+    io::Write,
     path::{Component, Path, PathBuf},
+};
+
+mod platform;
+use platform::{
+    absent, child, fingerprint, make_folder, open_root, private, refused_scope, remove_folder,
+    rename_exclusive, sync_folder,
 };
 use uuid::Uuid;
 
@@ -25,16 +26,6 @@ struct Fingerprint {
     size: u64,
     modified: i64,
     nanos: i64,
-}
-fn fingerprint(file: &File) -> Result<Fingerprint> {
-    let m = file.metadata().map_err(err)?;
-    Ok(Fingerprint {
-        device: m.dev(),
-        inode: m.ino(),
-        size: m.len(),
-        modified: m.mtime(),
-        nanos: m.mtime_nsec(),
-    })
 }
 fn identity(file: &File) -> Result<(u64, u64)> {
     let f = fingerprint(file)?;
@@ -61,22 +52,6 @@ fn parts(path: &str) -> Result<Vec<String>> {
     }
     Ok(names)
 }
-fn cstring(s: &str) -> Result<CString> {
-    CString::new(s).map_err(err)
-}
-fn child(dir: &File, name: &str, directory: bool) -> Result<File> {
-    let name = cstring(name)?;
-    let flags = libc::O_RDONLY
-        | libc::O_CLOEXEC
-        | libc::O_NOFOLLOW
-        | libc::O_NONBLOCK
-        | if directory { libc::O_DIRECTORY } else { 0 };
-    let fd = unsafe { libc::openat(dir.as_raw_fd(), name.as_ptr(), flags) };
-    if fd < 0 {
-        return Err(err(io::Error::last_os_error()));
-    }
-    Ok(unsafe { File::from_raw_fd(fd) })
-}
 fn parent(root: &File, path: &str) -> Result<(File, String)> {
     let mut names = parts(path)?;
     let name = names.pop().unwrap();
@@ -90,58 +65,6 @@ fn open_item(root: &File, path: &str) -> Result<File> {
     let (dir, name) = parent(root, path)?;
     child(&dir, &name, false)
 }
-fn absent(dir: &File, name: &str) -> Result<()> {
-    let name = cstring(name)?;
-    let mut m = std::mem::MaybeUninit::<libc::stat>::uninit();
-    let result = unsafe {
-        libc::fstatat(
-            dir.as_raw_fd(),
-            name.as_ptr(),
-            m.as_mut_ptr(),
-            libc::AT_SYMLINK_NOFOLLOW,
-        )
-    };
-    if result == 0 {
-        return Err("Destination already exists; nothing was overwritten".into());
-    }
-    let error = io::Error::last_os_error();
-    if error.kind() != io::ErrorKind::NotFound {
-        return Err(err(error));
-    }
-    Ok(())
-}
-fn rename_exclusive(from: &File, source: &str, to: &File, destination: &str) -> Result<()> {
-    let source = cstring(source)?;
-    let destination = cstring(destination)?;
-    #[cfg(target_os = "macos")]
-    let result = unsafe {
-        libc::renameatx_np(
-            from.as_raw_fd(),
-            source.as_ptr(),
-            to.as_raw_fd(),
-            destination.as_ptr(),
-            libc::RENAME_EXCL,
-        )
-    };
-    #[cfg(target_os = "linux")]
-    let result = unsafe {
-        libc::renameat2(
-            from.as_raw_fd(),
-            source.as_ptr(),
-            to.as_raw_fd(),
-            destination.as_ptr(),
-            libc::RENAME_NOREPLACE,
-        )
-    };
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    return Err("Atomic no-replace moves are unavailable on this platform".into());
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    if result != 0 {
-        return Err(err(io::Error::last_os_error()));
-    }
-    Ok(())
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Item {
@@ -221,19 +144,15 @@ impl Organizer {
         Uuid::parse_str(id).map_err(err)?;
         let path = self.journal.join(format!("{id}.{extension}"));
         let temporary = self.journal.join(format!("{}.tmp", Uuid::new_v4()));
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)
-            .map_err(err)?;
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        private(&mut options);
+        let mut file = options.open(&temporary).map_err(err)?;
         file.write_all(&serde_json::to_vec(value).map_err(err)?)
             .map_err(err)?;
         file.sync_all().map_err(err)?;
         fs::rename(&temporary, &path).map_err(err)?;
-        File::open(&self.journal)
-            .and_then(|dir| dir.sync_all())
-            .map_err(err)
+        sync_folder(&open_root(&self.journal)?)
     }
     /// This may only be called with the result of a user-operated native folder picker.
     pub fn grant(&mut self, account: &str, path: &Path) -> Result<Snapshot> {
@@ -241,37 +160,11 @@ impl Organizer {
             return Err("Sign in first".into());
         }
         let canonical = fs::canonicalize(path).map_err(err)?;
-        // Whole disks, home directories and operating-system roots are never organization scopes.
-        let count = canonical.components().count();
-        if count < 4
-            || [
-                "/System",
-                "/Library",
-                "/Applications",
-                "/bin",
-                "/sbin",
-                "/usr",
-                "/etc",
-                "/private/etc",
-                "/private/var/db",
-                "/dev",
-                "/proc",
-                "/sys",
-            ]
-            .iter()
-            .any(|p| canonical.starts_with(p))
-            || std::env::var_os("HOME").is_some_and(|home| {
-                canonical == Path::new(&home)
-                    || canonical.starts_with(Path::new(&home).join("Library"))
-            })
-        {
+        let canonical = platform::plain(&canonical);
+        if refused_scope(&canonical) {
             return Err("Choose a specific personal folder, not a disk or system folder".into());
         }
-        let root = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-            .open(&canonical)
-            .map_err(err)?;
+        let root = open_root(&canonical)?;
         let mut snapshot = Snapshot {
             grant_id: Uuid::new_v4().to_string(),
             folder_name: canonical.file_name().unwrap().to_string_lossy().into(),
@@ -296,11 +189,7 @@ impl Organizer {
             .get(id)
             .filter(|g| g.account == account && !g.revoked)
             .ok_or("Folder access is unavailable or revoked")?;
-        let root = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-            .open(&grant.root)
-            .map_err(err)?;
+        let root = open_root(&grant.root)?;
         if identity(&root)? != grant.root_identity {
             return Err("The selected folder changed".into());
         }
@@ -503,19 +392,16 @@ impl Organizer {
                     }
                     let (source, source_name) = parent(&root, from)?;
                     rename_exclusive(&source, &source_name, &to, &name)?;
-                    source.sync_all().map_err(err)?;
-                    to.sync_all().map_err(err)?;
+                    sync_folder(&source)?;
+                    sync_folder(&to)?;
                     if Some(fingerprint(&open_item(&root, &receipt.to)?)?) != receipt.fingerprint {
                         return Err(
                             "Moved item changed during verification; inspect the manifest".into(),
                         );
                     }
                 } else {
-                    let name = cstring(&name)?;
-                    if unsafe { libc::mkdirat(to.as_raw_fd(), name.as_ptr(), 0o755) } != 0 {
-                        return Err(err(io::Error::last_os_error()));
-                    }
-                    to.sync_all().map_err(err)?;
+                    make_folder(&to, &name)?;
+                    sync_folder(&to)?;
                     manifest.receipts[index].fingerprint =
                         Some(fingerprint(&open_item(&root, &receipt.to)?)?);
                 }
@@ -569,23 +455,18 @@ impl Organizer {
                     self.save(id, "manifest", &manifest)?;
                     let (source, source_name) = parent(&root, &receipt.to)?;
                     rename_exclusive(&source, &source_name, &to, &name)?;
-                    source.sync_all().map_err(err)?;
-                    to.sync_all().map_err(err)?;
+                    sync_folder(&source)?;
+                    sync_folder(&to)?;
                 } else {
                     if (actual.device, actual.inode) != (expected.device, expected.inode) {
                         return Err("Created folder changed; undo stopped".into());
                     }
                     // rmdir removes only this newly created, still empty directory.
                     let (dir, name) = parent(&root, &receipt.to)?;
-                    let name = cstring(&name)?;
                     manifest.receipts[index].state = "undoing".into();
                     self.save(id, "manifest", &manifest)?;
-                    if unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) }
-                        != 0
-                    {
-                        return Err(err(io::Error::last_os_error()));
-                    }
-                    dir.sync_all().map_err(err)?;
+                    remove_folder(&dir, &name)?;
+                    sync_folder(&dir)?;
                 }
                 Ok(())
             })();
@@ -626,7 +507,7 @@ fn scan(
         } else {
             format!("{relative}/{name}")
         };
-        if name.starts_with('.') || entry.file_type().map_err(err)?.is_symlink() {
+        if name.starts_with('.') || platform::is_link(&entry) {
             snapshot
                 .excluded
                 .push(format!("{path}: hidden item or link"));

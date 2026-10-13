@@ -9,6 +9,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   if (
     path.startsWith("/settings") ||
     path.startsWith("/account") ||
+    path === "/welcome" ||
     path === "/signin" ||
     path === "/register"
   )

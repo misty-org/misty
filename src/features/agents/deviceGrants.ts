@@ -8,12 +8,10 @@ import { useConversationProject } from "./store/useConversationProject";
 
 /** Each device's Misty browser has its own grant reference. */
 export const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
-/** Where files another of the person's devices sends this one arrive. */
-export const inboxGrantRef = (deviceId: string) => `inbox:${deviceId}`;
 
 const folderCapabilities = ["files.list", "files.read", "files.send"];
 /** Projects: the code tools, on this computer only, plus reading documents
- * and sending files the way read-only folders do. */
+ * and sending files to the Space Library the way read-only folders do. */
 export const projectCapabilities = [
   ...folderCapabilities,
   "code.read",
@@ -52,7 +50,7 @@ export interface RemoteAgentDevice {
 
 /**
  * Grants a desktop chat carries to the server: the project picked for the
- * chat (if any), the Misty browser, this computer's inbox, and whatever the
+ * chat (if any), the Misty browser, and whatever the
  * picked devices' own policies allow. Each is signed by this device when the
  * chat is sent, and each target checks it before acting.
  */
@@ -105,16 +103,6 @@ export async function desktopDeviceGrants(
       metadata: { source: "desktop" },
     },
   ];
-  if (targets.length) {
-    contexts.push({
-      deviceId: device.id,
-      kind: "inbox",
-      opaqueRef: inboxGrantRef(device.id),
-      displayName: "Misty downloads",
-      capabilities: ["files.receive"],
-      metadata: { source: "desktop" },
-    });
-  }
   for (const target of targets) {
     if (target.deviceId === device.id) continue;
     if (target.agentSurfaces.includes("folders")) {

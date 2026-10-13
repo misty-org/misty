@@ -128,9 +128,25 @@ pub(super) fn image_thumbnail_cache_path(
     ))
 }
 
+// Images decode inside Misty's own process off macOS, so a crafted file must
+// not be able to claim unbounded memory.
+#[cfg(not(target_os = "macos"))]
+pub(super) const MAX_SOURCE_DIMENSION: u32 = 16_384;
+#[cfg(not(target_os = "macos"))]
+const MAX_SOURCE_PIXELS: u64 = 100_000_000;
+#[cfg(not(target_os = "macos"))]
+const MAX_DECODE_ALLOCATION: u64 = 512 * 1024 * 1024;
+/// The largest PSD read into memory for a preview.
+#[cfg(not(target_os = "macos"))]
+pub(super) const MAX_PSD_BYTES: u64 = 256 * 1024 * 1024;
+
 #[cfg(not(target_os = "macos"))]
 pub(super) fn thumbnail_decode_limits() -> Limits {
-    Limits::no_limits()
+    let mut limits = Limits::default();
+    limits.max_image_width = Some(MAX_SOURCE_DIMENSION);
+    limits.max_image_height = Some(MAX_SOURCE_DIMENSION);
+    limits.max_alloc = Some(MAX_DECODE_ALLOCATION);
+    limits
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -138,6 +154,14 @@ pub(super) fn validate_image_thumbnail_source(width: u32, height: u32) -> ApiRes
     if width == 0 || height == 0 {
         return Err(ApiError::Message(
             "Image dimensions are invalid.".to_string(),
+        ));
+    }
+    if width > MAX_SOURCE_DIMENSION
+        || height > MAX_SOURCE_DIMENSION
+        || u64::from(width) * u64::from(height) > MAX_SOURCE_PIXELS
+    {
+        return Err(ApiError::Message(
+            "This image is too large to preview.".to_string(),
         ));
     }
 

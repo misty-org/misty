@@ -17,7 +17,11 @@ struct Dock {
     name: String,
 }
 
-pub(super) async fn dock(AxumState(bridge): AxumState<Bridge>, headers: HeaderMap, body: Bytes) -> Response {
+pub(super) async fn dock(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let body = match request::<Dock>(&bridge, &headers, &body) {
         Ok(body) => body,
         Err(response) => return response,
@@ -30,8 +34,10 @@ pub(super) async fn dock(AxumState(bridge): AxumState<Bridge>, headers: HeaderMa
                 None => return reply(Err("The benchmark tab is not open.".into())),
             };
             match app.get_window("main") {
-                Some(window) => crate::infra::agent_dock::detach(app, &window, &id, &body.name, "Dock check")
-                    .map(|host| json!({ "host": host })),
+                Some(window) => {
+                    crate::infra::agent_dock::detach(app, &window, &id, &body.name, "Dock check")
+                        .map(|host| json!({ "host": host }))
+                }
                 None => Err("Misty's main window is not open.".into()),
             }
         }
@@ -63,16 +69,31 @@ pub(super) async fn dock(AxumState(bridge): AxumState<Bridge>, headers: HeaderMa
         // The page as the agent would see it, without a task.
         #[cfg(target_os = "macos")]
         "snapshot" => {
-            let id = bridge.tabs.lock().await.get(&body.scope_id).map(|tab| tab.id.clone());
-            match id.and_then(|id| webview_label(&id).ok()).and_then(|l| app.get_webview(&l)) {
+            let id = bridge
+                .tabs
+                .lock()
+                .await
+                .get(&body.scope_id)
+                .map(|tab| tab.id.clone());
+            match id
+                .and_then(|id| webview_label(&id).ok())
+                .and_then(|l| app.get_webview(&l))
+            {
                 Some(view) => match view.size().map_err(|e| e.to_string()).and_then(|size| {
                     let scale = view.window().scale_factor().map_err(|e| e.to_string())?;
                     Ok(size.to_logical::<f64>(scale))
                 }) {
-                    Ok(size) => crate::infra::browser_macos::capture_webview_region_sized(
-                        view, 0.0, 0.0, size.width, size.height, 2560.0,
-                    )
-                    .await,
+                    Ok(size) => {
+                        crate::infra::browser_macos::capture_webview_region_sized(
+                            view,
+                            0.0,
+                            0.0,
+                            size.width,
+                            size.height,
+                            2560.0,
+                        )
+                        .await
+                    }
                     Err(error) => Err(error),
                 },
                 None => Err("The benchmark tab is not running.".into()),

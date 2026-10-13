@@ -450,7 +450,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn adopted_bookmark_scope_survives_source_close_and_ends_on_revocation() {
-        use super::super::directory_bookmark_macos as platform;
+        use super::super::directory_bookmark as platform;
         let (_root, mut registry) = fixture();
         let identity =
             platform::remember(&registry["first"].permissions.folders["folder"].directory).unwrap();

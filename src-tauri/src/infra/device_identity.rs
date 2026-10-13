@@ -1,14 +1,13 @@
-//! One device key for sync trust, agents and LAN file sharing
-//! (docs/design/devices/BRIEF.md). It is the Connected Devices endpoint seed
-//! in the OS keychain, so the device's iroh endpoint ID is its public key. The
-//! private key never leaves native code: every signature here prefixes an
-//! allow-listed domain, so one made for one purpose is never valid for another.
+//! One device key for sync trust, agents and the shared clipboard
+//! (docs/design/devices/BRIEF.md), kept in the credential store. The private
+//! key never leaves native code: every signature here prefixes an allow-listed
+//! domain, so one made for one purpose is never valid for another.
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::peer_identity,
+    infra::device_key,
 };
 
 pub const REQUEST_DOMAIN: &str = "misty.device.request.v1";
@@ -33,7 +32,7 @@ pub struct DeviceIdentity {
 impl DeviceIdentity {
     /// Loads (or creates) this install's key for an account.
     pub fn load(account_id: &str, local_device_id: &str) -> ApiResult<Self> {
-        let seed = peer_identity::load_or_create(account_id, local_device_id)?;
+        let seed = device_key::load_or_create(account_id, local_device_id)?;
         Ok(Self {
             signing: SigningKey::from_bytes(&seed),
         })
@@ -43,7 +42,7 @@ impl DeviceIdentity {
         STANDARD.encode(self.signing.verifying_key().as_bytes())
     }
 
-    /// The iroh endpoint ID: the same public key, in hex.
+    /// The public key in hex, as device registration names it.
     pub fn endpoint_id(&self) -> String {
         hex::encode(self.signing.verifying_key().as_bytes())
     }

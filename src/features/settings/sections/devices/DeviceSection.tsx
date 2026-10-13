@@ -67,8 +67,8 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
     }
     run(() =>
       devices.setPolicy({
-        // Misty no longer shares files between devices; Kura manages files.
-        files: "off",
+        // The signed policy still carries files; keep it as it is.
+        files: policy.files,
         clipboard: change.clipboard ?? policy.clipboard,
         agentSurfaces: [...surfaces],
       }),
@@ -149,7 +149,7 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
         label="Remove device"
         description={
           devices.view?.canSign
-            ? `${peer.name} loses sync, file sharing and agent access everywhere. ${readdNote}`
+            ? `${peer.name} loses sync, the shared clipboard and agent access everywhere. ${readdNote}`
             : "Unlock sync on this device to remove devices."
         }
       >

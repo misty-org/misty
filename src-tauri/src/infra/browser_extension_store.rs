@@ -47,7 +47,10 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                 if page_extension(&app, &id).as_deref() != Some(&extension) {
                     return;
                 }
-                if let Some(view) = webview_label(&id).ok().and_then(|label| app.get_webview(&label)) {
+                if let Some(view) = webview_label(&id)
+                    .ok()
+                    .and_then(|label| app.get_webview(&label))
+                {
                     let _ = view.eval(format!("window.__MISTY_EXTENSION_STORE__?.({installed});"));
                 }
             });
@@ -58,7 +61,11 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
 }
 
 fn page_extension(app: &AppHandle, id: &str) -> Option<String> {
-    let page = webview_label(id).ok().and_then(|label| app.get_webview(&label))?.url().ok()?;
+    let page = webview_label(id)
+        .ok()
+        .and_then(|label| app.get_webview(&label))?
+        .url()
+        .ok()?;
     store_extension(&page)
 }
 
@@ -114,7 +121,8 @@ mod tests {
             Some("ddkjiahejlhfcafbddmgiahcphecmpfh")
         );
         assert_eq!(
-            extension("https://chromewebstore.google.com/detail/ddkjiahejlhfcafbddmgiahcphecmpfh").as_deref(),
+            extension("https://chromewebstore.google.com/detail/ddkjiahejlhfcafbddmgiahcphecmpfh")
+                .as_deref(),
             Some("ddkjiahejlhfcafbddmgiahcphecmpfh")
         );
         assert_eq!(

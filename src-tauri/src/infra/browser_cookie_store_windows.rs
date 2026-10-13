@@ -2,46 +2,34 @@
 //! as renderer IPC. Every call validates the real user-data folder and profile.
 use super::browser_cookie_cdp as codec;
 use super::browser_data_coverage::CookieRead;
+use super::webview2::{self, CdpError};
 pub(crate) use codec::{representable, CookieStoreError};
 use misty_browser_sync::document::credentials::Cookie;
 use serde_json::{json, Value};
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
 use tauri::{Manager, Webview};
-use webview2_com::{
-    CallDevToolsProtocolMethodCompletedHandler,
-    Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2, ICoreWebView2Environment7, ICoreWebView2_13, ICoreWebView2_2,
-    },
+use webview2_com::Microsoft::Web::WebView2::Win32::{
+    ICoreWebView2, ICoreWebView2Environment7, ICoreWebView2_13, ICoreWebView2_2,
 };
-use windows::core::{Interface, HSTRING, PWSTR};
-use windows::Win32::System::Com::CoTaskMemFree;
-use zeroize::Zeroizing;
+use windows::core::Interface;
 
 type Result<T> = std::result::Result<T, CookieStoreError>;
 /// CDP reports unspecified and explicit SameSite=None separately.
 pub(crate) const SAME_SITE_NONE_IS_UNSPECIFIED: bool = false;
 
-// Frees native strings even if the platform returns a failed HRESULT after
-// allocating them. Never format native errors (which may include payload data).
-unsafe fn owned_string(
-    read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
-) -> Result<String> {
-    let mut pointer = PWSTR::null();
-    let status = read(&mut pointer);
-    let value = if status.is_ok() && !pointer.is_null() {
-        pointer.to_string().ok()
-    } else {
-        None
-    };
-    if !pointer.is_null() {
-        CoTaskMemFree(Some(pointer.0.cast()));
+impl From<CdpError> for CookieStoreError {
+    fn from(error: CdpError) -> Self {
+        match error {
+            CdpError::Unavailable => Self::Unavailable,
+            CdpError::Timeout => Self::Timeout,
+            CdpError::TooLarge => Self::TooLarge,
+            CdpError::Invalid => Self::Invalid,
+        }
     }
-    value.ok_or(CookieStoreError::Unavailable)
 }
+
+/// The view must use `expected` as its user-data folder and its default,
+/// non-private profile, so a cookie can never cross into another profile.
 unsafe fn verify_profile(view: &ICoreWebView2, expected: &Path) -> Result<()> {
     let extended = view
         .cast::<ICoreWebView2_2>()
@@ -51,7 +39,9 @@ unsafe fn verify_profile(view: &ICoreWebView2, expected: &Path) -> Result<()> {
         .map_err(|_| CookieStoreError::Unavailable)?
         .cast::<ICoreWebView2Environment7>()
         .map_err(|_| CookieStoreError::Unsupported)?;
-    let actual = PathBuf::from(owned_string(|p| environment.UserDataFolder(p))?);
+    let actual = webview2::owned_string(|p| environment.UserDataFolder(p))
+        .map(PathBuf::from)
+        .ok_or(CookieStoreError::Unavailable)?;
     let actual = actual
         .canonicalize()
         .map_err(|_| CookieStoreError::Profile)?;
@@ -66,7 +56,8 @@ unsafe fn verify_profile(view: &ICoreWebView2, expected: &Path) -> Result<()> {
         .map_err(|_| CookieStoreError::Unsupported)?
         .Profile()
         .map_err(|_| CookieStoreError::Unavailable)?;
-    let name = owned_string(|p| profile.ProfileName(p))?;
+    let name =
+        webview2::owned_string(|p| profile.ProfileName(p)).ok_or(CookieStoreError::Unavailable)?;
     let mut private = Default::default();
     profile
         .IsInPrivateModeEnabled(&mut private)
@@ -90,65 +81,12 @@ async fn call(
         .map_err(|_| CookieStoreError::Profile)?;
     let expected = super::browser::browser_data_directory(view.app_handle(), Some(profile))
         .map_err(|_| CookieStoreError::Profile)?;
-    let parameters =
-        Zeroizing::new(serde_json::to_string(&parameters).map_err(|_| CookieStoreError::Invalid)?);
-    if parameters.len() > 16 * 1024 * 1024 {
-        return Err(CookieStoreError::TooLarge);
-    }
-    let (send, receive) = tokio::sync::oneshot::channel();
-    let send = Arc::new(Mutex::new(Some(send)));
-    view.with_webview(move |platform| unsafe {
-        let begin = (|| -> Result<()> {
-            let native = platform
-                .controller()
-                .CoreWebView2()
-                .map_err(|_| CookieStoreError::Unavailable)?;
-            verify_profile(&native, &expected)?;
-            let reply = send.clone();
-            let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(
-                move |status, payload| {
-                    let payload = Zeroizing::new(payload);
-                    let result = if status.is_err() {
-                        Err(CookieStoreError::Unavailable)
-                    } else if payload.len() > 16 * 1024 * 1024 {
-                        Err(CookieStoreError::TooLarge)
-                    } else {
-                        serde_json::from_str::<Value>(&payload)
-                            .map_err(|_| CookieStoreError::Invalid)
-                            .and_then(|value| {
-                                if value.get("error").is_some() {
-                                    Err(CookieStoreError::Unavailable)
-                                } else {
-                                    Ok(value)
-                                }
-                            })
-                    };
-                    if let Some(send) = reply.lock().ok().and_then(|mut value| value.take()) {
-                        let _ = send.send(result);
-                    }
-                    Ok(())
-                },
-            ));
-            native
-                .CallDevToolsProtocolMethod(
-                    &HSTRING::from(method),
-                    &HSTRING::from(parameters.as_str()),
-                    &handler,
-                )
-                .map_err(|_| CookieStoreError::Unavailable)?;
-            Ok(())
-        })();
-        if let Err(error) = begin {
-            if let Some(send) = send.lock().ok().and_then(|mut value| value.take()) {
-                let _ = send.send(Err(error));
-            }
-        }
+    // SAFETY: runs on the view's UI thread with its live WebView2 object.
+    webview2::with_core(view, move |core, _| {
+        Ok(unsafe { verify_profile(core, &expected) })
     })
-    .map_err(|_| CookieStoreError::Unavailable)?;
-    tokio::time::timeout(Duration::from_secs(15), receive)
-        .await
-        .map_err(|_| CookieStoreError::Timeout)?
-        .map_err(|_| CookieStoreError::Unavailable)?
+    .await??;
+    Ok(webview2::cdp(view, method, &parameters).await?)
 }
 
 pub(crate) async fn read(view: &Webview, profile: &str) -> Result<CookieRead> {

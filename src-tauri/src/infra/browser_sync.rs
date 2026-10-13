@@ -147,6 +147,17 @@ pub(crate) async fn is_account_browser_profile(profile: &str) -> bool {
             .is_some_and(|selected| selected.logical == profile || selected.physical == profile)
 }
 
+/// The shared clipboard rides on the account's sync connection and seals clips
+/// with a key derived from the vault root. None while the vault is locked.
+pub(crate) async fn clipboard_session(
+    account: &str,
+) -> Option<(WorkerHandle, misty_browser_sync::crypto::ClipboardKey)> {
+    let session = session().lock().await;
+    let active = session.as_ref().filter(|s| s.scope.account_id == account)?;
+    let key = active.admission_root.clipboard_key(&active.scope).ok()?;
+    Some((active.handle.clone(), key))
+}
+
 /// Saved passwords live in the unlocked vault of the signed-in account. None
 /// while the vault is locked.
 pub(crate) async fn vault_handle() -> Option<WorkerHandle> {
@@ -371,9 +382,9 @@ async fn local_tab_session(
     }
 }
 
-/// WebKit requests popup creation synchronously on its UI thread. Never block
+/// Engines request popup creation synchronously on their UI thread. Never block
 /// that thread behind account shutdown; decline and let the user retry.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(super) fn popup_lifecycle_lease() -> Option<RwLockReadGuard<'static, ()>> {
     browser_lifecycle().try_read().ok()
 }

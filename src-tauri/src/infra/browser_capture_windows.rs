@@ -1,48 +1,146 @@
-//! WebView2 owns capture, including cross-origin frames and native page rendering.
-use base64::Engine;
+//! Page captures on WebView2. Chromium renders them, so cross-origin frames,
+//! video and canvas look exactly as they do on screen.
 use serde_json::{json, Value};
-use std::sync::{Arc, Mutex};
 use tauri::Webview;
-use webview2_com::{
-    CapturePreviewCompletedHandler,
-    Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
-};
-use windows::Win32::{
-    Foundation::HGLOBAL,
-    System::Com::{
-        StructuredStorage::CreateStreamOnHGlobal, STATFLAG_NONAME, STATSTG, STREAM_SEEK_SET,
-    },
-};
 
+use super::webview2::{self, CdpError};
+
+/// A rectangle in CSS pixels, relative to the page's visible viewport.
+#[derive(Clone, Copy)]
+pub struct Region {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// What a capture is for: its encoding and its largest side in pixels.
+#[derive(Clone, Copy)]
+pub enum Purpose {
+    /// Tab previews and agent screenshots: lossless, up to 2560 pixels.
+    Page,
+    /// A selected area attached to a message: JPEG, up to 1280 pixels.
+    Region,
+}
+
+impl Purpose {
+    fn max_side(self) -> f64 {
+        match self {
+            Self::Page => 2560.0,
+            Self::Region => 1280.0,
+        }
+    }
+}
+
+/// The visible page, as `{ dataUrl, width, height }`.
 pub async fn capture(webview: Webview) -> Result<Value, String> {
-    let (sender, receiver) = tokio::sync::oneshot::channel();
-    let sender = Arc::new(Mutex::new(Some(sender)));
-    webview.with_webview(move|platform|unsafe{
-  let start=(||->Result<(),String>{
-   let stream=CreateStreamOnHGlobal(HGLOBAL::default(),true).map_err(|e|e.to_string())?;
-   let result_stream=stream.clone();let reply=sender.clone();
-   let handler=CapturePreviewCompletedHandler::create(Box::new(move|status|{
-    let result=(||->Result<Value,String>{
-     status.map_err(|e|e.to_string())?;
-     let mut info=STATSTG::default();
-     result_stream.Stat(&mut info,STATFLAG_NONAME).map_err(|e|e.to_string())?;
-     if info.cbSize==0||info.cbSize>10*1024*1024{return Err("Capture image exceeds 10 MB".into())}
-     result_stream.Seek(0,STREAM_SEEK_SET,None).map_err(|e|e.to_string())?;
-     let mut data=vec![0u8;info.cbSize as usize];let mut read=0u32;
-     result_stream.Read(data.as_mut_ptr().cast(),data.len() as u32,Some(&mut read)).ok().map_err(|e|e.to_string())?;
-     if read as usize!=data.len(){return Err("Capture image was incomplete".into())}
-     Ok(json!({"dataUrl":format!("data:image/png;base64,{}",base64::engine::general_purpose::STANDARD.encode(data))}))
-    })();
-    if let Some(sender)=reply.lock().ok().and_then(|mut value|value.take()){let _=sender.send(result);}
-    Ok(())
-   }));
-   platform.controller().CoreWebView2().map_err(|e|e.to_string())?.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,&stream,&handler).map_err(|e|e.to_string())?;
-   Ok(())
-  })();
-  if let Err(error)=start{if let Some(sender)=sender.lock().ok().and_then(|mut value|value.take()){let _=sender.send(Err(error));}}
- }).map_err(|e|e.to_string())?;
-    tokio::time::timeout(std::time::Duration::from_secs(15), receiver)
-        .await
-        .map_err(|_| "Capture timed out")?
-        .map_err(|_| "Capture canceled")?
+    screenshot(&webview, None, Purpose::Page).await
+}
+
+/// One area of the visible page, as `{ dataUrl, width, height }`.
+pub async fn capture_region(webview: Webview, region: Region) -> Result<Value, String> {
+    if !(region.width.is_finite() && region.height.is_finite())
+        || region.width < 1.0
+        || region.height < 1.0
+    {
+        return Err("Capture region is invalid.".to_owned());
+    }
+    screenshot(&webview, Some(region), Purpose::Region).await
+}
+
+async fn screenshot(
+    view: &Webview,
+    region: Option<Region>,
+    purpose: Purpose,
+) -> Result<Value, String> {
+    let metrics = webview2::cdp(view, "Page.getLayoutMetrics", &json!({})).await?;
+    let css = &metrics["cssVisualViewport"];
+    let number = |value: &Value| value.as_f64().filter(|value| value.is_finite());
+    let (page_x, page_y) = (
+        number(&css["pageX"]).unwrap_or(0.0),
+        number(&css["pageY"]).unwrap_or(0.0),
+    );
+    let viewport_width = number(&css["clientWidth"]).ok_or(CdpError::Invalid)?;
+    let viewport_height = number(&css["clientHeight"]).ok_or(CdpError::Invalid)?;
+    let device_ratio = number(&metrics["visualViewport"]["clientWidth"])
+        .map(|device| device / viewport_width.max(1.0))
+        .filter(|ratio| *ratio > 0.0)
+        .unwrap_or(1.0);
+    let area = region.unwrap_or(Region {
+        x: 0.0,
+        y: 0.0,
+        width: viewport_width,
+        height: viewport_height,
+    });
+    // Never upscale; keep the longest side within the purpose's limit.
+    let scale = (purpose.max_side() / (area.width.max(area.height) * device_ratio)).min(1.0);
+    let format = match purpose {
+        Purpose::Page => json!({ "format": "png" }),
+        Purpose::Region => json!({ "format": "jpeg", "quality": 82 }),
+    };
+    let mut parameters = json!({
+        "clip": {
+            "x": page_x + area.x,
+            "y": page_y + area.y,
+            "width": area.width,
+            "height": area.height,
+            "scale": scale,
+        },
+        "fromSurface": true,
+    });
+    parameters
+        .as_object_mut()
+        .expect("object literal")
+        .extend(format.as_object().expect("object literal").clone());
+    let mime = if matches!(purpose, Purpose::Page) {
+        "image/png"
+    } else {
+        "image/jpeg"
+    };
+
+    // Misty's own overlay is drawn into the page; leave it out of the picture.
+    let _ = webview2::evaluate(view, OVERLAY_HIDE.to_owned(), None).await;
+    let shot = webview2::cdp(view, "Page.captureScreenshot", &parameters).await;
+    let _ = webview2::evaluate(view, OVERLAY_SHOW.to_owned(), None).await;
+    let data = shot?["data"].as_str().ok_or(CdpError::Invalid)?.to_owned();
+    let (width, height) = dimensions(&data).ok_or(CdpError::Invalid)?;
+    Ok(json!({
+        "dataUrl": format!("data:{mime};base64,{data}"),
+        "width": width,
+        "height": height,
+    }))
+}
+
+// Misty's companion and control ring are drawn into the page on WebView2.
+const OVERLAY_HIDE: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e) { e.dataset.mistyCaptureDisplay = e.style.display; e.style.setProperty('display', 'none', 'important'); } } })()";
+const OVERLAY_SHOW: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e && 'mistyCaptureDisplay' in e.dataset) { e.style.display = e.dataset.mistyCaptureDisplay; delete e.dataset.mistyCaptureDisplay; } } })()";
+
+/// The pixel size of a base64 PNG or JPEG, read from its header only.
+fn dimensions(base64_data: &str) -> Option<(u32, u32)> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_data)
+        .ok()?;
+    image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_dimensions_from_a_png_header() {
+        let mut png = Vec::new();
+        image::RgbaImage::new(3, 2)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        use base64::Engine;
+        let encoded = base64::engine::general_purpose::STANDARD.encode(png);
+        assert_eq!(dimensions(&encoded), Some((3, 2)));
+        assert_eq!(dimensions("not base64"), None);
+    }
 }

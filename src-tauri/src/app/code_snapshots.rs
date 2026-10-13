@@ -1,7 +1,6 @@
 //! Project snapshots: a ZIP of a code project after an agent changed it, so
 //! the agent's Space keeps a copy of what it built. The folder stays local;
 //! only the snapshot is uploaded, by the app, to the agent's Space.
-#![cfg(unix)]
 
 use std::{
     io::Write,

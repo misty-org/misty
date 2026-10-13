@@ -184,10 +184,8 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         }
         // Previously restored local data remains usable while the vault is locked.
         if read(app, account, &installation).is_ok_and(|journal| journal.initialized) {
-            let _ = native::request(
-                json!({"operation":"sync-restored","account":account,"id":id}),
-            )
-            .await;
+            let _ = native::request(json!({"operation":"sync-restored","account":account,"id":id}))
+                .await;
         }
     }
     if result.is_err() {

@@ -35,6 +35,13 @@ pub const EXTENSION_SYNC: &str = "extension_sync";
 /// server only ever holds each one sealed with the vault key.
 pub const PASSWORDS: &str = "passwords";
 pub const COLLECTIONS: [&str; 5] = [BOOKMARKS, TAB_GROUPS, HISTORY, EXTENSION_SYNC, PASSWORDS];
+/// The shared clipboard's ring of sealed clips. It is not a record
+/// collection: the worker moves its ciphertext without opening it.
+pub const CLIPBOARD: &str = "clipboard";
+/// How many clips the ring keeps.
+pub const CLIPBOARD_SLOTS: u8 = 20;
+/// The largest sealed clip the server stores (the same limit on both sides).
+pub const CLIPBOARD_MAX_BYTES: usize = 256 * 1024;
 
 fn known(collection: &str) -> Result<()> {
     if COLLECTIONS.contains(&collection) {
@@ -52,7 +59,9 @@ pub fn record_key(
     id: &str,
 ) -> Result<String> {
     use hkdf::hmac::{Hmac, Mac};
-    known(collection)?;
+    if collection != CLIPBOARD {
+        known(collection)?;
+    }
     let key = root.derive("misty.sync.record-id.v1", &(&scope.vault_id, collection))?;
     let mut mac =
         <Hmac<sha2::Sha256> as Mac>::new_from_slice(key.as_ref()).map_err(|_| Error::Invalid)?;

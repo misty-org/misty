@@ -15,6 +15,12 @@ use crate::{
     infra::environment::AppEnvironmentService,
 };
 
+/// A folder's canonical path as it is stored and compared: on Windows without
+/// the `\\?\` prefix canonicalizing adds, so every path here has one form.
+pub(crate) fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    fs::canonicalize(path).map(|path| misty_agent_code::plain_path(&path))
+}
+
 #[derive(Clone)]
 pub struct AgentService {
     pub(crate) database_path: PathBuf,
@@ -72,7 +78,7 @@ impl AgentService {
     /// Records a folder the person chose in the native picker. Agents can then
     /// list and read inside it, never outside it.
     pub async fn register_folder_scope(&self, path: PathBuf) -> ApiResult<Value> {
-        let root = fs::canonicalize(&path)
+        let root = canonical(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         if !root.is_dir() {
             return Err(ApiError::Message("Choose a folder, not a file.".into()));
@@ -115,7 +121,7 @@ impl AgentService {
                 [&request.scope_id],
                 |row| row.get(0),
             )?;
-            let root = fs::canonicalize(root).map_err(io_error)?;
+            let root = canonical(root).map_err(io_error)?;
             let relative = request.relative_path.trim().trim_matches('/');
             let relative_path = Path::new(relative);
             if relative_path.is_absolute()
@@ -128,7 +134,7 @@ impl AgentService {
             {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
-            let directory = fs::canonicalize(root.join(relative_path)).map_err(io_error)?;
+            let directory = canonical(root.join(relative_path)).map_err(io_error)?;
             if !directory.starts_with(&root) || !directory.is_dir() {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
@@ -262,6 +268,14 @@ fn ensure_schema(connection: &Connection) -> rusqlite::Result<()> {
             ))?;
         }
     }
+    // Windows folders were stored with the `\\?\` prefix canonicalizing adds;
+    // they are stored without it now (see `canonical`).
+    connection.execute_batch(
+        r"UPDATE OR IGNORE local_agent_scopes SET local_path = '\\' || substr(local_path, 9)
+              WHERE local_path LIKE '\\?\UNC\%';
+          UPDATE OR IGNORE local_agent_scopes SET local_path = substr(local_path, 5)
+              WHERE local_path LIKE '\\?\%';",
+    )?;
     Ok(())
 }
 
@@ -328,8 +342,8 @@ fn scoped_file_path_sync(
             "Document path is outside its device scope.",
         ));
     }
-    let root = fs::canonicalize(root).map_err(io_error)?;
-    let target = fs::canonicalize(root.join(relative_path)).map_err(io_error)?;
+    let root = canonical(root).map_err(io_error)?;
+    let target = canonical(root.join(relative_path)).map_err(io_error)?;
     if !target.starts_with(&root) || !target.is_file() {
         return Err(validation_error(
             "Document path is outside its device scope.",
@@ -365,6 +379,15 @@ pub(crate) fn validation_error(message: &str) -> rusqlite::Error {
     rusqlite::Error::InvalidParameterName(message.to_owned())
 }
 
+/// Windows opens the file with its default app. Explorer's exit code says
+/// nothing about success, and file associations drop `#page=` fragments.
+#[cfg(windows)]
+fn open_path(path: &Path, _pdf_page: Option<u64>) -> ApiResult<()> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|_| ApiError::Message("The citation could not be opened.".to_owned()))
+}
+
+#[cfg(not(windows))]
 fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
     let page_url = pdf_page.and_then(|page| {
         url::Url::from_file_path(path).ok().map(|mut value| {
@@ -377,8 +400,6 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
         .unwrap_or_else(|| path.to_str().unwrap_or_default());
     #[cfg(target_os = "macos")]
     let status = Command::new("open").arg(target).status();
-    #[cfg(target_os = "windows")]
-    let status = Command::new("explorer").arg(target).status();
     #[cfg(all(unix, not(target_os = "macos")))]
     let status = Command::new("xdg-open").arg(target).status();
     status
@@ -392,68 +413,5 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn folder_scopes_list_only_inside_the_chosen_folder() {
-        let state = tempfile::tempdir().unwrap();
-        let folder = tempfile::tempdir().unwrap();
-        fs::create_dir(folder.path().join("Reports")).unwrap();
-        fs::write(folder.path().join("Reports/q3.txt"), "Revenue grew").unwrap();
-        fs::write(folder.path().join("notes.md"), "Plan").unwrap();
-        fs::write(folder.path().join(".secret"), "hidden").unwrap();
-        let service = AgentService {
-            database_path: state.path().join("misty.db"),
-        };
-        let scope = service
-            .register_folder_scope(folder.path().to_path_buf())
-            .await
-            .unwrap();
-        let again = service
-            .register_folder_scope(folder.path().to_path_buf())
-            .await
-            .unwrap();
-        assert_eq!(scope["id"], again["id"], "a folder is granted once");
-        let id = scope["id"].as_str().unwrap().to_owned();
-        let root = service
-            .list_scoped_files(ListScopedFilesRequest {
-                scope_id: id.clone(),
-                relative_path: String::new(),
-            })
-            .await
-            .unwrap();
-        let names: Vec<_> = root["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|entry| entry["relativePath"].as_str().unwrap().to_owned())
-            .collect();
-        assert_eq!(names, vec!["Reports", "notes.md"]);
-        let nested = service
-            .list_scoped_files(ListScopedFilesRequest {
-                scope_id: id.clone(),
-                relative_path: "Reports".into(),
-            })
-            .await
-            .unwrap();
-        assert_eq!(nested["entries"][0]["relativePath"], "Reports/q3.txt");
-        for outside in ["..", "../..", "/etc"] {
-            assert!(service
-                .list_scoped_files(ListScopedFilesRequest {
-                    scope_id: id.clone(),
-                    relative_path: outside.into(),
-                })
-                .await
-                .is_err());
-        }
-        let document = service
-            .scoped_document_path(PrepareScopedAgentDocumentRequest {
-                scope_id: id,
-                relative_path: "Reports/q3.txt".into(),
-            })
-            .await
-            .unwrap();
-        assert!(document.ends_with("Reports/q3.txt"));
-    }
-}
+#[path = "agents_tests.rs"]
+mod tests;

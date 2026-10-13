@@ -25,14 +25,8 @@ pub fn release(permissions: &mut PermissionSet, handle: &str) {
     permissions
         .downloads
         .retain(|_, job| !job.uses_handle(handle));
-    permissions
-        .backup_jobs
-        .retain(|_, job| !job.uses_handle(handle));
-    permissions
-        .backup_repositories
-        .retain(|_, repository| !repository.uses_handle(handle));
     permissions.files.remove(handle);
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     permissions.folder_security_scopes.remove(handle);
     if let Some(folder) = permissions.folders.remove(handle) {
         permissions

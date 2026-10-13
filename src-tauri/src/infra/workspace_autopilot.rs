@@ -24,51 +24,10 @@ fn session() -> &'static Mutex<Session> {
     SESSION.get_or_init(Mutex::default)
 }
 #[cfg(target_os = "macos")]
-extern "C" {
-    fn misty_autopilot_supported() -> bool;
-    fn misty_autopilot_capture() -> *mut std::ffi::c_char;
-    fn misty_autopilot_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
-    fn misty_autopilot_hide_cursor();
-    fn misty_autopilot_focus_reason() -> *mut std::ffi::c_char;
-    fn misty_desktop_prepare(
-        task: *const std::ffi::c_char,
-        ask: bool,
-        callback: extern "C" fn(*const std::ffi::c_char),
-        island: extern "C" fn(*const std::ffi::c_char),
-    );
-    fn misty_desktop_island(task: *const std::ffi::c_char, json: *const std::ffi::c_char);
-    fn misty_agent_mist_waiting(waiting: bool);
-    fn misty_desktop_renew(task: *const std::ffi::c_char);
-    fn misty_desktop_stop(task: *const std::ffi::c_char);
-    fn misty_desktop_capture(task: *const std::ffi::c_char) -> *mut std::ffi::c_char;
-    fn misty_desktop_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
-    fn misty_desktop_audio(task: *const std::ffi::c_char, seconds: f64) -> *mut std::ffi::c_char;
-    fn misty_agent_window_ring(view: *mut std::ffi::c_void, active: bool);
-    fn misty_desktop_yield(task: *const std::ffi::c_char);
-}
+#[path = "workspace_autopilot_macos.rs"]
+mod macos;
 #[cfg(target_os = "macos")]
-extern "C" fn desktop_stopped(value: *const std::ffi::c_char) {
-    if value.is_null() {
-        return;
-    }
-    let payload =
-        unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
-    if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
-        let _ = app.emit_to("main", "misty://desktop-control-stopped", payload);
-    }
-}
-/// A press on the desktop control island: the in-app island performs it.
-#[cfg(target_os = "macos")]
-extern "C" fn desktop_island(value: *const std::ffi::c_char) {
-    if value.is_null() {
-        return;
-    }
-    let payload =
-        unsafe { serde_json::from_slice::<Value>(std::ffi::CStr::from_ptr(value).to_bytes()) };
-    if let (Some(app), Ok(payload)) = (DESKTOP_APP.get(), payload) {
-        let _ = app.emit_to("main", "misty://agent-island", payload);
-    }
-}
+use macos::*;
 pub fn renew(task: &str) {
     #[cfg(target_os = "macos")]
     if let Ok(task) = std::ffi::CString::new(task) {
@@ -76,22 +35,11 @@ pub fn renew(task: &str) {
             misty_desktop_renew(task.as_ptr());
         }
     }
-}
-#[cfg(target_os = "macos")]
-unsafe fn decode(pointer: *mut std::ffi::c_char) -> Result<Value, String> {
-    if pointer.is_null() {
-        return Err("Misty window control is unavailable".into());
-    }
-    let result = serde_json::from_slice(std::ffi::CStr::from_ptr(pointer).to_bytes())
-        .map_err(|e| e.to_string());
-    libc::free(pointer.cast());
-    let value: Value = result?;
-    if let Some(error) = value["error"].as_str() {
-        return Err(error.into());
-    }
-    Ok(value)
+    #[cfg(windows)]
+    super::desktop_control_windows::renew(task);
 }
 #[tauri::command]
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(unreachable_code))]
 pub fn agent_workspace_context(
     app: AppHandle,
     webview: Webview,
@@ -103,8 +51,8 @@ pub fn agent_workspace_context(
     if !unsafe { misty_autopilot_supported() } {
         return Err("Misty window control requires macOS 14.4 or later".into());
     }
-    #[cfg(not(target_os = "macos"))]
-    return Err("Misty window control requires macOS 14.4 or later".into());
+    #[cfg(not(any(target_os = "macos", windows)))]
+    return Err("Misty window control isn't available on this system".into());
     if webview.label() != "main" || context.to_string().len() > 32000 {
         return Err("Invalid workspace context".into());
     }
@@ -130,9 +78,15 @@ pub fn agent_workspace_context(
         let _ = webview.with_webview(move |platform| unsafe {
             misty_agent_window_ring(platform.inner().cast(), !desktop);
         });
+        DESKTOP_APP.get_or_init(|| app.clone());
+        #[cfg(windows)]
+        if desktop {
+            super::desktop_control_windows::prepare(&app, &task_id, ask);
+        }
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let _ = (desktop, ask);
         #[cfg(target_os = "macos")]
         if desktop {
-            DESKTOP_APP.get_or_init(|| app.clone());
             let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
             unsafe {
                 misty_desktop_prepare(task.as_ptr(), ask, desktop_stopped, desktop_island);
@@ -183,7 +137,7 @@ pub async fn agent_desktop_recent_audio(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = seconds;
-        Err("Desktop audio requires macOS 14 or later".into())
+        Err("Desktop audio isn't available on this system yet".into())
     }
 }
 /// The task waits for the person (a sign-in, a challenge, a review): give back
@@ -215,7 +169,18 @@ pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> 
         // The mist stays while the task waits for the person, thinner.
         unsafe { misty_agent_mist_waiting(yielded) };
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    if let Some(app) = DESKTOP_APP.get() {
+        if desktop {
+            if yielded {
+                super::desktop_control_windows::yield_control(&task_id);
+            }
+        } else if yielded {
+            super::desktop_overlays_windows::hide_pointer(app);
+        }
+        super::desktop_overlays_windows::set_mist_waiting(app, yielded);
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = (desktop, yielded);
     Ok(())
 }
@@ -242,7 +207,9 @@ pub fn agent_control_island(
         let json = std::ffi::CString::new(island.to_string()).map_err(|e| e.to_string())?;
         unsafe { misty_desktop_island(task.as_ptr(), json.as_ptr()) };
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    super::desktop_control_windows::island(&task_id, &island);
+    #[cfg(not(any(target_os = "macos", windows)))]
     let _ = island;
     Ok(())
 }
@@ -263,6 +230,13 @@ pub fn stop(task: &str) {
             misty_desktop_stop(task.as_ptr());
         }
     }
+    #[cfg(windows)]
+    {
+        super::desktop_control_windows::stop(task);
+        if let Some(app) = DESKTOP_APP.get() {
+            super::workspace_autopilot_windows::release(app);
+        }
+    }
 }
 fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Value, String> {
     let task = request.input["__mistyTaskId"].as_str().unwrap_or("");
@@ -281,7 +255,9 @@ fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Va
     if state.context["desktopControl"] != true && !window.is_focused().unwrap_or(false) {
         #[cfg(target_os = "macos")]
         return unsafe { decode(misty_autopilot_focus_reason()) };
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(windows)]
+        return Err(super::workspace_autopilot_windows::focus_reason());
+        #[cfg(not(any(target_os = "macos", windows)))]
         return Err("Bring Misty to the front, then resume the agent".into());
     }
     Ok(state.context.clone())
@@ -291,27 +267,20 @@ pub async fn execute(
     request: &BrowserAgentExecuteRequest,
 ) -> Result<Value, String> {
     let context = authorize(app, request)?;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = context;
-        return Err("Misty window control requires macOS 14 or later".into());
+        return Err("Misty window control isn't available on this system".into());
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     match request.operation.as_str() {
         "browser.workspace.visual" => {
             let desktop = context["desktopControl"] == true;
-            let task =
-                std::ffi::CString::new(request.input["__mistyTaskId"].as_str().unwrap_or(""))
-                    .map_err(|e| e.to_string())?;
-            let mut capture = tauri::async_runtime::spawn_blocking(move || unsafe {
-                decode(if desktop {
-                    misty_desktop_capture(task.as_ptr())
-                } else {
-                    misty_autopilot_capture()
-                })
-            })
-            .await
-            .map_err(|e| e.to_string())??;
+            let task = request.input["__mistyTaskId"]
+                .as_str()
+                .unwrap_or("")
+                .to_owned();
+            let mut capture = native_capture(app, desktop, task).await?;
             let latest = authorize(app, request)?;
             if context != latest {
                 return Err("browser_snapshot_stale: workspace changed while capturing".into());
@@ -354,33 +323,27 @@ pub async fn execute(
                 .as_str()
                 .unwrap_or("")
                 .to_owned();
+            #[cfg(windows)]
+            {
+                // Checked here, then acted on off the UI thread: UI Automation
+                // calls that reach Misty's own windows would wait on it.
+                super::browser::authorize_workspace_dispatch(&app, &scope, &agent, &grant, &task)?;
+                let (desktop, input) = take_snapshot(&task, &document, action)?;
+                return super::workspace_autopilot_windows::perform(&app, desktop, input).await;
+            }
+            #[cfg(target_os = "macos")]
             let (send, receive) = tokio::sync::oneshot::channel();
+            #[cfg(target_os = "macos")]
             let main = app.clone();
+            #[cfg(target_os = "macos")]
             app.run_on_main_thread(move || {
                 let result = (|| {
                     // Recheck inside the dispatch closure: a queued action must not outlive Stop.
                     super::browser::authorize_workspace_dispatch(
                         &main, &scope, &agent, &grant, &task,
                     )?;
-                    let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
-                    if state.task != task {
-                        return Err("agent_task_paused".into());
-                    }
-                    let snapshot = state
-                        .snapshot
-                        .take()
-                        .ok_or("browser_snapshot_stale: inspect before acting")?;
-                    let desktop = state.context["desktopControl"] == true;
-                    if snapshot.id != document
-                        || snapshot.captured.elapsed()
-                            > Duration::from_secs(if desktop { 20 } else { 90 })
-                    {
-                        return Err("browser_snapshot_stale: inspect before acting".into());
-                    }
-                    let mut input = snapshot.geometry;
-                    input["action"] = action;
-                    // Release state before native events invoke the app's event handlers.
-                    drop(state);
+                    // State is released before native events reach the app's handlers.
+                    let (desktop, input) = take_snapshot(&task, &document, action)?;
                     let encoded =
                         std::ffi::CString::new(input.to_string()).map_err(|e| e.to_string())?;
                     unsafe {
@@ -394,10 +357,54 @@ pub async fn execute(
                 let _ = send.send(result);
             })
             .map_err(|e| e.to_string())?;
-            receive.await.map_err(|e| e.to_string())?
+            #[cfg(target_os = "macos")]
+            return receive.await.map_err(|e| e.to_string())?;
         }
         _ => Err("Unsupported workspace operation".into()),
     }
+}
+
+/// Takes the inspected snapshot an action acts on: the one the agent saw, and
+/// recent. Whether it shows the desktop, and its geometry with the action.
+#[cfg(any(target_os = "macos", windows))]
+fn take_snapshot(task: &str, document: &str, action: Value) -> Result<(bool, Value), String> {
+    let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
+    if state.task != task {
+        return Err("agent_task_paused".into());
+    }
+    let snapshot = state
+        .snapshot
+        .take()
+        .ok_or("browser_snapshot_stale: inspect before acting")?;
+    let desktop = state.context["desktopControl"] == true;
+    let limit = Duration::from_secs(if desktop { 20 } else { 90 });
+    if snapshot.id != document || snapshot.captured.elapsed() > limit {
+        return Err("browser_snapshot_stale: inspect before acting".into());
+    }
+    let mut input = snapshot.geometry;
+    input["action"] = action;
+    Ok((desktop, input))
+}
+
+/// One capture of the display under control, or of the Misty window.
+#[cfg(any(target_os = "macos", windows))]
+async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<Value, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        let task = std::ffi::CString::new(task).map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || unsafe {
+            decode(if desktop {
+                misty_desktop_capture(task.as_ptr())
+            } else {
+                misty_autopilot_capture()
+            })
+        })
+        .await
+        .map_err(|e| e.to_string())?
+    }
+    #[cfg(windows)]
+    return super::workspace_autopilot_windows::native_capture(app, desktop, task).await;
 }
 fn validate_action(action: &Value) -> Result<(), String> {
     let coordinate = |key: &str| {

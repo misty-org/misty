@@ -122,7 +122,9 @@ mod tests {
 
     #[test]
     fn billing_commands_drop_server_values_that_would_override_its_credentials() {
-        let shown = compose(Path::new("/work/misty-billing")).display();
+        let shown = compose(Path::new("/work/misty-billing"))
+            .display()
+            .replace('\\', "/");
         assert!(shown.contains("--env-file"));
         assert!(shown.contains("/work/misty-billing/.env/dev/database.env"));
         let removed = format!("{:?}", compose(Path::new("/w")));

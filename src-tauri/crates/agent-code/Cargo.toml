@@ -23,6 +23,11 @@ similar = "3"
 tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 uuid = { version = "1", features = ["v4"] }
 
+[target.'cfg(windows)'.dependencies]
+misty-windows-confine = { path = "../windows-confine" }
+misty-windows-files = { path = "../windows-files" }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl"] }
+
 [dev-dependencies]
 tempfile = "3"
 tokio = { version = "1", features = ["io-std"] }

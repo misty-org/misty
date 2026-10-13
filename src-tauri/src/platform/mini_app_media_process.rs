@@ -1,110 +1,55 @@
-//! Platform process confinement for the fixed media operation. No permissive fallback.
-use std::{fs::File, path::Path, sync::atomic::AtomicBool};
-#[cfg(target_os = "macos")]
+//! The fixed media conversion: FFmpeg, run in the tool sandbox, on a private
+//! copy of the chosen media.
 use std::{
+    ffi::OsString,
+    fs::File,
     io::Write,
-    process::{Command, Stdio},
-    sync::atomic::Ordering,
-    time::{Duration, Instant},
+    path::Path,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Instant,
 };
 
-#[cfg(target_os = "macos")]
-const PROFILE: &str = r#"(version 1)
-(deny default)
-(allow process-exec (literal (param "TOOL")))
-(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
-  (subpath "/System/Library") (subpath "/usr/lib")
-  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
-  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
-  (literal "/") (literal "/dev/null") (literal "/dev/urandom")
-  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*[.]dylib$")
-  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*/lib$"))
-(allow file-write* (subpath (param "WORK")))
-(allow sysctl-read)
-(allow file-read-metadata)
-"#;
+use super::super::tool_sandbox::{read_at, Sandbox, Stopped, TIME_LIMIT};
 
-#[cfg(target_os = "macos")]
-pub(crate) fn command(executable: &Path, work: &Path) -> std::io::Result<Command> {
-    command_with_storage(executable, work, None)
-}
+const MAX_INPUT: u64 = 1_073_741_824;
+const MAX_OUTPUT: u64 = 268_435_456;
 
-#[cfg(target_os = "macos")]
-pub(crate) fn command_with_storage(
-    executable: &Path,
-    work: &Path,
-    storage: Option<&Path>,
-) -> std::io::Result<Command> {
-    use std::os::unix::process::CommandExt;
-    let executable = executable.canonicalize()?;
-    let work = work.canonicalize()?;
-    let mut command = Command::new("/usr/bin/sandbox-exec");
-    let profile = if storage.is_some() {
-        format!("{PROFILE}\n(allow file-read* file-write* (subpath (param \"INDEX\")))")
-    } else {
-        PROFILE.to_string()
-    };
-    if let Some(storage) = storage {
-        command
-            .arg("-D")
-            .arg(format!("INDEX={}", storage.canonicalize()?.display()));
-    }
-    command
-        .args(["-p", &profile, "-D"])
-        .arg(format!("TOOL={}", executable.display()))
-        .arg("-D")
-        .arg(format!("WORK={}", work.display()))
-        .arg(executable);
-    command
-        .current_dir(&work)
-        .env_clear()
-        .env("PATH", "/usr/bin:/bin")
-        .env("HOME", &work)
-        .env("TMPDIR", &work)
-        .env("LANG", "C");
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    command.process_group(0);
-    // Only async-signal-safe resource-limit calls run between fork and exec.
-    unsafe {
-        command.pre_exec(|| {
-            for (resource, value) in [
-                (libc::RLIMIT_CPU, 300),
-                (libc::RLIMIT_FSIZE, 268_435_456),
-                (libc::RLIMIT_NOFILE, 128),
-                (libc::RLIMIT_CORE, 0),
-            ] {
-                let limit = libc::rlimit {
-                    rlim_cur: value,
-                    rlim_max: value,
-                };
-                if libc::setrlimit(resource, &limit) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-            }
-            Ok(())
-        });
-    }
-    Ok(command)
-}
-#[cfg(target_os = "macos")]
-struct ChildGuard {
-    child: std::process::Child,
-    active: bool,
-}
-#[cfg(target_os = "macos")]
-impl Drop for ChildGuard {
-    fn drop(&mut self) {
-        if self.active {
-            unsafe {
-                libc::kill(-(self.child.id() as i32), libc::SIGKILL);
-            }
-            let _ = self.child.wait();
+impl Stopped {
+    /// The message for a media conversion.
+    fn conversion(self) -> String {
+        match self {
+            Self::Cancelled => "Conversion cancelled.".into(),
+            Self::TimedOut => "Conversion exceeded five minutes. Choose shorter media.".into(),
+            Self::Failed(message) => message,
         }
     }
 }
+
+/// Copies the chosen media into the sandbox, so the tool never sees the
+/// person's own file.
+fn stage(input: &File, path: &Path, cancel: &AtomicBool, started: Instant) -> Result<(), String> {
+    let mut staged = File::create(path).map_err(|_| "Could not prepare the selected media.")?;
+    let mut offset = 0u64;
+    let mut buffer = vec![0; 65_536];
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return Err("Conversion cancelled.".into());
+        }
+        if offset > MAX_INPUT || started.elapsed() > TIME_LIMIT {
+            return Err("Media input exceeds the conversion limits.".into());
+        }
+        let size =
+            read_at(input, &mut buffer, offset).map_err(|_| "Could not read the chosen media.")?;
+        if size == 0 {
+            return Ok(());
+        }
+        staged
+            .write_all(&buffer[..size])
+            .map_err(|_| "Could not prepare the selected media.")?;
+        offset += size as u64;
+    }
+}
+
 pub fn convert(
     executable: &Path,
     input: &File,
@@ -112,173 +57,128 @@ pub fn convert(
     quality: &str,
     cancel: &AtomicBool,
 ) -> Result<File, String> {
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = (executable, input, format, quality, cancel);
-        Err("Isolated media conversion is not implemented on this platform yet.".into())
+    let sandbox = Sandbox::new()?;
+    let started = Instant::now();
+    let input_path = sandbox.path().join("input.media");
+    stage(input, &input_path, cancel, started)?;
+    if cancel.load(Ordering::Acquire) {
+        return Err("Conversion cancelled.".into());
     }
-    #[cfg(target_os = "macos")]
-    {
-        use std::os::unix::fs::FileExt;
-        let work = tempfile::Builder::new()
-            .prefix("misty-media-")
-            .tempdir()
-            .map_err(|_| "Could not prepare conversion.")?;
-        let input_path = work.path().join("input.media");
-        let mut staged =
-            File::create(&input_path).map_err(|_| "Could not prepare the selected media.")?;
-        let mut offset = 0u64;
-        let mut buffer = vec![0; 65_536];
-        let started = Instant::now();
-        loop {
-            if cancel.load(Ordering::Acquire) {
-                return Err("Conversion cancelled.".into());
-            }
-            if offset > 1_073_741_824 || started.elapsed() > Duration::from_secs(300) {
-                return Err("Media input exceeds the conversion limits.".into());
-            }
-            let size = input
-                .read_at(&mut buffer, offset)
-                .map_err(|_| "Could not read the chosen media.")?;
-            if size == 0 {
-                break;
-            }
-            staged
-                .write_all(&buffer[..size])
-                .map_err(|_| "Could not prepare the selected media.")?;
-            offset += size as u64;
-        }
-        drop(staged);
-        if cancel.load(Ordering::Acquire) {
-            return Err("Conversion cancelled.".into());
-        }
-        let output_path = work.path().join(format!("output.{format}"));
-        // Homebrew's compact FFmpeg build can omit WebP. Use its separately
-        // installed, fixed WebP encoder in another restricted process when present.
-        let webp = if format == "webp" {
-            ["/opt/homebrew/bin/cwebp", "/usr/local/bin/cwebp"]
-                .into_iter()
-                .find_map(|path| std::path::Path::new(path).canonicalize().ok())
-        } else {
-            None
-        };
-        let intermediate_format = if webp.is_some() { "png" } else { format };
-        let intermediate = work.path().join(format!("output.{intermediate_format}"));
-        let mut command = command(executable, work.path())
-            .map_err(|_| "The native media sandbox is unavailable.")?;
-        command
-            .args([
-                "-nostdin",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-max_pixels",
-                "33554432",
-                "-max_alloc",
-                "268435456",
-                "-filter_threads",
-                "2",
-                "-filter_complex_threads",
-                "2",
-                "-threads",
-                "2",
-                "-protocol_whitelist",
-                "file,pipe",
-                "-i",
-            ])
-            .arg(&input_path);
-        options(&mut command, intermediate_format, quality);
-        command
-            .args(["-threads", "2", "-map_metadata", "-1", "-y"])
-            .arg(&intermediate);
-        run(command, cancel, started)?;
-        if let Some(encoder) = webp {
-            let mut encode =
-                command_for_webp(&encoder, work.path(), &intermediate, &output_path, quality)?;
-            encode.args(["-metadata", "none"]);
-            run(encode, cancel, started)?;
-        }
-        if cancel.load(Ordering::Acquire) {
-            return Err("Conversion cancelled.".into());
-        }
-        let output = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(output_path)
-            .map_err(|_| "Conversion produced no output.")?;
-        let bytes = output
-            .metadata()
-            .map_err(|_| "Conversion produced no output.")?
-            .len();
-        if bytes == 0 || bytes > 268_435_456 {
-            return Err("Converted output must be between one byte and 256 MB.".into());
-        }
-        // On macOS the open descriptor survives removal of the temporary job directory.
-        Ok(output)
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn command_for_webp(
-    executable: &Path,
-    work: &Path,
-    input: &Path,
-    output: &Path,
-    quality: &str,
-) -> Result<Command, String> {
-    let mut encode = command(executable, work).map_err(|_| "The WebP converter is unavailable.")?;
-    encode
-        .args([
-            "-quiet",
-            "-q",
-            match quality {
-                "small" => "68",
-                "high" => "88",
-                _ => "78",
-            },
-        ])
-        .arg(input)
-        .arg("-o")
-        .arg(output);
-    Ok(encode)
-}
-#[cfg(target_os = "macos")]
-fn run(mut command: Command, cancel: &AtomicBool, started: Instant) -> Result<(), String> {
-    #[cfg(test)]
-    command.stderr(Stdio::inherit());
-    let mut running = ChildGuard {
-        child: command
-            .spawn()
-            .map_err(|_| "Could not start the isolated media converter.")?,
-        active: true,
+    let output_path = sandbox.path().join(format!("output.{format}"));
+    // Homebrew's compact FFmpeg build can omit WebP. Use its separately
+    // installed, fixed WebP encoder in another restricted process when present.
+    let webp = if format == "webp" {
+        webp_encoder()
+    } else {
+        None
     };
-    loop {
-        if cancel.load(Ordering::Acquire) {
-            return Err("Conversion cancelled.".into());
-        }
-        if started.elapsed() > Duration::from_secs(300) {
-            return Err("Conversion exceeded five minutes. Choose shorter media.".into());
-        }
-        match running
-            .child
-            .try_wait()
-            .map_err(|_| "Conversion status unavailable.")?
+    let intermediate_format = if webp.is_some() { "png" } else { format };
+    let intermediate = sandbox.path().join(format!("output.{intermediate_format}"));
+    let mut arguments: Vec<OsString> = [
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-max_pixels",
+        "33554432",
+        "-max_alloc",
+        "268435456",
+        "-filter_threads",
+        "2",
+        "-filter_complex_threads",
+        "2",
+        "-threads",
+        "2",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-i",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .collect();
+    arguments.push(input_path.into_os_string());
+    arguments.extend(
+        options(intermediate_format, quality)
+            .into_iter()
+            .map(OsString::from),
+    );
+    arguments.extend(["-threads", "2", "-map_metadata", "-1", "-y"].map(OsString::from));
+    arguments.push(intermediate.clone().into_os_string());
+    if !sandbox
+        .run(executable, &arguments, None, cancel, started)
+        .map_err(Stopped::conversion)?
+    {
+        return Err("The isolated converter could not convert this file. Check the format and installed FFmpeg codecs.".into());
+    }
+    if let Some(encoder) = webp {
+        let quality = match quality {
+            "small" => "68",
+            "high" => "88",
+            _ => "78",
+        };
+        let mut arguments: Vec<OsString> = ["-quiet", "-q", quality]
+            .into_iter()
+            .map(OsString::from)
+            .collect();
+        arguments.push(intermediate.into_os_string());
+        arguments.push("-o".into());
+        arguments.push(output_path.clone().into_os_string());
+        arguments.extend(["-metadata", "none"].map(OsString::from));
+        if !sandbox
+            .run(&encoder, &arguments, None, cancel, started)
+            .map_err(Stopped::conversion)?
         {
-            Some(status) => {
-                running.active = false;
-                return if status.success() {
-                    Ok(())
-                } else {
-                    Err("The isolated converter could not convert this file. Check the format and installed FFmpeg codecs.".into())
-                };
-            }
-            None => std::thread::sleep(Duration::from_millis(50)),
+            return Err("The WebP converter could not convert this file.".into());
         }
     }
+    if cancel.load(Ordering::Acquire) {
+        return Err("Conversion cancelled.".into());
+    }
+    let output = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&output_path)
+        .map_err(|_| "Conversion produced no output.")?;
+    let bytes = output
+        .metadata()
+        .map_err(|_| "Conversion produced no output.")?
+        .len();
+    if bytes == 0 || bytes > MAX_OUTPUT {
+        return Err("Converted output must be between one byte and 256 MB.".into());
+    }
+    keep(output)
 }
 
-#[cfg(target_os = "macos")]
-fn options(command: &mut Command, format: &str, quality: &str) {
+/// The converted file, past the sandbox's removal. On macOS the open
+/// descriptor survives it; Windows can't remove a folder holding an open
+/// file, so the output is copied to an anonymous file first.
+fn keep(output: File) -> Result<File, String> {
+    #[cfg(windows)]
+    {
+        use std::io::{Read, Seek};
+        let mut kept = tempfile::tempfile().map_err(|_| "Could not keep the converted file.")?;
+        std::io::copy(&mut (&output).take(MAX_OUTPUT + 1), &mut kept)
+            .map_err(|_| "Could not keep the converted file.")?;
+        kept.seek(std::io::SeekFrom::Start(0))
+            .map_err(|_| "Could not keep the converted file.")?;
+        Ok(kept)
+    }
+    #[cfg(not(windows))]
+    Ok(output)
+}
+
+/// A separately installed WebP encoder, on macOS only: Windows FFmpeg
+/// builds carry WebP themselves.
+fn webp_encoder() -> Option<std::path::PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    ["/opt/homebrew/bin/cwebp", "/usr/local/bin/cwebp"]
+        .into_iter()
+        .find_map(|path| Path::new(path).canonicalize().ok())
+}
+
+fn options(format: &str, quality: &str) -> Vec<&'static str> {
     let crf = match quality {
         "small" => "30",
         "high" => "18",
@@ -290,77 +190,86 @@ fn options(command: &mut Command, format: &str, quality: &str) {
         _ => "192k",
     };
     match format {
-        "mp3" => {
-            command.args(["-vn", "-codec:a", "libmp3lame", "-b:a", audio]);
+        "mp3" => vec!["-vn", "-codec:a", "libmp3lame", "-b:a", audio],
+        "m4a" => vec!["-vn", "-c:a", "aac", "-b:a", audio],
+        "mp4" | "mov" => vec![
+            "-c:v",
+            "libx264",
+            "-crf",
+            crf,
+            "-c:a",
+            "aac",
+            "-movflags",
+            "+faststart",
+        ],
+        "webm" => vec![
+            "-c:v",
+            "libvpx-vp9",
+            "-crf",
+            crf,
+            "-b:v",
+            "0",
+            "-c:a",
+            "libopus",
+        ],
+        "gif" => vec![
+            "-vf",
+            "fps=12:round=up,scale='min(960,iw)':-1:flags=lanczos",
+        ],
+        "jpg" => vec![
+            "-frames:v",
+            "1",
+            "-q:v",
+            if quality == "high" { "2" } else { "5" },
+        ],
+        "png" | "webp" | "avif" => vec!["-frames:v", "1"],
+        _ => Vec::new(),
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::super::super::tool_sandbox::fixtures::*;
+    use super::*;
+
+    #[test]
+    fn real_ffmpeg_converts_inside_the_container() {
+        let Some((_copy, executable)) = private_ffmpeg() else {
+            eprintln!("FFmpeg unavailable: real conversion check skipped.");
+            return;
+        };
+        let fixture = tempfile::tempdir().unwrap();
+        let input = fixture.path().join("tone.wav");
+        wav(&input);
+        for format in ["mp3", "png"] {
+            let source = if format == "mp3" {
+                input.clone()
+            } else {
+                let visual = fixture.path().join("input.ppm");
+                let mut pixels = b"P6\n16 16\n255\n".to_vec();
+                pixels.extend(vec![127; 16 * 16 * 3]);
+                std::fs::write(&visual, pixels).unwrap();
+                visual
+            };
+            let result = convert(
+                &executable,
+                &File::open(&source).unwrap(),
+                format,
+                "balanced",
+                &AtomicBool::new(false),
+            )
+            .unwrap_or_else(|error| panic!("{format}: {error}"));
+            assert!(result.metadata().unwrap().len() > 0, "{format}");
         }
-        "m4a" => {
-            command.args(["-vn", "-c:a", "aac", "-b:a", audio]);
-        }
-        "mp4" | "mov" => {
-            command.args([
-                "-c:v",
-                "libx264",
-                "-crf",
-                crf,
-                "-c:a",
-                "aac",
-                "-movflags",
-                "+faststart",
-            ]);
-        }
-        "webm" => {
-            command.args([
-                "-c:v",
-                "libvpx-vp9",
-                "-crf",
-                crf,
-                "-b:v",
-                "0",
-                "-c:a",
-                "libopus",
-            ]);
-        }
-        "gif" => {
-            command.args([
-                "-vf",
-                "fps=12:round=up,scale='min(960,iw)':-1:flags=lanczos",
-            ]);
-        }
-        "jpg" => {
-            command.args([
-                "-frames:v",
-                "1",
-                "-q:v",
-                if quality == "high" { "2" } else { "5" },
-            ]);
-        }
-        "png" | "webp" | "avif" => {
-            command.args(["-frames:v", "1"]);
-        }
-        _ => {}
+        assert_eq!(std::fs::metadata(input).unwrap().len(), 1644);
     }
 }
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
+    use super::super::super::tool_sandbox::fixtures::*;
     use super::*;
-    fn wav(path: &Path) {
-        let samples = vec![0u8; 1600];
-        let mut bytes = b"RIFF".to_vec();
-        bytes.extend_from_slice(&(36u32 + samples.len() as u32).to_le_bytes());
-        bytes.extend_from_slice(b"WAVEfmt ");
-        bytes.extend_from_slice(&16u32.to_le_bytes());
-        bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&8000u32.to_le_bytes());
-        bytes.extend_from_slice(&16000u32.to_le_bytes());
-        bytes.extend_from_slice(&2u16.to_le_bytes());
-        bytes.extend_from_slice(&16u16.to_le_bytes());
-        bytes.extend_from_slice(b"data");
-        bytes.extend_from_slice(&(samples.len() as u32).to_le_bytes());
-        bytes.extend(samples);
-        std::fs::write(path, bytes).unwrap();
-    }
+
     #[test]
     fn real_ffmpeg_converts_a_fixture_under_the_restricted_policy() {
         let Some(executable) =
@@ -416,105 +325,5 @@ mod tests {
             .unwrap_or_else(|error| panic!("{format}: {error}"));
             assert!(output.metadata().unwrap().len() > 0, "{format}");
         }
-    }
-    #[test]
-    fn sandbox_denies_private_file_reads_writes_and_network_even_without_protocol_flags() {
-        let Some(executable) =
-            super::super::system_dependencies::resolve_executable("ffmpeg", None)
-        else {
-            eprintln!("FFmpeg unavailable: network/read probes skipped.");
-            return;
-        };
-        let work = tempfile::tempdir().unwrap();
-        let outside = tempfile::tempdir().unwrap();
-        let secret = outside.path().join("private.wav");
-        wav(&secret);
-        let status = command(&executable, work.path())
-            .unwrap()
-            .args(["-hide_banner", "-loglevel", "error", "-i"])
-            .arg(&secret)
-            .arg(work.path().join("stolen.mp3"))
-            .status()
-            .unwrap();
-        assert!(!status.success());
-        assert!(!work.path().join("stolen.mp3").exists());
-        let output = outside.path().join("ungranted");
-        let status = command(Path::new("/bin/sh"), work.path())
-            .unwrap()
-            .args(["-c", "printf forbidden > \"$1\"", "--"])
-            .arg(&output)
-            .status()
-            .unwrap();
-        assert!(!status.success());
-        assert!(!output.exists());
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        listener.set_nonblocking(true).unwrap();
-        let status = command(&executable, work.path())
-            .unwrap()
-            .args([
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-rw_timeout",
-                "1000000",
-                "-i",
-            ])
-            .arg(format!("http://{}/media", listener.local_addr().unwrap()))
-            .arg(work.path().join("network.mp3"))
-            .status()
-            .unwrap();
-        assert!(!status.success());
-        assert_eq!(
-            listener.accept().unwrap_err().kind(),
-            std::io::ErrorKind::WouldBlock
-        );
-    }
-    #[test]
-    fn converter_environment_is_replaced_and_child_execution_is_denied() {
-        let work = tempfile::tempdir().unwrap();
-        let output = command(Path::new("/usr/bin/env"), work.path())
-            .unwrap()
-            .stdout(Stdio::piped())
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        let values = String::from_utf8(output.stdout).unwrap();
-        let keys: std::collections::BTreeSet<_> = values
-            .lines()
-            .map(|line| line.split('=').next().unwrap())
-            .collect();
-        assert_eq!(
-            keys,
-            ["HOME", "LANG", "PATH", "TMPDIR"].into_iter().collect()
-        );
-        assert!(values.contains(work.path().canonicalize().unwrap().to_str().unwrap()));
-        let status = command(Path::new("/bin/sh"), work.path())
-            .unwrap()
-            .args(["-c", "exec /usr/bin/true"])
-            .status()
-            .unwrap();
-        assert!(!status.success());
-    }
-    #[test]
-    fn dropping_a_running_child_terminates_and_reaps_it() {
-        let work = tempfile::tempdir().unwrap();
-        let child = command(Path::new("/bin/sleep"), work.path())
-            .unwrap()
-            .arg("60")
-            .spawn()
-            .unwrap();
-        let id = child.id() as i32;
-        let started = Instant::now();
-        drop(ChildGuard {
-            child,
-            active: true,
-        });
-        assert!(started.elapsed() < Duration::from_secs(2));
-        let mut status = 0;
-        assert_eq!(unsafe { libc::waitpid(id, &mut status, libc::WNOHANG) }, -1);
-        assert_eq!(
-            std::io::Error::last_os_error().raw_os_error(),
-            Some(libc::ECHILD)
-        );
     }
 }

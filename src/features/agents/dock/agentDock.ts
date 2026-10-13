@@ -26,7 +26,7 @@ interface DockEvent {
   id?: string;
 }
 
-export const dockAvailable = () => hasTauriInternals() && /Mac/.test(navigator.platform);
+export const dockAvailable = () => hasTauriInternals() && /Mac|Win/.test(navigator.platform);
 
 /** Detach works on a task that runs in one of the person's own tabs here. */
 export function canDetach(execution: Execution | null) {

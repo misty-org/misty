@@ -4,6 +4,18 @@ use super::{BrowserAgentExecuteRequest, BrowserSessionState};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, Webview};
 
+#[cfg(windows)]
+#[path = "browser_native_input_windows.rs"]
+mod windows;
+
+/// The modifiers that make a key a browser or system shortcut: Command on
+/// macOS; Control (and the Windows key) elsewhere.
+const COMMAND_MODIFIERS: &[&str] = if cfg!(target_os = "macos") {
+    &["Meta"]
+} else {
+    &["Meta", "Control"]
+};
+
 pub(super) fn validate(input: &Value) -> Result<(), String> {
     let point = |key: &str| {
         input[key]
@@ -66,10 +78,13 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
         }
         _ => false,
     };
+    // Command shortcuts are limited to select-all and undo/redo, so an agent
+    // can never close tabs, open the address bar or reach the clipboard.
+    let is_command = |v: &Value| v.as_str().is_some_and(|m| COMMAND_MODIFIERS.contains(&m));
     let safe_shortcut = input["kind"] != "key"
         || !input["modifiers"]
             .as_array()
-            .is_some_and(|mods| mods.iter().any(|v| v == "Meta"))
+            .is_some_and(|mods| mods.iter().any(is_command))
         || (matches!(
             input["key"]
                 .as_str()
@@ -78,7 +93,7 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
             Some("a" | "z")
         ) && input["modifiers"]
             .as_array()
-            .is_some_and(|mods| mods.iter().all(|v| v == "Meta" || v == "Shift")));
+            .is_some_and(|mods| mods.iter().all(|v| is_command(v) || v == "Shift")));
     if valid && safe_shortcut {
         Ok(())
     } else {
@@ -88,7 +103,7 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
 
 /// Where an action puts the agent cursor, as a fraction of the viewport. Typing
 /// and keys act where the cursor already is, so they leave it in place.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub(super) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
     let (x, y) = match input["kind"].as_str()? {
         "click" | "scroll" => ("x", "y"),
@@ -101,7 +116,7 @@ pub(super) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
 /// Script that glides the agent's in-page cursor to a viewport point and keeps
 /// it there, so the next screenshot shows where the agent is pointing. It is a
 /// drawing only: the user's own pointer never moves.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub(super) fn cursor_script(input: &Value, viewport: &Value) -> Option<String> {
     let (x, y) = match input["kind"].as_str()? {
         "drag" => (input["fromX"].as_f64()?, input["fromY"].as_f64()?),
@@ -131,7 +146,9 @@ pub(super) fn set_locked(webview: &Webview, locked: bool) -> Result<(), String> 
             misty_browser_native_set_locked(platform.inner().cast(), locked);
         })
         .map_err(|error| error.to_string());
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    return windows::set_locked(webview, locked);
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = (webview, locked);
         Ok(())
@@ -147,10 +164,12 @@ pub(super) async fn dispatch(
     observed: &Value,
     generation: u64,
 ) -> Result<Value, String> {
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    return dispatch_windows(app, webview, request, input, origin, observed, generation).await;
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = (app, webview, request, input, origin, observed, generation);
-        return Err("Native browser input is currently available on macOS only.".into());
+        return Err("Native browser input is not available on this platform.".into());
     }
     #[cfg(target_os = "macos")]
     {
@@ -232,6 +251,100 @@ pub(super) async fn dispatch(
     }
 }
 
+/// Windows: trusted input through the DevTools protocol, rechecked against
+/// the grant before it lands.
+#[cfg(windows)]
+async fn dispatch_windows(
+    app: &AppHandle,
+    webview: Webview,
+    request: &BrowserAgentExecuteRequest,
+    input: &Value,
+    origin: &str,
+    observed: &Value,
+    generation: u64,
+) -> Result<Value, String> {
+    validate(input)?;
+    let window = webview.window();
+    if !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(true) {
+        return Err("The granted browser must be visible before native input.".into());
+    }
+    let (width, height) = crate::infra::webview2::css_viewport(&webview)
+        .await
+        .map_err(String::from)?;
+    let observed_size = (
+        observed["viewport"]["width"].as_f64().unwrap_or(0.0),
+        observed["viewport"]["height"].as_f64().unwrap_or(0.0),
+    );
+    if (width - observed_size.0).abs() > 2.0 || (height - observed_size.1).abs() > 2.0 {
+        return Err("browser_snapshot_stale: browser viewport resized before native input".into());
+    }
+    let target = cursor_target(input);
+    if let Some(script) = cursor_script(input, &observed["viewport"]) {
+        // Let the user watch the cursor arrive before the input lands.
+        let _ = webview.eval(script);
+        tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+    }
+    let authorize: windows::Authorize = {
+        let app = app.clone();
+        let view = webview.clone();
+        let expected_origin = origin.to_owned();
+        let request = BrowserAgentExecuteRequest {
+            scope_id: request.scope_id.clone(),
+            agent_id: request.agent_id.clone(),
+            grant_id: request.grant_id.clone(),
+            operation: request.operation.clone(),
+            input: request.input.clone(),
+            site_blocks: request.site_blocks.clone(),
+            confirm_kinds: request.confirm_kinds.clone(),
+        };
+        std::sync::Arc::new(move || {
+            authorize_native_input(&app, &view, &request, &expected_origin, generation)
+        })
+    };
+    let editable = observed["editable"].as_bool().unwrap_or(false);
+    let mut result = windows::act(&webview, authorize, input, (width, height), editable).await?;
+    if let (Some((x, y)), Some(object)) = (target, result.as_object_mut()) {
+        object.insert("cursor".into(), json!({"x": x, "y": y}));
+    }
+    Ok(result)
+}
+
+/// The agent still owns the task, the page has not navigated or changed since
+/// it was observed, and its origin is the one the agent saw.
+#[cfg(windows)]
+fn authorize_native_input(
+    app: &AppHandle,
+    view: &Webview,
+    request: &BrowserAgentExecuteRequest,
+    expected_origin: &str,
+    generation: u64,
+) -> Result<(), String> {
+    super::super::agent_workspace::authorize_scope(
+        app,
+        &request.scope_id,
+        &request.agent_id,
+        request.input["__mistyTaskId"].as_str().unwrap_or(""),
+    )?;
+    let state = app.state::<BrowserSessionState>();
+    let (id, _) = super::resolve_agent_webview(app, &state, request)?;
+    let current_generation = state
+        .sessions
+        .lock()
+        .map_err(|_| "Browser state unavailable")?
+        .get(&id)
+        .map(|session| session.snapshot_generation);
+    if current_generation != Some(generation) {
+        return Err(
+            "browser_snapshot_stale: browser navigated or observation changed before native input"
+                .into(),
+        );
+    }
+    if super::browser_page_origin(&view.url().map_err(|e| e.to_string())?) != expected_origin {
+        return Err("browser_snapshot_stale: browser origin changed before native input".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,6 +380,19 @@ mod tests {
             json!({"kind":"type","text":"house"}),
         ] {
             assert!(validate(&input).is_ok());
+        }
+        // Control is the command key off macOS: the same limits apply.
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert!(validate(&json!({"kind":"key","key":"a","modifiers":["Control"]})).is_ok());
+            assert!(
+                validate(&json!({"kind":"key","key":"z","modifiers":["Control","Shift"]})).is_ok()
+            );
+            for key in ["w", "l", "c", "v", "t", "n", "q"] {
+                assert!(
+                    validate(&json!({"kind":"key","key":key,"modifiers":["Control"]})).is_err()
+                );
+            }
         }
         for input in [
             json!({"kind":"drag","fromX":0.1,"fromY":0.2,"toX":1.1,"toY":0.9}),

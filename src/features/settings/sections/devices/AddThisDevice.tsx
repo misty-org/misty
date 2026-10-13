@@ -13,7 +13,7 @@ import { SettingsNote } from "../../SettingsControls";
 
 const addThisDeviceHelp =
   "Agents can already use this computer. Adding it once lets it sync and work with your other " +
-  "devices: agents can reach it from them, and files can move between them on the same network.";
+  "devices: agents can reach it from them, and it shares your clipboard with them.";
 
 const pollMs = 2000;
 

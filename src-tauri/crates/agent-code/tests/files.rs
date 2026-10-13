@@ -1,6 +1,6 @@
 mod common;
 
-use common::{failed, fixture};
+use common::{failed, fixture, link_folder};
 use serde_json::json;
 use std::fs;
 
@@ -72,9 +72,12 @@ async fn symlinks_never_lead_out_of_the_project() {
     let f = fixture();
     let secret = f.outside.path().join("secret.txt");
     fs::write(&secret, "TOP SECRET").unwrap();
+    // Windows symlinks to files need privilege; folders link everywhere.
+    #[cfg(unix)]
     std::os::unix::fs::symlink(&secret, f.root().join("link.txt")).unwrap();
-    std::os::unix::fs::symlink(f.outside.path(), f.root().join("linkdir")).unwrap();
+    link_folder(f.outside.path(), &f.root().join("linkdir"));
 
+    #[cfg(unix)]
     assert!(failed(&f.call("code.read", json!({ "path": "link.txt" })).await));
     assert!(failed(&f.call("code.read", json!({ "path": "linkdir/secret.txt" })).await));
     let write = f
@@ -83,7 +86,7 @@ async fn symlinks_never_lead_out_of_the_project() {
     assert!(failed(&write));
     assert!(!f.outside.path().join("new.txt").exists());
     let overwrite = f
-        .call("code.write", json!({ "path": "link.txt", "content": "overwritten" }))
+        .call("code.write", json!({ "path": if cfg!(unix) { "link.txt" } else { "linkdir" }, "content": "overwritten" }))
         .await;
     assert!(failed(&overwrite));
     assert_eq!(fs::read_to_string(&secret).unwrap(), "TOP SECRET");
@@ -112,14 +115,18 @@ async fn paths_outside_and_protected_files_are_refused() {
 #[tokio::test(flavor = "multi_thread")]
 async fn system_and_home_folders_cannot_be_projects() {
     let f = fixture();
-    for root in ["/", "/etc", "/System/Library", "/usr/local/x"] {
+    #[cfg(unix)]
+    let (roots, home_var, private) = (vec!["/", "/etc", "/System/Library", "/usr/local/x"], "HOME", "Library/Keychains");
+    #[cfg(windows)]
+    let (roots, home_var, private) = (vec![r"C:\", r"C:\Windows", r"C:\Windows\System32", r"C:\Program Files\x"], "USERPROFILE", "AppData/Roaming");
+    for root in roots {
         assert!(f.service.check_root(std::path::Path::new(root)).is_err(), "{root}");
     }
-    if let Some(home) = std::env::var_os("HOME") {
+    if let Some(home) = std::env::var_os(home_var) {
         let home = std::path::PathBuf::from(home);
         assert!(f.service.check_root(&home).is_err());
         assert!(f.service.check_root(&home.join(".ssh")).is_err());
-        assert!(f.service.check_root(&home.join("Library/Keychains")).is_err());
+        assert!(f.service.check_root(&home.join(private)).is_err());
         assert!(f.service.check_root(&home.join("Code/site")).is_ok());
     }
     assert!(f.service.check_root(&f.data_dir.path().canonicalize().unwrap()).is_err());

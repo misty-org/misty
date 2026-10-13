@@ -1,0 +1,14 @@
+[package]
+name = "misty-windows-files"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# File access relative to an open folder on Windows, never following a link:
+# the counterpart of openat with O_NOFOLLOW, shared by code projects and
+# folder organization.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Kernel"] }
+
+[dev-dependencies]
+tempfile = "3"

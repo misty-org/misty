@@ -12,14 +12,18 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::agents::{device_id, io_error, run_db, validation_error, AgentService},
+    infra::agents::{canonical, device_id, io_error, run_db, validation_error, AgentService},
 };
 
 impl AgentService {
     /// Shares a folder the person chose as a project. A folder already shared
     /// read-only becomes a project under the same id.
-    pub async fn register_project_scope(&self, path: PathBuf, code: &CodeService) -> ApiResult<Value> {
-        let root = fs::canonicalize(&path)
+    pub async fn register_project_scope(
+        &self,
+        path: PathBuf,
+        code: &CodeService,
+    ) -> ApiResult<Value> {
+        let root = canonical(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         if !root.is_dir() {
             return Err(ApiError::Message("Choose a folder, not a file.".into()));
@@ -64,7 +68,11 @@ impl AgentService {
 
     /// Lets agents change a folder that was shared read-only: it becomes a
     /// project. Only the person can do this, from Misty's own window.
-    pub async fn allow_project_changes(&self, scope_id: String, code: &CodeService) -> ApiResult<()> {
+    pub async fn allow_project_changes(
+        &self,
+        scope_id: String,
+        code: &CodeService,
+    ) -> ApiResult<()> {
         let lookup = scope_id.clone();
         let path: String = run_db(self.database_path.clone(), move |connection| {
             connection.query_row(
@@ -74,10 +82,12 @@ impl AgentService {
             )
         })
         .await?;
-        let root = fs::canonicalize(&path)
+        let root = canonical(&path)
             .map_err(|_| ApiError::Message("That folder is no longer on this computer.".into()))?;
         if root.to_string_lossy() != path {
-            return Err(ApiError::Message("That folder moved. Add it again as a project.".into()));
+            return Err(ApiError::Message(
+                "That folder moved. Add it again as a project.".into(),
+            ));
         }
         code.check_root(&root)
             .map_err(|error| ApiError::Message(error.to_string()))?;
@@ -92,7 +102,12 @@ impl AgentService {
     }
 
     /// Whether agents may push this project's branches, and its default branch.
-    pub async fn set_project_push(&self, scope_id: String, allow: bool, allow_default: bool) -> ApiResult<()> {
+    pub async fn set_project_push(
+        &self,
+        scope_id: String,
+        allow: bool,
+        allow_default: bool,
+    ) -> ApiResult<()> {
         run_db(self.database_path.clone(), move |connection| {
             let changed = connection.execute(
                 "UPDATE local_agent_scopes SET allow_push=?2, allow_push_default=?3 WHERE id=?1 AND access='write'",
@@ -133,13 +148,17 @@ impl AgentService {
             && !name.contains(['/', '\\', ':', '\0'])
             && name.chars().all(|c| !c.is_control());
         if !valid {
-            return Err(ApiError::Message("Use a short folder name without slashes.".into()));
+            return Err(ApiError::Message(
+                "Use a short folder name without slashes.".into(),
+            ));
         }
-        let parent = fs::canonicalize(&parent)
+        let parent = canonical(&parent)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         let folder = parent.join(name);
         if folder.exists() {
-            return Err(ApiError::Message(format!("{name} already exists there. Pick another name or place.")));
+            return Err(ApiError::Message(format!(
+                "{name} already exists there. Pick another name or place."
+            )));
         }
         code.check_root(&folder)
             .map_err(|error| ApiError::Message(error.to_string()))?;
@@ -149,7 +168,7 @@ impl AgentService {
         if registered.is_err() {
             let _ = fs::remove_dir(&folder);
         }
-        let folder = fs::canonicalize(&folder).unwrap_or(folder);
+        let folder = canonical(&folder).unwrap_or(folder);
         Ok((registered?, folder))
     }
 
@@ -177,7 +196,7 @@ impl AgentService {
                 [&scope_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )?;
-            let root = fs::canonicalize(&path).map_err(io_error)?;
+            let root = canonical(&path).map_err(io_error)?;
             if root.to_string_lossy() != path {
                 // The folder moved or a symlink replaced it: share it again.
                 return Err(validation_error("The project folder moved."));
@@ -213,14 +232,20 @@ mod tests {
             .register_project_scope(folder.path().to_path_buf(), &code)
             .await
             .unwrap();
-        assert_eq!(shared["id"], project["id"], "a shared folder becomes a project");
+        assert_eq!(
+            shared["id"], project["id"],
+            "a shared folder becomes a project"
+        );
         let id = project["id"].as_str().unwrap().to_owned();
         let snapshot = service.device_snapshot().await.unwrap();
         assert_eq!(snapshot["scopes"][0]["kind"], "project_folder");
         assert_eq!(snapshot["scopes"][0]["allowInstalls"], false);
 
         assert!(!service.project(id.clone()).await.unwrap().allow_installs);
-        service.set_project_installs(id.clone(), true).await.unwrap();
+        service
+            .set_project_installs(id.clone(), true)
+            .await
+            .unwrap();
         assert!(service.project(id.clone()).await.unwrap().allow_installs);
 
         let read_only = tempfile::tempdir().unwrap();
@@ -229,11 +254,23 @@ mod tests {
             .await
             .unwrap();
         let other_id = other["id"].as_str().unwrap().to_owned();
-        assert!(service.project(other_id.clone()).await.is_err(), "read-only folders aren't projects");
-        assert!(service.set_project_installs(other_id.clone(), true).await.is_err());
+        assert!(
+            service.project(other_id.clone()).await.is_err(),
+            "read-only folders aren't projects"
+        );
+        assert!(service
+            .set_project_installs(other_id.clone(), true)
+            .await
+            .is_err());
 
-        service.allow_project_changes(other_id.clone(), &code).await.unwrap();
-        assert!(service.project(other_id).await.is_ok(), "allowed changes make it a project");
+        service
+            .allow_project_changes(other_id.clone(), &code)
+            .await
+            .unwrap();
+        assert!(
+            service.project(other_id).await.is_ok(),
+            "allowed changes make it a project"
+        );
 
         if let Some(home) = dirs::home_dir() {
             assert!(service.register_project_scope(home, &code).await.is_err());

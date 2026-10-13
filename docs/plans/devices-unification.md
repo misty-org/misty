@@ -1,5 +1,7 @@
 # Devices unification — implementation plan
 
+> Superseded in part on October 12, 2026: the LAN data plane, iroh and device-list gossip described here were removed. See [drop-lan-clipboard-on-sync.md](drop-lan-clipboard-on-sync.md).
+
 Implements [docs/design/devices/BRIEF.md](../design/devices/BRIEF.md). Written October 5, 2026 against `main` at `7c426e81f`.
 
 ## Status (October 5, 2026)

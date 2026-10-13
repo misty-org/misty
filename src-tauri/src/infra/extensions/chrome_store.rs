@@ -44,7 +44,9 @@ fn parse(id: &str, xml: &str) -> Result<CatalogEntry, String> {
     match attribute(check, "status").as_deref() {
         Some("ok") => {}
         Some("noupdate") => {
-            return Err("This extension needs a newer version of Chrome than Misty supports.".into())
+            return Err(
+                "This extension needs a newer version of Chrome than Misty supports.".into(),
+            )
         }
         _ => return Err(unavailable()),
     }
@@ -145,7 +147,11 @@ fn message(runtime: &Path, manifest: &Value, value: &str) -> String {
         locales.insert(0, default);
     }
     for locale in locales {
-        if locale.is_empty() || !locale.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+        if locale.is_empty()
+            || !locale
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        {
             continue;
         }
         let path = runtime.join("_locales").join(locale).join("messages.json");

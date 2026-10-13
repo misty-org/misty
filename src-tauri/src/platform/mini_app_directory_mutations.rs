@@ -133,7 +133,25 @@ fn rename_exclusive(directory: &Dir, from: &OsStr, to: &OsStr) -> std::io::Resul
         Err(std::io::Error::last_os_error())
     }
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn rename_exclusive(directory: &Dir, from: &OsStr, to: &OsStr) -> std::io::Result<()> {
+    use cap_std::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        DELETE, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_DELETE,
+        FILE_SHARE_READ, FILE_SHARE_WRITE, SYNCHRONIZE,
+    };
+    // Both validated names are single children of the same held directory
+    // handle. The entry itself is opened relative to it, never a link's
+    // target, and the rename refuses a destination created concurrently.
+    let mut options = cap_std::fs::OpenOptions::new();
+    options
+        .access_mode(DELETE | SYNCHRONIZE)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT);
+    let entry = directory.open_with(from, &options)?;
+    crate::platform::windows::rename_without_replacing(&entry, directory, to)
+}
+#[cfg(not(any(target_os = "macos", windows)))]
 fn rename_exclusive(_directory: &Dir, _from: &OsStr, _to: &OsStr) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,

@@ -214,7 +214,6 @@ export function WorkspaceTabStrip(
           role="tablist"
           aria-label="Window tabs"
           aria-orientation={vertical ? "vertical" : "horizontal"}
-          data-tour-target="workspace-tab-bar"
           className={cn(
             "misty-workspace-tab-list flex min-w-0 flex-1 gap-1",
             vertical

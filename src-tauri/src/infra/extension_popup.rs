@@ -40,8 +40,14 @@ pub async fn extension_popup_open(
     }
     let (width, height) = (width.clamp(240.0, 1000.0), height.clamp(200.0, 900.0));
     let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let origin = window.outer_position().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
-    let size = window.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+    let origin = window
+        .outer_position()
+        .map_err(|e| e.to_string())?
+        .to_logical::<f64>(scale);
+    let size = window
+        .outer_size()
+        .map_err(|e| e.to_string())?
+        .to_logical::<f64>(scale);
     let x = (origin.x + size.width - width - 60.0).max(origin.x);
     let label = format!("{HOST_PREFIX}popup-{}", uuid::Uuid::new_v4());
     let title: String = title.chars().take(200).collect();
@@ -54,7 +60,11 @@ pub async fn extension_popup_open(
         // The page is the extension's; this one only holds the window open.
         WebviewUrl::App("index.html?agent_dock_host=1&popup=1".into()),
     )
-    .title(if title.is_empty() { "Extension".to_owned() } else { title })
+    .title(if title.is_empty() {
+        "Extension".to_owned()
+    } else {
+        title
+    })
     .inner_size(width, height)
     .min_inner_size(240.0, 200.0)
     .position(x, origin.y + 80.0)
@@ -90,7 +100,11 @@ pub async fn extension_popup_open(
 
 /// Closes a popup window; its tab returns to Misty's window, which closes it.
 #[tauri::command]
-pub async fn extension_popup_close(window: Window, app: AppHandle, host: String) -> Result<(), String> {
+pub async fn extension_popup_close(
+    window: Window,
+    app: AppHandle,
+    host: String,
+) -> Result<(), String> {
     if window.label() != "main" {
         return Err("Only the Misty window can close extension popups.".into());
     }
@@ -105,7 +119,10 @@ fn close(app: &AppHandle, label: &str) -> Result<(), String> {
     let Some(tab) = tab else {
         return Ok(());
     };
-    if let (Some(webview), Some(main)) = (app.get_webview(&browser_label(&tab)?), app.get_window("main")) {
+    if let (Some(webview), Some(main)) = (
+        app.get_webview(&browser_label(&tab)?),
+        app.get_window("main"),
+    ) {
         if webview.window().label() == label {
             webview.reparent(&main).map_err(|e| e.to_string())?;
             page_returned(&webview);
@@ -115,7 +132,11 @@ fn close(app: &AppHandle, label: &str) -> Result<(), String> {
     if let Some(window) = app.get_window(label) {
         let _ = window.destroy();
     }
-    let _ = app.emit_to("main", EVENT, json!({ "action": "closed", "id": label, "tab": tab }));
+    let _ = app.emit_to(
+        "main",
+        EVENT,
+        json!({ "action": "closed", "id": label, "tab": tab }),
+    );
     Ok(())
 }
 

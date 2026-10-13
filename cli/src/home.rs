@@ -132,6 +132,14 @@ fn write_if_missing(path: &Path, contents: &[u8]) -> Result<()> {
 }
 
 fn secure_known_files(root: &Path) -> Result<()> {
+    #[cfg(windows)]
+    for relative in &layout().private_files {
+        let path = root.join(relative);
+        if path.is_file() {
+            misty_credential_store::restrict_private_file(&path)
+                .with_context(|| format!("could not secure {}", path.display()))?;
+        }
+    }
     #[cfg(unix)]
     for relative in &layout().private_files {
         let path = root.join(relative);
@@ -145,6 +153,20 @@ fn secure_known_files(root: &Path) -> Result<()> {
 }
 
 fn check_permissions(root: &Path, problems: &mut Vec<String>) -> Result<()> {
+    #[cfg(windows)]
+    {
+        if !misty_credential_store::is_private_directory(root) {
+            problems.push("home directory is accessible by other users".to_owned());
+        }
+        for relative in &layout().private_files {
+            let path = root.join(relative);
+            if path.is_file() && !misty_credential_store::is_private_file(&path) {
+                problems.push(format!(
+                    "private file is accessible by other users: {relative}"
+                ));
+            }
+        }
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -176,6 +198,9 @@ fn secure_directory(path: &Path) -> Result<()> {
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))
             .with_context(|| format!("could not secure {}", path.display()))?;
     }
+    #[cfg(windows)]
+    misty_credential_store::restrict_private_directory(path)
+        .with_context(|| format!("could not secure {}", path.display()))?;
     Ok(())
 }
 

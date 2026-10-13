@@ -10,7 +10,12 @@ use crate::infra::device_identity::{verify_device_signature, POLICY_DOMAIN, RUN_
 pub const GRANT_DOMAIN: &str = "misty.device.grant.v2";
 pub const LIST_DOMAIN: &str = "misty.device.list.v1";
 
-pub use crate::domain::connected_devices::SignedRecord;
+/// A signed device record as its exact signed bytes (base64) and signature.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SignedRecord {
+    pub payload: String,
+    pub signature: String,
+}
 
 impl SignedRecord {
     pub fn new(payload: &[u8], signature: String) -> Self {
@@ -139,14 +144,6 @@ impl DeviceList {
             .iter()
             .find(|member| member.device_id == device_id)
             .map(|member| member.public_key.as_str())
-    }
-
-    /// The admitted device whose iroh endpoint is this hex key.
-    pub fn device_for_endpoint(&self, endpoint: &str) -> Option<&str> {
-        self.admitted
-            .iter()
-            .find(|member| endpoint_of(&member.public_key).as_deref() == Some(endpoint))
-            .map(|member| member.device_id.as_str())
     }
 
     fn removed_keys(&self) -> std::collections::HashSet<&str> {
@@ -406,10 +403,7 @@ mod tests {
         let root = VaultRoot::generate();
         let (a, b, c) = (member('a', 1), member('b', 2), member('c', 3));
         let first = list(&root, 1, &[a.clone(), b.clone()], &[]);
-        assert_eq!(
-            first.device_for_endpoint(&hex::encode([2u8; 32])),
-            Some(b.device_id.as_str())
-        );
+        assert!(first.admitted_key(&b.device_id).is_some());
         let other = VaultRoot::generate();
         assert!(DeviceList::verify(&first.record, &other.public_key().unwrap()).is_none());
         let mut tampered = first.record.clone();

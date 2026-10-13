@@ -4,7 +4,20 @@ use std::{
 };
 
 #[cfg(target_os = "windows")]
-use std::process::Command;
+use crate::platform::windows::registry;
+
+/// Where Windows lists programs to start at sign-in for the current user.
+#[cfg(target_os = "windows")]
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+#[cfg(target_os = "windows")]
+const RUN_VALUE: &str = "Misty";
+
+/// The command line Windows runs at sign-in: the quoted executable path, so
+/// spaces in "Program Files" or a user name never split it.
+#[cfg(target_os = "windows")]
+fn run_command(target: &Path) -> String {
+    format!("\"{}\"", target.display())
+}
 
 use serde::Serialize;
 
@@ -118,17 +131,11 @@ fn is_enabled(target: &Path) -> bool {
 }
 
 #[cfg(target_os = "windows")]
-fn is_enabled(_target: &Path) -> bool {
-    Command::new("reg")
-        .args([
-            "query",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            "Misty",
-        ])
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+fn is_enabled(target: &Path) -> bool {
+    registry::read_string(RUN_KEY, RUN_VALUE)
+        .ok()
+        .flatten()
+        .is_some_and(|command| command.eq_ignore_ascii_case(&run_command(target)))
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
@@ -162,26 +169,8 @@ fn enable(target: &Path) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn enable(target: &Path) -> Result<(), String> {
-    let target = target.display().to_string();
-    let status = Command::new("reg")
-        .args([
-            "add",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            "Misty",
-            "/t",
-            "REG_SZ",
-            "/d",
-            &target,
-            "/f",
-        ])
-        .status()
-        .map_err(|error| format!("Could not run reg add: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Could not enable launch on login.".to_owned())
-    }
+    registry::write_string(RUN_KEY, RUN_VALUE, &run_command(target))
+        .map_err(|_| "Could not enable launch on login.".to_owned())
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
@@ -203,21 +192,8 @@ fn disable() -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn disable() -> Result<(), String> {
-    let status = Command::new("reg")
-        .args([
-            "delete",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            "Misty",
-            "/f",
-        ])
-        .status()
-        .map_err(|error| format!("Could not run reg delete: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Could not disable launch on login.".to_owned())
-    }
+    registry::delete_value(RUN_KEY, RUN_VALUE)
+        .map_err(|_| "Could not disable launch on login.".to_owned())
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]

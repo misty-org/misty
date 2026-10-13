@@ -8,7 +8,6 @@ export interface AccountDevice {
   name: string;
   platform: string;
   publicKey: string;
-  p2pEndpointId?: string;
   admissionState: "pending" | "admitted" | "revoked" | "legacy";
   osVersion: string;
   appVersion: string;
@@ -19,12 +18,11 @@ export interface AccountDevice {
   policy?: Omit<DevicePolicy, "version"> & { version: number; updatedAt: string };
 }
 
-export type DeviceStatus = "self" | "same-network" | "other-network" | "offline" | "unreachable";
+export type DeviceStatus = "self" | "online" | "offline";
 
 export interface DevicePeer extends AccountDevice {
   isSelf: boolean;
   online: boolean;
-  connected: boolean;
   status: DeviceStatus;
 }
 
@@ -32,24 +30,18 @@ export function deviceStatusLabel(status: DeviceStatus): string {
   switch (status) {
     case "self":
       return "This device";
-    case "same-network":
-      return "Same network";
-    case "other-network":
-      return "Other network";
-    case "unreachable":
-      return "Can't reach";
+    case "online":
+      return "Online";
     default:
       return "Offline";
   }
 }
 
-/** The account's added devices with what this device knows of each now. */
+/** The account's added devices with their presence on the device channel. */
 export function devicePeers(
   devices: AccountDevice[],
   selfId: string | null,
   channel: ChannelSnapshot | null,
-  connected: string[],
-  unreachable: ReadonlySet<string>,
 ): DevicePeer[] {
   return devices
     .filter((device) => device.admissionState === "admitted" || device.id === selfId)
@@ -57,21 +49,8 @@ export function devicePeers(
       const isSelf = device.id === selfId;
       const presence = channel?.peers.find((peer) => peer.deviceId === device.id);
       const online = isSelf || Boolean(presence?.online);
-      const isConnected = connected.includes(device.id);
-      const sameNetwork =
-        Boolean(presence) &&
-        ((Boolean(channel?.networkKey) && presence?.networkKey === channel?.networkKey) ||
-          (Boolean(channel?.overlay) && Boolean(presence?.overlay)));
-      const status: DeviceStatus = isSelf
-        ? "self"
-        : !online
-          ? "offline"
-          : isConnected || sameNetwork
-            ? "same-network"
-            : unreachable.has(device.id)
-              ? "unreachable"
-              : "other-network";
-      return { ...device, isSelf, online, connected: isConnected, status };
+      const status: DeviceStatus = isSelf ? "self" : online ? "online" : "offline";
+      return { ...device, isSelf, online, status };
     })
     .sort((a, b) => Number(b.isSelf) - Number(a.isSelf) || a.name.localeCompare(b.name));
 }

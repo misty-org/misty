@@ -62,7 +62,7 @@ pub fn open(root: &Path) -> Result<Repository, CodeError> {
         .workdir()
         .and_then(|dir| dir.canonicalize().ok())
         .ok_or_else(|| CodeError::fix("The repository has no working folder."))?;
-    if workdir != root {
+    if crate::plain_path(&workdir) != crate::plain_path(root) {
         return Err(CodeError::Scope("The repository's working folder is outside the project.".into()));
     }
     Ok(repo)

@@ -26,11 +26,52 @@ pub(super) fn execute(permissions: &PermissionSet, params: &Value) -> Result<Val
         }
         Ok(Value::Null)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        let path = granted_path(file)?;
+        // The shell opens it with the file's default app; no command line is
+        // built, so no shell parses the file name.
+        crate::platform::windows::with_com(|| open_with_default_app(&path))
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = file;
         Err("Native file opening is not implemented on this platform yet.".into())
     }
+}
+
+#[cfg(windows)]
+pub(super) fn granted_path(file: &std::fs::File) -> Result<std::path::PathBuf, String> {
+    crate::platform::windows::verified_path(file, false)
+        .map_err(|_| "The chosen file moved or was replaced. Choose it again.".into())
+}
+
+#[cfg(windows)]
+fn open_with_default_app(path: &std::path::Path) -> Result<Value, String> {
+    use crate::platform::windows::wide;
+    use windows_sys::Win32::UI::{
+        Shell::{ShellExecuteExW, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW},
+        WindowsAndMessaging::SW_SHOWNORMAL,
+    };
+    let verb = wide("open");
+    let file = wide(path);
+    // SAFETY: an all-zero SHELLEXECUTEINFOW is valid before its fields are set.
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.nShow = SW_SHOWNORMAL;
+    // SAFETY: the strings outlive the call; a returned process handle is closed.
+    unsafe {
+        if ShellExecuteExW(&mut info) == 0 {
+            return Err("The native application could not open this file.".into());
+        }
+        if !info.hProcess.is_null() {
+            windows_sys::Win32::Foundation::CloseHandle(info.hProcess);
+        }
+    }
+    Ok(Value::Null)
 }
 
 #[cfg(target_os = "macos")]

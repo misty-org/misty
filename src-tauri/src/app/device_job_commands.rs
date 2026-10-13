@@ -9,9 +9,13 @@ use tauri::State;
 use crate::app::device_commands::{context, require_device_window};
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    connected_devices::DeliveryReceipt, device_admission as admission,
-    device_identity::canonical_request, device_records::SignedRecord, device_trust,
+    device_admission as admission, device_identity::canonical_request,
+    device_records::SignedRecord, device_trust,
 };
+
+/// The largest file a `files.send` job hands to the Space's Library, the
+/// same limit as any upload from the app.
+const MAX_SENT_FILE_BYTES: u64 = 128 * 1024 * 1024;
 
 /// Signs one of this device's HTTP requests. The private key never leaves
 /// native code; the domain prefix is added here, never by the caller.
@@ -123,51 +127,57 @@ pub async fn device_verify_job(
     .map_err(|_| "device_grant_invalid".to_owned())
 }
 
-/// Runs a `files.send` job: checks its grant, resolves the file inside the
-/// shared folder, and delivers it to the destination device over the LAN.
+/// Reads the file a `files.send` job names: checks its grant and resolves the
+/// file inside the shared folder. The app then saves it to the conversation's
+/// Space Library, where the person's other devices open it.
 #[tauri::command]
-pub async fn device_send_file(
+pub async fn device_read_shared_file(
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,
     scope_id: String,
     input: Value,
     config: Value,
-) -> Result<DeliveryReceipt, String> {
+) -> Result<tauri::ipc::Response, String> {
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
     device_trust::verify_job_grant(&grant, &scope_id, "files.send", "folders")
         .map_err(|_| "device_grant_invalid".to_owned())?;
+    if input["scopeId"].as_str() != Some(scope_id.as_str()) {
+        return Err("invalid_scope".into());
+    }
     let relative = input["relativePath"]
         .as_str()
         .unwrap_or_default()
         .to_owned();
-    let destination = input["destinationDeviceId"]
-        .as_str()
-        .unwrap_or_default()
-        .to_owned();
-    let inbox = input["destinationScopeId"]
-        .as_str()
-        .unwrap_or_default()
-        .to_owned();
-    if input["scopeId"].as_str() != Some(scope_id.as_str())
-        || inbox != format!("inbox:{destination}")
-    {
-        return Err("invalid_scope".into());
-    }
-    let receive_grant: SignedRecord = serde_json::from_value(input["receiveGrant"].clone())
-        .map_err(|_| "device_grant_invalid".to_owned())?;
     let path = state
         .agents
         .scoped_document_path(crate::infra::agents::PrepareScopedAgentDocumentRequest {
-            scope_id: scope_id.clone(),
+            scope_id,
             relative_path: relative,
         })
         .await
         .map_err(|_| "invalid_scope".to_owned())?;
-    state
-        .connected_devices
-        .deliver_file(&destination, &path, receive_grant, &inbox)
-        .await
-        .map_err(|error| error.to_string())
+    let bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        use std::io::Read;
+        let file = std::fs::File::open(&path).map_err(|_| "file_unavailable".to_owned())?;
+        let metadata = file.metadata().map_err(|_| "file_unavailable".to_owned())?;
+        if !metadata.is_file() {
+            return Err("not_a_file".into());
+        }
+        if metadata.len() > MAX_SENT_FILE_BYTES {
+            return Err("file_too_large".into());
+        }
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        file.take(MAX_SENT_FILE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "file_unavailable".to_owned())?;
+        if bytes.len() as u64 > MAX_SENT_FILE_BYTES {
+            return Err("file_too_large".into());
+        }
+        Ok(bytes)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
 }

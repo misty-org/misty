@@ -21,7 +21,10 @@ vi.mock("@tauri-apps/api/window", () => ({
     },
   }),
 }));
-vi.mock("./workspaceAutopilot", () => ({ watchWorkspaceAutopilot: mocks.watch }));
+vi.mock("./workspaceAutopilot", () => ({
+  watchWorkspaceAutopilot: mocks.watch,
+  autopilotStopShortcut: () => "Cmd+Shift+Escape",
+}));
 vi.mock("./localExecution", async () => {
   const { create } = await import("zustand");
   return {

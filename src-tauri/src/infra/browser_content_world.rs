@@ -1,10 +1,12 @@
-//! Named WKContentWorlds: Misty code that shares a page's DOM but not its
-//! JavaScript, so page scripts can neither observe nor patch it.
+//! Named script worlds: Misty code that shares a page's DOM but not its
+//! JavaScript, so page scripts can neither observe nor patch it. WebKit calls
+//! them content worlds; Chromium calls them isolated worlds.
 use tauri::Webview;
 
 /// Runs `function_body` in the named Misty content world. Each world shares the
 /// DOM with the page but keeps its own globals, invisible to page scripts and
 /// to other worlds, for as long as the page lives.
+#[cfg(target_os = "macos")]
 pub(crate) async fn evaluate_in_content_world(
     webview: Webview,
     world_name: &'static str,
@@ -70,4 +72,68 @@ pub(crate) async fn evaluate_in_content_world(
         .await
         .map_err(|_| "Page state timed out.".to_owned())?
         .map_err(|_| "Page state was canceled.".to_owned())?
+}
+
+/// Runs `function_body` in the named Misty isolated world of the page's main
+/// frame. Each world shares the DOM with the page but keeps its own globals,
+/// invisible to page scripts and to other worlds, for as long as the document
+/// lives: a world is created once per document and reused until it navigates.
+#[cfg(windows)]
+pub(crate) async fn evaluate_in_content_world(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+) -> Result<String, String> {
+    use crate::infra::webview2::{cdp, evaluate, CdpError};
+    use serde_json::{json, Value};
+    use std::{
+        collections::HashMap,
+        sync::{Mutex, OnceLock},
+    };
+
+    /// (view, world) -> (document loader, execution context)
+    type Worlds = HashMap<(String, &'static str), (String, i64)>;
+    static WORLDS: OnceLock<Mutex<Worlds>> = OnceLock::new();
+    let worlds = WORLDS.get_or_init(Mutex::default);
+
+    let tree = cdp(&webview, "Page.getFrameTree", &json!({})).await?;
+    let frame = &tree["frameTree"]["frame"];
+    let (frame_id, loader) = match (frame["id"].as_str(), frame["loaderId"].as_str()) {
+        (Some(frame), Some(loader)) => (frame.to_owned(), loader.to_owned()),
+        _ => return Err(CdpError::Invalid.into()),
+    };
+    let key = (webview.label().to_owned(), world_name);
+    let cached = worlds
+        .lock()
+        .ok()
+        .and_then(|worlds| worlds.get(&key).cloned())
+        .filter(|(document, _)| *document == loader)
+        .map(|(_, context)| context);
+    let context = match cached {
+        Some(context) => context,
+        None => {
+            let created = cdp(
+                &webview,
+                "Page.createIsolatedWorld",
+                &json!({ "frameId": frame_id, "worldName": world_name, "grantUniveralAccess": false }),
+            )
+            .await?;
+            let context = created["executionContextId"]
+                .as_i64()
+                .ok_or(CdpError::Invalid)?;
+            if let Ok(mut worlds) = worlds.lock() {
+                // Forget worlds of views that closed or navigated away.
+                worlds.retain(|(view, _), _| view != webview.label());
+                worlds.insert(key, (loader, context));
+            }
+            context
+        }
+    };
+    let expression = format!("(async () => {{\n{function_body}\n}})()");
+    match evaluate(&webview, expression, Some(context)).await {
+        Ok(Value::String(value)) => Ok(value),
+        Ok(Value::Null) => Ok("null".to_owned()),
+        Ok(_) => Err("The page returned an invalid answer.".to_owned()),
+        Err(error) => Err(error.into()),
+    }
 }

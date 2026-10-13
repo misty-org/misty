@@ -47,7 +47,6 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
     if matches!(event, RunEvent::Exit) {
         crate::infra::browser_sync::flush_before_exit();
         // Agent commands and previews never outlive Misty.
-        #[cfg(unix)]
         if let Some(runtime) = app.try_state::<crate::app::runtime::MistyRuntime>() {
             runtime.code.shutdown();
         }

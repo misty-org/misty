@@ -11,8 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { useAuth } from "@/features/auth";
-import { useTourStore } from "@/features/tour";
+import { useSetupStore } from "@/features/setup";
 import { useState } from "react";
 import {
   buildPublicFeedbackIssueUrl,
@@ -43,17 +42,16 @@ const initialDraft: FeedbackDraft = {
 };
 
 export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {}) {
-  const { user } = useAuth();
   const [draft, setDraft] = useState(initialDraft);
   const [notice, setNotice] = useState("");
   const [working, setWorking] = useState<"bundle" | "feedback" | "">("");
   const [resetArmed, setResetArmed] = useState(false);
   const [reloadArmed, setReloadArmed] = useState(false);
 
-  const replayTour = () => {
+  const reopenSetup = () => {
     onClose?.();
     window.dispatchEvent(new CustomEvent("misty:close-settings"));
-    useTourStore.getState().resetTour(user?.id);
+    useSetupStore.getState().reopenSetup();
   };
 
   const updateDraft = <Key extends keyof FeedbackDraft>(key: Key, value: FeedbackDraft[Key]) =>
@@ -133,16 +131,16 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
   return (
     <>
       <SupportSectionBlock
-        title="App Tour & Walkthrough"
-        description="Revisit the onboarding tour to rediscover where everything is, configure starter apps, and review workspace prerequisites."
+        title="Setup"
+        description="Choose your theme and layout again, or import from another browser."
       >
         <div className="grid gap-px bg-charcoal-border">
           <RecoveryAction
             icon={Compass}
-            title="Replay app tour"
-            detail="Restart the interactive tour sequence from the beginning."
-            action="Start tour"
-            onClick={replayTour}
+            title="Run setup again"
+            detail="Opens the first-run setup from the beginning. Your current choices stay selected."
+            action="Open setup"
+            onClick={reopenSetup}
           />
         </div>
       </SupportSectionBlock>

@@ -154,12 +154,12 @@
       ]
     },
     {
-      "title": "Connected Devices, Peer Files & Search",
-      "purpose": "Explain connected-device registration and grants, peer file access and transfer, indexing, local and remote search, semantic media search, and unified result fusion and preview behavior.",
+      "title": "Connected Devices & Clipboard",
+      "purpose": "Explain connected-device registration and grants, the device channel, device jobs, and the shared clipboard carried on sync.",
       "parent": "Browser & Device Sync",
       "page_notes": [
         {
-          "content": "Start with src/features/connected-devices/, src/features/global-search/globalSearchExecution.ts, src/features/global-search/indexing/, src/api/devices/, src/api/search/, src-tauri/src/infra/connected_devices.rs, src-tauri/src/infra/peer_files.rs, src-tauri/services/peer-transport/, and src-tauri/services/file-search/. Follow the native and server search adapters. Distinguish iroh peer file transport and granted filesystem access from the browser sync service's HTTP/WebSocket protocol and from cloud Library indexing."
+          "content": "Start with src/features/connected-devices/, src/api/devices/, src-tauri/src/infra/device_channel.rs, src-tauri/src/infra/device_trust.rs and src-tauri/src/infra/cloud_clipboard/. Devices never connect to each other: presence, jobs and revocation travel on the server device channel, the clipboard is an encrypted ring in browser sync, and agents move files between devices through a Space Library."
         }
       ]
     },
@@ -266,7 +266,7 @@
       "purpose": "Map the Tauri/Rust host's app/domain/infra/platform structure, runtime and IPC registration, capabilities, configuration and paths, native credentials, platform adapters, vendored patches, and bundled worker lifecycle.",
       "page_notes": [
         {
-          "content": "Use src-tauri/src/app/, src-tauri/src/domain/, src-tauri/src/infra/, src-tauri/src/platform/, src-tauri/src/infra/native_process_worker.rs, src-tauri/services/, src-tauri/capabilities/, src-tauri/tauri.conf.json, src-tauri/build.rs, src-tauri/Cargo.toml, src/native/, and src/features/builtin-services/. Explain which work runs in-process versus in workers on each supported platform and how workers are built and located. Treat vendor changes as targeted dependency patches, not independent Misty product subsystems."
+          "content": "Use src-tauri/src/app/, src-tauri/src/domain/, src-tauri/src/infra/, src-tauri/src/platform/, src-tauri/services/, src-tauri/capabilities/, src-tauri/tauri.conf.json, src-tauri/build.rs, src-tauri/Cargo.toml, src/native/, and src/features/builtin-services/. Explain which work runs in-process versus in workers on each supported platform and how workers are built and located. Treat vendor changes as targeted dependency patches, not independent Misty product subsystems."
         }
       ]
     },

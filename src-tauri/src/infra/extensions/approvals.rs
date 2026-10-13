@@ -74,9 +74,7 @@ pub(super) fn seed_existing(
     let packages = root(app, account)?.join("packages");
     let ledger: Ledger = installations
         .iter()
-        .filter(|item| {
-            item.installed && selected_package(&packages.join(&item.id), false).is_ok()
-        })
+        .filter(|item| item.installed && selected_package(&packages.join(&item.id), false).is_ok())
         .map(|item| (item.guid.clone(), approval_of(item)))
         .collect();
     write(&path, &ledger)

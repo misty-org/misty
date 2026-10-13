@@ -85,7 +85,8 @@ async function run(
     case "signins": {
       const { added, locked } = await browserImport.signins(target);
       const locks = locked
-        ? ` ${plural(locked, "sign-in")} stayed behind because that browser locks them to itself.`
+        ? ` ${plural(locked, "sign-in")} stayed behind because that browser locks them to itself.` +
+          " Sign in to those sites again, or import from another browser you use."
         : "";
       return {
         kind,

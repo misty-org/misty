@@ -44,7 +44,7 @@ export function AgentLanding({
     .filter((entry) => !entry.parent_run_id && entry.conversation_id)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 3);
-  const canOrganize = hasTauriInternals() && !/Win/.test(navigator.platform);
+  const canOrganize = hasTauriInternals();
   const templates = canOrganize ? suggested.slice(0, 2) : suggested;
   return (
     <div className="agent-landing">

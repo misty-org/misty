@@ -9,7 +9,6 @@ use std::{
     collections::{HashMap, HashSet},
     fs::{self, File},
     io::{Read, Write},
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -67,8 +66,15 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
+/// Modification time in nanoseconds since 1970 (as stat's mtime and
+/// mtime_nsec give it on unix).
 pub(crate) fn modified_ns(metadata: &fs::Metadata) -> i128 {
-    metadata.mtime() as i128 * 1_000_000_000 + metadata.mtime_nsec() as i128
+    metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos() as i128)
+        .unwrap_or(0)
 }
 
 /// The project's tracked files and symlinks, as undo sees them.
@@ -182,10 +188,10 @@ impl Checkpoints {
                     bytes += metadata.len();
                     manifest.files.push(FileRecord {
                         path,
-                        mode: metadata.mode() & 0o7777,
+                        mode: beneath::mode(&metadata),
                         size: metadata.len(),
                         modified_ns: modified_ns(&metadata),
-                        inode: metadata.ino(),
+                        inode: beneath::file_identity(&metadata),
                     });
                 }
             }
@@ -226,8 +232,8 @@ impl Checkpoints {
                     Some(record)
                         if record.size == metadata.len()
                             && record.modified_ns == modified_ns(&metadata)
-                            && record.inode == metadata.ino()
-                            && record.mode == metadata.mode() & 0o7777 => {}
+                            && record.inode == beneath::file_identity(&metadata)
+                            && record.mode == beneath::mode(&metadata) => {}
                     Some(_) => {}
                     None => {
                         if beneath::remove(&root, &path, false).is_ok() {
@@ -252,8 +258,8 @@ impl Checkpoints {
                 && fs::symlink_metadata(root_path.join(&record.path)).is_ok_and(|metadata| {
                     record.size == metadata.len()
                         && record.modified_ns == modified_ns(&metadata)
-                        && record.inode == metadata.ino()
-                        && record.mode == metadata.mode() & 0o7777
+                        && record.inode == beneath::file_identity(&metadata)
+                        && record.mode == beneath::mode(&metadata)
                 });
             if unchanged {
                 continue;

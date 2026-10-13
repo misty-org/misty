@@ -77,9 +77,7 @@ describe("navigation reordering", () => {
     agents.focus();
     const before = workspace().layout;
     fireEvent.keyDown(agents, { key: "ArrowUp", altKey: true, shiftKey: true });
-    await waitFor(() =>
-      expect(destinationOrder()).toEqual(["agents", "browser", "spaces"]),
-    );
+    await waitFor(() => expect(destinationOrder()).toEqual(["agents", "browser", "spaces"]));
     expect(saveOrder).toHaveBeenCalledWith(
       "collections.tabs.navigator",
       '["agents","browser","spaces"]',

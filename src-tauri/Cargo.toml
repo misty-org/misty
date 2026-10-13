@@ -45,6 +45,8 @@ hex = "0.4"
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
 misty-agent-files = { path = "crates/agent-files" }
+# Code projects: sandboxed commands and file tools (docs/plans/agent-code-projects.md).
+misty-agent-code = { path = "crates/agent-code" }
 kiri = { path = "../kiri" }
 libc = "0.2"
 rand = "0.8"
@@ -82,28 +84,20 @@ mdns-sd = "0.13"
 # Deflate through flate2's Rust backend only; zip's "deflate" also builds zopfli and zlib-rs.
 zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+zstd = { version = "0.13", default-features = false }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 percent-encoding = "2"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 cap-std = "4.0.3"
 
-# Code projects: sandboxed commands and file tools (docs/plans/agent-code-projects.md).
-[target.'cfg(unix)'.dependencies]
-misty-agent-code = { path = "crates/agent-code" }
-
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 cpal = "0.16"
 xcap = "0.9"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-iroh = "1.0.3"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 zune-psd = "0.5.1"
-tantivy = "0.26.2"
-calamine = "0.31"
-csv = "1"
-pdf-extract = "0.12"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
@@ -121,14 +115,19 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["s
 objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-single-instance = "2.4.3"
+tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
 tauri-plugin-process = "2.3.1"
 tauri-plugin-updater = "2.10.1"
 
 [target.'cfg(windows)'.dependencies]
+rfd = { version = "0.16", default-features = false }
+# Confined helpers and agent commands (AppContainer and Job objects).
+misty-windows-confine = { path = "crates/windows-confine" }
 webview2-com = "0.38.2"
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_UI_Input_KeyboardAndMouse", "Win32_Storage_FileSystem", "Win32_System_Power", "Win32_UI_WindowsAndMessaging"] }
+# The vendored copy (see [patch.crates-io]); used for download progress and cancel.
+wry = { version = "=0.55.1", default-features = false }
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Ole", "Win32_System_Variant", "Win32_UI_Accessibility"] }
+windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_Debug", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Power", "Win32_System_Registry", "Win32_System_Com", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

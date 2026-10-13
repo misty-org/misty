@@ -159,7 +159,8 @@ describe("main window readiness", () => {
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("leaves other platforms' window visibility alone", async () => {
-    mocks.platform.mockReturnValue("windows");
+    // macOS and Windows start hidden; Linux shows its window itself.
+    mocks.platform.mockReturnValue("linux");
     render(<DesktopWindowReady />);
     await act(async () => {
       await vi.runAllTimersAsync();

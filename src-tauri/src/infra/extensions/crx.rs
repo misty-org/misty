@@ -199,8 +199,7 @@ fn public_key(spki: &[u8]) -> Result<(Algorithm, &[u8]), String> {
     let (oid, parameters) = tlv(identifier, 0x06)?;
     let algorithm = if oid == RSA_ENCRYPTION {
         Algorithm::Rsa
-    } else if oid == EC_PUBLIC_KEY && tlv(parameters, 0x06).is_ok_and(|(curve, _)| curve == P256)
-    {
+    } else if oid == EC_PUBLIC_KEY && tlv(parameters, 0x06).is_ok_and(|(curve, _)| curve == P256) {
         Algorithm::P256
     } else {
         return Err("The package uses an unsupported signing key.".into());

@@ -18,7 +18,12 @@ async fn undo_restores_files_and_removes_added_ones() {
     f.call("code.write", json!({ "path": "pages/new.html", "content": "added" })).await;
     #[cfg(target_os = "macos")]
     f.run("rm css/site.css").await;
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        let deleted = f.run(r"del css\site.css").await;
+        assert!(!f.root().join("css/site.css").exists(), "{deleted}");
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     fs::remove_file(f.root().join("css/site.css")).unwrap();
 
     let listed = f.service.checkpoints("scope_test");
@@ -66,7 +71,9 @@ async fn previews_serve_the_project_safely() {
     fs::write(f.root().join(".env"), "SECRET=1").unwrap();
     let secret = f.outside.path().join("secret.txt");
     fs::write(&secret, "TOP SECRET").unwrap();
+    #[cfg(unix)]
     std::os::unix::fs::symlink(&secret, f.root().join("leak.txt")).unwrap();
+    common::link_folder(f.outside.path(), &f.root().join("leaks"));
 
     let preview = f.call("code.preview", json!({})).await;
     let url = preview["url"].as_str().unwrap().to_owned();
@@ -79,6 +86,7 @@ async fn previews_serve_the_project_safely() {
     assert_eq!(fetch(&url, &host, "/about").await.0, 200);
     assert_eq!(fetch(&url, &host, "/.env").await.0, 404);
     assert_eq!(fetch(&url, &host, "/leak.txt").await.0, 404);
+    assert_eq!(fetch(&url, &host, "/leaks/secret.txt").await.0, 404);
     assert_eq!(fetch(&url, &host, "/../../etc/passwd").await.0, 404);
     assert_eq!(fetch(&url, &host, "/%2e%2e/%2e%2e/etc/passwd").await.0, 404);
     assert_eq!(fetch(&url, "attacker.example", "/").await.0, 421, "rebinding is refused");
@@ -107,13 +115,13 @@ fn removing_a_tree_never_follows_symlinks() {
     fs::write(outside.join("precious.txt"), "keep me").unwrap();
     fs::create_dir_all(f.root().join("x/inner")).unwrap();
     fs::write(f.root().join("x/inner/a.txt"), "a").unwrap();
-    std::os::unix::fs::symlink(&outside, f.root().join("x/link")).unwrap();
+    common::link_folder(&outside, &f.root().join("x/link"));
     let root = misty_agent_code::beneath::open_root(&f.root()).unwrap();
     misty_agent_code::beneath::remove_tree(&root, std::path::Path::new("x")).unwrap();
     assert!(!f.root().join("x").exists());
     assert_eq!(fs::read_to_string(outside.join("precious.txt")).unwrap(), "keep me");
     // A symlinked parent is refused outright.
-    std::os::unix::fs::symlink(f.outside.path(), f.root().join("swapped")).unwrap();
+    common::link_folder(f.outside.path(), &f.root().join("swapped"));
     assert!(misty_agent_code::beneath::remove_tree(&root, std::path::Path::new("swapped/keep")).is_err());
     assert!(outside.join("precious.txt").exists());
 }

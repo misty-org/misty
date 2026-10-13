@@ -3,11 +3,14 @@ use super::{MiniAppState, PermissionSet};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
+    ffi::OsString,
     fs::File,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, OnceLock,
     },
+    time::Instant,
 };
 
 pub struct ReadGuard {
@@ -112,13 +115,7 @@ pub(super) async fn list_archive(
     result?
 }
 impl Request {
-    #[cfg(not(target_os = "macos"))]
     fn run(self) -> Result<Value, String> {
-        Err("Owned archive previews are not implemented on this platform yet.".into())
-    }
-    #[cfg(target_os = "macos")]
-    fn run(self) -> Result<Value, String> {
-        use std::io::{Read, Write};
         if self.cancel.load(Ordering::Acquire) {
             return Err("Archive preview cancelled.".into());
         }
@@ -135,69 +132,7 @@ impl Request {
         let entries = if self.input.format == "zip" {
             archive_zip_entries(reader, 500).map_err(|error| error.to_string())?
         } else {
-            // System tools inspect a private snapshot. They cannot reopen the
-            // original pathname, follow adjacent volumes or read outside this work area.
-            let work = tempfile::Builder::new()
-                .prefix("misty-archive-")
-                .tempdir()
-                .map_err(|_| "Could not prepare the archive preview.")?;
-            let input = work.path().join(format!("input.{}", self.input.format));
-            let mut output =
-                File::create(&input).map_err(|_| "Could not prepare the archive preview.")?;
-            std::io::copy(&mut reader, &mut output).map_err(|error| error.to_string())?;
-            output
-                .flush()
-                .map_err(|_| "Could not prepare the archive preview.")?;
-            drop(output);
-            let (tools, args): (&[&str], &[&str]) = match self.input.format.as_str() {
-                "tar" => (&["/usr/bin/tar"], &["-tf"]),
-                "7z" => (
-                    &[
-                        "/opt/homebrew/bin/7z",
-                        "/usr/local/bin/7z",
-                        "/opt/homebrew/bin/7zz",
-                        "/usr/local/bin/7zz",
-                    ],
-                    &["l", "-ba"],
-                ),
-                "rar" => (
-                    &["/opt/homebrew/bin/unrar", "/usr/local/bin/unrar"],
-                    &["lb"],
-                ),
-                _ => unreachable!(),
-            };
-            let executable = tools
-                .iter()
-                .map(std::path::Path::new)
-                .find(|path| path.is_file())
-                .ok_or_else(|| format!("Install {} to preview this archive.", self.input.format))?;
-            let listing = work.path().join("listing.txt");
-            let mut command = super::media::process::command(executable, work.path())
-                .map_err(|_| "The native archive sandbox is unavailable.")?;
-            command.args(args).arg(&input).stdout(
-                File::create(&listing).map_err(|_| "Could not prepare the archive listing.")?,
-            );
-            run_tool(command, &self.cancel)?;
-            let mut bytes = Vec::new();
-            File::open(&listing)
-                .map_err(|_| "The archive listing is unavailable.")?
-                .take(8 * 1024 * 1024 + 1)
-                .read_to_end(&mut bytes)
-                .map_err(|_| "Could not read the archive listing.")?;
-            if bytes.len() > 8 * 1024 * 1024 {
-                return Err("This archive listing exceeds the preview limit.".into());
-            }
-            String::from_utf8_lossy(&bytes)
-                .lines()
-                .filter(|line| !line.trim().is_empty())
-                .take(500)
-                .map(|line| ArchiveEntry {
-                    path: line.trim().to_owned(),
-                    is_dir: line.trim_end().ends_with('/'),
-                    compressed_size: 0,
-                    uncompressed_size: 0,
-                })
-                .collect()
+            list_with_tool(&self.input.format, &mut reader, &self.cancel)?
         };
         let after = self
             .file
@@ -213,29 +148,172 @@ impl Request {
     }
 }
 
+/// Lists a tar, 7z or rar archive with the reader installed on this
+/// computer. The reader inspects a private snapshot in the native sandbox: it
+/// cannot reopen the original, follow adjacent volumes or read outside its
+/// own folder.
+fn list_with_tool(
+    format: &str,
+    reader: &mut ArchiveReader,
+    cancel: &AtomicBool,
+) -> Result<Vec<ArchiveEntry>, String> {
+    use super::tool_sandbox::{Sandbox, Stopped};
+    use std::io::{Read, Write};
+    let (executable, arguments) = archive_tool(format)?;
+    let sandbox = Sandbox::new().map_err(|_| "The native archive sandbox is unavailable.")?;
+    let input = sandbox.path().join(format!("input.{format}"));
+    let mut output = File::create(&input).map_err(|_| "Could not prepare the archive preview.")?;
+    std::io::copy(reader, &mut output).map_err(|error| error.to_string())?;
+    output
+        .flush()
+        .map_err(|_| "Could not prepare the archive preview.")?;
+    drop(output);
+    let listing_path = sandbox.path().join("listing.txt");
+    let listing =
+        File::create(&listing_path).map_err(|_| "Could not prepare the archive listing.")?;
+    let mut arguments: Vec<OsString> = arguments.iter().map(OsString::from).collect();
+    arguments.push(input.into_os_string());
+    let read = sandbox
+        .run(
+            &executable,
+            &arguments,
+            Some(&listing),
+            cancel,
+            Instant::now(),
+        )
+        .map_err(|stopped| match stopped {
+            Stopped::Cancelled => "Archive preview cancelled.".to_owned(),
+            Stopped::TimedOut => "The archive preview exceeded five minutes.".to_owned(),
+            Stopped::Failed(message) => message,
+        })?;
+    if !read {
+        return Err(
+            "The archive tool could not read this file. Check its format and installed reader."
+                .into(),
+        );
+    }
+    drop(listing);
+    let mut bytes = Vec::new();
+    File::open(&listing_path)
+        .map_err(|_| "The archive listing is unavailable.")?
+        .take(8 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "Could not read the archive listing.")?;
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("This archive listing exceeds the preview limit.".into());
+    }
+    Ok(String::from_utf8_lossy(&bytes)
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .take(500)
+        .map(|line| ArchiveEntry {
+            path: line.trim().to_owned(),
+            is_dir: line.trim_end().ends_with('/'),
+            compressed_size: 0,
+            uncompressed_size: 0,
+        })
+        .collect())
+}
+
+/// The installed reader for `format`, from fixed locations only, and the
+/// arguments that make it list an archive.
+fn archive_tool(format: &str) -> Result<(PathBuf, &'static [&'static str]), String> {
+    archive_tools(format)
+        .into_iter()
+        .find(|(path, _)| path.is_file())
+        .ok_or_else(|| {
+            let reader = if cfg!(windows) && format != "tar" {
+                "7-Zip"
+            } else {
+                format
+            };
+            format!("Install {reader} to preview this archive.")
+        })
+}
+
 #[cfg(target_os = "macos")]
+fn archive_tools(format: &str) -> Vec<(PathBuf, &'static [&'static str])> {
+    let (paths, arguments): (&[&str], &'static [&'static str]) = match format {
+        "tar" => (&["/usr/bin/tar"], &["-tf"]),
+        "7z" => (
+            &[
+                "/opt/homebrew/bin/7z",
+                "/usr/local/bin/7z",
+                "/opt/homebrew/bin/7zz",
+                "/usr/local/bin/7zz",
+            ],
+            &["l", "-ba"],
+        ),
+        "rar" => (
+            &["/opt/homebrew/bin/unrar", "/usr/local/bin/unrar"],
+            &["lb"],
+        ),
+        _ => return Vec::new(),
+    };
+    paths
+        .iter()
+        .map(|path| (PathBuf::from(path), arguments))
+        .collect()
+}
+
+/// The tar Windows ships, WinRAR's UnRAR for rar, and 7-Zip, which reads
+/// rar too, from Program Files or Scoop.
+#[cfg(windows)]
+fn archive_tools(format: &str) -> Vec<(PathBuf, &'static [&'static str])> {
+    let variable = |name: &str| std::env::var_os(name).map(PathBuf::from);
+    if format == "tar" {
+        return variable("SystemRoot")
+            .map(|root| (root.join(r"System32\tar.exe"), &["-tf"][..]))
+            .into_iter()
+            .collect();
+    }
+    let program_files = [variable("ProgramFiles"), variable("ProgramFiles(x86)")];
+    let mut tools = Vec::new();
+    if format == "rar" {
+        tools.extend(
+            program_files
+                .iter()
+                .flatten()
+                .map(|folder| (folder.join(r"WinRAR\UnRAR.exe"), &["lb"][..])),
+        );
+    }
+    if matches!(format, "7z" | "rar") {
+        tools.extend(
+            program_files
+                .iter()
+                .flatten()
+                .map(|folder| folder.join(r"7-Zip\7z.exe"))
+                .chain(variable("USERPROFILE").map(|home| home.join(r"scoop\shims\7z.exe")))
+                .map(|path| (path, &["l", "-ba"][..])),
+        );
+    }
+    tools
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn archive_tools(_format: &str) -> Vec<(PathBuf, &'static [&'static str])> {
+    Vec::new()
+}
+
 struct ArchiveReader<'a> {
     file: &'a File,
     offset: u64,
     length: u64,
     cancel: &'a AtomicBool,
 }
-#[cfg(target_os = "macos")]
 impl std::io::Read for ArchiveReader<'_> {
     fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
-        use std::os::unix::fs::FileExt;
         if self.cancel.load(Ordering::Acquire) {
             return Err(std::io::Error::other("Archive preview cancelled."));
         }
         let length = bytes
             .len()
             .min(self.length.saturating_sub(self.offset) as usize);
-        let read = self.file.read_at(&mut bytes[..length], self.offset)?;
+        let read = super::tool_sandbox::read_at(self.file, &mut bytes[..length], self.offset)?;
         self.offset += read as u64;
         Ok(read)
     }
 }
-#[cfg(target_os = "macos")]
 impl std::io::Seek for ArchiveReader<'_> {
     fn seek(&mut self, position: std::io::SeekFrom) -> std::io::Result<u64> {
         if self.cancel.load(Ordering::Acquire) {
@@ -251,53 +329,8 @@ impl std::io::Seek for ArchiveReader<'_> {
         Ok(self.offset)
     }
 }
-#[cfg(target_os = "macos")]
-fn run_tool(mut command: std::process::Command, cancel: &AtomicBool) -> Result<(), String> {
-    struct Child {
-        process: std::process::Child,
-        active: bool,
-    }
-    impl Drop for Child {
-        fn drop(&mut self) {
-            if self.active {
-                unsafe {
-                    libc::kill(-(self.process.id() as i32), libc::SIGKILL);
-                }
-                let _ = self.process.wait();
-            }
-        }
-    }
-    let mut child = Child {
-        process: command
-            .spawn()
-            .map_err(|_| "The archive tool could not be started.")?,
-        active: true,
-    };
-    let started = std::time::Instant::now();
-    loop {
-        if cancel.load(Ordering::Acquire) {
-            return Err("Archive preview cancelled.".into());
-        }
-        if started.elapsed() > std::time::Duration::from_secs(300) {
-            return Err("The archive preview exceeded five minutes.".into());
-        }
-        if let Some(status) = child
-            .process
-            .try_wait()
-            .map_err(|_| "The archive tool stopped unexpectedly.")?
-        {
-            child.active = false;
-            return if status.success() {
-                Ok(())
-            } else {
-                Err("The archive tool could not read this file. Check its format and installed reader.".into())
-            };
-        }
-        std::thread::sleep(std::time::Duration::from_millis(30));
-    }
-}
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Write;
@@ -328,8 +361,11 @@ mod tests {
         zip.write_all(b"owned contents").unwrap();
         zip.finish().unwrap();
         let mut p = fixture(File::open(&path).unwrap());
-        std::fs::rename(&path, root.path().join("moved.zip")).unwrap();
-        std::fs::write(&path, b"not the granted archive").unwrap();
+        // Windows can't rename a file that is open.
+        if cfg!(unix) {
+            std::fs::rename(&path, root.path().join("moved.zip")).unwrap();
+            std::fs::write(&path, b"not the granted archive").unwrap();
+        }
         let (id, request) = prepare(&mut p, json!({"handle":"owned","format":"zip"})).unwrap();
         let result = request.run().unwrap();
         assert_eq!(result["entries"][0]["path"], "日本語.txt");
@@ -347,7 +383,14 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("notes.txt"), b"archive contents").unwrap();
         let path = root.path().join("chosen.tar.gz");
-        assert!(std::process::Command::new("/usr/bin/tar")
+        let tar = if cfg!(windows) {
+            std::path::Path::new(&std::env::var_os("SystemRoot").unwrap())
+                .join("System32")
+                .join("tar.exe")
+        } else {
+            "/usr/bin/tar".into()
+        };
+        assert!(std::process::Command::new(tar)
             .args(["-czf"])
             .arg(&path)
             .arg("-C")

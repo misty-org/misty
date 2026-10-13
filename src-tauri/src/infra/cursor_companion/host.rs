@@ -5,7 +5,6 @@ mod platform;
 #[path = "pointing.rs"]
 mod pointing;
 use base64::{engine::general_purpose::STANDARD, Engine};
-pub use pointing::*;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -16,6 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, Webview, WebviewUrl, WebviewWindowBuilder};
+pub use {platform::show_overlay, pointing::*};
 
 const PREFIX: &str = "misty-cursor-";
 #[derive(Clone, Serialize, PartialEq)]
@@ -180,7 +180,7 @@ pub async fn cursor_companion_present(
             let _ = window.emit("misty://cursor-presentation", &presentation);
             if label != "misty-cursor-controls" && !state.capture.load(Ordering::SeqCst) {
                 if visible {
-                    let _ = window.show();
+                    platform::show_overlay(&window);
                 } else {
                     let app = app.clone();
                     let label = label.clone();
@@ -304,7 +304,7 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
                 .unwrap_or(true)
                 && !state.capture.load(Ordering::SeqCst)
             {
-                let _ = window.show();
+                platform::show_overlay(&window);
             }
         }
         state
@@ -428,7 +428,7 @@ impl Drop for CaptureGuard {
             if visible && !state.capture.load(Ordering::SeqCst) {
                 for (label, w) in app.webview_windows() {
                     if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
-                        let _ = w.show();
+                        platform::show_overlay(&w);
                     }
                 }
             }

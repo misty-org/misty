@@ -7,6 +7,11 @@ import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { releasePendingWait } from "@/features/agent-interventions/WaitingForYouCard";
 import type { GlobalAiMessage } from "@/features/global-search/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import {
+  detectShortcutPlatform,
+  formatShortcutLabel,
+  shortcutMatchesEvent,
+} from "@/features/shortcuts";
 import { cn, IconButton, MessageComposer, MessageComposerSend } from "@/shared/ui";
 import { AgentActionQuestions } from "./AgentActionQuestions";
 import { listenForActionQuestions, useActionQuestions } from "./actionQuestions";
@@ -25,7 +30,7 @@ import {
 } from "./localExecution";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { toolLabel } from "./progress/progressTimeline";
-import { watchWorkspaceAutopilot } from "./workspaceAutopilot";
+import { autopilotStopShortcut, watchWorkspaceAutopilot } from "./workspaceAutopilot";
 
 /**
  * The control island (docs/design/agents-at-cursor/BRIEF.md): the one place to
@@ -149,7 +154,7 @@ export function AgentControlIsland() {
       execution.desktopControl,
     );
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && event.metaKey && event.shiftKey) {
+      if (shortcutMatchesEvent(autopilotStopShortcut(), event)) {
         event.preventDefault();
         stop();
       }
@@ -364,7 +369,9 @@ export function AgentControlIsland() {
         <AgentDockControls execution={execution} agentName={name} disabled={pending} act={act} />
         <span className="flex-1" />
         {execution.autopilot && running && !execution.desktopControl && (
-          <kbd className="text-xs text-cream-muted">⌘⇧Esc</kbd>
+          <kbd className="text-xs text-cream-muted">
+            {formatShortcutLabel(autopilotStopShortcut(), detectShortcutPlatform())}
+          </kbd>
         )}
         {finished || stopped ? (
           <IconButton

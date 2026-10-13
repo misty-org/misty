@@ -115,9 +115,7 @@ pub(super) async fn commit(app: &tauri::AppHandle, token: &str) -> Result<packag
     if review.blocked {
         return Err("This extension requires unavailable browser APIs.".into());
     }
-    let package = root(app, &account)?
-        .join("packages")
-        .join(&review.entry.id);
+    let package = root(app, &account)?.join("packages").join(&review.entry.id);
     std::fs::create_dir_all(&package).map_err(|e| e.to_string())?;
     let digest = review
         .entry

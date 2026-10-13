@@ -177,7 +177,7 @@ it("starts desktop control with Misty's own cursor, whatever the screen location
   });
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(current()?.state).toBe("failed"));
-  expect(current()?.error).toContain("needs the Misty app on a Mac");
+  expect(current()?.error).toContain("needs the Misty app on macOS or Windows");
   mocks.desktop = true;
 });
 

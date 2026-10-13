@@ -27,7 +27,7 @@ fn verified_worker(root: &Path, app_id: &str, version: &str) -> Result<Vec<u8>, 
     verified_service(root, app_id, version, "document-processing", 5)
 }
 
-pub(crate) fn verified_service(
+fn verified_service(
     _root: &Path,
     _tool: &str,
     _version: &str,
@@ -49,9 +49,9 @@ pub(crate) fn verified_service(
             return std::fs::read(fixture).map_err(|error| error.to_string());
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     return builtin_worker(service, protocol).map(|bytes| bytes.to_vec());
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     Err("Bundled workers are unavailable on this platform.".into())
 }
 
@@ -110,12 +110,12 @@ async fn execute_operation(
     {
         return Err("Invalid document description.".into());
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = (state, instance, image_dimension);
         return Err("Isolated document processing is unavailable on this device.".into());
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
         static SLOTS: std::sync::OnceLock<Arc<tokio::sync::Semaphore>> = std::sync::OnceLock::new();
         let slot = SLOTS
@@ -262,7 +262,7 @@ fn run_response(
     }
     drop(staged);
     let mut output = tempfile::tempfile().map_err(|_| "Could not receive document output.")?;
-    let mut command = super::media::process::command(&executable, work.path())
+    let mut command = super::tool_sandbox::command(&executable, work.path())
         .map_err(|_| "Could not confine document processor.")?;
     command.stdin(Stdio::piped()).stdout(Stdio::from(
         output
@@ -379,7 +379,44 @@ fn run_response(
     Ok(value)
 }
 
-#[cfg(target_os = "macos")]
+/// Runs the worker on a private copy of `input`; Windows confines it in an
+/// AppContainer (see `infra::document_worker_windows`).
+#[cfg(windows)]
+#[allow(clippy::too_many_arguments)]
+fn run_response(
+    worker: &[u8],
+    input: File,
+    request: Input,
+    stop: &AtomicBool,
+    operation: &str,
+    max_dimension: Option<u32>,
+    source_extension: Option<&str>,
+    png_output: Option<&mut Vec<u8>>,
+) -> Result<Value, String> {
+    use crate::infra::document_worker_windows::{run_file, Request};
+    let (value, image) = run_file(
+        worker,
+        &input,
+        &Request {
+            display_name: &request.display_name,
+            extension: &request.extension,
+            operation,
+            max_dimension,
+            source_extension,
+        },
+        stop,
+    )?;
+    if let Some(image) = image {
+        let target = png_output.ok_or("Missing image output receiver.")?;
+        if stop.load(Ordering::Acquire) {
+            return Err("Image processing cancelled.".into());
+        }
+        *target = image;
+    }
+    Ok(value)
+}
+
+#[cfg(any(target_os = "macos", windows))]
 fn run(worker: &[u8], input: File, request: Input, stop: &AtomicBool) -> Result<Value, String> {
     let value = run_response(worker, input, request, stop, "document", None, None, None)?;
     let document = value
@@ -404,13 +441,7 @@ pub(super) mod tests {
     fn receipt_for(root: &Path, bytes: &[u8], app_id: &str) {
         service_receipt(root, bytes, app_id, "document-processing", 5);
     }
-    pub(crate) fn service_receipt(
-        root: &Path,
-        bytes: &[u8],
-        app_id: &str,
-        service: &str,
-        protocol: u32,
-    ) {
+    fn service_receipt(root: &Path, bytes: &[u8], app_id: &str, service: &str, protocol: u32) {
         let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
         let directory = root.join("native").join(service).join(&platform);
         std::fs::create_dir_all(&directory).unwrap();
@@ -509,889 +540,6 @@ pub(super) mod tests {
         super::super::binary_files::release(permissions, "owned");
         assert!(cancel.load(Ordering::Acquire));
     }
-    #[tokio::test]
-    async fn peer_identity_requires_captured_native_authority_and_rejects_rebinding() {
-        let (state, root) = fixture();
-        let mut permissions=super::super::PermissionSet::from_document("files",
-            &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}),None).unwrap();
-        permissions.account_owned = true;
-        permissions.owner_namespace = Some("alice-family".into());
-        permissions.decide("files.read", true).unwrap();
-        permissions.decide("connections.read", true).unwrap();
-        state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-        service_receipt(root.path(), b"worker", "files", "peer-transport", 2);
-        let incomplete =
-            ServiceLease::acquire_service(&state, "test", "files", "peer-transport", 2)
-                .await
-                .unwrap();
-        assert!(incomplete.peer_identity("device_12345678").is_err());
-        let owner = super::super::super::NativeOwner {
-            account_id: "alice".into(),
-            space_id: Some("family".into()),
-            deployment: Some("https://misty.example/v1".into()),
-            authority_generation: Some(7),
-        };
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .native_owner = Some(owner.clone());
-        assert!(incomplete.validate(&state, "test").is_err());
-        let lease = ServiceLease::acquire_service(&state, "test", "files", "peer-transport", 2)
-            .await
-            .unwrap();
-        let identity = lease.peer_identity("device_12345678").unwrap();
-        assert_eq!(
-            (
-                identity.account_id,
-                identity.space_id,
-                identity.installed_version,
-                identity.authority_generation
-            ),
-            ("alice", "family", "1", 7)
-        );
-        for replacement in [
-            super::super::super::NativeOwner {
-                deployment: Some("https://other.example/v1".into()),
-                ..owner.clone()
-            },
-            super::super::super::NativeOwner {
-                authority_generation: Some(8),
-                ..owner.clone()
-            },
-            super::super::super::NativeOwner {
-                account_id: "bob".into(),
-                ..owner.clone()
-            },
-            super::super::super::NativeOwner {
-                space_id: Some("work".into()),
-                ..owner.clone()
-            },
-        ] {
-            state
-                .0
-                .lock()
-                .unwrap()
-                .get_mut("test")
-                .unwrap()
-                .permissions
-                .native_owner = Some(replacement);
-            assert!(lease.validate(&state, "test").is_err());
-        }
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .native_owner = Some(owner);
-        lease.validate(&state, "test").unwrap();
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .version = "2".into();
-        assert!(lease.validate(&state, "test").is_err());
-    }
-
-    #[cfg(target_os = "macos")]
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires the built peer transport worker"]
-    async fn peer_adapter_transfers_chunks_and_cancels_streams_without_stopping_other_connections()
-    {
-        use crate::infra::peer_transport_worker::{Endpoint, Relay};
-        use std::time::Duration;
-        let bytes = std::fs::read(std::env::var("MISTY_TEST_PEER_WORKER").unwrap()).unwrap();
-        async fn endpoint(
-            bytes: &[u8],
-            member: &str,
-            seed: u8,
-        ) -> (Arc<Endpoint>, MiniAppState, tempfile::TempDir) {
-            let (state, root) = fixture();
-            let mut permissions = super::super::PermissionSet::from_document("files",
-                &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}), None).unwrap();
-            permissions.account_owned = true;
-            permissions.owner_namespace = Some(format!("{member}-family"));
-            permissions.decide("files.read", true).unwrap();
-            permissions.decide("connections.read", true).unwrap();
-            state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-            service_receipt(root.path(), bytes, "files", "peer-transport", 2);
-            let lease = Arc::new(
-                ServiceLease::acquire_service(&state, "test", "files", "peer-transport", 2)
-                    .await
-                    .unwrap(),
-            );
-            (
-                Endpoint::initialize(lease, [seed; 32], Relay::Disabled)
-                    .await
-                    .unwrap(),
-                state,
-                root,
-            )
-        }
-        let (left, _left_state, _left_root) = endpoint(&bytes, "alice", 31).await;
-        let (right, _right_state, _right_root) = endpoint(&bytes, "bob", 32).await;
-        let snapshot = right.snapshot().await.unwrap();
-        let port = snapshot.address["addrs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(|value| value["Ip"].as_str()?.parse::<std::net::SocketAddr>().ok())
-            .find(std::net::SocketAddr::is_ipv4)
-            .unwrap()
-            .port();
-        let address =
-            serde_json::json!({"id":right.id(),"addrs":[{"Ip":format!("127.0.0.1:{port}")}]});
-        let (outgoing, incoming) = tokio::time::timeout(Duration::from_secs(10), async {
-            tokio::join!(left.connect(address.clone(), right.id()), right.accept())
-        })
-        .await
-        .unwrap();
-        let outgoing = outgoing.unwrap();
-        let incoming = incoming.unwrap();
-        assert_eq!(incoming.remote_id(), left.id());
-        let payload: Vec<u8> = (0..200_003).map(|n| (n % 251) as u8).collect();
-        let (mut send, mut receive) = outgoing.open_bi().await.unwrap();
-        tokio::time::timeout(Duration::from_secs(10), async {
-            tokio::join!(
-                async {
-                    send.write_all(&payload).await.unwrap();
-                    send.finish().await.unwrap();
-                    let mut reply = vec![0; payload.len()];
-                    receive.read_exact(&mut reply).await.unwrap();
-                    assert_eq!(reply, payload);
-                    assert_eq!(receive.read(&mut [0]).await.unwrap(), 0);
-                    assert!(send.write_all(b"late").await.is_err());
-                },
-                async {
-                    let (mut send, mut receive) = incoming.accept_bi().await.unwrap();
-                    let mut data = vec![0; payload.len()];
-                    receive.read_exact(&mut data).await.unwrap();
-                    assert_eq!(data, payload);
-                    assert_eq!(receive.read(&mut [0]).await.unwrap(), 0);
-                    send.write_all(&data).await.unwrap();
-                    send.finish().await.unwrap();
-                }
-            );
-        })
-        .await
-        .unwrap();
-        // Dropping a timed-out read closes this stream; the connection remains usable.
-        let (mut send, mut receive) = outgoing.open_bi().await.unwrap();
-        send.write_all(b"x").await.unwrap();
-        let (_remote_send, mut remote_receive) = incoming.accept_bi().await.unwrap();
-        remote_receive.read_exact(&mut [0]).await.unwrap();
-        assert!(
-            tokio::time::timeout(Duration::from_millis(100), receive.read(&mut [0]))
-                .await
-                .is_err()
-        );
-        assert!(send.write_all(b"uncertain offset").await.is_err());
-        let (_send, _receive) = outgoing.open_bi().await.unwrap();
-        let (second_out, second_in) = tokio::time::timeout(Duration::from_secs(10), async {
-            tokio::join!(left.connect(address, right.id()), right.accept())
-        })
-        .await
-        .unwrap();
-        let second_out = second_out.unwrap();
-        let second_in = second_in.unwrap();
-        outgoing.close();
-        assert!(outgoing.open_bi().await.is_err());
-        let (mut second_send, _second_receive) = second_out.open_bi().await.unwrap();
-        second_send.write_all(b"independent").await.unwrap();
-        let (_second_send, mut second_receive) = second_in.accept_bi().await.unwrap();
-        let mut buffer = [0; 11];
-        second_receive.read_exact(&mut buffer).await.unwrap();
-        assert_eq!(&buffer, b"independent");
-        left.snapshot().await.unwrap();
-        right.snapshot().await.unwrap();
-        use crate::domain::connected_devices::{PeerRequest, PeerResponse, PeerResponseEnvelope};
-        use crate::infra::space_peer_session::{read_frame, write_frame, Session};
-        use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-        use ed25519_dalek::Signer;
-        let signing = ed25519_dalek::SigningKey::from_bytes(&[91; 32]);
-        let keys = std::collections::HashMap::from([("test".to_owned(), signing.verifying_key())]);
-        let left_session = Session::fixture(left.clone(), "device-a", keys.clone());
-        let right_session = Session::fixture(right.clone(), "device-b", keys);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let ticket = |space: &str| {
-            let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"EdDSA","kid":"test"}"#);
-            let claims = serde_json::json!({"iss":"misty-api","aud":"misty-device/2","protocolVersion":"misty-device/2",
-                "jti":"handshake-1","pairId":"pair-1","sourceDeviceId":"device-a","targetDeviceId":"device-b",
-                "sourceEndpointId":left.id(),"targetEndpointId":right.id(),"spaceId":space,"appId":"files",
-                "installedVersion":"1","authorityGeneration":7,"permissions":["files:read","directories:subscribe"],"iat":now,"exp":now+8});
-            let body = format!(
-                "{header}.{}",
-                URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap())
-            );
-            format!(
-                "{body}.{}",
-                URL_SAFE_NO_PAD.encode(signing.sign(body.as_bytes()).to_bytes())
-            )
-        };
-        let address =
-            serde_json::json!({"id":right.id(),"addrs":[{"Ip":format!("127.0.0.1:{port}")}]});
-        assert!(left_session
-            .connect("device-b", right.id(), address.clone(), &ticket("work"))
-            .await
-            .is_err());
-        let known =
-            std::collections::HashMap::from([(left.id().to_owned(), "device-a".to_owned())]);
-        let signed = ticket("family");
-        let (authorized_left, authorized_right) =
-            tokio::time::timeout(Duration::from_secs(10), async {
-                tokio::join!(
-                    left_session.connect("device-b", right.id(), address.clone(), &signed),
-                    right_session.accept(&known)
-                )
-            })
-            .await
-            .unwrap();
-        let authorized_left = authorized_left.unwrap();
-        let authorized_right = authorized_right.unwrap();
-        assert!(left_session
-            .connect("device-b", right.id(), address, &signed)
-            .await
-            .is_err());
-        assert!(authorized_left
-            .request(PeerRequest::GetRoots)
-            .await
-            .is_err());
-        assert!(authorized_left
-            .request(PeerRequest::Hello { ticket: signed })
-            .await
-            .is_err());
-        let (request_id, _send, mut receive) = authorized_left
-            .request(PeerRequest::Ping { nonce: 42 })
-            .await
-            .unwrap();
-        let (request, mut send, _receive) = authorized_right.accept_request().await.unwrap();
-        assert_eq!(request.request, PeerRequest::Ping { nonce: 42 });
-        write_frame(
-            &mut send,
-            &PeerResponseEnvelope {
-                request_id: request.request_id,
-                response: Ok(PeerResponse::Pong { nonce: 42 }),
-            },
-            true,
-        )
-        .await
-        .unwrap();
-        let reply: PeerResponseEnvelope = read_frame(&mut receive, 1024).await.unwrap();
-        assert_eq!(reply.request_id, request_id);
-        use crate::infra::space_peer_files::serve_one;
-        use crate::infra::space_peer_roots::{GrantedRoot, Roots};
-        let shared = tempfile::tempdir().unwrap();
-        std::fs::write(shared.path().join("payload"), &payload).unwrap();
-        let released = Arc::new(AtomicBool::new(false));
-        let roots = Arc::new(
-            Roots::from_grants(
-                "bob-family",
-                "device-b",
-                vec![GrantedRoot {
-                    id: "selected-folder".into(),
-                    name: "Shared".into(),
-                    directory: Arc::new(
-                        cap_std::fs::Dir::open_ambient_dir(
-                            shared.path(),
-                            cap_std::ambient_authority(),
-                        )
-                        .unwrap(),
-                    ),
-                    released: released.clone(),
-                }],
-            )
-            .unwrap(),
-        );
-        let base = format!("misty://device/device-b/{}", roots.list()[0].id);
-        let path = format!("{base}/payload");
-        use super::super::peer::{read_range, ReadRequest};
-        assert!(read_range(
-            &authorized_left,
-            ReadRequest {
-                path: path.clone(),
-                offset: 0,
-                length: 256 * 1024 + 1,
-                expected_snapshot: None
-            }
-        )
-        .await
-        .is_err());
-        tokio::time::timeout(Duration::from_secs(3), async {
-            tokio::join!(
-                async {
-                    serve_one(&authorized_right, roots.clone()).await.unwrap();
-                },
-                async {
-                    let response = read_range(
-                        &authorized_left,
-                        ReadRequest {
-                            path: path.clone(),
-                            offset: 17,
-                            length: 150_000,
-                            expected_snapshot: Some(roots.stat(&path).unwrap().snapshot),
-                        },
-                    )
-                    .await
-                    .unwrap();
-                    assert_eq!(response["offset"], 17);
-                    let data = base64::engine::general_purpose::STANDARD
-                        .decode(response["data"].as_str().unwrap())
-                        .unwrap();
-                    assert_eq!(data, &payload[17..150_017]);
-                }
-            );
-        })
-        .await
-        .unwrap();
-        let (_id, _send, mut denied) = authorized_left
-            .request(PeerRequest::Stat {
-                path: path.replace("device-b", "device-other"),
-            })
-            .await
-            .unwrap();
-        serve_one(&authorized_right, roots.clone()).await.unwrap();
-        let reply: PeerResponseEnvelope = read_frame(&mut denied, 1024).await.unwrap();
-        assert!(reply.response.is_err());
-        let (_id, _send, mut subscription) = authorized_left
-            .request(PeerRequest::SubscribeDirectory { path: base })
-            .await
-            .unwrap();
-        tokio::time::timeout(Duration::from_secs(3), async {
-            tokio::join!(
-                async {
-                    assert!(serve_one(&authorized_right, roots.clone()).await.is_err());
-                },
-                async {
-                    let reply: PeerResponseEnvelope =
-                        read_frame(&mut subscription, 1024).await.unwrap();
-                    assert!(matches!(
-                        reply.response,
-                        Ok(PeerResponse::Subscribed { .. })
-                    ));
-                    released.store(true, Ordering::Release);
-                }
-            );
-        })
-        .await
-        .unwrap();
-
-        assert!(
-            tokio::time::timeout(Duration::from_secs(10), authorized_right.accept_request())
-                .await
-                .unwrap()
-                .is_err()
-        );
-        assert!(authorized_left
-            .request(PeerRequest::Ping { nonce: 43 })
-            .await
-            .is_err());
-        left.close();
-        right.close();
-    }
-
-    #[cfg(target_os = "macos")]
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    #[ignore = "requires the built peer transport worker"]
-    async fn peer_supervisor_multiplexes_and_revokes_only_its_space() {
-        use crate::infra::native_process_worker::ProcessWorker;
-        use std::time::Duration;
-        let bytes =
-            std::fs::read(std::env::var("MISTY_TEST_PEER_WORKER").expect("peer worker")).unwrap();
-        fn peer_state(namespace: &str) -> (MiniAppState, tempfile::TempDir) {
-            let (state, root) = fixture();
-            let mut permissions = super::super::PermissionSet::from_document("files",
-                &serde_json::json!({"version":"1","runtime_capabilities":["files.read","connections.read"]}), None).unwrap();
-            permissions.account_owned = true;
-            permissions.owner_namespace = Some(namespace.into());
-            permissions.decide("files.read", true).unwrap();
-            state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-            (state, root)
-        }
-        let (state, root) = peer_state("member-family");
-        service_receipt(root.path(), &bytes, "files", "peer-transport", 2);
-        assert!(
-            ServiceLease::acquire_service(&state, "test", "files", "peer-transport", 2)
-                .await
-                .is_err()
-        );
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("connections.read", true)
-            .unwrap();
-        let lease = Arc::new(
-            ServiceLease::acquire_service(&state, "test", "files", "peer-transport", 2)
-                .await
-                .unwrap(),
-        );
-        let worker = Arc::new(ProcessWorker::launch_peer(lease.clone()).unwrap());
-        let (other_state, other_root) = peer_state("member-work");
-        other_state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("connections.read", true)
-            .unwrap();
-        assert!(lease.validate(&other_state, "test").is_err());
-        service_receipt(other_root.path(), &bytes, "files", "peer-transport", 2);
-        let other_lease = Arc::new(
-            ServiceLease::acquire_service(&other_state, "test", "files", "peer-transport", 2)
-                .await
-                .unwrap(),
-        );
-        let other = ProcessWorker::launch_peer(other_lease).unwrap();
-        let first = worker.call(serde_json::json!({"operation":"initialize", "secret":vec![41u8;32], "relay":{"mode":"disabled"}})).unwrap();
-        let second = other.call(serde_json::json!({"operation":"initialize", "secret":vec![42u8;32], "relay":{"mode":"disabled"}})).unwrap();
-        assert_ne!(first, second);
-        let waiting = worker.clone();
-        let accept = tokio::task::spawn_blocking(move || {
-            waiting.wait_peer(serde_json::json!({"operation":"accept"}))
-        });
-        // A pending network accept must not serialize the response channel.
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(!accept.is_finished());
-        for _ in 0..40 {
-            let service = worker.clone();
-            let cancelled = tokio::spawn(async move {
-                service
-                    .peer_request(serde_json::json!({"operation":"accept"}))
-                    .await
-            });
-            let deadline = std::time::Instant::now() + Duration::from_secs(3);
-            while worker.pending_peer_operations() < 2 {
-                assert!(std::time::Instant::now() < deadline);
-                tokio::task::yield_now().await;
-            }
-            cancelled.abort();
-            assert!(cancelled.await.unwrap_err().is_cancelled());
-            worker
-                .peer_request(serde_json::json!({"operation":"snapshot"}))
-                .await
-                .unwrap();
-            assert!(
-                !accept.is_finished(),
-                "canceling one request stopped an unrelated accept"
-            );
-        }
-        let mut requests = Vec::new();
-        for _ in 0..16 {
-            let worker = worker.clone();
-            requests.push(tokio::task::spawn_blocking(move || {
-                worker.call(serde_json::json!({"operation":"snapshot"}))
-            }));
-        }
-        for request in requests {
-            tokio::time::timeout(Duration::from_secs(3), request)
-                .await
-                .expect("snapshot blocked behind accept")
-                .unwrap()
-                .unwrap();
-        }
-        let mut blocked = Vec::new();
-        for _ in 0..31 {
-            let worker = worker.clone();
-            blocked.push(tokio::task::spawn_blocking(move || {
-                worker.wait_peer(serde_json::json!({"operation":"accept"}))
-            }));
-        }
-        let deadline = std::time::Instant::now() + Duration::from_secs(3);
-        while worker.pending_peer_operations() != 32 {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "pending operations did not reach their bound"
-            );
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-        assert_eq!(
-            worker
-                .call(serde_json::json!({"operation":"accept"}))
-                .unwrap_err(),
-            "Peer transport is busy."
-        );
-        // Even with all network slots occupied, control requests still complete.
-        worker
-            .call(serde_json::json!({"operation":"snapshot"}))
-            .unwrap();
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("connections.read", false)
-            .unwrap();
-        assert!(lease.validate(&state, "test").is_err());
-        assert!(tokio::time::timeout(Duration::from_secs(3), accept)
-            .await
-            .expect("revocation did not cancel accept")
-            .unwrap()
-            .is_err());
-        assert!(worker
-            .call(serde_json::json!({"operation":"snapshot"}))
-            .is_err());
-        other
-            .call(serde_json::json!({"operation":"snapshot"}))
-            .unwrap();
-        for request in blocked {
-            assert!(tokio::time::timeout(Duration::from_secs(3), request)
-                .await
-                .expect("pending accept survived revocation")
-                .unwrap()
-                .is_err());
-        }
-        other.close();
-    }
-
-    #[tokio::test]
-    async fn code_tools_require_matching_release_space_and_both_grants() {
-        let (state, root) = fixture();
-        let mut permissions = super::super::PermissionSet::from_document("code",
-            &serde_json::json!({"version":"1","runtime_capabilities":["files.read","code.execute"]}), None).unwrap();
-        permissions.account_owned = true;
-        permissions.owner_namespace = Some("member-family".into());
-        permissions.decide("code.execute", true).unwrap();
-        state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-        service_receipt(root.path(), b"worker", "code", "code-tools", 1);
-        assert!(ServiceLease::acquire_code_tools(&state, "test")
-            .await
-            .is_err());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("files.read", true)
-            .unwrap();
-        let lease = ServiceLease::acquire_code_tools(&state, "test")
-            .await
-            .unwrap();
-        assert!(lease.is_code_tools());
-        let mut registry = state.0.lock().unwrap();
-        registry
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .owner_namespace = Some("member-work".into());
-        drop(registry);
-        assert!(lease.validate(&state, "test").is_err());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .owner_namespace = Some("member-family".into());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("files.read", false)
-            .unwrap();
-        assert!(lease.validate(&state, "test").is_err());
-    }
-    #[tokio::test]
-    async fn terminal_service_uses_mounted_app_authority_and_matching_receipt() {
-        let (state, root) = fixture();
-        let mut permissions = super::super::PermissionSet::from_document(
-            "sdk-shell",
-            &serde_json::json!({"version":"1","runtime_capabilities":["terminal.execute"]}),
-            None,
-        )
-        .unwrap();
-        permissions.owner_namespace = Some("member-family".into());
-        permissions.account_owned = true;
-        state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-        service_receipt(root.path(), b"worker", "sdk-shell", "terminal", 1);
-        assert!(ServiceLease::acquire_terminal(&state, "test")
-            .await
-            .is_err());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", true)
-            .unwrap();
-        let lease = ServiceLease::acquire_terminal(&state, "test")
-            .await
-            .unwrap();
-        assert!(lease.is_terminal());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", false)
-            .unwrap();
-        assert!(lease.validate(&state, "test").is_err());
-        assert!(ServiceLease::acquire_terminal(&state, "test")
-            .await
-            .is_err());
-    }
-    #[tokio::test]
-    #[ignore = "requires MISTY_TEST_TERMINAL_WORKER pointing to a built worker"]
-    async fn terminal_supervisor_checks_owner_signature_and_revokes_live_processes() {
-        use crate::infra::native_process_worker::ProcessWorker as TerminalWorker;
-        use std::os::unix::fs::PermissionsExt;
-        let bytes =
-            std::fs::read(std::env::var("MISTY_TEST_TERMINAL_WORKER").expect("terminal worker"))
-                .unwrap();
-        fn terminal_state(namespace: &str) -> (MiniAppState, tempfile::TempDir) {
-            let (state, root) = fixture();
-            let mut permissions = super::super::PermissionSet::from_document(
-                "terminal",
-                &serde_json::json!({"version":"1","runtime_capabilities":["terminal.execute"]}),
-                None,
-            )
-            .unwrap();
-            permissions.owner_namespace = Some(namespace.into());
-            permissions.account_owned = true;
-            state.0.lock().unwrap().get_mut("test").unwrap().permissions = permissions;
-            (state, root)
-        }
-        let (state, root) = terminal_state("member-family");
-        service_receipt(root.path(), &bytes, "terminal", "terminal", 1);
-        assert!(
-            ServiceLease::acquire_service(&state, "test", "terminal", "terminal", 1)
-                .await
-                .is_err()
-        );
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", true)
-            .unwrap();
-        let lease = Arc::new(
-            ServiceLease::acquire_service(&state, "test", "terminal", "terminal", 1)
-                .await
-                .unwrap(),
-        );
-        assert!(
-            ServiceLease::acquire_service(&state, "test", "terminal", "file-search", 1)
-                .await
-                .is_err()
-        );
-        let (other_state, other_root) = terminal_state("member-work");
-        other_state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", true)
-            .unwrap();
-        assert!(lease.validate(&other_state, "test").is_err());
-        service_receipt(other_root.path(), &bytes, "terminal", "terminal", 1);
-        let other_lease = Arc::new(
-            ServiceLease::acquire_service(&other_state, "test", "terminal", "terminal", 1)
-                .await
-                .unwrap(),
-        );
-        let shell = root.path().join("shell");
-        std::fs::write(&shell, "#!/bin/sh\nexec /bin/sh -s\n").unwrap();
-        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700)).unwrap();
-        let (send, receive) = std::sync::mpsc::channel();
-        let worker = Arc::new(
-            TerminalWorker::launch_test(
-                lease.clone(),
-                Arc::new(move |value| {
-                    let _ = send.send(value);
-                }),
-                &shell,
-            )
-            .unwrap(),
-        );
-        let created = worker
-            .call(serde_json::json!({"operation":"create","request":{"cwd":root.path(),"env":{}}}))
-            .unwrap();
-        let pid = created["processId"].as_u64().unwrap() as i32;
-        let other_worker =
-            TerminalWorker::launch_test(other_lease.clone(), Arc::new(|_| {}), &shell).unwrap();
-        let other_created=other_worker.call(serde_json::json!({"operation":"create","request":{"cwd":other_root.path(),"env":{}}})).unwrap();
-        let other_pid = other_created["processId"].as_u64().unwrap() as i32;
-        worker.call(serde_json::json!({"operation":"write","data":"printf 'worker-ready\n'; exec sleep 30\n"})).unwrap();
-        let mut output = String::new();
-        while !output.contains("worker-ready") {
-            let event = receive
-                .recv_timeout(std::time::Duration::from_secs(5))
-                .unwrap();
-            if let Some(data) = event["data"].as_str() {
-                output.push_str(data);
-            }
-        }
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", false)
-            .unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            while !lease.cancelled() || unsafe { libc::kill(pid, 0) } == 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-            }
-        })
-        .await
-        .expect("revocation must stop the terminal process");
-        assert!(worker
-            .call(serde_json::json!({"operation":"write","data":"late"}))
-            .is_err());
-        other_worker
-            .call(serde_json::json!({"operation":"write","data":"printf independent\n"}))
-            .expect("another Space must remain usable");
-        other_state.0.lock().unwrap().remove("test");
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            while unsafe { libc::kill(other_pid, 0) } == 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-            }
-        })
-        .await
-        .expect("closing the other instance must stop its own terminal");
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", true)
-            .unwrap();
-        assert!(worker
-            .call(serde_json::json!({"operation":"write","data":"must not restart"}))
-            .is_err());
-        // A raw PTY whose process never reads input forces write backpressure.
-        let raw_shell = root.path().join("raw-shell");
-        std::fs::write(
-            &raw_shell,
-            "#!/bin/sh\nstty -icanon -echo\nprintf raw-ready\nexec sleep 30\n",
-        )
-        .unwrap();
-        std::fs::set_permissions(&raw_shell, std::fs::Permissions::from_mode(0o700)).unwrap();
-        let raw_lease = Arc::new(
-            ServiceLease::acquire_service(&state, "test", "terminal", "terminal", 1)
-                .await
-                .unwrap(),
-        );
-        let (events_send, events) = std::sync::mpsc::channel();
-        let raw_worker = Arc::new(
-            TerminalWorker::launch_test(
-                raw_lease,
-                Arc::new(move |event| {
-                    let _ = events_send.send(event);
-                }),
-                &raw_shell,
-            )
-            .unwrap(),
-        );
-        let raw_created = raw_worker
-            .call(serde_json::json!({"operation":"create","request":{"env":{}}}))
-            .unwrap();
-        let raw_pid = raw_created["processId"].as_u64().unwrap() as i32;
-        loop {
-            let event = events
-                .recv_timeout(std::time::Duration::from_secs(5))
-                .unwrap();
-            if event["data"]
-                .as_str()
-                .is_some_and(|s| s.contains("raw-ready"))
-            {
-                break;
-            }
-        }
-        let writing = raw_worker.clone();
-        let (done_send, done) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let result =
-                writing.call(serde_json::json!({"operation":"write","data":"x".repeat(512*1024)}));
-            let _ = done_send.send(result);
-        });
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        assert!(
-            matches!(done.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty)),
-            "raw PTY write should be blocked"
-        );
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", false)
-            .unwrap();
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            while unsafe { libc::kill(raw_pid, 0) } == 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-            }
-        })
-        .await
-        .expect("revocation must stop a blocked PTY write");
-        assert!(done
-            .recv_timeout(std::time::Duration::from_secs(5))
-            .unwrap()
-            .is_err());
-        state
-            .0
-            .lock()
-            .unwrap()
-            .get_mut("test")
-            .unwrap()
-            .permissions
-            .decide("terminal.execute", true)
-            .unwrap();
-        let path = root
-            .path()
-            .join("native/terminal")
-            .join(format!(
-                "{}-{}",
-                std::env::consts::OS,
-                std::env::consts::ARCH
-            ))
-            .join("worker");
-        std::fs::write(path, b"tampered").unwrap();
-        assert!(
-            ServiceLease::acquire_service(&state, "test", "terminal", "terminal", 1)
-                .await
-                .is_err()
-        );
-    }
-
     #[tokio::test]
     #[ignore = "requires MISTY_TEST_DOCUMENT_WORKER pointing to a built worker"]
     async fn files_images_use_isolated_cache_and_revoke_cached_access() {
@@ -1563,40 +711,13 @@ pub(crate) struct ServiceLease {
     pub(crate) namespace: String,
     epoch: u64,
     capability: &'static str,
-    service: &'static str,
     instance: String,
     app_id: String,
     version: String,
     native_owner: Option<super::super::NativeOwner>,
-    _slot: Option<tokio::sync::OwnedSemaphorePermit>,
+    _slot: tokio::sync::OwnedSemaphorePermit,
 }
 impl ServiceLease {
-    #[cfg(all(test, target_os = "macos"))]
-    pub(super) fn fixture_worker(service: &'static str) -> Arc<Self> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("services")
-            .join(service)
-            .join("target/debug")
-            .join(format!("misty-{service}"));
-        Arc::new(Self {
-            worker: std::fs::read(path)
-                .expect("Build the app native-service fixtures before native integration tests"),
-            cancel: Cancellation {
-                flag: Arc::new(AtomicBool::new(false)),
-                watcher: tokio::spawn(std::future::pending()),
-            },
-            namespace: "fixture".into(),
-            epoch: 0,
-            capability: "files.read",
-            service,
-            instance: "fixture".into(),
-            app_id: "fixture".into(),
-            version: "fixture".into(),
-            native_owner: None,
-            _slot: None,
-        })
-    }
-
     pub(crate) async fn acquire(
         state: &MiniAppState,
         instance: &str,
@@ -1604,77 +725,26 @@ impl ServiceLease {
     ) -> Result<Self, String> {
         Self::acquire_service(state, instance, expected_app, "document-processing", 5).await
     }
-    /// Resolve ownership from the mounted instance. The service receipt must be
-    /// signed for this exact app and release, including for SDK component apps.
-    pub(crate) async fn acquire_terminal(
-        state: &MiniAppState,
-        instance: &str,
-    ) -> Result<Self, String> {
-        let app_id = {
-            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            registry
-                .get(instance)
-                .ok_or("App is closed.")?
-                .permissions
-                .app_id
-                .clone()
-        };
-        Self::acquire_service(state, instance, &app_id, "terminal", 1).await
-    }
-    pub(crate) async fn acquire_code_tools(
-        state: &MiniAppState,
-        instance: &str,
-    ) -> Result<Self, String> {
-        let app_id = {
-            let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
-            registry
-                .get(instance)
-                .ok_or("App is closed.")?
-                .permissions
-                .app_id
-                .clone()
-        };
-        Self::acquire_service(state, instance, &app_id, "code-tools", 1).await
-    }
-    pub(crate) async fn acquire_service(
+    async fn acquire_service(
         state: &MiniAppState,
         instance: &str,
         expected_app: &str,
         service: &'static str,
         protocol: u32,
     ) -> Result<Self, String> {
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         return Err("Document services are unavailable on this device.".into());
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
             static SLOTS: std::sync::OnceLock<Arc<tokio::sync::Semaphore>> =
                 std::sync::OnceLock::new();
-            let slot = if matches!(
-                service,
-                "file-search"
-                    | "terminal"
-                    | "code-tools"
-                    | "peer-transport"
-                    | "file-operations"
-                    | "backup-archive"
-            ) {
-                None
-            } else {
-                Some(
-                    SLOTS
-                        .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(2)))
-                        .clone()
-                        .try_acquire_owned()
-                        .map_err(|_| "Document services are busy. Try again shortly.")?,
-                )
-            };
+            let slot = SLOTS
+                .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(2)))
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| "Document services are busy. Try again shortly.")?;
             let capability = match (service, expected_app) {
-                ("document-processing", "files" | "library")
-                | ("file-search" | "peer-transport", "files") => "files.read",
-                ("file-operations", _) => "files.read",
-                ("backup-archive", "backups") => "backups.manage",
-                ("terminal", _) => "terminal.execute",
-                ("code-tools", _) => "code.execute",
+                ("document-processing", "files" | "library") => "files.read",
                 _ => return Err("Invalid native service owner.".into()),
             };
             let (root, app_id, version, builtin, epoch, namespace, native_owner, mut changes) = {
@@ -1685,12 +755,6 @@ impl ServiceLease {
                     return Err("The native service belongs to another app or Space.".into());
                 }
                 p.authorize(capability)?;
-                if service == "peer-transport" {
-                    p.authorize("connections.read")?;
-                }
-                if service == "code-tools" {
-                    p.authorize("files.read")?;
-                }
                 (
                     app.root.clone(),
                     p.app_id.clone(),
@@ -1727,7 +791,6 @@ impl ServiceLease {
                 cancel,
                 epoch,
                 capability,
-                service,
                 instance: instance.to_owned(),
                 app_id: expected_app.to_owned(),
                 version: installed_version,
@@ -1738,63 +801,10 @@ impl ServiceLease {
             Ok(lease)
         }
     }
-    #[cfg(desktop)]
-    pub(crate) fn peer_identity<'a>(
-        &'a self,
-        device_id: &'a str,
-    ) -> Result<crate::infra::peer_identity::SpacePeerIdentity<'a>, String> {
-        if !self.is_peer_transport() || self.cancelled() {
-            return Err("Peer service access is unavailable.".into());
-        }
-        let owner = self
-            .native_owner
-            .as_ref()
-            .ok_or("Missing native Space authority.")?;
-        let generation = owner
-            .authority_generation
-            .filter(|value| *value > 0 && *value <= 9_007_199_254_740_991)
-            .ok_or("Missing native authority generation.")?;
-        Ok(crate::infra::peer_identity::SpacePeerIdentity {
-            deployment: owner
-                .deployment
-                .as_deref()
-                .filter(|v| !v.is_empty())
-                .ok_or("Missing native deployment.")?,
-            account_id: &owner.account_id,
-            device_id,
-            space_id: owner
-                .space_id
-                .as_deref()
-                .filter(|v| !v.is_empty())
-                .unwrap_or("personal"),
-            installed_version: &self.version,
-            authority_generation: generation as i64,
-        })
-    }
-    pub(crate) fn is_peer_transport(&self) -> bool {
-        self.service == "peer-transport"
-            && self.app_id == "files"
-            && self.capability == "files.read"
-    }
-    pub(crate) fn is_code_tools(&self) -> bool {
-        self.service == "code-tools" && self.capability == "code.execute"
-    }
-    pub(crate) fn is_backup_runtime(&self) -> bool {
-        self.service == "backup-archive"
-    }
-    pub(crate) fn is_terminal(&self) -> bool {
-        self.service == "terminal" && self.capability == "terminal.execute"
-    }
     pub(crate) fn validate(&self, state: &MiniAppState, instance: &str) -> Result<(), String> {
         let registry = state.0.lock().map_err(|_| "App registry unavailable.")?;
         let p = &registry.get(instance).ok_or("App is closed.")?.permissions;
         p.authorize(self.capability)?;
-        if self.is_peer_transport() {
-            p.authorize("connections.read")?;
-        }
-        if self.is_code_tools() {
-            p.authorize("files.read")?;
-        }
         if self.cancel.flag.load(Ordering::Acquire)
             || p.epoch != self.epoch
             || instance != self.instance
@@ -1863,9 +873,9 @@ impl ServiceLease {
         source_extension: Option<&str>,
         png_output: Option<&mut Vec<u8>>,
     ) -> Result<Value, String> {
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         return Err("Document services are unavailable on this device.".into());
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
             if self.cancel.flag.load(Ordering::Acquire) {
                 return Err("Document service cancelled.".into());
@@ -1909,9 +919,56 @@ impl Drop for CancelService {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn builtin_worker(service: &str, protocol: u32) -> Result<&'static [u8], String> {
     // Executable bytes are part of the signed Misty binary, never downloaded or
     // resolved from a user-controlled package directory.
     include!(concat!(env!("OUT_DIR"), "/builtin_workers.rs"))
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    fn input(name: &str, extension: &str) -> Input {
+        Input {
+            handle: String::new(),
+            display_name: name.into(),
+            extension: extension.into(),
+        }
+    }
+
+    #[test]
+    fn app_documents_and_previews_run_in_the_confined_worker() {
+        let worker = builtin_worker("document-processing", 5).unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let stop = AtomicBool::new(false);
+        let notes = folder.path().join("notes.txt");
+        std::fs::write(&notes, "Quarterly notes\nRevenue grew.").unwrap();
+        let document = run(
+            worker,
+            File::open(&notes).unwrap(),
+            input("notes.txt", "txt"),
+            &stop,
+        )
+        .unwrap();
+        assert!(document.to_string().contains("Revenue grew."));
+        let photo = folder.path().join("photo.png");
+        image::RgbaImage::from_pixel(64, 48, image::Rgba([20, 40, 60, 255]))
+            .save(&photo)
+            .unwrap();
+        let mut png = Vec::new();
+        run_response(
+            worker,
+            File::open(&photo).unwrap(),
+            input("photo.png", "png"),
+            &stop,
+            "explorerImage",
+            Some(32),
+            None,
+            Some(&mut png),
+        )
+        .unwrap();
+        assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+    }
 }

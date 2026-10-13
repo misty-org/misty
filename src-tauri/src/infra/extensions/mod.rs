@@ -6,6 +6,9 @@ mod compat;
 mod crx;
 pub(crate) mod install;
 pub(crate) mod native;
+pub(crate) use native::{page_host, EXTENSION_SCHEME};
+#[cfg(windows)]
+mod native_windows;
 mod package;
 pub(crate) mod runtime;
 mod sync;
@@ -145,7 +148,7 @@ fn origins() -> &'static std::sync::RwLock<std::collections::BTreeSet<String>> {
     ORIGINS.get_or_init(Default::default)
 }
 pub(crate) fn is_extension_url(url: &url::Url) -> bool {
-    url.scheme() == "webkit-extension"
+    url.scheme() == EXTENSION_SCHEME
         && url.port().is_none()
         && url.username().is_empty()
         && url.password().is_none()
@@ -283,7 +286,10 @@ pub(crate) async fn agent_action(
     }
     let account = state.account.clone();
     drop(state);
-    let mut value=native::request(json!({"operation":operation,"account":account,"id":id,"tabId":tab,"script":script})).await?;
+    let mut value = native::request(
+        json!({"operation":operation,"account":account,"id":id,"tabId":tab,"script":script}),
+    )
+    .await?;
     let state = service().lock().await;
     if state.account != account
         || !state.agent_access
@@ -298,20 +304,18 @@ pub(crate) async fn agent_action(
     }
     if let Some(actions) = value["actions"].as_array_mut() {
         actions.retain(|action| {
-            action["id"]
-                .as_str()
-                .is_some_and(|id| {
-                    state
-                        .desired
-                        .get(id)
-                        .is_some_and(|v| v.installed && v.enabled && v.agent_access)
-                })
+            action["id"].as_str().is_some_and(|id| {
+                state
+                    .desired
+                    .get(id)
+                    .is_some_and(|v| v.installed && v.enabled && v.agent_access)
+            })
         });
     }
     Ok(value)
 }
 pub(crate) async fn authorize_agent_url(url: &url::Url) -> Result<(), String> {
-    if url.scheme() != "webkit-extension" {
+    if url.scheme() != EXTENSION_SCHEME {
         return Ok(());
     }
     let state = service().lock().await;
@@ -320,7 +324,10 @@ pub(crate) async fn authorize_agent_url(url: &url::Url) -> Result<(), String> {
             v.installed
                 && v.enabled
                 && v.agent_access
-                && url.host_str() == Some(&uuid_for(&format!("{}:{}", state.account, v.guid)))
+                && url.host_str().is_some_and(|host| {
+                    page_host(&uuid_for(&format!("{}:{}", state.account, v.guid))).as_deref()
+                        == Some(host)
+                })
         })
     {
         Ok(())

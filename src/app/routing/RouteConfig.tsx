@@ -1,5 +1,6 @@
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
+import { WelcomePage } from "@/features/welcome";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppFrameLayout } from "../layouts/AppFrameLayout";
@@ -16,7 +17,7 @@ function StartupRedirect() {
   const { user } = useAuth();
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
   if (!user) {
-    return <Navigate to={routes.signIn} replace />;
+    return <Navigate to={routes.welcome} replace />;
   }
   return <Navigate to={resolveStartupRoute(lastAppRoute, routes.browser)} replace />;
 }
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
                 element: null,
               },
               { path: "extensions/*", element: null },
+              {
+                path: "welcome",
+                element: <WelcomePage />,
+              },
               {
                 path: "signin",
                 element: <SignInPage />,

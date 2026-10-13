@@ -28,7 +28,7 @@ export function DevicesSettings() {
       <Section title="This device">
         <SettingsNote>
           This device was removed from your account. Sign in again and add it to use sync, agents
-          and file sharing here.
+          and the shared clipboard here.
         </SettingsNote>
       </Section>
     );

@@ -109,6 +109,7 @@ where
     /// shared workspace if it has none yet, then watch and resend.
     pub(super) async fn workspaces_connected(&mut self, socket: &mut SyncSocket) -> Result<()> {
         self.collections.connected();
+        self.clipboard.connected();
         let document: crate::document::Document =
             serde_json::from_slice(&self.store.committed_snapshot(&self.root)?)?;
         if !document.workspace_mode {
@@ -290,7 +291,7 @@ where
         code: &str,
         retry_after: Option<Duration>,
     ) -> Result<()> {
-        if self.records_failed(request, code, retry_after) {
+        if self.records_failed(request, code, retry_after) || self.clipboard.failed(request) {
             return Ok(());
         }
         self.workspaces

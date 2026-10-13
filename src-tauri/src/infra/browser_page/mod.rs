@@ -33,7 +33,7 @@ const RUNTIME: &str = concat!(
     "\n",
     include_str!("page_skills.js")
 );
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const WORLD: &str = "misty-agent-page";
 const SNAPSHOT_CHARS: u64 = 24_000;
 const AFTER_STEPS_SNAPSHOT_CHARS: u64 = 12_000;
@@ -78,7 +78,7 @@ async fn call(
         serde_json::to_string(&args).map_err(|error| error.to_string())?
     );
     let operation = serde_json::to_string(operation).map_err(|error| error.to_string())?;
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
         let body = format!(
             "{RUNTIME}\n{invocation}\nreturn JSON.stringify(await page.call({operation}, args));"
@@ -92,7 +92,7 @@ async fn call(
         serde_json::from_str(&raw)
             .map_err(|error| format!("The page returned invalid data: {error}"))
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         // The page world has no awaiting evaluation; settle is a host sleep there.
         if operation == "\"settle\"" {

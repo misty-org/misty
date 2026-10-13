@@ -4,9 +4,7 @@ use crate::domain::clipboard::ClipboardService;
 #[cfg(desktop)]
 use crate::domain::clipboard::{NativeClipboard, SharedClipboardClient};
 #[cfg(desktop)]
-use crate::infra::cloud_clipboard::{CloudClipboard, SharedClipboardFanout};
-#[cfg(desktop)]
-use crate::infra::connected_devices::ConnectedDevicesService;
+use crate::infra::cloud_clipboard::CloudClipboard;
 use crate::infra::{
     agents::AgentService, commands::CommandService, devices::DeviceService,
     environment::AppEnvironmentService, explorer::ExplorerService,
@@ -22,14 +20,11 @@ pub struct MistyRuntime {
     pub commands: CommandService,
     pub devices: DeviceService,
     #[cfg(desktop)]
-    pub connected_devices: ConnectedDevicesService,
-    #[cfg(desktop)]
     pub cloud_clipboard: CloudClipboard,
     pub explorer: ExplorerService,
     pub workspaces: WorkspaceService,
     pub agents: AgentService,
     /// Code projects: file tools, sandboxed commands, undo and previews.
-    #[cfg(unix)]
     pub code: Arc<misty_agent_code::CodeService>,
 }
 
@@ -41,19 +36,14 @@ impl MistyRuntime {
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         let environment = AppEnvironmentService::new_with_data_root(data_root);
         #[cfg(desktop)]
-        let connected_devices = ConnectedDevicesService::new(environment.cache_dir());
-        #[cfg(desktop)]
         let native_clipboard: Arc<dyn NativeClipboard> =
             crate::infra::native_clipboard::SystemClipboardAdapter::new();
         #[cfg(desktop)]
         let cloud_clipboard = CloudClipboard::default();
-        // Copies reach paired devices on the LAN and, through the encrypted
-        // cloud clipboard, the account's other devices anywhere.
+        // Copies reach the account's other devices through the encrypted
+        // clipboard ring in sync.
         #[cfg(desktop)]
-        let shared_clipboard: Arc<dyn SharedClipboardClient> = Arc::new(SharedClipboardFanout {
-            lan: Arc::new(connected_devices.clone()),
-            cloud: cloud_clipboard.clone(),
-        });
+        let shared_clipboard: Arc<dyn SharedClipboardClient> = Arc::new(cloud_clipboard.clone());
         #[cfg(desktop)]
         let clipboard = ClipboardService::new(Some(native_clipboard), Some(shared_clipboard));
         #[cfg(not(desktop))]
@@ -66,7 +56,6 @@ impl MistyRuntime {
                 clipboard_for_peer.accept_remote_payload(payload);
                 let _ = clipboard_for_peer.apply_shared_to_system_async();
             });
-            let _ = connected_devices.set_clipboard_handler(receive.clone());
             cloud_clipboard.set_handler(receive);
             let _ = clipboard.start();
         }
@@ -81,7 +70,6 @@ impl MistyRuntime {
             explorer_library.clone(),
         );
         let agents = AgentService::new(environment.clone());
-        #[cfg(unix)]
         let code = Arc::new(
             misty_agent_code::CodeService::new(environment.agent_code_dir(), dirs::home_dir())
                 .with_protected(vec![environment.misty_dir()]),
@@ -98,13 +86,10 @@ impl MistyRuntime {
             commands,
             devices,
             #[cfg(desktop)]
-            connected_devices,
-            #[cfg(desktop)]
             cloud_clipboard,
             explorer,
             workspaces,
             agents,
-            #[cfg(unix)]
             code,
         }
     }

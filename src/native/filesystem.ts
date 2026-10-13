@@ -9,7 +9,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 // The read-only folder listing behind Misty's file picker. Managing files
 // happens in Kura, a separate app.
-export * from "@/native/connected-devices";
 export * from "@/native/runtime";
 export * from "@/native/settings-plugins";
 export function devicesSnapshot(): Promise<DeviceSnapshot> {

@@ -6,7 +6,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
@@ -68,7 +67,7 @@ impl Side {
             Side::Copy { files, .. } => files.get(path).map(|record| (record.size, record.modified_ns, record.inode)),
             Side::Project { files, .. } => files
                 .get(path)
-                .map(|meta| (meta.len(), checkpoint::modified_ns(meta), meta.ino())),
+                .map(|meta| (meta.len(), checkpoint::modified_ns(meta), beneath::file_identity(meta))),
         }
     }
 }

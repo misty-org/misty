@@ -1,9 +1,8 @@
 #![allow(unexpected_cfgs)]
 use super::*;
 
-/// Keep WebKit's original popup configuration (including window.opener and the website
+/// Keep the engine's original popup (including window.opener and the website
 /// data store). All popups, including authentication, are adopted into Browser tabs.
-#[cfg(target_os = "macos")]
 pub(super) fn provider_popup(
     app: &AppHandle,
     source_id: &str,
@@ -67,12 +66,18 @@ fn create_popup(
     // Give this tab its own scripts and IPC handlers without replacing the required
     // configuration or its website data store. Otherwise the opener's shortcut token
     // and native message handler can leak into the popup (and vice versa).
-    let main_thread = objc2::MainThreadMarker::new()?;
-    unsafe {
-        features
-            .opener()
-            .target_configuration
-            .setUserContentController(&objc2_web_kit::WKUserContentController::new(main_thread));
+    // WebView2 gives every popup its own view and scripts already.
+    #[cfg(target_os = "macos")]
+    {
+        let main_thread = objc2::MainThreadMarker::new()?;
+        unsafe {
+            features
+                .opener()
+                .target_configuration
+                .setUserContentController(&objc2_web_kit::WKUserContentController::new(
+                    main_thread,
+                ));
+        }
     }
     let key = format!("popup-{}", uuid::Uuid::new_v4());
     let id = format!("tab-{key}");
@@ -234,8 +239,12 @@ fn create_popup(
             return None;
         }
     };
+    #[cfg(target_os = "macos")]
+    let attachment_downloads = attachment_download::install(window.as_ref());
+    #[cfg(not(target_os = "macos"))]
+    let attachment_downloads: Result<(), String> = Ok(());
     if super::super::browser_site_permissions::install(window.as_ref()).is_err()
-        || attachment_download::install(window.as_ref()).is_err()
+        || attachment_downloads.is_err()
         || host_messages::install(window.as_ref()).is_err()
         || install_close_handler(app, window.as_ref(), &id).is_err()
     {
@@ -282,20 +291,71 @@ fn create_popup(
     Some(NewWindowResponse::Create { window })
 }
 
+/// Closes the popup's tab the way the tab strip would, once the page itself
+/// asks to close (OAuth popups do this when they finish).
+fn close_from_page(app: AppHandle, id: String) {
+    // Leave the engine's callback before destroying its window and view.
+    tauri::async_runtime::spawn(async move {
+        let close_app = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let _ = browser_webview_close(
+                close_app.clone(),
+                close_app.state::<BrowserSessionState>(),
+                BrowserWebviewIdRequest { id },
+            );
+        });
+    });
+}
+
+/// WebView2 reports `window.close()` as WindowCloseRequested.
+#[cfg(windows)]
+fn install_close_handler(app: &AppHandle, webview: &Webview, id: &str) -> Result<(), String> {
+    use webview2_com::WindowCloseRequestedEventHandler;
+    let app = app.clone();
+    let id = id.to_owned();
+    webview
+        .with_webview(move |native| {
+            // SAFETY: the controller is live during this UI-thread callback; the
+            // handler owns clones of the app handle and tab id.
+            let _ = unsafe {
+                native.controller().CoreWebView2().and_then(|core| {
+                    let mut token = Default::default();
+                    core.add_WindowCloseRequested(
+                        &WindowCloseRequestedEventHandler::create(Box::new(move |_, _| {
+                            close_from_page(app.clone(), id.clone());
+                            Ok(())
+                        })),
+                        &mut token,
+                    )
+                })
+            };
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(windows)]
+pub(super) fn forget_close_handler(_id: &str) {}
+
 // Wry 0.55 supplies popup creation but omits WKUIDelegate.webViewDidClose.
 // Handle WebKit's actual close notification, including OAuth completion, without
 // injecting a replacement window.close or guessing which URL means success.
+#[cfg(target_os = "macos")]
 use std::sync::OnceLock;
+#[cfg(target_os = "macos")]
 type CloseTarget = (AppHandle, String);
+#[cfg(target_os = "macos")]
 static CLOSE_TARGETS: OnceLock<Mutex<HashMap<usize, CloseTarget>>> = OnceLock::new();
+#[cfg(target_os = "macos")]
 fn close_targets() -> &'static Mutex<HashMap<usize, CloseTarget>> {
     CLOSE_TARGETS.get_or_init(Mutex::default)
 }
+#[cfg(target_os = "macos")]
 pub(super) fn forget_close_handler(id: &str) {
     if let Ok(mut targets) = close_targets().lock() {
         targets.retain(|_, (_, target)| target != id);
     }
 }
+#[cfg(target_os = "macos")]
 extern "C" fn webview_did_close(
     _delegate: &objc::runtime::Object,
     _selector: objc::runtime::Sel,
@@ -306,19 +366,10 @@ extern "C" fn webview_did_close(
         .ok()
         .and_then(|targets| targets.get(&(view as usize)).cloned());
     if let Some((app, id)) = target {
-        // Leave WebKit's delegate callback before destroying its window/view.
-        tauri::async_runtime::spawn(async move {
-            let close_app = app.clone();
-            let _ = app.run_on_main_thread(move || {
-                let _ = browser_webview_close(
-                    close_app.clone(),
-                    close_app.state::<BrowserSessionState>(),
-                    BrowserWebviewIdRequest { id },
-                );
-            });
-        });
+        close_from_page(app, id);
     }
 }
+#[cfg(target_os = "macos")]
 fn install_close_handler(app: &AppHandle, webview: &Webview, id: &str) -> Result<(), String> {
     use objc::{msg_send, sel, sel_impl};
     let app = app.clone();

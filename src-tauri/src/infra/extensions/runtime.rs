@@ -12,8 +12,7 @@ async fn activate(
     let package_root = root(app, account)?.join("packages").join(&id);
     let removed = service().lock().await.removed.contains(&id);
     if !installation.enabled || removed {
-        native::request(json!({"operation":"unload","account":account,"id":id}))
-            .await?;
+        native::request(json!({"operation":"unload","account":account,"id":id})).await?;
         service().lock().await.loaded.remove(&id);
         sync::forget(account, &id);
         if let Ok(mut origins) = origins().write() {
@@ -22,9 +21,15 @@ async fn activate(
         let review = selected_package(&package_root, false)
             .ok()
             .and_then(|path| read_review(&path).ok());
-        return Ok(InstalledState { new_tab: None,
+        return Ok(InstalledState {
+            new_tab: None,
             id,
-            status: (if removed { "needs-attention" } else { "disabled" }).into(),
+            status: (if removed {
+                "needs-attention"
+            } else {
+                "disabled"
+            })
+            .into(),
             version: review.as_ref().map(|v| v.entry.version.clone()),
             detail: removed.then(|| catalog::REMOVED.to_owned()),
             review,
@@ -50,7 +55,8 @@ async fn activate(
                 .iter()
                 .any(|p| !installation.hosts.contains(p))
         {
-            return Ok(InstalledState { new_tab: None,
+            return Ok(InstalledState {
+                new_tab: None,
                 id,
                 status: "needs-review".into(),
                 version: None,
@@ -61,14 +67,14 @@ async fn activate(
         review = Some(commit(app, &prepared.token).await?);
     }
     if !approved {
-        native::request(json!({"operation":"unload","account":account,"id":id}))
-            .await?;
+        native::request(json!({"operation":"unload","account":account,"id":id})).await?;
         service().lock().await.loaded.remove(&id);
         sync::forget(account, &id);
         if let Ok(mut origins) = origins().write() {
             origins.remove(&uuid_for(&format!("{account}:{}", installation.guid)));
         }
-        return Ok(InstalledState { new_tab: None,
+        return Ok(InstalledState {
+            new_tab: None,
             id,
             status: "needs-review".into(),
             version: review.as_ref().map(|value| value.entry.version.clone()),
@@ -88,8 +94,13 @@ async fn activate(
         &serde_json::to_string(&(installation, &review.entry.digest)).map_err(|e| e.to_string())?,
     );
     if service().lock().await.loaded.get(&id) != Some(&signature) {
-        if let Ok(mut origins) = origins().write() {
-            origins.insert(uuid_for(&format!("{account}:{}", installation.guid)));
+        // Extension pages load from this host: the origin itself on macOS,
+        // the extension ID derived from it on Windows.
+        if let (Some(host), Ok(mut origins)) = (
+            page_host(&uuid_for(&format!("{account}:{}", installation.guid))),
+            origins().write(),
+        ) {
+            origins.insert(host);
         }
         sync::forget(account, &id);
         // Packages installed before the compatibility layer existed gain it here.
@@ -108,7 +119,8 @@ async fn activate(
                     fallback.map_err(|failure| {
                         format!("The update and previous runtime both failed: {error}; {failure}")
                     })?;
-                    return Ok(InstalledState { new_tab: None,
+                    return Ok(InstalledState {
+                        new_tab: None,
                         id,
                         status: "needs-attention".into(),
                         version: Some(old.entry.version),
@@ -153,7 +165,8 @@ fn new_tab_page(runtime: &Path, origin: &str) -> Option<String> {
         && Path::new(path)
             .components()
             .all(|part| matches!(part, std::path::Component::Normal(_)));
-    inside.then(|| format!("webkit-extension://{origin}/{page}"))
+    let host = page_host(origin)?;
+    inside.then(|| format!("{EXTENSION_SCHEME}://{host}/{page}"))
 }
 
 #[tauri::command]
@@ -232,14 +245,24 @@ pub async fn extensions_action(
     tab_id: Option<String>,
     anchor: Option<Value>,
 ) -> Result<Value, ExtensionFailure> {
-    let result: Result<_,String> = async {
-    native::trusted(&caller)?;
-    if !["actions", "invoke", "options", "diagnostics"].contains(&operation.as_str()) { return Err("Invalid extension action.".into()); }
-    let account = service().lock().await.account.clone();
-    if id.as_ref().is_some_and(|id| catalog::Store::of(id).is_none()) { return Err("Invalid extension ID.".into()); }
-    native::request(json!({"operation":operation,"account":account,"id":id,"tabId":tab_id,"anchor":anchor})).await
-
-    }.await;
+    let result: Result<_, String> = async {
+        native::trusted(&caller)?;
+        if !["actions", "invoke", "options", "diagnostics"].contains(&operation.as_str()) {
+            return Err("Invalid extension action.".into());
+        }
+        let account = service().lock().await.account.clone();
+        if id
+            .as_ref()
+            .is_some_and(|id| catalog::Store::of(id).is_none())
+        {
+            return Err("Invalid extension ID.".into());
+        }
+        native::request(
+            json!({"operation":operation,"account":account,"id":id,"tabId":tab_id,"anchor":anchor}),
+        )
+        .await
+    }
+    .await;
     result.map_err(ExtensionFailure::from)
 }
 
@@ -302,7 +325,11 @@ pub async fn extensions_check_updates(
                 {
                     // The store took it down: stop running it everywhere it loaded.
                     Err(error) if error == catalog::REMOVED => {
-                        service().lock().await.removed.insert(installation.id.clone());
+                        service()
+                            .lock()
+                            .await
+                            .removed
+                            .insert(installation.id.clone());
                         return Ok(Some(activate(&app, &account, &installation).await?));
                     }
                     result => result?,
@@ -324,7 +351,8 @@ pub async fn extensions_check_updates(
                         .any(|p| !installation.permissions.contains(p))
                     || review.hosts.iter().any(|p| !installation.hosts.contains(p))
                 {
-                    return Ok(Some(InstalledState { new_tab: None,
+                    return Ok(Some(InstalledState {
+                        new_tab: None,
                         id: installation.id.clone(),
                         status: "needs-review".into(),
                         version: Some(current.entry.version),

@@ -19,7 +19,7 @@ async fn native(
     input: Value,
     prepared: &Value,
 ) -> Result<Option<Value>, String> {
-    if !cfg!(target_os = "macos") {
+    if !cfg!(any(target_os = "macos", windows)) {
         return Ok(None);
     }
     let (id, _) = resolve_agent_webview(app, state, request)?;
@@ -195,9 +195,14 @@ async fn run_step_checked(
             }
         }
     } else if !allow_consequential {
-        let reason = match prepared["consequence"].as_str().filter(|reason| !reason.is_empty()) {
+        let reason = match prepared["consequence"]
+            .as_str()
+            .filter(|reason| !reason.is_empty())
+        {
             Some(reason) => reason.to_owned(),
-            None if confirm::KINDS.contains(&kind) => format!("This would {}.", confirm::label(kind)),
+            None if confirm::KINDS.contains(&kind) => {
+                format!("This would {}.", confirm::label(kind))
+            }
             None => String::new(),
         };
         if !reason.is_empty() {

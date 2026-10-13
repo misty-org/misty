@@ -5,6 +5,7 @@ import {
   readApiSessionGeneration,
 } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
+import { desktopOs } from "@/shared/platform/desktopOs";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import type { AccountHandoffPath, AccountMeResponse, LoginResponse } from "./types";
 type AccountMethod = "GET" | "POST" | "PUT";
@@ -188,7 +189,7 @@ function assertAccountGeneration(expected: number): void {
 function requestHeaders(body: unknown, token: string | null): Headers | undefined {
   if (body === undefined && !token) return undefined;
   const headers = new Headers();
-  headers.set("X-Misty-Platform", accountClientPlatform());
+  headers.set("X-Misty-Platform", desktopOs());
   headers.set(
     "X-Misty-Release-Channel",
     import.meta.env.VITE_RELEASE_CHANNEL?.trim() ||
@@ -198,12 +199,6 @@ function requestHeaders(body: unknown, token: string | null): Headers | undefine
   if (body !== undefined) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return headers;
-}
-function accountClientPlatform(): "windows" | "macos" | "linux" {
-  const platform = navigator.platform.toLowerCase();
-  if (platform.includes("win")) return "windows";
-  if (platform.includes("mac")) return "macos";
-  return "linux";
 }
 function shouldAttachAuthToken(path: string): boolean {
   return ![

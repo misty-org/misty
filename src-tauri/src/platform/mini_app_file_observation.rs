@@ -25,14 +25,37 @@ pub struct DirectoryWatch {
     _slot: tokio::sync::OwnedSemaphorePermit,
 }
 
+/// The watched folder's identity, so a folder swapped in at its path is noticed.
 #[cfg(target_os = "macos")]
-fn identity(metadata: &Metadata) -> (u64, u64) {
+fn root_identity(directory: &Dir) -> Result<(u64, u64), String> {
     use std::os::unix::fs::MetadataExt;
-    (metadata.dev(), metadata.ino())
+    let metadata = metadata(directory)?;
+    Ok((metadata.dev(), metadata.ino()))
 }
-#[cfg(not(target_os = "macos"))]
-fn identity(_: &Metadata) -> (u64, u64) {
-    (0, 0)
+#[cfg(target_os = "macos")]
+fn identity_at(path: &std::path::Path) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::symlink_metadata(path)
+        .ok()
+        .filter(Metadata::is_dir)
+        .map(|value| (value.dev(), value.ino()))
+}
+#[cfg(windows)]
+fn root_identity(directory: &Dir) -> Result<(u64, u64), String> {
+    crate::platform::windows::file_identity(directory)
+        .map_err(|_| "The chosen folder is unavailable.".into())
+}
+#[cfg(windows)]
+fn identity_at(path: &std::path::Path) -> Option<(u64, u64)> {
+    crate::platform::windows::identity_at(path, true).ok()
+}
+#[cfg(not(any(target_os = "macos", windows)))]
+fn root_identity(_: &Dir) -> Result<(u64, u64), String> {
+    Ok((0, 0))
+}
+#[cfg(not(any(target_os = "macos", windows)))]
+fn identity_at(_: &std::path::Path) -> Option<(u64, u64)> {
+    None
 }
 
 #[cfg(target_os = "macos")]
@@ -49,7 +72,12 @@ fn granted_path(directory: &Dir) -> Result<PathBuf, String> {
     let path = unsafe { CStr::from_ptr(bytes.as_ptr()) };
     Ok(PathBuf::from(std::ffi::OsStr::from_bytes(path.to_bytes())))
 }
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+fn granted_path(directory: &Dir) -> Result<PathBuf, String> {
+    crate::platform::windows::verified_path(directory, true)
+        .map_err(|_| "The chosen folder's location is unavailable.".into())
+}
+#[cfg(not(any(target_os = "macos", windows)))]
 fn granted_path(_: &Dir) -> Result<PathBuf, String> {
     Err("Directory observation is not implemented on this platform yet.".into())
 }
@@ -71,7 +99,7 @@ impl DirectoryWatch {
             .try_acquire_owned()
             .map_err(|_| "Too many folders are being watched.".to_owned())?;
         let path = granted_path(&directory)?;
-        let identity = identity(&metadata(&directory)?);
+        let identity = root_identity(&directory)?;
         let revision = Arc::new(AtomicU64::new(0));
         let failed = Arc::new(AtomicBool::new(false));
         let changes = revision.clone();
@@ -114,8 +142,7 @@ impl DirectoryWatch {
         Ok(result)
     }
     fn same_root(&self) -> bool {
-        std::fs::symlink_metadata(&self.path)
-            .is_ok_and(|value| value.is_dir() && identity(&value) == self.identity)
+        identity_at(&self.path) == Some(self.identity)
     }
     fn status(&mut self) -> Result<Value, String> {
         if self.released.load(Ordering::Acquire) {

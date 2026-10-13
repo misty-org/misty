@@ -10,8 +10,6 @@ use std::{
 
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tokio::process::Child;
-
 use crate::{exec, output::Capped, sandbox::Setup, CodeError};
 
 const PER_PROJECT: usize = 3;
@@ -42,9 +40,9 @@ struct Running {
     pid: Option<u32>,
     started: Instant,
     logs: Arc<Mutex<Capped>>,
-    child: Arc<tokio::sync::Mutex<Child>>,
+    child: Arc<tokio::sync::Mutex<exec::Child>>,
     exit: Arc<Mutex<Option<Option<i32>>>>,
-    tree: crate::tree::Tree,
+    tree: exec::Tree,
 }
 
 #[derive(Default, Clone)]
@@ -107,9 +105,8 @@ impl Registry {
                 "This project already has {PER_PROJECT} processes running. Stop one with code_stop first (see code_processes)."
             )));
         }
-        let mut child = exec::spawn(&setup)?;
+        let (mut child, tree) = exec::start(&setup)?;
         let pid = child.id();
-        let tree = crate::tree::Tree::watch(pid);
         let logs = Arc::new(Mutex::new(Capped::new(LOG_HEAD, LOG_TAIL)));
         exec::collect(&mut child, logs.clone());
         let child = Arc::new(tokio::sync::Mutex::new(child));

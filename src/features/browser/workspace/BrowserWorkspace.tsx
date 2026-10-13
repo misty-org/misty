@@ -1,6 +1,5 @@
 import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
-import { useExtensionsStore } from "@/features/extensions/store";
 import {
   useAiSurfaceAdapter,
   type AiArtifact,
@@ -20,7 +19,7 @@ import {
 } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, DropdownMenuCheckboxItem, Notification, Skeleton } from "@/shared/ui";
+import { Button, cn, DropdownMenuCheckboxItem, Notification } from "@/shared/ui";
 import { invoke } from "@tauri-apps/api/core";
 import { Pencil, VenetianMask } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -77,7 +76,6 @@ import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { browserBoundsAtAppZoom } from "./useBrowserWebviewGeometry";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
-  const extensionsReady = useExtensionsStore((state) => state.ready);
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
     const pane = panes.find((candidate) => candidate.id === store.layout.focusedPaneId) ?? panes[0];
@@ -85,17 +83,6 @@ export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
     return candidate?.surfaceId === "browser" ? candidate : undefined;
   });
   const tab = props.tab ?? fallbackTab;
-  if (hasTauriInternals() && !extensionsReady)
-    return (
-      <div role="status" aria-label="Browser" aria-busy="true" className="flex h-full flex-col">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-charcoal-border px-3">
-          <Skeleton className="size-5 rounded" />
-          <Skeleton className="size-5 rounded" />
-          <Skeleton className="h-6 flex-1 rounded-full" />
-        </div>
-        <div className="min-h-0 flex-1" />
-      </div>
-    );
   if (!tab) {
     return (
       <div className="grid h-full place-items-center bg-charcoal-bg text-sm text-cream-muted">

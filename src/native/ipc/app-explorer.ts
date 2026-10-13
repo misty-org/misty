@@ -80,35 +80,11 @@ export interface MountedDevice {
 export interface DeviceSnapshot {
   devices: MountedDevice[];
 }
-/** A live LAN connection from this device to another of its devices. */
-export interface ConnectedPeerStatus {
-  deviceId: string;
-  state: "online";
-  connectionType: "direct" | "relay" | "unknown";
-}
-export interface ConnectedDevicesSnapshot {
-  enabled: boolean;
-  endpointId: string | null;
-  addressing: unknown | null;
-  relayPolicy: "managed" | "public-development" | "disabled" | "lan-only";
-  peers: ConnectedPeerStatus[];
-  unavailableReason: string | null;
-}
-export interface PeerRoot {
-  id: string;
-  name: string;
-  kind: "system" | "volume" | "folder";
-  readonly: true;
-}
 export interface ExplorerLocation {
   kind: ExplorerLocationKind;
   providerType: string | null;
   remoteName: string | null;
   remotePath: string | null;
-  peerDeviceId?: string | null;
-  peerRootId?: string | null;
-  /** For a connected device: whether it lets this device change its files. */
-  peerWritable?: boolean;
 }
 export interface FileEntry {
   id: string;
