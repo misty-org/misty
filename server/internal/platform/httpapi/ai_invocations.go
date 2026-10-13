@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -10,8 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	agent "github.com/kannachi323/misty/server/internal/agents"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
@@ -153,20 +150,14 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 			return
 		}
 		var body aiInvocationInput
-		if err := TestingDecodeAIJSONWithLimit(w, r, &body, 24<<20); err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
+		if !decodeAIInvocationBody(w, r, &body) {
 			return
 		}
 		// Only the server links a run to a parent's notebook or delegation.
 		body.NotebookKey, body.DelegatedFrom = "", ""
-		var scheduled *deviceScheduledRunAdmission
-		if strings.TrimSpace(body.Trigger) == scheduledRunTrigger || body.ScheduleClaim != "" {
-			admitted, err := s.admitDeviceScheduledRun(r.Context(), userID, &body)
-			if err != nil {
-				writeJSON(w, http.StatusConflict, map[string]any{"code": "schedule_not_waiting", "message": err.Error()})
-				return
-			}
-			scheduled = admitted
+		scheduled, ok := s.admitScheduledInvocation(w, r, userID, &body)
+		if !ok {
+			return
 		}
 		admittedRun := false
 		defer func() {
@@ -174,225 +165,60 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 				scheduled.release(context.WithoutCancel(r.Context()), s.database, errors.New("the scheduled run couldn't start on its computer"))
 			}
 		}()
-		if _, err := resolveInvocationMethod(r.Context(), s.database, userID, &body); err != nil {
-			writeAgentMethodError(w, err)
+		if !s.validateInvocationRequest(w, r, userID, &body) {
 			return
 		}
-		if err := validateAIInvocationInput(&body); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_invocation", "message": err.Error()})
-			return
-		}
-
-		if header := strings.TrimSpace(r.Header.Get("Idempotency-Key")); header != "" {
-			if body.IdempotencyKey != "" && body.IdempotencyKey != header {
-				http.Error(w, "idempotency key mismatch", http.StatusBadRequest)
-				return
-			}
-			body.IdempotencyKey = header
-		}
-		if body.IdempotencyKey == "" {
-			http.Error(w, "idempotency key is required", http.StatusBadRequest)
+		if !ensureIdempotencyKey(w, r, &body) {
 			return
 		}
 		actionID := body.RequestedArtifactKind
 		if actionID == "" {
 			actionID = "ask"
 		}
-		if !s.agentRuntime.Enabled() {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "agent_runtime_unavailable", "message": "Misty's agent runtime is not configured."})
+		if !s.validateExecutionTarget(w, &body) {
 			return
 		}
-		if body.ExecutionMode == "" {
-			body.ExecutionMode = "user"
-		}
-		if body.ExecutionMode != "user" && body.ExecutionMode != "agent" && body.ExecutionMode != "team" {
-			http.Error(w, "invalid execution mode", http.StatusBadRequest)
+		if !s.resolveInvocationAgent(w, r, userID, &body) {
 			return
 		}
-		if body.ExecutionMode != "user" && strings.TrimSpace(body.WindowLabel) == "" {
-			http.Error(w, "execution window required", http.StatusBadRequest)
+		// AI execution belongs to the authenticated account.
+		st := aiInvocationAdmitState{conversationID: strings.TrimSpace(body.ConversationID), spaceID: ""}
+		if !s.chooseInvocationModel(w, r, userID, &body, &st) {
 			return
 		}
-		var identity *db.AskIdentity
-		var identityErr error
-		if body.AgentID == "" {
-			identity, identityErr = s.database.EnsureAskIdentity(r.Context(), userID, agent.FrontierDefaultModelID())
-		} else {
-			identity, identityErr = s.database.AskIdentityByID(r.Context(), userID, body.AgentID)
-		}
-		if identityErr != nil {
-			writePersonalAgentError(w, identityErr)
+		if !s.bindConversationModel(w, r, userID, &body, &st) {
 			return
 		}
-		if !identity.Enabled {
-			http.Error(w, "agent disabled", http.StatusConflict)
+		if !s.applyRequestedModelOverride(w, r, &body, &st) {
 			return
 		}
-		body.AgentID = identity.ID
-		if err := pinInvocationSkills(r.Context(), s.database, userID, &body); err != nil {
-			writeAgentMethodError(w, err)
+		if !s.admitInvocationExecution(w, r, userID, &body, &st) {
 			return
 		}
-		conversationID := strings.TrimSpace(body.ConversationID)
-		var err error
-		modelFallbackNotice := false
-		modelID := agent.FrontierDefaultModelID()
-		selectedModel, _, accountModel, selectErr := s.accountAgentModel(r.Context(), userID)
-		if selectErr != nil {
-			writeAIProviderError(w, selectErr)
+		if !s.createInvocationConversation(w, r, userID, &body, &st) {
 			return
 		}
-		if accountModel {
-			modelID = selectedModel
-		}
-		if !accountModel && body.Mode == "companion" && body.CompanionModel != "" {
-			if !agent.FrontierModelAvailable(r.Context(), body.CompanionModel) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_model", "message": "Choose an available model."})
-				return
-			}
-			modelID = body.CompanionModel
-		}
-		reasoning := agent.ManagedReasoning(body.ThinkingMode, body.ReasoningEffort)
-		modelOverrides := map[string]string{}
-		spaceID := "" // AI execution belongs to the authenticated account.
-		if conversationID != "" {
-			bound, boundErr := s.database.AgentConversationIdentity(r.Context(), userID, conversationID)
-			if boundErr != nil || (bound.AgentID != "" && bound.AgentID != body.AgentID) {
-				writeJSON(w, http.StatusConflict, map[string]any{"code": "conversation_context_changed", "message": "Start a new Misty task for this Space."})
-				return
-			}
-			if bindErr := s.database.BindConversationAgent(r.Context(), userID, conversationID, body.AgentID); bindErr != nil {
-				writePersonalAgentError(w, bindErr)
-				return
-			}
-			if body.ThinkingMode == "" && body.ReasoningEffort == "" {
-				reasoning = agent.ManagedReasoning("", bound.ReasoningEffort)
-			}
-			// The conversation's own pick beats the account's Thinking choice.
-			// A model the Gateway retired falls back with a notice.
-			if override := bound.ModelOverride; override != "" {
-				if agent.SenseModelRetired(r.Context(), "thinking", override) {
-					_ = s.database.SetMistyConversationModelOverride(r.Context(), userID, conversationID, "")
-					modelFallbackNotice = true
-				} else {
-					modelID = override
-					modelOverrides["agent"] = override
-				}
-			}
-			if bound.ModelID != modelID || bound.ReasoningEffort != reasoning {
-				if err := s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion); err != nil {
-					TestingWriteAIError(w, err)
-					return
-				}
-			}
-		}
-		if requested := strings.TrimSpace(body.ModelOverride); requested != "" {
-			if !agent.SenseModelAvailable(r.Context(), "thinking", requested) {
-				writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_model", "message": "Choose an available model."})
-				return
-			}
-			body.ModelOverride = requested
-			modelID = requested
-			modelOverrides["agent"] = requested
-		}
-		payload, _ := json.Marshal(body)
-		if err := s.database.ValidateNativeAgentExecution(r.Context(), &db.AIInvocationRecord{UserID: userID, SpaceID: spaceID, RequestPayload: payload}); err != nil {
-			http.Error(w, "Local execution is paused or unavailable", http.StatusConflict)
+		if !s.saveConversationModelOverride(w, r, userID, &body, &st) {
 			return
 		}
-		if err := validateAIInvocationDeviceContexts(body.Context, body.DeviceContexts, spaceID); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_device_context", "message": err.Error()})
+		if !checkInvocationModelAvailable(w, r, &body, &st) {
 			return
 		}
-		if err := verifyDeviceContextGrants(r.Context(), s.database, userID, body.AgentID, body.DeviceContexts); err != nil {
-			writeJSON(w, http.StatusForbidden, map[string]any{"code": "device_grant_required", "message": "This device couldn't confirm the request. Make sure it's added to your account and allows agents."})
+		if !s.checkInvocationSurface(w, r, userID, &body, actionID, &st) {
 			return
 		}
-		if conversationID == "" && (body.Mode == "drawer" || body.Mode == "companion") && body.RequestedArtifactKind == "" {
-			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, spaceID, body.AgentID)
-			if err != nil {
-				TestingWriteAIError(w, err)
-				return
-			}
-			_ = s.database.RenameAgentSession(r.Context(), userID, conversationID, cleanMistyTitle(body.Prompt))
-			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
-		}
-		if conversationID == "" && body.Mode == "companion" {
-			conversationID, err = s.database.CreatePersonalAgentConversation(r.Context(), userID, spaceID, body.AgentID)
-			if err != nil {
-				TestingWriteAIError(w, err)
-				return
-			}
-			_ = s.database.RenameAgentSession(r.Context(), userID, conversationID, cleanMistyTitle(body.Prompt))
-			_ = s.database.UpdateMistyConversationModel(r.Context(), userID, conversationID, modelID, reasoning, agent.FrontierModelCatalogVersion)
-		}
-		if body.ModelOverride != "" && conversationID != "" {
-			if err := s.database.SetMistyConversationModelOverride(r.Context(), userID, conversationID, body.ModelOverride); err != nil {
-				TestingWriteAIError(w, err)
-				return
-			}
-		}
-		if !accountModel && len(modelOverrides) == 0 && (!agent.FrontierModelAvailable(r.Context(), modelID) || !agent.FrontierModelReasoningAvailable(r.Context(), modelID, reasoning)) {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
+		if !s.admitInvocationCollaboration(w, r, userID, &body, &st) {
 			return
 		}
-		reasoning = companionAdmissionReasoning(body, reasoning)
-		available, err := s.database.AIActionAvailable(r.Context(), userID, body.SurfaceID, actionID, modelID)
-		if err != nil {
-			TestingWriteAIError(w, err)
+		stored, created, now, ok := s.storeInvocationRecord(w, r, userID, &body, &st, scheduled)
+		if !ok {
 			return
 		}
-		if !available {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]any{"code": "ai_surface_unavailable", "message": "Misty is temporarily unavailable for this action."})
+		if created && s.providerSettings != nil && !s.freezeInvocationRoutes(w, r, userID, stored.ID, &st) {
 			return
-		}
-		if body.Mode == "companion" && conversationID != "" {
-			if err := s.database.BindAskSurfaceConversation(r.Context(), userID, conversationID, spaceID, modelID, body.SurfaceID, firstAIContextHref(body.Context), aiInvocationPrivacyBoundary(body.Context)); err != nil {
-				TestingWriteAIError(w, err)
-				return
-			}
-		}
-		body.ConversationID = conversationID
-		body.ModelID = modelID
-		body.ReasoningEffort = reasoning
-		if err := admitCollaboration(r.Context(), s.database, userID, &body); err != nil {
-			TestingWriteAIError(w, err)
-			return
-		}
-		if err := s.database.ValidateAIConversationAttachments(r.Context(), userID, conversationID, body.AttachmentIDs); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]any{"code": "invalid_attachment", "message": err.Error()})
-			return
-		}
-		requestPayload, err := json.Marshal(body)
-		if err != nil {
-			http.Error(w, "invalid request", http.StatusBadRequest)
-			return
-		}
-		now := time.Now().UTC()
-		recordTrigger := body.Trigger
-		if scheduled != nil {
-			// Stored like the server's own scheduled runs, and billed the same way.
-			recordTrigger = "schedule"
-		}
-		stored, created, err := s.database.CreateAIInvocationRecord(r.Context(), db.AIInvocationRecord{
-			DispatchRuntime: true, ModelTurnLimit: planTurnLimit(r.Context(), s.database, userID),
-			ID: "invocation_" + uuid.NewString(), UserID: userID, SpaceID: spaceID, ConversationID: conversationID,
-			SurfaceID: body.SurfaceID, Mode: body.Mode, Trigger: recordTrigger, State: "queued",
-			IdempotencyKey: body.IdempotencyKey, RequestPayload: requestPayload, ExpiresAt: now.Add(aiInvocationTTL),
-		})
-		if err != nil {
-			TestingWriteAIError(w, err)
-			return
-		}
-		if created && s.providerSettings != nil {
-			planned, forced := planRoutes(r.Context(), s.database, userID, defaultAIRoutes(modelID, reasoning))
-			if _, routeErr := s.database.FreezeAIModelRoutes(r.Context(), userID, stored.ID, planned, modelOverrides, forced); routeErr != nil {
-				writeAIProviderError(w, routeErr)
-				return
-			}
 		}
 		if scheduled != nil {
-			if err := s.database.BindWorkflowScheduleRun(r.Context(), *scheduled.schedule, conversationID, stored.ID); err != nil {
+			if err := s.database.BindWorkflowScheduleRun(r.Context(), *scheduled.schedule, st.conversationID, stored.ID); err != nil {
 				TestingWriteAIError(w, err)
 				return
 			}
@@ -408,15 +234,13 @@ func (s *AIService) CreateInvocation() http.HandlerFunc {
 				s.invocations.append(stored.ID, aiInvocationEvent{Type: "assistant.status", Text: notice, Phase: "schedule_late"})
 			}
 		}
-		if created {
-			titleNewConversation(s.database, s.runtime, userID, conversationID, body)
-		}
 		if !created {
 			writeAIInvocationCreated(w, record)
 			return
 		}
+		titleNewConversation(s.database, s.runtime, userID, st.conversationID, body)
 		s.recordInvocationOnboarding(r.Context(), userID, body)
-		if modelFallbackNotice {
+		if st.modelFallbackNotice {
 			s.invocations.append(stored.ID, aiInvocationEvent{Type: "assistant.status", Text: "The previous model retired, so Misty switched this conversation to the frontier default.", Phase: "model_fallback"})
 		}
 		writeAIInvocationCreated(w, record)
