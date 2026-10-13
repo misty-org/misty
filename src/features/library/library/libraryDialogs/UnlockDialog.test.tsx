@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { UnlockDialogModel } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+import type { UnlockDialogModel } from "@/api/spaces/dto/SpaceLibraryDialogs";
 import { UnlockDialog } from "./UnlockDialog";
 
 describe("library lock dialog", () => {

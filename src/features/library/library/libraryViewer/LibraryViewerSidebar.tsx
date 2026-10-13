@@ -1,6 +1,6 @@
-import type { LibraryItemMetadataPatch } from "@/api/spaces/dto/interfaces/SpaceLibraryViewer";
-import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryItemMetadataPatch } from "@/api/spaces/dto/SpaceLibraryViewer";
+import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import type { Dispatch, SetStateAction } from "react";
 import { LibraryEditPanel } from "./LibraryEditPanel";
 import { LibraryMetadataForm } from "./LibraryMetadataForm";

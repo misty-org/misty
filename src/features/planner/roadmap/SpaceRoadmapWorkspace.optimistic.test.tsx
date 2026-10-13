@@ -1,4 +1,4 @@
-import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import type { RoadmapNode } from "@/features/planner/roadmap/spaceRoadmap/RoadmapCanvasNodes";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

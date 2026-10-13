@@ -4,7 +4,7 @@ export type {
   PersonDialogModel,
   TextDialogModel,
   UnlockDialogModel,
-} from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+} from "@/api/spaces/dto/SpaceLibraryDialogs";
 
 import type {
   AlbumDialogModel,
@@ -12,7 +12,7 @@ import type {
   PersonDialogModel,
   TextDialogModel,
   UnlockDialogModel,
-} from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+} from "@/api/spaces/dto/SpaceLibraryDialogs";
 import { AlbumDialog } from "./libraryDialogs/AlbumDialog";
 import { MetadataDialog } from "./libraryDialogs/MetadataDialog";
 import { PersonDialog } from "./libraryDialogs/PersonDialog";

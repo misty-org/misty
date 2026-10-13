@@ -1,4 +1,4 @@
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 
 export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 

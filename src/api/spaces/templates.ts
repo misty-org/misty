@@ -1,5 +1,5 @@
 import { apiRequest } from "@/api/client";
-import type { SpacePerson, SpaceTemplate } from "./dto/interfaces/types";
+import type { SpacePerson, SpaceTemplate } from "./dto/entities";
 
 /** What a saved template captures from its Space. Files and messages never are. */
 export interface SpaceTemplateParts {

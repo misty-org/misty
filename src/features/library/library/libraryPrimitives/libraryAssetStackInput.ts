@@ -1,5 +1,5 @@
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import type { LibraryAssetStackInput } from "@/api/spaces/dto/types/SpaceLibraryPrimitives";
+import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { LibraryAssetStackInput } from "@/api/spaces/dto/SpaceLibraryPrimitives";
 import { isLibraryRAW, libraryItemMIME } from "./libraryMediaTypes";
 
 const MAX_BURST_FRAMES = 100;

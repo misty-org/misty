@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 
 const IMAGE_EXTENSIONS = [
   "bmp",

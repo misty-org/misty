@@ -2,7 +2,7 @@ import { useAuth } from "@/features/auth";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
 import { useSpacesStore } from "@/features/spaces";
-import type { Space, SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember } from "@/api/spaces/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,

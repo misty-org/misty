@@ -1,7 +1,7 @@
-import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
+import type { SpacesStore } from "../model/stores/spaces/useSpacesStore";
 import { SpaceRequestError } from "@/api/spaces/api";
 import { setSpaceReferenceOnly, subscribeSpaceReferenceOnly } from "@/api/spaces/connectivity";
-import type { SpacesSnapshot } from "@/api/spaces/dto/interfaces/types";
+import type { SpacesSnapshot } from "@/api/spaces/dto/entities";
 import { removeSpaceReferenceCache } from "./reference-cache";
 
 let clearedReferenceCacheAccount = "";

@@ -42,7 +42,7 @@ export type {
   FramePacingState,
   WindowBounds,
   WindowRect,
-} from "@/app/layouts/model/types";
+} from "@/app/layouts/model";
 
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();

@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import type { Space, SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceTemplate } from "@/api/spaces/dto/entities";
 import { Pressable, Skeleton, cn } from "@/shared/ui";
 import { SpaceAvatar } from "../components/SpaceAvatar";
 import { seedCounts, templateIcon } from "./templateIcons";

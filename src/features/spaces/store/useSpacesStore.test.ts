@@ -1,5 +1,5 @@
 import { SpaceRequestError } from "@/api/spaces/api";
-import type { Space, SpaceMember, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember, SpaceMessage } from "@/api/spaces/dto/entities";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildMessageSpans,

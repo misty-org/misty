@@ -1,4 +1,4 @@
-import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/plannerExpansionTypes";
 import { cn, Pressable } from "@/shared/ui";
 import { CalendarDays, CheckSquare2, GitFork } from "lucide-react";
 import { useEffect, useRef } from "react";

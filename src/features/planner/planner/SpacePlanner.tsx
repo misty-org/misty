@@ -2,7 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/shared/ui";
 import { ArrowLeft } from "lucide-react";
 import { PlannerCollection } from "./PlannerCollection";
-export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
+export type { DueFilter, TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
 import { useSpacePanelRoute } from "@/features/spaces";
 import { SpaceRoadmapWorkspace } from "@/features/planner/roadmap";
 import { SpaceAgenda } from "./SpaceAgenda";

@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { Label } from "@/shared/ui";
 import type { ReactNode } from "react";
 import { LibrarySelect } from "../libraryPrimitives/LibrarySelect";

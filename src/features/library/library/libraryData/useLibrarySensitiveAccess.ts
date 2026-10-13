@@ -1,4 +1,4 @@
-import type { LibraryUnlockScope } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+import type { LibraryUnlockScope } from "@/api/spaces/dto/SpaceLibraryDialogs";
 import { useEffect, useState } from "react";
 import { accountApi } from "@/api/account/api";
 import { activeSensitiveGrant } from "../SpaceLibraryPrimitives";

@@ -1,5 +1,5 @@
 import type { Dispatch, FormEventHandler, SetStateAction } from "react";
-import type { SpaceLibraryItem } from "../interfaces/types";
+import type { SpaceLibraryItem } from "./entities";
 
 export type LibraryTextDialogState = {
   kind: "create-folder" | "rename-folder" | "rename-memory" | "rename-item" | "edit-tags";

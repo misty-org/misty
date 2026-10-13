@@ -1,5 +1,5 @@
 import { SpaceMembersPopover } from "@/features/spaces/members";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { IconButton } from "@/shared/ui";
 import { UsersRound } from "lucide-react";
 

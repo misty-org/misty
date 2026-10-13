@@ -2,7 +2,7 @@ import { subscribeAccountEvents } from "@/api/accountEvents";
 import { devicesNative } from "@/native/devices";
 import { mistyDeviceJobsEnabled } from "./flags";
 import { devicesApi } from "@/api/devices/api";
-import type { AgentDevice } from "./model/interfaces/types";
+import type { AgentDevice } from "./model/types";
 import {
   ensureServerAgentDevice,
   heartbeatServerAgentDevice,

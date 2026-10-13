@@ -1,4 +1,4 @@
-import type { LibraryEditDefinition } from "../types/types";
+import type { LibraryEditDefinition } from "./common";
 export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
 export type * from "./agentTaskTypes";

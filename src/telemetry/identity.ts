@@ -1,4 +1,4 @@
-import type { TelemetryClient } from "@/telemetry/model/interfaces/types";
+import type { TelemetryClient } from "@/telemetry/model/events";
 
 export class TelemetryIdentityManager {
   private currentUserId: string | null = null;

@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { Avatar, AvatarFallback, AvatarImage, Pressable } from "@/shared/ui";
 import { ImageIcon } from "lucide-react";
 import {

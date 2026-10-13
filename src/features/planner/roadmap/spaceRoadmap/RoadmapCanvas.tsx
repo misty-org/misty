@@ -6,7 +6,7 @@ import {
 import type {
   SpaceRoadmapEdgeType,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import { Button } from "@/shared/ui";
 import {
   addEdge,

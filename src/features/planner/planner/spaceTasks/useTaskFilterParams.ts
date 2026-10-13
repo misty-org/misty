@@ -1,5 +1,5 @@
-import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/common";
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FILTER_PARAM_KEYS, activeFilterCount, filterDueRange } from "./taskFiltering";

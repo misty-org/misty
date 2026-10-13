@@ -1,4 +1,4 @@
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import type { TaskDraft } from "../SpacePlannerViews";
 import { toLocalInput } from "../SpaceTaskPrimitives";
 

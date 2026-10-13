@@ -4,7 +4,7 @@ import { FileNameIcon } from "@/features/file-ui";
 import { spacesApi } from "@/api/spaces/api";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { Images, FileText, MessagesSquare, PencilRuler } from "lucide-react";
 import {

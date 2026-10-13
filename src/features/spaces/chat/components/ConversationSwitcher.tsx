@@ -30,7 +30,7 @@ import {
   PopoverTrigger,
   SkeletonList,
 } from "@/shared/ui";
-import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation, SpaceMember } from "@/api/spaces/dto/entities";
 import { useSpaceConversations } from "../sidebar/useSpaceConversations";
 import { conversationName, groupConversations } from "../sidebar/conversationGroups";
 import { CreateEditConversationDialog } from "../sidebar/CreateEditConversationDialog";

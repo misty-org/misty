@@ -1,4 +1,4 @@
-import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/plannerExpansionTypes";
 
 export type AgendaView = "month" | "week" | "day";
 

@@ -10,8 +10,8 @@ import type {
   LibrarySharedReference,
   SpaceLibraryItem,
   SpaceStorageUsage,
-} from "@/api/spaces/dto/interfaces/types";
-import type { BulkLibraryItemAction } from "@/api/spaces/dto/types/types";
+} from "@/api/spaces/dto/entities";
+import type { BulkLibraryItemAction } from "@/api/spaces/dto/common";
 
 import { libraryPreviewPath, libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { LibraryUploadOptions } from "./library-upload";

@@ -20,7 +20,7 @@ import {
   CollectionSkeleton,
   type CollectionItem,
 } from "@/shared/ui";
-import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/plannerExpansionTypes";
 import { dayKey } from "./spaceAgenda/agendaDates";
 import { NewCalendarEventDialog } from "./spaceAgenda/NewCalendarEventDialog";
 import { agendaItem, roadmapItem, taskItem } from "./plannerCollection/PlannerCollectionItems";

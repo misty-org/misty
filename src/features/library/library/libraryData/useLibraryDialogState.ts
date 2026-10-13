@@ -3,7 +3,7 @@ import type {
   LibraryMetadataDialogAction,
   LibraryPersonDialogMode,
   LibraryTextDialogState,
-} from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+} from "@/api/spaces/dto/SpaceLibraryDialogs";
 import { useState } from "react";
 
 /** Draft state for every Library dialog: album, person, metadata and the text prompt. */

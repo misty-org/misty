@@ -1,10 +1,6 @@
 import { socialEvents } from "../SocialRuntime";
 import { socialApi as spacesApi } from "../SocialRuntime";
-import type {
-  SpaceConversation,
-  SpaceEvent,
-  SpaceMessage,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation, SpaceEvent, SpaceMessage } from "@/api/spaces/dto/entities";
 import { readApiSessionGeneration } from "@/api/client/session";
 import {
   useCallback,

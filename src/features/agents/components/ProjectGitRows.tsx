@@ -1,6 +1,6 @@
 import { GitBranch } from "lucide-react";
 import { Button, Switch } from "@/shared/ui";
-import type { AgentScope } from "../model/interfaces/types";
+import type { AgentScope } from "../model/types";
 import { useProjectReview } from "./changes/useProjectReview";
 
 const pushHelp =

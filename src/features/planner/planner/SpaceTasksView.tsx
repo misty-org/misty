@@ -1,4 +1,4 @@
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import type { AiContextReference, AiSurfaceAdapter } from "@/features/ai-surface/types";
 import {
   AlertDialog,

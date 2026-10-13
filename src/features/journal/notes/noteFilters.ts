@@ -1,5 +1,5 @@
 import { matchesQuery } from "./connectorUtils";
-import type { NoteGroupId, UnifiedNote } from "./model/types/types";
+import type { NoteGroupId, UnifiedNote } from "./model/types";
 
 export function notesInGroup(
   notes: UnifiedNote[],

@@ -1,4 +1,4 @@
-import type { SpaceRole } from "../types/types";
+import type { SpaceRole } from "./common";
 
 export type AgentAvatar =
   | { kind: "preset"; preset_id: string; accent: string }

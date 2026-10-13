@@ -1,5 +1,5 @@
 import type { AiProgressItem } from "@/features/ai-surface/types";
-import type { AgentScope } from "../../model/interfaces/types";
+import type { AgentScope } from "../../model/types";
 import {
   agentsDeviceSnapshot,
   codeCheckpoints,

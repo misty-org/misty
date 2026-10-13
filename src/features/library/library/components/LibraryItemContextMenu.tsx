@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { LibraryAlbum, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAlbum, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   ContextMenu,
   ContextMenuAction,

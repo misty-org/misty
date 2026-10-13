@@ -1,4 +1,4 @@
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import { Button } from "@/shared/ui";
 import { RotateCw } from "lucide-react";

@@ -1,4 +1,4 @@
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

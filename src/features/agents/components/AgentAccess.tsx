@@ -1,7 +1,7 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { appsApi } from "../apps/api";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
-import type { AgentDeviceSnapshot } from "../model/interfaces/types";
+import type { AgentDeviceSnapshot } from "../model/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Skeleton } from "@/shared/ui";
 import { Cable, Layers } from "lucide-react";

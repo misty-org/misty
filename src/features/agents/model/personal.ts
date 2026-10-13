@@ -1,4 +1,4 @@
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 export interface GlobalSpaceLibraryHit {
   space_id: string;
   space_name: string;

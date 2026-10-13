@@ -1,5 +1,5 @@
-import type { NotesConnector, SyncResult } from "../model/interfaces/connectors";
-import type { UnifiedNote } from "../model/types/types";
+import type { NotesConnector, SyncResult } from "../model/connectors";
+import type { UnifiedNote } from "../model/types";
 
 /**
  * Fan-out layer over the registered connectors. The UI asks the registry for

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { socialApi as spacesApi } from "../SocialRuntime";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { isAgentAuthoredMessage } from "./messageHelpers";
 
 export interface ChatDisplayRow {

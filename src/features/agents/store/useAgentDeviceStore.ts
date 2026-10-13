@@ -8,7 +8,7 @@ import { devicesApi } from "@/api/devices/api";
 import { useUserStore } from "@/features/auth/core";
 import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
-import type { AgentDevice } from "../model/interfaces/types";
+import type { AgentDevice } from "../model/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
 
 // One device identity (docs/design/devices/BRIEF.md). The device key lives in

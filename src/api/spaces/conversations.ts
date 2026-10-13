@@ -1,9 +1,5 @@
-import type {
-  SpaceActorRef,
-  SpaceConversation,
-  SpaceMessage,
-} from "@/api/spaces/dto/interfaces/types";
-import type { MessageSpan } from "@/api/spaces/dto/types/types";
+import type { SpaceActorRef, SpaceConversation, SpaceMessage } from "@/api/spaces/dto/entities";
+import type { MessageSpan } from "@/api/spaces/dto/common";
 
 type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 

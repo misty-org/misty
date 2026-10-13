@@ -1,4 +1,4 @@
-import type { MistyFilePickerMode } from "../../FilePicker";
+import type { MistyFilePickerMode } from "../FilePicker";
 
 export type MistyPickerSource = "files" | "library";
 

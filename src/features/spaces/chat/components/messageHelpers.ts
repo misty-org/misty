@@ -1,4 +1,4 @@
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { personInitials } from "@/shared/lib/personInitials";
 
 export { personInitials as initials };

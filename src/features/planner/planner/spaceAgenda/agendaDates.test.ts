@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/plannerExpansionTypes";
 import { agendaEntryDayKey, groupAgendaEntries } from "./agendaDates";
 
 function allDayEntry(startsAt: string, timezone: string): SpaceAgendaEntry {

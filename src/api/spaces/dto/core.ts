@@ -1,4 +1,4 @@
-import type { MessageSpan, SpaceRole, SpaceTaskPriority, SpaceTaskStatus } from "../types/types";
+import type { MessageSpan, SpaceRole, SpaceTaskPriority, SpaceTaskStatus } from "./common";
 import type { SpaceTaskSourceRef } from "./agentTaskTypes";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
 import type { SpaceMessageSender } from "./conversationTypes";

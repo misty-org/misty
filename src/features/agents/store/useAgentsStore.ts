@@ -1,7 +1,7 @@
 import { supportsBundledDocumentWorkers } from "@/shared/platform/nativeServices";
 import { invoke } from "@tauri-apps/api/core";
 import type { DiffSet } from "../components/changes/diffTypes";
-import type { AgentDeviceSnapshot, PreparedAgentDocument } from "../model/interfaces/types";
+import type { AgentDeviceSnapshot, PreparedAgentDocument } from "../model/types";
 
 export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
   return invoke<AgentDeviceSnapshot>("agents_device_snapshot");

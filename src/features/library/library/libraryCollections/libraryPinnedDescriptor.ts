@@ -1,4 +1,4 @@
-import type { LibraryPinnedCollection } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryPinnedCollection } from "@/api/spaces/dto/entities";
 import {
   EyeOff,
   File,

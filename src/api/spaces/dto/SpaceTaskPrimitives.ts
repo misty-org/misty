@@ -1,5 +1,5 @@
-import type { SpaceTask } from "../interfaces/types";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "./types";
+import type { SpaceTask } from "./entities";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "./common";
 
 export type TaskDraft = {
   title: string;

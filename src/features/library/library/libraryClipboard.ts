@@ -1,6 +1,6 @@
 import { libraryRuntime } from "./LibraryRuntime";
 import { libraryApi as spacesApi } from "./LibraryRuntime";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 
 export async function copyLibraryItemsToClipboard(
   spaceId: string,

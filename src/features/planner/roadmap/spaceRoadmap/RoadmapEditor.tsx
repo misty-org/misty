@@ -1,8 +1,8 @@
 import type {
   SpaceRoadmapSaveState,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import { Button, cn, IconButton, Spinner } from "@/shared/ui";
 import {
   ArrowLeft,

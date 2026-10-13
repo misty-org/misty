@@ -1,6 +1,6 @@
 import { copyLibraryItemsToClipboard } from "@/features/library/library";
 import { socialApi as spacesApi } from "../SocialRuntime";
-import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "@/api/spaces/dto/entities";
 import { Badge, Button } from "@/shared/ui";
 import { LibraryBig, Paperclip } from "lucide-react";
 

@@ -8,7 +8,7 @@ import type {
   SpaceRoadmapNode,
   SpaceRoadmapNodeDefinition,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 
 type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 

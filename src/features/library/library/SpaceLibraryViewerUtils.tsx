@@ -1,8 +1,8 @@
 import { ChevronDown } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 
-import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditVersion } from "@/api/spaces/dto/entities";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, Slider } from "@/shared/ui";
 
 import { formatBytes } from "./libraryFormat";

@@ -3,8 +3,8 @@ import type {
   SafeErrorContext,
   SafeUserProperties,
   TelemetryClient,
-} from "@/telemetry/model/interfaces/types";
-import type { AnalyticsEventName } from "@/telemetry/model/types/types";
+} from "@/telemetry/model/events";
+import type { AnalyticsEventName } from "@/telemetry/model/environment";
 import posthog, { type PostHog } from "posthog-js";
 import { clientMetadata } from "./metadata";
 import { redactRecord, redactedError } from "./redaction";

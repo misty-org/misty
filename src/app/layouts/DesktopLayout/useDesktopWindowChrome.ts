@@ -1,4 +1,4 @@
-import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model/types";
+import type { DesktopPlatform, WindowBounds, WindowRect } from "@/app/layouts/model";
 import { enableModernWindowStyle } from "@/native";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { invoke } from "@tauri-apps/api/core";

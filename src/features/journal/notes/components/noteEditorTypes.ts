@@ -5,7 +5,7 @@ import type {
 } from "@/features/ai-surface/types";
 import type { JournalImageLease } from "@/features/journal/journalAssets";
 import type { ReactNode } from "react";
-import type { NoteBodyFormat } from "../model/types/types";
+import type { NoteBodyFormat } from "../model/types";
 import type { UploadNoteAssetInput } from "../noteAssets";
 import type { NoteCollaborationSession } from "../noteCollaboration";
 

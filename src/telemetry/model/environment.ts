@@ -1,4 +1,4 @@
-import type { AnalyticsEventProperties } from "@/telemetry/model/interfaces/types";
+import type { AnalyticsEventProperties } from "@/telemetry/model/events";
 export type Platform = "windows" | "macos" | "linux";
 export type Environment = "development" | "test" | "staging" | "production";
 export type ReleaseChannel =

@@ -1,7 +1,7 @@
 import { FolderOpen, LibraryBig } from "lucide-react";
 import { useState, type ComponentType } from "react";
-import type { MistyPickerProps, MistyPickerSource } from "./model/interfaces/MistyPicker";
-export type { MistyPickerProps, MistyPickerSource } from "./model/interfaces/MistyPicker";
+import type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
+export type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
 
 import { MistyLibraryPicker } from "@/features/library/library";
 import {

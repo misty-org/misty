@@ -1,7 +1,7 @@
 import { useNativeSessionStore } from "@/features/native-session";
 import { useMemo, useState, type ReactNode } from "react";
 import { readInitialUser, type AuthUser } from "./authSession";
-import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import type { SavedAccountSession } from "./model/stores/account/useAuthTokenStore";
 import { useAccountListActions } from "./provider/useAccountListActions";
 import { useAccountOperation } from "./provider/useAccountOperation";
 import {

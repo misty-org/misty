@@ -14,12 +14,12 @@ import { useSearchParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import type { NotePreviewProps } from "./components/NotePreviewView";
 import type { NoteReadingPaneProps } from "./components/NoteReadingPaneView";
-import type { NewNoteDialogProps } from "./model/interfaces/components/NotesIntegrationsDialog";
-import type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
-import type { UnifiedNote } from "./model/types/types";
+import type { NewNoteDialogProps } from "./model/NotesIntegrationsDialog";
+import type { SpaceNotesProps } from "./model/SpaceNotes";
+import type { UnifiedNote } from "./model/types";
 import { selectVisibleNotes } from "./noteFilters";
 import type { createNotesStore } from "./store/createNotesStore";
-export type { SpaceNotesProps } from "./model/interfaces/SpaceNotes";
+export type { SpaceNotesProps } from "./model/SpaceNotes";
 const shellClass =
   "relative flex h-full min-h-0 flex-col bg-charcoal-bg text-cream overflow-hidden";
 export interface NotesViewRuntime {

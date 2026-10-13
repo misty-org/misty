@@ -5,7 +5,7 @@ import type {
   SpaceRoadmapNodeColor,
   SpaceRoadmapNodeDefinition,
   SpaceRoadmapNodeKind,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import {
   AlertTriangle,
   CheckCircle2,

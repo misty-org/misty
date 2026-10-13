@@ -1,7 +1,4 @@
-import type {
-  SpaceRoadmap,
-  SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmap, SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import { usePinnedIds } from "@/shared/hooks/usePinnedIds";
 import { errorText } from "@/shared/lib/format";
 import {

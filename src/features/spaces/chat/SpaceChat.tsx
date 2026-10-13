@@ -1,5 +1,5 @@
 import { readApiSessionGeneration } from "@/api/client/session";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
 import type { MistyPickerSource } from "@/features/picker";

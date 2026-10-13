@@ -1,4 +1,4 @@
-import type { Space, SpaceMember, SpacesSnapshot } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember, SpacesSnapshot } from "@/api/spaces/dto/entities";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetSpacesAccountState, useSpacesStore } from "../store/useSpacesStore";
 

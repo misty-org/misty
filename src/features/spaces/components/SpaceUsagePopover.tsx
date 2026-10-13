@@ -1,4 +1,4 @@
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { cn, IconButton, Popover, PopoverContent, PopoverTrigger } from "@/shared/ui";
 import { Gauge } from "lucide-react";
 import { useState, type ReactElement } from "react";

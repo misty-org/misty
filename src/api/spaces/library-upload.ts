@@ -1,6 +1,6 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { httpRequest } from "@/api/client/http";
-import type { LibraryUploadResult, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryUploadResult, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   isApiSessionTransitioning,
   readApiAuthToken,

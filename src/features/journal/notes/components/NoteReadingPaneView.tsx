@@ -2,7 +2,7 @@ import { Button, cn, EmptyState, IconButton, Input, Pressable, Skeleton } from "
 import { ChevronLeft, ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import type { Text as YText } from "yjs";
-import type { NoteBodyFormat, UnifiedNote } from "../model/types/types";
+import type { NoteBodyFormat, UnifiedNote } from "../model/types";
 import type { NativeNotesApi } from "../noteServices";
 import type { NoteBlockEditorProps, NoteEditorRuntime } from "./NoteBlockEditorView";
 export interface NoteReadingRuntime {
