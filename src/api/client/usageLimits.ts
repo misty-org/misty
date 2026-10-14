@@ -1,7 +1,3 @@
-/** Which AI limit refused a request, as the server reports it. */
-export type UsageLimitName =
-  "window" | "weekly" | "monthly" | "command" | "service" | "model" | "email";
-
 function when(resetsAt: Date, now = new Date()): string {
   const sameDay = resetsAt.toDateString() === now.toDateString();
   const time = resetsAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });

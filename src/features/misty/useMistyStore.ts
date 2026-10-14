@@ -1,8 +1,7 @@
 import { openAgentWindow, stopAgentWindowTask } from "@/features/agents/agentWindowHandoff";
-import { desktopDeviceGrants } from "@/features/agents/deviceGrants";
-import { useAgentDeviceTargets } from "@/features/agents/devices";
+import { chatDeviceGrants } from "@/features/agents/deviceGrants";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
-import { resolveSetting, useSettingsProfiles } from "@/features/settings";
+import { awaitConversationTitle, openTurn, planDeepThinking } from "./conversationTurn";
 import { apiRequest } from "@/api/client";
 import {
   runtimeAiApi as aiSurfaceApi,
@@ -50,11 +49,6 @@ import { resetMistyDraftAttachments } from "./draftAttachments";
 import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
-
-const planDeepThinking = () => {
-  const profile = useSettingsProfiles.getState().state;
-  return Boolean(profile && resolveSetting(profile, "agents.plan_deep_thinking").value);
-};
 
 export type { GlobalSearchState } from "@/features/global-search/globalSearchState";
 const uncertainAdmissions = new Map<string, string>();
@@ -509,16 +503,20 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         ? collaboration.draftMode
         : undefined;
     echo.settle(conversationId);
-    updateConversation(set, get, conversationId, (conversation) => {
-      const messages = conversation.messages.filter((message) => !isEcho(message));
-      return {
-        ...conversation,
+    // The server names a new conversation with a separate model call; until then its title is a skeleton.
+    if (startsConversation && !companion?.continuation)
+      awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
+    updateConversation(set, get, conversationId, (conversation) =>
+      openTurn(conversation, {
+        prompt: normalized,
+        userMessage,
+        assistantMessage,
+        isEcho,
+        echoed: echo.echoed,
+        continuation: Boolean(companion?.continuation),
         reasoningEffort: thinkingEffort(requestedThinking),
-        title: messages.length ? conversation.title : normalized.slice(0, 56),
-        updatedAt: userMessage.createdAt,
-        messages: [...messages, ...(echo.echoed ? [userMessage] : []), assistantMessage],
-      };
-    });
+      }),
+    );
     if (presentation === "workspace") announceGlobalPanel(false);
     set({
       panel: presentation === "workspace" ? "closed" : "answer",
@@ -540,11 +538,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         uncertainAdmissions.get(admission) ??
         `global-answer-${globalMistyId()}`;
       uncertainAdmissions.set(admission, idempotencyKey);
-      // Shared folders and the Misty browser travel with every desktop chat,
+      // The chat's project and the Misty browser travel with a desktop chat,
       // plus whatever the devices picked in the composer allow.
       const grants = workerReceipt
         ? []
-        : await desktopDeviceGrants(useAgentDeviceTargets.getState().targets).catch(() => []);
+        : await chatDeviceGrants(conversationId, startsConversation);
       const created =
         workerReceipt ??
         (await aiSurfaceApi.createInvocation({
@@ -569,9 +567,11 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,
           methodInputs: companion?.methodInputs,
+          ...(companion?.schedule && { scheduleId: companion.schedule.id, scheduleClaim: companion.schedule.claim }),
           skillVersionIds: companion?.skillVersionIds,
           surfaceId: handoff?.surfaceId ?? "global",
-          trigger: selection ? "selection" : "message",
+          // Turns sent to carry on after a card read as events, not as typed messages.
+          trigger: companion?.schedule ? "scheduled_task" : selection ? "selection" : companion?.continuation ? "continuation" : "message",
           requestedArtifactKind: handoff?.requestedArtifactKind,
           prompt: normalized,
           context: invocationContext,
@@ -645,7 +645,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
             if (get().invocationId !== created.invocationId) return;
             applyGlobalInvocationEvent(set, get, conversationId, assistantMessage.id, event);
             if (event.type === "invocation.completed")
-              continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
+              void continueAfterScreenRequest(set, get, conversationId, assistantMessage.id);
             if (event.type === "assistant.status" && event.phase === "awaiting_intervention") {
               // The run is suspended until the person acts. It keeps its screen;
               // input and the control ring go back to them, and the request

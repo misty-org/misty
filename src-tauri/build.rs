@@ -27,6 +27,7 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionsInternal.h");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionTabs.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionPopupWindows.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompat.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNotifications.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.h");
@@ -40,6 +41,7 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentDock.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
@@ -49,6 +51,7 @@ fn main() {
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
             .file("native/macos/MistyExtensionTabs.m")
+            .file("native/macos/MistyExtensionPopupWindows.m")
             .file("native/macos/MistyExtensionCompat.m")
             .file("native/macos/MistyExtensionNotifications.m")
             .file("native/macos/MistyExtensionNativeMessaging.m")
@@ -59,6 +62,7 @@ fn main() {
             .file("native/macos/MistyDesktopControl.m")
             .file("native/macos/MistyAgentPointer.m")
             .file("native/macos/MistyAgentRing.m")
+            .file("native/macos/MistyAgentDock.m")
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .file("native/macos/MistyDefaultBrowser.m")
@@ -84,7 +88,35 @@ fn main() {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }
-    tauri_build::build();
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_common_controls_manifest();
+        let windows = tauri_build::WindowsAttributes::new_without_app_manifest();
+        tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+            .expect("tauri build failed");
+    } else {
+        tauri_build::build();
+    }
+}
+
+/// Tauri's Windows manifest only asks for Common Controls 6, and only the app
+/// gets it. Every binary that links this crate imports comctl32 v6 entry
+/// points, so unit tests and examples need it too or they fail to start with
+/// STATUS_ENTRYPOINT_NOT_FOUND. The linker embeds it everywhere instead,
+/// with the Windows versions Misty supports (`windows/compatibility.manifest`).
+fn embed_common_controls_manifest() {
+    let compatibility =
+        PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo manifest directory"))
+            .join("windows")
+            .join("compatibility.manifest");
+    println!("cargo:rerun-if-changed={}", compatibility.display());
+    println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+    println!(
+        "cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+    );
+    println!(
+        "cargo:rustc-link-arg=/MANIFESTINPUT:{}",
+        compatibility.display()
+    );
 }
 
 fn expose_public_app_configuration() {
@@ -130,9 +162,11 @@ fn read_env_value(path: &Path, key: &str) -> Option<String> {
 /// bytes. Keep helpers inside this build's OUT_DIR so neither the parent nor
 /// another desktop profile competes for the same worker build directory.
 fn build_builtin_workers() {
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os != "macos" && target_os != "windows" {
         return;
     }
+    let windows = target_os == "windows";
     let root = env::var_os("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
@@ -141,11 +175,7 @@ fn build_builtin_workers() {
     let profile = env::var("PROFILE").expect("Cargo profile");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
-    for (service, protocol) in [
-        ("document-processing", 5),
-        ("file-search", 1),
-        ("peer-transport", 2),
-    ] {
+    for (service, protocol) in [("document-processing", 5)] {
         let directory = root.join(service);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());
@@ -163,12 +193,22 @@ fn build_builtin_workers() {
         if profile == "release" {
             command.arg("--release");
         }
+        // The confined Windows helper cannot load the Visual C++ runtime from
+        // outside its folder, so it carries the runtime itself.
+        if windows {
+            let mut flags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
+            if !flags.is_empty() {
+                flags.push('');
+            }
+            flags.push_str("-Ctarget-feature=+crt-static");
+            command.env("CARGO_ENCODED_RUSTFLAGS", flags);
+        }
         let status = command.status().expect("could not build bundled worker");
         assert!(status.success(), "could not build bundled {service} worker");
-        let binary = worker_target
-            .join(&target)
-            .join(&profile)
-            .join(format!("misty-{service}"));
+        let binary = worker_target.join(&target).join(&profile).join(format!(
+            "misty-{service}{}",
+            if windows { ".exe" } else { "" }
+        ));
         source.push_str(&format!(
             "({service:?}, {protocol}) => Ok(include_bytes!({:?})),\n",
             binary

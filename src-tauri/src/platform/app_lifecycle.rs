@@ -45,8 +45,11 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if matches!(event, RunEvent::Exit) {
-        #[cfg(desktop)]
-        super::mini_app::shutdown(app);
+        crate::infra::browser_sync::flush_before_exit();
+        // Agent commands and previews never outlive Misty.
+        if let Some(runtime) = app.try_state::<crate::app::runtime::MistyRuntime>() {
+            runtime.code.shutdown();
+        }
         crate::telemetry::shutdown();
     }
 }

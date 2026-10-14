@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type BrowserDownloadState =
-  "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
+type BrowserDownloadState = "in_progress" | "finished" | "failed" | "cancelled" | "interrupted";
 
 export interface BrowserDownloadEntry {
   id: string;
@@ -46,6 +45,8 @@ export interface BrowserFindResult {
   total: number;
 }
 
+export const browserHistoryClearedEvent = "misty:browser-history-cleared";
+
 export type BrowserWebsiteDataKind = "cookies" | "cache";
 
 export const browserLibrary = {
@@ -73,7 +74,10 @@ export const browserLibrary = {
     invoke<void>("browser_history_forget", { request }),
   deleteVisits: (ids: number[]) => invoke<void>("browser_history_delete", { request: { ids } }),
   clearHistory: (request: { profileId?: string; since?: number }) =>
-    invoke<void>("browser_history_clear", { request }),
+    invoke<void>("browser_history_clear", { request }).then(() => {
+      // Open history lists reload instead of waiting for a manual refresh.
+      window.dispatchEvent(new Event(browserHistoryClearedEvent));
+    }),
 
   clearWebsiteData: (request: {
     profileId?: string;
@@ -82,10 +86,36 @@ export const browserLibrary = {
   }) => invoke<void>("browser_clear_website_data", { request }),
 };
 
+export interface BrowserMediaInfo {
+  title: string;
+  artist: string;
+  /** An https image from the page, or "". */
+  artwork: string;
+  duration: number | null;
+  position: number | null;
+  paused: boolean;
+  canPrevious: boolean;
+  canNext: boolean;
+}
+
+export interface BrowserFindOptions {
+  highlightAll: boolean;
+  matchCase: boolean;
+  matchDiacritics: boolean;
+  wholeWords: boolean;
+}
+
 export const browserPageTools = {
   stop: (id: string) => invoke<void>("browser_webview_stop", { request: { id } }),
-  find: (id: string, query: string, direction: "next" | "previous" | "clear") =>
-    invoke<BrowserFindResult>("browser_webview_find", { request: { id, query, direction } }),
+  find: (
+    id: string,
+    query: string,
+    direction: "next" | "previous" | "clear",
+    options: Partial<BrowserFindOptions> = {},
+  ) =>
+    invoke<BrowserFindResult>("browser_webview_find", {
+      request: { id, query, direction, ...options },
+    }),
   print: (id: string) => invoke<void>("browser_webview_print", { request: { id } }),
   savePage: (id: string, path: string) =>
     invoke<void>("browser_webview_save_page", { request: { id, path } }),
@@ -95,6 +125,15 @@ export const browserPageTools = {
     invoke<unknown>("browser_webview_reader_article", { request: { id } }),
   mediaPlayback: (id: string, action: "pause" | "play") =>
     invoke<void>("browser_webview_media_playback", { request: { id, action } }),
+  /** What the page is playing: its own title, artist and artwork, and its position. */
+  mediaInfo: (id: string) =>
+    invoke<BrowserMediaInfo>("browser_webview_media_info", { request: { id } }),
+  /** Runs the page's own media control, falling back to its media element for play and pause. */
+  mediaAction: (
+    id: string,
+    action: "play" | "pause" | "previoustrack" | "nexttrack" | "seekto",
+    position?: number,
+  ) => invoke<void>("browser_webview_media_action", { request: { id, action, position } }),
   pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit") =>
     invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

@@ -1,17 +1,17 @@
 //! Folder organization authority lives on the device. Models receive opaque item IDs and
 //! relative names; they cannot select a root, overwrite, delete, or execute code.
-#![cfg(unix)]
+#![cfg(any(unix, windows))]
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    ffi::CString,
-    fs::{self, File, OpenOptions},
-    io::{self, Write},
-    os::{
-        fd::{AsRawFd, FromRawFd},
-        unix::fs::{MetadataExt, OpenOptionsExt},
-    },
+    fs::{self, File},
     path::{Component, Path, PathBuf},
+};
+
+mod platform;
+use platform::{
+    absent, child, fingerprint, make_folder, open_root, refused_scope, remove_folder,
+    rename_exclusive, sync_folder,
 };
 use uuid::Uuid;
 
@@ -25,16 +25,6 @@ struct Fingerprint {
     size: u64,
     modified: i64,
     nanos: i64,
-}
-fn fingerprint(file: &File) -> Result<Fingerprint> {
-    let m = file.metadata().map_err(err)?;
-    Ok(Fingerprint {
-        device: m.dev(),
-        inode: m.ino(),
-        size: m.len(),
-        modified: m.mtime(),
-        nanos: m.mtime_nsec(),
-    })
 }
 fn identity(file: &File) -> Result<(u64, u64)> {
     let f = fingerprint(file)?;
@@ -61,22 +51,6 @@ fn parts(path: &str) -> Result<Vec<String>> {
     }
     Ok(names)
 }
-fn cstring(s: &str) -> Result<CString> {
-    CString::new(s).map_err(err)
-}
-fn child(dir: &File, name: &str, directory: bool) -> Result<File> {
-    let name = cstring(name)?;
-    let flags = libc::O_RDONLY
-        | libc::O_CLOEXEC
-        | libc::O_NOFOLLOW
-        | libc::O_NONBLOCK
-        | if directory { libc::O_DIRECTORY } else { 0 };
-    let fd = unsafe { libc::openat(dir.as_raw_fd(), name.as_ptr(), flags) };
-    if fd < 0 {
-        return Err(err(io::Error::last_os_error()));
-    }
-    Ok(unsafe { File::from_raw_fd(fd) })
-}
 fn parent(root: &File, path: &str) -> Result<(File, String)> {
     let mut names = parts(path)?;
     let name = names.pop().unwrap();
@@ -90,58 +64,6 @@ fn open_item(root: &File, path: &str) -> Result<File> {
     let (dir, name) = parent(root, path)?;
     child(&dir, &name, false)
 }
-fn absent(dir: &File, name: &str) -> Result<()> {
-    let name = cstring(name)?;
-    let mut m = std::mem::MaybeUninit::<libc::stat>::uninit();
-    let result = unsafe {
-        libc::fstatat(
-            dir.as_raw_fd(),
-            name.as_ptr(),
-            m.as_mut_ptr(),
-            libc::AT_SYMLINK_NOFOLLOW,
-        )
-    };
-    if result == 0 {
-        return Err("Destination already exists; nothing was overwritten".into());
-    }
-    let error = io::Error::last_os_error();
-    if error.kind() != io::ErrorKind::NotFound {
-        return Err(err(error));
-    }
-    Ok(())
-}
-fn rename_exclusive(from: &File, source: &str, to: &File, destination: &str) -> Result<()> {
-    let source = cstring(source)?;
-    let destination = cstring(destination)?;
-    #[cfg(target_os = "macos")]
-    let result = unsafe {
-        libc::renameatx_np(
-            from.as_raw_fd(),
-            source.as_ptr(),
-            to.as_raw_fd(),
-            destination.as_ptr(),
-            libc::RENAME_EXCL,
-        )
-    };
-    #[cfg(target_os = "linux")]
-    let result = unsafe {
-        libc::renameat2(
-            from.as_raw_fd(),
-            source.as_ptr(),
-            to.as_raw_fd(),
-            destination.as_ptr(),
-            libc::RENAME_NOREPLACE,
-        )
-    };
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    return Err("Atomic no-replace moves are unavailable on this platform".into());
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    if result != 0 {
-        return Err(err(io::Error::last_os_error()));
-    }
-    Ok(())
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Item {
@@ -198,41 +120,81 @@ struct Grant {
     snapshot: Snapshot,
     revoked: bool,
 }
-/// Serialized by the native command host. A manifest is journaled before every effect.
+/// Serialized by the native command host. A manifest is journaled before every effect: each
+/// save is its own committed transaction (WAL, `synchronous=FULL`), so it is on disk when
+/// the call returns and the effect only happens after.
 pub struct Organizer {
-    journal: PathBuf,
+    database: PathBuf,
     grants: HashMap<String, Grant>,
 }
+const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS agent_file_grants (
+        id TEXT PRIMARY KEY, document TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS agent_file_manifests (
+        id TEXT PRIMARY KEY, document TEXT NOT NULL, saved_at INTEGER NOT NULL);";
 impl Organizer {
-    pub fn new(journal: PathBuf) -> Result<Self> {
-        fs::create_dir_all(&journal).map_err(err)?;
-        let mut grants = HashMap::new();
-        for entry in fs::read_dir(&journal).map_err(err)? {
-            let path = entry.map_err(err)?.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("grant") {
-                let grant: Grant =
-                    serde_json::from_slice(&fs::read(path).map_err(err)?).map_err(err)?;
-                grants.insert(grant.snapshot.grant_id.clone(), grant);
-            }
-        }
-        Ok(Self { journal, grants })
+    fn connect(database: &Path) -> Result<rusqlite::Connection> {
+        let connection = rusqlite::Connection::open(database).map_err(err)?;
+        connection
+            .busy_timeout(std::time::Duration::from_secs(5))
+            .map_err(err)?;
+        connection
+            .execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")
+            .map_err(err)?;
+        connection.execute_batch(SCHEMA).map_err(err)?;
+        Ok(connection)
     }
-    fn save<T: Serialize>(&self, id: &str, extension: &str, value: &T) -> Result<()> {
+    /// `database` is the SQLite file the journal lives in (Misty's `misty.db`).
+    pub fn new(database: PathBuf) -> Result<Self> {
+        if let Some(parent) = database.parent() {
+            fs::create_dir_all(parent).map_err(err)?;
+        }
+        let connection = Self::connect(&database)?;
+        let mut grants = HashMap::new();
+        let mut statement = connection
+            .prepare("SELECT document FROM agent_file_grants")
+            .map_err(err)?;
+        for document in statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(err)?
+        {
+            let grant: Grant = serde_json::from_str(&document.map_err(err)?).map_err(err)?;
+            grants.insert(grant.snapshot.grant_id.clone(), grant);
+        }
+        drop(statement);
+        drop(connection);
+        Ok(Self { database, grants })
+    }
+    fn save<T: Serialize>(&self, id: &str, kind: &str, value: &T) -> Result<()> {
         Uuid::parse_str(id).map_err(err)?;
-        let path = self.journal.join(format!("{id}.{extension}"));
-        let temporary = self.journal.join(format!("{}.tmp", Uuid::new_v4()));
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&temporary)
-            .map_err(err)?;
-        file.write_all(&serde_json::to_vec(value).map_err(err)?)
-            .map_err(err)?;
-        file.sync_all().map_err(err)?;
-        fs::rename(&temporary, &path).map_err(err)?;
-        File::open(&self.journal)
-            .and_then(|dir| dir.sync_all())
+        let document = serde_json::to_string(value).map_err(err)?;
+        let connection = Self::connect(&self.database)?;
+        let saved = if kind == "grant" {
+            connection.execute(
+                "INSERT INTO agent_file_grants (id, document) VALUES (?1, ?2)
+                 ON CONFLICT (id) DO UPDATE SET document = excluded.document",
+                rusqlite::params![id, document],
+            )
+        } else {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |elapsed| elapsed.as_millis() as i64);
+            connection.execute(
+                "INSERT INTO agent_file_manifests (id, document, saved_at) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (id) DO UPDATE SET document = excluded.document, saved_at = excluded.saved_at",
+                rusqlite::params![id, document, now],
+            )
+        };
+        saved.map(|_| ()).map_err(err)
+    }
+    fn manifest_document(&self, id: &str) -> Result<Option<String>> {
+        use rusqlite::OptionalExtension;
+        Self::connect(&self.database)?
+            .query_row(
+                "SELECT document FROM agent_file_manifests WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()
             .map_err(err)
     }
     /// This may only be called with the result of a user-operated native folder picker.
@@ -241,37 +203,11 @@ impl Organizer {
             return Err("Sign in first".into());
         }
         let canonical = fs::canonicalize(path).map_err(err)?;
-        // Whole disks, home directories and operating-system roots are never organization scopes.
-        let count = canonical.components().count();
-        if count < 4
-            || [
-                "/System",
-                "/Library",
-                "/Applications",
-                "/bin",
-                "/sbin",
-                "/usr",
-                "/etc",
-                "/private/etc",
-                "/private/var/db",
-                "/dev",
-                "/proc",
-                "/sys",
-            ]
-            .iter()
-            .any(|p| canonical.starts_with(p))
-            || std::env::var_os("HOME").is_some_and(|home| {
-                canonical == Path::new(&home)
-                    || canonical.starts_with(Path::new(&home).join("Library"))
-            })
-        {
+        let canonical = platform::plain(&canonical);
+        if refused_scope(&canonical) {
             return Err("Choose a specific personal folder, not a disk or system folder".into());
         }
-        let root = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-            .open(&canonical)
-            .map_err(err)?;
+        let root = open_root(&canonical)?;
         let mut snapshot = Snapshot {
             grant_id: Uuid::new_v4().to_string(),
             folder_name: canonical.file_name().unwrap().to_string_lossy().into(),
@@ -296,11 +232,7 @@ impl Organizer {
             .get(id)
             .filter(|g| g.account == account && !g.revoked)
             .ok_or("Folder access is unavailable or revoked")?;
-        let root = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
-            .open(&grant.root)
-            .map_err(err)?;
+        let root = open_root(&grant.root)?;
         if identity(&root)? != grant.root_identity {
             return Err("The selected folder changed".into());
         }
@@ -328,7 +260,7 @@ impl Organizer {
     ) -> Result<Manifest> {
         Uuid::parse_str(plan_id).map_err(err)?;
         let (grant, root) = self.scope(account, grant_id)?;
-        if self.journal.join(format!("{plan_id}.manifest")).exists() {
+        if self.manifest_document(plan_id)?.is_some() {
             let existing = self.manifest(account, plan_id)?;
             if existing.grant_id != grant_id || existing.steps != steps {
                 return Err("Plan identity was reused with different operations".into());
@@ -408,32 +340,26 @@ impl Organizer {
         Ok(manifest)
     }
     pub fn history(&self, account: &str) -> Result<Vec<Manifest>> {
-        let mut paths = fs::read_dir(&self.journal)
-            .map_err(err)?
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("manifest"))
-            .collect::<Vec<_>>();
-        paths.sort_by_key(|entry| {
-            std::cmp::Reverse(entry.metadata().and_then(|m| m.modified()).ok())
-        });
-        Ok(paths
+        let ids: Vec<String> = {
+            let connection = Self::connect(&self.database)?;
+            let mut statement = connection
+                .prepare("SELECT id FROM agent_file_manifests ORDER BY saved_at DESC")
+                .map_err(err)?;
+            let rows = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(err)?;
+            rows.collect::<std::result::Result<_, _>>().map_err(err)?
+        };
+        Ok(ids
             .into_iter()
-            .filter_map(|entry| {
-                entry
-                    .path()
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .and_then(|id| self.manifest(account, id).ok())
-            })
+            .filter_map(|id| self.manifest(account, &id).ok())
             .take(20)
             .collect())
     }
     pub fn manifest(&self, account: &str, id: &str) -> Result<Manifest> {
         Uuid::parse_str(id).map_err(err)?;
-        let manifest: Manifest = serde_json::from_slice(
-            &fs::read(self.journal.join(format!("{id}.manifest"))).map_err(err)?,
-        )
-        .map_err(err)?;
+        let document = self.manifest_document(id)?.ok_or("Unknown plan")?;
+        let manifest: Manifest = serde_json::from_str(&document).map_err(err)?;
         // Reading a receipt remains possible after revocation; execution does not.
         if !self
             .grants
@@ -503,19 +429,16 @@ impl Organizer {
                     }
                     let (source, source_name) = parent(&root, from)?;
                     rename_exclusive(&source, &source_name, &to, &name)?;
-                    source.sync_all().map_err(err)?;
-                    to.sync_all().map_err(err)?;
+                    sync_folder(&source)?;
+                    sync_folder(&to)?;
                     if Some(fingerprint(&open_item(&root, &receipt.to)?)?) != receipt.fingerprint {
                         return Err(
                             "Moved item changed during verification; inspect the manifest".into(),
                         );
                     }
                 } else {
-                    let name = cstring(&name)?;
-                    if unsafe { libc::mkdirat(to.as_raw_fd(), name.as_ptr(), 0o755) } != 0 {
-                        return Err(err(io::Error::last_os_error()));
-                    }
-                    to.sync_all().map_err(err)?;
+                    make_folder(&to, &name)?;
+                    sync_folder(&to)?;
                     manifest.receipts[index].fingerprint =
                         Some(fingerprint(&open_item(&root, &receipt.to)?)?);
                 }
@@ -569,23 +492,18 @@ impl Organizer {
                     self.save(id, "manifest", &manifest)?;
                     let (source, source_name) = parent(&root, &receipt.to)?;
                     rename_exclusive(&source, &source_name, &to, &name)?;
-                    source.sync_all().map_err(err)?;
-                    to.sync_all().map_err(err)?;
+                    sync_folder(&source)?;
+                    sync_folder(&to)?;
                 } else {
                     if (actual.device, actual.inode) != (expected.device, expected.inode) {
                         return Err("Created folder changed; undo stopped".into());
                     }
                     // rmdir removes only this newly created, still empty directory.
                     let (dir, name) = parent(&root, &receipt.to)?;
-                    let name = cstring(&name)?;
                     manifest.receipts[index].state = "undoing".into();
                     self.save(id, "manifest", &manifest)?;
-                    if unsafe { libc::unlinkat(dir.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) }
-                        != 0
-                    {
-                        return Err(err(io::Error::last_os_error()));
-                    }
-                    dir.sync_all().map_err(err)?;
+                    remove_folder(&dir, &name)?;
+                    sync_folder(&dir)?;
                 }
                 Ok(())
             })();
@@ -626,7 +544,7 @@ fn scan(
         } else {
             format!("{relative}/{name}")
         };
-        if name.starts_with('.') || entry.file_type().map_err(err)?.is_symlink() {
+        if name.starts_with('.') || platform::is_link(&entry) {
             snapshot
                 .excluded
                 .push(format!("{path}: hidden item or link"));

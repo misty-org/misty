@@ -2,7 +2,7 @@
 //! Kiri for extension contexts: installs the WebExtension compatibility
 //! layer into an unpacked package.
 //!
-//! The system WebKit runtime omits several Firefox APIs. The layer's scripts
+//! The system WebKit runtime omits several Firefox and Chrome APIs. The layer's scripts
 //! run before an extension's own background scripts and pages and define only
 //! what WebKit lacks. Applying it is idempotent, so packages installed before
 //! the layer existed pick it up the next time they load.
@@ -18,15 +18,31 @@ use serde_json::{json, Value};
 use std::{fs, path::Path};
 
 pub const DIRECTORY: &str = "__misty_compat__";
-const SCRIPTS: [&str; 4] = ["core.js", "shims.js", "blocking.js", "native.js"];
+const SCRIPTS: [&str; 9] = [
+    "core.js",
+    "shims.js",
+    "chrome.js",
+    "declarative.js",
+    "userscripts.js",
+    "capture.js",
+    "blocking.js",
+    "native.js",
+    // Last: binds every API function, the layer's own included.
+    "detached.js",
+];
 const WORKER: &str = "__misty_compat__/worker.js";
 const MAX_PAGE_BYTES: u64 = 4 * 1024 * 1024;
 
-const ASSETS: [(&str, &str); 8] = [
+const ASSETS: [(&str, &str); 13] = [
     ("core.js", include_str!("compat/core.js")),
     ("shims.js", include_str!("compat/shims.js")),
+    ("chrome.js", include_str!("compat/chrome.js")),
+    ("declarative.js", include_str!("compat/declarative.js")),
+    ("userscripts.js", include_str!("compat/userscripts.js")),
+    ("capture.js", include_str!("compat/capture.js")),
     ("blocking.js", include_str!("compat/blocking.js")),
     ("native.js", include_str!("compat/native.js")),
+    ("detached.js", include_str!("compat/detached.js")),
     ("host.html", include_str!("compat/host.html")),
     ("host.js", include_str!("compat/host.js")),
     ("identity.html", include_str!("compat/identity.html")),
@@ -54,8 +70,15 @@ pub fn limitation(permission: &str) -> Option<&'static str> {
         "management" => "Can read only its own extension details.",
         "tabHide" => "Tab hiding is not available; tabs stay visible.",
         "contextualIdentities" => "Firefox containers are not available.",
-        "bookmarks" => "Bookmarks are not shared with extensions yet.",
+        "tabGroups" => "Tab groups work in the current window, and tabs don't report their group yet.",
+        "declarativeContent" => "Page rules check page addresses; rules about a page's contents always count as met.",
+        "contentSettings" => "Site settings can be read but not changed; Misty keeps them in Settings.",
+        "fontSettings" => "Font settings can be read but not changed.",
+        "power" => "Keeping the computer awake is not available; requests are ignored.",
+        "userScripts" => "User scripts run as content scripts: include and exclude globs are ignored, and USER_SCRIPT worlds run isolated.",
+        "tabCapture" | "desktopCapture" => "Capture uses macOS screen sharing, which asks what to share each time, and starts from the extension's own pages.",
         "privacy" => "Privacy settings can be read but not changed.",
+        "offscreen" => "Its offscreen document runs in a hidden extension page, without audio or clipboard access of its own.",
         _ => return None,
     })
 }
@@ -97,19 +120,28 @@ fn inject_background(runtime: &Path, manifest: &mut Value) -> Result<(), String>
     let Some(background) = manifest.get_mut("background").and_then(Value::as_object_mut) else {
         return Ok(());
     };
+    // A package from an older layer gets the current script list, in order.
     if let Some(scripts) = background.get_mut("scripts").and_then(Value::as_array_mut) {
-        if !scripts.iter().any(|s| s.as_str() == Some(&script_paths()[0])) {
-            for (index, path) in script_paths().into_iter().enumerate() {
-                scripts.insert(index, json!(path));
-            }
+        scripts.retain(|s| !s.as_str().is_some_and(|s| s.starts_with(&format!("{DIRECTORY}/"))));
+        for (index, path) in script_paths().into_iter().enumerate() {
+            scripts.insert(index, json!(path));
         }
         return Ok(());
     }
     if let Some(worker) = background.get("service_worker").and_then(Value::as_str) {
-        if worker == WORKER {
-            return Ok(());
-        }
-        let worker = format!("/{}", worker.trim_start_matches('/'));
+        let worker = if worker == WORKER {
+            // Ours already: the extension's own worker is its last import.
+            let ours = fs::read_to_string(runtime.join(WORKER)).map_err(|e| e.to_string())?;
+            ours.split('"')
+                .skip(1)
+                .step_by(2)
+                .filter(|path| !path.starts_with(&format!("/{DIRECTORY}/")))
+                .last()
+                .ok_or("The extension's background worker is missing.")?
+                .to_owned()
+        } else {
+            format!("/{}", worker.trim_start_matches('/'))
+        };
         let module = background.get("type").and_then(Value::as_str) == Some("module");
         let mut imports: Vec<String> = script_paths().iter().map(|p| format!("/{p}")).collect();
         imports.push(worker);
@@ -125,8 +157,9 @@ fn inject_background(runtime: &Path, manifest: &mut Value) -> Result<(), String>
     Ok(())
 }
 
-/// Firefox sidebar panels and address-bar page actions have no host surface in
-/// Misty. When an extension has no toolbar button, either one becomes its popup.
+/// Firefox sidebar panels, Chrome side panels and address-bar page actions have
+/// no host surface in Misty. When an extension has no toolbar button, one of
+/// them becomes its popup.
 fn add_toolbar_action(manifest: &mut Value) {
     let key = if manifest["manifest_version"].as_u64() == Some(3) {
         "action"
@@ -144,6 +177,8 @@ fn add_toolbar_action(manifest: &mut Value) {
             "default_title": sidebar["default_title"],
             "default_icon": sidebar["default_icon"],
         })
+    } else if let Some(panel) = manifest.get("side_panel") {
+        json!({ "default_popup": panel["default_path"], "default_icon": manifest["icons"] })
     } else {
         return;
     };
@@ -187,16 +222,23 @@ fn inject_pages(runtime: &Path, directory: &Path) -> Result<(), String> {
 }
 
 /// Places the layer before the page's first script. Returns `None` when the
-/// page already loads it.
+/// page already loads the current layer; an older layer's tags are replaced.
 fn inject_page(page: &str) -> Option<String> {
-    let first = format!("/{}", script_paths()[0]);
-    if page.contains(&first) {
-        return None;
-    }
     let tags: String = script_paths()
         .iter()
         .map(|p| format!("<script src=\"/{p}\"></script>"))
         .collect();
+    if page.contains(&tags) {
+        return None;
+    }
+    let first = format!("<script src=\"/{}\"></script>", script_paths()[0]);
+    if let Some(at) = page.find(&first) {
+        let mut rest = page.to_owned();
+        for path in script_paths() {
+            rest = rest.replacen(&format!("<script src=\"/{path}\"></script>"), "", 1);
+        }
+        return Some(format!("{}{}{}", &rest[..at], tags, &rest[at..]));
+    }
     let lower = page.to_ascii_lowercase();
     let after_tag = |name: &str| {
         let start = lower.find(&format!("<{name}"))?;
@@ -224,6 +266,11 @@ mod tests {
         assert!(compat < updated.find("popup.js").unwrap());
         assert!(updated.find("<HEAD>").unwrap() < compat);
         assert!(inject_page(&updated).is_none());
+        let older = "<head><script src=\"/__misty_compat__/core.js\"></script><script src=\"popup.js\"></script></head>";
+        let upgraded = inject_page(older).unwrap();
+        assert!(upgraded.contains("/__misty_compat__/declarative.js"));
+        assert_eq!(upgraded.matches("/__misty_compat__/core.js").count(), 1);
+        assert!(upgraded.find("declarative.js").unwrap() < upgraded.find("popup.js").unwrap());
         assert!(inject_page("<header>").unwrap().starts_with("<script"));
     }
 
@@ -233,9 +280,14 @@ mod tests {
         let mut manifest = json!({"background":{"scripts":["bg.js"]}});
         inject_background(root.path(), &mut manifest).unwrap();
         assert_eq!(manifest["background"]["scripts"][0], "__misty_compat__/core.js");
-        assert_eq!(manifest["background"]["scripts"][4], "bg.js");
+        assert_eq!(manifest["background"]["scripts"][9], "bg.js");
         inject_background(root.path(), &mut manifest).unwrap();
-        assert_eq!(manifest["background"]["scripts"].as_array().unwrap().len(), 5);
+        assert_eq!(manifest["background"]["scripts"].as_array().unwrap().len(), 10);
+        // An older layer's list becomes the current one.
+        let mut manifest = json!({"background":{"scripts":["__misty_compat__/core.js","bg.js"]}});
+        inject_background(root.path(), &mut manifest).unwrap();
+        assert_eq!(manifest["background"]["scripts"].as_array().unwrap().len(), 10);
+        assert_eq!(manifest["background"]["scripts"][9], "bg.js");
 
         fs::create_dir(root.path().join(DIRECTORY)).unwrap();
         let mut manifest = json!({"background":{"service_worker":"sw.js"}});
@@ -244,6 +296,10 @@ mod tests {
         let worker = fs::read_to_string(root.path().join(WORKER)).unwrap();
         assert!(worker.starts_with("importScripts(\"/__misty_compat__/core.js\""));
         assert!(worker.contains("\"/sw.js\""));
+        // Rewriting our own worker keeps the extension's worker last.
+        inject_background(root.path(), &mut manifest).unwrap();
+        let again = fs::read_to_string(root.path().join(WORKER)).unwrap();
+        assert_eq!(again, worker);
     }
 
     #[test]
@@ -254,5 +310,8 @@ mod tests {
         let mut manifest = json!({"manifest_version":2,"browser_action":{},"page_action":{"default_popup":"p.html"}});
         add_toolbar_action(&mut manifest);
         assert_eq!(manifest["browser_action"], json!({}));
+        let mut manifest = json!({"manifest_version":3,"side_panel":{"default_path":"panel.html"}});
+        add_toolbar_action(&mut manifest);
+        assert_eq!(manifest["action"]["default_popup"], "panel.html");
     }
 }

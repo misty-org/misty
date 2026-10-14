@@ -19,6 +19,24 @@ export function configureBrowserHomeUrl(value: string): void {
   configuredHomeUrl = normalizeBrowserHomeUrl(value);
 }
 
+/** An enabled extension's new-tab page (`chrome_url_overrides.newtab`). */
+let newTabOverride: string | null = null;
+export function configureNewTabOverride(url: string | null): void {
+  newTabOverride = url;
+}
+/**
+ * What a tab opened without an address shows: an extension's new-tab page while
+ * one is enabled, else the homepage. Private tabs keep the homepage, as extensions
+ * there need private access and the page is the extension's own.
+ */
+export function browserNewTabUrl(privateTab = false): string {
+  return !privateTab && newTabOverride ? newTabOverride : configuredHomeUrl;
+}
+/** The address bar stays empty on an extension's new-tab page, as on a blank tab. */
+export function isNewTabOverrideUrl(value: string): boolean {
+  return Boolean(newTabOverride) && value === newTabOverride;
+}
+
 /**
  * Resolves a user-entered homepage.
  *

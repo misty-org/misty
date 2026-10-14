@@ -1,4 +1,4 @@
-import type { LibrarySharedReference } from "@/api/spaces/dto/interfaces/types";
+import type { LibrarySharedReference } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 import { ClipboardCopy, MessagesSquare, X } from "lucide-react";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";

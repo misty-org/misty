@@ -17,17 +17,17 @@ mod exchange;
 #[path = "sync_journal.rs"]
 mod journal;
 use exchange::pass;
-use journal::{ciphers, journal_lock, journal_path, read, remove_local, write, Journal};
+use journal::{ciphers, journal_exists, journal_lock, read, remove_local, write, Journal};
 
 static EPOCH: AtomicU64 = AtomicU64::new(0);
 fn ready() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
     static READY: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> = OnceLock::new();
     READY.get_or_init(Default::default)
 }
-fn readiness_key(account: &str, id: u64) -> String {
+fn readiness_key(account: &str, id: &str) -> String {
     format!("{account}:{id}")
 }
-pub fn forget(account: &str, id: u64) {
+pub fn forget(account: &str, id: &str) {
     if let Ok(mut ready) = ready().lock() {
         ready.remove(&readiness_key(account, id));
     }
@@ -42,23 +42,26 @@ pub fn reset() {
     }
 }
 pub fn queue_removal(
-    app: &tauri::AppHandle,
+    _app: &tauri::AppHandle,
     account: &str,
     installation: &Installation,
 ) -> Result<(), String> {
-    let folder = root(app, account)?.join("removals");
-    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-    let temporary = tempfile::NamedTempFile::new_in(&folder).map_err(|e| e.to_string())?;
-    std::fs::write(
-        temporary.path(),
-        serde_json::to_vec(installation).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    temporary.as_file().sync_all().map_err(|e| e.to_string())?;
-    temporary
-        .persist(folder.join(format!("{}.json", installation.generation)))
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+        .connect()
+        .and_then(|connection| {
+            connection.execute(
+                "INSERT OR REPLACE INTO extension_removals (account, generation, installation)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![
+                    account,
+                    installation.generation,
+                    serde_json::to_string(installation).unwrap_or_default()
+                ],
+            )
+        })
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 pub async fn clear_local(
     app: &tauri::AppHandle,
@@ -76,7 +79,7 @@ pub async fn seed_local(
     installation: &Installation,
 ) -> Result<(), String> {
     let _guard = journal_lock().lock().await;
-    if journal_path(app, account, installation)?.exists() {
+    if journal_exists(app, account, installation)? {
         return Err("This extension installation generation already exists.".into());
     }
     write(
@@ -105,7 +108,11 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     let Some(account) = event["account"].as_str() else {
         return;
     };
-    let Some(id) = event["id"].as_str().and_then(|v| v.parse::<u64>().ok()) else {
+    let Some(id) = event["id"]
+        .as_str()
+        .filter(|v| super::catalog::Store::of(v).is_some())
+        .map(str::to_owned)
+    else {
         return;
     };
     let installation = {
@@ -176,14 +183,12 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
     })();
     if result.is_ok() && event["kind"] == "sync-ready" {
         if let Ok(mut ready) = ready().lock() {
-            ready.insert(readiness_key(account, id));
+            ready.insert(readiness_key(account, &id));
         }
         // Previously restored local data remains usable while the vault is locked.
         if read(app, account, &installation).is_ok_and(|journal| journal.initialized) {
-            let _ = native::request(
-                json!({"operation":"sync-restored","account":account,"id":id.to_string()}),
-            )
-            .await;
+            let _ = native::request(json!({"operation":"sync-restored","account":account,"id":id}))
+                .await;
         }
     }
     if result.is_err() {
@@ -229,20 +234,9 @@ pub fn start(app: tauri::AppHandle, account: String) {
             for installation in removed {
                 remove(&account, &installation).await;
             }
-            if let Ok(folder) = root(&app, &account).map(|v| v.join("removals")) {
-                if let Ok(entries) = std::fs::read_dir(folder) {
-                    for entry in entries.flatten() {
-                        if let Ok(bytes) = std::fs::read(entry.path()) {
-                            if let Ok(installation) = serde_json::from_slice::<Installation>(&bytes)
-                            {
-                                if valid_installation(&installation)
-                                    && remove(&account, &installation).await
-                                {
-                                    let _ = std::fs::remove_file(entry.path());
-                                }
-                            }
-                        }
-                    }
+            for installation in queued_removals(&account) {
+                if valid_installation(&installation) && remove(&account, &installation).await {
+                    forget_removal(&account, &installation.generation);
                 }
             }
             for installation in installations {
@@ -318,3 +312,39 @@ pub async fn remove(account: &str, installation: &Installation) -> bool {
 #[cfg(test)]
 #[path = "sync_tests.rs"]
 mod tests;
+
+fn removals_db() -> Option<rusqlite::Connection> {
+    let home = crate::infra::paths::misty_home_dir()?;
+    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+        .connect()
+        .ok()
+}
+
+/// Installations removed here whose remote values still need clearing.
+fn queued_removals(account: &str) -> Vec<Installation> {
+    let Some(connection) = removals_db() else {
+        return Vec::new();
+    };
+    let Ok(mut statement) =
+        connection.prepare("SELECT installation FROM extension_removals WHERE account = ?1")
+    else {
+        return Vec::new();
+    };
+    statement
+        .query_map([account], |row| row.get::<_, String>(0))
+        .map(|rows| {
+            rows.flatten()
+                .filter_map(|text| serde_json::from_str::<Installation>(&text).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn forget_removal(account: &str, generation: &str) {
+    if let Some(connection) = removals_db() {
+        let _ = connection.execute(
+            "DELETE FROM extension_removals WHERE account = ?1 AND generation = ?2",
+            [account, generation],
+        );
+    }
+}

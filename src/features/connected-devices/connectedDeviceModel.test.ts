@@ -21,58 +21,39 @@ const device = (
 const channel = (peers: ChannelSnapshot["peers"]): ChannelSnapshot => ({
   connected: true,
   admitted: true,
-  networkKey: "home",
-  overlay: false,
   peers,
 });
 
 describe("device peers", () => {
-  it("lists this device first and labels each other device by network", () => {
+  it("lists this device first and labels each other device by presence", () => {
     const peers = devicePeers(
       [device("b", "Studio"), device("self", "Laptop"), device("c", "Office"), device("d", "Old")],
       "self",
       channel([
-        { deviceId: "b", endpointId: "", online: true, networkKey: "home", overlay: false },
-        { deviceId: "c", endpointId: "", online: true, networkKey: "work", overlay: false },
+        { deviceId: "b", online: true },
+        { deviceId: "c", online: false },
       ]),
-      [],
-      new Set(),
     );
     expect(peers.map((peer) => [peer.name, deviceStatusLabel(peer.status)])).toEqual([
       ["Laptop", "This device"],
-      ["Office", "Other network"],
+      ["Office", "Offline"],
       ["Old", "Offline"],
-      ["Studio", "Same network"],
+      ["Studio", "Online"],
     ]);
   });
 
-  it("omits devices that are not added, and reports unreachable dials", () => {
+  it("omits devices that are not added", () => {
     const peers = devicePeers(
       [device("self", "Laptop"), device("p", "Pending", "pending"), device("c", "Office")],
       "self",
-      channel([
-        { deviceId: "c", endpointId: "", online: true, networkKey: "work", overlay: false },
-      ]),
-      [],
-      new Set(["c"]),
+      channel([{ deviceId: "c", online: true }]),
     );
     expect(peers.map((peer) => peer.id)).toEqual(["self", "c"]);
-    expect(deviceStatusLabel(peers[1].status)).toBe("Can't reach");
+    expect(peers[1].status).toBe("online");
   });
 
-  it("treats a shared overlay network as the same network", () => {
-    const [, peer] = devicePeers(
-      [device("self", "Laptop"), device("t", "Tailnet")],
-      "self",
-      {
-        ...channel([
-          { deviceId: "t", endpointId: "", online: true, networkKey: "elsewhere", overlay: true },
-        ]),
-        overlay: true,
-      },
-      [],
-      new Set(),
-    );
-    expect(peer.status).toBe("same-network");
+  it("counts every other device offline without a channel", () => {
+    const peers = devicePeers([device("self", "Laptop"), device("c", "Office")], "self", null);
+    expect(peers.map((peer) => peer.status)).toEqual(["self", "offline"]);
   });
 });

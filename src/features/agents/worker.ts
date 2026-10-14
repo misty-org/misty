@@ -2,7 +2,7 @@ import { subscribeAccountEvents } from "@/api/accountEvents";
 import { devicesNative } from "@/native/devices";
 import { mistyDeviceJobsEnabled } from "./flags";
 import { devicesApi } from "@/api/devices/api";
-import type { AgentDevice } from "./model/interfaces/types";
+import type { AgentDevice } from "./model/types";
 import {
   ensureServerAgentDevice,
   heartbeatServerAgentDevice,
@@ -11,6 +11,7 @@ import {
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
+import { codeProjectOperations, runCodeProjectOperation } from "./codeProjectTools";
 import { invoke } from "@tauri-apps/api/core";
 import {
   browserUncertainErrorCode,
@@ -27,6 +28,8 @@ import {
   registerRunBoundBrowserContext,
   type ClaimedWorkflowNodeJob,
 } from "./workerBrowserJobs";
+import { HeldClaims } from "./workerHeldClaim";
+import { touchHostedSession } from "./hostedSessionsState";
 
 export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
 export { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
@@ -50,6 +53,7 @@ export class DesktopAgentJobWorker {
   private refreshPresence?: () => Promise<unknown>;
   private presenceBusy = false;
   private lastDiscoveryAt = 0;
+  private held = new HeldClaims();
 
   start(accountId: string): void {
     if (this.running || !mistyDeviceJobsEnabled()) return;
@@ -81,6 +85,7 @@ export class DesktopAgentJobWorker {
     clearTimeout(this.retry);
     this.retry = undefined;
     clearInterval(this.presence);
+    this.held.cancel();
     this.refreshPresence = undefined;
     for (const controller of this.active) controller.abort(new Error("device_execution_stopped"));
   }
@@ -108,7 +113,7 @@ export class DesktopAgentJobWorker {
           : heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
       while (current() && this.active.size < 8) {
         this.lastDiscoveryAt = Date.now();
-        const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id);
+        const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id, this.held);
         if (!current()) return;
         this.failures = 0;
         if (!claim) break;
@@ -144,6 +149,8 @@ export class DesktopAgentJobWorker {
     const controller = new AbortController();
     this.active.add(controller);
     let job = claim.job;
+    const browser = job.operation.startsWith("browser.");
+    if (browser) this.held.noteBrowserJob();
     let leaseExpiresAt = claim.leaseExpiresAt ?? job.leaseExpiresAt;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -241,6 +248,7 @@ export class DesktopAgentJobWorker {
       clearTimeout(timer);
       clearInterval(heartbeat);
       this.active.delete(controller);
+      if (browser) this.held.noteBrowserJob();
     }
     // Retry only delivery of the exact observed result, never the operation.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -288,13 +296,21 @@ function browserExecutionControl(
 async function claimNextWorkflowNodeJob(
   deviceId: string,
   localDeviceId: string,
+  held: HeldClaims,
 ): Promise<ClaimedWorkflowNodeJob | null> {
-  const claim = await devicesApi.claimWorkflowJob<ClaimedWorkflowNodeJob | undefined>(
-    signedAgentDeviceRequest,
-    localDeviceId,
-    deviceId,
-  );
-  return claim ?? null;
+  const hold = held.next();
+  try {
+    const claim = await devicesApi.claimWorkflowJob<ClaimedWorkflowNodeJob | undefined>(
+      signedAgentDeviceRequest,
+      localDeviceId,
+      deviceId,
+      hold,
+    );
+    return claim ?? null;
+  } catch (error) {
+    if (hold && held.refused(error)) return claimNextWorkflowNodeJob(deviceId, localDeviceId, held);
+    throw error;
+  }
 }
 
 async function executeWorkflowNodeOnDevice(
@@ -312,11 +328,20 @@ async function executeWorkflowNodeOnDevice(
     throw new DeviceOperationNotAttempted(new Error("device_grant_invalid"));
   }
   signal.throwIfAborted();
+  if (job.operation === "browser.session") {
+    // A browser session for a request made on another of the person's devices.
+    return (await import("./hostedSessions")).startHostedSession(job, signal);
+  }
+  if (job.operation === "browser.spawn_tabs") {
+    // Tabs and signed grants for this task's sub-agents.
+    return (await import("./spawnChildTabs")).spawnChildTabs(job, signal);
+  }
   if (job.operation === "browser.act") {
     // One goal runs as a local loop: Midscene plans, Misty's native input acts.
     return (await import("./screenAct/screenActJob")).runScreenAct(job, signal);
   }
   if (job.operation.startsWith("browser.")) {
+    touchHostedSession(job.scopeId, job.runId);
     const cancel = () => {
       void invoke("browser_agent_execution_cancel", {
         request: browserExecutionControl(job, leaseExpiresAt),
@@ -365,16 +390,15 @@ async function executeWorkflowNodeOnDevice(
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
   }
+  if (codeProjectOperations.has(job.operation)) {
+    return runCodeProjectOperation(job, signal);
+  }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);
   }
   const ref = deviceContentReference(job.input, job.scopeId);
   const document = await agentsPrepareScopedDocument(
-    {
-      scopeId: ref.scopeId,
-      relativePath: ref.relativePath,
-      spaceId: job.spaceId ?? "",
-    },
+    { scopeId: ref.scopeId, relativePath: ref.relativePath },
     signal,
   );
   const content = {

@@ -11,8 +11,13 @@ pub(super) fn browser_theme(value: &str) -> Result<Option<Theme>, String> {
     }
 }
 
-// Remote sites own their colors. Transparent light pages need the browser's
-// standard white canvas, regardless of Misty's toolbar theme.
-pub(super) fn browser_background(_value: &str) -> Color {
-    Color(255, 255, 255, 255)
+// What a view shows before its page has painted. It matches Misty's own
+// canvas so a new or re-shown tab blends in instead of flashing white. Once
+// the page loads it reports its real color (white for a transparent page) and
+// that replaces this.
+pub(super) fn browser_background(value: &str) -> Color {
+    match value {
+        "light" => Color(255, 255, 255, 255),
+        _ => Color(19, 19, 19, 255),
+    }
 }

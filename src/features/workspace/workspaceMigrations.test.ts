@@ -129,37 +129,21 @@ it("preserves restored Space tabs during persistence migration", () => {
   expect(migrateRetiredWorkspaceView(tab)).toEqual(tab);
 });
 
-it.each([
-  "/extensions",
-  "/extensions?category=privacy-security",
-  "/extensions?category=tabs#results",
-  "/extensions#results",
-  "/extensions/installed",
-  "/extensions/addon/607454",
-])("preserves the Extensions workspace at %s instead of opening Google", (route) => {
-  const tab = legacyTab({
-    surfaceId: "extensions",
-    groupKey: "tool:extensions",
-    title: "Extensions",
-    route,
-  });
-  expect(migrateRetiredWorkspaceView(tab)).toEqual(tab);
-  const pane = createDockLeaf([tab]);
-  const migrated = migrateRetiredWorkspaceViews({ root: pane, focusedPaneId: pane.id });
-  expect(dockTreeViews(migrated.root)).toEqual([tab]);
-});
-
-it("restores Extensions views that lost their route", () => {
-  expect(
-    migrateRetiredWorkspaceView(
+it.each(["/extensions", "/extensions/installed", "/extensions/addon/607454"])(
+  "reopens a saved Extensions page at %s as the Chrome Web Store",
+  (route) => {
+    const migrated = migrateRetiredWorkspaceView(
       legacyTab({
         surfaceId: "extensions",
         groupKey: "tool:extensions",
-        route: undefined as unknown as string,
+        title: "Extensions",
+        route,
       }),
-    ),
-  ).toMatchObject({ surfaceId: "extensions", route: "/extensions" });
-});
+    );
+    expect(migrated).toMatchObject({ surfaceId: "browser", route: "/browser" });
+    expect(migrated.state).toMatchObject({ url: "https://chromewebstore.google.com/" });
+  },
+);
 
 it("migrates a saved Scheduled tab into Agents without losing its selected task", () => {
   const migrated = migrateRetiredWorkspaceView(

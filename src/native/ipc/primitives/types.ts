@@ -4,7 +4,7 @@ export type ClipboardOrigin = "local_system" | "local_misty" | "remote_shared";
 
 export type FileKind = "folder" | "file" | "symlink" | "other";
 
-export type ExplorerLocationKind = "local" | "remote_provider" | "remote" | "peer_device";
+export type ExplorerLocationKind = "local" | "remote_provider" | "remote";
 
 export type DirectorySizeStatus = "unknown" | "calculating" | "ready" | "failed";
 
@@ -24,20 +24,6 @@ export type SmartLibrarySourceKind = "local" | "cloud";
 
 export type SmartLibraryAssetStatus =
   "pending" | "queued" | "analyzed" | "failed" | "changed" | "unsupported";
-
-export type TransferType =
-  "upload" | "download" | "create" | "copy" | "move" | "rename" | "delete" | "archive";
-
-export type TransferStatus =
-  | "queued"
-  | "pending"
-  | "in_progress"
-  | "waiting_for_resolution"
-  | "completed"
-  | "failed"
-  | "canceled"
-  | "skipped"
-  | "interrupted";
 
 export type OperationKind =
   "copy" | "move" | "create" | "rename" | "delete" | "upload" | "download" | "archive";

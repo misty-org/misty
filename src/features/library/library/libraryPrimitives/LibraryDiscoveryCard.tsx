@@ -1,4 +1,4 @@
-import type { LibraryDiscoveryGroup } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryDiscoveryGroup } from "@/api/spaces/dto/entities";
 import { cn, DiscoverCard, IconButton, Pressable } from "@/shared/ui";
 import { Pin, type LucideIcon } from "lucide-react";
 import { useContext } from "react";

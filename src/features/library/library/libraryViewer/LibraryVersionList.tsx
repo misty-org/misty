@@ -1,4 +1,4 @@
-import type { LibraryEditVersion } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryEditVersion } from "@/api/spaces/dto/entities";
 import { LibraryError as SystemErrorNotice } from "../LibraryRuntime";
 import { Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2 } from "lucide-react";

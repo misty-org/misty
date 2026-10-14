@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import {
   activeLayoutView,
   useWorkspaceStore,
@@ -137,11 +137,8 @@ it("names the Space without a switcher and exposes management directly", async (
   expect(
     management.closest("header")?.contains(screen.getByRole("heading", { name: "Family" })),
   ).toBe(true);
-  fireEvent.click(within(management).getByRole("button", { name: "Usage" }));
-  expect(await screen.findByRole("dialog")).toBeTruthy();
-  expect(screen.getByText("Cloud storage")).toBeTruthy();
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // Usage is the account's, in the profile menu, not the Space's.
+  expect(within(management).queryByRole("button", { name: "Usage" })).toBeNull();
   fireEvent.click(within(management).getByRole("button", { name: "Members" }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
   expect(useSpacesStore.getState().loadMembers).toHaveBeenCalledWith("family");

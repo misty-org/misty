@@ -1,35 +1,4 @@
-import type { GlobalPreviewKind } from "@/features/file-ui";
 import { documentXmlFile, naturalPathSort, rtfToText, xmlToText } from "./previewFormat";
-import {
-  archiveExtensions,
-  audioMimeTypes,
-  imageMimeTypes,
-  officeExtensions,
-  textExtensions,
-  videoMimeTypes,
-} from "./previewMediaTables";
-export function globalPreviewKindForSource(extension: string, mimeType = ""): GlobalPreviewKind {
-  const normalizedExtension = extension.replace(/^\./, "").toLocaleLowerCase();
-  const normalizedMimeType = mimeType.split(";")[0].trim().toLocaleLowerCase();
-  if (videoMimeTypes[normalizedExtension] || normalizedMimeType.startsWith("video/"))
-    return "video";
-  if (audioMimeTypes[normalizedExtension] || normalizedMimeType.startsWith("audio/"))
-    return "audio";
-  if (archiveExtensions.has(normalizedExtension)) return "archive";
-  if (imageMimeTypes[normalizedExtension] || normalizedMimeType.startsWith("image/"))
-    return "image";
-  if (normalizedExtension === "pdf" || normalizedMimeType === "application/pdf") return "pdf";
-  if (normalizedExtension === "md" || normalizedExtension === "markdown") return "markdown";
-  if (
-    textExtensions.has(normalizedExtension) ||
-    normalizedMimeType.startsWith("text/") ||
-    normalizedMimeType.includes("json")
-  )
-    return "text";
-  if (officeExtensions.has(normalizedExtension)) return "document";
-  return "generic";
-}
-
 export async function extractDocumentText(extension: string, bytes: Uint8Array): Promise<string> {
   if (extension === "docx") {
     const mammoth = (await import("mammoth")).default;

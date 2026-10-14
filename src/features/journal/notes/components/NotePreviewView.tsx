@@ -1,7 +1,7 @@
 import { Button, EmptyState, Skeleton } from "@/shared/ui";
 import { ClipboardCopy } from "lucide-react";
 import { Suspense, useState, type ComponentType } from "react";
-import type { UnifiedNote } from "../model/types/types";
+import type { UnifiedNote } from "../model/types";
 
 import type { NoteBlockEditorProps } from "./NoteBlockEditorView";
 export interface NotePreviewRuntime {

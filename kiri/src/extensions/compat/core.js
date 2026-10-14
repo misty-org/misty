@@ -118,10 +118,38 @@
     define(api, name, value);
     if (globalThis.chrome && globalThis.chrome !== api) define(globalThis.chrome, name, value);
   }
+  // The extension's background: a service worker, or its background page. Work that
+  // must happen once per extension (page rules, user scripts) runs only there.
+  const background = (() => {
+    if (typeof ServiceWorkerGlobalScope !== "undefined" && globalThis instanceof ServiceWorkerGlobalScope)
+      return true;
+    if (typeof window === "undefined") return false;
+    const page = manifest.background?.page;
+    if (typeof page === "string" && location.pathname === `/${page.replace(/^\//, "")}`) return true;
+    try {
+      return api.extension?.getBackgroundPage?.() === window;
+    } catch {
+      return false;
+    }
+  })();
+  // Errors that escape the extension's background are reported to Misty, which
+  // otherwise can't see why an extension stopped responding. Capped per start.
+  if (background && typeof globalThis.addEventListener === "function") {
+    const reported = new Set();
+    const report = (value) => {
+      const message = String(value?.message ?? value ?? "Unknown error").slice(0, 2000);
+      if (reported.has(message) || reported.size >= 20) return;
+      reported.add(message);
+      call("runtime.reportError", message).catch(() => {});
+    };
+    globalThis.addEventListener("error", (event) => report(event.error ?? event.message));
+    globalThis.addEventListener("unhandledrejection", (event) => report(event.reason));
+  }
   Object.defineProperty(globalThis, "__mistyCompat", {
     value: Object.freeze({
       api,
       manifest,
+      background,
       declared: (permission) => declared.has(permission),
       call,
       emit,

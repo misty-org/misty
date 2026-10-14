@@ -1,8 +1,8 @@
 import { subscribeAccountEvents } from "@/api/accountEvents";
 import { useAuth } from "@/features/auth";
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditVersion, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { defaultLibraryEdit, normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";
 

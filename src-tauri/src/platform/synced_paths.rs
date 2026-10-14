@@ -2,9 +2,9 @@
 //!
 //! Account settings are stored on the server, so a path in them is data, not a
 //! decision this device made. A download folder must be an ordinary folder the
-//! person could have picked: inside their home folder (or on an external drive),
-//! never hidden, and never where the system or apps keep configuration that
-//! runs on its own.
+//! person could have picked: inside their home folder (or on an external drive,
+//! or on Windows another local drive), never hidden, and never where the system
+//! or apps keep configuration that runs on its own.
 use std::path::{Component, Path, PathBuf, Prefix};
 
 /// Windows network (UNC) and device paths are refused before anything touches
@@ -34,9 +34,14 @@ pub fn download_directory(candidate: &Path, home: &Path) -> Option<PathBuf> {
         let relative = directory.strip_prefix("/Volumes").ok()?;
         relative.components().next()?;
         relative.to_path_buf()
+    } else if let Some(relative) = other_drive(&directory) {
+        relative
     } else {
         return None;
     };
+    if hidden_within(&directory, &relative) {
+        return None;
+    }
     let names: Vec<String> = relative
         .components()
         .map(|part| match part {
@@ -58,6 +63,72 @@ pub fn download_directory(candidate: &Path, home: &Path) -> Option<PathBuf> {
         Some("appdata") => None,
         _ => Some(directory),
     }
+}
+
+/// The path below the root of a local drive other than the one Windows
+/// runs from, where the person keeps their own files.
+#[cfg(windows)]
+fn other_drive(directory: &Path) -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        Storage::FileSystem::GetDriveTypeW,
+        System::WindowsProgramming::{DRIVE_FIXED, DRIVE_REMOVABLE},
+    };
+    let letter = match directory.components().next()? {
+        Component::Prefix(prefix) => match prefix.kind() {
+            Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => letter.to_ascii_uppercase(),
+            _ => return None,
+        },
+        _ => return None,
+    };
+    let system = std::env::var("SystemDrive").ok()?;
+    if system.as_bytes().first().map(u8::to_ascii_uppercase) == Some(letter) {
+        return None;
+    }
+    let root: Vec<u16> = std::ffi::OsStr::new(&format!("{}:\\", char::from(letter)))
+        .encode_wide()
+        .chain([0])
+        .collect();
+    // SAFETY: a NUL-terminated drive root.
+    if !matches!(
+        unsafe { GetDriveTypeW(root.as_ptr()) },
+        DRIVE_FIXED | DRIVE_REMOVABLE
+    ) {
+        return None;
+    }
+    let relative: PathBuf = directory
+        .components()
+        .skip_while(|part| matches!(part, Component::Prefix(_) | Component::RootDir))
+        .collect();
+    Some(relative)
+}
+
+#[cfg(not(windows))]
+fn other_drive(_directory: &Path) -> Option<PathBuf> {
+    None
+}
+
+/// Whether a folder on the way to `directory`, within its last `relative`
+/// part, is hidden or belongs to the system (Windows marks its own that way,
+/// such as `$RECYCLE.BIN`). Elsewhere a leading dot hides a folder, which the
+/// name check catches.
+#[cfg(windows)]
+fn hidden_within(directory: &Path, relative: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    use windows_sys::Win32::Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_SYSTEM};
+    directory
+        .ancestors()
+        .take(relative.components().count())
+        .any(|folder| {
+            std::fs::metadata(folder).map_or(true, |metadata| {
+                metadata.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
+            })
+        })
+}
+
+#[cfg(not(windows))]
+fn hidden_within(_directory: &Path, _relative: &Path) -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -101,6 +172,29 @@ mod tests {
         assert!(download_directory(&root.join("Missing"), root).is_none());
         assert!(download_directory(Path::new("/etc"), root).is_none());
         assert!(download_directory(&root.join("Downloads/../.ssh"), root).is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn hidden_folders_are_refused_on_windows() {
+        use std::os::windows::ffi::OsStrExt;
+        let home = tempfile::tempdir().unwrap();
+        let folder = home.path().join("Kept");
+        std::fs::create_dir_all(folder.join("Inside")).unwrap();
+        assert!(download_directory(&folder, home.path()).is_some());
+        let wide: Vec<u16> = folder.as_os_str().encode_wide().chain([0]).collect();
+        // SAFETY: a NUL-terminated path inside the test's own folder.
+        unsafe {
+            windows_sys::Win32::Storage::FileSystem::SetFileAttributesW(
+                wide.as_ptr(),
+                windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN,
+            );
+        }
+        assert!(download_directory(&folder, home.path()).is_none());
+        assert!(download_directory(&folder.join("Inside"), home.path()).is_none());
+        // The system drive outside the home folder stays refused.
+        let windows = std::env::var("SystemRoot").unwrap();
+        assert!(download_directory(Path::new(&windows), home.path()).is_none());
     }
 
     #[test]

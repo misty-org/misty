@@ -1,5 +1,5 @@
-import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/entities";
+import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
 import { Button, Spinner } from "@/shared/ui";
 import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
 import type { ReactNode } from "react";

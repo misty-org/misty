@@ -1,17 +1,19 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "@/api/client";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 const api = vi.hoisted(() => ({ request: vi.fn(), generation: 1 }));
 vi.mock("@/api/client", async (original) => ({
   ...(await original<typeof ApiClient>()),
   apiRequest: api.request,
   readApiSessionGeneration: () => api.generation,
 }));
+import { resetAccountUsageCache } from "./AccountUsagePanel";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 const space = { id: "space-1", name: "Team" } as Space;
 afterEach(() => {
   cleanup();
+  resetAccountUsageCache();
   api.request.mockReset();
   api.generation = 1;
 });
@@ -40,17 +42,10 @@ const usage = {
       remaining_bytes: 4998500000,
       percentage_used: 0.03,
     },
-    sync: {
-      used: 100,
-      reserved: 0,
-      limit: 20000000000,
-      remaining: 19999999900,
-      percentage_used: 0.0000005,
-    },
   },
 };
 describe("Account usage from a Space", () => {
-  it("loads all three account meters only when opened, without a Space request", async () => {
+  it("loads the AI and storage meters only when opened, without a Space request", async () => {
     api.request.mockResolvedValue(usage);
     render(<SpaceUsagePopover space={space} />);
     expect(api.request).not.toHaveBeenCalled();
@@ -59,11 +54,10 @@ describe("Account usage from a Space", () => {
     });
     expect(api.request.mock.calls[0][0]).toBe("/billing/usage");
     expect(screen.getByText("Cloud storage")).toBeDefined();
-    expect(screen.getByText("Sync transfer")).toBeDefined();
-    expect(screen.getByText(/300 weighted tokens temporarily reserved/)).toBeDefined();
-    fireEvent.click(screen.getByText("Recent AI commands"));
-    expect(screen.getByText("750 weighted tokens used")).toBeDefined();
-    expect(screen.getByText("Ceiling: 1,000,000 weighted tokens")).toBeDefined();
+    expect(screen.queryByText("Sync transfer")).toBeNull();
+    expect(screen.getByText("1.5 MB of 5 GB")).toBeDefined();
+    expect(screen.getAllByText("<1%").length).toBe(2);
+    expect(screen.queryByText("Recent AI commands")).toBeNull();
   });
   it("shows a recoverable error rather than fabricated zero usage", async () => {
     api.request.mockRejectedValue(new Error("offline"));

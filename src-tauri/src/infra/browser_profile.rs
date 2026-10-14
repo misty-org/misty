@@ -14,16 +14,65 @@ pub(crate) fn legacy_profile_identity() -> String {
     identity
 }
 
-/// WebView2 uses folders rather than WK store identifiers. The native legacy
-/// capture alias must refer to the already existing folder on this engine too.
-pub(crate) fn relative_data_directory(profile: Option<&str>) -> Result<std::path::PathBuf, String> {
+/// The folder a profile's website data is found in, under Misty's own:
+/// `~/.misty/profiles/<profile>/webview`. WebView2 and WebKitGTK keep the data right there.
+/// WebKit on macOS chooses its own folder for a store, so there it is a symlink to that
+/// folder (see `link_webview_data`). The default and legacy profiles are `default`.
+pub(crate) fn webview_home(
+    home: &std::path::Path,
+    profile: Option<&str>,
+) -> Result<std::path::PathBuf, String> {
     data_store_identifier(profile)?;
-    Ok(
-        match profile.filter(|value| *value != legacy_profile_identity()) {
-            Some(profile) => std::path::Path::new("browser-profiles").join(profile),
-            None => std::path::PathBuf::from("browser-profile"),
-        },
-    )
+    let name = profile
+        .filter(|value| *value != legacy_profile_identity())
+        .unwrap_or("default");
+    // A development profile keeps its own website data beside the others.
+    let folder = match std::env::var("MISTY_PROFILE") {
+        Ok(dev) if !dev.is_empty() => format!("{dev}-{name}"),
+        _ => name.to_owned(),
+    };
+    Ok(home.join("profiles").join(folder).join("webview"))
+}
+
+/// On macOS, WebKit keeps a store at
+/// `~/Library/WebKit/<bundle id>/WebsiteDataStore/<uuid>`, where the uuid is the store's
+/// identifier. Points `webview` at it so a profile's data is reachable from Misty's folder.
+/// The store may not exist yet (WebKit creates it on first use); the link is then dangling
+/// until it does. Never removes anything it does not own.
+#[cfg(target_os = "macos")]
+pub(crate) fn link_webview_data(
+    home: &std::path::Path,
+    library: &std::path::Path,
+    bundle_identifier: &str,
+    profile: Option<&str>,
+) -> Result<(), String> {
+    let identifier = data_store_identifier(profile)?;
+    let target = library
+        .join("WebKit")
+        .join(bundle_identifier)
+        .join("WebsiteDataStore")
+        .join(uuid::Uuid::from_bytes(identifier).hyphenated().to_string());
+    let link = webview_home(home, profile)?;
+    std::fs::create_dir_all(link.parent().ok_or("Invalid profile folder.")?)
+        .map_err(|error| error.to_string())?;
+    match std::fs::symlink_metadata(&link) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            if std::fs::read_link(&link).is_ok_and(|current| current == target) {
+                return Ok(());
+            }
+            std::fs::remove_file(&link).map_err(|error| error.to_string())?;
+        }
+        // An empty folder from an earlier layout gives way; one with files is left alone.
+        Ok(meta) if meta.is_dir() => {
+            if std::fs::remove_dir(&link).is_err() {
+                return Ok(());
+            }
+        }
+        Ok(_) => return Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    std::os::unix::fs::symlink(&target, &link).map_err(|error| error.to_string())
 }
 
 /// The host supplies a validated 256-bit identity (logical hash or native
@@ -66,17 +115,18 @@ mod tests {
             data_store_identifier(Some(&"02".repeat(32))).unwrap(),
             [1; 16]
         );
+        let home = std::path::Path::new("/home/me/.misty");
         assert_eq!(
-            relative_data_directory(None).unwrap(),
-            relative_data_directory(Some(&legacy_profile_identity())).unwrap()
+            webview_home(home, None).unwrap(),
+            webview_home(home, Some(&legacy_profile_identity())).unwrap()
         );
         assert_eq!(
-            relative_data_directory(None).unwrap(),
-            std::path::Path::new("browser-profile")
+            webview_home(home, None).unwrap(),
+            home.join("profiles").join("default").join("webview")
         );
         assert_eq!(
-            relative_data_directory(Some(&"01".repeat(32))).unwrap(),
-            std::path::Path::new("browser-profiles").join("01".repeat(32))
+            webview_home(home, Some(&"01".repeat(32))).unwrap(),
+            home.join("profiles").join("01".repeat(32)).join("webview")
         );
     }
 
@@ -96,7 +146,27 @@ mod tests {
                 data_store_identifier(Some(value)).is_err(),
                 "accepted {value}"
             );
-            assert!(relative_data_directory(Some(value)).is_err());
+            assert!(webview_home(std::path::Path::new("/x"), Some(value)).is_err());
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_links_the_profile_to_webkits_own_store_and_removes_only_its_own_link() {
+        let directory = tempfile::tempdir().unwrap();
+        let (home, library) = (directory.path().join(".misty"), directory.path().join("Library"));
+        let profile = "01".repeat(32);
+        link_webview_data(&home, &library, "com.misty.desktop", Some(&profile)).unwrap();
+        let link = webview_home(&home, Some(&profile)).unwrap();
+        let target = std::fs::read_link(&link).unwrap();
+        assert!(target.ends_with("WebKit/com.misty.desktop/WebsiteDataStore/01010101-0101-0101-0101-010101010101"));
+        // A second call keeps it; the store appearing later makes it resolve.
+        link_webview_data(&home, &library, "com.misty.desktop", Some(&profile)).unwrap();
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("cookies"), "kept").unwrap();
+        assert!(link.join("cookies").is_file());
+        // Deleting the profile's folder removes the link, never what it points to.
+        std::fs::remove_dir_all(link.parent().unwrap()).unwrap();
+        assert!(target.join("cookies").is_file());
     }
 }

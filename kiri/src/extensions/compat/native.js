@@ -162,6 +162,72 @@
     });
   }
 
+  if (declared("bookmarks")) {
+    namespace("bookmarks", {
+      getTree: remote("bookmarks.getTree"),
+      getSubTree: remote("bookmarks.getSubTree"),
+      getChildren: remote("bookmarks.getChildren"),
+      get: remote("bookmarks.get"),
+      getRecent: remote("bookmarks.getRecent"),
+      search: remote("bookmarks.search"),
+      create: remote("bookmarks.create"),
+      update: remote("bookmarks.update"),
+      move: remote("bookmarks.move"),
+      remove: remote("bookmarks.remove"),
+      removeTree: remote("bookmarks.removeTree"),
+      onCreated: event("bookmarks.onCreated"),
+      onChanged: event("bookmarks.onChanged"),
+      onMoved: event("bookmarks.onMoved"),
+      onRemoved: event("bookmarks.onRemoved"),
+      onChildrenReordered: event("bookmarks.onChildrenReordered"),
+      onImportBegan: event("bookmarks.onImportBegan"),
+      onImportEnded: event("bookmarks.onImportEnded"),
+    });
+  }
+
+  // Tab groups. WebKit keeps tab ids private, so each tab travels as its index
+  // and its window's addresses, the way tabs.move finds it.
+  if (api.tabs) {
+    const located = (ids) =>
+      Promise.all(
+        (Array.isArray(ids) ? ids : [ids]).map(async (id) => {
+          const tab = await api.tabs.get(id);
+          const peers = await api.tabs.query({ windowId: tab.windowId });
+          return { from: tab.index, urls: peers.map((peer) => peer.url ?? "") };
+        }),
+      );
+    compat.define(api.tabs, "group", method(async ({ tabIds, groupId } = {}) =>
+      call("tabs.group", await located(tabIds), groupId ?? null),
+    ));
+    compat.define(api.tabs, "ungroup", method(async (ids) => {
+      await call("tabs.ungroup", await located(ids));
+    }));
+  }
+  if (declared("tabGroups")) {
+    // Group windows are reported as the current window: groups live in one window.
+    const windowed = async (value) => {
+      const current = await api.windows.getLastFocused().catch(() => null);
+      const withWindow = (group) => ({ ...group, windowId: current?.id ?? -1 });
+      return Array.isArray(value) ? value.map(withWindow) : withWindow(value);
+    };
+    namespace("tabGroups", {
+      TAB_GROUP_ID_NONE: -1,
+      Color: Object.fromEntries(
+        ["grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"].map((c) => [c.toUpperCase(), c]),
+      ),
+      get: method(async (id) => windowed(await call("tabGroups.get", id))),
+      query: method(async (info) => windowed(await call("tabGroups.query", info ?? {}))),
+      update: method(async (id, properties) =>
+        windowed(await call("tabGroups.update", id, properties ?? {})),
+      ),
+      move: unsupported("Misty cannot move tab groups from extensions yet."),
+      onCreated: event("tabGroups.onCreated"),
+      onUpdated: event("tabGroups.onUpdated"),
+      onRemoved: event("tabGroups.onRemoved"),
+      onMoved: event("tabGroups.onMoved"),
+    });
+  }
+
   if (declared("tts")) {
     namespace("tts", {
       speak: remote("tts.speak"),

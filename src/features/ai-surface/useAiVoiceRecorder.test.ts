@@ -7,6 +7,7 @@ vi.mock("@/features/agents/AgentsRuntime", () => ({
   runtimeAgentsApi: { transcribeVoice },
 }));
 
+import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
 import { useAiVoiceRecorder } from "./useAiVoiceRecorder";
 
 describe("useAiVoiceRecorder", () => {
@@ -115,7 +116,7 @@ describe("useAiVoiceRecorder", () => {
     await act(async () => result.current.start());
 
     expect(onError).toHaveBeenLastCalledWith(
-      "Microphone access is off. Allow it for Misty in System Settings, then try again.",
+      `Microphone access is off. ${microphoneSettingsHint()}`,
     );
     expect(onActivityChange).toHaveBeenLastCalledWith(false);
     expect(result.current.requesting).toBe(false);

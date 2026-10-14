@@ -62,6 +62,11 @@ export class MistyScreenDevice implements AbstractInterface {
       adapter: SurfaceAdapter;
       execute: ScreenExecute;
       allowConsequential: boolean;
+      /**
+       * Asks the person in the control island before a consequential action
+       * (roadmap C2). Resolves false when they refuse or don't answer.
+       */
+      confirm?: (description: string) => Promise<boolean>;
       /** Aborting it ends the goal; the device aborts it to stop or fail. */
       controller: AbortController;
     },
@@ -132,6 +137,15 @@ export class MistyScreenDevice implements AbstractInterface {
       this.end({
         status: "needs_confirmation",
         summary: `Stopped before a consequential action: ${plan.description}. Ask the user, then call again with allowConsequential if they agree.`,
+      });
+    if (
+      plan.consequential &&
+      this.options.confirm &&
+      !(await this.options.confirm(plan.description))
+    )
+      this.end({
+        status: "needs_confirmation",
+        summary: `The person didn't allow “${plan.description}” in Misty, so it wasn't done. Don't try another way; tell them it wasn't done.`,
       });
     const before = this.frame ?? (await this.capture());
     const mapped = this.options.adapter.input(action, {

@@ -1,4 +1,4 @@
-import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAssetStack } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 import { Play } from "lucide-react";
 

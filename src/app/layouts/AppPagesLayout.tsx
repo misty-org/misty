@@ -10,11 +10,12 @@ const appPageTitles = new Map<string, string>([
   [routes.scheduled, "Misty - Scheduled"],
   [routes.signIn, "Misty - Sign In"],
   [routes.register, "Misty - Register"],
+  [routes.welcome, "Misty"],
 ]);
 
 export function AppPagesLayout() {
   const location = useLocation();
-  const refreshLocalAccessToken = useNativeSessionStore((state) => state.refreshLocalAccessToken);
+  const refreshSession = useNativeSessionStore((state) => state.refreshSession);
 
   useEffect(() => {
     const match = [...appPageTitles.keys()]
@@ -28,12 +29,12 @@ export function AppPagesLayout() {
     if (!hasTauriInternals()) return;
     const interval = window.setInterval(
       () => {
-        void refreshLocalAccessToken();
+        void refreshSession();
       },
       10 * 60 * 1000,
     );
     return () => window.clearInterval(interval);
-  }, [refreshLocalAccessToken]);
+  }, [refreshSession]);
 
   return (
     <div className="app-pages-root h-full min-h-0 bg-charcoal-bg text-cream">

@@ -4,7 +4,7 @@ import { FileNameIcon } from "@/features/file-ui";
 import { spacesApi } from "@/api/spaces/api";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { Images, FileText, MessagesSquare, PencilRuler } from "lucide-react";
 import {
@@ -70,7 +70,11 @@ export function SpaceOverview({ space }: { space: Space }) {
       : data.items.filter(
           (item) =>
             filter === "all" ||
-            (filter === "favorites" ? item.favorite : item.creatorUserId === user?.id),
+            (filter === "favorites"
+              ? item.favorite
+              : filter === "agents"
+                ? Boolean(item.creatorAgentId)
+                : item.creatorUserId === user?.id),
         );
   const searched = filtered.filter((item) =>
     item.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
@@ -115,6 +119,7 @@ export function SpaceOverview({ space }: { space: Space }) {
         options={[
           { value: "all", label: "All" },
           { value: "yours", label: "Yours" },
+          { value: "agents", label: "From agents" },
           { value: "suggested", label: "Suggested" },
           { value: "favorites", label: "Favorites" },
         ]}
@@ -190,11 +195,11 @@ export function SpaceOverview({ space }: { space: Space }) {
               creator:
                 filter === "suggested"
                   ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : creatorName(item.creatorUserId, item.creatorAgentId),
+                  : creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName),
               creatorDescription:
                 filter === "suggested"
                   ? suggestions.find((s) => s.item.id === item.id)?.reason
-                  : `${item.kind === "file" ? "Added" : "Created"} by ${creatorName(item.creatorUserId, item.creatorAgentId)}`,
+                  : `${item.kind === "file" ? "Added" : "Created"} by ${creatorName(item.creatorUserId, item.creatorAgentId, item.creatorAgentName)}`,
               updated: item.updatedAt
                 ? new Date(item.updatedAt).toLocaleDateString(undefined, {
                     month: "short",

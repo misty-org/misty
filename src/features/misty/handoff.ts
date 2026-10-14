@@ -44,7 +44,7 @@ export function showMistyConversation() {
   const view = workspace.openDestination(surface);
   if (view.route !== route) workspace.updateViewRoute(view.id, route, true);
 }
-export async function acceptMistyHandoff(input: MistyHandoff) {
+async function acceptMistyHandoff(input: MistyHandoff) {
   const initial = useMistyStore.getState();
   const accountId = initial.accountId;
   const accountGeneration = useMistyDraftAttachments.getState().generation;

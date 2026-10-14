@@ -57,16 +57,42 @@
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["system", "dark", "light", "scheduled"],
+    "enum": ["system", "dark", "light"],
     "keywords": ["dark mode", "light mode", "color scheme"]
   },
   {
-    "id": "app.appearance.theme_light_start",
-    "label": "Light from",
-    "keywords": ["schedule", "sunrise", "theme"],
+    "id": "app.appearance.night_light",
+    "label": "Night light",
+    "keywords": ["eye saver", "blue light", "warm", "night shift", "schedule"],
     "page": "appearance",
     "section": "appearance",
-    "key": "theme_light_start",
+    "key": "night_light_mode",
+    "default": "off",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["off", "on", "scheduled"]
+  },
+  {
+    "id": "app.appearance.night_light_start",
+    "label": "Turns on",
+    "keywords": ["night light", "schedule", "sunset", "evening"],
+    "page": "appearance",
+    "section": "appearance",
+    "key": "night_light_start",
+    "default": "21:00",
+    "owner": "account",
+    "type": "string",
+    "maxLength": 5,
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "app.appearance.night_light_end",
+    "label": "Turns off",
+    "keywords": ["night light", "schedule", "sunrise", "morning"],
+    "page": "appearance",
+    "section": "appearance",
+    "key": "night_light_end",
     "default": "07:00",
     "owner": "account",
     "type": "string",
@@ -74,30 +100,18 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "app.appearance.theme_dark_start",
-    "label": "Dark from",
-    "keywords": ["schedule", "sunset", "theme", "night"],
+    "id": "app.appearance.night_light_warmth",
+    "label": "Warmth",
+    "keywords": ["night light", "eye saver", "blue light", "strength"],
     "page": "appearance",
     "section": "appearance",
-    "key": "theme_dark_start",
-    "default": "19:00",
+    "key": "night_light_warmth",
+    "default": 0.5,
     "owner": "account",
-    "type": "string",
-    "maxLength": 5,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.appearance.accent",
-    "label": "Accent color",
-    "keywords": ["color", "theme", "accent", "tint"],
-    "page": "appearance",
-    "section": "appearance",
-    "key": "accent_color",
-    "default": "",
-    "owner": "account",
-    "type": "string",
-    "maxLength": 7,
-    "platforms": ["desktop"]
+    "type": "number",
+    "platforms": ["desktop"],
+    "min": 0.1,
+    "max": 1
   },
   {
     "id": "app.appearance.compact_mode_enabled",
@@ -109,31 +123,6 @@
     "owner": "account",
     "type": "boolean",
     "platforms": ["desktop"]
-  },
-  {
-    "id": "app.appearance.navigator_auto_hide",
-    "label": "Auto-hide navigation",
-    "page": "layout",
-    "section": "appearance",
-    "key": "navigator_auto_hide",
-    "default": false,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.navigation.hidden",
-    "label": "Hidden navigation destinations",
-    "page": "layout",
-    "section": "appearance",
-    "key": "navigator_hidden_json",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"],
-    "keywords": ["navigation", "rail", "sidebar", "hide", "show"]
   },
   {
     "id": "app.appearance.dim_inactive_panes",
@@ -275,46 +264,6 @@
     "default": true,
     "owner": "account",
     "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.tabSleepMinutes",
-    "label": "Sleep inactive tabs",
-    "keywords": ["memory", "unload", "discard", "performance", "sleep"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_tab_sleep_minutes",
-    "default": 30,
-    "owner": "account",
-    "type": "number",
-    "min": 0,
-    "max": 1440,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.contentBlocking",
-    "label": "Block ads and trackers",
-    "keywords": ["ad blocker", "adblock", "tracking", "privacy", "ublock"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_content_blocking",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.contentBlockingAllowedSites",
-    "label": "Sites without blocking",
-    "keywords": ["ad blocker", "exceptions", "allow ads", "whitelist"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_content_blocking_allowed_json",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 16384,
     "platforms": ["desktop"]
   },
   {
@@ -464,6 +413,19 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "sync.frequency",
+    "label": "Sync frequency",
+    "keywords": ["batch", "battery", "data", "live", "saver", "requests"],
+    "page": "sync",
+    "section": "sync",
+    "key": "sync_frequency",
+    "default": "balanced",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["live", "balanced", "saver"]
+  },
+  {
     "id": "browser.privacy.page_state_excluded_sites",
     "label": "Don't capture page state on these sites",
     "page": "browser-privacy",
@@ -576,19 +538,7 @@
     "type": "number",
     "platforms": ["desktop"],
     "min": 0,
-    "max": 0.4
-  },
-  {
-    "id": "app.appearance.pane_focus_indicator",
-    "label": "Active-pane indicator",
-    "page": "appearance",
-    "section": "appearance",
-    "key": "pane_focus_indicator",
-    "default": "none",
-    "owner": "account",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["none", "outline", "border"]
+    "max": 0.5
   },
   {
     "id": "app.shortcuts.bindings",
@@ -661,19 +611,6 @@
     "default": "",
     "type": "string",
     "owner": "account",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "collections.tabs.navigator",
-    "label": "Navigation tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "navigator_tab_order",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
     "platforms": ["desktop"]
   },
   {
@@ -757,7 +694,7 @@
   {
     "id": "extensions.installations",
     "label": "Installed extensions",
-    "page": "browser",
+    "page": "browser-extensions",
     "section": "extensions",
     "key": "installations",
     "default": "[]",
@@ -770,7 +707,7 @@
   {
     "id": "extensions.agent_access",
     "label": "Allow agents to use extensions",
-    "page": "browser",
+    "page": "browser-extensions",
     "section": "extensions",
     "key": "agent_access",
     "default": true,

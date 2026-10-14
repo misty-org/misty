@@ -93,7 +93,7 @@ export function closeDrawingCollaborationSession(spaceId: string, drawingId: str
   if (entry.session) destroySession(entry.session);
 }
 
-export function closeAllDrawingCollaborationSessions(): void {
+function closeAllDrawingCollaborationSessions(): void {
   for (const [, entry] of sessions) {
     clearIdleTimer(entry);
     if (entry.session) destroySession(entry.session);

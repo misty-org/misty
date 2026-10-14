@@ -8,8 +8,6 @@ import { strippedUrl, typedUrlText } from "./urlText";
 export const relevance = {
   typedUrl: 1200,
   typedSearch: 1300,
-  /** Searching still ranks high when the text looks like an address. */
-  typedSearchForAddress: 1150,
   /** A familiar page whose address starts with the typed text: completes inline, beating search. */
   inlineAddress: 1350,
   addressPrefix: 1050,
@@ -18,6 +16,8 @@ export const relevance = {
   substring: 650,
   openTabPrefix: 950,
   suggestion: 800,
+  /** A site the engine itself named: above plain suggestions, below what was typed. */
+  suggestedSite: 1250,
   topPage: 600,
   action: 1000,
   contentTitlePrefix: 900,
@@ -28,10 +28,16 @@ export const relevance = {
 export type MatchQuality = "address-prefix" | "title-word-prefix" | "substring" | "none";
 
 /** How well typed text matches a page, best first. */
-export function matchQuality(text: string, url: string, title: string): MatchQuality {
+export function matchQuality(
+  text: string,
+  url: string,
+  title: string,
+  /** `strippedUrl(url)` lowercased, when the caller already has it. */
+  stripped = strippedUrl(url).toLowerCase(),
+): MatchQuality {
   const typed = typedUrlText(text);
   if (!typed) return "none";
-  if (strippedUrl(url).toLowerCase().startsWith(typed)) return "address-prefix";
+  if (stripped.startsWith(typed)) return "address-prefix";
   const query = text.trim().toLowerCase();
   const words = title.toLowerCase().split(/[\s\-–—|:·,/]+/);
   if (words.some((word) => word.startsWith(query)) || title.toLowerCase().startsWith(query))

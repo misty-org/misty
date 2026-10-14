@@ -15,11 +15,12 @@ import type {
   SplitTree,
   WorkspaceRecords,
 } from "./model";
+import { isWindowColor } from "@/features/workspace/windowColors";
 import { projectTabGroups } from "./tabGroupSync";
 
 const recoveryWindowId = "recovery:window";
 export const recoveryTabId = (viewId: string) => `recovery:tab:${viewId}`;
-export const recoveryPaneId = (viewId: string) => `recovery:pane:${viewId}`;
+const recoveryPaneId = (viewId: string) => `recovery:pane:${viewId}`;
 
 function records<K extends RecordKind>(view: WorkspaceRecords, kind: K): SharedRecord<K>[] {
   return view.records.filter((record) => record.kind === kind) as SharedRecord<K>[];
@@ -36,15 +37,17 @@ function panes(tree: SplitTree): string[] {
 const surfaceRoutes = {
   agents: "/agents",
   space: "/spaces",
-  extensions: "/extensions",
 } as const;
 /** A synced view as the pane content the workspace UI renders. */
 function viewAsWorkspaceView(record: SharedRecord<"view">): WorkspaceView {
   const fields = record.fields;
-  if (fields.surface === "home" || fields.surface === "files") {
-    // Older clients still sync the retired Home page and Files views (Files
-    // moved to Kura, a separate app); both open as a new tab.
-    const state = createBrowserViewState();
+  if (fields.surface === "home" || fields.surface === "files" || fields.surface === "extensions") {
+    // Older clients still sync the retired Home page, Files and Extensions
+    // views (Files moved to Kura, a separate app; extensions are added from
+    // their stores' sites). They open as a new tab, Extensions at its store.
+    const state = createBrowserViewState(
+      fields.surface === "extensions" ? "https://chromewebstore.google.com/" : undefined,
+    );
     return {
       id: record.id,
       instanceKey: record.id,
@@ -207,6 +210,7 @@ export function projectWorkspace(
     return {
       id: window.id,
       title: window.fields.title,
+      ...(isWindowColor(window.fields.color) ? { color: window.fields.color } : {}),
       createdAt: 0,
       lastFocusedAt: 0,
       layout: {

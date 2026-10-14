@@ -2,7 +2,7 @@ import { useAuth } from "@/features/auth";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
 import { useSpacesStore } from "@/features/spaces";
-import type { Space, SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { Space, SpaceMember } from "@/api/spaces/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
@@ -19,6 +19,8 @@ import { Settings2, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { AgentTeamRows } from "../agents/AgentTeamRows";
+import { useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyViewers: SpacePresenceViewer[] = [];
@@ -61,6 +63,9 @@ export function SpaceMembersPopover({
     };
   }, [loadMembers, members.length, open, space.id]);
 
+  // Agents load when the popover opens; an empty id keeps the hook idle.
+  const { agents } = useSpaceAgentMembers(open ? space.id : "");
+
   const groupedMembers = useMemo(
     () => groupMembersByPresence(members, viewers, user?.id),
     [members, user?.id, viewers],
@@ -86,7 +91,6 @@ export function SpaceMembersPopover({
             title="Team"
             aria-haspopup="dialog"
             aria-expanded={open}
-            data-tour-target="space-share-button"
           >
             <UsersRound size={16} strokeWidth={1.75} aria-hidden="true" />
           </IconButton>
@@ -98,7 +102,11 @@ export function SpaceMembersPopover({
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
             <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">
-              {members.length || space.member_count} teammates in {space.name}
+              {members.length || space.member_count} teammates
+              {agents?.length
+                ? ` and ${agents.length} agent${agents.length === 1 ? "" : "s"}`
+                : ""}{" "}
+              in {space.name}
             </p>
           </div>
           {onlineCount > 0 ? (
@@ -110,7 +118,10 @@ export function SpaceMembersPopover({
           {loading && members.length === 0 ? (
             <MembersSkeleton />
           ) : (
-            <TeamRows members={orderedMembers} />
+            <>
+              <TeamRows members={orderedMembers} />
+              <AgentTeamRows agents={agents ?? []} currentUserId={user?.id} />
+            </>
           )}
         </div>
 

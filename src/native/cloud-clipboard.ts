@@ -1,15 +1,19 @@
 import { invoke } from "./invoke";
 
-/** The shared clipboard across this account's devices (docs/design/clipboard/BRIEF.md). */
-export type CloudClipboardStatus = "off" | "locked" | "connecting" | "ready" | "unavailable";
+/**
+ * The shared clipboard across this account's devices (docs/design/clipboard/BRIEF.md). Clips
+ * travel through sync as a small ring; "unavailable" means sync can't be reached.
+ */
+type CloudClipboardStatus = "off" | "locked" | "connecting" | "ready" | "unavailable";
 
 export interface CloudClip {
   clipId: string;
   deviceId: string;
   deviceName: string;
   fromThisDevice: boolean;
-  kind: "empty" | "text" | "html" | "image" | "file_refs";
+  kind: "empty" | "text" | "html" | "image";
   preview: string;
+  /** The names of copied files, when the clip came from a file copy (shared as text). */
   fileNames: string[];
   size: number;
   createdAt: number;
@@ -18,6 +22,8 @@ export interface CloudClip {
 export interface CloudClipboardView {
   status: CloudClipboardStatus;
   clips: CloudClip[];
+  /** Plain words about the last copy that could not be shared, if any. */
+  notice: string | null;
 }
 
 /** Emitted natively whenever the clip list or its status changes. */

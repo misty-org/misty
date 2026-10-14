@@ -1,3 +1,4 @@
+import { awaitingRestore } from "./afterReload";
 import { capturePageState } from "./native";
 import { isExcludedSite, pageRestoreSettings } from "./settings";
 import { liveBrowserViews, pageReady, runtimeOf, viewUrl } from "./tabs";
@@ -10,7 +11,9 @@ export async function captureAll(force = false): Promise<void> {
   if (!pageRestoreSettings().enabled || capturing) return;
   capturing = true;
   try {
-    for (const tab of liveBrowserViews().filter(pageReady).slice(0, 40)) {
+    for (const tab of liveBrowserViews()
+      .filter((tab) => pageReady(tab) && !awaitingRestore(tab.id))
+      .slice(0, 40)) {
       await capturePageState(runtimeOf(tab), tab.id, isExcludedSite(viewUrl(tab)), force).catch(
         () => false,
       );

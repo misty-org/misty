@@ -65,8 +65,12 @@ describe("browser native view synchronization", () => {
       }),
     );
 
+    // A second user of tracking changes nothing, and tracking stays on until both let go.
     invoke.mockClear();
     setBrowserPointerTrackingEnabled(true);
+    await Promise.resolve();
+    expect(invoke).not.toHaveBeenCalled();
+    setBrowserPointerTrackingEnabled(false);
     await Promise.resolve();
     expect(invoke).not.toHaveBeenCalled();
 

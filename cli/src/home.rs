@@ -4,9 +4,8 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::artifacts::write_private;
 
 /// Shared with the desktop app, which applies the same layout on every launch.
 const LAYOUT_JSON: &str = include_str!("../../src-tauri/misty-home-layout.json");
@@ -22,13 +21,6 @@ struct Layout {
 
 fn layout() -> Layout {
     serde_json::from_str(LAYOUT_JSON).expect("misty-home-layout.json is valid")
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct HomeManifest {
-    format: String,
-    layout_version: u32,
 }
 
 pub fn default_root() -> Result<PathBuf> {
@@ -52,11 +44,9 @@ pub fn generate(destination: Option<&Path>) -> Result<()> {
         secure_directory(&destination.join(relative))?;
     }
 
-    write_if_missing(&destination.join("home.json"), &manifest_bytes()?)?;
-    write_if_missing(
-        &destination.join("config/misty.json"),
-        b"{\n  \"server\": {\n    \"mode\": \"hosted\"\n  }\n}\n",
-    )?;
+    if misty_credential_store::layout_version(&destination)?.is_none() {
+        misty_credential_store::set_layout_version(&destination, layout().layout_version)?;
+    }
     secure_known_files(&destination)?;
 
     println!("Misty home is ready at {}.", destination.display());
@@ -98,40 +88,23 @@ pub fn check(path: Option<&Path>) -> Result<()> {
 }
 
 fn check_manifest(root: &Path, problems: &mut Vec<String>) {
-    let path = root.join("home.json");
-    let Ok(contents) = fs::read_to_string(&path) else {
-        problems.push("missing or unreadable home.json".to_owned());
-        return;
-    };
-    match serde_json::from_str::<HomeManifest>(&contents) {
-        Ok(manifest)
-            if manifest.format == "misty-home"
-                && manifest.layout_version == layout().layout_version => {}
-        Ok(manifest) => problems.push(format!(
-            "unsupported home manifest: format={}, layoutVersion={}",
-            manifest.format, manifest.layout_version
-        )),
-        Err(_) => problems.push("invalid home.json".to_owned()),
+    match misty_credential_store::layout_version(root) {
+        Ok(Some(version)) if version == layout().layout_version => {}
+        Ok(Some(version)) => problems.push(format!("unsupported home layout version {version}")),
+        Ok(None) => problems.push("the home has no recorded layout version".to_owned()),
+        Err(_) => problems.push("the home's database could not be read".to_owned()),
     }
-}
-
-fn manifest_bytes() -> Result<Vec<u8>> {
-    let mut bytes = serde_json::to_vec_pretty(&HomeManifest {
-        format: "misty-home".to_owned(),
-        layout_version: layout().layout_version,
-    })?;
-    bytes.push(b'\n');
-    Ok(bytes)
-}
-
-fn write_if_missing(path: &Path, contents: &[u8]) -> Result<()> {
-    if path.exists() {
-        return Ok(());
-    }
-    write_private(path, contents)
 }
 
 fn secure_known_files(root: &Path) -> Result<()> {
+    #[cfg(windows)]
+    for relative in &layout().private_files {
+        let path = root.join(relative);
+        if path.is_file() {
+            misty_credential_store::restrict_private_file(&path)
+                .with_context(|| format!("could not secure {}", path.display()))?;
+        }
+    }
     #[cfg(unix)]
     for relative in &layout().private_files {
         let path = root.join(relative);
@@ -145,6 +118,20 @@ fn secure_known_files(root: &Path) -> Result<()> {
 }
 
 fn check_permissions(root: &Path, problems: &mut Vec<String>) -> Result<()> {
+    #[cfg(windows)]
+    {
+        if !misty_credential_store::is_private_directory(root) {
+            problems.push("home directory is accessible by other users".to_owned());
+        }
+        for relative in &layout().private_files {
+            let path = root.join(relative);
+            if path.is_file() && !misty_credential_store::is_private_file(&path) {
+                problems.push(format!(
+                    "private file is accessible by other users: {relative}"
+                ));
+            }
+        }
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -176,6 +163,9 @@ fn secure_directory(path: &Path) -> Result<()> {
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))
             .with_context(|| format!("could not secure {}", path.display()))?;
     }
+    #[cfg(windows)]
+    misty_credential_store::restrict_private_directory(path)
+        .with_context(|| format!("could not secure {}", path.display()))?;
     Ok(())
 }
 
@@ -198,7 +188,8 @@ mod tests {
         let destination = temporary.path().join("output/.misty");
         generate(Some(&destination)).unwrap();
         generate(Some(&destination)).unwrap();
-        assert!(destination.join("config").is_dir());
+        assert!(destination.join(".local/data/misty.db").is_file());
+        assert!(destination.join("profiles").is_dir());
         assert!(!destination.join("plugins").exists());
         check(Some(&destination)).unwrap();
     }

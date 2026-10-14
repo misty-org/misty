@@ -8,6 +8,9 @@ use kiri::channel::{HostChannel, HostMessage};
 // Saved passwords answer the page script's sign-in messages, which arrive here.
 #[path = "browser_passwords.rs"]
 pub(crate) mod passwords;
+// "Add to Misty" on the Chrome Web Store and Firefox Add-ons.
+#[path = "browser_extension_store.rs"]
+mod extension_store;
 use std::sync::OnceLock;
 
 #[derive(serde::Deserialize)]
@@ -58,7 +61,7 @@ fn navigate_message(raw: &str) -> Option<Url> {
     let url = Url::parse(&message.navigate).ok()?;
     matches!(
         url.scheme(),
-        "misty-shortcut" | "misty-context-menu" | "misty-passwords"
+        "misty-shortcut" | "misty-context-menu" | "misty-passwords" | "misty-extension-store"
     )
     .then_some(url)
 }
@@ -68,6 +71,36 @@ fn navigate_message(raw: &str) -> Option<Url> {
 struct BackgroundMessage {
     token: String,
     background: String,
+}
+
+/// The page asks to move the window: a press-and-drag on empty space at its top edge.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DragMessage {
+    token: String,
+    drag: bool,
+}
+
+fn drag_message(raw: &str) -> Option<DragMessage> {
+    if raw.len() > 1024 {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
+/// The page reports a double press on its top edge, which acts as the titlebar's double-click.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ZoomMessage {
+    token: String,
+    zoom: bool,
+}
+
+fn zoom_message(raw: &str) -> Option<ZoomMessage> {
+    if raw.len() > 1024 {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
 }
 
 fn background_message(raw: &str) -> Option<BackgroundMessage> {
@@ -117,6 +150,20 @@ pub(super) fn forget_page_background(id: &str) {
     }
 }
 
+/// The page's last reported color, if it has reported one.
+pub(super) fn reported_page_background(id: &str) -> Option<String> {
+    page_backgrounds()
+        .lock()
+        .ok()
+        .and_then(|values| values.get(id).cloned())
+}
+
+/// Re-applies a reported page color to the native view.
+#[cfg(any(target_os = "macos", windows))]
+pub(super) fn apply_page_background(webview: &Webview, hex: String) {
+    set_under_page_background(webview, hex);
+}
+
 pub(super) fn replay_page_background(app: &AppHandle, id: &str) {
     let color = page_backgrounds()
         .lock()
@@ -157,6 +204,18 @@ fn set_under_page_background(webview: &Webview, hex: String) {
     });
 }
 
+/// WebView2 fills unpainted area with its default background color.
+#[cfg(windows)]
+fn set_under_page_background(webview: &Webview, hex: String) {
+    let channel = |start: usize| u8::from_str_radix(&hex[start..start + 2], 16).unwrap_or(0);
+    let _ = webview.set_background_color(Some(tauri::window::Color(
+        channel(1),
+        channel(3),
+        channel(5),
+        255,
+    )));
+}
+
 fn trusted(app: &AppHandle, id: &str, token: &str) -> bool {
     app.try_state::<BrowserSessionState>()
         .is_some_and(|state| super::shortcut_token_matches(&state, id, token))
@@ -177,6 +236,7 @@ impl HostChannel for Channel {
             if message.main_frame
                 && !super::forward_navigation(app, id, &url)
                 && !passwords::forward(app, id, &url)
+                && !extension_store::forward(app, id, &url)
             {
                 super::context_menu::forward(app, id, &url);
             }
@@ -186,9 +246,14 @@ impl HostChannel for Channel {
             if !message.main_frame || !trusted(app, id, &background.token) {
                 return;
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             if let Some(webview) = app.get_webview(message.webview) {
                 set_under_page_background(&webview, background.background.clone());
+            }
+            // Before a page's styles apply, its color reads as the default
+            // white. Only a real color, or the page finishing, shows the view.
+            if !background.background.eq_ignore_ascii_case("#ffffff") {
+                super::release_first_paint(app, id);
             }
             if let Ok(mut values) = page_backgrounds().lock() {
                 values.insert(id.to_owned(), background.background.clone());
@@ -212,6 +277,24 @@ impl HostChannel for Channel {
                         y: pointer.pointer.y,
                         inside: pointer.pointer.inside,
                     },
+                );
+            }
+            return;
+        }
+        if let Some(drag) = drag_message(raw) {
+            if drag.drag && message.main_frame && trusted(app, id, &drag.token) {
+                if let Some(webview) = app.get_webview(message.webview) {
+                    let _ = webview.window().start_dragging();
+                }
+            }
+            return;
+        }
+        if let Some(zoom) = zoom_message(raw) {
+            if zoom.zoom && message.main_frame && trusted(app, id, &zoom.token) {
+                let _ = app.emit_to(
+                    super::browser_owner_label(app, id),
+                    "misty://browser-titlebar-zoom",
+                    BrowserFocusEvent { id: id.to_owned() },
                 );
             }
             return;

@@ -1,7 +1,7 @@
 export type ExplorerViewMode = "list" | "grid";
 export type ExplorerCommandQueryMode = "search" | "filter";
 export type ExplorerSortColumn = "name" | "modified" | "size" | "type";
-export type ExplorerSortDirection = "asc" | "desc";
+type ExplorerSortDirection = "asc" | "desc";
 export interface ExplorerSortState {
   column: ExplorerSortColumn;
   direction: ExplorerSortDirection;

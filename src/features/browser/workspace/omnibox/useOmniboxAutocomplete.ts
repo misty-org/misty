@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { mergeMatches, stillMatches } from "./controller";
 import type { OmniboxInput, OmniboxMatch, OmniboxProvider } from "./types";
 
@@ -6,8 +6,11 @@ type ProviderResults = Record<string, OmniboxMatch[]>;
 
 /**
  * Runs every provider for the current input and returns the merged list.
- * Synchronous providers show on the same frame; slower ones slot in as they
- * resolve. A new keystroke cancels in-flight work, and earlier rows that
+ * Providers run on a deferred copy of the input: React flushes a keystroke's
+ * effects before it paints, so running them on the typed input held each
+ * character back until every synchronous provider finished. Now the character
+ * paints first; synchronous providers follow on the next render and slower
+ * ones slot in as they resolve. A new keystroke cancels in-flight work, and earlier rows that
  * still fit the new text stay until fresh ones replace them, so the list
  * does not flicker empty between keystrokes. `input` must be memoized.
  */
@@ -16,8 +19,10 @@ export function useOmniboxAutocomplete(
   providers: readonly OmniboxProvider[],
 ): OmniboxMatch[] {
   const [results, setResults] = useState<ProviderResults>({});
+  const deferred = useDeferredValue(input);
 
   useEffect(() => {
+    const input = deferred;
     if (!input) {
       setResults({});
       return;
@@ -50,7 +55,7 @@ export function useOmniboxAutocomplete(
       );
     }
     return () => controller.abort();
-  }, [input, providers]);
+  }, [deferred, providers]);
 
   return useMemo(() => mergeMatches(Object.values(results)), [results]);
 }

@@ -7,8 +7,9 @@ import {
   readApiAuthToken,
   resolveRequiredApiBase,
 } from "@/api/client";
-import type { BillingUsage } from "@/api/spaces/dto/interfaces/agentUsageTypes";
+import type { BillingUsage } from "@/api/spaces/dto/agentUsageTypes";
 import type {
+  AiProgressItem,
   AiArtifact,
   AiInvocationCreated,
   AiInvocationEvent,
@@ -22,10 +23,18 @@ export type ScreenLocation = "separate" | "window" | "ask";
 export interface AiUserSettings {
   enabled: boolean;
   memory_enabled: boolean;
-  /** Sends, shares, deletes and payments in connected apps wait for approval. */
+  /** Agents pause before sending, sharing, deleting and paying. Off by default. */
   app_actions_ask: boolean;
+  /** Agents pause before paying while they otherwise act on their own. */
+  payments_ask?: boolean;
   /** Where agents open a screen when a task needs one. */
   screen_location?: ScreenLocation;
+  /** Agents may read but not act on banking, crypto, payment and adult sites. */
+  agent_block_sensitive?: boolean;
+  /** More sites agents may read but not act on, as hosts such as example.com. */
+  agent_blocked_sites?: string[];
+  /** A computer stays awake while an agent works on it. */
+  keep_awake_for_agents?: boolean;
   retention_days: number;
   purge_state: "none" | "queued" | "working" | "verified" | "failed";
   disabled_at?: string;
@@ -131,10 +140,20 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify({ location }),
     }),
-  updateAppActionsAsk: (ask: boolean) =>
+  updateAppActionsAsk: (change: { ask?: boolean; payments?: boolean }) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
       method: "PUT",
-      body: JSON.stringify({ ask }),
+      body: JSON.stringify(change),
+    }),
+  updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {
+      method: "PUT",
+      body: JSON.stringify(change),
+    }),
+  updateKeepAwake: (keepAwake: boolean) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/keep-awake", {
+      method: "PUT",
+      body: JSON.stringify({ keep_awake_for_agents: keepAwake }),
     }),
   memories: () => apiRequest<{ memories: AiMemoryRecord[] }>("/ai/memories"),
   forgetMemory: (memoryId: string) =>
@@ -179,6 +198,11 @@ export const aiSurfaceApi = {
       body: JSON.stringify(toServerInvocation({ ...input, deviceContexts })),
     });
   },
+  /** How a reply got its answer: notes and tool runs, rebuilt from its stored events. */
+  invocationProgress: (invocationId: string) =>
+    apiRequest<{ items: AiProgressItem[] }>(
+      `/ai/invocations/${encodeURIComponent(invocationId)}/progress`,
+    ),
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",
@@ -262,6 +286,8 @@ function toServerInvocation(input: AiInvocationRequest) {
     companion_mode: input.companionMode,
     method_version_id: input.methodVersionId,
     method_inputs: input.methodInputs,
+    schedule_id: input.scheduleId,
+    schedule_claim: input.scheduleClaim,
     skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
     companion_intent: input.companionIntent,
@@ -280,6 +306,7 @@ function toServerInvocation(input: AiInvocationRequest) {
       captured_at: c.capturedAt,
       display_id: c.display.id,
       source: c.source,
+      controls: c.controls,
     })),
     capture: input.capture
       ? {

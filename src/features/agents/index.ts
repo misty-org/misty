@@ -1,7 +1,7 @@
 export { default as AgentsPage } from "./AgentsPage";
 export * from "./flags";
-export type { GlobalSpaceLibraryHit } from "./model/interfaces/personal";
-export { agentsDeviceSnapshot, agentsRevokeFolderScope } from "./store/useAgentsStore";
+export type { GlobalSpaceLibraryHit } from "./model/personal";
+export { agentsDeviceSnapshot, codeRemoveProject } from "./store/useAgentsStore";
 export {
   deviceAccount,
   ensureDeviceStarted,
@@ -16,10 +16,14 @@ export * from "./store/useAiServerStore";
 export { companionReply } from "./companion/companionReply";
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";
-export { MistyPanel, MISTY_PANEL_WIDTH, type MistyPanelSide } from "./panel/MistyPanel";
-export { useMistyPanelStore } from "./panel/mistyPanelStore";
+export { MistyPanel, type MistyPanelSide } from "./panel/MistyPanel";
+export { MistyPanelDock } from "./panel/MistyPanelDock";
+export { mistyPanelHost, useMistyPanelHost, useMistyPanelSide } from "./panel/mistyPanelHost";
+export { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./panel/mistyPanelStore";
+export { MistyPanelSprite, useMistyPanelAgentName } from "./panel/MistyPanelSprite";
+export { AgentTabAway, useTabAway } from "./dock/AgentTabAway";
 
-export type { AgentScope } from "./model/interfaces/types";
+export type { AgentScope } from "./model/types";
 
 export type { DisplayCapture } from "./companion/protocol";
 
@@ -30,6 +34,8 @@ export type { AppRequest } from "./apps/api";
 export { AppRequestCard } from "./apps/AppRequestCard";
 
 export { ModelPicker } from "./models/ModelPicker";
+export { ReasoningPicker } from "./models/ReasoningPicker";
+export { settleProgress, withToolEvent } from "./progress/progressTimeline";
 export { describeNextRun } from "./workflows/scheduleSummary";
 export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";

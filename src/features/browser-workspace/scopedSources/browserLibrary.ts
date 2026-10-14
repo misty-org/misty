@@ -2,6 +2,7 @@ import { bookmarksBarId, bookmarkTree } from "@/features/bookmarks/library";
 import { bookmarkLocation, searchBookmarks } from "@/features/bookmarks/search";
 import { bookmarkWindowViews, browserLibrary, useBrowserDownloadsStore } from "@/features/browser";
 import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
+import { parseBrowserViewState } from "@/features/workspace/model";
 import { openBrowserTabs } from "@/features/workspace/browserTabs";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { resultLimit, type ScopedSearchResult } from "../scopedSearchSources";
@@ -64,17 +65,26 @@ export function searchBookmarkLibrary(query: string): ScopedSearchResult[] {
   ];
 }
 
-function closedTabs(query: string): ScopedSearchResult[] {
+/** Closed tabs of one page are one entry: the most recently closed, which comes first. */
+function closedTabs(query: string, skipUrls: ReadonlySet<string> = new Set()): ScopedSearchResult[] {
+  const seen = new Set<string>();
   return useWorkspaceStore
     .getState()
     .closedItems.map((closed, index) => ({ closed, index }))
     .filter(({ closed }) => !query.trim() || contains(closed.view.title, query))
+    .filter(({ closed }) => {
+      const url = closed.view.surfaceId === "browser" ? parseBrowserViewState(closed.view.state).url : "";
+      const key = url || `${closed.view.surfaceId}:${closed.view.title}`;
+      if (seen.has(key) || skipUrls.has(url)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, recentLimit)
     .map(({ closed, index }) => ({
       id: `closed:${closed.view.id}:${index}`,
       kind: "closed-tab",
       title: closed.view.title || "Untitled",
-      subtitle: "Recently closed",
+      subtitle: "",
       target: {
         kind: "run",
         run: () => {
@@ -105,7 +115,7 @@ export async function searchBrowserHistory(query: string): Promise<ScopedSearchR
       subtitle: host(visit.url),
       target: { kind: "url", url: visit.url },
     }));
-  return [...pages, ...closedTabs(query)].slice(0, resultLimit);
+  return [...pages, ...closedTabs(query, new Set(latest.keys()))].slice(0, resultLimit);
 }
 
 /** Agent-owned tabs belong to their run and are left out, as in the address bar. */

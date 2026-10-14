@@ -10,7 +10,12 @@ use crate::{
     workspace::Workspace,
 };
 
-use super::{model::ReleaseManifest, state};
+use super::{
+    model::{
+        cross_target, ReleaseManifest, MACOS_PLATFORM, WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
+    },
+    state,
+};
 
 pub(super) fn platform(
     workspace: &Workspace,
@@ -18,29 +23,16 @@ pub(super) fn platform(
     platform: &str,
     config_path: &Path,
 ) -> Result<()> {
-    let arguments = if platform == "macos-universal" {
-        vec![
-            "run",
-            "tauri",
-            "--",
-            "build",
-            "--bundles",
-            "app,dmg",
-            "--target",
-            "universal-apple-darwin",
-            "--config",
-        ]
+    let bundles = if platform == MACOS_PLATFORM {
+        "app,dmg"
     } else {
-        vec![
-            "run",
-            "tauri",
-            "--",
-            "build",
-            "--bundles",
-            "nsis",
-            "--config",
-        ]
+        "nsis"
     };
+    let mut arguments = vec!["run", "tauri", "--", "build", "--bundles", bundles];
+    if let Some(target) = cross_target(platform) {
+        arguments.extend(["--target", target]);
+    }
+    arguments.push("--config");
     // Connected Devices in a release build trusts only the production ticket
     // keys compiled into it; without them, devices cannot connect at all.
     let ticket_keys = match std::env::var("MISTY_DEVICE_TICKET_PUBLIC_KEYS") {
@@ -56,17 +48,18 @@ pub(super) fn platform(
         .arg("--ci")
         .env("MISTY_DEVICE_TICKET_PUBLIC_KEYS", ticket_keys)
         .run(&workspace.misty)?;
-    let bundle = if platform == "macos-universal" {
-        workspace
-            .misty
-            .join("src-tauri/target/universal-apple-darwin/release/bundle")
-    } else {
-        workspace.misty.join("src-tauri/target/release/bundle")
-    };
-    if platform == "macos-universal" {
+    let output = match cross_target(platform) {
+        Some(target) => workspace.misty.join("src-tauri/target").join(target),
+        None => workspace.misty.join("src-tauri/target"),
+    }
+    .join("release");
+    let bundle = output.join("bundle");
+    if platform == MACOS_PLATFORM {
         notarize_macos_bundle(workspace, &bundle)?;
         verify_macos_bundle(workspace, &bundle)?;
         archive_stapled_app(workspace, &bundle)?;
+    } else {
+        super::windows_signing::verify(workspace, &output)?;
     }
     let destination = state::release_root(workspace, &release.version).join(platform);
     if destination.exists() {
@@ -190,7 +183,7 @@ fn verify_macos_bundle(workspace: &Workspace, bundle: &Path) -> Result<()> {
 }
 
 fn select_artifacts(bundle: &Path, platform: &str) -> Result<Vec<PathBuf>> {
-    let extensions: &[&str] = if platform == "macos-universal" {
+    let extensions: &[&str] = if platform == MACOS_PLATFORM {
         &["dmg", "gz", "sig"]
     } else {
         &["exe", "sig"]
@@ -217,7 +210,7 @@ fn updater_pair(root: &Path, platform: &str) -> Result<(String, String)> {
     let updater = files
         .iter()
         .find(|path| {
-            if platform == "macos-universal" {
+            if platform == MACOS_PLATFORM {
                 path.to_string_lossy().ends_with(".app.tar.gz")
             } else {
                 path.extension().is_some_and(|extension| extension == "exe")
@@ -243,11 +236,13 @@ fn updater_pair(root: &Path, platform: &str) -> Result<(String, String)> {
     ))
 }
 
-pub(super) fn current_platform() -> Result<&'static str> {
+/// The platforms this machine builds: one universal macOS app, or Windows
+/// for x64 and ARM64.
+pub(super) fn current_platforms() -> Result<&'static [&'static str]> {
     if cfg!(target_os = "macos") {
-        Ok("macos-universal")
+        Ok(&[MACOS_PLATFORM])
     } else if cfg!(windows) {
-        Ok("windows-x86_64")
+        Ok(&[WINDOWS_PLATFORM, WINDOWS_ARM_PLATFORM])
     } else {
         bail!("desktop releases must be built on macOS or Windows")
     }

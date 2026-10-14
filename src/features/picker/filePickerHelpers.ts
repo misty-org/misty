@@ -1,6 +1,6 @@
 import { readLocalFileFromPath } from "@/api/local-files";
 
-export function fileNameFromPath(path: string): string {
+function fileNameFromPath(path: string): string {
   const normalized = path.replace(/\\/g, "/");
   const segments = normalized.split("/").filter(Boolean);
   return segments[segments.length - 1] ?? "file";

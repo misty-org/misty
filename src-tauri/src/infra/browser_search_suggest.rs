@@ -6,7 +6,7 @@
 //! fetch proxy. Requests carry no cookies, and any failure is an empty list:
 //! suggestions are a convenience, never something the address bar waits on.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{sync::OnceLock, time::Duration};
 
 const ENGINES: &str = include_str!("../../../src/shared/schemas/browser-search-engines.json");
@@ -49,27 +49,78 @@ fn suggest_url(engine_id: &str, text: &str) -> Option<String> {
     Some(template.replace("%s", &query))
 }
 
-/// OpenSearch suggestions: `["query", ["suggestion", ...], ...]`.
-fn parse_open_search(body: &[u8], text: &str) -> Vec<String> {
+/// One suggestion. A navigational one (Google's `NAVIGATION` type) names the site itself.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum Suggestion {
+    Query(String),
+    Site { text: String, url: String },
+}
+
+fn clean(value: &str) -> String {
+    value.trim().chars().take(MAX_TEXT_CHARS).collect()
+}
+
+/// An http(s) address from a navigational suggestion, which may omit the scheme.
+fn site_url(value: &str) -> Option<String> {
+    let value = value.trim();
+    let candidate = if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("https://{value}")
+    };
+    let parsed = url::Url::parse(&candidate).ok()?;
+    (matches!(parsed.scheme(), "http" | "https")
+        && parsed.host_str().is_some_and(|h| h.contains('.')))
+    .then(|| parsed.to_string())
+}
+
+/// OpenSearch suggestions: `["query", ["suggestion", ...], ["title", ...], [], {metadata}]`.
+/// Google's metadata marks which entries are sites (`google:suggesttype`).
+fn parse_open_search(body: &[u8], text: &str) -> Vec<Suggestion> {
     let Ok(serde_json::Value::Array(parts)) = serde_json::from_slice(body) else {
         return Vec::new();
     };
     let Some(serde_json::Value::Array(values)) = parts.get(1) else {
         return Vec::new();
     };
+    let titles = parts.get(2).and_then(|v| v.as_array());
+    let kinds = parts
+        .get(4)
+        .and_then(|meta| meta.get("google:suggesttype"))
+        .and_then(|v| v.as_array());
     let mut seen = std::collections::HashSet::new();
     values
         .iter()
-        .filter_map(|value| value.as_str())
-        .map(|value| {
-            value
-                .trim()
-                .chars()
-                .take(MAX_TEXT_CHARS)
-                .collect::<String>()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            let value = value.as_str()?;
+            let is_site = kinds
+                .and_then(|kinds| kinds.get(index))
+                .and_then(|kind| kind.as_str())
+                == Some("NAVIGATION");
+            if is_site {
+                let url = site_url(value)?;
+                let title = titles
+                    .and_then(|titles| titles.get(index))
+                    .and_then(|title| title.as_str())
+                    .map(clean)
+                    .filter(|title| !title.is_empty())
+                    .unwrap_or_else(|| clean(value));
+                return Some(Suggestion::Site { text: title, url });
+            }
+            Some(Suggestion::Query(clean(value)))
         })
-        .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case(text))
-        .filter(|value| seen.insert(value.to_lowercase()))
+        .filter(|suggestion| match suggestion {
+            Suggestion::Query(value) => !value.is_empty() && !value.eq_ignore_ascii_case(text),
+            Suggestion::Site { .. } => true,
+        })
+        .filter(|suggestion| {
+            seen.insert(match suggestion {
+                Suggestion::Query(value) => value.to_lowercase(),
+                Suggestion::Site { url, .. } => url.to_lowercase(),
+            })
+        })
         .take(MAX_SUGGESTIONS)
         .collect()
 }
@@ -82,7 +133,7 @@ pub struct BrowserSearchSuggestRequest {
 }
 
 #[tauri::command]
-pub async fn browser_search_suggest(request: BrowserSearchSuggestRequest) -> Vec<String> {
+pub async fn browser_search_suggest(request: BrowserSearchSuggestRequest) -> Vec<Suggestion> {
     let text = request.text.trim();
     if text.is_empty() || text.chars().count() > MAX_TEXT_CHARS {
         return Vec::new();
@@ -125,7 +176,7 @@ mod tests {
 
     #[test]
     fn suggest_url_encodes_the_query_and_rejects_unknown_engines() {
-        let url = suggest_url("duckduckgo", "a&b c/?").unwrap();
+        let url = suggest_url("google", "a&b c/?").unwrap();
         assert!(url.ends_with("q=a%26b+c%2F%3F"), "{url}");
         assert!(suggest_url("https://evil.invalid/?q=%s", "x").is_none());
     }
@@ -133,8 +184,29 @@ mod tests {
     #[test]
     fn parses_open_search_and_drops_echoes_duplicates_and_junk() {
         let body = br#"["mist",["mist","Misty","misty"," misty step ",7,""],[],{}]"#;
-        assert_eq!(parse_open_search(body, "mist"), vec!["Misty", "misty step"]);
+        assert_eq!(
+            parse_open_search(body, "mist"),
+            vec![
+                Suggestion::Query("Misty".into()),
+                Suggestion::Query("misty step".into())
+            ]
+        );
         assert!(parse_open_search(b"<html>", "mist").is_empty());
         assert!(parse_open_search(br#"{"items":[]}"#, "mist").is_empty());
+    }
+
+    #[test]
+    fn google_navigational_suggestions_carry_the_site() {
+        let body = br#"["leet",["leetcode","https://leetcode.com/","leetcode.com"],["","LeetCode","LeetCode"],[],{"google:suggesttype":["QUERY","NAVIGATION","NAVIGATION"]}]"#;
+        assert_eq!(
+            parse_open_search(body, "leet"),
+            vec![
+                Suggestion::Query("leetcode".into()),
+                Suggestion::Site {
+                    text: "LeetCode".into(),
+                    url: "https://leetcode.com/".into()
+                },
+            ]
+        );
     }
 }

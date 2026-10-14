@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { aiSurfaceApi, type ScreenLocation } from "@/features/ai-surface/api";
 import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
-import { ChoiceControl } from "../SettingsControls";
+import { ChoiceControl, SwitchControl } from "../SettingsControls";
+import { setKeepAwakeForAgents } from "@/features/agents/keepAwake";
 
 // "window" is a new tab in this window; the stored name predates the label.
 const options: { value: ScreenLocation; label: string }[] = [
@@ -13,13 +14,18 @@ const options: { value: ScreenLocation; label: string }[] = [
 /** Where agents open a screen when a task needs a website or the desktop. */
 export function ScreenLocationSection() {
   const [location, setLocation] = useState<ScreenLocation | null>(null);
+  const [keepAwake, setKeepAwake] = useState<boolean | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
     let live = true;
     aiSurfaceApi
       .settings()
-      .then((result) => live && setLocation(result.settings.screen_location ?? "window"))
+      .then((result) => {
+        if (!live) return;
+        setLocation(result.settings.screen_location ?? "window");
+        setKeepAwake(result.settings.keep_awake_for_agents ?? true);
+      })
       .catch(() => live && setError("This setting couldn’t load."));
     return () => {
       live = false;
@@ -38,6 +44,21 @@ export function ScreenLocationSection() {
       setWorking(false);
     }
   };
+  const changeKeepAwake = async (value: boolean) => {
+    if (working) return;
+    setWorking(true);
+    setError("");
+    try {
+      const { settings } = await aiSurfaceApi.updateKeepAwake(value);
+      const next = settings.keep_awake_for_agents ?? value;
+      setKeepAwake(next);
+      setKeepAwakeForAgents(next);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "This setting couldn’t be saved.");
+    } finally {
+      setWorking(false);
+    }
+  };
   return (
     <DesktopSettingsSection
       title="Screens"
@@ -49,7 +70,8 @@ export function ScreenLocationSection() {
       <DesktopSettingsRow
         label="Where Misty opens new screens"
         description={
-          "A new tab opens beside your work. A separate window leaves this one to you. " +
+          "A new tab opens beside your work. A separate window works small in a corner of " +
+          "your screen, so you can watch it while this one stays yours. " +
           "Saying where in your request, such as this tab or my whole screen, always wins."
         }
       >
@@ -58,6 +80,19 @@ export function ScreenLocationSection() {
           options={options}
           disabled={location === null || working}
           onValueChange={(value) => void change(value as ScreenLocation)}
+        />
+      </DesktopSettingsRow>
+      <DesktopSettingsRow
+        label="Keep computers awake"
+        description={
+          "While an agent works on one of your computers, it won’t go to sleep. " +
+          "The display can still turn off."
+        }
+      >
+        <SwitchControl
+          checked={keepAwake ?? true}
+          disabled={keepAwake === null || working}
+          onChange={(value) => void changeKeepAwake(value)}
         />
       </DesktopSettingsRow>
       {error ? (

@@ -1,8 +1,8 @@
-import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
+import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/openExternalLink";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { platform } from "@tauri-apps/plugin-os";
 import { hasTauriInternals } from "./tauri";
-export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/interfaces/openExternalLink";
+export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/openExternalLink";
 let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
 export function configureMistyBrowserLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,

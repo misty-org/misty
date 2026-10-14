@@ -15,39 +15,13 @@ impl Drop for CaptureView {
 }
 impl CaptureView {
     pub(super) fn open(app: &tauri::AppHandle, physical: &str) -> Result<Self, String> {
-        let owner = app
-            .get_window("main")
-            .ok_or("The main browser workspace is unavailable")?;
-        let builder = tauri::WebviewBuilder::new(
-            format!("misty-browser-capture-{}", uuid::Uuid::new_v4()),
-            tauri::WebviewUrl::External("about:blank".parse().map_err(|_| "Invalid capture URL")?),
-        )
-        .focused(false);
-        #[cfg(target_os = "macos")]
-        let builder = builder.data_store_identifier(
-            super::super::browser_profile::data_store_identifier(Some(physical))?,
-        );
-        #[cfg(windows)]
-        let builder = builder.data_directory(super::super::browser::browser_data_directory(
-            app,
-            Some(physical),
-        )?);
-        let view = owner
-            .add_child(
-                builder,
-                tauri::LogicalPosition::new(-10000., -10000.),
-                tauri::LogicalSize::new(1., 1.),
-            )
-            .map_err(|_| "Could not open the native cookie observer")?;
-        let result = Self {
+        Ok(Self {
             physical: physical.into(),
-            view,
-        };
-        result
-            .view
-            .hide()
-            .map_err(|_| "Could not hide the native cookie observer")?;
-        Ok(result)
+            view: super::super::browser_profile_view::open_hidden_profile_view(
+                app,
+                Some(physical),
+            )?,
+        })
     }
 }
 

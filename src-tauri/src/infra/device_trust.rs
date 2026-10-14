@@ -8,6 +8,8 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
+use super::store::Store;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -19,7 +21,6 @@ use crate::{
 /// A peer refuses new LAN connections when its newest verified list is older
 /// than this and nothing fresher can be reached.
 pub const LIST_FRESHNESS_SECONDS: i64 = 24 * 3600;
-const MAX_CACHED_ADDRESSES: usize = 8;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,9 +30,6 @@ struct TrustFile {
     account_id: String,
     local_device_id: String,
     server_device_id: Option<String>,
-    /// This device's own endpoint, never treated as a peer.
-    #[serde(default)]
-    own_endpoint: Option<String>,
     root_public_key: Option<String>,
     vault_id: Option<String>,
     list: Option<SignedRecord>,
@@ -40,11 +38,11 @@ struct TrustFile {
     list_fresh_at: i64,
     own_policy: Option<SignedRecord>,
     own_policy_state: Option<DevicePolicy>,
-    known_addresses: HashMap<String, Vec<String>>,
 }
 
 pub struct TrustState {
-    path: PathBuf,
+    store: Store,
+    key: String,
     file: TrustFile,
     list: Option<DeviceList>,
 }
@@ -56,7 +54,7 @@ fn state() -> &'static Mutex<Option<TrustState>> {
     STATE.get_or_init(|| Mutex::new(None))
 }
 
-/// Where trust files live; set once at startup.
+/// The folder that holds `misty.db`, where trust records live; set once at startup.
 pub fn set_storage_root(path: PathBuf) {
     let _ = ROOT.set(path);
 }
@@ -89,12 +87,21 @@ pub fn open(deployment: &str, account_id: &str, local_device_id: &str) -> ApiRes
     let name = hex::encode(Sha256::digest(
         format!("{deployment}\n{account_id}\n{local_device_id}").as_bytes(),
     ));
-    let path = root
-        .join("device-trust")
-        .join(format!("{}.json", &name[..32]));
-    let mut file: TrustFile = std::fs::read(&path)
+    let store = Store::at(root.join("misty.db"));
+    let key = name[..32].to_owned();
+    let mut file: TrustFile = store
+        .connect()
         .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .and_then(|connection| {
+            connection
+                .query_row(
+                    "SELECT document FROM device_trust WHERE key = ?1",
+                    [&key],
+                    |row| row.get::<_, String>(0),
+                )
+                .ok()
+        })
+        .and_then(|document| serde_json::from_str(&document).ok())
         .unwrap_or_default();
     if file.deployment != deployment
         || file.account_id != account_id
@@ -115,7 +122,12 @@ pub fn open(deployment: &str, account_id: &str, local_device_id: &str) -> ApiRes
         }
         _ => None,
     };
-    *guard = Some(TrustState { path, file, list });
+    *guard = Some(TrustState {
+        store,
+        key,
+        file,
+        list,
+    });
     Ok(())
 }
 
@@ -135,12 +147,19 @@ fn with_state<T>(apply: impl FnOnce(&mut TrustState) -> ApiResult<T>) -> ApiResu
 
 impl TrustState {
     fn save(&self) -> ApiResult<()> {
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let temporary = self.path.with_extension("json.tmp");
-        std::fs::write(&temporary, serde_json::to_vec(&self.file)?)?;
-        std::fs::rename(&temporary, &self.path)?;
+        let document = serde_json::to_string(&self.file)?;
+        let connection = self.store.connect().map_err(|error| {
+            ApiError::Message(format!("Device trust could not be saved: {error}"))
+        })?;
+        connection
+            .execute(
+                "INSERT INTO device_trust (key, document) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET document = excluded.document",
+                rusqlite::params![self.key, document],
+            )
+            .map_err(|error| {
+                ApiError::Message(format!("Device trust could not be saved: {error}"))
+            })?;
         Ok(())
     }
 }
@@ -149,16 +168,6 @@ pub fn set_server_device_id(device_id: &str) -> ApiResult<()> {
     with_state(|current| {
         if current.file.server_device_id.as_deref() != Some(device_id) {
             current.file.server_device_id = Some(device_id.to_owned());
-            current.save()?;
-        }
-        Ok(())
-    })
-}
-
-pub fn set_own_endpoint(endpoint: &str) -> ApiResult<()> {
-    with_state(|current| {
-        if current.file.own_endpoint.as_deref() != Some(endpoint) {
-            current.file.own_endpoint = Some(endpoint.to_owned());
             current.save()?;
         }
         Ok(())
@@ -206,12 +215,13 @@ pub fn pinned_root() -> Option<String> {
 pub enum ListOutcome {
     Adopted,
     Unchanged,
-    /// The server sent an older list than one a peer proved; its removals stay.
+    /// The server sent an older list than one already held; its removals stay.
     ServerBehind,
 }
 
-/// Applies the server's list. It is authoritative for admissions; a newer list
-/// learned from a peer survives only if it is a removal-only extension of it.
+/// Applies the server's list. It is authoritative for admissions, but never
+/// rolls back a newer list this device already holds (older builds also
+/// learned removal-only lists from peers; those removals stay).
 pub fn apply_server_list(record: Option<&SignedRecord>) -> ApiResult<ListOutcome> {
     with_state(|current| {
         let Some(root) = current.file.root_public_key.clone() else {
@@ -256,32 +266,6 @@ pub fn apply_server_list(record: Option<&SignedRecord>) -> ApiResult<ListOutcome
     })
 }
 
-/// Applies a list a peer showed during a LAN handshake: accepted only when it
-/// is newer, verifies, and only removes devices.
-pub fn apply_peer_list(record: &SignedRecord) -> ApiResult<bool> {
-    with_state(|current| {
-        let (Some(root), Some(existing)) =
-            (current.file.root_public_key.clone(), current.list.as_ref())
-        else {
-            return Ok(false);
-        };
-        let Some(list) = DeviceList::verify(record, &root)
-            .filter(|list| list.account_id == current.file.account_id)
-        else {
-            return Ok(false);
-        };
-        if !list.is_removal_only_extension_of(existing) {
-            return Ok(false);
-        }
-        current.file.list = Some(record.clone());
-        current.file.list_source = "peer".to_owned();
-        current.file.list_fresh_at = now();
-        current.list = Some(list);
-        current.save()?;
-        Ok(true)
-    })
-}
-
 pub fn current_list() -> Option<DeviceList> {
     state().lock().ok()?.as_ref()?.list.clone()
 }
@@ -294,37 +278,12 @@ fn fresh(current: &TrustState) -> bool {
     now() - current.file.list_fresh_at <= LIST_FRESHNESS_SECONDS
 }
 
-/// Marks the current list fresh after the server or a peer confirmed it.
+/// Marks the current list fresh after the server confirmed it.
 pub fn confirm_fresh() {
     let _ = with_state(|current| {
         current.file.list_fresh_at = now();
         current.save()
     });
-}
-
-/// The added device behind an iroh endpoint, if this device may connect to
-/// it now: in the current list, not this device, and the list is fresh.
-pub fn trusted_peer(endpoint: &str) -> Option<String> {
-    let guard = state().lock().ok()?;
-    let current = guard.as_ref()?;
-    if !fresh(current) {
-        return None;
-    }
-    // This device's own key is never a peer.
-    match current.file.own_endpoint.as_deref() {
-        Some(own) if own == endpoint => return None,
-        Some(_) => {}
-        None => {
-            let device = current.list.as_ref()?.device_for_endpoint(endpoint)?;
-            return (Some(device) != current.file.server_device_id.as_deref())
-                .then(|| device.to_owned());
-        }
-    }
-    current
-        .list
-        .as_ref()?
-        .device_for_endpoint(endpoint)
-        .map(str::to_owned)
 }
 
 /// Whether this device itself is in the current list.
@@ -367,39 +326,11 @@ pub fn effective_policy() -> DevicePolicy {
         .unwrap_or_else(|| DevicePolicy::first(Vec::new()))
 }
 
-pub fn remember_addresses(device_id: &str, addresses: &[String]) {
-    let _ = with_state(|current| {
-        let mut kept: Vec<String> = addresses
-            .iter()
-            .take(MAX_CACHED_ADDRESSES)
-            .cloned()
-            .collect();
-        kept.dedup();
-        if current.file.known_addresses.get(device_id) != Some(&kept) {
-            current
-                .file
-                .known_addresses
-                .insert(device_id.to_owned(), kept);
-            current.save()?;
-        }
-        Ok(())
-    });
-}
-
-pub fn known_addresses(device_id: &str) -> Vec<String> {
-    state()
-        .lock()
-        .ok()
-        .and_then(|guard| guard.as_ref()?.file.known_addresses.get(device_id).cloned())
-        .unwrap_or_default()
-}
-
 /// Forgets everything for this account after the device was removed.
 pub fn forget_after_removal() {
     let _ = with_state(|current| {
         current.file.list = None;
         current.list = None;
-        current.file.known_addresses.clear();
         current.file.list_fresh_at = 0;
         current.save()
     });

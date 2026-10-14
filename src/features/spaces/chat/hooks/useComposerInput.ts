@@ -1,5 +1,5 @@
 import type { MistyPickerSource } from "@/features/picker";
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/types/SpaceChat";
+import type { ChatComposerSuggestion } from "@/api/spaces/dto/SpaceChat";
 import type { ChatSuggestionsState } from "./useChatSuggestions";
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 

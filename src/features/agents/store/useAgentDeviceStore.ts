@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { hostname, platform, version } from "@tauri-apps/plugin-os";
+import { platform, version } from "@tauri-apps/plugin-os";
 import { getVersion } from "@tauri-apps/api/app";
 import { resolveApiBase } from "@/api/deployment/api";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
@@ -8,7 +8,7 @@ import { devicesApi } from "@/api/devices/api";
 import { useUserStore } from "@/features/auth/core";
 import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
-import type { AgentDevice } from "../model/interfaces/types";
+import type { AgentDevice } from "../model/types";
 import { ManagedAiRequestError } from "./useAiServerStore";
 
 // One device identity (docs/design/devices/BRIEF.md). The device key lives in
@@ -17,9 +17,9 @@ import { ManagedAiRequestError } from "./useAiServerStore";
 
 const lastHeartbeatByServerId = new Map<string, number>();
 let started: { key: string; promise: Promise<DevicesView> } | null = null;
-export let browserDeviceSessionId = secureId();
+let browserDeviceSessionId = secureId();
 
-export const agentDeviceCapabilities = {
+const agentDeviceCapabilities = {
   document_intelligence: true,
   folder_agents: true,
   job_leases: true,
@@ -40,18 +40,8 @@ export async function deviceAccount(): Promise<{ apiBase: string; accountId: str
   return { apiBase: await resolveApiBase(), accountId };
 }
 
-async function defaultDeviceName(): Promise<string> {
-  try {
-    const name = (await hostname())?.replace(/\.local$/i, "").trim();
-    if (name) return name.slice(0, 64);
-  } catch {
-    /* fall back below */
-  }
-  return "This Misty";
-}
-
-/** Registers this device (once per account session) and starts its channel,
- * LAN discovery and trust. Only the main window starts it; other windows read
+/** Registers this device (once per account session) and starts its channel
+ * and trust. Only the main window starts it; other windows read
  * the device the main window registered. */
 export async function ensureDeviceStarted(): Promise<DevicesView> {
   const account = await deviceAccount();
@@ -64,7 +54,8 @@ export async function ensureDeviceStarted(): Promise<DevicesView> {
   if (started?.key === key) return started.promise;
   const promise = (async () =>
     devicesNative.start(account, {
-      name: await defaultDeviceName(),
+      // Native names the device after the computer ("Matthew's MBP").
+      name: "",
       platform: platform(),
       osVersion: String(version() ?? "").slice(0, 64),
       appVersion: await getVersion().catch(() => ""),
@@ -165,7 +156,7 @@ export async function signedAgentDeviceRequest<T>(
 }
 
 /** The full server path a device request is signed over. */
-export function canonicalDevicePath(path: string, apiBasePath = "/api"): string {
+function canonicalDevicePath(path: string, apiBasePath = "/api"): string {
   const pathname = path.split("?", 1)[0] || "/";
   const basePath = `/${apiBasePath}`.replace(/\/{2,}/g, "/").replace(/\/$/, "");
   return `${basePath}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
@@ -199,10 +190,5 @@ export interface ServerTrustedDevice {
   publicKey?: string;
   revokedAt?: string | null;
   platform?: string;
-  p2pEndpointId?: string;
   protocolVersions?: string[];
-}
-
-export interface ServerDeviceList {
-  devices: ServerTrustedDevice[];
 }

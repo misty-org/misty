@@ -1,4 +1,4 @@
-import type { MetadataDialogModel } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+import type { MetadataDialogModel } from "@/api/spaces/dto/SpaceLibraryDialogs";
 import {
   Button,
   Dialog,

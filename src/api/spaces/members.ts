@@ -1,4 +1,4 @@
-import type { SpaceInvitation, SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceInvitation, SpaceMember } from "@/api/spaces/dto/entities";
 
 type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;

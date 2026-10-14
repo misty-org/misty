@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { libraryApi as spacesApi } from "./LibraryRuntime";
 import { LibraryError as SystemErrorNotice } from "./LibraryRuntime";
-import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryDiscoveryGroup, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   Dialog,
   DialogContent,

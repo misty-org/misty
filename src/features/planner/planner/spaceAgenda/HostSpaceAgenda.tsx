@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { spacesApi } from "@/api/spaces/api";
 import { connectionsApi } from "@/api/connections";
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { useSpaceAgendaPreferences, useSpacesStore } from "@/features/spaces";
 import { useAiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";

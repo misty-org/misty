@@ -4,7 +4,7 @@
  * Keep this list deliberately small and explicit. A feature leaves this file
  * only after its complete user journey has passed launch QA.
  */
-export const publicBetaAvailability = {
+const publicBetaAvailability = {
   connectedDevices: false,
   desktopMistyPanel: false,
   extensions: false,

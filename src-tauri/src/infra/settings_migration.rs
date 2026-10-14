@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 7;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 9;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read.
 /// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
@@ -55,6 +55,11 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     // Schema 7: the video wallpaper and its panel opacity were removed.
     ("appearance", "wallpaper_path"),
     ("appearance", "panel_opacity"),
+    // Schema 8: the optional accent color was removed.
+    ("appearance", "accent_color"),
+    // Schema 9: the theme no longer has a schedule; the night light does.
+    ("appearance", "theme_light_start"),
+    ("appearance", "theme_dark_start"),
 ];
 
 /// Removes retired keys from an existing settings file.

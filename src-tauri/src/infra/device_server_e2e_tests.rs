@@ -149,22 +149,16 @@ async fn device_server_e2e_add_once_approve_by_code_and_remove() {
     // A trusts B through the signed list, and can rename it.
     let a = DeviceContext::open(&base, &account, LOCAL_A).unwrap();
     admission::refresh_trust(&a).await.unwrap();
-    assert_eq!(device_trust::trusted_peer(&b_endpoint), Some(b_id.clone()));
+    assert!(device_trust::current_list().is_some_and(|list| list.admitted_key(&b_id).is_some()));
     admission::rename(&a, &b_id, "Studio Mac").await.unwrap();
 
     // The control channel: A runs the app's own channel client; B is a bare
-    // socket. Presence and LAN candidates flow between them, nothing else.
-    let found: Arc<Mutex<Vec<(String, String, Vec<String>)>>> = Arc::default();
-    let sink = found.clone();
+    // socket. Only presence flows between them.
     device_channel::start(ChannelConfig {
         app: None,
         http: a.http.clone(),
         local_device_id: LOCAL_A.into(),
         server_device_id: a_id.clone(),
-        addresses: Arc::new(|| vec!["192.168.77.10:4100".to_owned(), "8.8.8.8:53".to_owned()]),
-        on_candidates: Arc::new(move |device, endpoint, addresses| {
-            sink.lock().unwrap().push((device, endpoint, addresses))
-        }),
         on_event: Arc::new(|_| {}),
     });
     assert!(
@@ -208,14 +202,6 @@ async fn device_server_e2e_add_once_approve_by_code_and_remove() {
         .unwrap();
     let ready = next_frame(&mut socket, "ready").await;
     assert_eq!(ready["state"], "admitted");
-    socket
-        .send(SocketMessage::Text(
-            json!({"type": "address", "candidates": ["192.168.77.20:4200"]})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
     assert!(
         eventually(|| device_channel::snapshot()
             .peers
@@ -223,35 +209,6 @@ async fn device_server_e2e_add_once_approve_by_code_and_remove() {
             .any(|peer| peer.device_id == b_id && peer.online))
         .await
     );
-    // A's client told the server its address when it connected; B asks for A.
-    socket
-        .send(SocketMessage::Text(
-            json!({"type": "connect", "deviceId": a_id})
-                .to_string()
-                .into(),
-        ))
-        .await
-        .unwrap();
-    let to_b = next_frame(&mut socket, "candidates").await;
-    assert_eq!(to_b["deviceId"], a_id.as_str());
-    assert_eq!(
-        to_b["addresses"],
-        json!(["192.168.77.10:4100"]),
-        "only LAN addresses are relayed"
-    );
-    assert!(
-        eventually(|| found
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|(device, endpoint, addresses)| {
-                device == &b_id
-                    && endpoint == &b_endpoint
-                    && addresses == &vec!["192.168.77.20:4200".to_owned()]
-            }))
-        .await
-    );
-
     // A third device's request can be denied; it is never added.
     let mut c = DeviceContext::open(&base, &account, LOCAL_C).unwrap();
     admission::register(&mut c, "Old", "windows", "11", "1.0")
@@ -269,7 +226,6 @@ async fn device_server_e2e_add_once_approve_by_code_and_remove() {
     let a = DeviceContext::open(&base, &account, LOCAL_A).unwrap();
     admission::remove(&a, &b_id).await.unwrap();
     admission::refresh_trust(&a).await.unwrap();
-    assert_eq!(device_trust::trusted_peer(&b_endpoint), None);
     let list = device_trust::current_list().unwrap();
     assert!(list.admitted_key(&a_id).is_some() && list.admitted_key(&b_id).is_none());
     assert!(list

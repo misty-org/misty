@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { appIcons, Button, WorkspaceSectionLabel, SkeletonList } from "@/shared/ui";
 import { Images, MessagesSquare, Notebook, PencilRuler } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";

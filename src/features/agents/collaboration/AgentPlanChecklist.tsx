@@ -21,7 +21,7 @@ function StepIcon({ status }: { status: PlanStepStatus }) {
 }
 
 /**
- * The plan in the Task drawer. Once approved it is a live checklist the agent
+ * The plan in the Goal dialog. Once approved it is a live checklist the agent
  * ticks off with plan_update; a proposed plan points back to the conversation.
  */
 export function AgentPlanChecklist({
@@ -63,7 +63,7 @@ export function AgentPlanChecklist({
     <section className="agent-plan-checklist" aria-label="Plan">
       <h3>Plan</h3>
       <p className="agent-plan-checklist-title">{plan.plan.title}</p>
-      <p className="agent-task-panel-note">
+      <p className="agent-goal-note">
         {plan.state === "proposed"
           ? "Proposed. Review it in the conversation to run, edit or keep planning."
           : plan.state === "completed"

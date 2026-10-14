@@ -1,6 +1,6 @@
 import { useSpacesStore } from "@/features/spaces";
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceInvitation } from "@/api/spaces/dto/entities";
 import { useMinimumSpin } from "@/shared/hooks/useMinimumSpin";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";

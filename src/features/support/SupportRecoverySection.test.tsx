@@ -30,7 +30,7 @@ vi.mock("./recoveryActions", () => ({
   resetWorkspaceLayout: mocks.resetLayout,
 }));
 
-import { useTourStore } from "@/features/tour";
+import { useSetupStore } from "@/features/setup";
 import { SupportRecoverySection } from "./SupportRecoverySection";
 
 describe("SupportRecoverySection", () => {
@@ -107,22 +107,22 @@ describe("SupportRecoverySection", () => {
     expect(mocks.downloadBundle).not.toHaveBeenCalled();
   });
 
-  it("replays the app tour and closes settings when requested", async () => {
-    useTourStore.setState({ isOpen: false, currentStep: "closed" });
+  it("reopens setup and closes settings when requested", async () => {
+    useSetupStore.setState({ isOpen: false, step: "layout" });
     const closeSettingsListener = vi.fn();
     window.addEventListener("misty:close-settings", closeSettingsListener);
 
     await act(async () => root.render(<SupportRecoverySection />));
-    const startTourButton = Array.from(container.querySelectorAll("button")).find((btn) =>
-      btn.textContent?.includes("Start tour"),
+    const openSetupButton = Array.from(container.querySelectorAll("button")).find((btn) =>
+      btn.textContent?.includes("Open setup"),
     );
-    expect(startTourButton).toBeDefined();
+    expect(openSetupButton).toBeDefined();
 
-    await act(async () => startTourButton?.click());
+    await act(async () => openSetupButton?.click());
 
     expect(closeSettingsListener).toHaveBeenCalledOnce();
-    expect(useTourStore.getState().isOpen).toBe(true);
-    expect(useTourStore.getState().currentStep).toBe("welcome");
+    expect(useSetupStore.getState().isOpen).toBe(true);
+    expect(useSetupStore.getState().step).toBe("theme");
     window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });

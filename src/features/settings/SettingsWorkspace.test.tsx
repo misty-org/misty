@@ -114,6 +114,14 @@ vi.mock("@/api/assistant/senses", () => ({
           default_model: "openai/default",
           options: [{ id: "openai/default", name: "Default model", provider: "OpenAI" }],
         },
+        {
+          id: "browsing",
+          name: "Browsing",
+          description: "Reading and filling in web pages.",
+          model: "",
+          default_model: "openai/default",
+          options: [{ id: "openai/default", name: "Default model", provider: "OpenAI" }],
+        },
       ],
     }),
     set: async () => {},
@@ -183,6 +191,8 @@ describe("SettingsWorkspace", () => {
     await render("models");
     expect(container.querySelector("main")?.textContent).toContain("Thinking");
     expect(container.querySelector("main")?.textContent).toContain("Misty default");
+    // Browsing follows Seeing until the account picks a model for it.
+    expect(container.querySelector("main")?.textContent).toContain("Same as Seeing");
   });
   it("keeps system pages individually addressable", () => {
     for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])

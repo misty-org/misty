@@ -6,6 +6,7 @@ import { browserRuntimeCreated, browserScopeId } from "@/features/webviews/brows
 import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { Execution } from "../localExecution";
+import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
 
 const words = (text: string) =>
   new Set(
@@ -45,6 +46,33 @@ function pickBrowserTab(views: WorkspaceView[], focused: WorkspaceView | null, h
       Number(b.id === focused?.id) - Number(a.id === focused?.id) ||
       b.lastFocusedAt - a.lastFocusedAt,
   )[0];
+}
+
+/**
+ * The open tab whose title or address shares the most words with a request
+ * ("my Gmail tab", https://mail.google.com), or nothing when none shares any.
+ * Private tabs never count.
+ */
+export function matchingBrowserTab(hint: string): WorkspaceView | undefined {
+  const wanted = words(hint);
+  let best: WorkspaceView | undefined;
+  let bestScore = 0;
+  for (const view of allLayoutViews(useWorkspaceStore.getState().layout)) {
+    if (view.surfaceId !== "browser" || !browserRuntimeCreated(view)) continue;
+    if ((view.state as { private?: unknown } | null)?.private === true) continue;
+    const url = (view.state as { url?: unknown } | null)?.url;
+    const have = words(`${view.title} ${typeof url === "string" ? url : ""}`);
+    const score = [...wanted].filter((word) => have.has(word)).length;
+    // Ties go to the tab the user used most recently.
+    if (
+      score > bestScore ||
+      (score > 0 && score === bestScore && view.lastFocusedAt > best!.lastFocusedAt)
+    ) {
+      best = view;
+      bestScore = score;
+    }
+  }
+  return bestScore > 0 ? best : undefined;
 }
 
 /**
@@ -129,14 +157,7 @@ export async function companionBrowserContext(
         kind: "browser_tab",
         opaqueRef: scopeId,
         displayName: tab.title || "Current browser tab",
-        capabilities: [
-          "browser.inspect",
-          "browser.visual",
-          "browser.navigate",
-          "browser.act",
-          "browser.downloads.list",
-          "browser.upload",
-        ],
+        capabilities: browserTabAgentFileCapabilities,
         metadata: { app_id: "browser", window_label: "main", normal_tab: true, tab_id: tab.id },
       },
     ],

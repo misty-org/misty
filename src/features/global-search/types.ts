@@ -10,7 +10,7 @@ import type { SearchResult } from "@/native/ipc";
 
 export type GlobalAiMode = "search" | "ask";
 
-export type GlobalSearchKind =
+type GlobalSearchKind =
   | "space"
   | "task"
   | "note"
@@ -49,8 +49,8 @@ export interface GlobalSearchResult extends GlobalSearchDocument {
 }
 
 export type UnifiedMistyPanel = "closed" | "results" | "answer" | "agent";
-export type GlobalSearchSourceFilter = "all" | "device" | "cloud";
-export type GlobalSearchIntentFilter = "all" | "misty" | "agent";
+type GlobalSearchSourceFilter = "all" | "device" | "cloud";
+type GlobalSearchIntentFilter = "all" | "misty" | "agent";
 
 export interface GlobalSearchFilters {
   kinds: GlobalSearchKind[];
@@ -130,7 +130,7 @@ export interface GlobalAiMessage {
   /** Sub-agents the run started, with their progress. */
   subagents?: AgentSubagent[];
   /** Set on turns Misty started itself rather than the person typing them. */
-  source?: "scheduled_task" | "goal_continuation" | "continuation";
+  source?: "scheduled_task" | "goal_continuation" | "continuation" | "inbound_task";
   /** Misty sees this message and everything before it only as summarized notes. */
   compactedAfter?: boolean;
 }

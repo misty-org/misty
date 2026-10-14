@@ -63,7 +63,7 @@ export function parseAuthority(authority: string): ParsedAuthority | null {
   return null;
 }
 
-export function isLocalOrIpAddress(parsed: ParsedAuthority): boolean {
+function isLocalOrIpAddress(parsed: ParsedAuthority): boolean {
   const { host, port, isIpv6Bracketed } = parsed;
   if (isLocalHostOrDomain(host)) return true;
   if (isIpv4Address(host)) return true;
@@ -83,7 +83,9 @@ export function resolveDirectAddress(value: string): string | null {
   const internal = browserInternalPage(trimmed);
   if (internal) return browserInternalUrl(internal);
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Extension pages: WebKit's on macOS, Chromium's (32 letters a–p) in WebView2 on Windows.
   if (/^webkit-extension:\/\/[0-9a-f-]{36}(?:\/|$)/i.test(trimmed)) return trimmed;
+  if (/^chrome-extension:\/\/[a-p]{32}(?:\/|$)/.test(trimmed)) return trimmed;
   if (trimmed.includes(" ")) return null;
 
   const match = trimmed.match(/^([^/?#]+)(.*)$/);

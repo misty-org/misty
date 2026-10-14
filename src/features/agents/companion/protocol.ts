@@ -1,6 +1,6 @@
 import type { AiCaptureAttachment } from "@/features/ai-surface/types";
-export type CompanionMode = "team" | "auto";
-export type CompanionPhase = "idle" | "listening" | "processing" | "responding";
+type CompanionMode = "team" | "auto";
+type CompanionPhase = "idle" | "listening" | "processing" | "responding";
 /** Global coordinates are CG display points on macOS, physical pixels on Windows. */
 export interface DisplayFrame {
   id: number;
@@ -16,6 +16,19 @@ export interface DisplayCapture extends AiCaptureAttachment {
   screen: string;
   primary: boolean;
   display: DisplayFrame;
+  /** Misty's own visible controls on this screen, in this capture's pixels. */
+  controls?: ScreenControl[];
+}
+/** A Misty control named by its interface; x and y are its center. */
+export interface ScreenControl {
+  label: string;
+  role: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Present when the control only appears while the pointer is over it. */
+  reveal?: "hover";
 }
 export interface CursorSample {
   /** Activity sequence only; no key identities or typed text leave the native hook. */

@@ -1,4 +1,4 @@
-import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import { cn, Collapsible, CollapsibleContent, CollapsibleTrigger, Pressable } from "@/shared/ui";
 import { ChevronDown, ChevronRight, Circle, Flag, ListTree, Shapes } from "lucide-react";
 import { useState } from "react";

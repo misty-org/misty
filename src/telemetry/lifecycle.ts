@@ -2,7 +2,7 @@ import { readApiSessionGeneration } from "@/api/client/session";
 import { ConsentSync, type ConsentWriter } from "./consentSync";
 import { telemetrySetErrorReportingEnabled } from "@/native";
 import { secureId } from "@/shared/platform/secureId";
-import type { CommonClientProperties, TelemetryClient } from "@/telemetry/model/interfaces/types";
+import type { CommonClientProperties, TelemetryClient } from "@/telemetry/model/events";
 import { analytics } from "./client";
 import { clientMetadata } from "./metadata";
 

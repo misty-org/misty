@@ -2,10 +2,10 @@ import { useLibraryAi as useAiSurfaceAdapter } from "../LibraryRuntime";
 import { LibraryPhotoEditor as PhotoEditor } from "../LibraryRuntime";
 import type { AiArtifact, AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { editedImageFilename, editedImageMimeType } from "./libraryMediaKind";
 import { defaultLibraryEdit } from "../SpaceLibraryViewerUtils";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { useMemo } from "react";
 
 /**

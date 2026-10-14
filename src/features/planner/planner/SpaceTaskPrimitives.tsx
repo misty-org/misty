@@ -1,5 +1,5 @@
-import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/common";
 import { avatarInkClass } from "@/shared/lib/avatarPalette";
 import {
   Avatar,
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/shared/ui";
 import { Flag } from "lucide-react";
-export type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
+export type { TaskDraft } from "@/api/spaces/dto/SpaceTaskPrimitives";
 
 export const taskStatusOptions: Array<[SpaceTaskStatus, string]> = [
   ["todo", "To do"],
@@ -137,7 +137,7 @@ export function toLocalInput(value: string) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-export function memberInitials(name: string) {
+function memberInitials(name: string) {
   return (
     name
       .trim()

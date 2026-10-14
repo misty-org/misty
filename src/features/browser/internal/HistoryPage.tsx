@@ -11,7 +11,7 @@ import {
   WorkspaceSectionLabel,
   SkeletonList,
 } from "@/shared/ui";
-import { browserLibrary, type BrowserHistoryVisit } from "../library/native";
+import { browserHistoryClearedEvent, browserLibrary, type BrowserHistoryVisit } from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 import { historySectionRange, historySections, type HistorySection } from "./historySections";
@@ -102,6 +102,17 @@ export function HistoryPage(props: BrowserInternalPageProps) {
       invalidateRequests();
     };
   }, [archived, invalidateRequests, load, text]);
+
+  useEffect(() => {
+    const reload = () => {
+      setVisits([]);
+      setSelected(new Set());
+      setMore(false);
+      if (!archived) void load();
+    };
+    window.addEventListener(browserHistoryClearedEvent, reload);
+    return () => window.removeEventListener(browserHistoryClearedEvent, reload);
+  }, [archived, load]);
 
   const groups = useMemo(() => {
     const byDay = new Map<string, BrowserHistoryVisit[]>();

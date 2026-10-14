@@ -47,9 +47,13 @@ void MistySetPageMuted(WKWebView *view, BOOL muted) {
 - (void)goForwardForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done { [self.view goForward]; done(nil); }
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
     if (![@[@"https", @"http", @"webkit-extension"] containsObject:url.scheme]) { done(ExtensionError(@"This URL cannot be opened by an extension.")); return; }
+    if (self.window.popupWindow) { [self.view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); return; }
     [self.host event:@"navigate" data:@{@"tabId":self.identifier, @"url":url.absoluteString}]; done(nil);
 }
-- (void)activateForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done { [self.host event:@"activate-tab" data:@{@"tabId":self.identifier}]; done(nil); }
+- (void)activateForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
+    if (self.window.popupWindow) { [self.window.native makeKeyAndOrderFront:nil]; done(nil); return; }
+    [self.host event:@"activate-tab" data:@{@"tabId":self.identifier}]; done(nil);
+}
 - (void)duplicateUsingConfiguration:(WKWebExtensionTabConfiguration *)configuration forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(id<WKWebExtensionTab>, NSError *))done {
     NSURL *url = [self urlForWebExtensionContext:context];
     NSDictionary *options = @{@"focused":@(configuration.shouldBeActive), @"index":@(self.position + 1)};
@@ -57,7 +61,10 @@ void MistySetPageMuted(WKWebView *view, BOOL muted) {
         tab.parent = self; done(tab, error);
     }];
 }
-- (void)closeForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done { [self.host event:@"close-tab" data:@{@"tabId":self.identifier}]; done(nil); }
+- (void)closeForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
+    if (self.window.popupWindow) { [self.window.native close]; done(nil); return; }
+    [self.host event:@"close-tab" data:@{@"tabId":self.identifier}]; done(nil);
+}
 @end
 
 @implementation MistyExtensionWindow
@@ -72,7 +79,7 @@ void MistySetPageMuted(WKWebView *view, BOOL muted) {
     for (MistyExtensionTab *tab in [self tabsForWebExtensionContext:context]) if (tab.selected) return tab;
     return nil;
 }
-- (WKWebExtensionWindowType)windowTypeForWebExtensionContext:(WKWebExtensionContext *)context { return WKWebExtensionWindowTypeNormal; }
+- (WKWebExtensionWindowType)windowTypeForWebExtensionContext:(WKWebExtensionContext *)context { return self.popupWindow ? WKWebExtensionWindowTypePopup : WKWebExtensionWindowTypeNormal; }
 - (WKWebExtensionWindowState)windowStateForWebExtensionContext:(WKWebExtensionContext *)context {
     NSWindow *window = self.native;
     if (window.miniaturized) return WKWebExtensionWindowStateMinimized;
@@ -91,13 +98,18 @@ void MistySetPageMuted(WKWebView *view, BOOL muted) {
     done(nil);
 }
 - (BOOL)isPrivateForWebExtensionContext:(WKWebExtensionContext *)context { return self.privateWindow; }
-- (CGRect)frameForWebExtensionContext:(WKWebExtensionContext *)context { return self.native.frame; }
-- (CGRect)screenFrameForWebExtensionContext:(WKWebExtensionContext *)context { return self.native.screen.frame; }
+// Before a tab's view is attached the window is unknown; report Misty's main window
+// rather than an empty frame, which extensions use to place their own windows.
+- (NSWindow *)frameSource { return self.native ?: NSApp.mainWindow ?: NSApp.windows.firstObject; }
+- (CGRect)frameForWebExtensionContext:(WKWebExtensionContext *)context { return [self frameSource].frame; }
+- (CGRect)screenFrameForWebExtensionContext:(WKWebExtensionContext *)context { return ([self frameSource].screen ?: NSScreen.mainScreen).frame; }
 - (void)focusForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
-    if (self.identifier) [self.host event:@"focus-window" data:@{@"windowId":self.identifier}];
+    // Popup windows are native; Misty's workspace knows only its own windows.
+    if (self.identifier && !self.popupWindow) [self.host event:@"focus-window" data:@{@"windowId":self.identifier}];
     [self.native makeKeyAndOrderFront:nil]; done(nil);
 }
 - (void)closeForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
+    if (self.popupWindow) { [self.native close]; done(nil); return; }
     // A Misty workspace window can also contain protected app surfaces and
     // private tabs. Only close browser tabs represented by this extension window.
     for (MistyExtensionTab *tab in [self tabsForWebExtensionContext:context]) [self.host event:@"close-tab" data:@{@"tabId":tab.identifier}];

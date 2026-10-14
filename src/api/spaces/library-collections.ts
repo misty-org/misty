@@ -5,7 +5,7 @@ import type {
   LibraryIntelligencePolicy,
   LibraryPerson,
   SpaceLibraryItem,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 
 import type { SpaceRequest } from "./types";
 export function createSpaceLibraryCollectionsApi(spaceRequest: SpaceRequest) {

@@ -12,7 +12,6 @@ mod gate;
 mod host;
 
 pub mod capabilities;
-pub mod content_filter;
 #[cfg(feature = "tauri")]
 pub mod channel;
 #[cfg(feature = "tauri")]

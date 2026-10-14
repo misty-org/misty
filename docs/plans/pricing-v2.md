@@ -54,8 +54,11 @@ Max 60M weekly), which could cost far more than the $8 and $19 prices.
   2.9% + $0.30. Storage costs R2's $0.015 per GB-month.
 - Every plan gives more per dollar than the plan below it, and Ultra beats five Max
   accounts on every meter, so stacking cheaper accounts never pays.
-- Every feature is on every plan. Plans differ only in AI amount, models, storage
-  and sync. No trials: the free tier is the trial. No BYOK.
+- Every feature is on every plan. Plans differ only in AI amount, models and
+  storage. No trials: the free tier is the trial.
+- Sync is unlimited on every plan (decided 2026-10-11). Sync bytes are never metered
+  against a plan or shown as an allowance; abuse is handled by rate limits, not a quota.
+- No BYOK: every model runs on Misty's keys (reconfirmed 2026-10-11).
 - Usage is measured in weighted tokens: 1 = $0.000001 of provider cost. Users see
   "% of this week's AI used", never a token count.
 
@@ -71,7 +74,6 @@ Max 60M weekly), which could cost far more than the $8 and $19 prices.
 | Monthly AI ceiling | 2M | 7M | 12M | 62M | 126M |
 | Monthly AI per $1 | – | 0.58M | 0.60M | 0.62M | 0.63M |
 | Storage | 5 GB | 50 GB | 200 GB | 1 TB | 2 TB |
-| Monthly sync transfer | 20 GB | 200 GB | 1 TB | 5 TB | 10 TB |
 | Models | Fast | Fast, Mid, Flagship | same | same | same |
 | Default model | Fast | Mid | Mid | Mid | Mid |
 | Worst-case month | $2.08 | $7.75 | $15.00 | $77.00 | $156.00 |

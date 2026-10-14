@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 const idle = { dirty: false, busy: false };
 
@@ -8,22 +8,29 @@ const idle = { dirty: false, busy: false };
  */
 export function useAgentChangeGuard(working: boolean) {
   const [editorStatus, setEditorStatus] = useState(idle);
-  const [conversationStatus, setConversationStatus] = useState(idle);
+  // Whether the draft is dirty matters only when a change is attempted. Keeping it out
+  // of state spares the whole Agents page a render on the first keystroke of a message.
+  const conversationDirty = useRef(false);
+  const [conversationBusy, setConversationBusy] = useState(false);
+  const setConversationStatus = useCallback((status: { dirty: boolean; busy: boolean }) => {
+    conversationDirty.current = status.dirty;
+    setConversationBusy(status.busy);
+  }, []);
   const [pendingChange, setPendingChange] = useState<() => void>();
   const change = (action: () => void, replacesConversation = true) => {
     if (
       pendingChange ||
       editorStatus.busy ||
-      (replacesConversation && (conversationStatus.busy || working))
+      (replacesConversation && (conversationBusy || working))
     )
       return;
-    if (editorStatus.dirty || (replacesConversation && conversationStatus.dirty)) {
+    if (editorStatus.dirty || (replacesConversation && conversationDirty.current)) {
       setPendingChange(() => action);
     } else action();
   };
   return {
     change,
-    busy: editorStatus.busy || conversationStatus.busy,
+    busy: editorStatus.busy || conversationBusy,
     pending: Boolean(pendingChange),
     setEditorStatus,
     setConversationStatus,

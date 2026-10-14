@@ -1,4 +1,4 @@
-import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAssetStack, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useDropZone, usePointerDrag } from "@/features/dnd";
 import {
   Button,

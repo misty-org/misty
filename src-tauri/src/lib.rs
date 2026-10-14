@@ -29,29 +29,43 @@ use app::commands::{
 };
 
 #[cfg(desktop)]
-use app::commands::{
-    connected_devices_initialize, connected_devices_set_identity, connected_devices_snapshot,
-};
-#[cfg(desktop)]
 use app::device_admission_commands::{
     devices_admit_self, devices_approval_status, devices_approve_confirm, devices_approve_start,
-    devices_approve_status, devices_connect, devices_deny, devices_pending_requests,
-    devices_publish_folders, devices_remove, devices_rename, devices_request_approval,
-    devices_set_policy,
+    devices_approve_status, devices_deny, devices_pending_requests, devices_publish_folders,
+    devices_remove, devices_rename, devices_request_approval, devices_set_policy,
 };
 #[cfg(desktop)]
 use app::device_commands::{devices_refresh, devices_start, devices_stop, devices_view};
 #[cfg(desktop)]
 use app::device_job_commands::{
-    device_send_file, device_sign_request, device_sign_run_grants, device_verify_job,
+    device_read_shared_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
 #[cfg(desktop)]
+use infra::browser::action_confirm::agent_action_confirm;
+#[cfg(desktop)]
+use infra::browser::host_messages::passwords::{
+    browser_password_offer_respond, browser_passwords_delete, browser_passwords_list,
+    browser_passwords_reveal, browser_passwords_save,
+};
+#[cfg(desktop)]
+use infra::browser::page_tools::media_tools::session::{
+    browser_webview_media_action, browser_webview_media_info,
+};
+#[cfg(desktop)]
+use infra::browser::page_tools::media_tools::{
+    browser_webview_media_playback, browser_webview_picture_in_picture,
+    browser_webview_reader_article,
+};
+use infra::browser::pane_dim::browser_webview_set_pane_dim;
+#[cfg(desktop)]
+use infra::browser::profile_cleanup::browser_device_profile_delete;
+#[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
-    browser_webview_create, browser_webview_forward, browser_webview_hide,
+    browser_webview_create, browser_webview_forward, browser_webview_held, browser_webview_hide,
     browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
     browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
     browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
@@ -64,20 +78,6 @@ use infra::browser::{
     browser_webview_developer_tools, browser_webview_find, browser_webview_print,
     browser_webview_save_page, browser_webview_set_muted, browser_webview_stop,
 };
-#[cfg(desktop)]
-use infra::browser::page_tools::media_tools::{
-    browser_webview_media_playback, browser_webview_picture_in_picture,
-    browser_webview_reader_article,
-};
-#[cfg(desktop)]
-use infra::browser::profile_cleanup::browser_device_profile_delete;
-#[cfg(desktop)]
-use infra::browser::host_messages::passwords::{
-    browser_password_offer_respond, browser_passwords_delete, browser_passwords_list,
-    browser_passwords_reveal, browser_passwords_save,
-};
-#[cfg(desktop)]
-use infra::browser_site_style::browser_set_mouse_gestures;
 #[cfg(desktop)]
 use infra::browser_agent_control::{
     browser_agent_execute_bounded, browser_agent_execution_cancel, browser_agent_execution_renew,
@@ -102,10 +102,9 @@ use infra::browser_library::{
 use infra::browser_search_suggest::browser_search_suggest;
 #[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
-use infra::misty::{
-    check_system, ensure_local_access_token, save_authenticated_user, save_verified_license,
-    sign_out_misty,
-};
+#[cfg(desktop)]
+use infra::browser_site_style::browser_set_mouse_gestures;
+use infra::misty::{check_system, save_authenticated_user, save_verified_license, sign_out_misty};
 #[cfg(desktop)]
 use infra::tray;
 use platform::plugins::mac_rounded_corners;
@@ -114,18 +113,26 @@ use tauri::{Emitter, Manager};
 use telemetry::TelemetryReporter;
 
 pub fn run() {
+    // Only development builds adjust the context.
+    #[cfg_attr(not(all(desktop, debug_assertions)), allow(unused_mut))]
     let mut context = tauri::generate_context!();
     #[cfg(all(desktop, debug_assertions))]
     development_profile::configure(&mut context).expect("invalid development profile");
-    // Use one TLS provider for backend calls, updates and the peer transport.
+    // The credential store lives in the same database as every other store, so both must
+    // resolve the same data root (tests and development profiles can move it).
+    if let Some(home) = infra::paths::misty_home_dir() {
+        let _ = misty_credential_store::configure_root(home.join(".local").join("data"));
+    }
+    // Use one TLS provider for backend calls and updates.
     let _ = rustls::crypto::ring::default_provider().install_default();
     telemetry::initialize();
     let builder = tauri::Builder::default();
 
     // Register this first so duplicate launches are rejected before any other
     // plugin or application service can initialize a second Misty runtime.
+    infra::default_browser::remember_launch(std::env::args().skip(1));
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
         if !mac_rounded_corners::main_window_ready() {
             return;
         }
@@ -137,11 +144,22 @@ pub fn run() {
             let _ = window.unminimize();
             let _ = window.set_focus();
         }
+        // Links opened while Misty runs, as the default browser.
+        let urls = infra::default_browser::web_urls(args.iter().skip(1));
+        if !urls.is_empty() {
+            let _ = app.emit("deep-link://new-url", urls);
+        }
     }));
 
     // Web APIs that website tabs reach natively; see kiri/README.md.
     #[cfg(desktop)]
     let builder = builder.plugin(infra::browser_kiri::plugin());
+
+    // WebKit can end a page's process while Misty is in the background; reload
+    // it as Tauri would, and log which page it was.
+    #[cfg(target_os = "macos")]
+    let builder =
+        builder.on_web_content_process_terminate(infra::browser_process_ended::page_process_ended);
 
     #[cfg(desktop)]
     let builder = builder
@@ -165,6 +183,10 @@ pub fn run() {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
+            // Debug-only: the browser benchmark runs its tasks in Misty's own
+            // tabs when asked to; see browser_eval_bridge.rs.
+            #[cfg(all(desktop, debug_assertions))]
+            infra::browser::eval_bridge::start_if_requested(app.handle());
             // Debug-only end-to-end check of Kiri; see browser_kiri_probe.rs.
             #[cfg(all(debug_assertions, target_os = "macos"))]
             if std::env::var_os("MISTY_KIRI_PROBE").is_some() {
@@ -186,12 +208,6 @@ pub fn run() {
                     window.set_title(&profile)?;
                 }
             }
-            #[cfg(target_os = "macos")]
-            misty_browser_sync::secure_store::configure_device_store(
-                app.path()
-                    .local_data_dir()?
-                    .join("com.misty.desktop/device-keys"),
-            )?;
 
             // Runs only in the primary instance, before any service opens a
             // file under ~/.misty. Services still create what they need, so a
@@ -204,22 +220,22 @@ pub fn run() {
             // What this device trusts (vault root pin, device list, its own
             // policy) lives beside its other app data.
             #[cfg(desktop)]
-            infra::device_trust::set_storage_root(runtime.environment.config_dir());
-            #[cfg(desktop)]
-            {
-                let route_app = app.handle().clone();
-                let _ = runtime
-                    .connected_devices
-                    .set_workspace_route_handler(Arc::new(move |request| {
-                        route_app
-                            .emit("misty://open-workspace-route", request)
-                            .is_ok()
-                    }));
-            }
-            #[cfg(unix)]
+            infra::device_trust::set_storage_root(
+                runtime
+                    .environment
+                    .store()
+                    .path()
+                    .parent()
+                    .map(std::path::Path::to_path_buf)
+                    .unwrap_or_default(),
+            );
             app.manage(infra::agent_files::AgentFilesState::default());
-            #[cfg(all(desktop, unix))]
-            infra::clipboard_bridge::start(app.handle().clone(), runtime.environment.config_dir());
+            #[cfg(all(desktop, any(unix, windows)))]
+            infra::clipboard_bridge::start(
+                app.handle().clone(),
+                runtime.environment.store(),
+                runtime.environment.config_dir(),
+            );
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
@@ -241,13 +257,16 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             infra::app_menu::setup(app)?;
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             infra::devices::start_device_change_listener(app.handle().clone());
+            #[cfg(windows)]
+            infra::misty_context_windows::start_foreground_watch();
+            #[cfg(windows)]
+            if let Some(main) = app.get_webview("main") {
+                infra::browser_process_ended::watch_page_process(&main);
+            }
             Ok(())
         });
-
-    #[cfg(desktop)]
-    let builder = builder.manage(platform::mini_app::MiniAppState::default());
 
     #[cfg(desktop)]
     let builder = builder.on_menu_event(|app, event| {
@@ -293,12 +312,8 @@ pub fn run() {
         .invoke_handler({
             let dispatch: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> =
                 Box::new(tauri::generate_handler![
-                    crate::infra::extensions::extensions_search,
-                    crate::infra::extensions::extensions_categories,
-                    crate::infra::extensions::extensions_detail,
                     crate::infra::extensions::install::extensions_prepare,
                     crate::infra::extensions::install::extensions_commit,
-                    crate::infra::extensions::install::extensions_approve,
                     crate::infra::extensions::runtime::extensions_reconcile,
                     crate::infra::extensions::runtime::extensions_action,
                     crate::infra::extensions::runtime::extensions_respond,
@@ -320,6 +335,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_edit,
                     crate::infra::browser_sync::browser_sync_activate,
                     crate::infra::browser_sync::browser_sync_claim,
+                    crate::infra::browser_sync::browser_sync_flush,
                     crate::infra::browser_sync::browser_sync_rename_device,
                     crate::infra::page_state::browser_page_state_capture,
                     crate::infra::page_state::browser_page_state_restore,
@@ -330,6 +346,7 @@ pub fn run() {
                     crate::infra::page_state::history::browser_view_history_load,
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
+                    crate::infra::browser_sync::browser_sync_set_frequency,
                     crate::infra::browser_sync::browser_sync_forget_key,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
@@ -343,44 +360,53 @@ pub fn run() {
                     crate::infra::workspace_autopilot::agent_workspace_context,
                     crate::infra::workspace_autopilot::agent_desktop_recent_audio,
                     crate::infra::workspace_autopilot::agent_control_yield,
-                    #[cfg(desktop)]
-                    platform::mini_app::builtin_service_open,
-                    #[cfg(desktop)]
-                    platform::mini_app::mini_app_close,
+                    crate::infra::workspace_autopilot::agent_control_island,
+                    #[cfg(windows)]
+                    crate::infra::desktop_overlays_windows::agent_desktop_island_press,
+                    #[cfg(windows)]
+                    crate::infra::desktop_overlays_windows::agent_desktop_overlay_state,
+                    #[cfg(windows)]
+                    crate::infra::agent_dock_windows::agent_dock_card,
+                    #[cfg(windows)]
+                    crate::infra::window_snap_windows::window_show_snap_layouts,
+                    crate::infra::default_browser::app_take_launch_urls,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
+                    platform::plugins::mac_traffic_lights::set_traffic_lights_visible,
                     app_snapshot,
                     agents_device_snapshot,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_choose,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_prepare,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_apply,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_cancel,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_manifest,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_history,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_snapshot,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_undo,
-                    #[cfg(unix)]
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
+                    app::code_commands::code_execute,
+                    app::code_commands::code_choose_project,
+                    app::code_commands::code_set_project_installs,
+                    app::code_commands::code_allow_project_changes,
+                    app::code_commands::code_remove_project,
+                    app::code_commands::code_checkpoints,
+                    app::code_commands::code_undo,
+                    app::code_snapshots::code_project_snapshot,
+                    app::code_commands::code_new_project,
+                    app::code_commands::code_clone_project,
+                    app::code_commands::code_set_project_push,
+                    app::code_commands::code_run_diff,
+                    app::code_commands::code_git,
+                    app::code_commands::code_git_job,
                     agents_list_scoped_files,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
-                    connected_devices_initialize,
-                    #[cfg(desktop)]
-                    connected_devices_snapshot,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
                     #[cfg(desktop)]
-                    connected_devices_set_identity,
+                    #[cfg(desktop)]
                     #[cfg(desktop)]
                     devices_start,
                     #[cfg(desktop)]
@@ -414,7 +440,6 @@ pub fn run() {
                     #[cfg(desktop)]
                     devices_publish_folders,
                     #[cfg(desktop)]
-                    devices_connect,
                     #[cfg(desktop)]
                     device_sign_request,
                     #[cfg(desktop)]
@@ -422,11 +447,10 @@ pub fn run() {
                     #[cfg(desktop)]
                     device_verify_job,
                     #[cfg(desktop)]
-                    device_send_file,
+                    device_read_shared_file,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
                     check_system,
-                    ensure_local_access_token,
                     save_authenticated_user,
                     save_verified_license,
                     sign_out_misty,
@@ -434,6 +458,15 @@ pub fn run() {
                     browser_webview_create,
                     infra::agent_workspace::agent_window_open,
                     infra::agent_workspace::agent_window_show,
+                    infra::agent_dock::agent_dock_window,
+                    infra::agent_dock::agent_dock_open,
+                    infra::agent_dock::agent_dock_status,
+                    infra::agent_dock::agent_dock_visibility,
+                    infra::agent_dock::agent_dock_host_action,
+                    infra::agent_dock::agent_tab_detach,
+                    infra::agent_dock::agent_tab_attach,
+                    infra::extension_popup::extension_popup_open,
+                    infra::extension_popup::extension_popup_close,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_configure,
                     #[cfg(any(target_os = "macos", windows))]
@@ -458,6 +491,8 @@ pub fn run() {
                     infra::agent_workspace::agent_window_task_receipt,
                     infra::agent_workspace::agent_foreground_queue,
                     infra::agent_workspace::agent_workspace_acquire,
+                    #[cfg(desktop)]
+                    infra::power_keep_awake::power_keep_awake,
                     infra::agent_workspace::agent_workspace_release,
                     infra::agent_workspace::agent_workspace_bind_scope,
                     #[cfg(desktop)]
@@ -483,6 +518,9 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_webview_set_theme,
                     #[cfg(desktop)]
+                    browser_webview_set_pane_dim,
+                    agent_action_confirm,
+                    #[cfg(desktop)]
                     browser_webview_navigate,
                     #[cfg(desktop)]
                     browser_webview_back,
@@ -501,14 +539,15 @@ pub fn run() {
                     #[cfg(desktop)]
                     infra::browser_site_zoom::browser_set_site_zoom_levels,
                     #[cfg(desktop)]
-                    infra::browser_content_blocking::browser_set_content_blocking,
-                    #[cfg(desktop)]
                     infra::browser_site_style::browser_set_site_styles,
                     #[cfg(desktop)]
                     infra::browser_site_style::browser_webview_pick_element,
+                    #[cfg(desktop)]
+                    infra::browser_night_light::browser_set_night_light,
                     browser_webview_set_zoom,
                     #[cfg(desktop)]
                     browser_webview_show,
+                    browser_webview_held,
                     #[cfg(desktop)]
                     browser_webviews_set_overlay_active,
                     #[cfg(desktop)]
@@ -537,6 +576,8 @@ pub fn run() {
                     browser_webview_picture_in_picture,
                     #[cfg(desktop)]
                     browser_webview_media_playback,
+                    browser_webview_media_action,
+                    browser_webview_media_info,
                     #[cfg(desktop)]
                     browser_webview_reader_article,
                     #[cfg(desktop)]

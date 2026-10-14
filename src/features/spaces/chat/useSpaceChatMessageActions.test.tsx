@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import {
   useSpaceChatMessageActions,
   type SpaceChatMessageActionsOptions,

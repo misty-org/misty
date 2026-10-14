@@ -10,7 +10,7 @@ function validFactor(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0.25 && value <= 5;
 }
 
-/** Stored as `[{ host, factor }]`, the list shape structured account settings use. */
+/** Stored as `[{ host, factor }]`, the list shape structured settings use. */
 export function parseSiteZoomLevels(raw: string): SiteZoomLevels {
   try {
     const parsed: unknown = JSON.parse(raw);

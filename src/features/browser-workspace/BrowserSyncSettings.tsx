@@ -6,7 +6,7 @@ import {
 } from "@/features/settings/desktop";
 import { ChoiceControl, SettingsNote, stringSetting } from "@/features/settings/SettingsControls";
 import type { SettingsContentProps } from "@/features/settings/settingsTypes";
-import { SettingsSyncSection, SyncRestoreSettings } from "@/features/settings/syncSettings";
+import { SyncRestoreSettings } from "@/features/settings/syncSettings";
 import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
 import { deviceRows, publishingDeviceId } from "./deviceControl";
 import { SyncDeviceList } from "./SyncDeviceList";
@@ -79,7 +79,6 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
         {session && <DeviceWebsiteDataList session={session} />}
       </Section>
       <SyncRestoreSettings {...props} />
-      <SettingsSyncSection showStatus={false} />
       <div ref={accountSection}>
         <SyncAccountSettings controller={controller} />
       </div>

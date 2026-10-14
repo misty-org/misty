@@ -1,4 +1,4 @@
-import type { AlbumDialogModel } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+import type { AlbumDialogModel } from "@/api/spaces/dto/SpaceLibraryDialogs";
 import {
   Button,
   Dialog,

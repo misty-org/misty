@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import posthog from "@posthog/rollup-plugin";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const nodeShims: Record<string, string> = {
   fs: "fs",
@@ -105,17 +106,19 @@ export default defineConfig(({ command, mode }) => {
     },
     resolve: {
       alias: [
-        { find: "@", replacement: new URL("../src", import.meta.url).pathname },
+        { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
         // Midscene's planner runs in the app; its Node-only helpers get browser stubs.
         ...Object.entries(nodeShims).map(([name, file]) => ({
           find: new RegExp(`^node:${name}$`),
-          replacement: new URL(`../src/shared/platform/nodeShims/${file}.ts`, import.meta.url)
-            .pathname,
+          replacement: fileURLToPath(
+            new URL(`../src/shared/platform/nodeShims/${file}.ts`, import.meta.url),
+          ),
         })),
         {
           find: /^sharp$/,
-          replacement: new URL("../src/shared/platform/nodeShims/sharp.ts", import.meta.url)
-            .pathname,
+          replacement: fileURLToPath(
+            new URL("../src/shared/platform/nodeShims/sharp.ts", import.meta.url),
+          ),
         },
       ],
     },
@@ -126,6 +129,7 @@ export default defineConfig(({ command, mode }) => {
         input: {
           main: resolve(process.cwd(), "src/app/index.html"),
           companion: resolve(process.cwd(), "src/app/companion.html"),
+          desktop: resolve(process.cwd(), "src/app/desktop.html"),
         },
       },
       assetsInlineLimit: 0,

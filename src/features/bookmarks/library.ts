@@ -66,7 +66,7 @@ function placement(parentId: string): { parent_id?: string } {
   return { parent_id: parentId };
 }
 
-export function ensureBookmarkRoot(id: BookmarkRootId) {
+function ensureBookmarkRoot(id: BookmarkRootId) {
   const state = useWorkspaceStore.getState();
   if (state.bookmarkFolders.some((folder) => folder.id === id)) return id;
   const index = bookmarkRoots.findIndex((root) => root.id === id);
@@ -203,5 +203,36 @@ export function saveBookmark(input: {
 export function removeBookmark(id: string) {
   useWorkspaceStore.setState((s) => ({
     bookmarks: s.bookmarks.filter((b) => b.id !== id),
+  }));
+}
+/** Puts a folder or bookmark at `index` among its folder's subfolders and links,
+ * as the bookmarks extension API places them. */
+export function placeBookmarkNode(id: string, index: number) {
+  const tree = currentTree();
+  const folder = tree.folder(id);
+  const bookmark = tree.bookmarks.find((item) => item.id === id);
+  const parentId = folder ? folder.parentId : bookmark?.folderId;
+  if (!parentId || isBookmarkRoot(id)) throw new Error("This bookmark can't be moved.");
+  const siblings = tree.children(parentId).filter((node) => node.id !== id);
+  const node = tree.children(parentId).find((item) => item.id === id);
+  if (!node) return;
+  siblings.splice(Math.max(0, Math.min(index, siblings.length)), 0, node);
+  const order = new Map(siblings.map((item, position) => [item.id, position]));
+  useWorkspaceStore.setState((s) => ({
+    bookmarkFolders: s.bookmarkFolders.map((f) =>
+      order.has(f.id) ? { ...f, fields: { ...f.fields, order: order.get(f.id)! } } : f,
+    ),
+    bookmarks: s.bookmarks.map((b) =>
+      order.has(b.id) ? { ...b, fields: { ...b.fields, order: order.get(b.id)! } } : b,
+    ),
+  }));
+}
+/** Removes a folder with every folder and link inside it. */
+export function removeBookmarkTree(id: string) {
+  if (isBookmarkRoot(id)) throw new Error("This folder can't be removed.");
+  const inside = currentTree().descendants(id);
+  useWorkspaceStore.setState((s) => ({
+    bookmarkFolders: s.bookmarkFolders.filter((f) => !inside.has(f.id)),
+    bookmarks: s.bookmarks.filter((b) => !inside.has(b.fields.folder_id)),
   }));
 }

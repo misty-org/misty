@@ -13,15 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
   SkeletonList,
-  Switch,
 } from "@/shared/ui";
-import { settingsBoolean, settingsString, useSettingsStore } from "@/features/settings";
-import {
-  contentBlockingAllowedOn,
-  contentBlockingSettingWith,
-  contentBlockingSite,
-  parseContentBlockingAllowedSites,
-} from "@/features/webviews/contentBlocking";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import {
   type BrowserSiteInfo as SiteInfo,
@@ -105,7 +97,6 @@ export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; 
         </PopoverTrigger>
         <PopoverContent align="start" className="w-80 max-w-[calc(100vw-24px)] p-4">
           <h2 className="break-all text-sm font-medium">{info?.origin ?? "Site information"}</h2>
-          <ContentBlockingRow url={url} />
           <Button
             type="button"
             variant="outline"
@@ -199,37 +190,5 @@ export function BrowserSiteInfo({ id, url, active }: { id: string; url: string; 
         </PopoverContent>
       </Popover>
     </>
-  );
-}
-
-/** Turns ad and tracker blocking off or on for this site, while blocking is on. */
-function ContentBlockingRow({ url }: { url: string }) {
-  const enabled = useSettingsStore((state) =>
-    settingsBoolean(state.settings?.document ?? {}, "general", "browser_content_blocking", true),
-  );
-  const raw = useSettingsStore((state) =>
-    settingsString(
-      state.settings?.document ?? {},
-      "general",
-      "browser_content_blocking_allowed_json",
-      "[]",
-    ),
-  );
-  if (!enabled || !contentBlockingSite(url)) return null;
-  const blocked = !contentBlockingAllowedOn(parseContentBlockingAllowedSites(raw), url);
-  return (
-    <label className="mt-3 flex min-h-10 items-center justify-between gap-3 text-sm">
-      <span>Block ads and trackers</span>
-      <Switch
-        checked={blocked}
-        onCheckedChange={(checked) => {
-          const next = contentBlockingSettingWith(raw, url, checked);
-          if (next !== null)
-            useSettingsStore
-              .getState()
-              .updateSetting("general", "browser_content_blocking_allowed_json", next);
-        }}
-      />
-    </label>
   );
 }

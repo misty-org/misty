@@ -1,5 +1,5 @@
 import { apiRequest } from "@/api/client";
-import type { GlobalSpaceLibraryHit } from "@/api/spaces/dto/interfaces/search";
+import type { GlobalSpaceLibraryHit } from "@/api/spaces/dto/search";
 
 export const searchApi = {
   spaceLibraries: (query: string, limit = 50) =>

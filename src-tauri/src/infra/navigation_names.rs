@@ -1,31 +1,20 @@
-use serde::{Deserialize, Serialize};
+//! Names the person gave to windows, tabs and groups, per account, in `misty.db`.
+use super::store::Store;
+use serde::Serialize;
 use std::{collections::BTreeMap, path::PathBuf};
-use tokio::sync::Mutex;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct NavigationDocument {
-    pub version: u32,
-    #[serde(default)]
-    pub accounts: BTreeMap<String, BTreeMap<String, String>>,
-}
-impl Default for NavigationDocument {
-    fn default() -> Self {
-        Self {
-            version: 1,
-            accounts: BTreeMap::new(),
-        }
-    }
-}
 #[derive(Clone, Serialize)]
 pub struct NavigationSnapshot {
     pub names: BTreeMap<String, String>,
     pub error: Option<String>,
 }
+
 pub struct NavigationNamesService {
-    path: PathBuf,
-    document: Mutex<NavigationDocument>,
+    store: Store,
+    /// `navigation.json` from an earlier layout, imported once when no names exist yet.
+    legacy_path: PathBuf,
 }
+
 fn valid_name(value: &str) -> bool {
     !value.is_empty()
         && value.trim() == value
@@ -34,59 +23,79 @@ fn valid_name(value: &str) -> bool {
             .chars()
             .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
 }
+
 fn valid_key(key: &str) -> bool {
     !key.is_empty() && key.len() <= 2048 && !key.chars().any(char::is_control)
 }
+
+fn read_names(store: &Store, account: &str) -> Result<BTreeMap<String, String>, String> {
+    let connection = store.connect().map_err(|e| e.to_string())?;
+    let mut statement = connection
+        .prepare("SELECT key, name FROM navigation_names WHERE account = ?1")
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map([account], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
+}
+
+/// Imports an earlier `navigation.json` (`{"version":1,"accounts":{...}}`) once.
+fn import_legacy(store: &Store, legacy: &std::path::Path) -> Result<(), String> {
+    store
+        .import_once("navigation.json", |connection| -> Result<(), rusqlite::Error> {
+            let Ok(bytes) = std::fs::read(legacy) else {
+                return Ok(());
+            };
+            #[derive(serde::Deserialize)]
+            struct Legacy {
+                #[serde(default)]
+                accounts: BTreeMap<String, BTreeMap<String, String>>,
+            }
+            let Ok(document) = serde_json::from_slice::<Legacy>(&bytes) else {
+                return Ok(());
+            };
+            for (account, names) in document.accounts {
+                for (key, name) in names {
+                    if valid_key(&account) && valid_key(&key) && valid_name(&name) {
+                        connection.execute(
+                            "INSERT OR IGNORE INTO navigation_names (account, key, name) VALUES (?1, ?2, ?3)",
+                            rusqlite::params![account, key, name],
+                        )?;
+                    }
+                }
+            }
+            Ok(())
+        })
+        .map_err(|e| e.to_string())
+}
+
 impl NavigationNamesService {
-    pub fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            document: Mutex::new(NavigationDocument::default()),
-        }
+    pub fn new(store: Store, legacy_path: PathBuf) -> Self {
+        Self { store, legacy_path }
     }
-    async fn read(&self) -> Result<NavigationDocument, String> {
-        match tokio::fs::read(&self.path).await {
-            Ok(bytes) => {
-                if bytes.len() > 4 * 1024 * 1024 {
-                    return Err("Navigation names file is too large.".into());
-                }
-                let doc: NavigationDocument = serde_json::from_slice(&bytes).map_err(|_| {
-                    "Navigation names file is invalid. Correct navigation.json and retry."
-                })?;
-                if doc.version != 1
-                    || doc.accounts.iter().any(|(account, names)| {
-                        !valid_key(account)
-                            || names
-                                .iter()
-                                .any(|(key, name)| !valid_key(key) || !valid_name(name))
-                    })
-                {
-                    return Err(
-                        "Navigation names contain an unsupported version or invalid label.".into(),
-                    );
-                }
-                Ok(doc)
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(NavigationDocument::default()),
-            Err(_) => {
-                Err("Misty could not read navigation.json. Check its file permissions.".into())
-            }
-        }
-    }
+
     pub async fn snapshot(&self, account: &str) -> NavigationSnapshot {
-        let mut current = self.document.lock().await;
-        let error = match self.read().await {
-            Ok(doc) => {
-                *current = doc;
-                None
-            }
-            Err(e) => Some(e),
-        };
-        NavigationSnapshot {
-            names: current.accounts.get(account).cloned().unwrap_or_default(),
-            error,
+        let (store, legacy, account) = (
+            self.store.clone(),
+            self.legacy_path.clone(),
+            account.to_owned(),
+        );
+        let result = tokio::task::spawn_blocking(move || {
+            import_legacy(&store, &legacy)?;
+            read_names(&store, &account)
+        })
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|result| result);
+        match result {
+            Ok(names) => NavigationSnapshot { names, error: None },
+            Err(error) => NavigationSnapshot {
+                names: BTreeMap::new(),
+                error: Some(error),
+            },
         }
     }
+
     pub async fn update(
         &self,
         account: String,
@@ -97,58 +106,44 @@ impl NavigationNamesService {
         {
             return Err("Choose a single-line name of 1–120 characters.".into());
         }
-        let mut current = self.document.lock().await;
-        // Merge into the latest file, never overwrite malformed external edits.
-        let mut next = self.read().await?;
-        let names = next.accounts.entry(account.clone()).or_default();
-        if let Some(name) = name {
-            names.insert(key, name);
-        } else {
-            names.remove(&key);
-        }
-        let parent = self
-            .path
-            .parent()
-            .ok_or("Navigation config directory is missing")?;
-        tokio::fs::create_dir_all(parent)
-            .await
+        let store = self.store.clone();
+        let names = tokio::task::spawn_blocking(move || {
+            let connection = store.connect().map_err(|e| e.to_string())?;
+            match name {
+                Some(name) => connection.execute(
+                    "INSERT INTO navigation_names (account, key, name) VALUES (?1, ?2, ?3)
+                     ON CONFLICT (account, key) DO UPDATE SET name = excluded.name",
+                    rusqlite::params![account, key, name],
+                ),
+                None => connection.execute(
+                    "DELETE FROM navigation_names WHERE account = ?1 AND key = ?2",
+                    rusqlite::params![account, key],
+                ),
+            }
             .map_err(|e| e.to_string())?;
-        let temporary = parent.join(format!(".navigation-{}.tmp", uuid::Uuid::new_v4()));
-        let bytes = serde_json::to_vec_pretty(&next).map_err(|e| e.to_string())?;
-        let result = async {
-            use tokio::io::AsyncWriteExt;
-            let mut options = tokio::fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)]
-            options.mode(0o600);
-            let mut file = options.open(&temporary).await.map_err(|e| e.to_string())?;
-            file.write_all(&bytes).await.map_err(|e| e.to_string())?;
-            file.sync_all().await.map_err(|e| e.to_string())?;
-            tokio::fs::rename(&temporary, &self.path)
-                .await
-                .map_err(|e| e.to_string())
-        }
-        .await;
-        if let Err(e) = result {
-            let _ = tokio::fs::remove_file(&temporary).await;
-            return Err(e);
-        }
-        *current = next;
-        Ok(NavigationSnapshot {
-            names: current.accounts.get(&account).cloned().unwrap_or_default(),
-            error: None,
+            read_names(&store, &account)
         })
+        .await
+        .map_err(|e| e.to_string())??;
+        Ok(NavigationSnapshot { names, error: None })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn service(directory: &tempfile::TempDir) -> NavigationNamesService {
+        NavigationNamesService::new(
+            Store::at(directory.path().join("misty.db")),
+            directory.path().join("navigation.json"),
+        )
+    }
+
     #[tokio::test]
-    async fn names_merge_reset_and_recover_from_external_edits() {
-        let root = std::env::temp_dir().join(format!("misty-names-{}", uuid::Uuid::new_v4()));
-        let path = root.join("navigation.json");
-        let service = NavigationNamesService::new(path.clone());
+    async fn names_merge_reset_and_stay_per_account() {
+        let directory = tempfile::tempdir().unwrap();
+        let service = service(&directory);
         let (a, b) = tokio::join!(
             service.update("account-a".into(), "tab:1".into(), Some("School".into())),
             service.update("account-a".into(), "tab:2".into(), Some("Mail".into()))
@@ -156,68 +151,49 @@ mod tests {
         a.unwrap();
         b.unwrap();
         assert_eq!(service.snapshot("account-a").await.names.len(), 2);
+        // A new service over the same database sees the saved names.
         assert_eq!(
-            NavigationNamesService::new(path.clone())
-                .snapshot("account-a")
-                .await
-                .names["tab:1"],
+            self::service(&directory).snapshot("account-a").await.names["tab:1"],
             "School"
         );
         assert!(service.snapshot("account-b").await.names.is_empty());
-        tokio::fs::write(&path, b"invalid").await.unwrap();
-        let snapshot = service.snapshot("account-a").await;
-        assert!(snapshot.error.is_some());
-        assert_eq!(snapshot.names.len(), 2);
-        assert!(service
-            .update("account-a".into(), "tab:1".into(), None)
+        service
+            .update("account-a".into(), "tab:1".into(), Some("Edited".into()))
             .await
-            .is_err());
-        tokio::fs::write(
-            &path,
-            br#"{"version":1,"accounts":{"account-a":{"tab:1":"Edited"}}}"#,
-        )
-        .await
-        .unwrap();
+            .unwrap();
         assert_eq!(service.snapshot("account-a").await.names["tab:1"], "Edited");
         service
             .update("account-a".into(), "tab:1".into(), None)
             .await
             .unwrap();
-        assert!(NavigationNamesService::new(path)
+        assert!(!service
             .snapshot("account-a")
             .await
             .names
-            .is_empty());
-        tokio::fs::remove_dir_all(root).await.unwrap();
+            .contains_key("tab:1"));
     }
+
     #[tokio::test]
-    async fn write_failure_does_not_replace_saved_names() {
-        let root = std::env::temp_dir().join(format!("misty-names-{}", uuid::Uuid::new_v4()));
-        let path = root.join("navigation.json");
-        let service = NavigationNamesService::new(path.clone());
+    async fn an_earlier_navigation_file_is_imported_once() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(
+            directory.path().join("navigation.json"),
+            br#"{"version":1,"accounts":{"account-a":{"tab:1":"Old name"}}}"#,
+        )
+        .unwrap();
+        let service = service(&directory);
+        assert_eq!(
+            service.snapshot("account-a").await.names["tab:1"],
+            "Old name"
+        );
         service
-            .update("account".into(), "tab:1".into(), Some("Saved".into()))
+            .update("account-a".into(), "tab:1".into(), None)
             .await
             .unwrap();
-        let original = tokio::fs::read(&path).await.unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            tokio::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o500))
-                .await
-                .unwrap();
-            let result = service
-                .update("account".into(), "tab:1".into(), Some("Unsaved".into()))
-                .await;
-            tokio::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700))
-                .await
-                .unwrap();
-            assert!(result.is_err());
-            assert_eq!(tokio::fs::read(&path).await.unwrap(), original);
-            assert_eq!(service.snapshot("account").await.names["tab:1"], "Saved");
-        }
-        tokio::fs::remove_dir_all(root).await.unwrap();
+        // The file does not come back after the name was removed.
+        assert!(service.snapshot("account-a").await.names.is_empty());
     }
+
     #[test]
     fn labels_are_bounded_single_line() {
         for value in ["", " padded ", "a\nb", "a\u{2028}b"] {

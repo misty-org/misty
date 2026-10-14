@@ -28,7 +28,7 @@ export function xmlToText(xml: string): string {
     .trim();
 }
 
-export function decodeXmlEntities(value: string): string {
+function decodeXmlEntities(value: string): string {
   const textarea = document.createElement("textarea");
   textarea.innerHTML = value;
   return textarea.value;
@@ -47,26 +47,15 @@ export function rtfToText(value: string): string {
 export function naturalPathSort(left: string, right: string): number {
   return left.localeCompare(right, undefined, { numeric: true });
 }
-
-export function imageOutputMimeType(extension: string): string {
-  return extension === "jpg" || extension === "jpeg"
-    ? "image/jpeg"
-    : extension === "webp"
-      ? "image/webp"
-      : "image/png";
-}
 export function sourceExtension(source: GlobalPreviewSource): string {
   return (source.extension || source.name.split(".").pop() || "").replace(/^\./, "").toLowerCase();
-}
-export function fileName(path: string): string {
-  return path.replace(/\\/g, "/").split("/").pop() || path;
 }
 export function friendlyType(extension: string, mimeType?: string | null): string {
   return extension
     ? `${extension.toUpperCase()} ${typeFamily(extension, mimeType)}`
     : mimeType || "File";
 }
-export function typeFamily(extension: string, mimeType?: string | null): string {
+function typeFamily(extension: string, mimeType?: string | null): string {
   if (imageMimeTypes[extension] || mimeType?.startsWith("image/")) return "image";
   if (videoMimeTypes[extension] || mimeType?.startsWith("video/")) return "video";
   if (audioMimeTypes[extension] || mimeType?.startsWith("audio/")) return "audio";

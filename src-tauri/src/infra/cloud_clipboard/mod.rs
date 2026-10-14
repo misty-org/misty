@@ -1,52 +1,31 @@
-//! The cloud clipboard (docs/design/clipboard/BRIEF.md): clips travel between
-//! this account's admitted devices through a Cloudflare Worker, sealed with a
-//! key derived from the vault root. The Worker, R2 and Misty's server only ever
-//! see ciphertext. The Misty API's only part is a short ticket for this device.
+//! The shared clipboard (docs/design/clipboard/BRIEF.md): what a person copies
+//! reaches their account's other added devices through sync, as a small ring
+//! of sealed clips. Each clip is compressed and sealed on the device with a key
+//! derived from the vault root; the server only ever holds ciphertext.
 #![cfg(desktop)]
 
-mod connection;
-mod files;
-mod transfer;
-mod wire;
-
-use connection::*;
-use files::*;
-use transfer::*;
-use wire::*;
+mod clip;
+mod ring;
 
 use std::{
-    io::Write as _,
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Mutex, RwLock,
     },
-    time::{Duration, Instant},
 };
 
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use futures_util::{SinkExt, StreamExt};
-use misty_browser_sync::{
-    crypto::ClipboardKey,
-    transport::{open_device_socket, SocketMessage},
-};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
 use crate::domain::clipboard::{
-    ClipboardFileRef, ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
+    ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
 };
-use crate::infra::{device_http::DeviceHttp, device_identity::DeviceIdentity, device_trust};
+use crate::infra::device_trust;
+use clip::Clip;
 
-/// The Worker's limit for one clip, and so the most this device uploads at once.
-const MAX_CLIP_BYTES: u64 = 25 * 1024 * 1024;
-const MAX_TEXT_BYTES: usize = 1024 * 1024;
-const MAX_HISTORY: usize = 20;
-const MAX_SOCKET_FRAME: usize = 8 * 1024 * 1024;
-const KEEPALIVE: Duration = Duration::from_secs(30);
-/// Received files stay in the clipboard cache this long, like the clips themselves.
-const RECEIVED_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
+/// Clips older than this are never shown or pasted.
+const CLIP_LIFETIME_MS: i64 = 24 * 60 * 60 * 1000;
 pub const HISTORY_EVENT: &str = "misty://clipboard-history";
 
 /// One clip in the popover and in Kura's sidebar. Contains only what this
@@ -75,7 +54,7 @@ pub enum CloudStatus {
     Locked,
     Connecting,
     Ready,
-    /// The Worker or the ticket route is unreachable; the LAN path still works.
+    /// Sync is unreachable right now.
     Unavailable,
 }
 
@@ -84,51 +63,44 @@ pub enum CloudStatus {
 pub struct CloudClipboardView {
     pub status: CloudStatus,
     pub clips: Vec<ClipSummary>,
+    /// Plain words about the last copy that could not be shared, if any.
+    pub notice: Option<String>,
 }
 
 pub(super) type ClipHandler = Arc<dyn Fn(ClipboardPayload) + Send + Sync>;
-/// A file read for upload: its name, whether it is a zipped folder, its bytes.
-pub(super) type ReadFile = (String, bool, Vec<u8>);
 
 #[derive(Clone, Default)]
 pub struct CloudClipboard {
     inner: Arc<Inner>,
 }
 
+#[derive(Default)]
 struct Inner {
     generation: AtomicU64,
-    changes: tokio::sync::broadcast::Sender<()>,
-    session: RwLock<Option<Arc<Session>>>,
+    changes: Changes,
+    session: RwLock<Option<Arc<ring::Session>>>,
     status: Mutex<CloudStatus>,
-    history: Mutex<Vec<(ClipSummary, Manifest)>>,
+    notice: Mutex<Option<String>>,
+    /// Open clips by ring slot, newest first.
+    history: Mutex<Vec<(u8, Clip)>>,
     handler: RwLock<Option<ClipHandler>>,
     app: RwLock<Option<AppHandle>>,
-    cache_dir: RwLock<PathBuf>,
 }
 
-impl Default for Inner {
+struct Changes(tokio::sync::broadcast::Sender<()>);
+
+impl Default for Changes {
     fn default() -> Self {
-        Self {
-            generation: AtomicU64::new(0),
-            changes: tokio::sync::broadcast::channel(16).0,
-            session: RwLock::default(),
-            status: Mutex::default(),
-            history: Mutex::default(),
-            handler: RwLock::default(),
-            app: RwLock::default(),
-            cache_dir: RwLock::default(),
-        }
+        Self(tokio::sync::broadcast::channel(16).0)
     }
 }
 
 pub struct CloudStart {
     pub app: AppHandle,
-    pub api_base: String,
     pub account_id: String,
-    pub local_device_id: String,
+    /// This device's id on the server, recorded with each clip it shares.
     pub server_device_id: String,
     pub device_name: String,
-    pub cache_dir: PathBuf,
 }
 
 impl CloudClipboard {
@@ -139,18 +111,15 @@ impl CloudClipboard {
         }
     }
 
-    /// Starts (or restarts) the connection for this device. It keeps running
-    /// until `stop` and follows the device's policy and vault state.
+    /// Starts (or restarts) for this device. It keeps running until `stop`
+    /// and follows the device's policy and vault state.
     pub fn start(&self, start: CloudStart) {
         let generation = self.inner.generation.fetch_add(1, Ordering::SeqCst) + 1;
         if let Ok(mut app) = self.inner.app.write() {
             *app = Some(start.app.clone());
         }
-        if let Ok(mut dir) = self.inner.cache_dir.write() {
-            *dir = start.cache_dir.join("cloud-clipboard");
-        }
         let inner = self.inner.clone();
-        tauri::async_runtime::spawn(async move { run(inner, generation, start).await });
+        tauri::async_runtime::spawn(async move { ring::run(inner, generation, start).await });
     }
 
     pub fn stop(&self) {
@@ -166,61 +135,66 @@ impl CloudClipboard {
 
     /// Fires whenever the clip list or the status changes.
     pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<()> {
-        self.inner.changes.subscribe()
+        self.inner.changes.0.subscribe()
     }
 
     pub fn view(&self) -> CloudClipboardView {
+        let now = chrono::Utc::now().timestamp_millis();
+        let session = self.inner.session();
         CloudClipboardView {
             status: *self.inner.status.lock().expect("cloud clipboard status"),
             clips: self
                 .inner
                 .history
                 .lock()
-                .map(|history| history.iter().map(|(summary, _)| summary.clone()).collect())
+                .map(|history| {
+                    history
+                        .iter()
+                        .filter(|(_, clip)| fresh(clip, now))
+                        .map(|(_, clip)| summary(clip, session.as_deref()))
+                        .collect()
+                })
                 .unwrap_or_default(),
+            notice: self
+                .inner
+                .notice
+                .lock()
+                .ok()
+                .and_then(|notice| notice.clone()),
         }
     }
 
-    /// Opens a clip into a payload this device can paste, downloading and
-    /// decrypting its parts. Files land in the clipboard cache.
+    /// A clip as a payload this device can paste.
     pub async fn open_clip(&self, clip_id: &str) -> Result<ClipboardPayload, String> {
-        let (summary, manifest) = self.inner.find(clip_id)?;
-        let session = self
-            .inner
-            .session()
-            .ok_or("The shared clipboard isn't connected.")?;
-        hydrate(&self.inner, &session, &summary, &manifest).await
+        let clip = self.inner.find(clip_id)?;
+        Ok(payload(&clip))
     }
 
-    /// Writes a clip's files into `directory` and returns their paths. Names
-    /// never overwrite: an existing name gets a numbered copy.
+    /// Writes a clip's image into `directory` and returns where it landed.
+    /// Names never overwrite: an existing name gets a numbered copy.
     pub async fn save_clip_files(
         &self,
         clip_id: &str,
         directory: &Path,
     ) -> Result<Vec<PathBuf>, String> {
-        let payload = self.open_clip(clip_id).await?;
-        if payload.file_refs.is_empty() && payload.images.is_empty() {
+        let clip = self.inner.find(clip_id)?;
+        let Some(image) = clip.header.image.as_ref() else {
             return Err("This clip has no files.".into());
-        }
+        };
         std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
-        let mut saved = Vec::new();
-        for file in &payload.file_refs {
-            let target = unique_path(directory, &file.display_name);
-            std::fs::copy(&file.local_path, &target).map_err(|error| error.to_string())?;
-            saved.push(target);
-        }
-        for (index, image) in payload.images.iter().enumerate() {
-            let target = unique_path(directory, &format!("Clipboard image {}.png", index + 1));
-            std::fs::write(&target, &image.bytes).map_err(|error| error.to_string())?;
-            saved.push(target);
-        }
-        Ok(saved)
+        let extension = if image.mime_type == "image/jpeg" {
+            "jpg"
+        } else {
+            "png"
+        };
+        let target = unique_path(directory, &format!("Clipboard image.{extension}"));
+        std::fs::write(&target, &clip.image).map_err(|error| error.to_string())?;
+        Ok(vec![target])
     }
+}
 
-    /// Seals and uploads a payload copied on this device. Returns false when
-    /// the cloud clipboard isn't running, so the caller can rely on the LAN.
-    fn publish_async(&self, payload: ClipboardPayload) -> bool {
+impl SharedClipboardClient for CloudClipboard {
+    fn publish(&self, payload: &ClipboardPayload) -> bool {
         let Some(session) = self.inner.session() else {
             return false;
         };
@@ -228,42 +202,14 @@ impl CloudClipboard {
             return false;
         }
         let inner = self.inner.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Err(error) = publish(&inner, &session, payload).await {
-                eprintln!("cloud clipboard: {error}");
-            }
-        });
+        let payload = payload.clone();
+        tauri::async_runtime::spawn(async move { ring::publish(&inner, &session, payload).await });
         true
-    }
-}
-
-impl SharedClipboardClient for CloudClipboard {
-    fn publish(&self, payload: &ClipboardPayload) -> bool {
-        self.publish_async(payload.clone())
     }
 
     fn hydrate_payload(&self, _payload: &mut ClipboardPayload) -> bool {
         // Clips are opened before they reach the clipboard service.
         true
-    }
-}
-
-/// Offers a copy to every path that may carry it: paired devices on the LAN
-/// (text and images; files left Misty's LAN sharing) and the cloud clipboard.
-pub struct SharedClipboardFanout {
-    pub lan: Arc<dyn SharedClipboardClient>,
-    pub cloud: CloudClipboard,
-}
-
-impl SharedClipboardClient for SharedClipboardFanout {
-    fn publish(&self, payload: &ClipboardPayload) -> bool {
-        let lan = payload.kind != ClipboardPayloadKind::FileRefs && self.lan.publish(payload);
-        let cloud = self.cloud.publish(payload);
-        lan || cloud
-    }
-
-    fn hydrate_payload(&self, payload: &mut ClipboardPayload) -> bool {
-        self.lan.hydrate_payload(payload)
     }
 }
 
@@ -279,14 +225,25 @@ impl Inner {
         }
     }
 
+    fn set_notice(&self, notice: Option<&str>) {
+        if let Ok(mut current) = self.notice.lock() {
+            let notice = notice.map(str::to_owned);
+            if *current != notice {
+                *current = notice;
+                drop(current);
+                self.notify();
+            }
+        }
+    }
+
     fn notify(&self) {
-        let _ = self.changes.send(());
+        let _ = self.changes.0.send(());
         if let Some(app) = self.app.read().ok().and_then(|app| app.clone()) {
             let _ = app.emit(HISTORY_EVENT, ());
         }
     }
 
-    fn session(&self) -> Option<Arc<Session>> {
+    fn session(&self) -> Option<Arc<ring::Session>> {
         self.session.read().ok().and_then(|session| session.clone())
     }
 
@@ -294,30 +251,93 @@ impl Inner {
         self.generation.load(Ordering::SeqCst) == generation
     }
 
-    fn find(&self, clip_id: &str) -> Result<(ClipSummary, Manifest), String> {
+    fn find(&self, clip_id: &str) -> Result<Clip, String> {
+        let now = chrono::Utc::now().timestamp_millis();
         self.history
             .lock()
             .map_err(|_| "The clipboard is busy.".to_owned())?
             .iter()
-            .find(|(summary, _)| summary.clip_id == clip_id)
-            .map(|(summary, manifest)| (summary.clone(), manifest.clone()))
+            .map(|(_, clip)| clip)
+            .find(|clip| clip.header.clip_id == clip_id && fresh(clip, now))
+            .cloned()
             .ok_or_else(|| "That clip expired.".to_owned())
     }
 
-    fn remember(&self, summary: ClipSummary, manifest: Manifest) {
-        if let Ok(mut history) = self.history.lock() {
-            history.retain(|(existing, _)| existing.clip_id != summary.clip_id);
-            history.push((summary, manifest));
-            history.sort_by(|left, right| right.0.created_at.cmp(&left.0.created_at));
-            history.truncate(MAX_HISTORY);
-        }
-        self.notify();
+    fn handler(&self) -> Option<ClipHandler> {
+        self.handler.read().ok().and_then(|handler| handler.clone())
     }
+}
 
-    fn cache_dir(&self) -> PathBuf {
-        self.cache_dir
-            .read()
-            .map(|dir| dir.clone())
-            .unwrap_or_else(|_| std::env::temp_dir().join("misty-cloud-clipboard"))
+fn fresh(clip: &Clip, now: i64) -> bool {
+    now - clip.header.created_unix_ms < CLIP_LIFETIME_MS
+}
+
+fn summary(clip: &Clip, session: Option<&ring::Session>) -> ClipSummary {
+    let header = &clip.header;
+    let preview = match header.kind {
+        ClipboardPayloadKind::Text | ClipboardPayloadKind::Html => {
+            header.text.chars().take(200).collect()
+        }
+        ClipboardPayloadKind::Image => "Image".into(),
+        _ => String::new(),
+    };
+    ClipSummary {
+        clip_id: header.clip_id.clone(),
+        device_id: header.device_id.clone(),
+        device_name: header.device_name.clone(),
+        from_this_device: session.is_some_and(|session| session.device_id == header.device_id),
+        kind: header.kind,
+        preview,
+        file_names: header.file_names.clone(),
+        size: (header.text.len() + header.html.len() + clip.image.len()) as u64,
+        created_at: header.created_unix_ms,
     }
+}
+
+fn payload(clip: &Clip) -> ClipboardPayload {
+    let header = &clip.header;
+    ClipboardPayload {
+        kind: header.kind,
+        payload_id: header.clip_id.clone(),
+        source_device_id: header.device_id.clone(),
+        source_device_name: header.device_name.clone(),
+        revision: header.revision,
+        created_unix_ms: header.created_unix_ms,
+        text: header.text.clone(),
+        html: header.html.clone(),
+        images: header
+            .image
+            .iter()
+            .map(|image| ClipboardImage {
+                mime_type: image.mime_type.clone(),
+                blob_id: header.clip_id.clone(),
+                checksum: String::new(),
+                size_bytes: clip.image.len() as u64,
+                width: image.width,
+                height: image.height,
+                bytes: clip.image.clone(),
+            })
+            .collect(),
+        ..ClipboardPayload::default()
+    }
+}
+
+fn unique_path(directory: &Path, name: &str) -> PathBuf {
+    let candidate = directory.join(name);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let path = Path::new(name);
+    let stem = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_else(|| name.to_owned());
+    let extension = path
+        .extension()
+        .map(|extension| format!(".{}", extension.to_string_lossy()))
+        .unwrap_or_default();
+    (2..)
+        .map(|index| directory.join(format!("{stem} {index}{extension}")))
+        .find(|candidate| !candidate.exists())
+        .expect("an unused name")
 }

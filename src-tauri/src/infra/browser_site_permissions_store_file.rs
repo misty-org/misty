@@ -1,10 +1,9 @@
-//! Where site permission choices live on Windows and Linux: persistent profiles
-//! in a local file, the private session in memory until its last tab closes.
+//! Where site permission choices live on Windows and Linux: persistent profiles in
+//! `misty.db`, the private session in memory until its last tab closes.
 use super::Permissions;
 use kiri::engine::StoreScope;
 use std::{
     collections::BTreeMap,
-    path::PathBuf,
     sync::{Mutex, OnceLock},
 };
 
@@ -16,15 +15,17 @@ fn temporary() -> &'static Mutex<BTreeMap<usize, SitePermissions>> {
     TEMPORARY.get_or_init(Mutex::default)
 }
 
-/// Serializes read/modify/write of the file.
+/// Serializes read/modify/write of the stored choices.
 fn file_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(Mutex::default)
 }
 
-fn path() -> Option<PathBuf> {
+/// The earlier layout's `browser/site-permissions.json`, as text.
+fn earlier_file() -> Option<String> {
     super::super::paths::misty_home_dir()
         .map(|home| home.join("browser").join("site-permissions.json"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
 }
 
 pub(super) fn forget_temporary() {
@@ -86,10 +87,8 @@ pub(super) unsafe fn update_scope(
 }
 
 pub(super) fn read_store() -> PermissionStore {
-    path()
-        .and_then(|path| std::fs::read(path).ok())
-        .and_then(|raw| serde_json::from_slice(&raw).ok())
-        .unwrap_or_default()
+    super::db::import_earlier_once(earlier_file);
+    super::db::read_all()
 }
 
 pub(super) fn write_store(store: &PermissionStore) -> Result<(), String> {
@@ -100,15 +99,7 @@ pub(super) fn write_store(store: &PermissionStore) -> Result<(), String> {
 }
 
 fn write_file(store: &PermissionStore) -> Result<(), String> {
-    let path = path().ok_or("Misty's data folder is unavailable.")?;
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    }
-    let data = serde_json::to_vec(store).map_err(|error| error.to_string())?;
-    // Replace atomically so a crash never leaves half a file.
-    let staging = path.with_extension("json.tmp");
-    std::fs::write(&staging, data).map_err(|error| error.to_string())?;
-    std::fs::rename(&staging, &path).map_err(|error| error.to_string())
+    super::db::write_all(store)
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ import * as accessErrors from "@/api/spaces/access-errors";
 import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
-import type { SpacesStore } from "../model/stores/spaces/interfaces/useSpacesStore";
+import type { SpacesStore } from "../model/stores/spaces/useSpacesStore";
 import { createSpaceContentActions } from "./createSpaceContentActions";
 import {
   createSpacesRealtimeActions,

@@ -1,0 +1,179 @@
+/* Misty's desktop control overlays on Windows: monochrome, as the approved
+   palette asks; status is carried by text, not color. */
+.desktop-island {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 12px 10px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 16px;
+  background: rgb(20 20 20 / 96%);
+  color: #fff;
+  font:
+    500 12.5px/1.3 system-ui,
+    "Segoe UI",
+    sans-serif;
+}
+
+.desktop-island-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.desktop-island-status {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-island-meta,
+.desktop-island-hint {
+  color: rgb(255 255 255 / 60%);
+  white-space: nowrap;
+}
+
+.desktop-island-hint {
+  margin-left: auto;
+}
+
+.desktop-island-field {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+  color: #fff;
+  font: inherit;
+}
+
+.desktop-island-field:focus {
+  outline: 1px solid rgb(255 255 255 / 55%);
+}
+
+.desktop-mist {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px rgb(255 255 255 / 55%),
+    inset 0 0 48px 8px rgb(255 255 255 / 18%);
+  transition: box-shadow 0.4s ease;
+}
+
+.desktop-mist-waiting {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 35%),
+    inset 0 0 24px 2px rgb(255 255 255 / 8%);
+}
+
+.desktop-pointer {
+  position: absolute;
+  overflow: visible;
+  transition:
+    left 0.25s ease,
+    top 0.25s ease;
+}
+
+.desktop-pointer path {
+  fill: #fff;
+  stroke: #131313;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.desktop-pointer-pulse {
+  fill: none;
+  stroke: rgb(255 255 255 / 80%);
+  stroke-width: 2;
+  animation: desktop-pointer-pulse 0.6s ease-out forwards;
+}
+
+@keyframes desktop-pointer-pulse {
+  from {
+    r: 2;
+    opacity: 1;
+  }
+  to {
+    r: 22;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-pointer,
+  .desktop-mist {
+    transition: none;
+  }
+  .desktop-pointer-pulse {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* The agent dock stack: Windows draws each live thumbnail over its card's
+   view area; the caption sits below it. */
+.dock-stack {
+  position: fixed;
+  inset: 0;
+  font:
+    500 12px/1.3 system-ui,
+    "Segoe UI",
+    sans-serif;
+  color: #fff;
+}
+
+.dock-card {
+  position: absolute;
+  border-radius: 10px;
+  background: rgb(20 20 20 / 96%);
+  outline: 1px solid rgb(255 255 255 / 14%);
+}
+
+.dock-card-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.dock-card-view:focus-visible {
+  outline: 1px solid #fff;
+}
+
+.dock-card-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 8px;
+  border-radius: 0 0 10px 10px;
+  background: rgb(20 20 20 / 96%);
+}
+
+.dock-card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dock-card-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-card-text > span {
+  color: rgb(255 255 255 / 60%);
+}

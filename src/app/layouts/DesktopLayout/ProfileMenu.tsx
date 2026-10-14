@@ -1,6 +1,7 @@
 import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
 import { reportSystemError } from "@/features/support/systemErrors";
 import { routes } from "@/features/app-shell";
+import { AccountUsagePanel } from "@/features/spaces";
 import { useNativeSessionStore } from "@/features/native-session";
 import {
   DropdownMenuContent,
@@ -9,7 +10,7 @@ import {
   MenuItem,
   MenuSubmenu,
 } from "@/shared/ui";
-import { Check, ExternalLink, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
+import { Check, ExternalLink, Gauge, LogIn, LogOut, Plus, Repeat2, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -23,8 +24,11 @@ function Initials(props: { children: string }) {
   );
 }
 
-/** The profile button's menu: account actions, and a submenu to switch saved accounts. */
-export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
+/** The profile menu's rows: account actions, and a submenu to switch saved accounts. */
+export function ProfileMenuItems(props: {
+  onClose: () => void;
+  onOpenAccountSettings: () => void;
+}) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
@@ -78,7 +82,7 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
   };
 
   return (
-    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
+    <>
       <DropdownMenuLabel className="truncate py-1.5 text-xs font-medium text-cream">
         {email || "Not signed in"}
       </DropdownMenuLabel>
@@ -98,6 +102,11 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
             shortcut={<ExternalLink className="size-3.5" aria-hidden="true" />}
             onSelect={props.onOpenAccountSettings}
           />
+          <MenuSubmenu icon={<Gauge />} label="Usage" width="xl">
+            <div className="px-2 py-1.5">
+              <AccountUsagePanel />
+            </div>
+          </MenuSubmenu>
           <MenuSubmenu
             icon={<Repeat2 />}
             label="Switch accounts"
@@ -146,6 +155,15 @@ export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings:
           <MenuItem icon={<LogOut />} label="Log out" disabled={transitioning} onSelect={signOut} />
         </>
       )}
+    </>
+  );
+}
+
+/** The profile button's menu. */
+export function ProfileMenu(props: { onClose: () => void; onOpenAccountSettings: () => void }) {
+  return (
+    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Profile">
+      <ProfileMenuItems {...props} />
     </DropdownMenuContent>
   );
 }

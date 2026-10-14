@@ -8,6 +8,7 @@ import {
   type OmniboxInput,
   type OmniboxMatch,
 } from "@/features/browser/omnibox";
+import { activeBrowserTabContext } from "@/features/workspace/browserTabs";
 import { allBangs } from "./bangs/catalog";
 import { bangDestination, matchingBangs, parseBang } from "./bangs/parse";
 import type { Bang, WebBang } from "./bangs/types";
@@ -16,11 +17,35 @@ import { useScopedSearch } from "./useScopedSearch";
 import { searchCommands, searchSiteApps } from "./commandResults";
 
 // Providers read their sources at query time, so one set serves every search.
-const providers = createOmniboxProviders(liveOmniboxDeps);
+// Enter here always opens a new tab, so pages that are already open stay in the
+// list as ordinary suggestions that open another copy, never as "Switch to tab".
+const providers = createOmniboxProviders(liveOmniboxDeps).map((provider) =>
+  provider.id === "open-tabs"
+    ? {
+        ...provider,
+        start: (input: OmniboxInput, signal: AbortSignal) =>
+          (provider.start(input, signal) as OmniboxMatch[]).map((match): OmniboxMatch => ({
+            ...match,
+            kind: "history",
+            target: { type: "navigate", url: match.target.url },
+            allowedToBeDefault: false,
+          })),
+      }
+    : provider,
+);
 const suggestProviders = [searchSuggestProvider(liveOmniboxDeps)];
 
 function omniboxInput(text: string): OmniboxInput {
-  return { text, tabId: "", currentUrl: "", private: false, sessionHistory: [] };
+  // The focused tab's profile, so history cleared there stays gone here.
+  const tab = activeBrowserTabContext();
+  return {
+    text,
+    tabId: tab?.tabId ?? "",
+    profileId: tab?.profileId,
+    currentUrl: "",
+    private: tab?.private ?? false,
+    sessionHistory: [],
+  };
 }
 
 /** One row that sends `query` to a website shortcut. */

@@ -1,4 +1,4 @@
-import type { SpaceRoadmapNodeDefinition } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapNodeDefinition } from "@/api/spaces/dto/plannerExpansionTypes";
 import { Button, cn, IconButton, Input } from "@/shared/ui";
 import { GripVertical, PanelLeftClose, Search, Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";

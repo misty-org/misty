@@ -4,12 +4,14 @@ import { useLayoutEffect, useRef } from "react";
 import {
   browserRuntimeResumeEvent,
   hideBrowserWebview,
+  isBrowserLayoutMoving,
+  isBrowserRuntimeCreated,
   requestBrowserWebviewLayout,
   syncBrowserWebview,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
 import type { BrowserBounds, BrowserTheme } from "./types";
-import type { WorkspaceView } from "@/features/workspace";
+import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
 
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
@@ -44,6 +46,9 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     const synchronize = () => {
       frame = 0;
       if (disposed) return;
+      // While the chrome slides to a new edge the page holds still, rather than chasing every
+      // frame of the motion through native calls. The layout's end re-measures every page.
+      if (isBrowserLayoutMoving()) return;
       const current = latest.current;
       if (current.offline) {
         if (!hiddenForInvalidBounds) {
@@ -139,9 +144,13 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     schedule();
     const recoverLayout = () => requestBrowserWebviewLayout(effectTab);
     window.addEventListener("misty:workspace-geometry-changed", recoverLayout);
-    recoveryTimers.push(window.setTimeout(recoverLayout, 50));
-    recoveryTimers.push(window.setTimeout(recoverLayout, 200));
-    recoveryTimers.push(window.setTimeout(recoverLayout, 600));
+    // A page that already exists only needs re-measuring while the layout
+    // settles; forcing a native reconcile each time re-clips and re-stacks it,
+    // which blinks right after a tab switch.
+    const settleLayout = isBrowserRuntimeCreated(effectTab) ? schedule : recoverLayout;
+    recoveryTimers.push(window.setTimeout(settleLayout, 50));
+    recoveryTimers.push(window.setTimeout(settleLayout, 200));
+    recoveryTimers.push(window.setTimeout(settleLayout, 600));
 
     return () => {
       disposed = true;
@@ -160,7 +169,9 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       // The native page is a sibling of the React renderer, so unmounting the
       // Browser workspace does not remove it. Explicitly release this tab's
       // layer before the next active tab is presented.
-      void hideBrowserWebview(effectTab);
+      // Another browser tab taking this one's place presents itself within a
+      // frame or two; keep this page up until then instead of flashing empty.
+      void hideBrowserWebview(effectTab, browserSurfaceStillActive() ? 120 : 0);
     };
   }, [
     input.hostRef,
@@ -218,13 +229,17 @@ const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"] as 
 function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, number, number] {
   const style = getComputedStyle(clip);
   const box = clip.getBoundingClientRect();
+  // A clip's border and padding both keep the page inside: a pane's seam is its padding, a
+  // page area's outline is its border.
+  const inset = (padding: string, border: string) =>
+    (parseFloat(padding) || 0) + (parseFloat(border) || 0);
   const pad = {
-    top: parseFloat(style.paddingTop) || 0,
-    right: parseFloat(style.paddingRight) || 0,
-    bottom: parseFloat(style.paddingBottom) || 0,
-    left: parseFloat(style.paddingLeft) || 0,
+    top: inset(style.paddingTop, style.borderTopWidth),
+    right: inset(style.paddingRight, style.borderRightWidth),
+    bottom: inset(style.paddingBottom, style.borderBottomWidth),
+    left: inset(style.paddingLeft, style.borderLeftWidth),
   };
-  // The page fills the clip's padding box: a pane's seam is its padding.
+  // The page fills the clip's content box.
   const edge = {
     top: box.top + pad.top,
     right: box.right - pad.right,
@@ -249,7 +264,7 @@ function isMacNativeRuntime(): boolean {
   return /Mac/.test(navigator.platform);
 }
 
-export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
+function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
   const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
   return quantizeBrowserBounds({
     x: bounds.x * zoom,
@@ -269,7 +284,7 @@ export function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): 
   });
 }
 
-export function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
+function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
   const quantize = (value: number) => Math.round(value * 2) / 2;
   return {
     x: quantize(bounds.x),
@@ -278,4 +293,11 @@ export function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
     height: Math.max(1, quantize(bounds.height)),
     ...(bounds.cornerRadii ? { cornerRadii: bounds.cornerRadii } : {}),
   };
+}
+
+/** Whether some pane still shows a browser tab, as when switching between them. */
+function browserSurfaceStillActive(): boolean {
+  return dockLeaves(useWorkspaceStore.getState().layout.root).some(
+    (pane) => pane.views.find((view) => view.id === pane.activeViewId)?.surfaceId === "browser",
+  );
 }

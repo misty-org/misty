@@ -1,14 +1,18 @@
 import { extensionsNative } from "../native";
 import type { ExtensionEvent } from "../types";
+import { bookmarkHandlers, watchBookmarks } from "./bookmarks";
 import { downloadHandlers, watchDownloads } from "./downloads";
 import type { CompatHandler } from "./events";
 import { historyHandlers, watchVisits } from "./history";
+import { tabGroupHandlers, watchTabGroups } from "./tabGroups";
 import { workspaceHandlers } from "./workspace";
 
 const handlers: Record<string, CompatHandler> = {
   ...downloadHandlers,
   ...historyHandlers,
   ...workspaceHandlers,
+  ...bookmarkHandlers,
+  ...tabGroupHandlers,
 };
 
 /**
@@ -34,6 +38,6 @@ export async function answerCompatRequest(event: ExtensionEvent): Promise<void> 
 
 /** Starts the app-side sources of extension events. Returns a stop function. */
 export function startCompatEvents(): () => void {
-  const stops = [watchDownloads(), watchVisits()];
+  const stops = [watchDownloads(), watchVisits(), watchBookmarks(), watchTabGroups()];
   return () => stops.forEach((stop) => stop());
 }

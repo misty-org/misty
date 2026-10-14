@@ -1,9 +1,6 @@
 import { CalendarDays, Check, Clock3, Flag } from "lucide-react";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type {
-  SpaceAgendaEntry,
-  SpaceRoadmap,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceAgendaEntry, SpaceRoadmap } from "@/api/spaces/dto/plannerExpansionTypes";
 import type { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
 import { itemTones, type CollectionItem } from "@/shared/ui";
 

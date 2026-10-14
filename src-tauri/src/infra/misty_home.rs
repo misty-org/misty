@@ -3,7 +3,8 @@
 //! The home lives outside the app bundle, so installing or updating Misty never
 //! replaces it. This module only ever adds what is missing and tightens
 //! permissions; it never deletes. Paths retired by an earlier layout are moved
-//! to the Trash so the user can still recover them.
+//! to the Trash (the Recycle Bin on Windows) so the user can still recover
+//! them.
 use crate::infra::paths;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -45,10 +46,10 @@ fn layout() -> Layout {
 pub fn ensure_misty_home() -> io::Result<HomeReport> {
     let root = paths::misty_home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no home directory"))?;
-    ensure_at(&root, &trash_dir())
+    ensure_at(&root, &Trash::for_this_system())
 }
 
-fn ensure_at(root: &Path, trash: &Path) -> io::Result<HomeReport> {
+fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
     let layout = layout();
     let mut report = HomeReport::default();
     secure_dir(root, &mut report, "")?;
@@ -68,18 +69,18 @@ fn ensure_at(root: &Path, trash: &Path) -> io::Result<HomeReport> {
         }
     }
     if manifest_version(root) != layout.layout_version {
-        let manifest = HomeManifest {
-            format: "misty-home".to_owned(),
-            layout_version: layout.layout_version,
-        };
-        let mut bytes = serde_json::to_vec_pretty(&manifest)?;
-        bytes.push(b'\n');
-        write_private(&root.join("home.json"), &bytes)?;
+        misty_credential_store::set_layout_version(root, layout.layout_version)?;
+        // The manifest an earlier layout kept as a file is superseded.
+        let _ = fs::remove_file(root.join("home.json"));
     }
     Ok(report)
 }
 
 fn manifest_version(root: &Path) -> u32 {
+    if let Ok(Some(version)) = misty_credential_store::layout_version(root) {
+        return version;
+    }
+    // An earlier layout recorded it in `home.json`.
     fs::read(root.join("home.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<HomeManifest>(&bytes).ok())
@@ -90,7 +91,7 @@ fn manifest_version(root: &Path) -> u32 {
 fn retire(
     root: &Path,
     retired: &[String],
-    trash: &Path,
+    trash: &Trash,
     report: &mut HomeReport,
 ) -> io::Result<()> {
     let present: Vec<&String> = retired
@@ -101,15 +102,22 @@ fn retire(
         return Ok(());
     }
     let stamp = chrono::Local::now().format("%Y-%m-%d %H.%M.%S");
-    let destination = trash.join(format!("Misty retired files {stamp}"));
     for relative in present {
-        let target = destination.join(relative);
-        let moved = target
-            .parent()
-            .map_or(Ok(()), fs::create_dir_all)
-            .and_then(|_| fs::rename(root.join(relative), &target));
-        // A cross-volume Trash cannot take a rename; leave the path rather than
-        // copy-and-delete user data.
+        let moved = match trash {
+            Trash::Folder(folder) => {
+                let target = folder
+                    .join(format!("Misty retired files {stamp}"))
+                    .join(relative);
+                // A cross-volume Trash cannot take a rename; the path stays
+                // rather than user data being copied and deleted.
+                target
+                    .parent()
+                    .map_or(Ok(()), fs::create_dir_all)
+                    .and_then(|_| fs::rename(root.join(relative), &target))
+            }
+            #[cfg(windows)]
+            Trash::RecycleBin => recycle(&root.join(relative)),
+        };
         match moved {
             Ok(()) => report.retired.push(relative.clone()),
             Err(_) => report.kept.push(relative.clone()),
@@ -118,15 +126,58 @@ fn retire(
     Ok(())
 }
 
-fn trash_dir() -> PathBuf {
-    let home = paths::misty_data_root().unwrap_or_default();
-    if cfg!(target_os = "macos") {
-        home.join(".Trash")
-    } else {
-        // No portable user Trash without a desktop service; keep retired paths
-        // inside the home so they stay recoverable and out of the live layout.
-        home.join(".misty").join(".retired")
+/// Where retired paths go, so the person can still recover them.
+enum Trash {
+    Folder(PathBuf),
+    #[cfg(windows)]
+    RecycleBin,
+}
+
+impl Trash {
+    fn for_this_system() -> Self {
+        #[cfg(windows)]
+        {
+            Self::RecycleBin
+        }
+        #[cfg(not(windows))]
+        {
+            let home = paths::misty_data_root().unwrap_or_default();
+            if cfg!(target_os = "macos") {
+                Self::Folder(home.join(".Trash"))
+            } else {
+                // Linux has no portable user Trash without a desktop service;
+                // retired paths stay inside the home, recoverable and out of
+                // the live layout.
+                Self::Folder(home.join(".misty").join(".retired"))
+            }
+        }
     }
+}
+
+/// Moves `path` to the Recycle Bin, where the person can restore it.
+#[cfg(windows)]
+fn recycle(path: &Path) -> io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::{
+        SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+        SHFILEOPSTRUCTW,
+    };
+    // A double-NUL-terminated list of one path.
+    let from: Vec<u16> = path.as_os_str().encode_wide().chain([0, 0]).collect();
+    // SAFETY: zeroed input, then the fields the operation reads.
+    let mut operation: SHFILEOPSTRUCTW = unsafe { std::mem::zeroed() };
+    operation.wFunc = FO_DELETE;
+    operation.pFrom = from.as_ptr();
+    operation.fFlags = (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT) as u16;
+    // SAFETY: `from` outlives the call; nothing is shown to the person.
+    let status = unsafe { SHFileOperationW(&mut operation) };
+    if status != 0 || operation.fAnyOperationsAborted != 0 {
+        return Err(io::Error::other(format!(
+            "Recycle Bin refused {}",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Result<()> {
@@ -141,18 +192,13 @@ fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Resul
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
     }
-    Ok(())
-}
-
-fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let staging = path.with_extension("json.tmp");
-    fs::write(&staging, bytes)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&staging, fs::Permissions::from_mode(0o600))?;
+    // The home's own DACL admits only its owner and SYSTEM; everything
+    // inside inherits it.
+    #[cfg(windows)]
+    if relative.is_empty() {
+        misty_credential_store::restrict_private_directory(path)?;
     }
-    fs::rename(staging, path)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -175,7 +221,7 @@ mod tests {
     fn creates_a_fresh_home_with_the_current_layout() {
         let base = temp("fresh");
         let root = base.join(".misty");
-        let report = ensure_at(&root, &base.join("Trash")).unwrap();
+        let report = ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
 
         for relative in layout().directories {
             assert!(root.join(&relative).is_dir(), "{relative}");
@@ -191,9 +237,9 @@ mod tests {
         let root = base.join(".misty");
         let trash = base.join("Trash");
         fs::create_dir_all(root.join("plugins/public")).unwrap();
-        fs::create_dir_all(root.join(".keys")).unwrap();
+        fs::create_dir_all(root.join(".local/data")).unwrap();
         fs::create_dir_all(root.join("config")).unwrap();
-        fs::write(root.join(".keys/misty-backup.agekey"), "key").unwrap();
+        fs::write(root.join(".local/data/keep.txt"), "kept").unwrap();
         fs::write(root.join("config/settings.json"), "{}").unwrap();
         fs::write(
             root.join("home.json"),
@@ -201,11 +247,11 @@ mod tests {
         )
         .unwrap();
 
-        let report = ensure_at(&root, &trash).unwrap();
+        let report = ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
 
         assert_eq!(report.retired, vec!["plugins".to_owned()]);
         assert!(!root.join("plugins").exists());
-        assert!(root.join(".keys/misty-backup.agekey").is_file());
+        assert!(root.join(".local/data/keep.txt").is_file());
         assert!(root.join("config/settings.json").is_file());
         let moved = fs::read_dir(&trash)
             .unwrap()
@@ -222,11 +268,11 @@ mod tests {
         let base = temp("repeat");
         let root = base.join(".misty");
         let trash = base.join("Trash");
-        ensure_at(&root, &trash).unwrap();
+        ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
         // A path that looks retired but appears after the upgrade is not touched.
         fs::create_dir_all(root.join("notes")).unwrap();
 
-        let report = ensure_at(&root, &trash).unwrap();
+        let report = ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
 
         assert!(report.created.is_empty());
         assert!(report.retired.is_empty());
@@ -239,13 +285,13 @@ mod tests {
     fn recreates_folders_removed_since_the_last_launch() {
         let base = temp("recreate");
         let root = base.join(".misty");
-        ensure_at(&root, &base.join("Trash")).unwrap();
-        fs::remove_dir_all(root.join("tmp")).unwrap();
+        ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
+        fs::remove_dir_all(root.join("profiles")).unwrap();
 
-        let report = ensure_at(&root, &base.join("Trash")).unwrap();
+        let report = ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
 
-        assert!(report.created.contains(&"tmp/downloads".to_owned()));
-        assert!(root.join("tmp/transfers").is_dir());
+        assert!(report.created.contains(&"profiles".to_owned()));
+        assert!(root.join("profiles").is_dir());
         let _ = fs::remove_dir_all(base);
     }
 }

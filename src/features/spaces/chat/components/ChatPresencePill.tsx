@@ -2,7 +2,7 @@ import { useSocialAuth as useAuth } from "../SocialRuntime";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { SpacePresenceViewer } from "@/features/spaces";
 import { useSocialSpaces as useSpacesStore } from "../SocialRuntime";
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 import {
   Avatar,
   AvatarFallback,

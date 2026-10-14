@@ -9,7 +9,7 @@ import {
   type WorkspacePane,
 } from "./model";
 
-export interface ClosedPanelPlacement {
+interface ClosedPanelPlacement {
   splitId: string;
   anchorNodeId: string;
   direction: DockSplitDirection;

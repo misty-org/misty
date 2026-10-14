@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const mistyTerminalCommands = [
+const mistyTerminalCommands = [
   "terminal.clear",
   "terminal.search",
   "terminal.zoom_in",
@@ -10,7 +10,7 @@ export const mistyTerminalCommands = [
   "terminal.paste",
 ] as const;
 
-export const mistyPlannerCommands = [
+const mistyPlannerCommands = [
   "planner.create",
   "roadmap.create",
   "roadmap.copy",
@@ -21,7 +21,7 @@ export const mistyPlannerCommands = [
   "roadmap.redo",
 ] as const;
 
-export const mistyBrowserCommands = [
+const mistyBrowserCommands = [
   "navigation.back",
   "navigation.forward",
   "navigation.refresh",
@@ -29,7 +29,7 @@ export const mistyBrowserCommands = [
   "browser.annotation_redo",
 ] as const;
 
-export const mistyCodeCommands = [
+const mistyCodeCommands = [
   "code.add_cursor_above",
   "code.add_cursor_below",
   "code.apply_inline_ai",

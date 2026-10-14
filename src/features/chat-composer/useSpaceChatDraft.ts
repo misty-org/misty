@@ -1,11 +1,9 @@
 import { spacesApi } from "@/api/spaces/api";
-import type { MessageAttachment } from "@/api/spaces/dto/interfaces/types";
+import type { MessageAttachment } from "@/api/spaces/dto/entities";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { readApiSessionGeneration } from "@/api/client/session";
 import type { Dispatch, SetStateAction } from "react";
 import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
-export { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
-
 type DraftState = {
   text: string;
   selectedFileIds: string[];

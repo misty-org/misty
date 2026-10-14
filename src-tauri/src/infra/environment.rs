@@ -22,7 +22,6 @@ pub struct AppEnvironment {
     pub tmp_dir: PathBuf,
     pub settings_path: PathBuf,
     pub misty_config_path: PathBuf,
-    pub workspaces_path: PathBuf,
     pub commands_path: PathBuf,
     pub config_exists: bool,
 }
@@ -38,7 +37,6 @@ pub struct AppEnvironmentSnapshot {
     pub tmp_dir: String,
     pub settings_path: String,
     pub misty_config_path: String,
-    pub workspaces_path: String,
     pub commands_path: String,
     /// Retired remote-mount prefix, relative to the home directory.
     pub mount_path: String,
@@ -62,6 +60,17 @@ impl AppEnvironmentService {
 
     pub fn misty_config_path(&self) -> PathBuf {
         self.inner.misty_config_path.clone()
+    }
+
+    /// The database every store lives in: `~/.misty/.local/data/misty.db`.
+    pub fn store(&self) -> crate::infra::store::Store {
+        crate::infra::store::Store::at(
+            self.inner
+                .misty_dir
+                .join(".local")
+                .join("data")
+                .join("misty.db"),
+        )
     }
 
     pub fn misty_db_path(&self) -> PathBuf {
@@ -93,8 +102,14 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
-    pub fn workspaces_path(&self) -> PathBuf {
-        self.inner.workspaces_path.clone()
+    /// Misty's own data root (never shareable with agents).
+    pub fn misty_dir(&self) -> PathBuf {
+        self.inner.misty_dir.clone()
+    }
+
+    /// Undo copies, command homes and scratch folders for code projects.
+    pub fn agent_code_dir(&self) -> PathBuf {
+        self.inner.misty_dir.join("agent-code")
     }
 
     #[cfg(test)]
@@ -111,11 +126,10 @@ impl AppEnvironment {
         let misty_dir = home_dir.join(".misty");
         let config_dir = misty_dir.join("config");
         let db_dir = misty_dir.join("db");
-        let cache_dir = misty_dir.join(".cache");
+        let cache_dir = misty_dir.join("cache");
         let tmp_dir = misty_dir.join("tmp");
         let settings_path = config_dir.join("settings.json");
         let misty_config_path = config_dir.join("misty.json");
-        let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
 
         Self {
@@ -127,7 +141,6 @@ impl AppEnvironment {
             tmp_dir,
             settings_path,
             misty_config_path: misty_config_path.clone(),
-            workspaces_path,
             commands_path,
             config_exists: misty_config_path.exists(),
         }
@@ -138,11 +151,10 @@ impl AppEnvironment {
         let misty_dir = home_dir.join(".misty");
         let config_dir = misty_dir.join("config");
         let db_dir = misty_dir.join("db");
-        let cache_dir = misty_dir.join(".cache");
+        let cache_dir = misty_dir.join("cache");
         let tmp_dir = misty_dir.join("tmp");
         let settings_path = config_dir.join("settings.json");
         let misty_config_path = config_dir.join("misty.json");
-        let workspaces_path = config_dir.join("workspaces.json");
         let commands_path = config_dir.join("commands.msy");
 
         Self {
@@ -154,7 +166,6 @@ impl AppEnvironment {
             tmp_dir,
             settings_path,
             misty_config_path,
-            workspaces_path,
             commands_path,
             config_exists: false,
         }
@@ -170,7 +181,6 @@ impl AppEnvironment {
             tmp_dir: display_path(&self.tmp_dir),
             settings_path: display_path(&self.settings_path),
             misty_config_path: display_path(&self.misty_config_path),
-            workspaces_path: display_path(&self.workspaces_path),
             commands_path: display_path(&self.commands_path),
             mount_path: ".misty/mnt".to_owned(),
             config_exists: self.config_exists,
@@ -224,11 +234,10 @@ mod tests {
                 misty_dir: root.join(".misty"),
                 config_dir: root.join(".misty/config"),
                 db_dir: root.join(".misty/db"),
-                cache_dir: root.join(".misty/.cache"),
+                cache_dir: root.join(".misty/cache"),
                 tmp_dir: root.join(".misty/tmp"),
                 settings_path: root.join(".misty/config/settings.json"),
                 misty_config_path: root.join(".misty/config/misty.json"),
-                workspaces_path: root.join(".misty/config/workspaces.json"),
                 commands_path: root.join(".misty/config/commands.msy"),
                 config_exists: false,
             }),

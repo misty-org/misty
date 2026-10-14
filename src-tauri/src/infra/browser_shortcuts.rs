@@ -41,6 +41,14 @@ pub fn default_shortcut_bindings() -> Vec<BrowserShortcutBinding> {
         ("Cmd+]", false),
         ("Ctrl+Tab", false),
         ("Ctrl+Shift+Tab", false),
+        // macOS reaches these through its menu bar; Windows has none.
+        ("Ctrl+N", true),
+        ("Ctrl+Shift+W", false),
+        ("Ctrl+Alt+Grave", true),
+        ("Ctrl+Alt+Shift+Grave", true),
+        ("Ctrl+Alt+Shift+W", false),
+        ("Ctrl+Shift+S", true),
+        ("Ctrl+Shift+A", true),
     ];
     #[cfg(not(target_os = "macos"))]
     let defaults: &[(&str, bool)] = &[

@@ -63,7 +63,7 @@ export function matchingBangs(input: string, bangs: readonly Bang[]): Bang[] {
 
 /**
  * Where a website shortcut goes: its front page without a query, otherwise its
- * search. Custom templates come from synced settings, so anything that does
+ * search. Custom templates are typed by the person, so anything that does
  * not resolve to http or https is refused.
  */
 export function bangDestination(bang: WebBang, query: string): string | null {

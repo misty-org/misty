@@ -1,5 +1,5 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { LibraryPinnedCollection } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryPinnedCollection } from "@/api/spaces/dto/entities";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
 type PinTargetKind = LibraryPinnedCollection["target_kind"];

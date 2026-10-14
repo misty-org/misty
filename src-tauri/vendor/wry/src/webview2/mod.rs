@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
+pub(crate) mod download;
 mod drag_drop;
 mod util;
 
@@ -856,6 +857,10 @@ impl InnerWebView {
 
             if download_started_handler(uri, &mut path) {
               let simplified = dunce::simplified(&path);
+              download::track(
+                &args.DownloadOperation()?,
+                simplified.to_string_lossy().into_owned(),
+              );
               let path = HSTRING::from(simplified);
               args.SetResultFilePath(&path)?;
               args.SetHandled(true)?;

@@ -1,6 +1,7 @@
 import { runtimeAgentsApi as agentsApi } from "@/features/agents/AgentsRuntime";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
 
 const voiceInputStorageKey = "misty.voice.input-device";
 
@@ -228,7 +229,7 @@ function preferredRecordingMimeType(): string | undefined {
 function microphoneErrorMessage(reason: unknown): string {
   const name = reason instanceof DOMException ? reason.name : "";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Microphone access is off. Allow it for Misty in System Settings, then try again.";
+    return `Microphone access is off. ${microphoneSettingsHint()}`;
   }
   if (name === "NotFoundError" || name === "DevicesNotFoundError") {
     return "Misty could not find a microphone on this device.";

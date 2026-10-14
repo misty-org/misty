@@ -1,4 +1,4 @@
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 
 export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
@@ -9,6 +9,7 @@ import { UserPlus } from "lucide-react";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { MemberActionDialog } from "./MemberActionDialog";
 import { MemberList } from "./MemberList";
+import { AgentMemberList } from "../agents/AgentMemberList";
 import { PendingInvitationsCard } from "./PendingInvitationsCard";
 import { useMemberDialogs } from "./useMemberDialogs";
 import { useSpaceMembers } from "./useSpaceMembers";
@@ -65,6 +66,8 @@ export function SpaceMembers({
           currentUserId={user?.id}
           onAction={dialogs.setMemberAction}
         />
+
+        <AgentMemberList spaceId={spaceId} currentUserId={user?.id} />
 
         {state.canInvite ? (
           <PendingInvitationsCard

@@ -23,7 +23,7 @@ export function endGoogleSignInCodeWait(): void {
 const codeAlphabet = /^[ABCDEFGHJKMNPQRSTVWXYZ23456789]{10}$/;
 
 /** The code as the server expects it, or "" when it cannot be one. */
-export function normalizeGoogleSignInCode(code: string): string {
+function normalizeGoogleSignInCode(code: string): string {
   const value = code.toUpperCase().replace(/[\s-]/g, "");
   return codeAlphabet.test(value) ? value : "";
 }

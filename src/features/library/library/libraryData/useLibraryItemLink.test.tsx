@@ -2,7 +2,7 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import type { PropsWithChildren } from "react";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useLibraryItemLink } from "./useLibraryItemLink";
 
 function wrapper({ children }: PropsWithChildren) {

@@ -1,5 +1,5 @@
 import type { MistyPickerSource } from "@/features/picker";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import type { RefObject, UIEventHandler } from "react";
 import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { MessageEditingState } from "../hooks/useMessageEditing";

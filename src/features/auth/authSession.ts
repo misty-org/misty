@@ -6,8 +6,8 @@ import type { CurrentLicense } from "@/features/native-session";
 import { resetConnectionsAccountState } from "@/features/integrations";
 import { resetSpacesAccountState } from "@/features/spaces";
 import { resetWorkspaceAccountState } from "@/features/workspace";
-import type { AccountMeResponse } from "./model/stores/account/interfaces/useAccountStore";
-import type { SavedAccountSession } from "./model/stores/account/interfaces/useAuthTokenStore";
+import type { AccountMeResponse } from "./model/stores/account/useAccountStore";
+import type { SavedAccountSession } from "./model/stores/account/useAuthTokenStore";
 import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./store/accountEvents";
 import { isAccountUnauthorizedError } from "./store/useAccountStore";
 import { readActiveSavedAccountSession } from "./store/useAuthTokenStore";
@@ -47,7 +47,7 @@ export function assertAccountIdentity(me: AccountMeResponse, expectedAccountId: 
 export function isInvalidAccountSessionError(error: unknown): boolean {
   return isAccountUnauthorizedError(error) || error instanceof AccountIdentityMismatchError;
 }
-export class AccountIdentityMismatchError extends Error {
+class AccountIdentityMismatchError extends Error {
   name = "AccountIdentityMismatchError";
   constructor() {
     super("The saved Misty session did not match the expected account.");
@@ -64,7 +64,7 @@ export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
     license_device: me.license_device || null,
   };
 }
-export function readStoredUser(): AuthUser | null {
+function readStoredUser(): AuthUser | null {
   try {
     const stored = readDeploymentStorageItem(authUserStorageKey);
     return stored ? (JSON.parse(stored) as AuthUser) : null;

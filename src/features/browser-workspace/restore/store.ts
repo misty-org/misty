@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type RestoreStatus = "restoring" | "restored" | "partial" | "failed";
+type RestoreStatus = "restoring" | "restored" | "partial" | "failed";
 
 export interface ViewRestore {
   tabId: string;

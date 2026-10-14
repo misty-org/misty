@@ -1,4 +1,4 @@
-import type { SpaceConversation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceConversation } from "@/api/spaces/dto/entities";
 
 export interface ConversationGroup {
   id: string;

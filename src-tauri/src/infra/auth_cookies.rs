@@ -46,9 +46,8 @@ fn clients() -> &'static Mutex<HashMap<String, Arc<AccountClient>>> {
 
 fn credential_io<T>(operation: impl FnOnce() -> std::io::Result<T>) -> Result<T, String> {
     let run = || operation().map_err(|error| error.to_string());
-    // A first restore may wait for Keychain authorization. Keep the account
-    // lifecycle barrier, but let Tokio service other work while this worker
-    // blocks (including on another credential operation's mutex).
+    // Keep the account lifecycle barrier, but let Tokio service other work while
+    // this worker blocks (including on another credential operation's mutex).
     if tokio::runtime::Handle::try_current()
         .is_ok_and(|handle| handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread)
     {

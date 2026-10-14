@@ -11,7 +11,7 @@ import type {
   LibraryPinnedCollection,
   LibrarySharedReference,
   SpaceStorageUsage,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { useCallback, useEffect, useState } from "react";
 
 const emptyDiscovery: LibraryDiscovery = {

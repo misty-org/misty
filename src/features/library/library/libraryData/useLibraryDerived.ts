@@ -7,7 +7,7 @@ import type {
   LibraryItemQuery,
   LibraryPerson,
   SpaceLibraryItem,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { useMemo } from "react";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 

@@ -12,6 +12,7 @@ import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { lazy, Suspense } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
+import { isAuthPath } from "@/features/app-shell";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
@@ -24,7 +25,7 @@ export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
   const recovery = useWorkspaceRecoveryState();
   const location = useLocation();
-  const isAuthRoute = location.pathname === "/signin" || location.pathname === "/register";
+  const isAuthRoute = isAuthPath(location.pathname);
   const isInviteRoute = location.pathname.startsWith("/invite/");
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
   const syncAllowed =

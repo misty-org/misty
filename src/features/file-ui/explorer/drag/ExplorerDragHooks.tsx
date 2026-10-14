@@ -3,11 +3,9 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
-  type HTMLAttributes,
-  type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { ExplorerDragItem, ExplorerDropZoneSpec } from "../model/interfaces/drag/types";
+import type { ExplorerDragItem, ExplorerDropZoneSpec } from "../model/drag";
 import { ExplorerDragContext } from "./ExplorerDragState";
 export function useExplorerDragSource(items: ExplorerDragItem[]) {
   const context = useContext(ExplorerDragContext);
@@ -38,20 +36,4 @@ export function useExplorerDropZone(spec: ExplorerDropZoneSpec) {
   );
   const active = context?.state.activeZoneId === spec.id;
   return { ref: setElement, active, valid: active && context?.state.acceptance?.valid === true };
-}
-
-export function Droppable(
-  props: HTMLAttributes<HTMLDivElement> & { zone: ExplorerDropZoneSpec; children: ReactNode },
-) {
-  const { zone, children, className, ...rest } = props;
-  const drop = useExplorerDropZone(zone);
-  return (
-    <div {...rest} ref={drop.ref} className={className}>
-      {children}
-    </div>
-  );
-}
-
-export function useExplorerDropRegistry() {
-  return useContext(ExplorerDragContext)?.registerZone ?? null;
 }

@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth";
 import { readDeploymentScope } from "@/api/deployment/api";
-import { observeAccountChanges } from "@/api/accountEvents";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { useSettingsProfiles } from "./store";
-import { readNavigatorLayout } from "@/features/app-shell";
 import { mutateState } from "./persistence";
 import { useDockingLayoutStore } from "@/features/app-shell/dockingLayout";
 
@@ -25,7 +23,6 @@ export function SettingsProfilesBridge() {
   useEffect(() => {
     if (!loaded || !available || transitioning) return;
     let active = true;
-    let stop: (() => void) | undefined;
     const initialize = async () => {
       // A frozen installation baseline prevents a newly selected account from
       // importing the previous account's projected profile preferences.
@@ -37,7 +34,6 @@ export function SettingsProfilesBridge() {
             ...document,
             appearance: {
               ...((document.appearance as Record<string, unknown>) ?? {}),
-              navigator_auto_hide: readNavigatorLayout().autoHide,
               saved_layouts_json: JSON.stringify(useDockingLayoutStore.getState().savedLayouts),
             },
           };
@@ -76,22 +72,17 @@ export function SettingsProfilesBridge() {
       } catch {
         /* Use defaults for corrupt legacy preferences. */
       }
-      await useSettingsProfiles
-        .getState()
-        .configure(JSON.stringify([scope, accountId]), accountId, seed);
-      if (!active || !useSettingsProfiles.getState().ready) return;
-      // The account stream resets after reconnect/overflow; focus and online
-      // also reconcile. No periodic settings reads are needed.
-      stop = observeAccountChanges(accountId, ["settings-profiles"], () =>
-        useSettingsProfiles.getState().refresh(),
-      );
+      // Settings belong to this device, not to an account: they stay put when someone else
+      // signs in, and they apply on the sign-in screen too.
+      await useSettingsProfiles.getState().configure(JSON.stringify([scope]), seed);
     };
     void initialize().catch((error) => useSettingsProfiles.setState({ error: String(error) }));
     return () => {
       active = false;
-      stop?.();
       useSettingsProfiles.getState().disconnect();
     };
-  }, [loaded, available, transitioning, user?.id, scope, retry]);
+    // The scope already follows the signed-in account, so its id is not a separate trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, available, transitioning, scope, retry]);
   return null;
 }

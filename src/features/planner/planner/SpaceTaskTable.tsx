@@ -1,5 +1,5 @@
-import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/common";
 import {
   cn,
   Button,

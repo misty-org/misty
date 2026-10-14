@@ -1,5 +1,5 @@
 import { useSocialSpaces as useSpacesStore } from "../SocialRuntime";
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 
 export interface SpaceChatPermissions {
   activeSpace: Space | undefined;

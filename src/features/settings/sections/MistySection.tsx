@@ -176,7 +176,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
         >
           <SettingsRow
             label="Enable Misty"
-            description="Allow hosted AI in embedded surfaces and Global Misty. Lexical search continues when this is off."
+            description="Allow hosted AI in the Misty panel and across your workspace. Search keeps working when this is off."
           >
             <SwitchControl
               checked={settings?.enabled ?? false}
@@ -192,9 +192,9 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           <SettingsSectionBlock
             title="Memory"
             description={
-              "Pane Misty starts with only the visible object and explicitly attached context. Global Misty can retrieve " +
-              "across Spaces you can currently access. Content from pages, mail, files, chat, providers, and extensions " +
-              "is treated as untrusted data and cannot grant capabilities."
+              "Misty starts with what you're looking at and the context you attach, and can search the Spaces " +
+              "you can access. Content from pages, mail, files, chat and extensions is treated as untrusted " +
+              "data and can't grant capabilities."
             }
           >
             <SettingsRow

@@ -4,7 +4,7 @@ import type {
   SpaceMember,
   SpaceMessage,
   SpaceNode,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
