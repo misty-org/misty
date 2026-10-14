@@ -1,13 +1,12 @@
 import { appIcons, TooltipProvider } from "@/shared/ui";
 import { useAuth } from "@/features/auth";
-import { Images, Layers, MessagesSquare, Notebook } from "lucide-react";
+import { Images, MessagesSquare, Notebook } from "lucide-react";
 import { rememberedJournalRoute } from "../spacesShell/spaceSubpageMemory";
 import { useSpacesStore } from "../store/useSpacesStore";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
 // Work surfaces only. Management controls live at the bottom of the Space rail.
 const sections = [
-  { id: "home", label: "All", icon: Layers },
   { id: "social", label: "Chat", icon: MessagesSquare },
   { id: "planner", label: "Planner", icon: appIcons.planner },
   { id: "journal", label: "Journal", icon: Notebook },

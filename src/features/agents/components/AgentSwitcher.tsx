@@ -1,12 +1,10 @@
 import { useState, type Ref } from "react";
-import { Check, MessageSquare, Plus, SlidersHorizontal } from "lucide-react";
+import { Check, Plus, SlidersHorizontal } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
 import type { GlobalAiConversation } from "@/features/global-search/types";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
@@ -18,9 +16,7 @@ import { AgentAvatar } from "./AgentAvatar";
 
 export function AgentSwitcher({
   agents,
-  conversations,
   selectedAgent,
-  conversationId,
   disabled,
   restoreTriggerFocus,
   triggerRef,
@@ -43,15 +39,6 @@ export function AgentSwitcher({
   onSettings(): void;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const chats = conversations
-    .flatMap((chat) => {
-      const agent = agents.find(
-        (a) => a.id === chat.agentId || (!chat.agentId && a.system_managed),
-      );
-      return agent ? [{ chat, agent }] : [];
-    })
-    .sort((a, b) => b.chat.updatedAt.localeCompare(a.chat.updatedAt));
   const choose = (action: () => void) => {
     setOpen(false);
     action();
@@ -59,10 +46,7 @@ export function AgentSwitcher({
   return (
     <Popover
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) setQuery("");
-      }}
+      onOpenChange={setOpen}
     >
       <MenuTrigger
         ref={triggerRef}
@@ -76,28 +60,19 @@ export function AgentSwitcher({
       <PopoverContent
         align="start"
         className="w-80 p-0"
-        aria-label="Switch agent or conversation"
+        aria-label="Switch agent"
         data-agent-navigation-control
         onCloseAutoFocus={(event) => {
           if (!restoreTriggerFocus) event.preventDefault();
         }}
       >
-        <Command label="Switch agent or conversation">
-          <CommandInput
-            autoFocus
-            aria-label="Find agents and conversations"
-            placeholder="Find agents and conversations…"
-            value={query}
-            onValueChange={setQuery}
-          />
+        <Command label="Switch agent">
           <CommandList>
-            <CommandEmpty>No agents or conversations found.</CommandEmpty>
             <CommandGroup heading="Agents">
               {agents.map((agent) => (
                 <CommandItem
                   key={agent.id}
                   value={`agent:${agent.id}`}
-                  keywords={[agent.name]}
                   disabled={disabled}
                   onSelect={() =>
                     choose(() => {
@@ -114,36 +89,6 @@ export function AgentSwitcher({
                 </CommandItem>
               ))}
             </CommandGroup>
-            {/* Conversations join the list only while searching; the sidebar lists recents. */}
-            {query.trim() && (
-              <CommandGroup heading="Conversations">
-                {chats.map(({ chat, agent }) => (
-                  <CommandItem
-                    key={chat.id}
-                    value={`conversation:${chat.id}`}
-                    keywords={[chat.title || "Untitled conversation", agent.name]}
-                    disabled={disabled}
-                    onSelect={() =>
-                      choose(() => {
-                        if (chat.id !== conversationId || agent.id !== selectedAgent?.id)
-                          onSelect(agent.id, false, chat.id);
-                      })
-                    }
-                  >
-                    <MessageSquare />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">
-                        {chat.title || "Untitled conversation"}
-                      </span>
-                      <span className="block truncate text-xs text-cream-muted">{agent.name}</span>
-                    </span>
-                    {chat.id === conversationId && agent.id === selectedAgent?.id && (
-                      <Check aria-label="Current conversation" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
             <CommandSeparator />
             <CommandGroup>
               <CommandItem disabled={disabled} onSelect={() => choose(onCreate)}>

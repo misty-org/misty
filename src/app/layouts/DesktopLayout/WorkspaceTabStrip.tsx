@@ -20,7 +20,9 @@ import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
+import { AgentsMenuButton } from "./WorkspaceStripDock";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
+import { dockingMetrics } from "./dockingGeometry";
 
 const setNavSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setNav(element);
@@ -32,11 +34,11 @@ export function WorkspaceTabStrip(
     position?: DockPosition;
     onNewTab(): void;
     onCloseLayoutTab(id: string): void;
-    /** Spaces and Agents buttons: a sidebar's bottom-left, or a strip's right end. */
-    shortcuts?: ReactNode;
     account?: ReactNode;
     /** The sidebar's bottom-left: downloads. */
     footEnd?: ReactNode;
+    /** Horizontal tabs: Spaces, Agents and the profile, at the row's trailing end. */
+    cluster?: ReactNode;
   },
 ) {
   const position = props.position ?? "top";
@@ -120,7 +122,15 @@ export function WorkspaceTabStrip(
           <SidebarAddressFallback />
         </div>
       )}
-      {vertical ? <div className="misty-sidebar-shortcut-row">{props.shortcuts}</div> : null}
+      {vertical && props.cluster ? (
+        <div
+          className="mb-1 flex min-w-0 flex-col items-start gap-1"
+          data-misty-window-drag-block="true"
+        >
+          {props.cluster}
+          <AgentsMenuButton />
+        </div>
+      ) : null}
       {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
       <div
         {...reorder}
@@ -189,9 +199,9 @@ export function WorkspaceTabStrip(
           vertical
             ? undefined
             : {
-                // The first shoulder starts in the strip's inset, next to the traffic
-                // lights, but never closer to the edge than a rounded pane corner.
-                paddingLeft: `max(12px, ${props.titlebarInsets?.left ?? 8}px - var(--tab-shoulder))`,
+                // The first shoulder starts a little past the window buttons, and never closer to the
+                // edge than a rounded pane corner.
+                paddingLeft: `max(12px, ${(props.titlebarInsets?.left ?? 0) + dockingMetrics.tabLead}px)`,
                 paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
               }
         }
@@ -205,6 +215,7 @@ export function WorkspaceTabStrip(
                 <div ref={setNavSlot} className="flex items-center" />
                 <SidebarNavFallback />
               </div>
+
             </div>
             {cardBody}
             <SidebarNowPlaying />
@@ -215,6 +226,15 @@ export function WorkspaceTabStrip(
         ) : (
           cardBody
         )}
+        {!vertical && props.cluster ? (
+          <div
+            className="ml-2 flex shrink-0 items-center gap-1"
+            data-browser-toolbar
+            data-misty-window-drag-block="true"
+          >
+            {props.cluster}
+          </div>
+        ) : null}
         {vertical ? props.account : null}
         {hoverCards.card}
         {editingGroup && (

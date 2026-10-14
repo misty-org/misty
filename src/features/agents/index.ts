@@ -28,6 +28,7 @@ export type { AgentScope } from "./model/types";
 export type { DisplayCapture } from "./companion/protocol";
 
 export { AgentAvatar } from "./components/AgentAvatar";
+export { usePersonalAgentsStore } from "./personalAgentsStore";
 export { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
 
 export type { AppRequest } from "./apps/api";

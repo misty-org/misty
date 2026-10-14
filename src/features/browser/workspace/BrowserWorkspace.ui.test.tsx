@@ -150,7 +150,9 @@ describe("BrowserWorkspace", () => {
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
     expect(container.querySelector('[aria-label="Misty"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Extensions"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Bookmark this page"]')?.closest("form")).toBe(
+    // Site information (left) and the pane layout (right) sit inside the address field; no star.
+    expect(container.querySelector('[aria-label="Bookmark this page"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Pane layout"]')?.closest("form")).toBe(
       omnibox?.closest("form"),
     );
     expect(container.querySelector('[aria-label="Annotate page"]')).toBeNull();

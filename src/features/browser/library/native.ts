@@ -94,8 +94,12 @@ export interface BrowserMediaInfo {
   duration: number | null;
   position: number | null;
   paused: boolean;
+  /** Something has played on the page and not ended, even if it is paused now. */
+  hasMedia?: boolean;
   canPrevious: boolean;
   canNext: boolean;
+  /** Floating in the system's picture-in-picture window. */
+  pictureInPicture?: boolean;
 }
 
 export interface BrowserFindOptions {
@@ -134,6 +138,6 @@ export const browserPageTools = {
     action: "play" | "pause" | "previoustrack" | "nexttrack" | "seekto",
     position?: number,
   ) => invoke<void>("browser_webview_media_action", { request: { id, action, position } }),
-  pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit") =>
+  pictureInPicture: (id: string, mode: "toggle" | "enter" | "exit" | "refresh") =>
     invoke<void>("browser_webview_picture_in_picture", { request: { id, mode } }),
 };

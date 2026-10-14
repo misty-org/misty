@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import type { WorkspaceView } from "@/features/workspace/core";
@@ -19,6 +19,7 @@ import {
 import { GlobalCreateSpaceDialog } from "./GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace } from "./defaultSpace";
+import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
 import { useSpacesStore } from "./store/useSpacesStore";
 import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
 import { SpaceWorkspaceRail } from "./components/SpaceWorkspaceRail";
@@ -27,6 +28,7 @@ import { SpaceInvitationsNotice } from "./spacesShell/SpaceInvitationsNotice";
 export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const focused = useWorkspaceViewFocused();
   const setViewingSpace = useSpacesStore((state) => state.setViewingSpace);
   const route = useSpacePanelRoute();
@@ -51,9 +53,16 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const [inviteError, setInviteError] = useState("");
   useEffect(() => {
     if (!route.activeSpaceId && ready && fallback) {
-      navigate(`/spaces/${encodeURIComponent(fallback.id)}/home`, { replace: true });
+      navigate(defaultSpaceRoute(fallback.id), { replace: true });
     }
   }, [fallback, ready, route.activeSpaceId, navigate]);
+  useEffect(() => {
+    if (!route.activeSpaceId) return;
+    const base = `/spaces/${encodeURIComponent(route.activeSpaceId)}`;
+    if (location.pathname === base || location.pathname === `${base}/home`) {
+      navigate(`${base}/chat${location.search}${location.hash}`, { replace: true });
+    }
+  }, [location.hash, location.pathname, location.search, navigate, route.activeSpaceId]);
   useEffect(() => {
     if (!focused || !user || !space) return;
     setViewingSpace(space.id);

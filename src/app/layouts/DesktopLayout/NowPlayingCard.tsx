@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import {
   Pause,
   PictureInPicture2,
@@ -11,36 +18,9 @@ import {
 } from "lucide-react";
 import type { BrowserMediaInfo } from "@/features/browser/library";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
-import { IconButton, OverflowFadeText, Pressable } from "@/shared/ui";
+import { IconButton, MarqueeGroup, OverflowFadeText, PlaybackClock, Pressable } from "@/shared/ui";
 
 type Action = "play" | "pause" | "previoustrack" | "nexttrack";
-
-/**
- * The position to show: the page's reported time, carried forward between reports so the bar
- * advances smoothly while playing. A report, or a seek, re-anchors it.
- */
-function useSmoothPosition(reported: number | null, length: number | null, playing: boolean) {
-  const anchor = useRef({ position: reported ?? 0, at: performance.now() });
-  const [shown, setShown] = useState(reported);
-  useEffect(() => {
-    if (reported == null) return;
-    anchor.current = { position: reported, at: performance.now() };
-    setShown(reported);
-  }, [reported]);
-  useEffect(() => {
-    if (!playing || length == null) return;
-    const timer = window.setInterval(() => {
-      const { position, at } = anchor.current;
-      setShown(Math.min(length, position + (performance.now() - at) / 1000));
-    }, 100);
-    return () => window.clearInterval(timer);
-  }, [playing, length]);
-  const jump = (seconds: number) => {
-    anchor.current = { position: seconds, at: performance.now() };
-    setShown(seconds);
-  };
-  return [shown, jump] as const;
-}
 
 /**
  * One playing tab in the media player, laid out like Zen's: the page's artwork and title with
@@ -60,6 +40,10 @@ export function NowPlayingCard(props: {
   onSeek?(seconds: number): void;
   /** Present when picture in picture is available. */
   onPictureInPicture?(): void;
+  /** This page's video is floating now, so the button reads pressed. */
+  pictureInPictureActive?: boolean;
+  /** Closes the card: the breadcrumbs that switch between sources. */
+  footer?: ReactNode;
   /** Stops the player: the page is paused and the card goes away. */
   onClose?(): void;
 }) {
@@ -71,11 +55,13 @@ export function NowPlayingCard(props: {
   const length = info?.duration && info.duration < 86_400 ? info.duration : null;
   const position = length && info?.position != null ? Math.min(info.position, length) : null;
   const bar = useRef<HTMLSpanElement>(null);
-  const [smooth, jump] = useSmoothPosition(position, length, !paused);
+  // A seek moves the clock at once; the next report from the page, or another source, replaces it.
+  const [sought, setSought] = useState<number | null>(null);
+  useEffect(() => setSought(null), [position, props.view.id]);
   // While the bar is dragged it follows the pointer instead of the page's reported position.
   const [scrub, setScrub] = useState<number | null>(null);
   const seek = (seconds: number) => {
-    jump(seconds);
+    setSought(seconds);
     props.onSeek?.(seconds);
   };
   const at = (event: PointerEvent<HTMLElement>) => {
@@ -83,7 +69,7 @@ export function NowPlayingCard(props: {
     if (!rect || !length) return 0;
     return Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)) * length;
   };
-  const shown = scrub ?? smooth;
+  const shown = scrub ?? sought ?? position;
   return (
     <div className="misty-now-playing-card">
       <div className="misty-now-playing-header">
@@ -96,19 +82,26 @@ export function NowPlayingCard(props: {
             <img className="misty-now-playing-art" src={info.artwork} alt="" draggable={false} />
           ) : null}
           <span className="misty-now-playing-meta">
-            <OverflowFadeText marquee className="misty-now-playing-title">
-              {title}
-            </OverflowFadeText>
-            {detail ? (
-              <OverflowFadeText marquee className="misty-now-playing-detail">
-                {detail}
+            <MarqueeGroup>
+              <OverflowFadeText marquee className="misty-now-playing-title">
+                {title}
               </OverflowFadeText>
-            ) : null}
+              {detail ? (
+                <OverflowFadeText marquee className="misty-now-playing-detail">
+                  {detail}
+                </OverflowFadeText>
+              ) : null}
+            </MarqueeGroup>
           </span>
         </Pressable>
         <div className="misty-now-playing-actions">
           {props.onPictureInPicture ? (
-            <IconButton size="xs" label="Picture in picture" onClick={props.onPictureInPicture}>
+            <IconButton
+              size="xs"
+              label="Picture in picture"
+              aria-pressed={Boolean(props.pictureInPictureActive)}
+              onClick={props.onPictureInPicture}
+            >
               <PictureInPicture2 className="size-4" />
             </IconButton>
           ) : null}
@@ -120,8 +113,17 @@ export function NowPlayingCard(props: {
         </div>
       </div>
       {length && shown != null ? (
-        <div className="misty-now-playing-time">
-          <span>{clock(shown)}</span>
+        <PlaybackClock
+          className="misty-now-playing-time"
+          position={shown}
+          length={length}
+          playing={!paused && scrub === null}
+        >
+          <span
+            className="playback-elapsed"
+            data-hours={length >= 3600 ? "true" : undefined}
+            aria-hidden="true"
+          />
           <span
             ref={bar}
             className="misty-now-playing-bar"
@@ -165,10 +167,10 @@ export function NowPlayingCard(props: {
             }}
             onPointerCancel={() => setScrub(null)}
           >
-            <span style={{ width: `${(shown / length) * 100}%` }} />
+            <span />
           </span>
           <span>{clock(length)}</span>
-        </div>
+        </PlaybackClock>
       ) : null}
       <div className="misty-now-playing-controls">
         {state.faviconUrl ? (
@@ -181,32 +183,32 @@ export function NowPlayingCard(props: {
         ) : (
           <span className="misty-now-playing-source" aria-hidden="true" />
         )}
-        <span className="flex-1" />
-        <IconButton
-          size="xs"
-          label={info?.canPrevious ? "Previous" : "Restart"}
-          disabled={!info?.canPrevious && !props.onSeek}
-          // A page with no previous track restarts this one, like a player's first press.
-          onClick={() => (info?.canPrevious ? props.onAction("previoustrack") : seek(0))}
-        >
-          <SkipBack className="size-4" />
-        </IconButton>
-        <IconButton
-          size="xs"
-          label={paused ? `Play ${title}` : `Pause ${title}`}
-          onClick={() => props.onAction(paused ? "play" : "pause")}
-        >
-          {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
-        </IconButton>
-        <IconButton
-          size="xs"
-          label="Next"
-          disabled={!info?.canNext}
-          onClick={() => props.onAction("nexttrack")}
-        >
-          <SkipForward className="size-4" />
-        </IconButton>
-        <span className="flex-1" />
+        <span className="misty-now-playing-transport">
+          <IconButton
+            size="xs"
+            label={info?.canPrevious ? "Previous" : "Restart"}
+            disabled={!info?.canPrevious && !props.onSeek}
+            // A page with no previous track restarts this one, like a player's first press.
+            onClick={() => (info?.canPrevious ? props.onAction("previoustrack") : seek(0))}
+          >
+            <SkipBack className="size-4" />
+          </IconButton>
+          <IconButton
+            size="xs"
+            label={paused ? `Play ${title}` : `Pause ${title}`}
+            onClick={() => props.onAction(paused ? "play" : "pause")}
+          >
+            {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+          </IconButton>
+          <IconButton
+            size="xs"
+            label="Next"
+            disabled={!info?.canNext}
+            onClick={() => props.onAction("nexttrack")}
+          >
+            <SkipForward className="size-4" />
+          </IconButton>
+        </span>
         <IconButton
           size="xs"
           label={muted ? `Unmute ${title}` : `Mute ${title}`}
@@ -215,6 +217,7 @@ export function NowPlayingCard(props: {
           {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
         </IconButton>
       </div>
+      {props.footer}
     </div>
   );
 }

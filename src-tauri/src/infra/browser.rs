@@ -382,6 +382,16 @@ pub struct BrowserWebviewIdRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BrowserWebviewHideRequest {
+    pub id: String,
+    /// The page floats a video in picture in picture: park it instead of hiding it, so the
+    /// floating window's back-to-tab button still has a page to return to.
+    #[serde(default)]
+    pub keep_live: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BrowserNavigateRequest {
     pub id: String,
     pub url: String,
@@ -2244,7 +2254,7 @@ pub fn browser_webviews_set_companion(
 pub fn browser_webview_hide(
     caller: Webview,
     app: AppHandle,
-    request: BrowserWebviewIdRequest,
+    request: BrowserWebviewHideRequest,
 ) -> Result<(), String> {
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
@@ -2259,7 +2269,17 @@ pub fn browser_webview_hide(
     #[cfg(windows)]
     park_windows_webview(&webview)?;
     #[cfg(not(windows))]
-    webview.hide().map_err(|error| error.to_string())?;
+    {
+        if request.keep_live {
+            // A hidden view has no window for the system to return a floating video to. Out of
+            // sight, but still in the window, it keeps one. Reconciling its bounds brings it back.
+            webview
+                .set_position(tauri::LogicalPosition::new(-32_000.0, -32_000.0))
+                .map_err(|error| error.to_string())?;
+        } else {
+            webview.hide().map_err(|error| error.to_string())?;
+        }
+    }
     refresh_browser_cursor_ownership(&webview)
 }
 
@@ -2322,6 +2342,49 @@ pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), 
             {
                 errors.push(error);
             }
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserWebviewsHideExceptRequest {
+    pub keep: Vec<String>,
+}
+
+/// Hides every tab page in the caller's window that the interface does not want on screen. A
+/// page whose tab lost track of it would otherwise stay up, covering the tab that replaced it.
+/// Agent and preview pages are left alone: they are not tab pages.
+#[tauri::command]
+pub fn browser_webviews_hide_except(
+    caller: Webview,
+    app: AppHandle,
+    request: BrowserWebviewsHideExceptRequest,
+) -> Result<(), String> {
+    let keep: HashSet<String> = request
+        .keep
+        .iter()
+        .filter_map(|id| webview_label(id).ok())
+        .collect();
+    let mut errors = Vec::new();
+    for (label, webview) in app.webviews() {
+        if !label.starts_with("misty-browser-tab-")
+            || keep.contains(&label)
+            || webview.window().label() != caller.window().label()
+        {
+            continue;
+        }
+        #[cfg(windows)]
+        let hidden = park_windows_webview(&webview);
+        #[cfg(not(windows))]
+        let hidden = webview.hide().map_err(|error| error.to_string());
+        if let Err(error) = hidden.and_then(|()| refresh_browser_cursor_ownership(&webview)) {
+            errors.push(error);
         }
     }
     if errors.is_empty() {

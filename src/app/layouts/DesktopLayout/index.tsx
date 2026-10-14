@@ -24,9 +24,9 @@ import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
 import {
   BrowserMenuAccountItems,
+  AgentsMenuButton,
   BrowserProfileButton,
   StripDownloads,
-  StripShortcuts,
 } from "./WorkspaceStripDock";
 import { SpacesMenuButton } from "@/features/spaces";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
@@ -171,23 +171,33 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         onSettingsClick={openSettingsOverlay}
       />
     ) : null;
-  const stripShortcuts = <StripShortcuts />;
-  // The sidebar's bottom edge: downloads on the left, sync on the right.
+  // The sidebar's bottom edge: downloads and sync together on the left, the app launcher on the
+  // right.
   const stripFootEnd = (
     <>
-      <StripDownloads />
-      {/* Sidebar chrome, so it is the same 28px button as downloads and settings. */}
-      <div className="flex shrink-0 items-center" data-browser-toolbar data-sidebar>
-        <BrowserSyncBadge
-          key={user?.id}
-          accountId={user?.id ?? ""}
-          onOpenSettings={openSyncSettings}
-        />
+      <div className="flex items-center gap-0.5">
+        <StripDownloads />
+        {/* Sidebar chrome, so it is the same 28px button as downloads and settings. */}
+        <div className="flex shrink-0 items-center" data-browser-toolbar data-sidebar>
+          <BrowserSyncBadge
+            key={user?.id}
+            accountId={user?.id ?? ""}
+            onOpenSettings={openSyncSettings}
+          />
+        </div>
       </div>
     </>
   );
   const browserChrome = {
-    spaces: <SpacesMenuButton toolbar />,
+    spaces: <SpacesMenuButton labeled />,
+    agents: <AgentsMenuButton />,
+    sync: (
+      <BrowserSyncBadge
+        key={user?.id}
+        accountId={user?.id ?? ""}
+        onOpenSettings={openSyncSettings}
+      />
+    ),
     profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
     accountItems: <BrowserMenuAccountItems onSyncClick={openSyncSettings} />,
   };
@@ -239,7 +249,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               aria-hidden="true"
               // Stops where the first tab's curve starts, so the curve is not painted over.
               style={{
-                width: Math.max(0, (topTabInsets?.left ?? 0) - dockingMetrics.tabShoulder),
+                width: Math.max(0, (topTabInsets?.left ?? 0) + dockingMetrics.tabLead),
               }}
             />
           ) : null}
@@ -279,7 +289,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 tabPosition={docking.tabs}
                 titlebarInsets={topTabInsets}
                 hideTabStrip={focusMode}
-                stripShortcuts={stripShortcuts}
                 stripFootEnd={stripFootEnd}
                 stripAccount={stripAccount}
                 browserChrome={browserChrome}

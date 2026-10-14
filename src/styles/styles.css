@@ -1160,3 +1160,37 @@
   background-color: var(--misty-night-light);
   mix-blend-mode: multiply;
 }
+
+/* The edge fades of sliding text (OverflowFadeText marquee) animate, so they are typed lengths. */
+@property --marquee-fade-left {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --marquee-fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* A playback position that advances by itself (PlaybackClock): the clock text and the bar both read
+   the animated number, so nothing in script has to tick. */
+@property --playback-position {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --playback-length {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+.playback-elapsed::after {
+  counter-reset: ph round(down, calc(var(--playback-position) / 3600), 1) pm
+    round(down, mod(calc(var(--playback-position) / 60), 60), 1) ps
+    round(down, mod(var(--playback-position), 60), 1);
+  content: counter(pm) ":" counter(ps, decimal-leading-zero);
+}
+.playback-elapsed[data-hours]::after {
+  content: counter(ph) ":" counter(pm, decimal-leading-zero) ":" counter(ps, decimal-leading-zero);
+}

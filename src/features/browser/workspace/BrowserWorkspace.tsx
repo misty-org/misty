@@ -14,7 +14,6 @@ import { useEffect, useRef, useState } from "react";
 import { useBrowserToolbarSlot } from "./browserToolbarSlot";
 import { BrowserAgentAccessMenu } from "./BrowserAgentAccessMenu";
 import { BrowserBookmarkDialog } from "./BrowserBookmarkDialog";
-import { BrowserBookmarkStar } from "./BrowserBookmarkStar";
 import { BrowserClearDataDialog } from "./BrowserClearDataDialog";
 import { BrowserClipboardButton } from "./BrowserClipboardButton";
 import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
@@ -41,7 +40,6 @@ import { inspectBrowserPage } from "./browserPageInspection";
 import { setBrowserError } from "./browserErrors";
 import { BrowserNotices } from "./BrowserNotices";
 import { BrowserPageStage } from "./BrowserPageStage";
-import { BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { BrowserViewportMenu, useBrowserViewport } from "./BrowserViewportMenu";
@@ -200,10 +198,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
     [claimsNav],
   );
-  const bookmark =
-    page.commands.bookmark && !hiddenButtons.has("bookmark") ? (
-      <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
-    ) : undefined;
   const navButtons = (
     <BrowserNavigationButtons
       canGoBack={history.index > 0}
@@ -293,7 +287,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
       )}
       {siteInfo}
-      {paneLayout}
       {browserMenu(true)}
     </>
   );
@@ -306,18 +299,14 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       onNavigate={navigateActiveTab}
       hostOnly={sidebar}
       panel={sidebar}
-      trailing={sidebar ? sidebarTrailing : bookmark}
+      leading={sidebar ? undefined : siteInfo}
+      trailing={sidebar ? sidebarTrailing : undefined}
     />
   );
   const toolButtons = (
     <>
-      {hiddenButtons.has("misty") ? null : <BrowserMistyButton tabId={tab.id} />}
-      {chrome ? (
-        <>
-          {chrome.spaces}
-          {chrome.profile}
-        </>
-      ) : hiddenButtons.has("extensions") ? null : (
+      {paneLayout}
+      {hiddenButtons.has("extensions") ? null : (
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
       )}
       {hiddenButtons.has("downloads") ? null : (
@@ -326,6 +315,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           onShowAll={() => page.commands.openPage("downloads")}
         />
       )}
+      {chrome?.sync}
+      {chrome?.profile}
       {browserMenu(false)}
     </>
   );
@@ -341,8 +332,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     >
       <div className={browserToolbarStyles.group}>
         {navButtons}
-        {siteInfo}
-        {paneLayout}
       </div>
       {badges}
       {omnibox}
@@ -387,6 +376,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
                 data-misty-window-drag-block="true"
               >
                 {navButtons}
+                {paneLayout}
               </div>
             </Portal>
           ) : null}

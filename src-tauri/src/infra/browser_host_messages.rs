@@ -44,6 +44,62 @@ fn pointer_message(raw: &str) -> Option<PointerMessage> {
     Some(message)
 }
 
+/// What a page is playing, pushed whenever it changes. The fields are fixed and capped, so the
+/// page can say nothing else through this message.
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct MediaState {
+    title: String,
+    artist: String,
+    artwork: String,
+    duration: Option<f64>,
+    position: Option<f64>,
+    paused: bool,
+    has_media: bool,
+    can_previous: bool,
+    can_next: bool,
+    picture_in_picture: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MediaMessage {
+    token: String,
+    media: MediaState,
+}
+
+fn media_message(raw: &str) -> Option<MediaMessage> {
+    if raw.len() > 4096 {
+        return None;
+    }
+    let message: MediaMessage = serde_json::from_str(raw).ok()?;
+    let m = &message.media;
+    let fine = |value: Option<f64>| value.is_none_or(|n| n.is_finite() && (0.0..=1.0e9).contains(&n));
+    (m.title.chars().count() <= 200
+        && m.artist.chars().count() <= 200
+        && m.artwork.len() <= 600
+        && fine(m.duration)
+        && fine(m.position))
+    .then_some(message)
+}
+
+/// A video came back from picture in picture still playing: the floating window's back-to-tab
+/// button. Misty's window comes forward even if the person is in another app.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PictureInPictureReturn {
+    token: String,
+    #[serde(rename = "pipReturn")]
+    pip_return: bool,
+}
+
+fn picture_in_picture_return(raw: &str) -> Option<PictureInPictureReturn> {
+    if raw.len() > 1024 {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
 /// A host navigation (shortcut or context menu) posted instead of loaded, so
 /// the page cannot observe the URL that carries the token. The forwarders it
 /// is handed to check that token exactly as they do for a navigation.
@@ -115,7 +171,8 @@ fn background_message(raw: &str) -> Option<BackgroundMessage> {
     Some(message)
 }
 
-/// Escape stopped a loading page.
+/// Escape stopped a loading page, its document finished loading, or the page changed its URL
+/// without loading (History API or hash). The last carries no URL: the host reads it from the view.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StatusMessage {
@@ -127,6 +184,8 @@ struct StatusMessage {
 #[serde(rename_all = "lowercase")]
 enum StatusChange {
     Stopped,
+    Loaded,
+    Location,
 }
 
 fn status_message(raw: &str) -> Option<StatusMessage> {
@@ -265,6 +324,32 @@ impl HostChannel for Channel {
             );
             return;
         }
+        if let Some(back) = picture_in_picture_return(raw) {
+            if back.pip_return && message.main_frame && trusted(app, id, &back.token) {
+                if let Some(window) = app.get_window(&super::browser_owner_label(app, id)) {
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                // The same signal as a click on the page: its tab comes forward.
+                let _ = app.emit_to(
+                    super::browser_owner_label(app, id),
+                    "misty://browser-focus",
+                    BrowserFocusEvent { id: id.to_owned() },
+                );
+            }
+            return;
+        }
+        if let Some(update) = media_message(raw) {
+            if message.main_frame && trusted(app, id, &update.token) {
+                let _ = app.emit_to(
+                    super::browser_owner_label(app, id),
+                    "misty://browser-media-state",
+                    json!({ "id": id, "info": update.media }),
+                );
+            }
+            return;
+        }
         // Companion tracking shares the authenticated channel with focus.
         // URL-based telemetry cancels WebKit loads while the user moves the mouse.
         if let Some(pointer) = pointer_message(raw) {
@@ -300,13 +385,26 @@ impl HostChannel for Channel {
             return;
         }
         if let Some(status) = status_message(raw) {
-            if trusted(app, id, &status.token) {
-                let StatusChange::Stopped = status.status;
-                let _ = app.emit_to(
-                    super::browser_owner_label(app, id),
-                    "misty://browser-stopped",
-                    BrowserFocusEvent { id: id.to_owned() },
-                );
+            if !trusted(app, id, &status.token) {
+                return;
+            }
+            let owner = super::browser_owner_label(app, id);
+            match status.status {
+                StatusChange::Stopped => {
+                    let _ = app.emit_to(owner, "misty://browser-stopped", BrowserFocusEvent { id: id.to_owned() });
+                }
+                // A finished document ends the load even when WebKit never reports it finished.
+                StatusChange::Loaded if message.main_frame => {
+                    let _ = app.emit_to(owner, "misty://browser-stopped", BrowserFocusEvent { id: id.to_owned() });
+                }
+                StatusChange::Location if message.main_frame => {
+                    let url = app.get_webview(message.webview).and_then(|view| view.url().ok());
+                    if let Some(url) = url {
+                        let event = BrowserPageEvent { id: id.to_owned(), url: url.to_string(), phase: "navigated" };
+                        let _ = app.emit_to(owner, "misty://browser-page", event);
+                    }
+                }
+                _ => {}
             }
             return;
         }

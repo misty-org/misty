@@ -17,7 +17,7 @@ describe("Space preference precedence", () => {
     preferences({});
     useSpacesTabsStore.setState({ sessions: {} });
   });
-  it("uses Home by default, then the profile's opening tool for new sessions only", () => {
+  it("uses Chat by default, then the profile's opening tool for new sessions only", () => {
     const store = useSpacesTabsStore.getState();
     store.ensureSession("account", "first");
     const route = (id: string) =>
@@ -25,12 +25,12 @@ describe("Space preference precedence", () => {
         useSpacesTabsStore.getState().sessions[spacesTabsSessionKey("account", id)]
           .tabs[0] as SpaceWorkspaceTab
       ).route;
-    expect(route("first")).toBe("/spaces/first/home");
+    expect(route("first")).toBe("/spaces/first/chat");
     preferences({ opening_tool: "chat" });
     store.ensureSession("account", "second");
     expect(route("second")).toBe("/spaces/second/chat");
     store.ensureSession("account", "first");
-    expect(route("first")).toBe("/spaces/first/home");
+    expect(route("first")).toBe("/spaces/first/chat");
     store.ensureSession("account", "explicit", "/spaces/explicit/library");
     expect(route("explicit")).toBe("/spaces/explicit/library");
   });

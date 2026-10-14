@@ -10,7 +10,6 @@ import {
   Settings2,
   Star,
 } from "lucide-react";
-import { MistyPanelSprite, useMistyPanelStore } from "@/features/agents";
 import { useBrowserChromeSlot } from "@/features/browser/workspace";
 import { browserToolbarStyles } from "@/features/browser/workspace/browserToolbarStyles";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
@@ -33,21 +32,6 @@ import {
 
 function openInternalPage(page: BrowserInternalPage) {
   useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl(page) });
-}
-
-/** Misty: opens the Misty side panel in the browser, on the side chosen in settings. */
-function MistyButton() {
-  const open = useMistyPanelStore((state) => state.open);
-  return (
-    <IconButton
-      label="Misty"
-      tooltip={false}
-      aria-pressed={open}
-      onClick={() => useMistyPanelStore.getState().setOpen(!open, null)}
-    >
-      <MistyPanelSprite size={24} />
-    </IconButton>
-  );
 }
 
 /** The browser menu's rows that need no page: tabs, windows, library pages, settings and sync. */
@@ -103,7 +87,7 @@ function MoreMenu() {
 /**
  * The browser toolbar on a page that isn't a browser page: resting back, forward and reload,
  * an empty address field that opens search, and the same four buttons on the right as a
- * browser page has: Misty, Spaces, the profile and the menu. With horizontal tabs the toolbar
+ * browser page has: Misty, the profile and the menu. With horizontal tabs the toolbar
  * is always there, so the rest of the app stays one click away.
  */
 export function PaneToolbarFallback() {
@@ -135,8 +119,7 @@ export function PaneToolbarFallback() {
         Search or enter address
       </button>
       <div className={browserToolbarStyles.group}>
-        <MistyButton />
-        {chrome?.spaces}
+        {chrome?.sync}
         {chrome?.profile}
         <MoreMenu />
       </div>

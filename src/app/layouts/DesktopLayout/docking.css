@@ -304,9 +304,14 @@
       )
       bottom right / var(--pane-corner-bottom-right) var(--pane-corner-bottom-right);
   background-repeat: no-repeat;
-  /* A panel's margin of chrome, painted here because the page host stays transparent. */
-  box-shadow: inset 0 0 0 var(--pane-frame, 0px)
-    var(--misty-window-chrome, var(--misty-theme-workspace));
+  /* A pane's margin of chrome, painted here because the page host stays transparent. */
+  /* Each edge's own width: the edge a tab strip hangs from keeps just its 1px seam, so the
+     toolbar there is not painted over. */
+  box-shadow:
+    inset var(--pane-seam-left, 0px) var(--pane-seam-top, 0px) 0 0
+      var(--misty-window-chrome, var(--misty-theme-workspace)),
+    inset calc(-1 * var(--pane-seam-right, 0px)) calc(-1 * var(--pane-seam-bottom, 0px)) 0 0
+      var(--misty-window-chrome, var(--misty-theme-workspace));
   pointer-events: none;
 }
 .misty-docking-frame [data-workspace-panes] > [role="tabpanel"]::after {
@@ -352,7 +357,7 @@
     [data-tab-position="left"],
     [data-tab-position="right"]
   ) {
-  padding-top: calc(5px + var(--window-chrome-top, 0px));
+  padding-top: calc(var(--shell-side-tab-inset, 5px) + var(--window-chrome-top, 0px));
 }
 [data-workspace-titlebar-fallback] {
   display: none;
@@ -379,11 +384,11 @@
    the same line as New tab and the pane controls. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
   /* Corner and shoulder radius; ConnectedTabShape and the drag preview read it. */
-  --tab-shoulder: 14px;
-  --tab-inset: var(--shell-tab-inset, 3px);
+  --tab-shoulder: 12px;
+  --tab-inset: var(--shell-tab-inset, 8px);
   position: relative;
   z-index: 1;
-  height: var(--shell-tab-strip-height, 38px);
+  height: var(--shell-tab-strip-height, 44px);
   align-items: stretch;
   border: 0;
   /* WorkspaceTabStrip sets padding-left from the traffic-light inset. */
@@ -405,7 +410,9 @@
   .misty-workspace-tab-list[data-reorder-list] {
   height: 100%;
   align-items: flex-end;
-  gap: 0;
+  /* Tabs sit close; the active tab's flare runs a little under a neighbor's edge, but stays clear
+     of its favicon, which starts a shoulder's width inside. */
+  gap: 6px;
   padding: var(--tab-inset) var(--tab-shoulder) 0;
 }
 .misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-list[data-reorder-list] {
@@ -435,7 +442,7 @@
   [role="tab"] {
   justify-content: flex-start;
   gap: 8px;
-  /* Favicon and close glyph both sit 12px inside the tab's sides. */
+  /* The favicon starts 12px inside the tab body, mirroring the close glyph on the other side. */
   padding: 0 6px 0 12px;
   color: inherit;
   text-align: left;
@@ -451,17 +458,17 @@
   color: var(--workspace-tab-text);
   background: transparent;
 }
-/* Inactive hover: a pill shorter than the active tab, inset sideways to clear
-   the active shoulders, kept off the pane seam so the seam stays visible, and
-   centered on the tab's content. */
+/* Inactive hover: the tab body's own footprint, with the active tab's top corners, stopping
+   short of the pane seam so the seam stays visible. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab:not([data-active="true"])::before {
   content: "";
   position: absolute;
-  inset: 3px 4px 6px;
+  /* A 28px pill, set to the tab content's measured center. */
+  inset: 3px 0 5px;
   z-index: -1;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--workspace-tab-surface) 75%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--workspace-tab-text) 10%, transparent);
   opacity: 0;
   pointer-events: none;
 }
@@ -492,15 +499,13 @@
 }
 .misty-workspace-tabs[data-tab-position="bottom"]
   .misty-workspace-tab:not([data-active="true"])::before {
-  inset: 6px 4px 3px;
+  inset: 4px 0 0;
+  border-radius: 8px 8px var(--tab-shoulder) var(--tab-shoulder);
 }
-/* The tab fills the strip minus the --tab-inset gap; padding the pane side by the
-   same gap centers its content on the strip, level with New tab and the controls. */
-.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab {
-  padding: 0 0 var(--tab-inset);
-}
+/* The tab fills the strip minus the --tab-inset gap, and its content is centered on the tab. */
+.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab,
 .misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab {
-  padding: var(--tab-inset) 0 0;
+  padding: 0;
 }
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab-list
@@ -510,23 +515,18 @@
   align-self: center;
   margin-block: 0;
 }
-/* New tab and group headers sit in the tab list, which is inset from the strip;
-   the opposite margin puts them back on the strip's center line. The pane controls
-   sit outside the list and center on the strip directly. */
-.misty-workspace-tabs[data-tab-position="top"]
-  .misty-workspace-tab-list
-  > :is(button, .misty-tab-group-header) {
-  margin-bottom: var(--tab-inset);
-}
-.misty-workspace-tabs[data-tab-position="bottom"]
-  .misty-workspace-tab-list
-  > :is(button, .misty-tab-group-header) {
+/* New tab and group headers sit in the tab list, so they center on the tabs. The pane controls
+   sit outside it and center on the whole strip, so the inset margin brings them level. */
+.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab-actions {
   margin-top: var(--tab-inset);
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-actions {
+  margin-bottom: var(--tab-inset);
 }
 /* A clear gap after New tab, so it reads as part of the tabs and not the pane controls. */
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab-actions {
-  margin-left: 25px;
+  margin-left: 4px;
   color: var(--workspace-tab-muted);
 }
 /* Close and New tab share a 1.33px stroke and sit 12px either side of the
@@ -543,7 +543,8 @@
 }
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-new-tab {
-  margin-left: 4px;
+  /* The list's shoulder-wide gap already separates it from the last tab. */
+  margin-left: 0;
   color: var(--workspace-tab-muted);
 }
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
@@ -558,12 +559,27 @@
   width: 20px;
   height: 20px;
   min-width: 20px;
-  margin: 0 6px 0 0;
+  /* The 14px glyph sits 3px inside its 20px target, so it ends 12px inside the tab body. */
+  margin: 0 9px 0 0;
   color: inherit;
 }
 .misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
   .misty-workspace-tab-close
   svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+/* The tab's media button (speaker, muted speaker or play) is the close button's twin: the same
+   20px target, 14px glyph and stroke, so the two read as one pair. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-tab-media-button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+}
+.misty-workspace-tabs .misty-tab-media-button svg {
   width: 14px;
   height: 14px;
   stroke-width: 2.29;
@@ -978,34 +994,11 @@
 }
 /* The sidebar's bottom edge, above the account row: Spaces and Misty on the left, downloads on
    the right. */
-/* Above favorites, in the sidebar's body. */
-.misty-sidebar-shortcut-row {
-  display: flex;
-  flex-shrink: 0;
-  margin: 0 0 8px;
-}
-/* As wide as the favorites container below it, its two buttons sharing the width. */
-.misty-sidebar-shortcuts {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-}
-.misty-sidebar-shortcuts > * {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 38px;
-  justify-content: center;
-}
 .misty-sidebar-foot {
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 4px;
   /* The card's own bottom padding closes it, so it matches the space on its sides. */
@@ -1050,10 +1043,9 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
-/* Beside a vertical sidebar the page is a rounded panel: a 1px gray outline hugs it from the
+/* The page is a rounded pane in every tab layout: a 1px gray outline hugs it from the
    margin just outside, where the native page cannot cover it. */
-.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-pane-frame::after {
+.misty-docking-frame .misty-pane-frame::after {
   content: "";
   position: absolute;
   inset: -1px;
@@ -1065,8 +1057,7 @@
 /* The page's corners are curved, but its area is square: its background would show in the four
    corners, notably the two beside the Misty panel, which no pane mask covers. Paint them in
    the chrome color. */
-.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-pane-frame::before {
+.misty-docking-frame .misty-pane-frame::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1180,4 +1171,46 @@
   [data-text-overflowing="true"] {
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
   mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
+}
+
+/* Once a tab is split, every pane is its own rounded container with a gap between them, so the
+   page's single outline gives way to each pane's own. */
+.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id])::after {
+  display: none;
+}
+.misty-docking-frame
+  .misty-pane-frame:has([data-panel-resize-handle-id])
+  [data-workspace-pane] {
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+}
+
+/* Split panes float on the dark workspace backdrop. Nothing opaque may sit behind a page: while
+   a popover is open the native pages drop below the app layer and show only through transparent
+   CSS, so the frame and panes container stay transparent (styles.css) and the backdrop is painted
+   only where no page is: the margin (the tabpanel's inset shadow, in --misty-window-chrome), the
+   gaps (the resize handles) and the four corners outside each pane's rounded edge. */
+.misty-docking-frame:has([data-panel-resize-handle-id]) {
+  --misty-window-chrome: var(--misty-theme-workspace) !important;
+}
+.misty-docking-frame [data-panel-resize-handle-id] {
+  background-color: var(--misty-theme-workspace);
+}
+.misty-docking-frame
+  .misty-pane-frame:has([data-panel-resize-handle-id])
+  [data-pane-layout-content]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px)
+      top left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px)
+      top right / 12px 12px no-repeat,
+    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px)
+      bottom left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px)
+      bottom right / 12px 12px no-repeat;
 }

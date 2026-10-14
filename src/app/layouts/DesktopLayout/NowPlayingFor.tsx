@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBrowserMediaStore, type BrowserMediaInfo } from "@/features/browser/library";
 import type { WorkspaceView } from "@/features/workspace/model";
@@ -12,6 +13,8 @@ export function NowPlayingFor(props: {
   view: WorkspaceView;
   info?: BrowserMediaInfo;
   onOpen?: () => void;
+  /** Closes the card, such as the breadcrumbs between several sources. */
+  footer?: ReactNode;
 }) {
   const navigate = useNavigate();
   const paused = useBrowserMediaStore(
@@ -28,8 +31,12 @@ export function NowPlayingFor(props: {
       onToggleMute={() => void useBrowserMediaStore.getState().toggleMuted(props.view.id)}
       onSeek={(seconds) => actOnMedia(props.view, "seekto", seconds)}
       onPictureInPicture={
-        pictureInPictureSupported() ? () => togglePictureInPicture(props.view) : undefined
+        pictureInPictureSupported()
+          ? () => togglePictureInPicture(props.view, Boolean(props.info?.pictureInPicture))
+          : undefined
       }
+      pictureInPictureActive={props.info?.pictureInPicture}
+      footer={props.footer}
       onClose={() => {
         closeMedia(props.view);
         props.onOpen?.();

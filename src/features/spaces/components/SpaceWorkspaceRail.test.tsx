@@ -96,7 +96,7 @@ it("opens a section in the owning Space tab after loading it", async () => {
     within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent),
-  ).toEqual(["All", "Chat", "Planner", "Journal", "Library"]);
+  ).toEqual(["Chat", "Planner", "Journal", "Library"]);
   expect(within(nav).getByRole("link", { name: "Journal" }).getAttribute("aria-current")).toBe(
     "page",
   );

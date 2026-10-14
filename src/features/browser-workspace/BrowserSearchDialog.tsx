@@ -23,22 +23,6 @@ import { SearchResultList, type SearchListItem } from "./SearchResultList";
 import { openInNewBrowserTab, openMatch, openResult } from "./searchTargets";
 import { useSearchItems } from "./useSearchItems";
 
-/**
- * Margins that move the top-anchored panel onto the page area, not the whole window. The
- * input stays put while results grow downward beneath it.
- */
-function centerOnPage(open: boolean) {
-  const rect = open
-    ? document.querySelector("[data-browser-page-host]")?.getBoundingClientRect()
-    : undefined;
-  if (!rect?.width) return { marginLeft: 84, marginTop: 0 };
-  return {
-    marginLeft: Math.round(rect.left + rect.right - window.innerWidth),
-    // The dialog's own 12vh top offset is replaced by 12% of the page height.
-    marginTop: Math.round(rect.top + rect.height * 0.12 - window.innerHeight * 0.12),
-  };
-}
-
 /** Margins that put the panel's top-left corner where the address bar was. */
 function overAddressBar(anchor: SearchAnchor) {
   return { marginLeft: anchor.left, marginTop: anchor.top, width: anchor.width };
@@ -171,7 +155,8 @@ export function BrowserSearchDialog() {
       <DialogContent
         placement="top"
         backdrop={!anchor}
-        style={anchor ? overAddressBar(anchor) : centerOnPage(open)}
+        // Unanchored, it opens in the middle of the window, whatever the panes are doing.
+        style={anchor ? overAddressBar(anchor) : undefined}
         className={cn(
           anchor ? "max-w-none" : "max-w-[700px]",
           "gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",

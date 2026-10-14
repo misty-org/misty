@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
+import { sidebarWidthMin, useSidebarWidthStore } from "@/features/app-shell/sidebarWidth";
 import { useSidebarCollapsedStore } from "@/features/app-shell/sidebarCollapsed";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -24,6 +24,8 @@ const lightsInset = 2;
 /** The reveal strip at the window edge, and how long the pointer may rest outside the drawer. */
 const edgeZone = 8;
 const hideDelayMs = 180;
+/** How far past its narrowest the pointer must pull the drawer for it to close, in pixels. */
+const sidebarCloseDistance = 70;
 
 /**
  * Holds the vertical tab sidebar. Open, it is a column beside the page. Collapsed, the column
@@ -170,10 +172,21 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
             setResizing(true);
             // Native pages step aside so they cannot swallow the drag.
             setBrowserWebviewsSuspended(true, "sidebar-resize");
-            const move = (e: PointerEvent) =>
-              useSidebarWidthStore
-                .getState()
-                .set(props.side === "left" ? e.clientX - origin.left : origin.right - e.clientX);
+            const move = (e: PointerEvent) => {
+              const width =
+                props.side === "left" ? e.clientX - origin.left : origin.right - e.clientX;
+              // Pulled well past the narrowest it goes, in the closing direction, it closes.
+              if (width < sidebarWidthMin - sidebarCloseDistance) {
+                end();
+                // The page steps aside while the drawer slides, as with the toggle button.
+                setBrowserWebviewsSuspended(true, "sidebar-toggle");
+                window.setTimeout(() => setBrowserWebviewsSuspended(false, "sidebar-toggle"), 340);
+                if (!useSidebarCollapsedStore.getState().collapsed)
+                  useSidebarCollapsedStore.getState().toggle();
+                return;
+              }
+              useSidebarWidthStore.getState().set(width);
+            };
             const end = () => {
               handle.removeEventListener("pointermove", move);
               handle.removeEventListener("pointerup", end);

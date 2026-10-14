@@ -15,7 +15,7 @@ import {
   canFitDockSplit,
   dockLeaves,
   dockWidgetRegistry,
-  maxWorkspacePanels,
+  maxWorkspacePanes,
   useWindowDockingLayout,
   useWorkspaceStore,
   WorkspaceViewTitleProvider,
@@ -58,7 +58,7 @@ export interface WorkspaceDockTreeProps {
   workspaceActive?: boolean;
   node: WorkspaceDockNode;
   dockEdge?: { top: boolean; left: boolean; right: boolean };
-  panelDirection?: DockSplitDirection;
+  paneDirection?: DockSplitDirection;
   titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
   focusedPaneId: string;
@@ -111,9 +111,9 @@ function DockSplitView(
       : { top: false, left: edge.left, right: edge.right };
   const persistTimerRef = useRef<number | null>(null);
   const pendingRatioRef = useRef(props.node.ratio);
-  const panelGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
+  const splitGroupRef = useRef<ImperativePanelGroupHandle | null>(null);
   useEffect(() => {
-    const handle = panelGroupRef.current;
+    const handle = splitGroupRef.current;
     const layout = handle?.getLayout();
     if (!handle || layout?.length !== 2) return;
     const desired = props.node.ratio * 100;
@@ -129,7 +129,7 @@ function DockSplitView(
   );
   return (
     <PanelGroup
-      ref={panelGroupRef}
+      ref={splitGroupRef}
       id={props.node.id}
       direction={props.node.direction}
       className="h-full min-h-0 w-full min-w-0"
@@ -153,7 +153,7 @@ function DockSplitView(
           {...props}
           node={props.node.first}
           dockEdge={firstEdge}
-          panelDirection={props.node.direction === "horizontal" ? "left" : "up"}
+          paneDirection={props.node.direction === "horizontal" ? "left" : "up"}
         />
       </Panel>
       <PanelResizeHandle
@@ -163,12 +163,10 @@ function DockSplitView(
             : "Resize panes vertically"
         }
         className={cn(
-          "relative z-20 bg-charcoal-border transition-colors before:absolute",
-          "hover:bg-charcoal-active focus-visible:outline-none focus-visible:ring-2",
-          "focus-visible:ring-cream-muted/60 data-[resize-handle-active]:bg-charcoal-active",
-          props.node.direction === "horizontal"
-            ? "w-px cursor-col-resize before:inset-y-0 before:-inset-x-[5px]"
-            : "h-px cursor-row-resize before:inset-x-0 before:-inset-y-[5px]",
+          // Panes are separate rounded containers, so the handle is the gap between them.
+          "relative z-20 bg-transparent",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted/60",
+          props.node.direction === "horizontal" ? "w-2 cursor-col-resize" : "h-2 cursor-row-resize",
         )}
       />
       <Panel
@@ -182,7 +180,7 @@ function DockSplitView(
           {...props}
           node={props.node.second}
           dockEdge={secondEdge}
-          panelDirection={props.node.direction === "horizontal" ? "right" : "down"}
+          paneDirection={props.node.direction === "horizontal" ? "right" : "down"}
         />
       </Panel>
     </PanelGroup>
@@ -367,6 +365,7 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         "overflow-hidden bg-charcoal-bg focus:outline-none",
       )}
       data-workspace-pane={pane.id}
+      data-browser-corner-clip=""
       onDragOver={dragOver}
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropZone(null);
@@ -581,7 +580,7 @@ function dockSplitFits(
   movingTab: WorkspaceView,
 ): boolean {
   if (zone === "center") return true;
-  if (dockLeaves(useWorkspaceStore.getState().layout.root).length >= maxWorkspacePanels)
+  if (dockLeaves(useWorkspaceStore.getState().layout.root).length >= maxWorkspacePanes)
     return false;
   const remaining = pane.views.filter((tab) => tab.id !== movingTab.id);
   if (!remaining.length) return false;

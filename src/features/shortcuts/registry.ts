@@ -155,12 +155,12 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
       allowInEditable: true,
     });
   }),
-  command("workspace.swap_panel_next", "Swap panel", {
+  command("workspace.swap_panel_next", "Swap pane", {
     description:
-      "Choose a panel with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
+      "Choose a pane with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
     category: "Virtual windows",
     scope: "workspace",
-    aliases: ["reorder panels", "move panel"],
+    aliases: ["reorder panes", "move pane"],
   }),
   command("workspace.new_tab", "New tab", {
     description: "Open the keyboard-first New Tab picker.",

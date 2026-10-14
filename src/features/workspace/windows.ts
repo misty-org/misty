@@ -18,7 +18,7 @@ import {
   removeDockLeaf,
 } from "./dockTree";
 import {
-  maxWorkspacePanels,
+  maxWorkspacePanes,
   type WorkspaceLayout,
   type WorkspaceScopeKey,
   type WorkspaceWindow,
@@ -54,7 +54,7 @@ export function normalizeWorkspaceLayout(
     const source = tab.id === activeId ? migrated : tab;
     const root = normalizeDockNode(
       fillEmptyDockLeaves(
-        capDockLeaves(source.root, maxWorkspacePanels),
+        capDockLeaves(source.root, maxWorkspacePanes),
         noTabs ? undefined : () => createDefaultWorkspaceView(scopeKey),
       ),
     );

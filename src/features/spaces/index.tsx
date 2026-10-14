@@ -10,5 +10,6 @@ export * from "./store/useSpaceAgendaPreferences";
 export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
 export { SpacesMenuButton } from "./components/SpacesMenuButton";
+export { SpacesLauncherList } from "./components/SpacesLauncherList";
 export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
 export { SocialPicker } from "./chat/SocialRuntime";

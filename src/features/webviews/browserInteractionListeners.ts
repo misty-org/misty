@@ -31,6 +31,13 @@ interface BrowserDownloadEvent {
   error?: string;
 }
 
+/** A native page took keyboard focus, which the renderer's DOM never hears about. Drop the DOM's
+ * focus too, so a field that kept it (the address bar shows its draft while focused) lets go. */
+function releaseRendererFocus() {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active !== document.body) active.blur();
+}
+
 function focusBrowserRuntimeTab(runtimeId: string): boolean {
   const tabId = browserTabIdForRuntime(runtimeId);
   return tabId ? focusBrowserTab(tabId) : false;
@@ -106,11 +113,15 @@ export function listenBrowserInteractionEvents({
       );
     }),
     listen<BrowserFocusEvent>("misty://browser-focus", ({ payload }) => {
-      if (!isDisposed()) focusBrowserRuntimeTab(payload.id);
+      if (isDisposed()) return;
+      releaseRendererFocus();
+      focusBrowserRuntimeTab(payload.id);
     }),
     listen<{ x: number; y: number }>("misty://browser-page-pointer-down", ({ payload }) => {
       const scale = getAppliedAppRenderScale();
-      if (!isDisposed()) focusBrowserPageAt(payload.x / scale, payload.y / scale);
+      if (isDisposed()) return;
+      releaseRendererFocus();
+      focusBrowserPageAt(payload.x / scale, payload.y / scale);
     }),
     listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
       if (isDisposed()) return;

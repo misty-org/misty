@@ -23,6 +23,9 @@ const slideMs = 240;
  * page: each is its own rounded panel. */
 const panelGap = 8;
 
+/** How far past its narrowest the pointer must pull the panel for it to close, in pixels. */
+const closeDistance = 70;
+
 const geometryChanged = () => window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
 
 /**
@@ -114,8 +117,16 @@ function MistyPanelResizer({ side, width }: { side: MistyPanelSide; width: numbe
     if (event.button !== 0) return;
     event.preventDefault();
     const origin = { x: event.clientX, width };
-    const move = (next: globalThis.PointerEvent) =>
-      setWidth(origin.width + direction * (next.clientX - origin.x));
+    const move = (next: globalThis.PointerEvent) => {
+      const dragged = origin.width + direction * (next.clientX - origin.x);
+      // Pulled well past the narrowest it goes, in the closing direction, it closes.
+      if (dragged < MISTY_PANEL_MIN_WIDTH - closeDistance) {
+        end();
+        useMistyPanelStore.getState().setOpen(false);
+        return;
+      }
+      setWidth(dragged);
+    };
     const end = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", end);

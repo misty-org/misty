@@ -111,23 +111,6 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
   );
 });
 
-it("searches conversations from the switcher without changing the active conversation", () => {
-  useMistyStore.setState({
-    activeConversationId: "draft",
-    conversations: [{ ...conversation("draft", "Launch draft"), remote: false }],
-  });
-  renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  // Conversations join the switcher only while searching; the sidebar lists recents.
-  expect(screen.queryByRole("option", { name: /Launch draft/ })).toBeNull();
-  const search = screen.getByRole("combobox", { name: "Switch agent or conversation" });
-  fireEvent.change(search, { target: { value: "launch" } });
-  expect(screen.getByRole("option", { name: /Launch draft/ })).toBeTruthy();
-  fireEvent.change(search, { target: { value: "unmatched" } });
-  expect(screen.queryByRole("option", { name: /Launch draft/ })).toBeNull();
-  expect(useMistyStore.getState().activeConversationId).toBe("draft");
-});
-
 it("keeps recent conversations beside a draft and guards opening one", () => {
   useMistyStore.setState({ conversations: [conversation("draft", "Launch draft")] });
   renderAgentsPage();
@@ -159,28 +142,6 @@ it("switches agents in place, guarding drafts and leaving the current agent unto
   expect(screen.getByRole("button", { name: "Switch agent: Research" })).toBeTruthy();
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
   expect(useMistyStore.getState().selectedAgentId).toBe("research");
-});
-
-it("finds and opens another agent's historical conversation through the switcher", async () => {
-  fixture.includeSecond = true;
-  const selectConversation = vi.fn(async (id: string) => {
-    useMistyStore.setState({ activeConversationId: id });
-  });
-  useMistyStore.setState({
-    selectConversation,
-    conversations: [
-      { ...conversation("research-chat", "Solar research", "research"), updatedAt: "2026-09-30" },
-    ],
-  });
-  renderAgentsPage();
-  fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  fireEvent.change(screen.getByRole("combobox", { name: "Switch agent or conversation" }), {
-    target: { value: "Solar" },
-  });
-  fireEvent.click(screen.getByRole("option", { name: /Solar research/ }));
-  expect(selectConversation).toHaveBeenCalledWith("research-chat");
-  expect(useMistyStore.getState().activeConversationId).toBe("research-chat");
-  expect(screen.getByRole("button", { name: "Switch agent: Research" })).toBeTruthy();
 });
 
 it("prevents switching while a response is running", () => {

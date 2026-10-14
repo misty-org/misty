@@ -26,6 +26,18 @@
   height: 18px;
 }
 
+/* Controls inside the address field are the compact 28px size, so they sit tight at its edges. */
+[data-browser-toolbar] form [data-icon-size="sm"] {
+  width: 28px;
+  height: 28px;
+}
+
+[data-browser-toolbar] form [data-icon-size="sm"] > svg:not(.absolute),
+[data-browser-toolbar] form [data-icon-size="sm"] > svg.size-4 {
+  width: 18px;
+  height: 18px;
+}
+
 /* Inside the sidebar the toolbar's buttons are the compact size so nav and tools share a row. */
 [data-browser-toolbar][data-sidebar] [data-icon-size="sm"] {
   width: 28px;

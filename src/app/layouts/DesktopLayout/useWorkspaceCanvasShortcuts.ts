@@ -5,7 +5,7 @@ import {
   canFitDockSplit,
   dockLeaves,
   findDockLeaf,
-  maxWorkspacePanels,
+  maxWorkspacePanes,
   paneBoundsFromDocument,
   paneIdInDirection,
   useWorkspaceStore,
@@ -54,7 +54,7 @@ export function useWorkspaceCanvasShortcuts(actions: {
     };
     const canSplitFocusedPane = (direction: "right" | "down") => {
       const state = useWorkspaceStore.getState();
-      if (dockLeaves(state.layout.root).length >= maxWorkspacePanels) return false;
+      if (dockLeaves(state.layout.root).length >= maxWorkspacePanes) return false;
       const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
       const bounds = paneBoundsFromDocument().find((candidate) => candidate.id === pane?.id);
       if (!pane || !bounds) return false;

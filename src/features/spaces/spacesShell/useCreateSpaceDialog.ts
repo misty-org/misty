@@ -131,7 +131,7 @@ export function useCreateSpaceDialog(options: {
     setOpen(false);
     restoreDocumentInteractivityAfterModalClose();
     resetDraft();
-    navigate(`/spaces/${encodeURIComponent(created.space.id)}/home`);
+    navigate(`/spaces/${encodeURIComponent(created.space.id)}/chat`);
     const sent = await Promise.allSettled(
       pendingInvites.map((email) => spacesApi.invite(created.space.id, email)),
     );

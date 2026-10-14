@@ -1,7 +1,6 @@
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace/core";
 
 const validSpaceSections = new Set([
-  "home",
   "social",
   "chat",
   "planner",
@@ -24,7 +23,7 @@ export function spaceLandingRoute(
     const activeTab =
       focused?.views.find((tab) => tab.id === focused.activeViewId) ?? focused?.views[0];
     if (activeTab?.route?.startsWith(`/spaces/${encodeURIComponent(spaceId)}/`)) {
-      return activeTab.route;
+      return activeTab.route.replace(/\/home(?=[?#]|$)/, "/chat");
     }
   }
 
@@ -40,5 +39,5 @@ export function spaceLandingRoute(
     }
   }
 
-  return `${base}/home`;
+  return `${base}/chat`;
 }
