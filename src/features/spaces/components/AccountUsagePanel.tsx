@@ -24,36 +24,65 @@ export type AccountUsage = {
   };
 };
 
-/** One account's AI and storage allowances across every Space; loads when it mounts. */
+/** How long a loaded reading stays current before opening the panel refreshes it. */
+const usageTtlMs = 60_000;
+
+type UsageCache = { generation: number; value?: AccountUsage; at: number; failed?: boolean };
+let cache: UsageCache | undefined;
+let inflight: { generation: number; promise: Promise<void> } | undefined;
+const subscribers = new Set<() => void>();
+const notify = () => subscribers.forEach((listener) => listener());
+
+/**
+ * Loads the allowances unless a recent reading exists. Every panel shares one reading, so
+ * reopening a menu paints instantly and fetches only once the reading is old or a Space's
+ * library changed. A refresh keeps the last values on screen until the new ones arrive.
+ */
+function loadUsage(force = false): void {
+  const generation = readApiSessionGeneration();
+  const fresh =
+    cache?.generation === generation && !cache.failed && Date.now() - cache.at < usageTtlMs;
+  if (!force && fresh) return;
+  if (inflight?.generation === generation) return;
+  const promise = apiRequest<AccountUsage>("/billing/usage", { cache: "no-store" })
+    .then((value) => {
+      if (generation === readApiSessionGeneration()) cache = { generation, value, at: Date.now() };
+    })
+    .catch(() => {
+      if (generation !== readApiSessionGeneration()) return;
+      // A failed refresh keeps the last good reading rather than replacing it with an error.
+      if (cache?.generation === generation && cache.value) cache = { ...cache, at: 0 };
+      else cache = { generation, at: Date.now(), failed: true };
+    })
+    .finally(() => {
+      if (inflight?.promise === promise) inflight = undefined;
+      notify();
+    });
+  inflight = { generation, promise };
+}
+
+/** Forgets the shared reading, so the next panel to open fetches a fresh one. */
+export function resetAccountUsageCache(): void {
+  cache = undefined;
+  inflight = undefined;
+}
+
+/** One account's AI and storage allowances across every Space; shared and cached. */
 export function AccountUsagePanel() {
   const generation = readApiSessionGeneration();
-  const [result, setResult] = useState<{
-    generation: number;
-    value?: AccountUsage;
-    failed?: boolean;
-  }>();
+  const [, rerender] = useState(0);
   useEffect(() => {
-    const controller = new AbortController();
-    const refresh = () =>
-      void apiRequest<AccountUsage>("/billing/usage", {
-        signal: controller.signal,
-        cache: "no-store",
-      })
-        .then((value) => {
-          if (!controller.signal.aborted && generation === readApiSessionGeneration())
-            setResult({ generation, value });
-        })
-        .catch(() => {
-          if (!controller.signal.aborted) setResult({ generation, failed: true });
-        });
-    refresh();
+    const update = () => rerender((count) => count + 1);
+    subscribers.add(update);
+    const refresh = () => loadUsage(true);
+    loadUsage();
     window.addEventListener("misty:space-library-event", refresh);
     return () => {
-      controller.abort();
+      subscribers.delete(update);
       window.removeEventListener("misty:space-library-event", refresh);
     };
   }, [generation]);
-  const current = result?.generation === generation ? result : undefined;
+  const current = cache?.generation === generation ? cache : undefined;
   if (current?.failed)
     return (
       <p role="status" className="text-sm text-cream-muted">
@@ -96,10 +125,10 @@ function UsageMeters({ account, loaded }: { account: AccountUsage["account"]; lo
     <div className="divide-y divide-cream/10">
       {meters.map(({ label, meter, detail }) => (
         <div key={label} className="py-3 first:pt-0 last:pb-0">
-          <div className="mb-2 flex items-baseline justify-between gap-4 text-sm">
-            <span className="font-medium">{label}</span>
+          <div className="mb-2 flex flex-nowrap items-baseline justify-between gap-4 whitespace-nowrap text-sm">
+            <span className="shrink-0 font-medium">{label}</span>
             {meter && meter.limit > 0 ? (
-              <span className="tabular-nums">
+              <span className="shrink-0 tabular-nums">
                 <span className="mr-2 text-cream-muted">{detail(meter)}</span>
                 {percent(meter.percentage_used)}
               </span>

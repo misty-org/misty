@@ -22,7 +22,8 @@
 }
 .misty-docking-titlebar-drag-region {
   position: absolute;
-  inset: 0 auto 0 0;
+  /* Stops one row short of the bottom so the pane seam shows beneath it, edge to edge. */
+  inset: 0 auto 1px 0;
   max-width: 100%;
   /* Browser views make the shell transparent. Paint this otherwise empty
      corner so the native window backing cannot show beside the traffic lights. */

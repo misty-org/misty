@@ -8,10 +8,12 @@ vi.mock("@/api/client", async (original) => ({
   apiRequest: api.request,
   readApiSessionGeneration: () => api.generation,
 }));
+import { resetAccountUsageCache } from "./AccountUsagePanel";
 import { SpaceUsagePopover } from "./SpaceUsagePopover";
 const space = { id: "space-1", name: "Team" } as Space;
 afterEach(() => {
   cleanup();
+  resetAccountUsageCache();
   api.request.mockReset();
   api.generation = 1;
 });
