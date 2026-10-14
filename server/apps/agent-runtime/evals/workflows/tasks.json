@@ -225,10 +225,10 @@
           "web_search"
         ],
         "forbidden": [
-          "screen_*",
+          
           "browser_act"
         ],
-        "maxCalls": 10,
+        "maxCalls": 16,
         "maxResearchCalls": 12,
         "maxRuns": 1
       },

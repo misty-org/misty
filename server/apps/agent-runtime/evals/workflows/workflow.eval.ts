@@ -23,6 +23,8 @@ const here = resolve(import.meta.dirname);
 const list = (value: string | undefined) => (value ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 // The cheapest current model of each provider's line.
 const models = list(process.env.MISTY_WORKFLOW_EVAL_MODELS || "anthropic/claude-haiku-5.5,openai/gpt-6-luna,google/gemini-3.5-flash-lite");
+// The run's reasoning effort; the server honors it only with MISTY_ALLOW_MODEL_OVERRIDE.
+const effort = process.env.MISTY_WORKFLOW_EVAL_EFFORT?.trim() || "low";
 const judgeModel = process.env.MISTY_WORKFLOW_EVAL_JUDGE?.trim() || "anthropic/claude-haiku-5.5";
 // One run can't tell an improvement from luck, so each task runs this many times.
 const repeat = Math.max(1, Math.min(10, Number(process.env.MISTY_WORKFLOW_EVAL_REPEAT || 3)));
@@ -33,7 +35,7 @@ const accounts = new Set(list(process.env.MISTY_WORKFLOW_EVAL_ACCOUNTS));
 // eval bridge, so device tools such as web.fetch run on it as they would for a real request.
 const deviceId = process.env.MISTY_WORKFLOW_EVAL_DEVICE?.trim() || "";
 const device = /^device_[0-9a-f-]{36}$/.test(deviceId);
-const workspaceCapabilities = ["bookmark.add", "bookmark.list", "browser.tab.list", "browser.tab.open", "web.fetch"];
+const workspaceCapabilities = ["bookmark.add", "bookmark.list", "browser.session", "browser.tab.list", "browser.tab.open", "web.fetch"];
 
 async function deviceContexts(userId: string, agentId: string): Promise<unknown[]> {
   if (!device) return [];
@@ -64,7 +66,7 @@ const selected = (task: WorkflowTask) => !only.size || only.has(task.id) || only
 /** The request each agent.entry sends today. Schedules run as the composer until the eval can claim one. */
 function request(task: WorkflowTask, model: string, agentId: string, siteBase: string, contexts: unknown[]): Record<string, unknown> {
   const base = {
-    prompt: task.prompt, model_override: model, reasoning_effort: "low", window_label: "main",
+    prompt: task.prompt, model_override: model, reasoning_effort: effort, window_label: "main",
     ...(agentId ? { agent_id: agentId } : {}), ...(contexts.length ? { device_contexts: contexts } : {}),
   };
   if (task.surface === "cursor") {
@@ -198,7 +200,7 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   const dir = join(here, "reports");
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
-  writeFileSync(file, JSON.stringify({ models, judgeModel, repeat, spentUsd: Number(budget.spent.toFixed(4)), balanceUsd: budget.balance, stopped, summary: report(runs), skipped, runs }, null, 2));
+  writeFileSync(file, JSON.stringify({ models, effort, judgeModel, repeat, spentUsd: Number(budget.spent.toFixed(4)), balanceUsd: budget.balance, stopped, summary: report(runs), skipped, runs }, null, 2));
   if (runs.length) process.stderr.write(`\n${table(runs)}\n`);
   process.stderr.write(`\nSpent $${budget.spent.toFixed(2)} (balance $${budget.balance.toFixed(2)})${stopped ? ` — stopped, ${stopped}` : ""}\nReport: ${file}\n`);
   expect(runs.length + Object.keys(skipped).length).toBeGreaterThan(0);
