@@ -105,7 +105,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const monitor = toolMonitor({ catalog, order, checkpoint: execution.checkpoint, rejected });
     // agent.tool: answer by default; browse, desktop, code and loaded families on request.
     const toolsets = agentTools(catalog);
-    const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch") };
+    const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch"), open: catalog.modelName("screen.open") };
     const tools: ToolSet = {
       ...catalogTools(catalog, async (callId, name, value) => {
         guard(callId);
@@ -246,7 +246,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       const research = researchUse(messages, researchTools);
       const closed = closedResearchTools(research, researchTools);
       if (closed.size) visibleTools = visibleTools.filter((name) => !closed.has(name));
-      const researchWarning = researchNote(research, messages);
+      const researchWarning = researchNote(research, messages, researchTools);
       if (researchWarning) messages.push({ role: "user", content: researchWarning });
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);

@@ -15,6 +15,7 @@
     "eval:browser": "vitest run --config evals/browser/vitest.config.ts",
     "eval:code": "vitest run --config evals/code/vitest.config.ts",
     "eval:workflows": "vitest run --config evals/workflows/vitest.config.ts",
+    "eval:odysseys": "vitest run --config evals/odysseys/vitest.config.ts",
     "trace": "node evals/browser/trace.ts",
     "eval:voice": "vitest run --config evals/voice/vitest.config.ts"
   },

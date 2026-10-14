@@ -24,6 +24,8 @@ export interface ResearchUse {
 export interface ResearchTools {
   search?: string;
   fetch?: string;
+  /** screen_open, when the run can open its own browser tab: the route for a page a fetch can't read. */
+  open?: string;
 }
 
 const stopWords = new Set(["the", "and", "for", "with", "what", "how", "are", "was", "who", "that", "this", "from", "about", "does", "did"]);
@@ -91,7 +93,7 @@ export function closedResearchTools(use: ResearchUse, tools: ResearchTools): Set
 const noteMarker = "Research budget";
 
 /** The note for a stage, or undefined when it is open or the transcript already carries it. */
-export function researchNote(use: ResearchUse, messages: ModelMessage[]): string | undefined {
+export function researchNote(use: ResearchUse, messages: ModelMessage[], tools: ResearchTools = {}): string | undefined {
   if (use.stage === "open") return undefined;
   const marker = `${noteMarker} (${use.stage})`;
   const said = messages.some((message) => {
@@ -102,7 +104,11 @@ export function researchNote(use: ResearchUse, messages: ModelMessage[]): string
   if (said) return undefined;
   const spent = `${use.searches} search${use.searches === 1 ? "" : "es"} and ${use.fetches} page read${use.fetches === 1 ? "" : "s"}` +
     (use.repeats ? `, ${use.repeats} of them repeats` : "");
+  // A fact a page holds behind a toggle, a click or JavaScript is found by opening the page, not by searching.
+  const browse = tools.open
+    ? ` Facts on pages a fetch could not show (behind a toggle, a click, JavaScript or a sign-in) are not found by searching: open them in your own tab with ${tools.open} and the first page's url, then go to each other page that needs it with browser_navigate. Browser tools are not counted here, so finish every page the request needs.`
+    : "";
   if (use.stage === "wrap-up")
-    return `${marker}: this run has used ${spent}. Answer now from what you have unless one specific fact is still missing. If it is, name it and make the single call that finds it; do not search again with new wording.`;
-  return `${marker}: this run has used ${spent}, so search and page reading are closed. Answer from what you found, say plainly what you could not confirm, and call agent_finish.`;
+    return `${marker}: this run has used ${spent}. Answer now from what you have unless one specific fact is still missing. If it is, name it and make the single call that finds it; do not search again with new wording.${browse}`;
+  return `${marker}: this run has used ${spent}, so search and page reading are closed. Answer from what you found${tools.open ? ` or from pages you open with ${tools.open}` : ""}, say plainly what you could not confirm, and call agent_finish.`;
 }

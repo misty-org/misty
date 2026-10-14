@@ -81,7 +81,8 @@ export class EvalClient {
 
   /** Starts one run and reads its events until it ends. */
   /** `approve` names the app actions (Composio slugs) whose approval cards the run may pass, because the task asked for them. */
-  async run(body: Record<string, unknown>, timeoutMs = 10 * 60_000, approve: string[] = []): Promise<EvalRun> {
+  /** `observe` sees every event as it arrives (the Odysseys recorder captures pages with it). */
+  async run(body: Record<string, unknown>, timeoutMs = 10 * 60_000, approve: string[] = [], observe?: (event: Record<string, unknown>) => Promise<void>): Promise<EvalRun> {
     const key = `workflow-eval-${randomUUID()}`;
     const created = await this.json<{ eventsUrl: string }>("/ai/invocations", {
       method: "POST",
@@ -108,6 +109,7 @@ export class EvalClient {
           if (!data) continue;
           const event = JSON.parse(data) as { type: string; [key: string]: unknown };
           run.events.push(event.type);
+          if (observe) await observe(event).catch(() => undefined);
           if (event.type === "response.delta") run.answer += String(event.delta ?? "");
           if (event.type === "assistant.message") run.answer = String(event.text ?? run.answer);
           // Started events carry catalog names (note.search); the model sees underscores.

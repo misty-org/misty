@@ -13,6 +13,7 @@ import { judge } from "../browser/judge.js";
 import { serveSites } from "../browser/tasks.js";
 import { Budget } from "./budget.js";
 import { EvalClient } from "./client.js";
+import { device, deviceContexts } from "./device.js";
 import { composioFor } from "./composio.js";
 import { StateReader } from "./state.js";
 import { expectPassed, passed, report, routing, table, type WorkflowRun } from "./score.js";
@@ -30,35 +31,6 @@ const judgeModel = process.env.MISTY_WORKFLOW_EVAL_JUDGE?.trim() || "anthropic/c
 const repeat = Math.max(1, Math.min(10, Number(process.env.MISTY_WORKFLOW_EVAL_REPEAT || 3)));
 const only = new Set(list(process.env.MISTY_WORKFLOW_EVAL_TASKS));
 const accounts = new Set(list(process.env.MISTY_WORKFLOW_EVAL_ACCOUNTS));
-// The person's own computer, by its agent-device id (trusted_devices.id): runs carry the
-// workspace context a chat sent from it carries, signed by it through the debug build's
-// eval bridge, so device tools such as web.fetch run on it as they would for a real request.
-const deviceId = process.env.MISTY_WORKFLOW_EVAL_DEVICE?.trim() || "";
-const device = /^device_[0-9a-f-]{36}$/.test(deviceId);
-const workspaceCapabilities = ["bookmark.add", "bookmark.list", "browser.session", "browser.tab.list", "browser.tab.open", "web.fetch"];
-
-async function deviceContexts(userId: string, agentId: string): Promise<unknown[]> {
-  if (!device) return [];
-  const bridge = process.env.MISTY_BROWSER_EVAL_BRIDGE?.replace(/\/$/, "");
-  const token = process.env.MISTY_BROWSER_EVAL_BRIDGE_TOKEN;
-  if (!bridge || !token) throw new Error("A device needs the desktop's eval bridge: set MISTY_BROWSER_EVAL_BRIDGE and its token.");
-  const scope = `workspace:${deviceId}`;
-  const response = await fetch(`${bridge}/run-grants`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      // The API base the desktop signed in with (its session is kept per origin), which
-      // can differ from the address this runner uses for the same server.
-      apiBase: process.env.MISTY_WORKFLOW_EVAL_DEVICE_API_BASE || `${process.env.MISTY_ACCEPTANCE_API ?? "http://127.0.0.1:8081"}/v1`, accountId: userId,
-      grants: [{ targetDeviceId: deviceId, agentId, capabilities: workspaceCapabilities, scopes: [scope] }],
-    }),
-  });
-  const signed = (await response.json()) as { ok: boolean; result?: unknown[]; error?: string };
-  if (!signed.ok || !signed.result?.[0]) throw new Error(`run grant: ${signed.error ?? response.status}`);
-  return [{ device_id: deviceId, kind: "workspace", opaque_ref: scope, display_name: "Misty browser",
-    capabilities: workspaceCapabilities, metadata: { source: "desktop" }, run_grant: signed.result[0] }];
-}
-
 const enabled = process.env.MISTY_WORKFLOW_EVAL === "1";
 
 const selected = (task: WorkflowTask) => !only.size || only.has(task.id) || only.has(task.category) || only.has(task.source);

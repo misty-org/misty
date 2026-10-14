@@ -141,11 +141,23 @@ pub async fn browser_agent_execute(
                 .get("url")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "A URL is required.".to_owned())?;
-            app.get_webview(&webview_label(&id)?)
-                .ok_or_else(|| "Browser tab is not running.".to_owned())?
-                .navigate(external_url(url)?)
-                .map_err(|error| error.to_string())?;
-            Ok(json!({"ok": true, "url": url}))
+            let view = app
+                .get_webview(&webview_label(&id)?)
+                .ok_or_else(|| "Browser tab is not running.".to_owned())?;
+            let previous = view.url().map_err(|error| error.to_string())?;
+            let target = external_url(url)?;
+            view.navigate(target.clone()).map_err(|error| error.to_string())?;
+            let mut landed = json!({"ok": true, "url": url});
+            // The page it lands on, read once it has loaded, unless the caller only navigates.
+            if request.input["includeSnapshot"] != false {
+                if let Some(snapshot) = page_agent::landed(&app, &id, &previous, &target).await {
+                    if snapshot["url"].is_string() {
+                        landed["url"] = snapshot["url"].clone();
+                    }
+                    landed["snapshot"] = snapshot;
+                }
+            }
+            Ok(landed)
         }
         "browser.click" => click_browser(&app, &state, &id, &agent_id, &request).await,
         "browser.type" => {

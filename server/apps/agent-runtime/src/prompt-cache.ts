@@ -9,7 +9,7 @@ import type { ModelMessage, ToolResultPart } from "ai";
 // batches: each drop rewrites earlier messages and costs one uncached turn.
 
 /** Page tools whose results carry a snapshot tree. */
-const snapshotTools = new Set(["browser_snapshot", "browser_steps", "browser_fill_form"]);
+const snapshotTools = new Set(["browser_snapshot", "browser_steps", "browser_fill_form", "browser_navigate"]);
 /** The newest snapshots stay; the model acts on them. */
 const KEEP_SNAPSHOTS = 2;
 /** Stale snapshot text that triggers one batched drop. */
