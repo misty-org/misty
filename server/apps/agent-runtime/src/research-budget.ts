@@ -53,8 +53,26 @@ export function pageKey(url: string): string {
   }
 }
 
-function stageFor(cost: number): ResearchStage {
-  return cost >= researchLimits.close ? "closed" : cost >= researchLimits.wrapUp ? "wrap-up" : "open";
+function stageFor(cost: number, scale = 1): ResearchStage {
+  return cost >= researchLimits.close * scale ? "closed" : cost >= researchLimits.wrapUp * scale ? "wrap-up" : "open";
+}
+
+/**
+ * A long request earns a longer budget: one base allowance for every two steps of the
+ * run's own checklist (log_work_checklist), never less than one. A quick question has no
+ * checklist and keeps the base budget (docs/plans/odysseys-campaign.md).
+ */
+export function budgetScale(messages: ModelMessage[]): number {
+  const steps = new Set<string>();
+  for (const message of messages) {
+    if (message.role !== "assistant" || typeof message.content === "string") continue;
+    for (const part of message.content) {
+      if (part.type !== "tool-call" || part.toolName !== "log_work_checklist") continue;
+      const items = ((part.input ?? {}) as { items?: Array<{ id?: unknown }> }).items ?? [];
+      for (const item of items) if (typeof item?.id === "string") steps.add(item.id);
+    }
+  }
+  return Math.max(1, Math.ceil(steps.size / 2));
 }
 
 /** What the run has spent on research so far, read from its tool calls. */
@@ -81,7 +99,7 @@ export function researchUse(messages: ModelMessage[], tools: ResearchTools): Res
     }
   }
   const cost = use.searches + use.fetches + use.repeats;
-  return { ...use, cost, stage: stageFor(cost) };
+  return { ...use, cost, stage: stageFor(cost, budgetScale(messages)) };
 }
 
 /** The tools to hide: both research tools once the budget is closed. */

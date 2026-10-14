@@ -21,6 +21,8 @@ import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
+import { earlyGiveUp } from "../src/persistence-check.js";
+import { deadlineNote } from "../src/turn-deadline.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
@@ -89,6 +91,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   };
   let finishRefused = false;
   let citationRefused = false;
+  let persistenceRefused = false;
   // Recomputed from the transcript before every model call.
   let visibleTools: string[] = [];
   let modelTurn = 0;
@@ -128,7 +131,15 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
             }
           }
-          if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
+          // Refused once when it gives up early with room left (src/persistence-check.ts).
+        if (!persistenceRefused) {
+          const unfinished = earlyGiveUp(report, modelTurn, limit);
+          if (unfinished) {
+            persistenceRefused = true;
+            return { status: "failure", tool_error: { message: unfinished } };
+          }
+        }
+        if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
           const refusal = unbackedCompletion(report, messages, catalog.readOnly);
           if (refusal) {
             finishRefused = true;
@@ -248,6 +259,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       if (closed.size) visibleTools = visibleTools.filter((name) => !closed.has(name));
       const researchWarning = researchNote(research, messages, researchTools);
       if (researchWarning) messages.push({ role: "user", content: researchWarning });
+      // The deliverable deadline (src/turn-deadline.ts): near the turn limit the run writes its
+      // answer from what it found instead of ending with nothing.
+      const deadline = deadlineNote(modelTurn, limit, messages);
+      if (deadline) messages.push({ role: "user", content: deadline });
+      if (modelTurn >= limit - 1) visibleTools = visibleTools.filter((name) => name === taskCompletionTool);
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
       // Admission (billing's hold for this turn) happens before the model call and

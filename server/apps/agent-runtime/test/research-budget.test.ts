@@ -59,4 +59,11 @@ describe("research budget", () => {
     expect(researchNote(use, [], tools)).toContain("open them in your own tab with screen_open");
     expect(researchNote(use, [], { search: "web_search", fetch: "web_fetch" })).not.toContain("screen_open");
   });
+  it("gives a long, planned request a longer budget", () => {
+    const tools = { search: "web_search", fetch: "web_fetch" };
+    const searches = Array.from({ length: 8 }, (_, index) => ({ role: "assistant" as const, content: [{ type: "tool-call" as const, toolCallId: `s${index}`, toolName: "web_search", input: { query: ["notion pricing", "linear plans", "airtable cost", "depop seller", "hulu shows", "memory alpha", "ponies cast", "old navy joggers"][index] } }] }));
+    expect(researchUse(searches, tools).stage).toBe("wrap-up");
+    const plan = { role: "assistant" as const, content: [{ type: "tool-call" as const, toolCallId: "plan", toolName: "log_work_checklist", input: { items: ["a", "b", "c", "d", "e", "f"].map((id) => ({ id, title: id, status: "pending" })) } }] };
+    expect(researchUse([plan, ...searches], tools).stage).toBe("open");
+  });
 });
