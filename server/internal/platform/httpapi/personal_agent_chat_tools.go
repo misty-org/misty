@@ -31,6 +31,8 @@ type spaceConversationToolActor struct {
 	memorySpaceID string
 	// memorySearch ranks memory by meaning; nil lists by recency instead.
 	memorySearch memorySearchFunc
+	// service runs the browser tools with the server's model client (browser.extract).
+	service *SpacesService
 }
 
 func executeSpaceConversationTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, originalPrompt string, tool serveragent.ToolRequest) (json.RawMessage, error) {

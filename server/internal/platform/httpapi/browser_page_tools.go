@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -209,9 +210,15 @@ func (s *SpacesService) browsingModelRoute(ctx context.Context, user, run, fallb
 
 // browserExtract runs the extraction model over page text the device read.
 // The call is billed on the run's browsing route and spends no agent turn.
-func (s *SpacesService) browserExtract(ctx context.Context, invocation agenttools.Invocation, jobID string, arguments, page json.RawMessage) (json.RawMessage, error) {
-	instruction, schema, err := validBrowserExtractRequest(arguments)
-	if err != nil {
+func (s *SpacesService) browserExtract(ctx context.Context, invocation agenttools.Invocation, jobID string, arguments, page json.RawMessage) (out json.RawMessage, err error) {
+	// The model sees a generic failure; the reason belongs in the server log.
+	defer func() {
+		if err != nil {
+			log.Printf("browser.extract failed for run %s: %v", invocation.RunID, err)
+		}
+	}()
+	instruction, schema, validErr := validBrowserExtractRequest(arguments)
+	if err = validErr; err != nil {
 		return nil, err
 	}
 	var source struct {

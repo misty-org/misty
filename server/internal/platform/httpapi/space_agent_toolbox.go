@@ -28,6 +28,9 @@ type agentToolboxOptions struct {
 	accountLevel        bool
 	browserTabs         []string
 	browserCapabilities map[string]bool
+	// browser runs browser tools; it carries the model client browser.extract needs.
+	// Without it the tools still run, but extraction reports no model.
+	browser *SpacesService
 	// delegation registers agent.background for runs that may start a worker.
 	delegation agenttools.Handler
 	// memberRequest builds the toolbox for work someone else asked of an agent:
@@ -102,8 +105,11 @@ func buildAgentToolbox(database *db.Database, options agentToolboxOptions) *agen
 		registrations = append(registrations, agenttools.Registration{Descriptor: agentDelegationToolDescriptor(), Handler: options.delegation})
 	}
 	if len(options.browserTabs) > 0 {
+		service := options.browser
+		if service == nil {
+			service = &SpacesService{database: database}
+		}
 		browserHandler := func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
-			service := &SpacesService{database: database}
 			return service.executeBrowserAgentToolInvocation(ctx, invocation, request)
 		}
 		for _, descriptor := range browserToolDescriptors() {

@@ -241,6 +241,15 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 	metadata["window_label"] = body.WindowLabel
 	tab.Metadata, _ = json.Marshal(metadata)
 	if _, err := s.database.AttachRunningAIInvocationContext(ctx, record.UserID, record.ID, tab.DeviceID, tab.Kind, tab.OpaqueRef, tab.DisplayName, tab.Capabilities, tab.Metadata, runGrantRecord(tab.RunGrant)); err != nil {
+		// Calls made together (one per site) share the device's one session tab: the
+		// first attaches it and the others find it attached.
+		if attached, readErr := s.database.AIInvocationContexts(ctx, record.UserID, record.ID); readErr == nil {
+			for _, item := range attached {
+				if item.OpaqueRef == tab.OpaqueRef {
+					return sessionOpened(tab.OpaqueRef, name, url, true)
+				}
+			}
+		}
 		return nil, err
 	}
 	return sessionOpened(tab.OpaqueRef, name, url, false)
@@ -253,8 +262,8 @@ func sessionOpened(scopeID, name, url string, reused bool) (json.RawMessage, err
 		opened = "Your own browser tab on " + name + " is already open"
 	}
 	next := "Read it with browser_snapshot"
-	if url == "" {
-		next = "Go to a page with browser_navigate, then read it with browser_snapshot"
+	if url == "" || reused {
+		next = "It is one tab: visit pages one after another with browser_navigate, which returns each page's snapshot"
 	}
 	return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "catalog_changed": true,
 		"message": opened + " (scopeId " + scopeID + "). Browser tools act on it from your next step. " + next + ", and keep working in this run."})

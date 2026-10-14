@@ -14,7 +14,7 @@ import (
 // tools, attached browser tools and the agent's connected tools. The runtime
 // context, the MCP server and every tool call use this same resolution.
 func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIInvocationRecord, agentID, prompt string, collaboration collaborationState) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
-	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID, memorySearch: s.searchMemory}
+	actor := spaceConversationToolActor{userID: record.UserID, agentID: agentID, runID: record.ID, sessionID: record.ConversationID, memorySearch: s.searchMemory, service: s}
 	connected := append(s.aiInvocationConnectedTools(ctx, record), s.deviceToolRegistrations(ctx, record)...)
 	connected = append(connected, s.collaborationToolRegistrations(record, collaboration)...)
 	var body aiInvocationInput
@@ -43,7 +43,7 @@ func (s *SpacesService) aiInvocationConnectedTools(ctx context.Context, record *
 func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database, actor spaceConversationToolActor, prompt string, connected ...agenttools.Registration) (*agenttools.Registry, agenttools.Invocation, serveragent.ToolManifest, error) {
 	browserTabs, browserCapabilities := aiInvocationBrowserGrants(ctx, database, actor.userID, actor.runID)
 	options := agentToolboxOptions{
-		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
+		accountLevel: actor.spaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities, browser: actor.service,
 		extra: append(connected, agentMemberToolRegistrations(database)...), memorySearch: actor.memorySearch,
 		// A chat run is always its asker's own.
 		run: ownRun(actor.userID),

@@ -78,7 +78,7 @@ func (s *SpacesService) resolvePersonalAgentRuntimeToolbox(ctx context.Context, 
 	connected = append(connected, agentMemberToolRegistrations(s.database)...)
 	connected = append(connected, s.accountAdminToolRegistrations()...)
 	toolbox := buildAgentToolbox(s.database, agentToolboxOptions{
-		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities,
+		accountLevel: run.SpaceID == "", browserTabs: browserTabs, browserCapabilities: browserCapabilities, browser: s,
 		delegation: delegationHandler, extra: connected, memorySearch: s.searchMemory,
 		run: ownRun(run.OwnerUserID),
 	})
