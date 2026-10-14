@@ -28,6 +28,8 @@ export interface Installation {
   enabled: boolean;
   privateAccess: boolean;
   agentAccess: boolean;
+  /** Shown as its own button in the browser toolbar, as Chrome's pin does. */
+  pinned?: boolean;
   permissions: string[];
   hosts: string[];
 }

@@ -38,7 +38,7 @@ export function FavoritesStrip(props: { vertical: boolean; onOpen(view: Workspac
   const activeBookmark = useWorkspaceStore((state) =>
     bookmarkOf(activeLayoutView(state.layout) ?? undefined),
   );
-  if (!favorites.length) return null;
+  if (!favorites.length && !props.vertical) return null;
   const open = (favorite: Bookmark, newTab = false) => {
     const state = useWorkspaceStore.getState();
     const existing = newTab ? undefined : openFavoriteTab(favorite.id);
@@ -54,6 +54,7 @@ export function FavoritesStrip(props: { vertical: boolean; onOpen(view: Workspac
       role="toolbar"
       aria-label="Favorites"
       data-misty-window-drag-block="true"
+      data-empty={favorites.length === 0 || undefined}
       className={cn(
         "misty-workspace-favorites",
         props.vertical && "misty-workspace-favorites-grid",

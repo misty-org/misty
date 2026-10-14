@@ -3,6 +3,13 @@ import { parseBrowserViewState } from "@/features/workspace/model";
 import { invoke } from "@tauri-apps/api/core";
 import { browserProfileFor } from "./browserProfileResolver";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
+import {
+  cancelDeferredHide,
+  completeHandoff,
+  deferHideUntilHandoff,
+  hasPendingHandoff,
+  markBrowserPerf,
+} from "./browserSwitchHandoff";
 import type { BrowserBounds, BrowserTheme } from "./types";
 export { useBrowserRuntimeStore } from "./browserRuntimeStore";
 export type {
@@ -275,6 +282,8 @@ export function syncBrowserWebview(input: BrowserSyncInput): Promise<void> {
   const id = registerBrowserRuntime(input.tab);
   browserParkGeneration += 1;
   desiredVisibleRuntimeIds.add(id);
+  cancelDeferredHide(id);
+  markBrowserPerf(id, "sync requested");
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   const existingState = browserSyncStates.get(id);
   if (
@@ -331,6 +340,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
   if (profileId) input = { ...input, profileId };
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
   if (!createdRuntimeIds.has(id)) {
+    markBrowserPerf(id, "create start");
     await invoke("browser_webview_create", {
       request: {
         id,
@@ -348,6 +358,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
       },
     });
     createdRuntimeIds.add(id);
+    markBrowserPerf(id, "create done");
     // A new webview's own history holds only the page it opened with.
     useBrowserRuntimeStore.getState().resetNativeHistory(input.tab.id);
   }
@@ -384,6 +395,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     if (!exists) throw new Error("Browser webview could not be attached.");
   }
   lastBounds.set(id, boundsKey);
+  markBrowserPerf(id, "reconciled");
   // The Browser surface can unmount while native creation or reconciliation
   // is still in flight. Honor the latest desired visibility before exposing
   // the child, otherwise that late completion can cover Home or another tool.
@@ -393,6 +405,18 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     return;
   }
   visibleRuntimeIds.add(id);
+  // A new page can exist yet still be parked until its first paint. The page
+  // it replaces must stay up until it is really on screen.
+  const held = hasPendingHandoff()
+    ? await invoke<boolean>("browser_webview_held", { request: { id } }).catch(() => false)
+    : false;
+  markBrowserPerf(id, held ? "held for first paint" : "presented");
+  if (!held) completeHandoff(id);
+}
+
+/** Whether a native page already exists for this tab, so showing it is only a reconcile. */
+export function isBrowserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
+  return createdRuntimeIds.has(registerBrowserRuntime(tab));
 }
 
 export function browserContentHash(value: string): string {
@@ -555,9 +579,9 @@ export async function browserOverlayReady(): Promise<void> {
 }
 
 /**
- * `graceMs` keeps the page on screen briefly when another browser tab is about
- * to take its place, so a switch never shows an empty frame between them. The
- * new page is presented on top; the old one is parked once that has settled.
+ * A positive `graceMs` keeps the page on screen while another browser tab is
+ * about to take its place, so a switch never shows an empty frame between
+ * them. The old page leaves as soon as the new one is presented.
  */
 export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
   const id = registerBrowserRuntime(tab);
@@ -565,17 +589,21 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise
   visibleRuntimeIds.delete(id);
   releaseDeferredNavigation(id);
   if (graceMs > 0) {
+    // The old page stays until the next one is presented; the fallback in
+    // browserSwitchHandoff covers a page that never arrives.
+    markBrowserPerf(id, "old page waiting to hand off", true);
     return new Promise<void>((resolve) => {
-      window.setTimeout(() => {
+      deferHideUntilHandoff(id, () => {
         // The tab was shown again, or its runtime closed, while waiting.
         if (desiredVisibleRuntimeIds.has(id)) return resolve();
         void enqueue(id, async () => {
           if (desiredVisibleRuntimeIds.has(id)) return;
           await invoke("browser_webview_hide", { request: { id } }).catch(() => undefined);
         }).then(resolve);
-      }, graceMs);
+      });
     });
   }
+  cancelDeferredHide(id);
   // Always enqueue the hide. A create/reconcile operation may still be in
   // flight even when the frontend has not marked this runtime visible yet.
   // The native command safely no-ops when no child exists.
@@ -601,6 +629,7 @@ export async function closeBrowserRuntime(
 ): Promise<void> {
   const id = registerBrowserRuntime(tab);
   desiredVisibleRuntimeIds.delete(id);
+  cancelDeferredHide(id);
   closedRuntimes.set(id, isClosed);
   const grants = useBrowserRuntimeStore.getState().grants[tab.id] ?? [];
   await Promise.allSettled(
@@ -639,38 +668,6 @@ export async function closeBrowserRuntime(
       useBrowserRuntimeStore.getState().removeTab(tab.id);
     }
   });
-}
-
-/** Native pages that exist now, with the workspace tab each belongs to. */
-export function liveBrowserRuntimes(): { id: string; tabId: string; visible: boolean }[] {
-  return [...createdRuntimeIds].map((id) => ({
-    id,
-    tabId: runtimeTabIds.get(id) ?? "",
-    visible: visibleRuntimeIds.has(id) || desiredVisibleRuntimeIds.has(id),
-  }));
-}
-
-/**
- * Puts a hidden page to sleep: its native view is closed to free memory while
- * the tab stays. Showing the tab creates the page again at its current address.
- * Resolves false when the page was shown, closed or recreated meanwhile.
- */
-export function sleepBrowserRuntime(id: string): Promise<boolean> {
-  let slept = false;
-  return enqueue(id, async () => {
-    if (
-      !createdRuntimeIds.has(id) ||
-      visibleRuntimeIds.has(id) ||
-      desiredVisibleRuntimeIds.has(id) ||
-      closedRuntimes.has(id)
-    )
-      return;
-    await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
-    createdRuntimeIds.delete(id);
-    lastBounds.delete(id);
-    deferredNavigations.delete(id);
-    slept = true;
-  }).then(() => slept);
 }
 
 export async function parkAllBrowserWebviews(): Promise<void> {

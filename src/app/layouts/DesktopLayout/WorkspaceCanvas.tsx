@@ -1,31 +1,35 @@
+import { BrowserChromeSlotContext, WindowMenuSlotContext } from "@/features/browser/workspace";
+import { useWorkspaceWindowMenu } from "./WorkspaceWindowMenu";
+import { registerWindowColorAnchor } from "./windowColorRequest";
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
+import { PaneSwapMode } from "./PaneSwapMode";
+import { WindowColorPopover } from "./WindowColorPopover";
+import { requestNewWindow } from "./windowColorRequest";
 import { routes } from "@/features/app-shell";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
   canCloseWorkspaceView,
-  canCloseWorkspaceWindow,
-  canFitDockSplit,
   dockLeaves,
   findDockLeaf,
-  maxWorkspacePanels,
-  paneBoundsFromDocument,
-  paneIdInDirection,
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/workspace";
 import { allLayoutViews, layoutTabs } from "@/features/workspace/layoutTabs";
 import type { DockSplitDirection } from "@/features/workspace/model";
 import { mapAllWorkspaceWindowLayouts } from "@/features/workspace/windows";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { minimumForWorkspaceViews, WorkspaceDockTree } from "./WorkspaceDockTree";
+import { WorkspaceDockTree } from "./WorkspaceDockTree";
+import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 import { closePeek, usePeekStore } from "@/features/workspace/peek";
 import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import type { WorkspaceTab } from "@/features/workspace/model";
 import { useWindowTransition } from "./useWindowTransition";
+import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
 export function WorkspaceCanvas(props: {
@@ -34,6 +38,9 @@ export function WorkspaceCanvas(props: {
   windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
+  stripShortcuts?: ReactNode;
+  /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
+  browserChrome?: { spaces: ReactNode; profile: ReactNode; accountItems: ReactNode };
 }) {
   const legacyNames = useNavigationNames((state) => state.names);
   const legacyNamesReady = useNavigationNames((state) => state.ready);
@@ -123,15 +130,18 @@ export function WorkspaceCanvas(props: {
     [navigateToActiveLayoutTab],
   );
 
-  const createWorkspaceVirtualWindow = useCallback(() => {
-    useWorkspaceStore.getState().createWindow();
-    window.setTimeout(navigateToActiveLayoutTab, 0);
-  }, [navigateToActiveLayoutTab]);
+  const createWorkspaceVirtualWindow = useCallback(
+    () => requestNewWindow(() => window.setTimeout(navigateToActiveLayoutTab, 0)),
+    [navigateToActiveLayoutTab],
+  );
 
-  const reopenWorkspaceVirtualWindow = useCallback(() => {
-    if (useWorkspaceStore.getState().reopenClosedWindow())
-      window.setTimeout(navigateToActiveLayoutTab, 0);
-  }, [navigateToActiveLayoutTab]);
+  const reopenWorkspaceVirtualWindow = useCallback(
+    (windowId?: string) => {
+      if (useWorkspaceStore.getState().reopenClosedWindow(windowId))
+        window.setTimeout(navigateToActiveLayoutTab, 0);
+    },
+    [navigateToActiveLayoutTab],
+  );
 
   const closeWorkspaceVirtualWindow = useCallback(
     (windowId: string) => {
@@ -235,162 +245,15 @@ export function WorkspaceCanvas(props: {
     return () => unregister.forEach((remove) => remove());
   }, [openSelectedTab]);
 
-  useEffect(() => {
-    const paneInDirection = (direction: "left" | "right" | "up" | "down") => {
-      const state = useWorkspaceStore.getState();
-      return paneIdInDirection(state.layout.focusedPaneId, direction, paneBoundsFromDocument());
-    };
-    const focusPane = (direction: "left" | "right" | "up" | "down") => {
-      const state = useWorkspaceStore.getState();
-      const paneId = paneInDirection(direction);
-      const pane = paneId ? findDockLeaf(state.layout.root, paneId) : null;
-      const tab =
-        pane?.views.find((candidate) => candidate.id === pane.activeViewId) ?? pane?.views[0];
-      if (tab) openTab(tab);
-      else if (pane) state.focusPane(pane.id);
-    };
-    const canSplitFocusedPane = (direction: "right" | "down") => {
-      const state = useWorkspaceStore.getState();
-      if (dockLeaves(state.layout.root).length >= maxWorkspacePanels) return false;
-      const pane = findDockLeaf(state.layout.root, state.layout.focusedPaneId);
-      const bounds = paneBoundsFromDocument().find((candidate) => candidate.id === pane?.id);
-      if (!pane || !bounds) return false;
-      return canFitDockSplit(bounds, direction, minimumForWorkspaceViews(pane.views), {
-        width: 360,
-        height: 240,
-      });
-    };
-    const unregister = [
-      registerShortcutHandler(
-        "workspace.focus_pane_left",
-        () => focusPane("left"),
-        () => Boolean(paneInDirection("left")),
-      ),
-      registerShortcutHandler(
-        "workspace.focus_pane_up",
-        () => focusPane("up"),
-        () => Boolean(paneInDirection("up")),
-      ),
-      registerShortcutHandler(
-        "workspace.focus_pane_right",
-        () => focusPane("right"),
-        () => Boolean(paneInDirection("right")),
-      ),
-      registerShortcutHandler(
-        "workspace.focus_pane_down",
-        () => focusPane("down"),
-        () => Boolean(paneInDirection("down")),
-      ),
-      registerShortcutHandler(
-        "workspace.split_right",
-        () => {
-          const state = useWorkspaceStore.getState();
-          splitWorkspacePane(state.layout.focusedPaneId, "right");
-        },
-        () => canSplitFocusedPane("right"),
-      ),
-      registerShortcutHandler(
-        "workspace.split_down",
-        () => {
-          const state = useWorkspaceStore.getState();
-          splitWorkspacePane(state.layout.focusedPaneId, "down");
-        },
-        () => canSplitFocusedPane("down"),
-      ),
-      registerShortcutHandler(
-        "workspace.close_pane",
-        () => {
-          const state = useWorkspaceStore.getState();
-          state.closePane(state.layout.focusedPaneId);
-        },
-        () => dockLeaves(useWorkspaceStore.getState().layout.root).length > 1,
-      ),
-    ];
-    return () => unregister.forEach((remove) => remove());
-  }, [openTab, splitWorkspacePane]);
-
-  useEffect(() => {
-    const hasMultipleVirtualWindows = () => {
-      const state = useWorkspaceStore.getState();
-      return (state.windowsByScope[state.activeScopeKey]?.length ?? 0) > 1;
-    };
-    const cycleWindow = (direction: 1 | -1) => {
-      const state = useWorkspaceStore.getState();
-      const windows = state.windowsByScope[state.activeScopeKey] ?? [];
-      if (windows.length < 2) return;
-      const index = Math.max(
-        0,
-        windows.findIndex((window) => window.id === state.activeWindowId),
-      );
-      selectVirtualWindow(windows[(index + direction + windows.length) % windows.length].id);
-    };
-    const unregister = [
-      registerShortcutHandler("workspace.new_virtual_window", () => {
-        createWorkspaceVirtualWindow();
-      }),
-      registerShortcutHandler(
-        "workspace.close_virtual_window",
-        () => closeWorkspaceVirtualWindow(useWorkspaceStore.getState().activeWindowId),
-        () => {
-          const state = useWorkspaceStore.getState();
-          const windows = state.windowsByScope[state.activeScopeKey] ?? [];
-          const active = windows.find(
-            (workspaceWindow) => workspaceWindow.id === state.activeWindowId,
-          );
-          return Boolean(active && windows.length > 1 && canCloseWorkspaceWindow(active, windows));
-        },
-      ),
-      registerShortcutHandler(
-        "workspace.next_virtual_window",
-        () => cycleWindow(1),
-        hasMultipleVirtualWindows,
-      ),
-      registerShortcutHandler(
-        "workspace.previous_virtual_window",
-        () => cycleWindow(-1),
-        hasMultipleVirtualWindows,
-      ),
-      registerShortcutHandler(
-        "workspace.reopen_virtual_window",
-        reopenWorkspaceVirtualWindow,
-        () => {
-          const state = useWorkspaceStore.getState();
-          return Boolean(state.closedWindowsByScope[state.activeScopeKey]?.length);
-        },
-      ),
-      registerShortcutHandler("workspace.swap_panel_next", () => {
-        const state = useWorkspaceStore.getState();
-        const panes = dockLeaves(state.layout.root);
-        if (panes.length < 2) return;
-        const index = Math.max(
-          0,
-          panes.findIndex((pane) => pane.id === state.layout.focusedPaneId),
-        );
-        state.swapPanes(panes[index].id, panes[(index + 1) % panes.length].id);
-      }),
-      ...Array.from({ length: 9 }, (_, index) =>
-        registerShortcutHandler(
-          `workspace.window_${index + 1}`,
-          () => {
-            const state = useWorkspaceStore.getState();
-            const workspaceWindow = state.windowsByScope[state.activeScopeKey]?.[index];
-            if (workspaceWindow) selectVirtualWindow(workspaceWindow.id);
-          },
-          () => {
-            const state = useWorkspaceStore.getState();
-            return Boolean(state.windowsByScope[state.activeScopeKey]?.[index]);
-          },
-        ),
-      ),
-    ];
-    return () => unregister.forEach((remove) => remove());
-  }, [
+  useWorkspaceCanvasShortcuts({
     closeWorkspaceVirtualWindow,
     createWorkspaceVirtualWindow,
     navigateToActiveLayoutTab,
+    openTab,
     reopenWorkspaceVirtualWindow,
     selectVirtualWindow,
-  ]);
+    splitWorkspacePane,
+  });
 
   useEffect(() => {
     const focusRequestedTab = (event: Event) => {
@@ -444,54 +307,112 @@ export function WorkspaceCanvas(props: {
     !props.titlebarInsets &&
     (props.tabPosition ?? "top") === "top";
 
+  const windowMenu = useWorkspaceWindowMenu({
+    windows: virtualWindows,
+    activeWindowId: activeVirtualWindowId,
+    canReopen: canReopenVirtualWindow,
+    onSelect: selectVirtualWindow,
+    onCreate: createWorkspaceVirtualWindow,
+    onClose: closeWorkspaceVirtualWindow,
+    onReopen: reopenWorkspaceVirtualWindow,
+  });
+  const windowMenuSlot = {
+    items: windowMenu.items,
+    dialog: windowMenu.dialog,
+    registerAnchor: registerWindowColorAnchor,
+  };
+
   return (
-    <div
-      ref={windowTransitionRef}
-      className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-border ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
-      data-workspace-panes={leaves.length}
-      data-workspace-scope={activeScopeKey}
-      data-virtual-window={activeVirtualWindowId}
-    >
-      {!standaloneAgents && !props.hideTabStrip && (
-        <WorkspaceTabStrip
-          position={props.tabPosition}
-          titlebarInsets={props.titlebarInsets}
-          windowsTitlebarControls={props.windowsTitlebarControls}
-          focusedPaneId={layout.focusedPaneId}
-          lastUsedViewByGroup={lastUsedTabByGroup}
-          onOpen={openTab}
-          onClose={closeWorkspaceTab}
-          onNewTab={() => openTab(useWorkspaceStore.getState().newTab())}
-          onCloseLayoutTab={(id) => {
-            const state = useWorkspaceStore.getState();
-            if (state.resetPinnedTab(id)) return;
-            if (state.closeTab(id)) navigateToActiveLayoutTab();
-          }}
-          onMoveView={moveTab}
-          onDockView={dockTab}
-          onSplitPane={splitWorkspacePane}
-          onClosePane={(paneId) => {
-            closePane(paneId);
-            navigateToActiveLayoutTab();
-          }}
-          windows={virtualWindows}
-          activeWindowId={activeVirtualWindowId}
-          canReopenWindow={canReopenVirtualWindow}
-          onSelectWindow={selectVirtualWindow}
-          onCreateWindow={createWorkspaceVirtualWindow}
-          onCloseWindow={closeWorkspaceVirtualWindow}
-          onReopenWindow={reopenWorkspaceVirtualWindow}
-          onResizeSplit={updateSplitRatio}
-        />
-      )}
-      <WorkspaceTabPanels
-        layout={layout}
-        renderTree={dockTree}
-        onClosePeek={() => {
-          if (closePeek()) navigateToActiveLayoutTab();
-        }}
-      />
-      {pinBlockedNotice}
-    </div>
+    <BrowserChromeSlotContext.Provider value={props.browserChrome ?? null}>
+      <WindowMenuSlotContext.Provider value={windowMenuSlot}>
+        <div
+          ref={windowTransitionRef}
+          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-border ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
+          data-workspace-panes={leaves.length}
+          data-workspace-scope={activeScopeKey}
+          data-virtual-window={activeVirtualWindowId}
+        >
+          {!standaloneAgents &&
+            !props.hideTabStrip &&
+            (isSideDock(props.tabPosition ?? "top") ? (
+              <SidebarDrawer side={props.tabPosition === "right" ? "right" : "left"}>
+                <WorkspaceTabStrip
+                  position={props.tabPosition}
+                  titlebarInsets={props.titlebarInsets}
+                  windowsTitlebarControls={props.windowsTitlebarControls}
+                  focusedPaneId={layout.focusedPaneId}
+                  lastUsedViewByGroup={lastUsedTabByGroup}
+                  onOpen={openTab}
+                  onClose={closeWorkspaceTab}
+                  onNewTab={() => useBrowserSearchStore.getState().show()}
+                  onCloseLayoutTab={(id) => {
+                    const state = useWorkspaceStore.getState();
+                    if (state.resetPinnedTab(id)) return;
+                    if (state.closeTab(id)) navigateToActiveLayoutTab();
+                  }}
+                  onMoveView={moveTab}
+                  onDockView={dockTab}
+                  onSplitPane={splitWorkspacePane}
+                  onClosePane={(paneId) => {
+                    closePane(paneId);
+                    navigateToActiveLayoutTab();
+                  }}
+                  windows={virtualWindows}
+                  activeWindowId={activeVirtualWindowId}
+                  canReopenWindow={canReopenVirtualWindow}
+                  onSelectWindow={selectVirtualWindow}
+                  onCreateWindow={createWorkspaceVirtualWindow}
+                  onCloseWindow={closeWorkspaceVirtualWindow}
+                  onReopenWindow={reopenWorkspaceVirtualWindow}
+                  onResizeSplit={updateSplitRatio}
+                  shortcuts={props.stripShortcuts}
+                />
+              </SidebarDrawer>
+            ) : (
+              <WorkspaceTabStrip
+                position={props.tabPosition}
+                titlebarInsets={props.titlebarInsets}
+                windowsTitlebarControls={props.windowsTitlebarControls}
+                focusedPaneId={layout.focusedPaneId}
+                lastUsedViewByGroup={lastUsedTabByGroup}
+                onOpen={openTab}
+                onClose={closeWorkspaceTab}
+                onNewTab={() => useBrowserSearchStore.getState().show()}
+                onCloseLayoutTab={(id) => {
+                  const state = useWorkspaceStore.getState();
+                  if (state.resetPinnedTab(id)) return;
+                  if (state.closeTab(id)) navigateToActiveLayoutTab();
+                }}
+                onMoveView={moveTab}
+                onDockView={dockTab}
+                onSplitPane={splitWorkspacePane}
+                onClosePane={(paneId) => {
+                  closePane(paneId);
+                  navigateToActiveLayoutTab();
+                }}
+                windows={virtualWindows}
+                activeWindowId={activeVirtualWindowId}
+                canReopenWindow={canReopenVirtualWindow}
+                onSelectWindow={selectVirtualWindow}
+                onCreateWindow={createWorkspaceVirtualWindow}
+                onCloseWindow={closeWorkspaceVirtualWindow}
+                onReopenWindow={reopenWorkspaceVirtualWindow}
+                onResizeSplit={updateSplitRatio}
+                shortcuts={props.stripShortcuts}
+              />
+            ))}
+          <WorkspaceTabPanels
+            layout={layout}
+            renderTree={dockTree}
+            onClosePeek={() => {
+              if (closePeek()) navigateToActiveLayoutTab();
+            }}
+          />
+          {pinBlockedNotice}
+          <PaneSwapMode />
+          <WindowColorPopover onCreated={() => window.setTimeout(navigateToActiveLayoutTab, 0)} />
+        </div>
+      </WindowMenuSlotContext.Provider>
+    </BrowserChromeSlotContext.Provider>
   );
 }

@@ -1,3 +1,4 @@
+import { nextWindowColor, type WindowColor } from "./windowColors";
 import {
   recoverPaneHistoryViews,
   isEmptyTab,
@@ -73,11 +74,13 @@ export function createWorkspaceWindow(
   layout = initialWorkspaceLayout(),
   title = "Window 1",
   scopeKey: WorkspaceScopeKey = "global",
+  color?: WindowColor,
 ): WorkspaceWindow {
   const now = Date.now();
   return {
     id: `window:${now.toString(36)}:${Math.random().toString(36).slice(2, 9)}`,
     title,
+    ...(color ? { color } : {}),
     layout: normalizeWorkspaceLayout(layout, scopeKey),
     createdAt: now,
     lastFocusedAt: now,
@@ -240,12 +243,13 @@ export function adoptDefaultWorkspaceScope(
   };
 }
 
-export function addWindow(state: WorkspaceWindowsState, title?: string) {
+export function addWindow(state: WorkspaceWindowsState, title?: string, color?: WindowColor) {
   const windows = currentWindows(state);
   const window = createWorkspaceWindow(
     initialWorkspaceLayout(state.activeScopeKey),
     title?.trim() || `Window ${windows.length + 1}`,
     state.activeScopeKey,
+    color ?? nextWindowColor(windows.map((candidate) => candidate.color)),
   );
   return { window, update: activateWindowUpdate(state, [...windows, window], window) };
 }
@@ -302,6 +306,7 @@ export function extractPaneToWindow(state: WorkspaceWindowsState, paneId: string
     { root: pane, focusedPaneId: pane.id },
     activeTab?.title || `Window ${windows.length + 1}`,
     state.activeScopeKey,
+    nextWindowColor(windows.map((candidate) => candidate.color)),
   );
   const sourceRoot = removeDockLeaf(state.layout.root, paneId) ?? createDockLeaf([]);
   const sourceLayout = normalizeWorkspaceLayout(
@@ -318,6 +323,21 @@ export function extractPaneToWindow(state: WorkspaceWindowsState, paneId: string
     )
     .concat(window);
   return { window, update: activateWindowUpdate(state, nextWindows, window) };
+}
+
+export function setWindowColor(
+  state: WorkspaceWindowsState,
+  windowId: string,
+  color: WindowColor,
+): WorkspaceWindowsUpdate {
+  return {
+    windowsByScope: {
+      ...state.windowsByScope,
+      [state.activeScopeKey]: currentWindows(state).map((window) =>
+        window.id === windowId ? { ...window, color } : window,
+      ),
+    },
+  };
 }
 
 export function renameWindow(

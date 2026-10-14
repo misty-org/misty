@@ -128,11 +128,6 @@ pub(crate) fn sync_folder(dir: &File) -> Result<()> {
     dir.sync_all().map_err(err)
 }
 
-/// Journal files are readable by this account only.
-pub(crate) fn private(options: &mut OpenOptions) {
-    options.mode(0o600);
-}
-
 pub(crate) fn is_link(entry: &DirEntry) -> bool {
     entry
         .file_type()

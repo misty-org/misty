@@ -8,9 +8,10 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn, DropdownMenuCheckboxItem } from "@/shared/ui";
+import { cn, DropdownMenuCheckboxItem, Portal } from "@/shared/ui";
 import { Pencil, VenetianMask } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useBrowserToolbarSlot } from "./browserToolbarSlot";
 import { BrowserAgentAccessMenu } from "./BrowserAgentAccessMenu";
 import { BrowserBookmarkDialog } from "./BrowserBookmarkDialog";
 import { BrowserBookmarkStar } from "./BrowserBookmarkStar";
@@ -20,9 +21,13 @@ import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
 import { BrowserMenu } from "./BrowserMenu";
+import { BrowserMenuLeadRows } from "./BrowserMenuLeadRows";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { useTabAway } from "@/features/agents";
 import { BrowserOmnibox } from "./BrowserOmnibox";
+import { BrowserLibraryMenus } from "./BrowserLibraryMenus";
+import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
+import { useBrowserChromeSlot } from "./browserChromeSlot";
 import { BrowserQrCodeDialog } from "./BrowserQrCodeDialog";
 import {
   browserRuntimeCreated,
@@ -176,125 +181,220 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   });
   const showStop = pageLoading && !internalPage && Boolean(page.commands.stop);
   const hiddenButtons = useHiddenToolbarButtons();
+  const siteInfo =
+    !hiddenButtons.has("site-info") && supportsSitePermissions() && /^https?:/.test(state.url) ? (
+      <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
+    ) : null;
+  const paneLayout = <BrowserPaneLayoutMenu tabId={tab.id} />;
+  const chrome = useBrowserChromeSlot();
+  const { nav: navSlot, top: topSlot } = useBrowserToolbarSlot();
+  const paneFocused = useWorkspaceStore((store) =>
+    dockLeaves(store.layout.root).some(
+      (pane) => pane.id === store.layout.focusedPaneId && pane.activeViewId === tab.id,
+    ),
+  );
+  // With vertical tabs the focused pane's toolbar lives in the sidebar; no pane keeps a row.
+  const sidebar = Boolean(topSlot);
+  const claimsNav = paneFocused && sidebar && Boolean(navSlot);
+  useEffect(
+    () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
+    [claimsNav],
+  );
+  const bookmark =
+    page.commands.bookmark && !hiddenButtons.has("bookmark") ? (
+      <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
+    ) : undefined;
+  const navButtons = (
+    <BrowserNavigationButtons
+      canGoBack={history.index > 0}
+      canGoForward={history.index < history.entries.length - 1}
+      showStop={showStop}
+      reloadDisabled={Boolean(internalPage)}
+      onTravel={travel}
+      onStop={page.commands.stop}
+      onReload={reload}
+    />
+  );
+  const badges = (
+    <>
+      {state.private ? (
+        <span
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
+            "bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
+          )}
+          title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
+        >
+          <VenetianMask className="size-3" aria-hidden="true" />
+          Private
+        </span>
+      ) : null}
+      {state.agentOwned ? (
+        <span
+          className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
+          title="This browser tab is scoped to Misty's current work"
+        >
+          Misty
+        </span>
+      ) : null}
+    </>
+  );
+  const moreAnchor = useRef<HTMLDivElement | null>(null);
+  const browserMenu = (sidebarMenu: boolean) => (
+    <BrowserMenu
+      toolsIcon={sidebarMenu}
+      library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
+      account={sidebarMenu ? undefined : chrome?.accountItems}
+      lead={
+        sidebarMenu ? (
+          <BrowserMenuLeadRows
+            tabId={tab.id}
+            runtimeId={browserRuntimeId(tab)}
+            url={state.url}
+            agentOwned={Boolean(state.agentOwned)}
+            onBookmark={page.commands.bookmark}
+            anchor={() => moreAnchor.current}
+          />
+        ) : undefined
+      }
+      nativeRuntime={nativeRuntime}
+      tab={tab}
+      url={state.url}
+      commands={page.commands}
+      tools={
+        <>
+          <DropdownMenuCheckboxItem
+            checked={annotationsActive}
+            onCheckedChange={(checked) => setAnnotationsActive(checked === true)}
+          >
+            <Pencil />
+            <span className="min-w-0 flex-1 truncate">Annotate page</span>
+          </DropdownMenuCheckboxItem>
+          <BrowserViewportMenu
+            value={viewport}
+            onChange={setViewport}
+            sizes={sizes}
+            onSizeChange={setSize}
+          />
+          <BrowserAgentAccessMenu
+            nativeRuntime={nativeRuntime}
+            mistyPage={mistyPage}
+            mistyPageLoading={mistyPageLoading}
+            onAttachPage={() => void attachPageToMisty()}
+          />
+          <BrowserClipboardButton />
+        </>
+      }
+    />
+  );
+  const sidebarTrailing = (
+    <>
+      {hiddenButtons.has("extensions") ? null : (
+        <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
+      )}
+      {siteInfo}
+      {paneLayout}
+      {browserMenu(true)}
+    </>
+  );
+  const omnibox = (
+    <BrowserOmnibox
+      focusRequest={addressFocusRequest}
+      currentUrl={state.url}
+      historyEntries={history.entries}
+      tab={tab}
+      onNavigate={navigateActiveTab}
+      hostOnly={sidebar}
+      panel={sidebar}
+      trailing={sidebar ? sidebarTrailing : bookmark}
+    />
+  );
+  const toolButtons = (
+    <>
+      {hiddenButtons.has("misty") ? null : <BrowserMistyButton tabId={tab.id} />}
+      {chrome ? (
+        <>
+          {chrome.spaces}
+          {chrome.profile}
+        </>
+      ) : hiddenButtons.has("extensions") ? null : (
+        <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
+      )}
+      {hiddenButtons.has("downloads") ? null : (
+        <BrowserDownloadsButton
+          suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
+          onShowAll={() => page.commands.openPage("downloads")}
+        />
+      )}
+      {browserMenu(false)}
+    </>
+  );
+  // Vertical tabs: back/forward/reload go beside the sidebar toggle, and the address field,
+  // pinned extensions and a ⋯ menu (bookmark, Misty, extensions, then the browser menu) fill
+  // the sidebar's top slot.
+  const toolbar = (
+    <div
+      className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
+      style={{ backgroundColor: browserChromeBackground }}
+      data-window-toolbar
+      data-browser-toolbar
+    >
+      <div className={browserToolbarStyles.group}>
+        {navButtons}
+        {siteInfo}
+        {paneLayout}
+      </div>
+      {badges}
+      {omnibox}
+      <div className={browserToolbarStyles.group}>{toolButtons}</div>
+    </div>
+  );
+  const sidebarTop = (
+    <div className={browserToolbarStyles.sidebarTop} data-browser-toolbar data-sidebar>
+      {state.private || state.agentOwned ? (
+        <div className="flex items-center gap-1" data-misty-window-drag-block="true">
+          {badges}
+        </div>
+      ) : null}
+      <div
+        ref={moreAnchor}
+        className="flex items-center gap-0.5"
+        data-misty-window-drag-block="true"
+      >
+        {omnibox}
+      </div>
+    </div>
+  );
   return (
     <section
       className={cn("grid h-full min-h-0 overflow-hidden", "text-cream")}
       style={{
-        gridTemplateRows: `${browserToolbarStyles.rowHeight}px auto minmax(0,1fr)`,
+        gridTemplateRows: `${sidebar ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
         backgroundColor: browserChromeBackground,
       }}
       data-browser-theme={browserTheme}
       data-browser-workspace-tab={tab.id}
     >
-      <div
-        className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
-        style={{
-          backgroundColor: browserChromeBackground,
-        }}
-        data-window-toolbar
-        data-browser-toolbar
-      >
-        <BrowserNavigationButtons
-          canGoBack={history.index > 0}
-          canGoForward={history.index < history.entries.length - 1}
-          showStop={showStop}
-          reloadDisabled={Boolean(internalPage)}
-          onTravel={travel}
-          onStop={page.commands.stop}
-          onReload={reload}
-        />
-
-        {state.private ? (
-          <span
-            className={cn(
-              "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
-              "bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
-            )}
-            title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
-          >
-            <VenetianMask className="size-3" aria-hidden="true" />
-            Private
-          </span>
-        ) : null}
-        {state.agentOwned ? (
-          <span
-            className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
-            title="This browser tab is scoped to Misty's current work"
-          >
-            Misty
-          </span>
-        ) : null}
-
-        {!hiddenButtons.has("site-info") &&
-        supportsSitePermissions() &&
-        /^https?:/.test(state.url) ? (
-          <BrowserSiteInfo id={browserRuntimeId(tab)} url={state.url} active={active} />
-        ) : null}
-        <BrowserOmnibox
-          compact={Boolean(state.bookmarkId)}
-          pageTitle={tab.title}
-          focusRequest={addressFocusRequest}
-          currentUrl={state.url}
-          historyEntries={history.entries}
-          tab={tab}
-          onNavigate={navigateActiveTab}
-          trailing={
-            page.commands.bookmark && !hiddenButtons.has("bookmark") ? (
-              <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
-            ) : undefined
-          }
-        />
-
-        <div className={browserToolbarStyles.group}>
-          {hiddenButtons.has("misty") ? null : <BrowserMistyButton tabId={tab.id} />}
-          {hiddenButtons.has("extensions") ? null : (
-            <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
-          )}
-          {hiddenButtons.has("downloads") ? null : (
-            <BrowserDownloadsButton
-              suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
-              onShowAll={() => page.commands.openPage("downloads")}
-            />
-          )}
-          <BrowserMenu
-            nativeRuntime={nativeRuntime}
-            tab={tab}
-            url={state.url}
-            commands={page.commands}
-            tools={
-              <>
-                <DropdownMenuCheckboxItem
-                  checked={annotationsActive}
-                  onCheckedChange={(checked) => setAnnotationsActive(checked === true)}
-                >
-                  <Pencil />
-                  <span className="min-w-0 flex-1 truncate">Annotate page</span>
-                </DropdownMenuCheckboxItem>
-                <BrowserViewportMenu
-                  value={viewport}
-                  onChange={setViewport}
-                  sizes={sizes}
-                  onSizeChange={setSize}
-                />
-                <BrowserAgentAccessMenu
-                  nativeRuntime={nativeRuntime}
-                  mistyPage={mistyPage}
-                  mistyPageLoading={mistyPageLoading}
-                  onAttachPage={() => void attachPageToMisty()}
-                />
-                <BrowserClipboardButton />
-              </>
-            }
-          />
-        </div>
-      </div>
-      <div>
-        <BrowserFindBar
-          runtimeId={browserRuntimeId(tab)}
-          request={page.findRequest}
-          pageKey={state.url}
-        />
-      </div>
+      {sidebar ? (
+        <>
+          <div aria-hidden="true" />
+          {paneFocused && navSlot ? (
+            <Portal container={navSlot}>
+              <div
+                className={cn(browserToolbarStyles.group)}
+                data-browser-toolbar
+                data-sidebar
+                data-misty-window-drag-block="true"
+              >
+                {navButtons}
+              </div>
+            </Portal>
+          ) : null}
+          {paneFocused && topSlot ? <Portal container={topSlot}>{sidebarTop}</Portal> : null}
+        </>
+      ) : (
+        toolbar
+      )}
       <BrowserBookmarkDialog
         request={page.bookmarkRequest}
         url={state.url}
@@ -337,6 +437,11 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         onRetry={handleRetry}
         onGoHome={handleGoHome}
         reader={reader}
+      />
+      <BrowserFindBar
+        runtimeId={browserRuntimeId(tab)}
+        request={page.findRequest}
+        pageKey={state.url}
       />
     </section>
   );

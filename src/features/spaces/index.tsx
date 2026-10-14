@@ -9,6 +9,6 @@ export * from "./store/reference-mode";
 export * from "./store/useSpaceAgendaPreferences";
 export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
-export { WorkspaceSpaceNavigation } from "./components/WorkspaceSpaceNavigation";
+export { SpacesMenuButton } from "./components/SpacesMenuButton";
 export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
 export { SocialPicker } from "./chat/SocialRuntime";

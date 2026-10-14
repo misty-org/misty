@@ -15,6 +15,7 @@ import type {
   SplitTree,
   WorkspaceRecords,
 } from "./model";
+import { isWindowColor } from "@/features/workspace/windowColors";
 import { projectTabGroups } from "./tabGroupSync";
 
 const recoveryWindowId = "recovery:window";
@@ -209,6 +210,7 @@ export function projectWorkspace(
     return {
       id: window.id,
       title: window.fields.title,
+      ...(isWindowColor(window.fields.color) ? { color: window.fields.color } : {}),
       createdAt: 0,
       lastFocusedAt: 0,
       layout: {

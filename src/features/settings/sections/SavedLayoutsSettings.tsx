@@ -1,11 +1,16 @@
-import { useDockingLayoutStore, type DockingLayout } from "@/features/app-shell/dockingLayout";
+import {
+  tabOrientation,
+  useDockingLayoutStore,
+  type DockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 import { Button, Input } from "@/shared/ui";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
 import { useSettingsProfiles } from "../profiles/store";
 
-const describe = (layout: DockingLayout) => `Navigation ${layout.navigation} · Tabs ${layout.tabs}`;
+const describe = (layout: DockingLayout) =>
+  `${tabOrientation(layout) === "vertical" ? "Vertical" : "Horizontal"} tabs · Navigation ${layout.navigation}`;
 
 /** Named navigation and tab positions, saved to the account and applied to the current window. */
 export function SavedLayoutsSettings() {

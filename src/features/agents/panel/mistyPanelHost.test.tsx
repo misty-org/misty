@@ -101,7 +101,9 @@ describe("Misty panel width", () => {
     act(() => {
       fireEvent.keyDown(edge, { key: "ArrowRight", shiftKey: true });
     });
-    expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH + 16 - 64);
+    expect(useMistyPanelStore.getState().width).toBe(
+      Math.max(MISTY_PANEL_MIN_WIDTH, MISTY_PANEL_WIDTH + 16 - 64),
+    );
     act(() => {
       fireEvent.doubleClick(edge);
     });

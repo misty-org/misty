@@ -29,8 +29,12 @@ pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), Str
     super::super::browser_macos::remove_browser_data_store(&app, identifier).await?;
     #[cfg(not(target_os = "macos"))]
     let _ = identifier;
-    let directory = browser_data_directory(&app, Some(&profile_id))?;
-    remove_profile_directory(&directory).await
+    // The profile's whole folder under `~/.misty/profiles`. On macOS its `webview` is a link
+    // that is removed without following it (WebKit's own store was erased above).
+    let home = super::super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let directory = super::super::browser_profile::webview_home(&home, Some(&profile_id))?;
+    let profile_folder = directory.parent().ok_or("Invalid profile folder.")?;
+    remove_profile_directory(profile_folder).await
 }
 
 /// Deletes a profile's folder. A profile that never opened a page has no

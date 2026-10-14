@@ -297,7 +297,7 @@ export function SyncDeviceList({
                         ? "Update this device to change its sync mode."
                         : device.full_sync
                           ? "Share this device’s tabs and website sign-ins."
-                          : "Independent workspace. Tabs and website sign-ins stay here; account settings still sync."
+                          : "Independent workspace. Tabs and website sign-ins stay here."
                     }
                   >
                     <SwitchControl

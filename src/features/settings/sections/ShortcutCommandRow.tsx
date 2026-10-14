@@ -24,7 +24,6 @@ export function ShortcutCommandRow(props: {
   problem: { message: string; onReassign?: () => void; onCancel?: () => void } | null;
   disabled: boolean;
   onBegin: (target: CaptureTarget) => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, target: CaptureTarget) => void;
   onClear: (target: CaptureTarget) => void;
   onRestore: () => void;
 }) {
@@ -41,7 +40,6 @@ export function ShortcutCommandRow(props: {
       capturing={props.capture?.commandId === definition.id && props.capture.slot === name}
       disabled={props.disabled}
       onBegin={props.onBegin}
-      onKeyDown={props.onKeyDown}
       onClear={props.onClear}
     />
   );
@@ -93,7 +91,6 @@ function BindingSlot(props: {
   capturing: boolean;
   disabled: boolean;
   onBegin: (target: CaptureTarget) => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>, target: CaptureTarget) => void;
   onClear: (target: CaptureTarget) => void;
 }) {
   const target = { commandId: props.commandId, slot: props.slot };
@@ -103,7 +100,6 @@ function BindingSlot(props: {
         disabled={props.disabled}
         aria-label={`${props.label} shortcut${props.value ? `: ${props.value}` : ": unbound"}`}
         onClick={() => props.onBegin(target)}
-        onKeyDown={(event) => (props.capturing ? props.onKeyDown(event, target) : undefined)}
         className={cn(
           "flex h-8 w-full items-center justify-center gap-0.5 rounded border px-2",
           "text-xs",

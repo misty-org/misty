@@ -3,10 +3,6 @@ import engineTable from "@/shared/schemas/browser-search-engines.json";
 /**
  * The search engine a typed query falls back to in the browser surface.
  *
- * Read through a function rather than a constant, the same way `browserHome`
- * works: the settings store pushes the saved preference in on load and on
- * every change, so the value stays live without threading props.
- *
  * The engine table is shared with the native host, which fetches search
  * suggestions from the `suggest` endpoints, so a changed endpoint is a data
  * fix in one file.
@@ -22,29 +18,9 @@ export interface BrowserSearchEngine {
 
 export const browserSearchEngines: readonly BrowserSearchEngine[] = engineTable;
 
-let configuredEngine = browserSearchEngines[0];
-let customDefaultTrigger = "";
-
-/** The engine typed searches go to: a chosen search shortcut, else a built-in engine. */
+/** Misty searches with Google only: its suggestions name sites, which gives rows their icons. */
 export function browserSearchEngine(): BrowserSearchEngine {
-  const custom = customDefaultTrigger
-    ? customBangs.find((bang) => bang.trigger === customDefaultTrigger)
-    : undefined;
-  // A shortcut has no suggestions endpoint, so suggestions stay off while it is the default.
-  return custom
-    ? { id: `custom:${custom.trigger}`, name: custom.name, search: custom.url }
-    : configuredEngine;
-}
-
-/** Makes one of the person's search shortcuts the default; empty or unknown uses the built-in engine. */
-export function configureBrowserCustomSearchEngine(trigger: string): void {
-  customDefaultTrigger = trigger.trim().toLowerCase();
-}
-
-/** Selects an engine by its stable id; unknown ids fall back to the first engine. */
-export function configureBrowserSearchEngine(id: string): void {
-  configuredEngine =
-    browserSearchEngines.find((engine) => engine.id === id) ?? browserSearchEngines[0];
+  return browserSearchEngines[0];
 }
 
 let suggestionsEnabled = false;
@@ -87,7 +63,7 @@ export function customBangProblem(bang: BrowserCustomBang): string | null {
   return null;
 }
 
-/** Synced settings are untrusted: anything malformed is dropped, not repaired. */
+/** Anything malformed is dropped, not repaired. */
 export function parseBrowserCustomBangs(raw: string): BrowserCustomBang[] {
   let value: unknown;
   try {

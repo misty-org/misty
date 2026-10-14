@@ -1,10 +1,5 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import {
-  browserSearchEngines,
-  defaultBrowserHomeUrl,
-  normalizeBrowserHomeUrl,
-} from "@/features/workspace";
-import { parseBrowserCustomBangs } from "@/features/workspace/browserSearchEngine";
+import { defaultBrowserHomeUrl, normalizeBrowserHomeUrl } from "@/features/workspace";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -14,13 +9,11 @@ import {
   ChoiceControl,
   FilePathControl,
   numberSetting,
-  SelectControl,
   stringSetting,
   SwitchControl,
   TextControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { definitionById, runtimeAdapters } from "../profiles/registry";
 import { BrowserBangsSettings } from "./BrowserBangsSettings";
 import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
@@ -36,39 +29,11 @@ const archiveOptions = [
   { value: "720", label: "After 30 days" },
 ];
 
-const tabSleepOptions = [
-  { value: "0", label: "Never" },
-  { value: "15", label: "After 15 minutes" },
-  { value: "30", label: "After 30 minutes" },
-  { value: "60", label: "After 1 hour" },
-  { value: "120", label: "After 2 hours" },
-];
-
-// The engine is stored by its legacy index; ids stay stable if the list is reordered.
-const searchEngineSetting = runtimeAdapters.get("browser.searchEngine")!;
-function engineStorageIndex(id: string): number {
-  return definitionById.get("browser.searchEngine")!.legacyValues!.indexOf(id);
-}
-
 export function BrowserSection(
   props: Pick<SettingsContentProps, "document" | "working" | "onSettingChange"> & {
     page?: "browsing" | "downloads";
   },
 ) {
-  const engineId = String(searchEngineSetting.read(props.document));
-  const customEngines = parseBrowserCustomBangs(
-    stringSetting(props.document, "general", "browser_custom_bangs_json", "[]"),
-  );
-  const customTrigger = stringSetting(props.document, "general", "browser_custom_search_engine", "")
-    .trim()
-    .toLowerCase();
-  // A deleted shortcut falls back to the built-in engine, the same as in the browser.
-  const customIndex = customEngines.findIndex((bang) => bang.trigger === customTrigger);
-  const engineName =
-    customIndex >= 0
-      ? customEngines[customIndex].name
-      : (browserSearchEngines.find((engine) => engine.id === engineId)?.name ??
-        "your search engine");
   return (
     <>
       <SettingsSectionBlock title={props.page === "downloads" ? "Downloads" : "Browsing"}>
@@ -92,52 +57,8 @@ export function BrowserSection(
               />
             </SettingsRow>
             <SettingsRow
-              label="Search engine"
-              description="Where a typed phrase goes when it is not a web address."
-            >
-              <SelectControl
-                value={
-                  customIndex >= 0
-                    ? browserSearchEngines.length + customIndex
-                    : Math.max(
-                        0,
-                        browserSearchEngines.findIndex((engine) => engine.id === engineId),
-                      )
-                }
-                options={[
-                  ...browserSearchEngines.map((engine) => engine.name),
-                  ...customEngines.map((bang) => `${bang.name} (!${bang.trigger})`),
-                ]}
-                disabled={props.working}
-                onChange={(index) => {
-                  if (index >= browserSearchEngines.length) {
-                    const bang = customEngines[index - browserSearchEngines.length];
-                    if (bang)
-                      props.onSettingChange(
-                        "general",
-                        "browser_custom_search_engine",
-                        bang.trigger,
-                      );
-                    return;
-                  }
-                  if (customTrigger)
-                    props.onSettingChange("general", "browser_custom_search_engine", "");
-                  props.onSettingChange(
-                    "general",
-                    "browser_search_engine_index",
-                    engineStorageIndex(browserSearchEngines[index].id),
-                  );
-                }}
-              />
-            </SettingsRow>
-            <SettingsRow
               label="Show search suggestions"
-              muted={customIndex >= 0}
-              description={
-                customIndex >= 0
-                  ? `Suggestions are not available while ${engineName} is the search engine.`
-                  : `Send what you type in the address bar to ${engineName} to suggest searches.`
-              }
+              description="Send what you type in the address bar to Google to suggest searches and sites."
             >
               <SwitchControl
                 checked={booleanSetting(
@@ -146,7 +67,7 @@ export function BrowserSection(
                   "browser_search_suggestions",
                   false,
                 )}
-                disabled={props.working || customIndex >= 0}
+                disabled={props.working}
                 onChange={(value) =>
                   props.onSettingChange("general", "browser_search_suggestions", value)
                 }
@@ -227,21 +148,6 @@ export function BrowserSection(
                 disabled={props.working}
                 onValueChange={(value) =>
                   props.onSettingChange("general", "browser_auto_archive_hours", Number(value))
-                }
-              />
-            </SettingsRow>
-            <SettingsRow
-              label="Sleep inactive tabs"
-              description="Tabs you haven't looked at for a while free their memory and reload when you return. Tabs playing sound stay awake."
-            >
-              <ChoiceControl
-                value={String(
-                  numberSetting(props.document, "general", "browser_tab_sleep_minutes", 30),
-                )}
-                options={tabSleepOptions}
-                disabled={props.working}
-                onValueChange={(value) =>
-                  props.onSettingChange("general", "browser_tab_sleep_minutes", Number(value))
                 }
               />
             </SettingsRow>

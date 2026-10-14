@@ -2,7 +2,7 @@
 //! a link (see `misty-windows-files`), and renames that never replace.
 use std::{
     ffi::OsStr,
-    fs::{DirEntry, File, OpenOptions},
+    fs::{DirEntry, File},
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
@@ -108,10 +108,6 @@ pub(crate) fn remove_folder(dir: &File, name: &str) -> Result<()> {
 pub(crate) fn sync_folder(_dir: &File) -> Result<()> {
     Ok(())
 }
-
-/// The journal lives in Misty's own data folder, which only this account may
-/// use; new files inherit that.
-pub(crate) fn private(_options: &mut OpenOptions) {}
 
 pub(crate) fn is_link(entry: &DirEntry) -> bool {
     entry

@@ -7,26 +7,42 @@ pub(super) fn database_path(
     deployment: &str,
     account_id: &str,
 ) -> Result<PathBuf, String> {
+    // A development profile has its own sync storage, even for the same account.
     let hash = Sha256::digest(
-        serde_json::to_vec(&(deployment, account_id))
-            .map_err(|_| "Could not identify sync storage")?,
+        match std::env::var("MISTY_PROFILE").ok() {
+            Some(profile) => serde_json::to_vec(&(deployment, account_id, profile)),
+            None => serde_json::to_vec(&(deployment, account_id)),
+        }
+        .map_err(|_| "Could not identify sync storage")?,
     );
     let identity: String = hash.iter().map(|byte| format!("{byte:02x}")).collect();
-    let base = app
+    // Vault databases live under Misty's data folder. One an earlier layout kept in the
+    // app's own data folder stays where it is (see below).
+    let base = super::super::paths::misty_home_dir()
+        .ok_or("Local application storage is unavailable")?
+        .join(".local")
+        .join("sync");
+    let earlier_base = app
         .path()
         .app_local_data_dir()
         .map_err(|_| "Local application storage is unavailable")?
         .join("browser-sync");
-    let directory = base.join(identity);
+    let directory = base.join(&identity);
     let path = directory.join("workspace.sqlite");
     if path.is_file() {
         return Ok(path);
     }
+    let earlier = earlier_base.join(&identity).join("workspace.sqlite");
+    if earlier.is_file() {
+        return Ok(earlier);
+    }
+    let base_for_scan = earlier_base;
     // Reuse earlier workspace-scoped databases in place. Moving/copying a live
     // WAL or reenrolling would risk losing pending edits or cloning counters.
     let mut previous = None;
-    if base.is_dir() {
-        let entries = std::fs::read_dir(&base).map_err(|_| "Could not inspect sync storage")?;
+    if base_for_scan.is_dir() {
+        let entries =
+            std::fs::read_dir(&base_for_scan).map_err(|_| "Could not inspect sync storage")?;
         for (index, entry) in entries.enumerate() {
             if index >= 1024 {
                 return Err("Too many local vaults to select safely".into());

@@ -90,5 +90,49 @@ export function useTitlebarPointerHandlers(
       startTitlebarDrag,
     ],
   );
-  return { startTitlebarDrag, handleDesktopTitlebarPointerDown };
+
+  // A page's top edge is content as much as titlebar: a plain press must stay a plain press, or
+  // the native drag loop it starts swallows the second press of a double-click. So the drag
+  // waits for the pointer to move, and the second press zooms or restores.
+  const lastTopEdgePress = useRef<{ time: number; x: number; y: number } | null>(null);
+  const handleTopEdgePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (event.button !== 0 || !hasTauriInternals()) return;
+      const { clientX: x, clientY: y } = event;
+      const now = Date.now();
+      const previous = lastTopEdgePress.current;
+      if (
+        previous &&
+        now - previous.time <= 500 &&
+        Math.abs(x - previous.x) + Math.abs(y - previous.y) <= 8
+      ) {
+        lastTopEdgePress.current = null;
+        event.preventDefault();
+        void (
+          desktopPlatform === "macos" ? togglePseudoMaximize() : toggleTitlebarMaximize()
+        ).catch(() => undefined);
+        return;
+      }
+      lastTopEdgePress.current = { time: now, x, y };
+      const stop = () => {
+        window.removeEventListener("pointermove", move, true);
+        window.removeEventListener("pointerup", stop, true);
+        window.removeEventListener("pointercancel", stop, true);
+      };
+      const move = (moved: PointerEvent) => {
+        if ((moved.buttons & 1) === 0) return stop();
+        if (Math.abs(moved.clientX - x) + Math.abs(moved.clientY - y) < 4) return;
+        stop();
+        lastTopEdgePress.current = null;
+        void getCurrentWindow()
+          .startDragging()
+          .catch(() => undefined);
+      };
+      window.addEventListener("pointermove", move, true);
+      window.addEventListener("pointerup", stop, true);
+      window.addEventListener("pointercancel", stop, true);
+    },
+    [desktopPlatform, togglePseudoMaximize, toggleTitlebarMaximize],
+  );
+  return { startTitlebarDrag, handleDesktopTitlebarPointerDown, handleTopEdgePointerDown };
 }

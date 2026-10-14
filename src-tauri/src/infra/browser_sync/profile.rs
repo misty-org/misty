@@ -51,6 +51,17 @@ pub(in crate::infra) struct BrowserProfileLease {
     pub tab_session: Option<serde_json::Value>,
 }
 
+/// Debug builds print how long each step of opening a page waited, so a page
+/// that never appears can be traced to the lock or call it is stuck behind.
+fn trace_lease(started: std::time::Instant, step: &str) {
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "[browser-lease] +{}ms {step}",
+            started.elapsed().as_millis()
+        );
+    }
+}
+
 /// Resolve logical/default workspace requests through the encrypted native
 /// registry. No renderer may choose a physical generation for this resolution.
 /// Keep the returned lease until native view creation/reuse has completed.
@@ -59,12 +70,26 @@ pub(in crate::infra) async fn browser_profile_lease(
     requested: Option<&str>,
     tab: Option<(&str, &str)>,
 ) -> Result<BrowserProfileLease, String> {
+    let started = std::time::Instant::now();
+    trace_lease(started, "waiting for the browser lifecycle lock");
     let epoch = BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire);
     let lifecycle = browser_lifecycle().read().await;
+    trace_lease(
+        started,
+        "got the lifecycle lock; waiting for the sync session",
+    );
     if BROWSER_ACCOUNT_EPOCH.load(Ordering::Acquire) != epoch {
         return Err("The browser account changed before this page could open.".into());
     }
     let mut current = session().lock().await;
+    trace_lease(
+        started,
+        if current.is_some() {
+            "got the sync session"
+        } else {
+            "no sync session (locked or signed out)"
+        },
+    );
     let previous_issue = current
         .as_ref()
         .and_then(|active| active.credential_issue.clone());
@@ -93,6 +118,7 @@ pub(in crate::infra) async fn browser_profile_lease(
             }
         }
     }
+    trace_lease(started, "profile resolved");
     let (profile_id, logical_profile_id) = match selected {
         Some(selected) if requested.is_none() || requested == Some(selected.logical.as_str()) => {
             (Some(selected.physical), Some(selected.logical))
@@ -118,6 +144,7 @@ pub(in crate::infra) async fn browser_profile_lease(
             let _ = app.emit_to("main", "misty:browser-sync-changed", &active.scope.vault_id);
         }
     }
+    trace_lease(started, "lease ready");
     Ok(BrowserProfileLease {
         tab_session,
         _lifecycle: lifecycle,

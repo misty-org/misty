@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { activeLayoutView, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
-import { configureBrowserSearchEngine } from "@/features/workspace/browserSearchEngine";
 import { BrowserSearchDialog } from "./BrowserSearchDialog";
 import { useBrowserSearchStore } from "./search";
 vi.mock("@/features/webviews/browserRuntime", () => ({
@@ -16,7 +15,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useBrowserSearchStore.getState().close();
-  configureBrowserSearchEngine("google");
 });
 
 function renderDialog() {
@@ -36,12 +34,11 @@ function openedUrl() {
 }
 
 describe("browser search submission", () => {
-  it("opens a search with the chosen engine as a native browser tab and closes the box", async () => {
-    configureBrowserSearchEngine("duckduckgo");
+  it("opens a search with Google as a native browser tab and closes the box", async () => {
     fireEvent.change(renderDialog(), { target: { value: "workspace sync" } });
     fireEvent.click(screen.getByRole("button", { name: "Open in new tab" }));
     await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(openedUrl()).toBe("https://duckduckgo.com/?q=workspace%20sync");
+    expect(openedUrl()).toBe("https://www.google.com/search?q=workspace%20sync");
   });
 
   it("does not create a tab for a blank submission", () => {

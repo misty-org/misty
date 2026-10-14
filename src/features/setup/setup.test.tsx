@@ -54,7 +54,7 @@ it("applies a theme and a layout as they are chosen, then finishes", () => {
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(screen.getByText("Choose a layout")).toBeTruthy();
   fireEvent.click(screen.getByRole("radio", { name: /Vertical tabs/ }));
-  expect(mocks.setLayout).toHaveBeenCalledWith({ navigation: "left", tabs: "left" });
+  expect(mocks.setLayout).toHaveBeenCalledWith({ navigation: "right", tabs: "left" });
 
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   expect(screen.queryByText("Choose a layout")).toBeNull();

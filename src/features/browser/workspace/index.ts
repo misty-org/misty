@@ -3,3 +3,7 @@ export * from "./browserRuntime";
 export * from "./BrowserOfflinePage";
 export * from "./types";
 export * from "./BrowserViewAudioButton";
+export * from "./browserToolbarSlot";
+export * from "./windowMenuSlot";
+export * from "./browserChromeSlot";
+export { browserToolbarStyles } from "./browserToolbarStyles";

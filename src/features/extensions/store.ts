@@ -130,10 +130,7 @@ export function installations() {
   return parseInstallations(preference("installations", "[]"));
 }
 export async function setPreference(key: string, value: string | boolean) {
-  const profile = useSettingsProfiles.getState();
-  if (profile.accountId !== useExtensionsStore.getState().account)
-    throw new Error("The extension account changed.");
-  await profile.edit(`extensions.${key}`, value);
+  await useSettingsProfiles.getState().edit(`extensions.${key}`, value);
 }
 let controlQueue: Promise<unknown> = Promise.resolve();
 function changeControls(work: () => Promise<void>) {

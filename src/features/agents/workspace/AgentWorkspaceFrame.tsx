@@ -6,11 +6,11 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { LayoutGrid, Plug, Repeat2, SquarePen } from "lucide-react";
+import { LayoutGrid, Menu, Plug, X, Repeat2, SquarePen } from "lucide-react";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { Button } from "@/shared/ui";
+import { Button, IconButton } from "@/shared/ui";
 import { useAgentFoldersStore } from "../folders/agentFoldersStore";
 import { FolderNameDialog } from "../folders/FolderNameDialog";
 import {
@@ -127,9 +127,10 @@ export function AgentWorkspaceFrame({
   }, [activeId, readable]);
   const [sidebarWidth, setSidebarWidth] = useAgentSidebarWidth();
   const [creatingProject, setCreatingProject] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const newProject = useCallback(() => setCreatingProject(true), []);
   return (
-    <div className="agent-studio" data-page={page}>
+    <div className="agent-studio" data-page={page} data-drawer={drawerOpen ? "open" : "closed"}>
       <aside
         className="agent-studio-sidebar"
         aria-label={`${agent.name} workspace`}
@@ -137,7 +138,17 @@ export function AgentWorkspaceFrame({
       >
         {/* A window toolbar, so the shared titlebar code notices when the sidebar
             meets the native window buttons and the identity drops below them. */}
-        <header data-window-toolbar>{identity}</header>
+        <header data-window-toolbar>
+          {identity}
+          <IconButton
+            className="agent-studio-drawer-close"
+            label="Close menu"
+            tooltip={false}
+            onClick={() => setDrawerOpen(false)}
+          >
+            <X size={18} />
+          </IconButton>
+        </header>
         <nav aria-label="Agent workspace pages">
           <Button
             data-agent-navigation-control
@@ -202,6 +213,16 @@ export function AgentWorkspaceFrame({
         <AgentSidebarResizer width={sidebarWidth} onWidthChange={setSidebarWidth} />
       </aside>
       <div className="agent-studio-canvas">
+        <IconButton
+          className="agent-studio-drawer-toggle"
+          label="Open menu"
+          tooltip={false}
+          aria-expanded={drawerOpen}
+          onClick={() => setDrawerOpen(true)}
+        >
+          <Menu size={18} />
+        </IconButton>
+        <div className="agent-studio-drawer-scrim" onClick={() => setDrawerOpen(false)} />
         {/* Keep the live conversation mounted while browsing catalogs; its draft and voice state belong to it. */}
         <div className="agent-studio-task" hidden={page !== "task"}>
           {children}

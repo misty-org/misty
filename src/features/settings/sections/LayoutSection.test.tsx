@@ -1,14 +1,20 @@
 import { registerProfileWriter } from "../profiles/bridge";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useDockingLayoutStore, defaultDockingLayout } from "@/features/app-shell/dockingLayout";
-import { useSettingsStore } from "../store/useSettingsStore";
 import { useSettingsProfiles } from "../profiles/store";
 import { searchSettings } from "../components/SettingsSearchResults";
 import { LayoutSection } from "./LayoutSection";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useWindowDockingLayout } from "@/features/workspace/useWindowDockingLayout";
-import { renderHook } from "@testing-library/react";
 
 beforeEach(() => {
   registerProfileWriter(async (id, value) => {
@@ -22,27 +28,30 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
-const choose = (group: string, edge: string) =>
+const chooseTabs = (orientation: "Horizontal" | "Vertical") =>
   fireEvent.click(
-    within(screen.getByRole("radiogroup", { name: group })).getByRole("radio", { name: edge }),
+    within(screen.getByRole("radiogroup", { name: "Tabs" })).getByRole("radio", {
+      name: orientation,
+    }),
   );
-it.each(["Left", "Top", "Right", "Bottom"])(
-  "allows navigation and tabs to share the %s edge",
-  (edge) => {
-    render(<LayoutSection />);
-    const { result } = renderHook(useWindowDockingLayout);
-    choose("Navigation position", edge);
-    choose("Tabs position", edge);
-    expect(result.current).toEqual({ navigation: edge.toLowerCase(), tabs: edge.toLowerCase() });
-    expect(
-      screen.getAllByRole("radio").every((radio) => !(radio as HTMLButtonElement).disabled),
-    ).toBe(true);
-  },
-);
+
+it("has no navigation controls: the tab strip carries the navigation", () => {
+  render(<LayoutSection />);
+  expect(screen.queryByRole("radiogroup", { name: "Navigation position" })).toBeNull();
+  expect(screen.queryByText("Auto-hide navigation")).toBeNull();
+});
+it("switches tabs between horizontal and vertical", () => {
+  render(<LayoutSection />);
+  const { result } = renderHook(useWindowDockingLayout);
+  chooseTabs("Vertical");
+  expect(result.current.tabs).toBe("left");
+  chooseTabs("Horizontal");
+  expect(result.current.tabs).toBe("top");
+});
 it("saves the current layout by name and lists it for reuse", async () => {
   useSettingsProfiles.setState({ ready: true });
   render(<LayoutSection />);
-  choose("Navigation position", "Right");
+  chooseTabs("Vertical");
   fireEvent.change(screen.getByRole("textbox", { name: "Layout name" }), {
     target: { value: "Focus" },
   });
@@ -50,72 +59,25 @@ it("saves the current layout by name and lists it for reuse", async () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
   });
   expect(useDockingLayoutStore.getState().savedLayouts).toEqual([
-    expect.objectContaining({ name: "Focus", navigation: "right", tabs: "top" }),
+    expect.objectContaining({ name: "Focus", tabs: "left" }),
   ]);
-  // The current layout's row and the saved layout's row describe the same positions.
-  expect(screen.getAllByText("Navigation right · Tabs top")).toHaveLength(2);
   expect(searchSettings("Saved layouts")).toContainEqual(
     expect.objectContaining({ page: "layout" }),
   );
-});
-it("hides a navigation destination through account settings", () => {
-  const edit = vi.fn(async () => {});
-  useSettingsProfiles.setState({ ready: true, syncing: false, edit });
-  render(<LayoutSection />);
-  fireEvent.click(screen.getByRole("switch", { name: "Spaces" }));
-  expect(edit).toHaveBeenCalledWith("app.navigation.hidden", JSON.stringify(["spaces"]));
 });
 it("edits the current virtual window and restores its arrangement when switching", () => {
   const firstId = useWorkspaceStore.getState().activeWindowId;
   render(<LayoutSection />);
   const { result } = renderHook(useWindowDockingLayout);
-  choose("Navigation position", "Bottom");
-  choose("Tabs position", "Left");
-  expect(result.current).toEqual({ navigation: "bottom", tabs: "left" });
+  chooseTabs("Vertical");
+  expect(result.current.tabs).toBe("left");
   act(() => {
     useWorkspaceStore.getState().createWindow("Research");
   });
   expect(screen.getByRole("heading", { name: "Layout for Research" })).toBeTruthy();
   expect(result.current).toEqual(defaultDockingLayout);
-  choose("Navigation position", "Right");
-  choose("Tabs position", "Bottom");
-  expect(result.current).toEqual({ navigation: "right", tabs: "bottom" });
   act(() => {
     useWorkspaceStore.getState().switchWindow(firstId);
   });
-  expect(result.current).toEqual({ navigation: "bottom", tabs: "left" });
-  expect(
-    within(screen.getByRole("radiogroup", { name: "Navigation position" }))
-      .getByRole("radio", {
-        name: "Bottom",
-      })
-      .getAttribute("aria-checked"),
-  ).toBe("true");
-});
-
-it("saves navigation visibility through account settings and appears in Layout search", () => {
-  useSettingsProfiles.setState({ ready: true });
-  useSettingsStore.setState({ working: false });
-  const update = vi
-    .spyOn(useSettingsStore.getState(), "updateSetting")
-    .mockImplementation(() => {});
-  render(<LayoutSection />);
-  fireEvent.click(screen.getByRole("switch", { name: "Auto-hide navigation" }));
-  expect(update).toHaveBeenCalledWith("appearance", "navigator_auto_hide", true);
-  expect(searchSettings("Auto-hide navigation")).toContainEqual(
-    expect.objectContaining({ page: "layout", focus: "Auto-hide navigation" }),
-  );
-});
-
-it("supports same-edge selection with pill keyboard shortcuts", () => {
-  render(<LayoutSection />);
-  choose("Tabs position", "Bottom");
-  const nav = screen.getByRole("radiogroup", { name: "Navigation position" });
-  fireEvent.keyDown(nav, { key: "End" });
-  expect(within(nav).getByRole("radio", { name: "Bottom" }).getAttribute("aria-checked")).toBe(
-    "true",
-  );
-  expect(within(nav).getByRole("radio", { name: "Right" }).getAttribute("aria-checked")).toBe(
-    "false",
-  );
+  expect(result.current.tabs).toBe("left");
 });

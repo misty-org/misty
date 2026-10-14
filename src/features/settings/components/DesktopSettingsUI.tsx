@@ -48,8 +48,8 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             <X className="size-4" strokeWidth={1.8} />
           </IconButton>
         ) : null}
-        {/* The scroller spans the full pane so its scrollbar sits at the panel edge. */}
-        <div className="misty-scrollbar min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+        {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
+        <div className="misty-scrollbar misty-scrollbar-floating my-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="w-full max-w-[960px] px-10 pb-12 pt-9 text-[15px] leading-6 max-[720px]:px-6">
             {props.contentHeader}
             {props.children}

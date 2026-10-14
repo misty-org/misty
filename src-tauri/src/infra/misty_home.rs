@@ -69,18 +69,18 @@ fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
         }
     }
     if manifest_version(root) != layout.layout_version {
-        let manifest = HomeManifest {
-            format: "misty-home".to_owned(),
-            layout_version: layout.layout_version,
-        };
-        let mut bytes = serde_json::to_vec_pretty(&manifest)?;
-        bytes.push(b'\n');
-        write_private(&root.join("home.json"), &bytes)?;
+        misty_credential_store::set_layout_version(root, layout.layout_version)?;
+        // The manifest an earlier layout kept as a file is superseded.
+        let _ = fs::remove_file(root.join("home.json"));
     }
     Ok(report)
 }
 
 fn manifest_version(root: &Path) -> u32 {
+    if let Ok(Some(version)) = misty_credential_store::layout_version(root) {
+        return version;
+    }
+    // An earlier layout recorded it in `home.json`.
     fs::read(root.join("home.json"))
         .ok()
         .and_then(|bytes| serde_json::from_slice::<HomeManifest>(&bytes).ok())
@@ -201,17 +201,6 @@ fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Resul
     Ok(())
 }
 
-fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let staging = path.with_extension("json.tmp");
-    fs::write(&staging, bytes)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&staging, fs::Permissions::from_mode(0o600))?;
-    }
-    fs::rename(staging, path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,9 +237,9 @@ mod tests {
         let root = base.join(".misty");
         let trash = base.join("Trash");
         fs::create_dir_all(root.join("plugins/public")).unwrap();
-        fs::create_dir_all(root.join(".keys")).unwrap();
+        fs::create_dir_all(root.join(".local/data")).unwrap();
         fs::create_dir_all(root.join("config")).unwrap();
-        fs::write(root.join(".keys/misty-backup.agekey"), "key").unwrap();
+        fs::write(root.join(".local/data/keep.txt"), "kept").unwrap();
         fs::write(root.join("config/settings.json"), "{}").unwrap();
         fs::write(
             root.join("home.json"),
@@ -262,7 +251,7 @@ mod tests {
 
         assert_eq!(report.retired, vec!["plugins".to_owned()]);
         assert!(!root.join("plugins").exists());
-        assert!(root.join(".keys/misty-backup.agekey").is_file());
+        assert!(root.join(".local/data/keep.txt").is_file());
         assert!(root.join("config/settings.json").is_file());
         let moved = fs::read_dir(&trash)
             .unwrap()
@@ -297,12 +286,12 @@ mod tests {
         let base = temp("recreate");
         let root = base.join(".misty");
         ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
-        fs::remove_dir_all(root.join("db")).unwrap();
+        fs::remove_dir_all(root.join("profiles")).unwrap();
 
         let report = ensure_at(&root, &Trash::Folder(base.join("Trash"))).unwrap();
 
-        assert!(report.created.contains(&"db".to_owned()));
-        assert!(root.join("db").is_dir());
+        assert!(report.created.contains(&"profiles".to_owned()));
+        assert!(root.join("profiles").is_dir());
         let _ = fs::remove_dir_all(base);
     }
 }

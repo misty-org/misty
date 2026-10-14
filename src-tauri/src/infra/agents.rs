@@ -10,6 +10,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use super::store::Store;
 use crate::{
     error::{ApiError, ApiResult},
     infra::environment::AppEnvironmentService,
@@ -58,8 +59,13 @@ pub struct PrepareScopedAgentDocumentRequest {
 
 impl AgentService {
     pub fn new(environment: AppEnvironmentService) -> Self {
+        let store = environment.store();
+        // Folders shared before the database moved come along once.
+        if let Err(error) = import_legacy(&store, &environment.misty_db_path()) {
+            eprintln!("Could not import earlier shared folders: {error}");
+        }
         Self {
-            database_path: environment.misty_db_path(),
+            database_path: store.path().to_path_buf(),
         }
     }
 
@@ -201,16 +207,8 @@ where
     F: FnOnce(&mut Connection) -> Result<T, rusqlite::Error> + Send + 'static,
 {
     tokio::task::spawn_blocking(move || {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                ApiError::Message(format!("Could not create device scope directory: {error}"))
-            })?;
-        }
-        let mut connection = Connection::open(path).map_err(|error| {
+        let mut connection = Store::at(path).connect().map_err(|error| {
             ApiError::Message(format!("Could not open device scope database: {error}"))
-        })?;
-        ensure_schema(&connection).map_err(|error| {
-            ApiError::Message(format!("Could not initialize device scopes: {error}"))
         })?;
         operation(&mut connection)
             .map_err(|error| ApiError::Message(format!("Device scope operation failed: {error}")))
@@ -219,64 +217,73 @@ where
     .map_err(|error| ApiError::Message(format!("Device scope worker failed: {error}")))?
 }
 
-fn ensure_schema(connection: &Connection) -> rusqlite::Result<()> {
-    connection.execute_batch(
-        "CREATE TABLE IF NOT EXISTS local_agent_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS local_agent_scopes (
-            id TEXT PRIMARY KEY,
-            device_id TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            local_path TEXT NOT NULL UNIQUE,
-            created_at TEXT NOT NULL
-        );
-
-        -- Scoped one-time cleanup of the retired whole-Agent runtime. Keep
-        -- settings and scopes because v2 Read content leases reference them.
-        DROP TABLE IF EXISTS local_agent_mutations;
-        DROP TABLE IF EXISTS local_agent_file_outbox;
-        DROP TABLE IF EXISTS local_agent_file_checkpoints;
-        DROP TABLE IF EXISTS local_agent_scope_checkpoints;
-        DROP TABLE IF EXISTS local_agent_artifacts;
-        DROP TABLE IF EXISTS local_agent_approvals;
-        DROP TABLE IF EXISTS local_agent_jobs;
-        DROP TABLE IF EXISTS local_agent_definitions;",
-    )?;
-    // Code projects (docs/plans/agent-code-projects.md): a scope with write
-    // access is a project; installs open the package proxy for it.
-    let columns: Vec<String> = connection
-        .prepare("PRAGMA table_info(local_agent_scopes)")?
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<_, _>>()?;
-    if !columns.iter().any(|column| column == "access") {
-        connection.execute_batch(
-            "ALTER TABLE local_agent_scopes ADD COLUMN access TEXT NOT NULL DEFAULT 'read'",
-        )?;
-    }
-    for (column, definition) in [
-        ("allow_installs", "INTEGER NOT NULL DEFAULT 0"),
-        // Git (docs/plans/agent-git-projects.md): agents may push branches,
-        // and separately the default branch.
-        ("allow_push", "INTEGER NOT NULL DEFAULT 0"),
-        ("allow_push_default", "INTEGER NOT NULL DEFAULT 0"),
-    ] {
-        if !columns.iter().any(|existing| existing == column) {
-            connection.execute_batch(&format!(
-                "ALTER TABLE local_agent_scopes ADD COLUMN {column} {definition}"
-            ))?;
-        }
-    }
-    // Windows folders were stored with the `\\?\` prefix canonicalizing adds;
-    // they are stored without it now (see `canonical`).
+/// Windows folders were stored with the `\\?\` prefix canonicalizing adds; they are stored
+/// without it now (see `canonical`).
+fn strip_verbatim_prefixes(connection: &Connection) -> rusqlite::Result<()> {
     connection.execute_batch(
         r"UPDATE OR IGNORE local_agent_scopes SET local_path = '\\' || substr(local_path, 9)
               WHERE local_path LIKE '\\?\UNC\%';
           UPDATE OR IGNORE local_agent_scopes SET local_path = substr(local_path, 5)
               WHERE local_path LIKE '\\?\%';",
-    )?;
-    Ok(())
+    )
+}
+
+/// Imports the shared folders and the device id from `db/data.db` of an earlier layout,
+/// once.
+fn import_legacy(store: &Store, legacy: &Path) -> rusqlite::Result<()> {
+    store.import_once("agents/data.db", |connection| {
+        if !legacy.is_file() {
+            return Ok(());
+        }
+        let old = Connection::open_with_flags(legacy, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        // A column an older build never added falls back to the new table's default.
+        let columns: Vec<String> = old
+            .prepare("PRAGMA table_info(local_agent_scopes)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<_, _>>()?;
+        if let Ok(mut statement) = old.prepare("SELECT key,value FROM local_agent_settings") {
+            for row in statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))? {
+                let (key, value) = row?;
+                connection.execute(
+                    "INSERT OR IGNORE INTO local_agent_settings(key,value) VALUES(?1,?2)",
+                    [key, value],
+                )?;
+            }
+        }
+        let has = |name: &str| columns.iter().any(|column| column == name);
+        let select = format!(
+            "SELECT id,device_id,display_name,local_path,created_at,{},{},{},{} FROM local_agent_scopes",
+            if has("access") { "access" } else { "'read'" },
+            if has("allow_installs") { "allow_installs" } else { "0" },
+            if has("allow_push") { "allow_push" } else { "0" },
+            if has("allow_push_default") { "allow_push_default" } else { "0" },
+        );
+        if let Ok(mut statement) = old.prepare(&select) {
+            let rows = statement.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, i64>(8)?,
+                ))
+            })?;
+            for row in rows {
+                let row = row?;
+                connection.execute(
+                    "INSERT OR IGNORE INTO local_agent_scopes
+                     (id,device_id,display_name,local_path,created_at,access,allow_installs,allow_push,allow_push_default)
+                     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    rusqlite::params![row.0, row.1, row.2, row.3, row.4, row.5, row.6, row.7, row.8],
+                )?;
+            }
+        }
+        strip_verbatim_prefixes(connection)
+    })
 }
 
 fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> {

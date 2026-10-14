@@ -57,7 +57,7 @@ describe("bang destinations", () => {
       "https://www.youtube.com/results?search_query=lo%20fi",
     );
     expect(bangDestination(web("gh"), "  ")).toBe("https://github.com/");
-    expect(bangDestination(web("ddg"), "misty")).toBe("https://duckduckgo.com/?q=misty");
+    expect(bangDestination(web("g"), "misty")).toBe("https://www.google.com/search?q=misty");
   });
 
   it("refuses a template that is not http or https", () => {

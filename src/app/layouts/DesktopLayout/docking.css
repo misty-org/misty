@@ -6,7 +6,7 @@
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--misty-theme-workspace);
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
   color: var(--misty-theme-text);
 }
 .misty-docking-titlebar {
@@ -26,7 +26,7 @@
   max-width: 100%;
   /* Browser views make the shell transparent. Paint this otherwise empty
      corner so the native window backing cannot show beside the traffic lights. */
-  background: var(--misty-theme-workspace);
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
   pointer-events: auto;
 }
 .misty-docking-nav {
@@ -264,7 +264,7 @@
 /* Every orientation uses the reference pane seam. Geometry chooses the edges
    that touch chrome; masks keep WebKit toolbar paint inside the curved seam. */
 .misty-docking-frame [data-workspace-panes] {
-  background: var(--misty-theme-workspace);
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
 }
 .misty-docking-frame [data-workspace-panes] > [role="tabpanel"] {
   position: relative;
@@ -278,15 +278,34 @@
   inset: 0;
   z-index: 2147483646;
   background:
-    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
-      left / var(--pane-corner-top-left) var(--pane-corner-top-left),
-    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
-      right / var(--pane-corner-top-right) var(--pane-corner-top-right),
-    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
-      left / var(--pane-corner-bottom-left) var(--pane-corner-bottom-left),
-    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
-      right / var(--pane-corner-bottom-right) var(--pane-corner-bottom-right);
+    radial-gradient(
+        circle at 100% 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top left / var(--pane-corner-top-left) var(--pane-corner-top-left),
+    radial-gradient(
+        circle at 0 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top right / var(--pane-corner-top-right) var(--pane-corner-top-right),
+    radial-gradient(
+        circle at 100% 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom left / var(--pane-corner-bottom-left) var(--pane-corner-bottom-left),
+    radial-gradient(
+        circle at 0 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom right / var(--pane-corner-bottom-right) var(--pane-corner-bottom-right);
   background-repeat: no-repeat;
+  /* A panel's margin of chrome, painted here because the page host stays transparent. */
+  box-shadow: inset 0 0 0 var(--pane-frame, 0px)
+    var(--misty-window-chrome, var(--misty-theme-workspace));
   pointer-events: none;
 }
 .misty-docking-frame [data-workspace-panes] > [role="tabpanel"]::after {
@@ -295,7 +314,7 @@
   inset: 0;
   z-index: 2147483647;
   border-style: solid;
-  border-color: var(--color-charcoal-border);
+  border-color: var(--pane-seam-color, var(--color-charcoal-border));
   border-width: var(--pane-seam-top) var(--pane-seam-right) var(--pane-seam-bottom)
     var(--pane-seam-left);
   border-radius: var(--pane-corner-top-left) var(--pane-corner-top-right)
@@ -305,63 +324,6 @@
 @media (prefers-reduced-motion: reduce) {
   .misty-shell-motion,
   .misty-global-navigator [data-navigator-stack] {
-    transition: none;
-  }
-}
-
-.misty-navigator-edge-marker {
-  position: fixed;
-  z-index: 21;
-  pointer-events: none;
-  width: var(--misty-marker-size);
-  height: 22px;
-  background: var(--misty-marker);
-  opacity: 0;
-  scale: 1 0;
-  translate: 0 -50%;
-  transform-origin: center;
-  transition:
-    scale 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 160ms linear;
-}
-.misty-navigator-edge-marker[data-edge="left"] {
-  left: 0;
-  border-radius: 0 999px 999px 0;
-}
-.misty-navigator-edge-marker[data-edge="right"] {
-  right: 0;
-  border-radius: 999px 0 0 999px;
-}
-.misty-navigator-edge-marker[data-state="hover"] {
-  opacity: 0.55;
-  scale: 1 0.45;
-}
-.misty-navigator-edge-marker[data-state="active"] {
-  opacity: 1;
-  scale: 1 1;
-}
-.misty-navigator-edge-marker:is([data-edge="top"], [data-edge="bottom"]) {
-  width: 22px;
-  height: var(--misty-marker-size);
-  translate: -50% 0;
-  scale: 0 1;
-}
-.misty-navigator-edge-marker[data-edge="top"] {
-  top: 0;
-  border-radius: 0 0 999px 999px;
-}
-.misty-navigator-edge-marker[data-edge="bottom"] {
-  bottom: 0;
-  border-radius: 999px 999px 0 0;
-}
-.misty-navigator-edge-marker:is([data-edge="top"], [data-edge="bottom"])[data-state="hover"] {
-  scale: 0.45 1;
-}
-.misty-navigator-edge-marker:is([data-edge="top"], [data-edge="bottom"])[data-state="active"] {
-  scale: 1 1;
-}
-@media (prefers-reduced-motion: reduce) {
-  .misty-navigator-edge-marker {
     transition: none;
   }
 }
@@ -425,8 +387,11 @@
   border: 0;
   /* WorkspaceTabStrip sets padding-left from the traffic-light inset. */
   /* Leave the overlapped seam row unpainted so the pane outline shows. */
-  background: linear-gradient(var(--misty-theme-workspace), var(--misty-theme-workspace)) top / 100%
-    calc(100% - 1px) no-repeat;
+  background: linear-gradient(
+      var(--misty-window-chrome, var(--misty-theme-workspace)),
+      var(--misty-window-chrome, var(--misty-theme-workspace))
+    )
+    top / 100% calc(100% - 1px) no-repeat;
 }
 .misty-workspace-tabs[data-tab-position="top"] {
   margin-bottom: -1px;
@@ -622,9 +587,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 2px;
-  margin-right: 6px;
-  padding-right: 6px;
-  border-right: 1px solid var(--color-charcoal-border, rgba(255, 255, 255, 0.08));
+  margin-right: 4px;
 }
 .misty-workspace-favorites-grid {
   display: grid;
@@ -637,9 +600,9 @@
 .misty-workspace-favorite {
   display: grid;
   place-items: center;
-  width: 32px;
+  width: 30px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--workspace-tab-muted, inherit);
 }
 .misty-workspace-favorites-grid .misty-workspace-favorite {
@@ -648,12 +611,347 @@
 }
 .misty-workspace-favorite:hover,
 .misty-workspace-favorite[data-menu-open] {
-  background: var(--color-charcoal-hover, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.05);
 }
 .misty-workspace-favorite[data-active] {
-  background: var(--color-charcoal-card, rgba(255, 255, 255, 0.1));
+  background: rgba(255, 255, 255, 0.09);
 }
 .misty-workspace-favorite:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 34px
+   rounded rows with hover-only close buttons, and the window actions sit in a footer. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
+  --shell-tab-height: 34px;
+  gap: 0;
+  padding-bottom: 8px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 2px 0 10px;
+  padding: 0 0 10px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite {
+  height: 34px;
+  border-radius: 8px;
+  background: transparent;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite:is(:hover, [data-menu-open]) {
+  background: rgba(255, 255, 255, 0.05);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite[data-active] {
+  background: rgba(255, 255, 255, 0.09);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  gap: 2px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  border-radius: 8px;
+  font-size: 13px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-close {
+  opacity: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:is(:hover, :focus-within)
+  .misty-workspace-tab-close {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+    .misty-workspace-tab-close {
+    opacity: 1;
+  }
+}
+.misty-workspace-new-tab-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: var(--shell-tab-height, 34px);
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--workspace-tab-muted, var(--color-cream-muted));
+  text-align: left;
+}
+/* New Tab reads as a tab row: the same hover wash and text, without a close button. */
+.misty-workspace-new-tab-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+.misty-workspace-new-tab-row:focus-visible {
   outline: 1px solid var(--color-cream-muted, currentColor);
   outline-offset: -1px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-actions {
+  margin: 0 0 6px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+}
+
+/* The vertical tab list sits directly on the sidebar, fading at the edges that still have
+   tabs beyond them so it reads as scrollable. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  margin-top: 2px;
+}
+
+/* Favorites and the window actions (below the address field) sit directly on the sidebar. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid {
+  margin: 0 0 6px;
+  padding: 6px;
+  align-content: start;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+}
+/* Until a favorite exists the container takes no room and draws nothing. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid[data-empty] {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-actions {
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+}
+
+/* New Tab is the first row of the tab list: sticky, on the sidebar's own color. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 2px;
+  padding: 0 8px;
+  width: 100%;
+  background: var(--misty-tab-well);
+}
+/* Its hover is a wash over the sidebar color, like a tab's, kept opaque so tabs scrolling
+   beneath the sticky row never show through. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row:is(:hover, :focus-visible) {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)),
+    var(--misty-tab-well);
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+
+/* Tabs fade out at the list's edges while more sit beyond them. The bottom is a mask; the
+   top is a gradient hanging off the sticky New Tab row, so tabs dissolve into that row. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-fade-end, 0px)), transparent);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: var(--tab-fade-start, 0px);
+  background: linear-gradient(var(--misty-tab-well), transparent);
+  pointer-events: none;
+}
+
+/* Vertical tabs: selected and hovered rows are a soft highlight, not a bordered card. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab[data-active="true"] {
+  background: rgba(255, 255, 255, 0.09);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:not(:hover, :focus-within)
+  .misty-workspace-tab-close {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The focused browser pane's toolbar (nav, address field, tools) sits at the top of a vertical
+   strip. Empty, as on a non-browser page, it takes no room. */
+.misty-workspace-toolbar-slot {
+  flex-shrink: 0;
+}
+.misty-sidebar-address {
+  margin-bottom: 8px;
+}
+
+/* The sidebar toggle and back/forward/reload share the traffic lights' band, so the sidebar
+   has no header row of its own: the head row rises into the strip's titlebar padding and
+   starts where the native buttons end. */
+.misty-sidebar-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 28px;
+  padding-left: max(0px, calc(var(--window-chrome-left, 0px) - var(--shell-gap, 8px)));
+}
+.misty-workspace-tabs[data-window-chrome="true"] .misty-sidebar-head {
+  min-height: max(28px, var(--window-chrome-top, 0px));
+  margin-top: calc(-5px - var(--window-chrome-top, 0px));
+}
+
+.misty-docking-rail-cap {
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
+  pointer-events: none;
+}
+
+/* A rail on the right has no traffic lights above it, so it starts at the window's top edge. */
+.misty-docking-frame[data-rail-flush] .misty-global-navigator {
+  padding-top: 10px;
+}
+
+/* The vertical sidebar's holder. Open it is a column; collapsed, its width animates to nothing
+   and the panel waits off its edge, sliding over the page when revealed. */
+.misty-sidebar-drawer {
+  --sidebar-w: min(var(--shell-side-tabs, 240px), 35vw);
+  position: relative;
+  flex: none;
+  width: var(--sidebar-w);
+  transition: width var(--shell-motion-duration, 300ms) var(--shell-motion-easing, ease-in-out);
+}
+.misty-sidebar-drawer[data-collapsed] {
+  width: 0;
+}
+/* While dragging the edge the width follows the pointer, with no easing. */
+.misty-sidebar-drawer[data-resizing],
+.misty-sidebar-drawer[data-resizing] .misty-sidebar-drawer-panel {
+  transition: none;
+}
+/* The outer edge: a thin grab strip on the side away from the page. */
+.misty-sidebar-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 45;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.misty-sidebar-resize[data-side="left"] {
+  right: -4px;
+}
+.misty-sidebar-resize[data-side="right"] {
+  left: -4px;
+}
+.misty-sidebar-drawer-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--sidebar-w);
+  z-index: 40;
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
+  transition:
+    transform var(--shell-motion-duration, 300ms) var(--shell-motion-easing, ease-in-out),
+    opacity var(--shell-motion-duration, 300ms) var(--shell-motion-easing, ease-in-out);
+}
+.misty-sidebar-drawer[data-side="left"] .misty-sidebar-drawer-panel {
+  left: 0;
+}
+.misty-sidebar-drawer[data-side="right"] .misty-sidebar-drawer-panel {
+  right: 0;
+}
+.misty-sidebar-drawer .misty-workspace-tabs {
+  width: 100%;
+}
+.misty-sidebar-drawer[data-collapsed]:not([data-revealed])[data-side="left"]
+  .misty-sidebar-drawer-panel {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.misty-sidebar-drawer[data-collapsed]:not([data-revealed])[data-side="right"]
+  .misty-sidebar-drawer-panel {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-drawer-panel {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  border-radius: 12px;
+}
+
+/* Flat sidebar: the color the sticky New Tab row and the top fade blend into. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
+  --misty-tab-well: var(--misty-window-chrome, var(--misty-theme-workspace));
+}
+
+/* Stand-ins for the focused browser page's address field and nav buttons, shown on any other
+   page and hidden while a browser page fills their slots. */
+.misty-sidebar-address-fallback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--workspace-tab-muted, var(--color-cream-muted));
+  font-size: 13px;
+  text-align: left;
+}
+.misty-sidebar-address-fallback:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.misty-sidebar-address:has(.misty-workspace-toolbar-slot:not(:empty))
+  .misty-sidebar-address-fallback,
+.misty-sidebar-nav:has(> div:first-child:not(:empty)) .misty-sidebar-nav-fallback {
+  display: none;
+}
+/* The strip above the page, across the whole window, moves the window. It is as tall as the
+   page's top margin and painted in the chrome color, and it sits under the revealed drawer. */
+.misty-sidebar-drag-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: 100vw;
+  height: var(--pane-seam-top, 8px);
+  background: var(--misty-window-chrome, var(--misty-theme-workspace));
+}
+.misty-sidebar-drawer[data-side="right"] .misty-sidebar-drag-band {
+  left: auto;
+  right: 0;
+}
+
+/* A vertical sidebar's bottom edge, above the account island floating over the window's corner:
+   Spaces and Agents. The sidebar's list leaves room for the island beneath it. */
+.misty-sidebar-foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0 64px;
 }

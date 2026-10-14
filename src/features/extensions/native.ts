@@ -50,11 +50,13 @@ export const extensionsNative = {
   prepare: (id: string) => invoke<ExtensionReview>("extensions_prepare", { id }),
   commit: (token: string, generation: string | null = null, privateAccess = false) =>
     invoke<ExtensionReview>("extensions_commit", { token, generation, privateAccess }),
-  /** Records access granted on this device; synced settings alone cannot widen it. */
-  approve: (guid: string, permissions: string[], hosts: string[], privateAccess: boolean) =>
-    invoke<void>("extensions_approve", { guid, permissions, hosts, privateAccess }),
   reconcile: (account: string, installations: Installation[], agentAccess: boolean) =>
-    invoke<InstalledState[]>("extensions_reconcile", { account, installations, agentAccess }),
+    invoke<InstalledState[]>("extensions_reconcile", {
+      account,
+      // Pinning is toolbar layout only; the runtime never sees it.
+      installations: installations.map(({ pinned: _pinned, ...item }) => item),
+      agentAccess,
+    }),
   actions: (tabId: string) =>
     invoke<{ actions: ExtensionAction[] }>("extensions_action", { operation: "actions", tabId }),
   invoke: (id: string, tabId: string, anchor: Pick<DOMRect, "x" | "y" | "width" | "height">) =>

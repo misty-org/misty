@@ -7,7 +7,6 @@ import {
   definitionForLegacy,
   validPreference,
   projectPreferences,
-  runtimeAdapters,
   type PreferenceValues,
 } from "../profiles/registry";
 import { writeProfilePreference } from "../profiles/bridge";
@@ -30,16 +29,10 @@ import type {
   ShortcutsSnapshot,
   UpdateShortcutRequest,
 } from "@/native/ipc";
-import {
-  publishNavigatorLayout,
-  readNavigatorLayout,
-  configureStartupPreference,
-} from "@/features/app-shell";
+import { configureStartupPreference } from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
 import {
   configureBrowserCustomBangs,
-  configureBrowserCustomSearchEngine,
-  configureBrowserSearchEngine,
   configureBrowserSearchSuggestions,
 } from "@/features/workspace/browserSearchEngine";
 import {
@@ -54,12 +47,12 @@ import {
 import { configureBrowserSiteZoom } from "@/features/webviews/siteZoom";
 import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
 import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
-import { configureBrowserTabSleep } from "@/features/webviews/tabSleepSettings";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
 import { configureAutoPictureInPicture } from "@/features/webviews/pictureInPictureSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
+import { invoke } from "@/native/invoke";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
 import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
@@ -266,12 +259,6 @@ function applySettingsSideEffects(
   } catch {
     /* Invalid legacy data uses the last applied presets. */
   }
-  const appearance = document.appearance as Record<string, unknown> | undefined;
-  if (applyPortableLayout && typeof appearance?.navigator_auto_hide === "boolean") {
-    const layout = readNavigatorLayout();
-    const autoHide = appearance.navigator_auto_hide;
-    if (layout.autoHide !== autoHide) publishNavigatorLayout({ autoHide });
-  }
   telemetryPreferencesChanged(
     settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
     settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
@@ -282,24 +269,22 @@ function applySettingsSideEffects(
     excludedSites: settingsString(document, "privacy", "page_state_excluded_sites", ""),
   });
   configureTabHistoryBudget(settingsNumber(document, "general", "browser_tab_history_kb", 256));
+  // This device's own sync frequency: the native sync worker scales its send timings by it.
+  void invoke("browser_sync_set_frequency", {
+    frequency: settingsString(document, "sync", "sync_frequency", "balanced"),
+  }).catch(() => undefined);
   configureBrowserHomeUrl(settingsString(document, "general", "browser_homepage", ""));
-  // The document stores the engine's legacy index; the registry resolves the id.
-  configureBrowserSearchEngine(String(runtimeAdapters.get("browser.searchEngine")!.read(document)));
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
   configureBrowserCustomBangs(
     settingsString(document, "general", "browser_custom_bangs_json", "[]"),
   );
-  configureBrowserCustomSearchEngine(
-    settingsString(document, "general", "browser_custom_search_engine", ""),
-  );
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
   configureBrowserMouseGestures(
     settingsBoolean(document, "general", "browser_mouse_gestures", false),
   );
-  configureBrowserTabSleep(settingsNumber(document, "general", "browser_tab_sleep_minutes", 30));
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
   configureAutoPictureInPicture(

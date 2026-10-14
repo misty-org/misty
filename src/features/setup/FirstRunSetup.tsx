@@ -31,24 +31,14 @@ const themeChoices: Array<{ value: AppThemeMode; label: string }> = [
 
 const layoutChoices: Array<{ label: string; detail: string; layout: DockingLayout }> = [
   {
-    label: "Classic",
-    detail: "Navigation left, tabs on top",
+    label: "Horizontal tabs",
+    detail: "Tabs across the top, navigation on the left",
     layout: { navigation: "left", tabs: "top" },
   },
   {
     label: "Vertical tabs",
-    detail: "Tabs in a column beside navigation",
-    layout: { navigation: "left", tabs: "left" },
-  },
-  {
-    label: "Top bar",
-    detail: "Navigation and tabs across the top",
-    layout: { navigation: "top", tabs: "top" },
-  },
-  {
-    label: "Right-handed",
-    detail: "Navigation and tabs on the right",
-    layout: { navigation: "right", tabs: "right" },
+    detail: "Tabs in a sidebar, navigation on the opposite side",
+    layout: { navigation: "right", tabs: "left" },
   },
 ];
 
@@ -59,7 +49,8 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
   },
   layout: {
     title: "Choose a layout",
-    description: "Pick where navigation and tabs sit. It applies to this window as you choose.",
+    description:
+      "Pick how tabs are laid out. Navigation always sits on the opposite side. It applies to this window as you choose.",
   },
   import: {
     title: "Import from your browser",

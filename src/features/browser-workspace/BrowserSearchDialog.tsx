@@ -18,22 +18,30 @@ import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime"
 import { mistyBangs } from "./bangs/catalog";
 import { bangDestination, parseBang, parseLeadingBang } from "./bangs/parse";
 import type { Bang } from "./bangs/types";
-import { browserSearchDestination, useBrowserSearchStore } from "./search";
+import { browserSearchDestination, useBrowserSearchStore, type SearchAnchor } from "./search";
 import { SearchResultList, type SearchListItem } from "./SearchResultList";
 import { openInNewBrowserTab, openMatch, openResult } from "./searchTargets";
 import { useSearchItems } from "./useSearchItems";
 
-/** Margins that move the centered panel onto the page area, not the whole window. */
+/**
+ * Margins that move the top-anchored panel onto the page area, not the whole window. The
+ * input stays put while results grow downward beneath it.
+ */
 function centerOnPage(open: boolean) {
   const rect = open
     ? document.querySelector("[data-browser-page-host]")?.getBoundingClientRect()
     : undefined;
-  if (!rect?.width) return { marginLeft: 84, marginTop: 40 };
+  if (!rect?.width) return { marginLeft: 84, marginTop: 0 };
   return {
     marginLeft: Math.round(rect.left + rect.right - window.innerWidth),
-    // Lifted 8% of the page height: a tall palette reads as low at the exact middle.
-    marginTop: Math.round(rect.top + rect.bottom - window.innerHeight - rect.height * 0.16),
+    // The dialog's own 12vh top offset is replaced by 12% of the page height.
+    marginTop: Math.round(rect.top + rect.height * 0.12 - window.innerHeight * 0.12),
   };
+}
+
+/** Margins that put the panel's top-left corner where the address bar was. */
+function overAddressBar(anchor: SearchAnchor) {
+  return { marginLeft: anchor.left, marginTop: anchor.top, width: anchor.width };
 }
 
 const close = () => useBrowserSearchStore.getState().close();
@@ -41,6 +49,7 @@ const close = () => useBrowserSearchStore.getState().close();
 export function BrowserSearchDialog() {
   const open = useBrowserSearchStore((state) => state.open);
   const openScope = useBrowserSearchStore((state) => state.scope);
+  const anchor = useBrowserSearchStore((state) => state.anchor);
   const [bang, setBang] = useState<Bang | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -108,8 +117,15 @@ export function BrowserSearchDialog() {
 
   const choose = (item: SearchListItem) => {
     if (item.type === "bang") pickBang(item.bang, item.query);
-    else if (item.type === "match") run(() => openMatch(item.match, navigate));
-    else run(() => openResult(item.result, navigate));
+    else if (item.type === "match") {
+      const target = item.match.target;
+      if (anchor && target.type !== "switch-tab" && target.type !== "open-in-app")
+        run(() => anchor.openUrl(target.url));
+      else run(() => openMatch(item.match, navigate));
+    } else if (anchor && item.result.target.kind === "url") {
+      const { url } = item.result.target;
+      run(() => anchor.openUrl(url));
+    } else run(() => openResult(item.result, navigate));
   };
 
   /** Enter with nothing highlighted: a website shortcut's search, or the typed address or search. */
@@ -121,7 +137,7 @@ export function BrowserSearchDialog() {
       parsed?.bang.kind === "web"
         ? bangDestination(parsed.bang, parsed.query)
         : browserSearchDestination(query);
-    if (url) run(() => openInNewBrowserTab(url, navigate));
+    if (url) run(() => (anchor ? anchor.openUrl(url) : openInNewBrowserTab(url, navigate)));
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -153,10 +169,12 @@ export function BrowserSearchDialog() {
       onOpenChange={(next) => (next ? useBrowserSearchStore.getState().show() : close())}
     >
       <DialogContent
-        placement="center"
-        style={centerOnPage(open)}
+        placement="top"
+        backdrop={!anchor}
+        style={anchor ? overAddressBar(anchor) : centerOnPage(open)}
         className={cn(
-          "max-w-[700px] gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
+          anchor ? "max-w-none" : "max-w-[700px]",
+          "gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
           "ring-0 shadow-[0_24px_70px_rgba(0,0,0,0.65)] [&>[data-slot=dialog-close]]:hidden",
         )}
       >
@@ -182,11 +200,7 @@ export function BrowserSearchDialog() {
             ) : (
               <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
             )}
-            {bang && (
-              <span className="shrink-0 text-base text-zinc-400">
-                !{bang.trigger}
-              </span>
-            )}
+            {bang && <span className="shrink-0 text-base text-zinc-400">!{bang.trigger}</span>}
             <Input
               variant="bare"
               autoFocus

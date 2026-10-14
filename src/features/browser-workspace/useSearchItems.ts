@@ -17,7 +17,22 @@ import { useScopedSearch } from "./useScopedSearch";
 import { searchCommands, searchSiteApps } from "./commandResults";
 
 // Providers read their sources at query time, so one set serves every search.
-const providers = createOmniboxProviders(liveOmniboxDeps);
+// Enter here always opens a new tab, so pages that are already open stay in the
+// list as ordinary suggestions that open another copy, never as "Switch to tab".
+const providers = createOmniboxProviders(liveOmniboxDeps).map((provider) =>
+  provider.id === "open-tabs"
+    ? {
+        ...provider,
+        start: (input: OmniboxInput, signal: AbortSignal) =>
+          (provider.start(input, signal) as OmniboxMatch[]).map((match): OmniboxMatch => ({
+            ...match,
+            kind: "history",
+            target: { type: "navigate", url: match.target.url },
+            allowedToBeDefault: false,
+          })),
+      }
+    : provider,
+);
 const suggestProviders = [searchSuggestProvider(liveOmniboxDeps)];
 
 function omniboxInput(text: string): OmniboxInput {

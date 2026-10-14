@@ -42,34 +42,30 @@ export function AccountCollectionFilters({
   const raw = useSettingsProfiles((store) =>
     store.state ? String(resolveSetting(store.state, id).value) : "[]",
   );
-  const accountId = useSettingsProfiles((store) => store.accountId);
   const ready = useSettingsProfiles((store) => store.ready);
   const edit = useSettingsProfiles((store) => store.edit);
-  const [failure, setFailure] = useState<{ accountId: string; message: string }>();
+  const [failure, setFailure] = useState<string>();
   return (
     <>
       <CollectionFilters
         {...props}
         options={orderedTabs(props.options, raw)}
         onReorder={
-          ready && accountId
+          ready
             ? (ids) => {
                 // Retain temporarily hidden sections when another section is moved.
                 const merged = mergeTabOrder(raw, ids);
                 setFailure(undefined);
                 void edit(id, JSON.stringify(merged)).catch(() =>
-                  setFailure({
-                    accountId,
-                    message: "Tab order couldn’t be saved. Try moving the tab again.",
-                  }),
+                  setFailure("Tab order couldn’t be saved. Try moving the tab again."),
                 );
               }
             : undefined
         }
       />
-      {failure?.accountId === accountId && (
+      {failure && (
         <p role="alert" className="text-sm text-cream-muted">
-          {failure.message}
+          {failure}
         </p>
       )}
     </>

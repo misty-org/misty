@@ -69,7 +69,6 @@ export function ExtensionSettingsItem({
           disabled={busy || local?.review?.privateAllowed === false}
           onChange={(value) =>
             void work(async () => {
-              if (value) await extensionsNative.approve(item.guid, [], [], true);
               await updateInstallation(item.id, { privateAccess: value });
             })
           }
@@ -105,7 +104,10 @@ export function ExtensionSettingsItem({
         </DesktopSettingsRow>
       )}
       {local?.review?.hasOptions && (
-        <DesktopSettingsRow label="Extension settings" description="Opens the extension's own options.">
+        <DesktopSettingsRow
+          label="Extension settings"
+          description="Opens the extension's own options."
+        >
           <Button
             variant="outline"
             disabled={busy || local.status !== "enabled"}
@@ -143,7 +145,9 @@ export function ExtensionSettingsItem({
       ))}
       <DesktopSettingsRow
         label="Store page"
-        description={store === "chrome" ? "Opens it on the Chrome Web Store." : "Opens it on Firefox Add-ons."}
+        description={
+          store === "chrome" ? "Opens it on the Chrome Web Store." : "Opens it on Firefox Add-ons."
+        }
       >
         <Button variant="outline" onClick={() => openStorePage(storePage(item))}>
           Open

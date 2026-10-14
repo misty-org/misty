@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-mod approvals;
 mod catalog;
 mod chrome_store;
 mod compat;

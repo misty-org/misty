@@ -65,7 +65,7 @@ use infra::browser::profile_cleanup::browser_device_profile_delete;
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
-    browser_webview_create, browser_webview_forward, browser_webview_hide,
+    browser_webview_create, browser_webview_forward, browser_webview_held, browser_webview_hide,
     browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
     browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
     browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
@@ -118,6 +118,11 @@ pub fn run() {
     let mut context = tauri::generate_context!();
     #[cfg(all(desktop, debug_assertions))]
     development_profile::configure(&mut context).expect("invalid development profile");
+    // The credential store lives in the same database as every other store, so both must
+    // resolve the same data root (tests and development profiles can move it).
+    if let Some(home) = infra::paths::misty_home_dir() {
+        let _ = misty_credential_store::configure_root(home.join(".local").join("data"));
+    }
     // Use one TLS provider for backend calls and updates.
     let _ = rustls::crypto::ring::default_provider().install_default();
     telemetry::initialize();
@@ -203,12 +208,6 @@ pub fn run() {
                     window.set_title(&profile)?;
                 }
             }
-            #[cfg(target_os = "macos")]
-            misty_browser_sync::secure_store::configure_device_store(
-                app.path()
-                    .local_data_dir()?
-                    .join("com.misty.desktop/device-keys"),
-            )?;
 
             // Runs only in the primary instance, before any service opens a
             // file under ~/.misty. Services still create what they need, so a
@@ -221,10 +220,22 @@ pub fn run() {
             // What this device trusts (vault root pin, device list, its own
             // policy) lives beside its other app data.
             #[cfg(desktop)]
-            infra::device_trust::set_storage_root(runtime.environment.config_dir());
+            infra::device_trust::set_storage_root(
+                runtime
+                    .environment
+                    .store()
+                    .path()
+                    .parent()
+                    .map(std::path::Path::to_path_buf)
+                    .unwrap_or_default(),
+            );
             app.manage(infra::agent_files::AgentFilesState::default());
             #[cfg(all(desktop, any(unix, windows)))]
-            infra::clipboard_bridge::start(app.handle().clone(), runtime.environment.config_dir());
+            infra::clipboard_bridge::start(
+                app.handle().clone(),
+                runtime.environment.store(),
+                runtime.environment.config_dir(),
+            );
             app.manage(runtime);
             #[cfg(desktop)]
             app.manage(BrowserSessionState::default());
@@ -303,7 +314,6 @@ pub fn run() {
                 Box::new(tauri::generate_handler![
                     crate::infra::extensions::install::extensions_prepare,
                     crate::infra::extensions::install::extensions_commit,
-                    crate::infra::extensions::install::extensions_approve,
                     crate::infra::extensions::runtime::extensions_reconcile,
                     crate::infra::extensions::runtime::extensions_action,
                     crate::infra::extensions::runtime::extensions_respond,
@@ -336,6 +346,7 @@ pub fn run() {
                     crate::infra::page_state::history::browser_view_history_load,
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
+                    crate::infra::browser_sync::browser_sync_set_frequency,
                     crate::infra::browser_sync::browser_sync_forget_key,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
@@ -361,6 +372,7 @@ pub fn run() {
                     crate::infra::default_browser::app_take_launch_urls,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
+                    platform::plugins::mac_traffic_lights::set_traffic_lights_visible,
                     app_snapshot,
                     agents_device_snapshot,
                     infra::agent_files::agent_files_choose,
@@ -535,6 +547,7 @@ pub fn run() {
                     browser_webview_set_zoom,
                     #[cfg(desktop)]
                     browser_webview_show,
+                    browser_webview_held,
                     #[cfg(desktop)]
                     browser_webviews_set_overlay_active,
                     #[cfg(desktop)]

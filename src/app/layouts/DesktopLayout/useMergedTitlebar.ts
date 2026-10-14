@@ -68,9 +68,22 @@ export function useMergedTitlebar(
           rect.right <= rect.left ||
           rect.bottom <= rect.top ||
           element.closest('[inert], [aria-hidden="true"]')
-        )
+        ) {
+          // A modal marks the shell inert while it is open. Keep the insets the chrome already
+          // has, or the strip's content jumps up under the traffic lights and back.
+          if (modified.has(element) && element.closest('[inert], [aria-hidden="true"]'))
+            retained.add(element);
           return;
-        const insets = windowChromeInsets(rect, shellBounds.width / scale, chromeLeft, chromeRight);
+        }
+        // A sliding sidebar is measured by its holder, which stays put, so the controls' insets
+        // do not shift its header while the panel moves.
+        const holder = sideTabs ? element.closest<HTMLElement>(".misty-sidebar-drawer") : null;
+        const insets = windowChromeInsets(
+          holder ? { ...rect, left: bounds(holder).left, right: bounds(holder).right } : rect,
+          shellBounds.width / scale,
+          chromeLeft,
+          chromeRight,
+        );
         if (!insets.touchesTitlebar) return;
         retained.add(element);
         if (!modified.has(element)) {
@@ -80,7 +93,11 @@ export function useMergedTitlebar(
           const style = getComputedStyle(element);
           basePadding.set(element, { left: style.paddingLeft, right: style.paddingRight });
         }
-        element.dataset.windowChrome = "true";
+        // Only a header the native controls actually overlap is "in the chrome". One that merely
+        // sits near the top, such as a page beside a sidebar, keeps its normal spacing.
+        if (insets.left > 0 || insets.right > 0 || sideTabs || fallback)
+          element.dataset.windowChrome = "true";
+        else delete element.dataset.windowChrome;
         const padding = basePadding.get(element)!;
         element.style.setProperty("--window-toolbar-base-left", padding.left);
         element.style.setProperty("--window-toolbar-base-right", padding.right);
@@ -107,7 +124,11 @@ export function useMergedTitlebar(
       // A top tab strip already owns the titlebar band; panes start below it (overlapping
       // only by the connected-tab seam) and never need the fallback title header.
       const topTabs = shell.querySelector('.misty-workspace-tabs[data-tab-position="top"]');
-      if (!topTabs)
+      // A side strip owns the titlebar band, so no page needs a title header of its own.
+      const sideTabs = shell.querySelector(
+        '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
+      );
+      if (!topTabs && !sideTabs)
         shell.querySelectorAll<HTMLElement>("[data-workspace-pane]").forEach((pane) => {
           if (![...retained].some((element) => pane.contains(element))) apply(pane, true);
         });

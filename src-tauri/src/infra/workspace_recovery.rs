@@ -52,13 +52,22 @@ fn recovery_directory(
     deployment: &str,
     account: &str,
 ) -> Result<std::path::PathBuf, String> {
+    // A development profile has its own recovery, even for the same account.
+    let profile = std::env::var("MISTY_PROFILE").ok();
     let identity = hex::encode(Sha256::digest(
-        serde_json::to_vec(&(deployment, account)).map_err(|_| "Invalid workspace identity")?,
+        match &profile {
+            Some(profile) => serde_json::to_vec(&(deployment, account, profile)),
+            None => serde_json::to_vec(&(deployment, account)),
+        }
+        .map_err(|_| "Invalid workspace identity")?,
     ));
-    Ok(app
-        .path()
-        .app_local_data_dir()
-        .map_err(|_| "Workspace storage is unavailable")?
+    // Under Misty's data folder with everything else. (A recovery database from an
+    // earlier layout was sealed with a key that no longer exists, so it is not reused.)
+    let _ = app;
+    Ok(super::paths::misty_home_dir()
+        .ok_or("Workspace storage is unavailable")?
+        .join(".local")
+        .join("data")
         .join("workspace-recovery")
         .join(identity))
 }
@@ -158,7 +167,7 @@ pub async fn browser_recovery_open(
     main_only(&webview)?;
     let lifetime = super::browser_sync::browser_lifecycle().read().await;
     // Move the lifetime lease into the blocking task. Cancellation of IPC cannot
-    // let an account switch race an outstanding SQLite/Keychain operation.
+    // let an account switch race an outstanding SQLite operation.
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
         let deployment = super::browser_sync::account_api(&api_base, &account_id)?.deployment();

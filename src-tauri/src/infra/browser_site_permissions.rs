@@ -333,6 +333,8 @@ pub(crate) fn import_decisions(
     Ok(added)
 }
 
+#[path = "browser_site_permissions_db.rs"]
+mod db;
 #[cfg(target_os = "macos")]
 #[path = "browser_site_permissions_store.rs"]
 mod store;

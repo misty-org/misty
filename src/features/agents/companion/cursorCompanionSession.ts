@@ -123,7 +123,7 @@ export class CursorCompanionSession {
 
   applyPreferences = () => {
     const settings = useSettingsProfiles.getState();
-    if (settings.accountId !== this.accountId || !settings.state) return;
+    if (!settings.state) return;
     const values = effectiveValues(settings.state);
     this.show = values["agents.companion.visible"] !== false;
     this.change({

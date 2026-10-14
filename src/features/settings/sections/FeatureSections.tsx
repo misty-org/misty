@@ -24,7 +24,6 @@ import { AppActionsSection } from "./AppActionsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { InboundTasksSection } from "./InboundTasksSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
-import { WebSearchSection } from "./WebSearchSection";
 import { PreferenceRow } from "./PreferenceRow";
 export function SpaceDefaultsSection() {
   return (
@@ -93,7 +92,6 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
-      <WebSearchSection />
       <Section title="Misty panel">
         <PanelSideRow />
       </Section>

@@ -25,6 +25,8 @@ interface BookmarkFields {
 interface WindowFields {
   title: string;
   order: number;
+  /** The window's chrome color; absent on windows made before colors. */
+  color?: string | null;
 }
 export type SplitTree =
   | {

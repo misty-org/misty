@@ -13,6 +13,15 @@ export function enableModernWindowStyle(window: unknown): Promise<void> {
   return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 0 });
 }
 
+/** They slide `distance` points and fade over `durationMs`, as the sidebar beside them does. */
+export function setTrafficLightsVisible(
+  visible: boolean,
+  distance = 0,
+  durationMs = 0,
+): Promise<void> {
+  return invoke("set_traffic_lights_visible", { visible, distance, durationMs });
+}
+
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
 }

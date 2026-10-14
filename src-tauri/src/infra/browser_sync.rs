@@ -49,8 +49,12 @@ mod workspace_control;
 mod workspace_edits;
 
 pub use account::browser_sync_lock;
+pub use account::browser_sync_set_frequency;
 use account::stop;
 pub(crate) use account::{__cmd__browser_sync_lock, __tauri_command_name_browser_sync_lock};
+pub(crate) use account::{
+    __cmd__browser_sync_set_frequency, __tauri_command_name_browser_sync_set_frequency,
+};
 pub(super) use account::{change_account, change_account_if};
 pub(super) use database::lock_database;
 pub(crate) use database::{

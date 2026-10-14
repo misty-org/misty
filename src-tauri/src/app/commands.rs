@@ -18,7 +18,6 @@ use crate::domain::explorer::{
     PrepareOpenItemRequest, PreparedDragItem, PreparedDragItemsResult, PreparedDragSkippedItem,
     PreparedOpenItem, RenameItemRequest, RenameItemsRequest,
 };
-use crate::domain::workspace::WorkspaceDocument;
 use crate::error::{ApiError, ApiResult};
 use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
@@ -351,19 +350,6 @@ pub async fn explorer_prepare_open_item(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedOpenItem> {
     state.explorer.prepare_open_item(request).await
-}
-
-#[tauri::command]
-pub async fn workspaces_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<WorkspaceDocument> {
-    state.workspaces.snapshot().await
-}
-
-#[tauri::command]
-pub async fn workspaces_save(
-    document: WorkspaceDocument,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<WorkspaceDocument> {
-    state.workspaces.save(document).await
 }
 
 #[tauri::command]

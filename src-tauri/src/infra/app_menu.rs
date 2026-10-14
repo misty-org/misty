@@ -44,13 +44,6 @@ fn build_menu<R: Runtime, M: Manager<R>>(
             &command_item(
                 manager,
                 snapshot,
-                "search.toggle",
-                "Search or Enter URL",
-                "Cmd+T",
-            )?,
-            &command_item(
-                manager,
-                snapshot,
                 "app.command_palette",
                 "Command Palette…",
                 "Cmd+Shift+P",
@@ -91,13 +84,6 @@ fn build_menu<R: Runtime, M: Manager<R>>(
         "View",
         true,
         &[
-            &command_item(
-                manager,
-                snapshot,
-                "app.toggle_navigator",
-                "Toggle Navigator",
-                "Cmd+Shift+B",
-            )?,
             &command_item(
                 manager,
                 snapshot,
@@ -159,7 +145,7 @@ fn build_menu<R: Runtime, M: Manager<R>>(
                 "Cmd+Option+Shift+W",
             )?,
             &PredefinedMenuItem::separator(manager)?,
-            &command_item(manager, snapshot, "workspace.new_tab", "New Tab", "")?,
+            &command_item(manager, snapshot, "search.toggle", "New Tab", "Cmd+T")?,
             &command_item(
                 manager,
                 snapshot,
@@ -301,9 +287,9 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
     let Some(command_id) = id.strip_prefix(SHORTCUT_MENU_PREFIX) else {
         return false;
     };
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.emit(SHORTCUT_MENU_EVENT, command_id);
-    }
+    // The Misty window holds native page views beside its own, so it is no longer a
+    // single-webview window and `get_webview_window` cannot find it; address the event.
+    let _ = app.emit_to("main", SHORTCUT_MENU_EVENT, command_id);
     true
 }
 

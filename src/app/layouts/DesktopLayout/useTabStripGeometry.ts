@@ -1,20 +1,24 @@
 import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
-/** Fades a horizontal tab list's edges while more tabs are scrolled out of view. */
+/** Fades a tab list's edges while more tabs are scrolled out of view (sideways, or up and down). */
 export function useTabStripFade(
   listRef: RefObject<HTMLDivElement | null>,
   enabled: boolean,
   count: number,
+  axis: "x" | "y" = "x",
 ) {
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!list || !enabled) return;
     const updateFade = () => {
-      list.style.setProperty("--tab-fade-start", list.scrollLeft > 1 ? "16px" : "0px");
-      list.style.setProperty(
-        "--tab-fade-end",
-        list.scrollWidth - list.clientWidth - list.scrollLeft > 1 ? "16px" : "0px",
-      );
+      const y = axis === "y";
+      const offset = y ? list.scrollTop : list.scrollLeft;
+      const rest = y
+        ? list.scrollHeight - list.clientHeight - list.scrollTop
+        : list.scrollWidth - list.clientWidth - list.scrollLeft;
+      const size = y ? "28px" : "16px";
+      list.style.setProperty("--tab-fade-start", offset > 1 ? size : "0px");
+      list.style.setProperty("--tab-fade-end", rest > 1 ? size : "0px");
     };
     updateFade();
     const observer = new ResizeObserver(updateFade);
@@ -25,7 +29,7 @@ export function useTabStripFade(
       observer.disconnect();
       list.removeEventListener("scroll", updateFade);
     };
-  }, [listRef, enabled, count]);
+  }, [listRef, enabled, count, axis]);
 }
 
 /** The rendered size of a dock pane, so split controls only offer splits that fit. */

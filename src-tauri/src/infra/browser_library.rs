@@ -1,6 +1,6 @@
-//! The browser's durable library: the downloads list and browsing history.
-//! Both live in one SQLite file in the app's data directory, so they survive
-//! restarts and stay with the local device (they are not synchronized).
+//! The browser's durable library: the downloads list and browsing history, in `misty.db`,
+//! so they survive restarts and stay with the local device (downloads are never
+//! synchronized; history syncs only through the encrypted browser sync).
 
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -11,6 +11,10 @@ use std::{
 };
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
+
+use super::store::Store;
+#[path = "browser_library_import.rs"]
+mod legacy;
 
 static LIBRARY: OnceLock<Mutex<Connection>> = OnceLock::new();
 const MAX_DOWNLOADS: i64 = 1_000;
@@ -24,11 +28,15 @@ pub(crate) fn now_ms() -> i64 {
 
 pub(crate) fn library(app: &AppHandle) -> Result<MutexGuard<'static, Connection>, String> {
     if LIBRARY.get().is_none() {
-        let directory = app
+        let home = super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+        let store = Store::at(home.join(".local").join("data").join("misty.db"));
+        // The library an earlier build kept beside the app's data comes along once.
+        let legacy = app
             .path()
             .app_data_dir()
-            .map_err(|error| error.to_string())?;
-        let connection = open(&directory.join("browser-library.sqlite"))?;
+            .map_err(|error| error.to_string())?
+            .join("browser-library.sqlite");
+        let connection = open(&store, &legacy)?;
         let _ = LIBRARY.set(Mutex::new(connection));
     }
     LIBRARY
@@ -38,41 +46,9 @@ pub(crate) fn library(app: &AppHandle) -> Result<MutexGuard<'static, Connection>
         .map_err(|_| "The browser library is unavailable.".to_owned())
 }
 
-fn open(path: &Path) -> Result<Connection, String> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    }
-    let connection = Connection::open(path).map_err(|error| error.to_string())?;
-    connection
-        .busy_timeout(Duration::from_secs(5))
-        .map_err(|error| error.to_string())?;
-    connection
-        .execute_batch(
-            "PRAGMA journal_mode = WAL;
-             CREATE TABLE IF NOT EXISTS downloads (
-                 id TEXT PRIMARY KEY,
-                 url TEXT NOT NULL,
-                 path TEXT NOT NULL,
-                 state TEXT NOT NULL,
-                 error TEXT,
-                 received INTEGER NOT NULL DEFAULT 0,
-                 total INTEGER NOT NULL DEFAULT -1,
-                 started_at INTEGER NOT NULL,
-                 finished_at INTEGER
-             );
-             CREATE INDEX IF NOT EXISTS downloads_started ON downloads(started_at);
-             CREATE TABLE IF NOT EXISTS visits (
-                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 profile_id TEXT NOT NULL,
-                 url TEXT NOT NULL,
-                 title TEXT NOT NULL DEFAULT '',
-                 visited_at INTEGER NOT NULL
-             );
-             CREATE INDEX IF NOT EXISTS visits_profile_time ON visits(profile_id, visited_at);
-             CREATE INDEX IF NOT EXISTS visits_profile_url ON visits(profile_id, url);",
-        )
-        .map_err(|error| error.to_string())?;
-    migrate(&connection)?;
+fn open(store: &Store, legacy: &Path) -> Result<Connection, String> {
+    legacy::import(store, legacy).map_err(|error| error.to_string())?;
+    let connection = store.connect().map_err(|error| error.to_string())?;
     // Anything still running when Misty quit can no longer finish.
     connection
         .execute(
@@ -81,35 +57,6 @@ fn open(path: &Path) -> Result<Connection, String> {
         )
         .map_err(|error| error.to_string())?;
     Ok(connection)
-}
-
-/// Schema changes after the original tables, applied once in order and
-/// tracked with SQLite's `user_version`.
-fn migrate(connection: &Connection) -> Result<(), String> {
-    const MIGRATIONS: &[&str] = &[
-        // 1: whether the person typed the address, which the address bar ranks highest.
-        "ALTER TABLE visits ADD COLUMN typed INTEGER NOT NULL DEFAULT 0;",
-        // 2: history sync. `origin` is the device that browsed ('' = this one);
-        // `changed` marks a visit not yet in its synced batch; `history_dirty`
-        // holds hours whose batch must be rewritten after a deletion.
-        "ALTER TABLE visits ADD COLUMN origin TEXT NOT NULL DEFAULT '';
-         ALTER TABLE visits ADD COLUMN changed INTEGER NOT NULL DEFAULT 1;
-         CREATE INDEX visits_sync ON visits(profile_id, origin, visited_at);
-         CREATE TABLE history_dirty (origin TEXT NOT NULL, hour INTEGER NOT NULL, PRIMARY KEY (origin, hour));",
-    ];
-    let version: usize = connection
-        .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
-        .map_err(|error| error.to_string())?
-        .max(0) as usize;
-    for (index, migration) in MIGRATIONS.iter().enumerate().skip(version) {
-        connection
-            .execute_batch(&format!(
-                "BEGIN; {migration} PRAGMA user_version = {}; COMMIT;",
-                index + 1
-            ))
-            .map_err(|error| error.to_string())?;
-    }
-    Ok(())
 }
 
 #[derive(Debug, Serialize, Clone)]

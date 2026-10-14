@@ -1,14 +1,14 @@
+import type { ReactNode } from "react";
 import { TabGroupEditor, TabGroupHeader } from "./MistyTabGroups";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
-import { cn, OverlaySideProvider, inwardSide, IconButton } from "@/shared/ui";
-import { PanelBottomDashed, PanelRightDashed, Plus } from "lucide-react";
+import { cn, Pressable, OverlaySideProvider, inwardSide, IconButton } from "@/shared/ui";
+import { Plus } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { isEmptyTab, layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { useTabPresenceMotion } from "./useTabPresenceMotion";
 import { useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
-import { WorkspaceWindowMenu } from "./WorkspaceWindowMenu";
 import { FavoritesStrip } from "./FavoritesStrip";
 import { useTabHoverCards } from "./TabHoverCard";
 import { useWindowSwipe } from "./useWindowSwipe";
@@ -16,13 +16,23 @@ import { navigatorMotionClass } from "./styles";
 import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 import { useTabStripReorder } from "./useTabStripReorder";
 import { useFocusedPaneSplit } from "./useFocusedPaneSplit";
+import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
+import { useBrowserToolbarSlot } from "@/features/browser/workspace";
+import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
+
+const setNavSlot = (element: HTMLDivElement | null) =>
+  useBrowserToolbarSlot.getState().setNav(element);
+const setTopSlot = (element: HTMLDivElement | null) =>
+  useBrowserToolbarSlot.getState().setTop(element);
 
 export function WorkspaceTabStrip(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
     position?: DockPosition;
     onNewTab(): void;
     onCloseLayoutTab(id: string): void;
+    /** Spaces and Agents buttons: a sidebar's bottom-left, or a strip's right end. */
+    shortcuts?: ReactNode;
   },
 ) {
   const position = props.position ?? "top";
@@ -47,7 +57,7 @@ export function WorkspaceTabStrip(
   useTabPresenceMotion(tabListRef, !vertical);
   const hoverCards = useTabHoverCards();
   useWindowSwipe(ref, tabListRef, props.windows, props.activeWindowId, props.onSelectWindow);
-  useTabStripFade(tabListRef, !vertical, tabs.length);
+  useTabStripFade(tabListRef, true, tabs.length, vertical ? "y" : "x");
   const { pane, ClosePaneIcon, canRight, canDown } = useFocusedPaneSplit(layout);
   const { reorder, bindTabList } = useTabStripReorder({
     vertical,
@@ -62,7 +72,16 @@ export function WorkspaceTabStrip(
       ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [layout.activeTabId, position]);
-  const newTabButton = (
+  const newTabButton = vertical ? (
+    <Pressable
+      type="button"
+      className="misty-workspace-new-tab misty-workspace-new-tab-row"
+      onClick={props.onNewTab}
+    >
+      <Plus className="size-4" aria-hidden="true" />
+      New Tab
+    </Pressable>
+  ) : (
     <IconButton
       className="misty-workspace-new-tab"
       size="xs"
@@ -95,7 +114,7 @@ export function WorkspaceTabStrip(
         ref={ref}
         data-tab-position={position}
         className={cn(
-          "misty-workspace-tabs flex min-w-0 shrink-0 border-charcoal-border bg-charcoal-workspace",
+          "misty-workspace-tabs flex min-w-0 shrink-0 border-charcoal-border bg-[var(--misty-window-chrome,var(--color-charcoal-workspace))]",
           props.titlebarInsets?.animate && cn("transition-[padding]", navigatorMotionClass),
         )}
         style={
@@ -110,7 +129,22 @@ export function WorkspaceTabStrip(
         }
         data-misty-window-titlebar-region={props.titlebarInsets ? "true" : undefined}
       >
-        <FavoritesStrip vertical={vertical} onOpen={props.onOpen} />
+        {vertical && (
+          <div className="misty-sidebar-head" data-misty-window-titlebar-region="true">
+            <SidebarToggleButton side={position === "right" ? "right" : "left"} />
+            <div className="misty-sidebar-nav ml-auto flex items-center">
+              <div ref={setNavSlot} className="flex items-center" />
+              <SidebarNavFallback />
+            </div>
+          </div>
+        )}
+        {vertical && (
+          <div className="misty-sidebar-address">
+            <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
+            <SidebarAddressFallback />
+          </div>
+        )}
+        {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
         <div
           {...reorder}
           ref={bindTabList}
@@ -124,6 +158,7 @@ export function WorkspaceTabStrip(
               : "items-center overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           )}
         >
+          {vertical && newTabButton}
           {allTabs.map((tab) => {
             const group = groups.find((g) => g.id === tab.tabGroupId);
             const firstInGroup = group && !shownGroups.has(group.id);
@@ -160,8 +195,13 @@ export function WorkspaceTabStrip(
               </Fragment>
             );
           })}
-          {newTabButton}
+          {!vertical && newTabButton}
         </div>
+        {vertical ? (
+          <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
+            {props.shortcuts}
+          </div>
+        ) : null}
         {hoverCards.card}
         {editingGroup && (
           <TabGroupEditor
@@ -170,40 +210,6 @@ export function WorkspaceTabStrip(
             onClose={() => setEditingGroup(null)}
             onOpen={props.onOpen}
           />
-        )}
-        {!props.windowsTitlebarControls && (
-          <div className="misty-workspace-tab-actions">
-            <IconButton
-              size="xs"
-              tooltip={false}
-              disabled={!canRight}
-              label="Create split right"
-              title="Split right"
-              onClick={() => props.onSplitPane(pane.id, "right")}
-            >
-              <PanelRightDashed className="size-4" size={16} />
-            </IconButton>
-            <IconButton
-              size="xs"
-              tooltip={false}
-              disabled={!canDown}
-              label="Create split down"
-              title="Split down"
-              onClick={() => props.onSplitPane(pane.id, "down")}
-            >
-              <PanelBottomDashed className="size-4" size={16} />
-            </IconButton>
-            {closePaneControl}
-            <WorkspaceWindowMenu
-              windows={props.windows}
-              activeWindowId={props.activeWindowId}
-              canReopen={props.canReopenWindow}
-              onSelect={props.onSelectWindow}
-              onCreate={props.onCreateWindow}
-              onClose={props.onCloseWindow}
-              onReopen={props.onReopenWindow}
-            />
-          </div>
         )}
         <WindowsWorkspaceTitlebarControls
           enabled={Boolean(props.windowsTitlebarControls)}

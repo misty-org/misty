@@ -89,7 +89,6 @@ function validEvent(value: unknown): value is AccountEvent {
   const event = value as AccountEvent;
   return (
     [
-      "settings-profiles",
       "reset",
       "runs",
       "invocations",

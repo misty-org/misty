@@ -28,7 +28,7 @@ describe("WorkspaceWindowMenu", () => {
   });
   afterEach(cleanup);
 
-  it("lists, creates, closes, and reopens virtual windows", () => {
+  it("lists, creates, closes, and reopens virtual windows", async () => {
     const first = createWorkspaceWindow(undefined, "Writing");
     const second = createWorkspaceWindow(undefined, "Research");
     const onCreate = vi.fn();
@@ -60,7 +60,8 @@ describe("WorkspaceWindowMenu", () => {
     expect(screen.getByRole("menuitem", { name: "Writing" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "Research" })).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: /New/ }));
-    expect(onCreate).toHaveBeenCalledOnce();
+    // The menu closes first, then the new window is asked for beside it.
+    await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Manage virtual windows" }), {
       button: 0,

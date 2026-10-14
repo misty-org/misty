@@ -174,7 +174,7 @@ async fn generated_image_thumbnail_is_cached_and_dimensioned() {
         service
             .home_dir
             .join(".misty")
-            .join(".cache")
+            .join("cache")
             .join("thumbnails")
     );
     let thumbnail = image::open(&first.path).unwrap();

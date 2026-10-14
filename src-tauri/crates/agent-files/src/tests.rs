@@ -31,7 +31,7 @@ impl Fixture {
         fs::write(root.join("invoice.txt"), "original invoice").unwrap();
         fs::create_dir(root.join("nested")).unwrap();
         fs::write(root.join("nested/invoice.txt"), "second invoice").unwrap();
-        let mut engine = Organizer::new(temp.path().join("journal")).unwrap();
+        let mut engine = Organizer::new(temp.path().join("journal.db")).unwrap();
         let snapshot = engine.grant("alice", &root).unwrap();
         Self {
             temp,
@@ -138,7 +138,7 @@ fn pause_restart_and_revocation() {
         .unwrap();
     assert_eq!(paused.state, "paused");
     assert!(f.root.join("invoice.txt").exists());
-    let restored = Organizer::new(f.temp.path().join("journal")).unwrap();
+    let restored = Organizer::new(f.temp.path().join("journal.db")).unwrap();
     assert_eq!(
         restored.apply("alice", &plan.id, || false).unwrap().state,
         "completed"

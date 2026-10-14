@@ -293,6 +293,39 @@ longer exist. Only the bundled document worker remains, for agent document prepa
 - HTTP attachment downloads for displayable types: Chromium handles them.
 - The WKWebView workarounds: pointer guard, corner scrollbars, frame rate, Safari UA, live resize.
 
+## Open: the 2026-10-13 shell redesign was built and checked on macOS only
+
+These were written against macOS behavior. Each needs a pass on Windows (and Linux where noted)
+before it counts as done; add rows above as they close.
+
+- **Window buttons follow the left sidebar.** `set_traffic_lights_visible` in
+  `src-tauri/src/platform/plugins/mac_rounded_corners.rs` slides and fades the native traffic
+  lights with the drawer. Windows draws its own caption buttons on the right
+  (`WindowsTitlebarControls`), so there is nothing to slide with a left sidebar; decide whether a
+  right-side tab sidebar should carry them, and what the command does on Windows (it is a no-op).
+- **Top-edge drag and double-click zoom.** The page script (`browser_scripts.rs`) and the app-page
+  handler (`handleTopEdgePointerDown`) call `togglePseudoMaximize` on macOS and
+  `toggleTitlebarMaximize` elsewhere. Check on Windows that a double press zooms, that snap
+  layouts still work, and that dragging from the top tenth does not fight resize borders.
+- **Panel look and corner masks.** Vertical tabs make the page a rounded panel with an 8px margin
+  (`dockingGeometry.ts`, `docking.css`). The page's rounded corners come from the macOS layer mask
+  in `browser.rs` (`position_macos_webview`); confirm Windows clips the WebView2 child to the same
+  radii and shows no gray margin.
+- **Overlays above native pages.** The address bar's search panel, the layout menu, the Spaces
+  menu and the account island rely on the renderer being raised above the native page. The
+  floating account island is hidden behind the page in horizontal tabs on macOS; check whether
+  the Windows transparency path (`set_windows_renderer_transparency`) behaves the same.
+- **Titlebar insets.** Tab-strip and sidebar-header insets reserve room for left-side traffic
+  lights (`titlebarInsets`, `useMergedTitlebar`). On Windows the controls are on the right; check
+  the horizontal strip's right inset, the sidebar's flush top, and the drag region that stops
+  short of the first tab's curve.
+- **Windows-only chrome still on the old layout.** `WindowsWorkspaceTitlebarControls` keeps its own
+  split buttons and window menu; the macOS layout moved those into the browser's pane layout
+  menu. Bring Windows in line or decide it keeps them.
+- **Profile website data.** Profiles' `webview` folders are a symlink to WebKit's store on macOS
+  and a real folder on Windows/Linux (`browser_profile.rs`); the home layout and migration were
+  only exercised on macOS.
+
 ## Keeping it caught up
 
 - Any new `#[cfg(target_os = "macos")]` command needs a Windows branch or a row here.

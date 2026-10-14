@@ -111,11 +111,10 @@ describe("extension account controls", () => {
       ).map((item) => item.id),
     ).toEqual([chrome]);
   });
-  it("blocks incompatible packages and account-mismatched preference writes", async () => {
+  it("blocks incompatible packages and writes extension preferences to this device's settings", async () => {
     await expect(install({ ...review, blocked: true }, true)).rejects.toThrow("unavailable");
     expect(mocks.commit).not.toHaveBeenCalled();
-    mocks.account = "account-b";
-    await expect(setPreference("agent_access", false)).rejects.toThrow("account changed");
-    expect(mocks.edit).not.toHaveBeenCalled();
+    await setPreference("agent_access", false);
+    expect(mocks.edit).toHaveBeenCalledWith("extensions.agent_access", false);
   });
 });

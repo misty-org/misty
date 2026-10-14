@@ -131,11 +131,7 @@ func (w *connectionWriter) policy() error {
 	if !w.batching {
 		return nil
 	}
-	bounded, stop := context.WithTimeout(w.ctx, 5*time.Second)
-	// Unreadable preferences still yield the base policy (see
-	// batchPolicyFrame); a settings outage never disconnects sync.
-	frame, _ := w.service.batchPolicyFrame(bounded, w.identity.UserID)
-	stop()
+	frame := w.service.batchPolicyFrame()
 	lanes, _ := json.Marshal(frame["policy"].(map[string]any)["lanes"])
 	if bytes.Equal(lanes, w.lastPolicy) {
 		return nil
@@ -224,7 +220,7 @@ func (w *connectionWriter) handleEvent(event db.AccountEvent) error {
 			return err
 		}
 	}
-	if event.Topic == "settings-profiles" || event.Topic == "reset" {
+	if event.Topic == "reset" {
 		if err := w.policy(); err != nil {
 			return err
 		}

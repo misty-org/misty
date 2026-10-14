@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import {
   browserRuntimeResumeEvent,
   hideBrowserWebview,
+  isBrowserRuntimeCreated,
   requestBrowserWebviewLayout,
   syncBrowserWebview,
   useBrowserRuntimeStore,
@@ -139,9 +140,13 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     schedule();
     const recoverLayout = () => requestBrowserWebviewLayout(effectTab);
     window.addEventListener("misty:workspace-geometry-changed", recoverLayout);
-    recoveryTimers.push(window.setTimeout(recoverLayout, 50));
-    recoveryTimers.push(window.setTimeout(recoverLayout, 200));
-    recoveryTimers.push(window.setTimeout(recoverLayout, 600));
+    // A page that already exists only needs re-measuring while the layout
+    // settles; forcing a native reconcile each time re-clips and re-stacks it,
+    // which blinks right after a tab switch.
+    const settleLayout = isBrowserRuntimeCreated(effectTab) ? schedule : recoverLayout;
+    recoveryTimers.push(window.setTimeout(settleLayout, 50));
+    recoveryTimers.push(window.setTimeout(settleLayout, 200));
+    recoveryTimers.push(window.setTimeout(settleLayout, 600));
 
     return () => {
       disposed = true;

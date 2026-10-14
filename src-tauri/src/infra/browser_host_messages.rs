@@ -73,6 +73,36 @@ struct BackgroundMessage {
     background: String,
 }
 
+/// The page asks to move the window: a press-and-drag on empty space at its top edge.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DragMessage {
+    token: String,
+    drag: bool,
+}
+
+fn drag_message(raw: &str) -> Option<DragMessage> {
+    if raw.len() > 1024 {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
+/// The page reports a double press on its top edge, which acts as the titlebar's double-click.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ZoomMessage {
+    token: String,
+    zoom: bool,
+}
+
+fn zoom_message(raw: &str) -> Option<ZoomMessage> {
+    if raw.len() > 1024 {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
 fn background_message(raw: &str) -> Option<BackgroundMessage> {
     if raw.len() > 1024 {
         return None;
@@ -247,6 +277,24 @@ impl HostChannel for Channel {
                         y: pointer.pointer.y,
                         inside: pointer.pointer.inside,
                     },
+                );
+            }
+            return;
+        }
+        if let Some(drag) = drag_message(raw) {
+            if drag.drag && message.main_frame && trusted(app, id, &drag.token) {
+                if let Some(webview) = app.get_webview(message.webview) {
+                    let _ = webview.window().start_dragging();
+                }
+            }
+            return;
+        }
+        if let Some(zoom) = zoom_message(raw) {
+            if zoom.zoom && message.main_frame && trusted(app, id, &zoom.token) {
+                let _ = app.emit_to(
+                    super::browser_owner_label(app, id),
+                    "misty://browser-titlebar-zoom",
+                    BrowserFocusEvent { id: id.to_owned() },
                 );
             }
             return;

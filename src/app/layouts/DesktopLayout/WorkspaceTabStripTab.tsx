@@ -12,9 +12,8 @@ import { ConnectedTabShape } from "./ConnectedTabShape";
 import type { useTabHoverCards } from "./TabHoverCard";
 import { TabPageMenu } from "./PinnedTabMenu";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
-import { WorkspaceTabStripPaneMenu } from "./WorkspaceTabStripPaneMenu";
 
-/** One renameable tab in the strip, with its pane menu or close button. */
+/** One renameable tab in the strip. Its title follows the focused pane; × closes the whole tab. */
 export function WorkspaceTabStripTab({
   tab,
   group,
@@ -142,15 +141,17 @@ export function WorkspaceTabStripTab({
           ) : null}
         </Pressable>
         {!iconOnly && <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />}
-        {pinned ? null : panes.length > 1 ? (
-          <WorkspaceTabStripPaneMenu tab={tab} panes={panes} label={label} onOpen={onOpen} />
-        ) : (
+        {pinned ? null : (
           <IconButton
             size="xs"
             tooltip={false}
             label={`Close tab ${label}`}
-            title={`Close tab ${label}`}
-            className="misty-workspace-tab-close mr-0.5"
+            title={
+              panes.length > 1
+                ? `Close tab ${label} and its ${panes.length} panes`
+                : `Close tab ${label}`
+            }
+            className="misty-workspace-tab-close mr-1"
             onClick={() => onCloseLayoutTab(tab.id)}
           >
             <X className="size-3.5" size={14} />

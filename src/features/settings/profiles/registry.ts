@@ -29,19 +29,8 @@ export type SettingSearchEntry = Pick<
 // Controls with their own server APIs are searchable alongside preferences.
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Tab orders are edited in place; hidden destinations are searched as "Show in navigation".
-  ...settingDefinitions.filter(
-    (definition) =>
-      definition.id !== "app.navigation.hidden" && !definition.id.startsWith("collections.tabs."),
-  ),
-  {
-    id: "app.navigation.show",
-    label: "Show in navigation",
-    page: "layout",
-    owner: "account",
-    platforms: ["desktop"],
-    keywords: ["rail", "sidebar", "hide", "Browser", "Agents", "Extensions", "Spaces"],
-  },
+  // Tab orders are edited in place.
+  ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -102,11 +91,7 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
     try {
       const parsed: unknown = JSON.parse(String(value));
       if (!Array.isArray(parsed)) return false;
-      if (
-        d.id.startsWith("collections.tabs.") ||
-        d.id === "app.navigation.hidden" ||
-        d.id === "browser.toolbarHidden"
-      )
+      if (d.id.startsWith("collections.tabs.") || d.id === "browser.toolbarHidden")
         return (
           parsed.length <= 40 &&
           new Set(parsed).size === parsed.length &&

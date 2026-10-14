@@ -4,18 +4,23 @@ import {
   type DockPosition,
   type DockingLayout,
 } from "@/features/app-shell/dockingLayout";
-import { navigatorRailWidth, navigatorScale } from "./navigatorMode";
 
 export const dockingMetrics = {
   titlebar: 38,
   tabStrip: 38,
   /** Gap between a horizontal tab strip's outer edge and its connected tabs. */
   tabInset: 3,
-  rail: navigatorRailWidth,
-  horizontalRail: Math.round(38 * navigatorScale),
-  sideTabs: 200,
+  /** How far a connected tab's curve flares out past its sides; mirrors `--tab-shoulder`. */
+  tabShoulder: 14,
+  /** The retired navigation rail: its tracks stay at zero, but the layout model still names them. */
+  rail: 62,
+  horizontalRail: 44,
+  sideTabs: 240,
   gap: 8,
   tab: 28,
+  /** Chrome margin around the page when vertical tabs make it a panel. */
+  panelMargin: 8,
+  panelRadius: 12,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };
 type ShellStyle = CSSProperties & Record<`--${string}`, string | number>;
@@ -28,12 +33,15 @@ export function dockingGeometry({
   shareTopBand = tabs === "top",
   chromeLeft = 84,
   chromeRight = 0,
+  sideTabsWidth = dockingMetrics.sideTabs,
 }: DockingLayout & {
   autoHide?: boolean;
   shareTopBand?: boolean;
   /** Already adjusted for application zoom. */
   chromeLeft?: number;
   chromeRight?: number;
+  /** The vertical tab sidebar's width, which the person can drag. */
+  sideTabsWidth?: number;
 }) {
   const { rail, gap } = dockingMetrics;
   const titlebar =
@@ -49,7 +57,7 @@ export function dockingGeometry({
     gridTemplateColumns: `${position === "left" ? size : 0}px minmax(0, 1fr) ${position === "right" ? size : 0}px`,
     gridTemplateRows: `${position === "top" ? size : titlebar}px 0px minmax(0, 1fr) ${position === "bottom" ? size : 0}px`,
     "--shell-titlebar": `${titlebar}px`,
-    "--shell-side-tabs": `${dockingMetrics.sideTabs}px`,
+    "--shell-side-tabs": `${sideTabsWidth}px`,
     "--shell-tab-strip-height": `${dockingMetrics.tabStrip}px`,
     "--shell-tab-inset": `${dockingMetrics.tabInset}px`,
     "--shell-tab-height": `${dockingMetrics.tab}px`,
@@ -57,14 +65,32 @@ export function dockingGeometry({
     "--shell-motion-duration": `${dockingMotion.duration}ms`,
     "--shell-motion-easing": dockingMotion.easing,
   };
+  // A vertical tab sidebar makes the page a panel: an even margin of window chrome on every
+  // edge, with the page's own rounded corners inside it. Horizontal strips keep the thin seam
+  // their connected tabs hang from.
+  const panel = tabs === "left" || tabs === "right";
+  frame["--pane-frame"] = panel ? `${dockingMetrics.panelMargin}px` : "0px";
+  frame["--pane-seam-color"] = panel ? "transparent" : "var(--color-charcoal-border)";
   for (const edge of ["top", "right", "bottom", "left"] as const)
-    frame[`--pane-seam-${edge}`] = edges.has(edge) ? "1px" : "0px";
+    frame[`--pane-seam-${edge}`] = panel
+      ? `${dockingMetrics.panelMargin}px`
+      : edges.has(edge)
+        ? "1px"
+        : "0px";
+  // A panel's corner is the margin plus the page's own radius, so the page curve sits inside it.
   for (const y of ["top", "bottom"] as const)
     for (const x of ["left", "right"] as const)
-      frame[`--pane-corner-${y}-${x}`] = edges.has(y) && edges.has(x) ? "12px" : "0px";
+      frame[`--pane-corner-${y}-${x}`] = panel
+        ? `${dockingMetrics.panelMargin + dockingMetrics.panelRadius}px`
+        : edges.has(y) && edges.has(x)
+          ? "12px"
+          : "0px";
+  // Native window buttons sit on the left (or the right on Windows), so a right rail with
+  // nothing above it reaches the window's top edge.
+  const railFlush = side && position === "right" && chromeRight === 0;
   const navigation: CSSProperties = {
     gridColumn: side ? (position === "right" ? 3 : 1) : "1 / -1",
-    gridRow: side ? "2 / -1" : position === "bottom" ? 4 : 1,
+    gridRow: side ? (railFlush ? "1 / -1" : "2 / -1") : position === "bottom" ? 4 : 1,
     ...(side ? { width: rail } : { height: thickness }),
   };
   const content: CSSProperties = {
@@ -72,7 +98,7 @@ export function dockingGeometry({
     gridRow: position === "top" && !autoHide ? 3 : "1 / 4",
   };
   const floating: CSSProperties = side
-    ? { top: titlebar, bottom: 0, width: rail, [position]: 0 }
+    ? { top: railFlush ? 0 : titlebar, bottom: 0, width: rail, [position]: 0 }
     : { left: 0, right: 0, height: thickness, [position]: 0 };
   const reveal: CSSProperties = side ? { ...floating, width: 8 } : { ...floating, height: 8 };
   const translate = {
@@ -88,6 +114,6 @@ export function dockingGeometry({
         right: shared ? Math.max(0, chromeRight - (position === "right" ? size : 0)) : 0,
       }
     : undefined;
-  return { frame, navigation, content, floating, reveal, translate, titlebarInsets };
+  return { frame, navigation, content, floating, reveal, translate, titlebarInsets, railFlush };
 }
 export type DockingGeometry = ReturnType<typeof dockingGeometry>;

@@ -9,17 +9,27 @@ import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationN
 import { useSettingsStore } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { useWindowDockingLayout } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
+import { windowChromeBackground } from "@/features/workspace/windowColors";
+import { useWindowColorRequest } from "./windowColorRequest";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import "./docking.css";
+import { isTopEdgeDragPress } from "./windowChromeHelpers";
 import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { GlobalNavigator } from "./GlobalNavigator";
-import { navigatorRailWidth } from "./navigatorMode";
-import { NavigatorRail } from "./NavigatorRail";
+import { AccountIsland } from "./AccountIsland";
+import {
+  BrowserMenuAccountItems,
+  BrowserProfileButton,
+  StripShortcuts,
+} from "./WorkspaceStripDock";
+import { SpacesMenuButton } from "@/features/spaces";
+import { isSideDock } from "@/features/app-shell/dockingLayout";
+import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { StandaloneRouteSurface } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
@@ -30,7 +40,7 @@ import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
-import { useNavigatorAutoHide } from "./useNavigatorAutoHide";
+import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
@@ -60,8 +70,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   const {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
-    startTitlebarDrag,
     handleDesktopTitlebarPointerDown,
+    handleTopEdgePointerDown,
     toggleTitlebarMaximize,
     minimizeTitlebarWindow,
     closeTitlebarWindow,
@@ -75,8 +85,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
   const [profileOpen, setProfileOpen] = useState(false);
   const docking = useWindowDockingLayout();
-  const { focusMode, navigatorAutoHide, toggleNavigatorAutoHide } = useNavigatorAutoHide();
-  const navigatorWidth = navigatorRailWidth;
+  const focusMode = useFocusModeShortcuts();
   const {
     settingsOpen,
     setSettingsOpen,
@@ -93,7 +102,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     lastNonSettingsRouteRef,
     openSettingsOverlay,
   });
-  useDesktopShortcuts({ navigate, openSettingsOverlay, toggleNavigatorAutoHide });
+  useDesktopShortcuts({ navigate, openSettingsOverlay });
 
   useEffect(() => {
     setBrowserWebviewsSuspended(profileOpen || settingsOpen, "shell-overlay");
@@ -102,10 +111,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
   useEffect(() => setProfileOpen(false), [docking]);
   const shellRef = useRef<HTMLElement>(null);
-  useDockingTransition(
-    shellRef,
-    `${docking.navigation}:${docking.tabs}:${navigatorAutoHide}:${focusMode}`,
-  );
+  useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}:${focusMode}`);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   const {
@@ -114,43 +120,49 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     sharedTitlebar,
     windowsTitlebarControlsRef,
     titlebarNavigationGeometry,
-    tabsFollowNavigator,
     geometry,
     topTabInsets,
   } = useDesktopTitlebarGeometry({
     shellRef,
     pathname: location.pathname,
     docking,
-    navigatorAutoHide,
     focusMode,
     shouldShowWindowsControls,
     appZoom,
   });
-  const navigatorContent = (
-    <GlobalNavigator
-      syncControl={
-        <BrowserSyncBadge
-          key={user?.id}
-          accountId={user?.id ?? ""}
-          onOpenSettings={() => {
-            useSettingsStore.getState().setActiveSection("sync");
-            openSettingsOverlay();
-          }}
-        />
-      }
-      position={docking.navigation}
-      profileOpen={profileOpen}
-      settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-      suppressActiveTool={Boolean(standaloneRouteTitle)}
-      onProfileOpenChange={(open) => {
-        if (open) setSettingsOpen(false);
-        setProfileOpen(open);
-      }}
-      onOpenAccountSettings={openAccountSettings}
-      onSettingsClick={openSettingsOverlay}
-      onStartWindowDrag={startTitlebarDrag}
-    />
+  // The color being tried in the picker shows live, before it is kept.
+  const activeWindowId = useWorkspaceStore((state) => state.activeWindowId);
+  // Editing another window leaves this one's chrome alone.
+  const windowColorPreview = useWindowColorRequest((state) =>
+    state.request?.kind === "edit" && state.request.windowId !== activeWindowId
+      ? null
+      : state.preview,
   );
+  const windowChrome = useWorkspaceStore((state) =>
+    windowChromeBackground(
+      windowColorPreview ??
+        (state.windowsByScope[state.activeScopeKey] ?? []).find(
+          (item) => item.id === state.activeWindowId,
+        )?.color,
+    ),
+  );
+  // The window's color tints everything around the content region.
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (windowChrome && !isAuthRoute)
+      shell?.style.setProperty("--misty-window-chrome", windowChrome);
+    else shell?.style.removeProperty("--misty-window-chrome");
+  }, [windowChrome, isAuthRoute]);
+  const openSyncSettings = () => {
+    useSettingsStore.getState().setActiveSection("sync");
+    openSettingsOverlay();
+  };
+  const stripShortcuts = <StripShortcuts />;
+  const browserChrome = {
+    spaces: <SpacesMenuButton toolbar />,
+    profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
+    accountItems: <BrowserMenuAccountItems onSyncClick={openSyncSettings} />,
+  };
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <ExtensionPermissionRequest />
@@ -168,12 +180,19 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             : geometry.frame
         }
         data-misty-desktop-frame
+        data-rail-flush={!isAuthRoute && geometry.railFlush ? "true" : undefined}
         data-navigation-position={docking.navigation}
         data-tab-position={docking.tabs}
         onPointerDown={(event) => {
           const target = event.target instanceof Element ? event.target : null;
-          if (!target?.closest("[data-misty-window-titlebar-region='true']")) return;
-          handleDesktopTitlebarPointerDown(event);
+          if (target?.closest("[data-misty-window-titlebar-region='true']")) {
+            handleDesktopTitlebarPointerDown(event);
+            return;
+          }
+          // Pages drawn by the app itself move the window from their top edge too, as native
+          // browser pages do. Portalled menus and dialogs sit outside this element.
+          if (shellRef.current?.contains(target) && isTopEdgeDragPress(event))
+            handleTopEdgePointerDown(event);
         }}
       >
         <header
@@ -190,7 +209,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 styles.navigatorMotionClass,
               )}
               aria-hidden="true"
-              style={{ width: tabsFollowNavigator ? navigatorWidth : topTabInsets?.left }}
+              // Stops where the first tab's curve starts, so the curve is not painted over.
+              style={{
+                width: Math.max(0, (topTabInsets?.left ?? 0) - dockingMetrics.tabShoulder),
+              }}
             />
           ) : null}
           {shouldShowWindowsControls ? (
@@ -207,16 +229,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             />
           ) : null}
         </header>
-
-        {!isAuthRoute ? (
-          <NavigatorRail
-            autoHide={navigatorAutoHide}
-            position={docking.navigation}
-            geometry={geometry}
-          >
-            {navigatorContent}
-          </NavigatorRail>
-        ) : null}
 
         <section
           className="route-shell relative z-10 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
@@ -239,6 +251,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 tabPosition={docking.tabs}
                 titlebarInsets={topTabInsets}
                 hideTabStrip={focusMode}
+                stripShortcuts={stripShortcuts}
+                browserChrome={browserChrome}
               />
             )}
             {!isAuthRoute && user?.id ? (
@@ -247,7 +261,25 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
           </>
         </section>
 
-        {!isAuthRoute ? <></> : null}
+        {!isAuthRoute && isSideDock(docking.tabs) ? (
+          <AccountIsland
+            open={profileOpen}
+            onOpenChange={(open) => {
+              if (open) setSettingsOpen(false);
+              setProfileOpen(open);
+            }}
+            onOpenAccountSettings={openAccountSettings}
+            syncControl={
+              <BrowserSyncBadge
+                key={user?.id}
+                accountId={user?.id ?? ""}
+                onOpenSettings={openSyncSettings}
+              />
+            }
+            settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+            onSettingsClick={openSettingsOverlay}
+          />
+        ) : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         {!isAuthRoute ? (
           <DesktopShellOverlays

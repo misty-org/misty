@@ -4,12 +4,10 @@ import { useBrowserMediaStore } from "@/features/browser/library";
 import { listenForPasswordOffers } from "@/features/passwords/offers";
 import { startTabArchive } from "@/features/workspace/tabArchive";
 import { startAutoPictureInPicture } from "./autoPictureInPicture";
-import { startBrowserTabSleep } from "./browserTabSleep";
 
 /** Background services that run for as long as the browser bridge is mounted. */
 export function useBrowserRuntimeServices(): void {
   useEffect(() => startAutoPictureInPicture(), []);
-  useEffect(() => startBrowserTabSleep(), []);
   useEffect(() => listenForPasswordOffers(), []);
   const { user } = useAuth();
   const archiveAccount = useRef(user?.id ?? "");

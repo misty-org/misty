@@ -1,8 +1,8 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::PathBuf};
 
+use rusqlite::OptionalExtension;
+
+use super::store::Store;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -13,7 +13,9 @@ const MAX_RECENT_ITEMS: usize = 20;
 
 #[derive(Debug, Clone)]
 pub struct ExplorerLibraryService {
-    path: PathBuf,
+    store: Store,
+    /// `explorer_state.json` of an earlier layout, imported once.
+    legacy_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -79,13 +81,14 @@ pub struct SetTagsRequest {
 impl ExplorerLibraryService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
-            path: environment.cache_dir().join("explorer_state.json"),
+            store: environment.store(),
+            legacy_path: environment.cache_dir().join("explorer_state.json"),
         }
     }
 
     pub async fn snapshot(&self) -> ApiResult<ExplorerLibrarySnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || load_snapshot(path))
+        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
+        tokio::task::spawn_blocking(move || load_snapshot(&store, &legacy))
             .await
             .map_err(|err| ApiError::Message(format!("Explorer library worker failed: {err}")))?
     }
@@ -94,12 +97,12 @@ impl ExplorerLibraryService {
         &self,
         request: RecordRecentRequest,
     ) -> ApiResult<ExplorerLibrarySnapshot> {
-        let path = self.path.clone();
+        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
         tokio::task::spawn_blocking(move || {
-            let mut snapshot = load_snapshot(path.clone())?;
+            let mut snapshot = load_snapshot(&store, &legacy)?;
             add_recent(&mut snapshot, request.item);
-            save_snapshot(&path, &snapshot)?;
-            load_snapshot(path)
+            save_snapshot(&store, &snapshot)?;
+            load_snapshot(&store, &legacy)
         })
         .await
         .map_err(|err| ApiError::Message(format!("Explorer library worker failed: {err}")))?
@@ -109,88 +112,88 @@ impl ExplorerLibraryService {
         &self,
         request: RecordLastOpenedRequest,
     ) -> ApiResult<ExplorerLibrarySnapshot> {
-        let path = self.path.clone();
+        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
         tokio::task::spawn_blocking(move || {
-            let mut snapshot = load_snapshot(path.clone())?;
+            let mut snapshot = load_snapshot(&store, &legacy)?;
             snapshot.last_opened_path = request.path;
-            save_snapshot(&path, &snapshot)?;
-            load_snapshot(path)
+            save_snapshot(&store, &snapshot)?;
+            load_snapshot(&store, &legacy)
         })
         .await
         .map_err(|err| ApiError::Message(format!("Explorer library worker failed: {err}")))?
     }
 
     pub async fn set_tags(&self, request: SetTagsRequest) -> ApiResult<ExplorerLibrarySnapshot> {
-        let path = self.path.clone();
+        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
         tokio::task::spawn_blocking(move || {
-            let mut snapshot = load_snapshot(path.clone())?;
+            let mut snapshot = load_snapshot(&store, &legacy)?;
             set_item_metadata(
                 &mut snapshot,
                 request.item,
                 sanitize_tags(request.tags),
                 request.comments.map(sanitize_comment),
             );
-            save_snapshot(&path, &snapshot)?;
-            load_snapshot(path)
+            save_snapshot(&store, &snapshot)?;
+            load_snapshot(&store, &legacy)
         })
         .await
         .map_err(|err| ApiError::Message(format!("Explorer library worker failed: {err}")))?
     }
 }
 
-fn load_snapshot(path: PathBuf) -> ApiResult<ExplorerLibrarySnapshot> {
-    let mut snapshot = match fs::read_to_string(&path) {
-        Ok(raw) => serde_json::from_str::<ExplorerLibrarySnapshot>(&raw).unwrap_or_default(),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            ExplorerLibrarySnapshot::default()
-        }
-        Err(err) => {
-            return Err(ApiError::Message(format!(
-                "Failed to read explorer library {}: {err}",
-                path.display()
-            )));
-        }
-    };
+fn db_error(error: rusqlite::Error) -> ApiError {
+    ApiError::Message(format!("Explorer library persistence failed: {error}"))
+}
+
+fn load_snapshot(store: &Store, legacy: &std::path::Path) -> ApiResult<ExplorerLibrarySnapshot> {
+    // An earlier layout's `explorer_state.json` (already in this document shape) comes
+    // along once.
+    store
+        .import_once("explorer_state.json", |connection| -> Result<(), rusqlite::Error> {
+            if let Ok(raw) = fs::read_to_string(legacy) {
+                if serde_json::from_str::<ExplorerLibrarySnapshot>(&raw).is_ok() {
+                    connection.execute(
+                        "INSERT OR IGNORE INTO explorer_library (id, document) VALUES (1, ?1)",
+                        [raw],
+                    )?;
+                }
+            }
+            Ok(())
+        })
+        .map_err(db_error)?;
+    let raw: Option<String> = store
+        .connect()
+        .map_err(db_error)?
+        .query_row("SELECT document FROM explorer_library WHERE id = 1", [], |row| {
+            row.get(0)
+        })
+        .optional()
+        .map_err(db_error)?;
+    let mut snapshot = raw
+        .and_then(|raw| serde_json::from_str::<ExplorerLibrarySnapshot>(&raw).ok())
+        .unwrap_or_default();
     snapshot.recent_files.retain(|item| item.r#type == 0);
     snapshot.starred_files.retain(|item| item.r#type == 0);
-    snapshot.path = path.display().to_string();
+    snapshot.path = store.path().display().to_string();
     Ok(snapshot)
 }
 
-fn save_snapshot(path: &Path, snapshot: &ExplorerLibrarySnapshot) -> ApiResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| {
-            ApiError::Message(format!(
-                "Failed to create explorer library directory {}: {err}",
-                parent.display()
-            ))
-        })?;
-    }
+fn save_snapshot(store: &Store, snapshot: &ExplorerLibrarySnapshot) -> ApiResult<()> {
     let document = json!({
         "recent_files": snapshot.recent_files.iter().map(disk_item_json).collect::<Vec<_>>(),
         "starred_files": snapshot.starred_files.iter().map(disk_item_json).collect::<Vec<_>>(),
         "last_opened_path": snapshot.last_opened_path,
     });
-    let raw = serde_json::to_string_pretty(&document)
-        .map_err(|err| ApiError::Message(format!("Failed to serialize explorer library: {err}")))?;
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, &raw).map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to write explorer library {}: {err}",
-            tmp.display()
-        ))
-    })?;
-    fs::rename(&tmp, path)
-        .or_else(|_| {
-            let _ = fs::remove_file(&tmp);
-            fs::write(path, &raw)
-        })
-        .map_err(|err| {
-            ApiError::Message(format!(
-                "Failed to save explorer library {}: {err}",
-                path.display()
-            ))
-        })
+    store
+        .connect()
+        .map_err(db_error)?
+        .execute(
+            "INSERT INTO explorer_library (id, document) VALUES (1, ?1)
+             ON CONFLICT (id) DO UPDATE SET document = excluded.document",
+            [document.to_string()],
+        )
+        .map(|_| ())
+        .map_err(db_error)
 }
 
 fn disk_item_json(item: &ExplorerLibraryItem) -> serde_json::Value {
@@ -305,25 +308,31 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_round_trips_native_snake_case_document() {
-        let path = std::env::temp_dir()
-            .join(format!("misty-library-test-{}", Uuid::new_v4()))
-            .join("explorer_state.json");
-        fs::create_dir_all(path.parent().expect("test parent")).expect("create parent");
+    fn an_earlier_state_file_imports_once_and_snapshots_round_trip() {
+        let directory = std::env::temp_dir().join(format!("misty-library-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&directory).expect("create dir");
+        let legacy = directory.join("explorer_state.json");
         fs::write(
-            &path,
+            &legacy,
             r#"{
               "recent_files": [{"path": "/tmp/demo.txt", "name": "demo.txt", "id": "/tmp/demo.txt", "is_dir": false, "last_modified": "today", "mime_type": "text/plain", "type": 0}],
               "starred_files": [],
               "last_opened_path": "/tmp"
             }"#,
         ).expect("write fixture");
+        let store = Store::at(directory.join("misty.db"));
 
-        let snapshot = load_snapshot(path.clone()).expect("load snapshot");
+        let snapshot = load_snapshot(&store, &legacy).expect("load snapshot");
         assert_eq!(snapshot.recent_files[0].path, "/tmp/demo.txt");
         assert!(!snapshot.recent_files[0].is_dir);
         assert_eq!(snapshot.last_opened_path, "/tmp");
-        fs::remove_dir_all(path.parent().unwrap()).expect("cleanup");
+
+        let mut edited = snapshot;
+        edited.last_opened_path = "/home".into();
+        save_snapshot(&store, &edited).expect("save");
+        // The old file never overwrites later changes.
+        assert_eq!(load_snapshot(&store, &legacy).unwrap().last_opened_path, "/home");
+        fs::remove_dir_all(directory).expect("cleanup");
     }
 
     #[test]

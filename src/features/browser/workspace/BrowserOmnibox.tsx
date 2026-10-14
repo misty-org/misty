@@ -10,6 +10,7 @@ import { BrowserOmniboxView, type OmniboxContext } from "./BrowserOmniboxView";
 import { forgetBrowserPage, markBrowserNavigationTyped } from "../library/historyRecorder";
 import { createOmniboxProviders } from "./omnibox/providers";
 import { liveOmniboxDeps } from "./omnibox/liveDeps";
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 export * from "./BrowserOmniboxView";
 
 const setOverlay = async (reason: string, active: boolean) => {
@@ -31,6 +32,7 @@ export function BrowserOmnibox(
     | "onSwitchView"
     | "onOpenInApp"
     | "onRemove"
+    | "onOpenPanel"
   > & {
     tab: WorkspaceView;
     historyEntries: string[];
@@ -53,10 +55,19 @@ export function BrowserOmnibox(
   return (
     <BrowserOmniboxView
       currentUrl={props.currentUrl}
-      compact={props.compact}
-      pageTitle={props.pageTitle}
       focusRequest={props.focusRequest}
       trailing={props.trailing}
+      leading={props.leading}
+      hostOnly={props.hostOnly}
+      panel={props.panel}
+      onOpenPanel={(field) =>
+        useBrowserSearchStore.getState().show(undefined, {
+          left: field.left,
+          top: field.top,
+          width: Math.min(480, window.innerWidth - 16),
+          openUrl: (url) => props.onNavigate(url),
+        })
+      }
       context={context}
       providers={providers}
       suspensionReason={`browser-omnibox:${browserRuntimeId(props.tab)}`}

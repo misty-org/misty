@@ -32,6 +32,12 @@ vi.mock("./GlobalNavigator", () => ({
   GlobalNavigator: () => <div data-testid="global-navigator">Global Navigator</div>,
 }));
 
+vi.mock("./AccountIsland", () => ({ AccountIsland: () => null }));
+vi.mock("./WorkspaceStripDock", () => ({
+  BrowserMenuAccountItems: () => null,
+  BrowserProfileButton: () => null,
+  StripShortcuts: () => null,
+}));
 vi.mock("./WorkspaceCanvas", () => ({
   WorkspaceCanvas: (props: { titlebarInsets?: { left: number } }) => (
     <div data-testid="workspace-canvas" data-tab-inset={props.titlebarInsets?.left}>
@@ -148,14 +154,12 @@ import { useNavigationNames } from "@/features/navigation-names/store";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
 import { DesktopLayout } from "./index";
-import { navigatorLayoutStorageKey, publishNavigatorLayout } from "./navigatorMode";
 
 describe("DesktopLayout on Auth Routes", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    localStorage.removeItem(navigatorLayoutStorageKey);
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -272,7 +276,7 @@ describe("DesktopLayout on Auth Routes", () => {
     );
   });
 
-  it("reserves native window controls when Layout settings hides the rail", async () => {
+  it("gives no room to a navigation rail: the tab strip carries its buttons", async () => {
     await act(async () =>
       root.render(
         <MemoryRouter initialEntries={["/browser"]}>
@@ -281,47 +285,8 @@ describe("DesktopLayout on Auth Routes", () => {
       ),
     );
     const frame = container.querySelector<HTMLElement>("[data-misty-desktop-frame]")!;
-    const before = frame.style.gridTemplateColumns;
-    const dragRegion = container.querySelector<HTMLElement>(".misty-docking-titlebar-drag-region")!;
-    expect(dragRegion.style.width).toBe(before.split(" ")[0]);
-    await act(async () => publishNavigatorLayout({ autoHide: true }));
-    expect(frame.style.gridTemplateColumns).not.toBe(before);
-    expect(Number.parseFloat(dragRegion.style.width)).toBeGreaterThan(56);
-    await act(async () => {
-      dragRegion.dispatchEvent(new MouseEvent("pointerdown", { button: 0, bubbles: true }));
-    });
-    expect(mocks.titlebarPointerDown).toHaveBeenCalledTimes(1);
-    expect(
-      container.querySelector('[data-testid="workspace-canvas"]')?.getAttribute("data-tab-inset"),
-    ).toBe(dragRegion.style.width.replace("px", ""));
-    expect(container.querySelector('button[aria-label="Go back"]')).toBeNull();
-    expect(container.querySelector('button[aria-label="Go forward"]')).toBeNull();
-  });
-
-  it("keeps the workspace mounted when navigation visibility changes from settings", async () => {
-    await act(async () =>
-      root.render(
-        <MemoryRouter initialEntries={["/browser"]}>
-          <DesktopLayout getRouteId={() => "browser"} />
-        </MemoryRouter>,
-      ),
-    );
-    const frame = container.querySelector<HTMLElement>("[data-misty-desktop-frame]")!;
-    const canvas = container.querySelector<HTMLElement>('[data-testid="workspace-canvas"]')!;
-    const originalColumns = frame.style.gridTemplateColumns;
-    const originalInset = canvas.dataset.tabInset;
-    await act(async () => publishNavigatorLayout({ autoHide: true }));
     expect(frame.style.gridTemplateColumns).toBe("0px minmax(0, 1fr) 0px");
-    expect(container.querySelector('[aria-label="Auto-hide navigation"]')).toBeNull();
-    expect(container.querySelector(".misty-docking-nav")?.hasAttribute("inert")).toBe(true);
-    expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
-    // Both changing lengths must use the same timeline; an instant grid jump
-    // followed by animated padding sends the tabs underneath the window controls.
-    expect(frame.className).toContain("transition-[grid-template-columns,grid-template-rows]");
-    await act(async () => publishNavigatorLayout({ autoHide: false }));
-    expect(frame.style.gridTemplateColumns).toBe(originalColumns);
-    expect(canvas.dataset.tabInset).toBe(originalInset);
-    expect(container.querySelector('[data-testid="workspace-canvas"]')).toBe(canvas);
+    expect(container.querySelector(".misty-docking-nav")).toBeNull();
   });
 
   it("suppresses the sidebar navigator and renders Outlet directly on /signin", async () => {

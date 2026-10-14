@@ -7,8 +7,9 @@ const setting = (definitions as { id: string; enum?: string[]; legacyValues?: st
 )!;
 
 describe("browser search engine table", () => {
-  it("lists exactly the engines the synced setting accepts", () => {
-    expect(engines.map((engine) => engine.id).sort()).toEqual([...setting.enum!].sort());
+  it("offers Google only", () => {
+    expect(engines.map((engine) => engine.id)).toEqual(["google"]);
+    expect(setting.enum).toContain("google");
   });
 
   it("keeps every engine reachable through the stored legacy index", () => {
