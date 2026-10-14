@@ -78,6 +78,22 @@ describe("tool monitor", () => {
     expect(monitor.failures()).toHaveLength(1);
   });
 
+  it("looks again after an uncertain page action, but stops on an uncertain consequential one", async () => {
+    const pages = modelCatalog([
+      { name: "browser.snapshot", description: "", inputSchema: schema, readOnly: true },
+      { name: "browser.steps", description: "", inputSchema: schema },
+    ], ["agent_finish"]);
+    for (const [input, stops] of [[{ steps: [{ action: "click", ref: "e4" }] }, false], [{ steps: [{ action: "click", ref: "e9", allowConsequential: true }] }, true]] as const) {
+      const order = serialToolLifecycle();
+      const monitor = toolMonitor({ catalog: pages, order, rejected: new Set(), checkpoint: async () => {} });
+      const toolCall = { toolCallId: "act", toolName: "browser_steps", input };
+      await monitor.onStart({ toolCall });
+      await monitor.onEnd({ toolCall, durationMs: 1, success: true, output: { status: "uncertain" } });
+      expect(order.stoppedReason !== "").toBe(stops);
+      if (!stops) expect(monitor.requiredInspection).toBe("browser.snapshot");
+    }
+  });
+
   it("declines the rest of a response after a failure without running it", async () => {
     const { order, monitor } = setup(new Set(["write"]));
     const write = { toolCallId: "write", toolName: "note_update", input: {} };

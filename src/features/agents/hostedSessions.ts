@@ -31,11 +31,14 @@ const renewMs = 10_000;
 const timers = new Map<string, ReturnType<typeof setInterval>>();
 let unsubscribe: (() => void) | undefined;
 
+// A hosted session is the agent's own hidden tab, so it runs beside the person's
+// tasks and other sessions instead of waiting for them.
 const lease = (session: Pick<HostedSession, "accountId" | "agentId" | "taskId">) => ({
   accountId: session.accountId,
   agentId: session.agentId,
   spaceId: "",
   taskId: session.taskId,
+  background: true,
 });
 
 export async function endHostedSession(taskId: string): Promise<void> {

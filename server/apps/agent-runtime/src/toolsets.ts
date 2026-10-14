@@ -19,7 +19,8 @@ function toolsetOf(name: string): Toolset | Family | undefined {
   if (name.startsWith("browser.workspace.")) return "desktop";
   if (name === "browser.act") return "browse";
   if (name.startsWith("browser.") && !name.startsWith("browser.tab.")) return "browse";
-  if (name === "screen.open") return "browse";
+  // Opening the agent's own tab is how a run reads what a fetch can't, so it stays in answer.
+  if (name === "screen.open") return undefined;
   if (name.startsWith("code.")) return "code";
   if (name.startsWith("integration.")) return "integration";
   if (name === "agent.delegate" || name === "agent.wait") return "agent";

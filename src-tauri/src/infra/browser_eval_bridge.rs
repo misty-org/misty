@@ -28,6 +28,8 @@ use std::sync::Arc;
 
 #[path = "browser_eval_bridge_dock.rs"]
 mod dock;
+#[path = "browser_eval_bridge_pages.rs"]
+mod pages;
 #[path = "browser_eval_bridge_grants.rs"]
 mod grants;
 
@@ -119,6 +121,8 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/evaluate", post(evaluate))
             .route("/close", post(close))
             .route("/dock", post(dock::dock))
+            .route("/pages", post(pages::pages))
+            .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
             .with_state(bridge);
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {

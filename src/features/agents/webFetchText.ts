@@ -61,7 +61,17 @@ export function billingNote(text: string): string | undefined {
     !/\b(annual(ly)?|yearly|per year|billed monthly|month-to-month|monthly)\b/i.test(text)
   )
     return undefined;
-  return "Prices here show the billing period the page opens on (often yearly) and the page's monthly/yearly toggle cannot be switched by a fetch. State which period each price is for. To read the other period, open the page in the browser and switch the toggle.";
+  return "Prices here show the billing period the page opens on (often yearly) and the page's monthly/yearly toggle cannot be switched by a fetch. State which period each price is for. To read the other period, call screen_open with this page's url, which opens your own tab in the background and keeps this run going, then switch the toggle with browser_steps.";
+}
+
+/**
+ * A page a fetch can't read: an error, a sign-in wall or a script-only shell with little
+ * text. The agent's own browser tab can (docs/plans/odysseys-campaign.md).
+ */
+export function browserNote(status: number, text: string): string | undefined {
+  const shell = /enable javascript|javascript is (required|disabled)|requires javascript|please turn on javascript/i;
+  if (status < 400 && text.replace(/\s+/g, " ").length >= 600 && !shell.test(text)) return undefined;
+  return "This page did not give its content to a fetch (it needs a browser, an account or is blocked). To read or use it, call screen_open with this url: it opens your own browser tab in the background and this run keeps going with browser tools.";
 }
 
 export interface ReadablePage {

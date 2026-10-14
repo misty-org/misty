@@ -5,7 +5,7 @@ import { parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
-import { billingNote, readablePage } from "./webFetchText";
+import { billingNote, browserNote, readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
@@ -132,7 +132,7 @@ export async function runDeviceAgentOperation(
         title: readable.title,
         text: readable.text,
         truncated: readable.truncated || page.truncated,
-        note: billingNote(readable.text),
+        note: browserNote(page.status, readable.text) ?? billingNote(readable.text),
       };
     }
     case "bookmark.add": {

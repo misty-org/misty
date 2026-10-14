@@ -14,15 +14,17 @@ const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
  * only, plus reading documents and sending files to the Space Library the way
  * read-only folders do. */
 export const projectCapabilities = [...folderCapabilities, "code.delegate"];
+/** On any device, this one included, the agent may open its own browser session:
+ * a hidden tab of its own that joins the run (docs/plans/odysseys-campaign.md). */
 const workspaceCapabilities = [
   "browser.tab.list",
   "browser.tab.open",
   "bookmark.list",
   "bookmark.add",
   "web.fetch",
+  "browser.session",
 ];
-/** On another device the agent may also open its own browser session there. */
-const remoteWorkspaceCapabilities = [...workspaceCapabilities, "browser.session"];
+const remoteWorkspaceCapabilities = workspaceCapabilities;
 
 /** Another of the person's devices picked for this chat, as its own signed
  * policy describes it (docs/design/devices/BRIEF.md). */

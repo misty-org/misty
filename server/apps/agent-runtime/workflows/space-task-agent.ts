@@ -19,6 +19,7 @@ import { runBrowserReplay, validReplay } from "../src/browser-replay.js";
 import { catalogTools, modelCatalog } from "../src/model-tools.js";
 import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
+import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
@@ -79,8 +80,103 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     });
     throw new FatalError("Misty's capability registry is unavailable.");
   }
-  const catalog = modelCatalog(mcpCatalog.tools, [taskCompletionTool, toolUseTool, toolLoadTool]);
-  const advertised = new Set(mcpCatalog.tools.map((descriptor) => descriptor.name));
+  if (context.routine_execution !== undefined) throw new FatalError("Retired automation execution cannot be resumed.");
+
+  const order = serialToolLifecycle();
+  const guard = (callId: string) => {
+    const declined = order.declined(callId);
+    if (declined) throw new Error(declined);
+  };
+  let finishRefused = false;
+  let citationRefused = false;
+  // Recomputed from the transcript before every model call.
+  let visibleTools: string[] = [];
+  let modelTurn = 0;
+  // The agent swallows errors thrown from its step hooks, so a failed settlement
+  // checkpoint is held here and rethrown once the call returns.
+  let hookFailure: unknown;
+  let wrappingUp = false;
+  // The run's tools and agent, built from Misty's catalog. A screen that joins the
+  // run mid-run (screen_open opening the agent's own tab) rebuilds them, so browser
+  // tools reach the model in this run instead of a hand-off to a new one.
+  const assemble = (descriptors: typeof mcpCatalog.tools) => {
+    const catalog = modelCatalog(descriptors, [taskCompletionTool, toolUseTool, toolLoadTool]);
+    const advertised = new Set(descriptors.map((descriptor) => descriptor.name));
+    const monitor = toolMonitor({ catalog, order, checkpoint: execution.checkpoint, rejected });
+    // agent.tool: answer by default; browse, desktop, code and loaded families on request.
+    const toolsets = agentTools(catalog);
+    const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch") };
+    const tools: ToolSet = {
+      ...catalogTools(catalog, async (callId, name, value) => {
+        guard(callId);
+        return await execution.executeCapability(callId, name, value);
+      }),
+      ...toolsets.tools,
+      [taskCompletionTool]: tool({
+        description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. This records a report; it grants no capabilities and performs no external action.",
+        inputSchema: taskCompletionSchema,
+        execute: async (report, options) => {
+          guard(options.toolCallId);
+          // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
+          const messages = options.messages ?? [];
+          // Refused once when it cites a page the run never read (src/citation-check.ts).
+          if (!citationRefused) {
+            const unread = unreadCitations(report.summary, messages, researchTools);
+            if (unread.length) {
+              citationRefused = true;
+              const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
+              return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
+            }
+          }
+          if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
+          const refusal = unbackedCompletion(report, messages, catalog.readOnly);
+          if (refusal) {
+            finishRefused = true;
+            return { status: "failure", tool_error: { message: refusal } };
+          }
+          return report;
+        },
+      }),
+    };
+    const toolNames = Object.keys(tools);
+    const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, citationInstructions, toolsets.instructions, modelFamilyNote(context.model_id)].filter(Boolean));
+    const agent = new WorkflowAgent({
+      id: "misty-space-task-agent",
+      model: new InstanceModel(context.model_id, identity),
+      instructions,
+      tools,
+      prepareStep: () => ({ activeTools: monitor.activeTools(visibleTools) }),
+      // One model call per stream lets the coordinator refresh the active-time
+      // deadline after durable tool waits. The aggregate loop below owns the cap.
+      stopWhen: isStepCount(1),
+      maxRetries: 2,
+      // Match the Go admission ceiling (agents.MaxAgentTurnOutputTokens).
+      maxOutputTokens: 8_192,
+      reasoning: context.reasoning_effort === "max" ? undefined : context.reasoning_effort || undefined,
+      telemetry: { isEnabled: true, recordInputs: false, recordOutputs: false, functionId: "misty.space-task-agent" },
+      experimental_onStepStart: async ({ stepNumber }) => {
+        if (stepNumber !== 0) throw new FatalError("unexpected_model_step: the pinned adapter exceeded one model call");
+      },
+      onStepEnd: async ({ finishReason, usage, text }) => {
+        try {
+          await execution.checkpoint({
+            node_id: `model:${modelTurn + 1}`, state: "completed", phase: "working", progress: Math.min(90, 15 + modelTurn * 6),
+            // The control plane projects this model-owned text into the public SSE
+            // stream for interactive invocations. Tool-only steps normally have no
+            // text, while the final step supplies Markdown as it becomes durable.
+            output: { finish_reason: finishReason, usage, text_delta: text },
+          });
+        } catch (error) {
+          hookFailure ??= error;
+        }
+      },
+      onToolExecutionStart: monitor.onStart,
+      onToolExecutionEnd: monitor.onEnd,
+    });
+    return { catalog, advertised, monitor, toolsets, researchTools, toolNames, instructions, agent };
+  };
+  let { catalog, advertised, monitor, toolsets, researchTools, toolNames, instructions, agent } = assemble(mcpCatalog.tools);
+  visibleTools = toolNames;
   await execution.checkpoint({
     node_id: "mcp:catalog", state: "completed", phase: "tools_ready", progress: 8,
     output: {
@@ -88,93 +184,6 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       missing_allowed_tools: context.allowed_tools.filter((name) => !advertised.has(name)),
       omitted_tools: catalog.omitted,
     },
-  });
-  if (context.routine_execution !== undefined) throw new FatalError("Retired automation execution cannot be resumed.");
-
-  const order = serialToolLifecycle();
-  const monitor = toolMonitor({ catalog, order, checkpoint: execution.checkpoint, rejected });
-  const guard = (callId: string) => {
-    const declined = order.declined(callId);
-    if (declined) throw new Error(declined);
-  };
-  // agent.tool: answer by default; browse, desktop, code and loaded families on request.
-  const toolsets = agentTools(catalog);
-  let finishRefused = false;
-  let citationRefused = false;
-  const tools: ToolSet = {
-    ...catalogTools(catalog, async (callId, name, value) => {
-      guard(callId);
-      return await execution.executeCapability(callId, name, value);
-    }),
-    ...toolsets.tools,
-    [taskCompletionTool]: tool({
-      description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. This records a report; it grants no capabilities and performs no external action.",
-      inputSchema: taskCompletionSchema,
-      execute: async (report, options) => {
-        guard(options.toolCallId);
-        // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
-        const messages = options.messages ?? [];
-        // Refused once when it cites a page the run never read (src/citation-check.ts).
-        if (!citationRefused) {
-          const unread = unreadCitations(report.summary, messages, researchTools);
-          if (unread.length) {
-            citationRefused = true;
-            const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
-            return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
-          }
-        }
-        if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
-        const refusal = unbackedCompletion(report, messages, catalog.readOnly);
-        if (refusal) {
-          finishRefused = true;
-          return { status: "failure", tool_error: { message: refusal } };
-        }
-        return report;
-      },
-    }),
-  };
-  const toolNames = Object.keys(tools);
-  const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch") };
-  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, citationInstructions, toolsets.instructions, modelFamilyNote(context.model_id)].filter(Boolean));
-  // Recomputed from the transcript before every model call.
-  let visibleTools = toolNames;
-  let modelTurn = 0;
-  // The agent swallows errors thrown from its step hooks, so a failed settlement
-  // checkpoint is held here and rethrown once the call returns.
-  let hookFailure: unknown;
-  let wrappingUp = false;
-  const agent = new WorkflowAgent({
-    id: "misty-space-task-agent",
-    model: new InstanceModel(context.model_id, identity),
-    instructions,
-    tools,
-    prepareStep: () => ({ activeTools: monitor.activeTools(visibleTools) }),
-    // One model call per stream lets the coordinator refresh the active-time
-    // deadline after durable tool waits. The aggregate loop below owns the cap.
-    stopWhen: isStepCount(1),
-    maxRetries: 2,
-    // Match the Go admission ceiling (agents.MaxAgentTurnOutputTokens).
-    maxOutputTokens: 8_192,
-    reasoning: context.reasoning_effort === "max" ? undefined : context.reasoning_effort || undefined,
-    telemetry: { isEnabled: true, recordInputs: false, recordOutputs: false, functionId: "misty.space-task-agent" },
-    experimental_onStepStart: async ({ stepNumber }) => {
-      if (stepNumber !== 0) throw new FatalError("unexpected_model_step: the pinned adapter exceeded one model call");
-    },
-    onStepEnd: async ({ finishReason, usage, text }) => {
-      try {
-        await execution.checkpoint({
-          node_id: `model:${modelTurn + 1}`, state: "completed", phase: "working", progress: Math.min(90, 15 + modelTurn * 6),
-          // The control plane projects this model-owned text into the public SSE
-          // stream for interactive invocations. Tool-only steps normally have no
-          // text, while the final step supplies Markdown as it becomes durable.
-          output: { finish_reason: finishReason, usage, text_delta: text },
-        });
-      } catch (error) {
-        hookFailure ??= error;
-      }
-    },
-    onToolExecutionStart: monitor.onStart,
-    onToolExecutionEnd: monitor.onEnd,
   });
 
   let result: Awaited<ReturnType<typeof agent.stream>> | undefined;
@@ -262,6 +271,14 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       // WorkflowAgent returns the complete model transcript, including tool
       // results. Reinject our fixed system instructions once on the next call.
       messages = current.messages.filter((message) => message.role !== "system");
+      if (screenJoined(current.toolResults)) {
+        // The agent's own tab joined this run: offer its browser tools from the next turn.
+        const next = await discoverRemoteMCPTools(identity);
+        if (next.supported) {
+          ({ catalog, advertised, monitor, toolsets, researchTools, toolNames, instructions, agent } = assemble(next.tools));
+          toolsetState = toolState(messages, toolsets.initial);
+        }
+      }
       if (streamAborted || order.stoppedReason) break;
       if (order.resume()) {
         // The model plans again from the failure or stale screen it just saw.

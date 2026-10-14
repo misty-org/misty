@@ -12,11 +12,11 @@ describe("agent.tool", () => {
   const tools = agentTools(catalog);
   const all = [...catalog.tools.map((item) => item.modelName), ...Object.keys(tools.tools)];
 
-  it("starts in answer and hides what acts on a screen, a project, apps and sub-agents", () => {
+  it("starts in answer, with its own tab one call away, and hides projects, apps and sub-agents", () => {
     expect(tools.initial).toBe("answer");
     const shown = tools.visible(all, toolState([], tools.initial));
-    expect(shown).toEqual(expect.arrayContaining(["web_search", "web_fetch", "note_search", "screen_look", "browser_tab_list", toolUseTool, toolLoadTool]));
-    for (const hidden of ["screen_open", "code_delegate", "integration_search", "integration_execute", "agent_delegate"]) expect(shown).not.toContain(hidden);
+    expect(shown).toEqual(expect.arrayContaining(["web_search", "web_fetch", "note_search", "screen_look", "screen_open", "browser_tab_list", toolUseTool, toolLoadTool]));
+    for (const hidden of ["code_delegate", "integration_search", "integration_execute", "agent_delegate"]) expect(shown).not.toContain(hidden);
   });
 
   it("follows switches and loads in the transcript", () => {

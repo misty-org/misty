@@ -39,6 +39,9 @@ struct Lease {
     account: String,
     window: String,
     expires: Instant,
+    /// A hidden session of the agent's own (never on screen, no native input), which
+    /// neither waits for nor blocks other tasks in the window.
+    background: bool,
 }
 struct Scope {
     agent: String,
@@ -66,6 +69,10 @@ pub struct LeaseRequest {
     task_id: String,
     #[serde(default)]
     renew: bool,
+    /// The agent's own hidden session: it runs beside other tasks
+    /// (docs/plans/odysseys-campaign.md).
+    #[serde(default)]
+    background: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -439,11 +446,14 @@ fn acquire_lease(
     if request.renew && !inner.leases.contains_key(&request.task_id) {
         return Err("agent_task_paused".into());
     }
-    if inner.leases.iter().any(|(id, lease)| {
-        id != &request.task_id
-            && (lease.window == window
-                || lease.agent == request.agent_id && lease.account == request.account_id)
-    }) {
+    if !request.background
+        && inner.leases.iter().any(|(id, lease)| {
+            id != &request.task_id
+                && !lease.background
+                && (lease.window == window
+                    || lease.agent == request.agent_id && lease.account == request.account_id)
+        })
+    {
         return Err("agent_busy: this agent or window already has an active task".into());
     }
     if let Some(lease) = inner.leases.get(&request.task_id) {
@@ -461,6 +471,7 @@ fn acquire_lease(
             account: request.account_id,
             window: window.clone(),
             expires: Instant::now() + Duration::from_secs(30),
+            background: request.background,
         },
     );
     Ok(LeaseResult {

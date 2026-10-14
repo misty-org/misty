@@ -87,6 +87,10 @@ func (s *SpacesService) applyAIInvocationBrowserConfig(
 	}
 	var body aiInvocationInput
 	_ = json.Unmarshal(record.RequestPayload, &body)
+	// A tab that joined the run mid-run (screen_open) is only in the run's stored contexts.
+	if err := s.withJoinedContexts(ctx, record, &body); err != nil {
+		return err
+	}
 	surface := browserToolSurface(body, scopeID)
 	if strings.HasPrefix(tool.Name, "browser.workspace.") || (tool.Name == screenActTool && surface != "browser") {
 		if body.ExecutionMode != "agent" || body.WindowLabel != "main" || body.TaskID == "" || surface == "browser" {
@@ -267,4 +271,32 @@ func (s *SpacesService) awaitBrowserDeviceJob(
 	default:
 		return nil, browserDeviceFailureForOperation(current.ErrorCode, current.Operation)
 	}
+}
+
+// withJoinedContexts adds the run's stored browser tabs that its request did not
+// carry, such as the agent's own tab opened mid-run, so their task and surface resolve.
+func (s *SpacesService) withJoinedContexts(ctx context.Context, record *db.AIInvocationRecord, body *aiInvocationInput) error {
+	stored, err := s.database.AIInvocationContexts(ctx, record.UserID, record.ID)
+	if err != nil {
+		return err
+	}
+	for _, item := range stored {
+		if item.Kind != "browser_tab" {
+			continue
+		}
+		known := false
+		for _, carried := range body.DeviceContexts {
+			if carried.OpaqueRef == item.OpaqueRef && carried.DeviceID == item.DeviceID {
+				known = true
+				break
+			}
+		}
+		if !known {
+			body.DeviceContexts = append(body.DeviceContexts, aiInvocationDeviceContext{
+				DeviceID: item.DeviceID, Kind: item.Kind, OpaqueRef: item.OpaqueRef, DisplayName: item.DisplayName,
+				Capabilities: item.Capabilities, Metadata: item.Metadata,
+			})
+		}
+	}
+	return nil
 }

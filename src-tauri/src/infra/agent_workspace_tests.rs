@@ -9,6 +9,7 @@ fn fixture() -> WorkspaceState {
             agent: "one".into(),
             window: "worker-one".into(),
             expires: Instant::now() + Duration::from_secs(20),
+            background: false,
         },
     );
     state.leases.insert(
@@ -18,6 +19,7 @@ fn fixture() -> WorkspaceState {
             agent: "two".into(),
             window: "worker-two".into(),
             expires: Instant::now() + Duration::from_secs(20),
+            background: false,
         },
     );
     state.scopes.insert(
@@ -47,7 +49,24 @@ fn personal_request(task: &str, renew: bool) -> LeaseRequest {
         space_id: String::new(),
         task_id: task.into(),
         renew,
+        background: false,
     }
+}
+
+#[test]
+fn hidden_sessions_run_beside_other_tasks() {
+    let mut state = WorkspaceState::default();
+    let background = |task: &str| LeaseRequest {
+        background: true,
+        ..personal_request(task, false)
+    };
+    assert!(acquire_lease(&mut state, "space-personal", background("hidden-one")).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", background("hidden-two")).is_ok());
+    // A task on screen still gets the window, and two on screen still exclude each other.
+    let visible = personal_request("visible", false);
+    assert!(acquire_lease(&mut state, "space-personal", visible).is_ok());
+    let other = personal_request("other", false);
+    assert!(acquire_lease(&mut state, "space-personal", other).is_err());
 }
 #[test]
 fn revealing_a_worker_requires_the_exact_owner_and_agent() {
