@@ -9,8 +9,32 @@ export function revealMainWindow(): Promise<void> {
   return invoke("reveal_main_window");
 }
 
-export function enableModernWindowStyle(window: unknown): Promise<void> {
-  return invoke("enable_modern_window_style", { window, offsetX: -4, offsetY: 0 });
+/** Where the window buttons sit relative to their usual spot (20pt from the left, 19pt down):
+ * the vertical sidebar moves them onto its panel. Every call to the window style carries the
+ * current value, so the order the shell and the sidebar mount in never undoes it. */
+export type TrafficLightOffset = { x: number; y: number };
+/** Where the vertical sidebar's content starts, from the window's left edge: the strip's 8pt
+ * padding, the panel's 1pt border and its 10pt padding (docking.css). The window buttons start
+ * here too, so the red one lines up with the address bar. */
+export const sidebarContentLeft = 19;
+const trafficLightRestX = 20;
+export const trafficLightOffsetDefault: TrafficLightOffset = {
+  x: sidebarContentLeft - trafficLightRestX,
+  y: 0,
+};
+let trafficLightOffset = trafficLightOffsetDefault;
+
+/** `offset`, when given, becomes the new position; omitted, the current one is kept. */
+export function enableModernWindowStyle(
+  window: unknown,
+  offset?: TrafficLightOffset,
+): Promise<void> {
+  if (offset) trafficLightOffset = offset;
+  return invoke("enable_modern_window_style", {
+    window,
+    offsetX: trafficLightOffset.x,
+    offsetY: trafficLightOffset.y,
+  });
 }
 
 /** They slide `distance` points and fade over `durationMs`, as the sidebar beside them does. */

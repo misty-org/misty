@@ -229,7 +229,7 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
                 if !main_window_ready() {
                     let ns_window = webview.ns_window() as id;
                     configure_main_renderer_resize(webview.inner() as id);
-                    apply_modern_window_style(ns_window, -4.0, 0.0);
+                    apply_modern_window_style(ns_window, -1.0, 0.0);
                     let _: () = msg_send![ns_window, displayIfNeeded];
                     MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
                     ns_window.makeKeyAndOrderFront_(nil);

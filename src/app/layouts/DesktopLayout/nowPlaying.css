@@ -14,13 +14,31 @@
 .misty-now-playing-card + .misty-now-playing-card {
   border-top: 1px solid var(--misty-theme-border);
 }
+.misty-now-playing-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
 .misty-now-playing-top {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 10px;
   min-width: 0;
   border-radius: 8px;
   text-align: left;
+}
+.misty-now-playing-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.misty-now-playing-source {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+  object-fit: contain;
 }
 .misty-now-playing-art {
   flex: none;
@@ -34,10 +52,11 @@
   display: grid;
   min-width: 0;
 }
+/* Long text fades out at its edge (OverflowFadeText) instead of ending in an ellipsis. */
 .misty-now-playing-title,
 .misty-now-playing-detail {
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 .misty-now-playing-title {
@@ -64,33 +83,58 @@
 .misty-now-playing-bar {
   position: relative;
   flex: 1;
-  height: 3px;
-  overflow: hidden;
+  height: 4px;
   border-radius: 2px;
   background: var(--misty-theme-border);
 }
+/* A larger grab area than the 3px line, so the bar is easy to drag. */
+.misty-now-playing-bar[data-seekable] {
+  cursor: pointer;
+  touch-action: none;
+}
+.misty-now-playing-bar[data-seekable]:is(:hover, :focus-visible, [data-scrubbing]) {
+  height: 6px;
+}
+.misty-now-playing-bar[data-scrubbing] > span {
+  transition: none;
+  background: var(--misty-theme-text-bright);
+}
+.misty-now-playing-bar[data-seekable]::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
+}
 .misty-now-playing-bar > span {
+  border-radius: 2px;
   position: absolute;
   inset: 0 auto 0 0;
   background: var(--misty-theme-text-muted);
-  transition: width 1s linear;
+  transition: width 100ms linear;
 }
 .misty-now-playing-controls {
   display: flex;
   align-items: center;
   gap: 2px;
 }
-.misty-now-playing-controls .misty-now-playing-play {
-  border-radius: 999px;
-  background: var(--misty-theme-text-bright);
-  color: var(--misty-theme-card);
-}
-.misty-now-playing-controls .misty-now-playing-play:hover {
-  background: var(--misty-theme-text);
-  color: var(--misty-theme-card);
-}
 @media (prefers-reduced-motion: reduce) {
   .misty-now-playing-bar > span {
     transition: none;
   }
+}
+
+/* In the vertical sidebar the player is part of the panel: a lifted card above the foot, one per
+   playing tab. */
+.misty-sidebar-now-playing {
+  display: grid;
+  flex-shrink: 0;
+  gap: 6px;
+  margin-top: 8px;
+}
+.misty-sidebar-now-playing .misty-now-playing-card {
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.misty-sidebar-now-playing .misty-now-playing-card + .misty-now-playing-card {
+  border-top: 1px solid var(--color-charcoal-border);
 }

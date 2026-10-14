@@ -1,34 +1,21 @@
-import { useEffect, type ReactNode } from "react";
-import {
-  MistyPanelDock,
-  MistyPanelSprite,
-  useMistyPanelHost,
-  useMistyPanelSide,
-  useMistyPanelStore,
-} from "@/features/agents";
+import type { ReactNode } from "react";
+import { MistyPanelSprite, useMistyPanelStore } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
-import { cn, IconButton } from "@/shared/ui";
+import { IconButton } from "@/shared/ui";
 
 /**
- * Whether this browser tab's pane holds the Misty panel. The panel sits in one browser
- * pane's content area, under its toolbar; opened by shortcut it lands in the focused
- * browser pane and stays there while focus moves between panes.
+ * Whether the Misty panel is open. The panel is a column of its own beside the workspace's
+ * panes, a panel apart from the page like the tab drawer, so every browser tab shares it.
  */
 export function useBrowserMistyPanel(tabId: string) {
   const paneId = useWorkspaceStore(
     (state) => dockLeaves(state.layout.root).find((pane) => pane.activeViewId === tabId)?.id,
   );
-  const host = useMistyPanelHost();
-  const here = Boolean(paneId) && host === paneId;
-  const open = useMistyPanelStore((s) => s.open) && here;
-  useEffect(() => {
-    if (open && paneId && useMistyPanelStore.getState().paneId !== paneId)
-      useMistyPanelStore.getState().setOpen(true, paneId);
-  }, [open, paneId]);
-  return { paneId, here, open };
+  const open = useMistyPanelStore((s) => s.open);
+  return { paneId, here: open, open };
 }
 
-/** The toolbar's Misty button: opens the panel in this pane, or closes it here. */
+/** The toolbar's Misty button: opens the panel, or closes it. */
 export function BrowserMistyButton({ tabId }: { tabId: string }) {
   const { paneId, open } = useBrowserMistyPanel(tabId);
   return (
@@ -43,14 +30,7 @@ export function BrowserMistyButton({ tabId }: { tabId: string }) {
   );
 }
 
-/** The content row under the toolbar: the page, with the Misty panel beside it. */
-export function BrowserMistyRow({ tabId, children }: { tabId: string; children: ReactNode }) {
-  const { here, open } = useBrowserMistyPanel(tabId);
-  const side = useMistyPanelSide();
-  return (
-    <div className={cn("flex min-h-0 min-w-0", side === "left" && "flex-row-reverse")}>
-      {children}
-      {here ? <MistyPanelDock open={open} side={side} /> : null}
-    </div>
-  );
+/** The content row under the toolbar: the page. */
+export function BrowserMistyRow({ children }: { tabId: string; children: ReactNode }) {
+  return <div className="flex min-h-0 min-w-0">{children}</div>;
 }

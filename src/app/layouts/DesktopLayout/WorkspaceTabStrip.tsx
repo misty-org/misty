@@ -19,6 +19,7 @@ import { useFocusedPaneSplit } from "./useFocusedPaneSplit";
 import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
+import { SidebarNowPlaying } from "./SidebarNowPlaying";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
 
 const setNavSlot = (element: HTMLDivElement | null) =>
@@ -33,6 +34,9 @@ export function WorkspaceTabStrip(
     onCloseLayoutTab(id: string): void;
     /** Spaces and Agents buttons: a sidebar's bottom-left, or a strip's right end. */
     shortcuts?: ReactNode;
+    account?: ReactNode;
+    /** The sidebar's bottom-left: downloads. */
+    footEnd?: ReactNode;
   },
 ) {
   const position = props.position ?? "top";
@@ -108,6 +112,70 @@ export function WorkspaceTabStrip(
       <ClosePaneIcon className="size-4" size={16} />
     </IconButton>
   );
+  const cardBody = (
+    <>
+      {vertical && (
+        <div className="misty-sidebar-address">
+          <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
+          <SidebarAddressFallback />
+        </div>
+      )}
+      {vertical ? <div className="misty-sidebar-shortcut-row">{props.shortcuts}</div> : null}
+      {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
+      <div
+        {...reorder}
+        ref={bindTabList}
+        role="tablist"
+        aria-label="Window tabs"
+        aria-orientation={vertical ? "vertical" : "horizontal"}
+        className={cn(
+          "misty-workspace-tab-list flex min-w-0 flex-1 gap-1",
+          vertical
+            ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto"
+            : "items-center overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        {vertical && newTabButton}
+        {allTabs.map((tab) => {
+          const group = groups.find((g) => g.id === tab.tabGroupId);
+          const firstInGroup = group && !shownGroups.has(group.id);
+          if (group) shownGroups.add(group.id);
+          return (
+            <Fragment key={tab.id}>
+              {firstInGroup && (
+                <TabGroupHeader
+                  group={group}
+                  count={allTabs.filter((t) => t.tabGroupId === group.id).length}
+                  onEdit={setEditingGroup}
+                  onOpen={props.onOpen}
+                />
+              )}
+              {!group?.collapsed && (
+                <WorkspaceTabStripTab
+                  tab={tab}
+                  group={group}
+                  active={tab.id === layout.activeTabId}
+                  vertical={vertical}
+                  tabs={tabs}
+                  stripRef={ref}
+                  pendingGroupEditor={pendingGroupEditor}
+                  hoverCards={hoverCards}
+                  onSelect={select}
+                  onEditGroupLater={(id) => {
+                    pendingGroupEditor.current = id;
+                  }}
+                  onEditGroup={setEditingGroup}
+                  onOpen={props.onOpen}
+                  onCloseLayoutTab={props.onCloseLayoutTab}
+                />
+              )}
+            </Fragment>
+          );
+        })}
+        {!vertical && newTabButton}
+      </div>
+    </>
+  );
   return (
     <OverlaySideProvider value={inwardSide[position]}>
       <header
@@ -129,79 +197,25 @@ export function WorkspaceTabStrip(
         }
         data-misty-window-titlebar-region={props.titlebarInsets ? "true" : undefined}
       >
-        {vertical && (
-          <div className="misty-sidebar-head" data-misty-window-titlebar-region="true">
-            <SidebarToggleButton side={position === "right" ? "right" : "left"} />
-            <div className="misty-sidebar-nav ml-auto flex items-center">
-              <div ref={setNavSlot} className="flex items-center" />
-              <SidebarNavFallback />
+        {vertical ? (
+          <div className="misty-sidebar-card">
+            <div className="misty-sidebar-head" data-misty-window-titlebar-region="true">
+              <SidebarToggleButton side={position === "right" ? "right" : "left"} />
+              <div className="misty-sidebar-nav flex items-center">
+                <div ref={setNavSlot} className="flex items-center" />
+                <SidebarNavFallback />
+              </div>
+            </div>
+            {cardBody}
+            <SidebarNowPlaying />
+            <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
+              {props.footEnd}
             </div>
           </div>
+        ) : (
+          cardBody
         )}
-        {vertical && (
-          <div className="misty-sidebar-address">
-            <div ref={setTopSlot} className="misty-workspace-toolbar-slot" />
-            <SidebarAddressFallback />
-          </div>
-        )}
-        {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
-        <div
-          {...reorder}
-          ref={bindTabList}
-          role="tablist"
-          aria-label="Window tabs"
-          aria-orientation={vertical ? "vertical" : "horizontal"}
-          className={cn(
-            "misty-workspace-tab-list flex min-w-0 flex-1 gap-1",
-            vertical
-              ? "min-h-0 flex-col overflow-x-hidden overflow-y-auto"
-              : "items-center overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          )}
-        >
-          {vertical && newTabButton}
-          {allTabs.map((tab) => {
-            const group = groups.find((g) => g.id === tab.tabGroupId);
-            const firstInGroup = group && !shownGroups.has(group.id);
-            if (group) shownGroups.add(group.id);
-            return (
-              <Fragment key={tab.id}>
-                {firstInGroup && (
-                  <TabGroupHeader
-                    group={group}
-                    count={allTabs.filter((t) => t.tabGroupId === group.id).length}
-                    onEdit={setEditingGroup}
-                    onOpen={props.onOpen}
-                  />
-                )}
-                {!group?.collapsed && (
-                  <WorkspaceTabStripTab
-                    tab={tab}
-                    group={group}
-                    active={tab.id === layout.activeTabId}
-                    vertical={vertical}
-                    tabs={tabs}
-                    stripRef={ref}
-                    pendingGroupEditor={pendingGroupEditor}
-                    hoverCards={hoverCards}
-                    onSelect={select}
-                    onEditGroupLater={(id) => {
-                      pendingGroupEditor.current = id;
-                    }}
-                    onEditGroup={setEditingGroup}
-                    onOpen={props.onOpen}
-                    onCloseLayoutTab={props.onCloseLayoutTab}
-                  />
-                )}
-              </Fragment>
-            );
-          })}
-          {!vertical && newTabButton}
-        </div>
-        {vertical ? (
-          <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
-            {props.shortcuts}
-          </div>
-        ) : null}
+        {vertical ? props.account : null}
         {hoverCards.card}
         {editingGroup && (
           <TabGroupEditor

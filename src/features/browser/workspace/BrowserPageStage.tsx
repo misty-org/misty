@@ -1,5 +1,5 @@
 import { AgentTabAway } from "@/features/agents";
-import type { browserInternalPage} from "@/features/workspace";
+import type { browserInternalPage } from "@/features/workspace";
 import { blankBrowserUrl, type WorkspaceView } from "@/features/workspace";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { cn } from "@/shared/ui";
@@ -7,7 +7,7 @@ import type { RefObject } from "react";
 import { BrowserInternalPage } from "../internal/BrowserInternalPage";
 import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
 import { setBrowserError } from "./browserErrors";
-import { BrowserMistyRow } from "./BrowserMistyPanel";
+import { BrowserMistyRow, useBrowserMistyPanel } from "./BrowserMistyPanel";
 import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
 import { ReaderView } from "./ReaderView";
@@ -55,11 +55,15 @@ export function BrowserPageStage({
   onGoHome: () => void;
   reader: { article: ReaderArticle | null; close: () => void };
 }) {
+  // Beside the Misty panel the page is a rounded panel of its own, on every corner.
+  const mistyOpen = useBrowserMistyPanel(tab.id).open;
   return (
     <BrowserMistyRow tabId={tab.id}>
       <div
+        data-browser-corner-clip=""
         className={cn(
           "flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden",
+          mistyOpen && "rounded-xl",
           viewport === "responsive" ? "p-0" : "p-3",
           viewport === "responsive" ? undefined : "bg-charcoal-workspace",
         )}

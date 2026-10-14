@@ -79,7 +79,8 @@ describe("Misty panel width", () => {
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH + 100);
     // A drag never animates: the width follows the pointer at once.
     const dock = edge.closest<HTMLElement>("[data-misty-panel-dock]")!;
-    expect(dock.style.width).toBe(`${MISTY_PANEL_WIDTH + 100}px`);
+    // The dock is the panel plus the margin of window chrome beside it.
+    expect(dock.style.width).toBe(`${MISTY_PANEL_WIDTH + 100 + 8}px`);
     expect(dock.style.transitionDuration).toBe("");
     pointer(window, "pointermove", 640);
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH - 40);

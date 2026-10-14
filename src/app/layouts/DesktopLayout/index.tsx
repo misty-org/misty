@@ -25,6 +25,7 @@ import { AccountIsland } from "./AccountIsland";
 import {
   BrowserMenuAccountItems,
   BrowserProfileButton,
+  StripDownloads,
   StripShortcuts,
 } from "./WorkspaceStripDock";
 import { SpacesMenuButton } from "@/features/spaces";
@@ -157,7 +158,34 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useSettingsStore.getState().setActiveSection("sync");
     openSettingsOverlay();
   };
+  const stripAccount =
+    !isAuthRoute && isSideDock(docking.tabs) ? (
+      <AccountIsland
+        open={profileOpen}
+        onOpenChange={(open) => {
+          if (open) setSettingsOpen(false);
+          setProfileOpen(open);
+        }}
+        onOpenAccountSettings={openAccountSettings}
+        settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+        onSettingsClick={openSettingsOverlay}
+      />
+    ) : null;
   const stripShortcuts = <StripShortcuts />;
+  // The sidebar's bottom edge: downloads on the left, sync on the right.
+  const stripFootEnd = (
+    <>
+      <StripDownloads />
+      {/* Sidebar chrome, so it is the same 28px button as downloads and settings. */}
+      <div className="flex shrink-0 items-center" data-browser-toolbar data-sidebar>
+        <BrowserSyncBadge
+          key={user?.id}
+          accountId={user?.id ?? ""}
+          onOpenSettings={openSyncSettings}
+        />
+      </div>
+    </>
+  );
   const browserChrome = {
     spaces: <SpacesMenuButton toolbar />,
     profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
@@ -252,6 +280,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 titlebarInsets={topTabInsets}
                 hideTabStrip={focusMode}
                 stripShortcuts={stripShortcuts}
+                stripFootEnd={stripFootEnd}
+                stripAccount={stripAccount}
                 browserChrome={browserChrome}
               />
             )}
@@ -261,25 +291,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
           </>
         </section>
 
-        {!isAuthRoute && isSideDock(docking.tabs) ? (
-          <AccountIsland
-            open={profileOpen}
-            onOpenChange={(open) => {
-              if (open) setSettingsOpen(false);
-              setProfileOpen(open);
-            }}
-            onOpenAccountSettings={openAccountSettings}
-            syncControl={
-              <BrowserSyncBadge
-                key={user?.id}
-                accountId={user?.id ?? ""}
-                onOpenSettings={openSyncSettings}
-              />
-            }
-            settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-            onSettingsClick={openSettingsOverlay}
-          />
-        ) : null}
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
         {!isAuthRoute ? (
           <DesktopShellOverlays

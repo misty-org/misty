@@ -15,7 +15,7 @@ export const dockingMetrics = {
   /** The retired navigation rail: its tracks stay at zero, but the layout model still names them. */
   rail: 62,
   horizontalRail: 44,
-  sideTabs: 240,
+  sideTabs: 280,
   gap: 8,
   tab: 28,
   /** Chrome margin around the page when vertical tabs make it a panel. */

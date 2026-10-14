@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { ExternalLink, StarOff } from "lucide-react";
+import { StarOff } from "lucide-react";
 import { removeFavorite, useFavorites } from "@/features/bookmarks/favorites";
 import type { Bookmark } from "@/features/bookmarks/tree";
 import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
-import { dockTreeViews } from "@/features/workspace/dockTree";
-import { activeLayoutView, layoutTabs } from "@/features/workspace/layoutTabs";
+import { activeLayoutView } from "@/features/workspace/layoutTabs";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import {
@@ -17,37 +16,37 @@ import {
   Pressable,
 } from "@/shared/ui";
 
-function bookmarkOf(view: WorkspaceView | null | undefined): string | undefined {
-  return view?.surfaceId === "browser" ? parseBrowserViewState(view.state).bookmarkId : undefined;
-}
-
-/** The tab in this virtual window that a favorite opened, if it is still open. */
-function openFavoriteTab(bookmarkId: string) {
-  const state = useWorkspaceStore.getState();
-  return layoutTabs(state.layout).find((tab) =>
-    dockTreeViews(tab.root).some((view) => bookmarkOf(view) === bookmarkId),
-  );
+function originOf(address: string): string {
+  try {
+    return new URL(address).origin;
+  } catch {
+    return address;
+  }
 }
 
 /**
- * Favorites lead the tab strip in every virtual window. A favorite switches to the
- * tab it opened in this window, or opens one; the list syncs with bookmarks.
+ * Whether a view is still the page its favorite opened. A tab keeps the favorite's id after it
+ * navigates, so the id alone is stale: a tab that opened YouTube and has since gone to another
+ * site is no longer that favorite, and clicking the favorite must not land there.
+ */
+function isFavoritePage(view: WorkspaceView | null | undefined, favorite: Bookmark): boolean {
+  if (view?.surfaceId !== "browser") return false;
+  const state = parseBrowserViewState(view.state);
+  return state.bookmarkId === favorite.id && originOf(state.url) === originOf(favorite.url);
+}
+
+/**
+ * Favorites lead the tab strip in every virtual window. A favorite always opens a new tab, never
+ * switching to one already open; the list syncs with bookmarks.
  */
 export function FavoritesStrip(props: { vertical: boolean; onOpen(view: WorkspaceView): void }) {
   const favorites = useFavorites();
-  const activeBookmark = useWorkspaceStore((state) =>
-    bookmarkOf(activeLayoutView(state.layout) ?? undefined),
-  );
+  const activeView = useWorkspaceStore((state) => activeLayoutView(state.layout));
   if (!favorites.length && !props.vertical) return null;
-  const open = (favorite: Bookmark, newTab = false) => {
-    const state = useWorkspaceStore.getState();
-    const existing = newTab ? undefined : openFavoriteTab(favorite.id);
-    if (existing) {
-      const view = state.selectTab(existing.id);
-      if (view) props.onOpen(view);
-      return;
-    }
-    props.onOpen(state.openBrowserView({ url: favorite.url, bookmarkId: favorite.id }));
+  const open = (favorite: Bookmark) => {
+    props.onOpen(
+      useWorkspaceStore.getState().openBrowserView({ url: favorite.url, bookmarkId: favorite.id }),
+    );
   };
   return (
     <div
@@ -64,19 +63,15 @@ export function FavoritesStrip(props: { vertical: boolean; onOpen(view: Workspac
         <FavoriteTile
           key={favorite.id}
           favorite={favorite}
-          active={favorite.id === activeBookmark}
-          onOpen={(newTab) => open(favorite, newTab)}
+          active={isFavoritePage(activeView, favorite)}
+          onOpen={() => open(favorite)}
         />
       ))}
     </div>
   );
 }
 
-function FavoriteTile(props: {
-  favorite: Bookmark;
-  active: boolean;
-  onOpen(newTab: boolean): void;
-}) {
+function FavoriteTile(props: { favorite: Bookmark; active: boolean; onOpen(): void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const reason = `favorite-menu:${props.favorite.id}`;
   return (
@@ -94,20 +89,15 @@ function FavoriteTile(props: {
           data-active={props.active || undefined}
           data-menu-open={menuOpen || undefined}
           className="misty-workspace-favorite"
-          onClick={(event) => props.onOpen(event.metaKey || event.ctrlKey)}
+          onClick={props.onOpen}
           onAuxClick={(event) => {
-            if (event.button === 1) props.onOpen(true);
+            if (event.button === 1) props.onOpen();
           }}
         >
           <SavedWebsiteIcon url={props.favorite.url} />
         </Pressable>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuAction
-          label="Open in new tab"
-          icon={<ExternalLink />}
-          onSelect={() => props.onOpen(true)}
-        />
         <ContextMenuAction
           label="Remove from favorites"
           icon={<StarOff />}

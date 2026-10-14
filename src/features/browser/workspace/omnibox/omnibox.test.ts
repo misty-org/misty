@@ -67,13 +67,11 @@ describe("address text", () => {
 });
 
 describe("omnibox ranking", () => {
-  it("offers a direct site before a web search, without fetching its favicon", async () => {
+  it("offers a direct site, not a second search for the same text, without fetching its favicon", async () => {
     const matches = await suggest("youtube.com");
-    expect(matches.map((match) => match.kind)).toEqual(["url", "search"]);
+    expect(matches.map((match) => match.kind)).toEqual(["url"]);
     expect(matches[0].target).toEqual({ type: "navigate", url: "https://youtube.com/" });
     expect(matches[0].faviconUrl).toBeNull();
-    expect(matches[1].title).toBe("youtube.com");
-    expect(matches[1].detail).toBe("");
   });
 
   it("offers local development addresses directly", async () => {

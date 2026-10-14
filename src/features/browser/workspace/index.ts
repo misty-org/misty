@@ -7,3 +7,4 @@ export * from "./browserToolbarSlot";
 export * from "./windowMenuSlot";
 export * from "./browserChromeSlot";
 export { browserToolbarStyles } from "./browserToolbarStyles";
+export { BrowserDownloadsButton } from "./BrowserDownloadsButton";

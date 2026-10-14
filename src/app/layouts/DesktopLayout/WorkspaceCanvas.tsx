@@ -39,6 +39,9 @@ export function WorkspaceCanvas(props: {
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
   stripShortcuts?: ReactNode;
+  stripFootEnd?: ReactNode;
+  /** The vertical sidebar's closing row: the account, sync and settings, inside its panel. */
+  stripAccount?: ReactNode;
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
   browserChrome?: { spaces: ReactNode; profile: ReactNode; accountItems: ReactNode };
 }) {
@@ -170,6 +173,25 @@ export function WorkspaceCanvas(props: {
       if (closeTab(tab.id)) navigateToActiveLayoutTab();
     },
     [closeTab, navigateToActiveLayoutTab],
+  );
+
+  // A tab split into panes closes one pane at a time, like stepping on to the next with the pane
+  // chips; only its last pane takes the tab with it.
+  const closeLayoutTab = useCallback(
+    (id: string) => {
+      const state = useWorkspaceStore.getState();
+      if (state.resetPinnedTab(id)) return;
+      const tab = layoutTabs(state.layout).find((candidate) => candidate.id === id);
+      const panes = tab ? dockLeaves(tab.root) : [];
+      if (tab && panes.length > 1) {
+        const pane = panes.find((candidate) => candidate.id === tab.focusedPaneId) ?? panes[0]!;
+        const view = pane.views.find((item) => item.id === pane.activeViewId) ?? pane.views[0];
+        if (view && state.closeView(view.id, pane.id)) navigateToActiveLayoutTab();
+        return;
+      }
+      if (state.closeTab(id)) navigateToActiveLayoutTab();
+    },
+    [navigateToActiveLayoutTab],
   );
 
   const closeActiveTab = useCallback(() => {
@@ -345,11 +367,7 @@ export function WorkspaceCanvas(props: {
                   onOpen={openTab}
                   onClose={closeWorkspaceTab}
                   onNewTab={() => useBrowserSearchStore.getState().show()}
-                  onCloseLayoutTab={(id) => {
-                    const state = useWorkspaceStore.getState();
-                    if (state.resetPinnedTab(id)) return;
-                    if (state.closeTab(id)) navigateToActiveLayoutTab();
-                  }}
+                  onCloseLayoutTab={closeLayoutTab}
                   onMoveView={moveTab}
                   onDockView={dockTab}
                   onSplitPane={splitWorkspacePane}
@@ -366,6 +384,8 @@ export function WorkspaceCanvas(props: {
                   onReopenWindow={reopenWorkspaceVirtualWindow}
                   onResizeSplit={updateSplitRatio}
                   shortcuts={props.stripShortcuts}
+                  account={props.stripAccount}
+                  footEnd={props.stripFootEnd}
                 />
               </SidebarDrawer>
             ) : (
@@ -378,11 +398,7 @@ export function WorkspaceCanvas(props: {
                 onOpen={openTab}
                 onClose={closeWorkspaceTab}
                 onNewTab={() => useBrowserSearchStore.getState().show()}
-                onCloseLayoutTab={(id) => {
-                  const state = useWorkspaceStore.getState();
-                  if (state.resetPinnedTab(id)) return;
-                  if (state.closeTab(id)) navigateToActiveLayoutTab();
-                }}
+                onCloseLayoutTab={closeLayoutTab}
                 onMoveView={moveTab}
                 onDockView={dockTab}
                 onSplitPane={splitWorkspacePane}
@@ -399,6 +415,8 @@ export function WorkspaceCanvas(props: {
                 onReopenWindow={reopenWorkspaceVirtualWindow}
                 onResizeSplit={updateSplitRatio}
                 shortcuts={props.stripShortcuts}
+                account={props.stripAccount}
+                footEnd={props.stripFootEnd}
               />
             ))}
           <WorkspaceTabPanels

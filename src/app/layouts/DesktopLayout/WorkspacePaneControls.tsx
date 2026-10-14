@@ -1,7 +1,11 @@
 import { liftPanePresentation } from "@/features/workspace/paneDragPresentation";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Move, X } from "lucide-react";
 import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/workspace";
+import {
+  setBrowserPointerTrackingEnabled,
+  setBrowserWebviewsSuspended,
+} from "@/features/webviews/browserRuntime";
 import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
 import { cn, IconButton, Portal } from "@/shared/ui";
 
@@ -29,9 +33,15 @@ export function WorkspacePaneControls({
   const anchor = useRef<HTMLSpanElement>(null);
   const [bounds, setBounds] = useState({ top: 0, right: 0 });
   const [hovered, setHovered] = useState(false);
+  // The pointer is on the tray itself: only then is the app raised above the pages. Anywhere
+  // else over a page it must stay beneath, or the page could not be clicked.
+  const [onTray, setOnTray] = useState(false);
+  const trayBounds = useRef(bounds);
+  trayBounds.current = bounds;
+  const multiple = panes.length >= 2;
   useLayoutEffect(() => {
     const paneElement = anchor.current?.closest<HTMLElement>("[data-workspace-pane]");
-    if (!paneElement) return;
+    if (!paneElement || !multiple) return;
     const update = () => {
       const rect = paneElement.getBoundingClientRect();
       // The tray straddles the pane's top edge, except under another pane: that pane's
@@ -46,28 +56,42 @@ export function WorkspacePaneControls({
     // Shows while the pointer moves over the pane (or its tray strip), then fades once
     // the pointer has been still for a moment.
     let idle: number | undefined;
-    const move = (event: PointerEvent) => {
+    const track = (x: number, y: number) => {
       const rect = paneElement.getBoundingClientRect();
       const inside =
         rect.width > 0 &&
         rect.height > 0 &&
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right + 4 &&
-        event.clientY >= rect.top - 20 &&
-        event.clientY <= rect.bottom;
+        x >= rect.left &&
+        x <= rect.right + 4 &&
+        y >= rect.top - 20 &&
+        y <= rect.bottom;
       window.clearTimeout(idle);
       setHovered(inside);
+      const tray = trayBounds.current;
+      const right = window.innerWidth - tray.right;
+      setOnTray(
+        inside && x >= right - 96 && x <= right + 8 && y >= tray.top - 8 && y <= tray.top + 36,
+      );
       if (inside) idle = window.setTimeout(() => setHovered(false), CONTROLS_IDLE_MS);
+    };
+    const move = (event: PointerEvent) => track(event.clientX, event.clientY);
+    // A native page swallows the pointer, so the host reports where it is while it is over one.
+    const nativeMove = (event: Event) => {
+      const { x, y } = (event as CustomEvent<{ x: number; y: number }>).detail;
+      if (Number.isFinite(x) && Number.isFinite(y)) track(x, y);
     };
     const leave = () => {
       window.clearTimeout(idle);
       setHovered(false);
+      setOnTray(false);
     };
     update();
     const observer = new ResizeObserver(update);
     for (let element: HTMLElement | null = paneElement; element; element = element.parentElement)
       observer.observe(element);
     window.addEventListener("pointermove", move);
+    window.addEventListener("misty:browser-pointer", nativeMove);
+    setBrowserPointerTrackingEnabled(true);
     window.addEventListener("blur", leave);
     window.addEventListener("resize", update);
     // Scrolling inside the pane cannot move it; only an enclosing scroller can.
@@ -79,12 +103,21 @@ export function WorkspacePaneControls({
       window.clearTimeout(idle);
       observer.disconnect();
       window.removeEventListener("pointermove", move);
+      window.removeEventListener("misty:browser-pointer", nativeMove);
+      setBrowserPointerTrackingEnabled(false);
       window.removeEventListener("blur", leave);
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", scrolled, true);
     };
-  }, [root]);
-  if (panes.length < 2) return null;
+  }, [root, multiple]);
+  // While the pointer is on the tray, the app's layer is raised above the native pages, so the
+  // tray is never hidden behind one.
+  useEffect(() => {
+    if (!hovered || !onTray) return;
+    setBrowserWebviewsSuspended(true, "pane-controls");
+    return () => setBrowserWebviewsSuspended(false, "pane-controls");
+  }, [hovered, onTray]);
+  if (!multiple) return null;
   return (
     <>
       <span ref={anchor} className="pointer-events-none absolute right-0 top-0" aria-hidden />

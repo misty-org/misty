@@ -1,13 +1,12 @@
-/* Misty panel: the app's dark surface beside the content, split from it by a hairline */
+/* Misty panel: the app's dark surface beside the content, as a panel of its own */
 aside[data-misty-panel] {
   --misty-panel-bg: var(--color-charcoal-bg, #131313);
   background: var(--misty-panel-bg);
 }
-aside[data-misty-panel="right"] {
-  border-left: 1px solid var(--color-charcoal-border);
-}
-aside[data-misty-panel="left"] {
-  border-right: 1px solid var(--color-charcoal-border);
+/* Its own rounded panel, set off from the page by a margin of window chrome. */
+aside[data-misty-panel] {
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
 }
 
 aside[data-misty-panel] .agent-studio,
@@ -30,8 +29,8 @@ aside[data-misty-panel] .agents-chat {
   min-width: 0;
 }
 
-/* The hairline is the resize handle: drag it, or focus it and use the arrow keys.
-   It brightens while hovered, focused or dragged. */
+/* The panel's outline is the resize handle: drag it, or focus it and use the arrow keys. Like the
+   tab drawer's, it draws nothing of its own, only the resize cursor. */
 .misty-panel-resizer {
   position: absolute;
   inset-block: 0;
@@ -41,25 +40,12 @@ aside[data-misty-panel] .agents-chat {
   outline: none;
   touch-action: none;
 }
+/* On the panel's own outline, 8px in from the dock's edge, not on the page beside it. */
 .misty-panel-resizer[data-side="right"] {
-  left: -6px;
+  left: 2px;
 }
 .misty-panel-resizer[data-side="left"] {
-  right: -6px;
-}
-.misty-panel-resizer::after {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  left: 5px;
-  width: 2px;
-  background: var(--color-charcoal-active);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-}
-.misty-panel-resizer:is(:hover, :focus-visible)::after,
-.misty-panel-resizer[data-dragging]::after {
-  opacity: 1;
+  right: 2px;
 }
 html:has(.misty-panel-resizer[data-dragging]) {
   cursor: col-resize;
