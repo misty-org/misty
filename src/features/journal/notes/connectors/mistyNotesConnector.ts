@@ -7,8 +7,8 @@ import type {
   NotesConnector,
   SyncResult,
   UpdateNoteInput,
-} from "../model/interfaces/connectors";
-import type { UnifiedNote } from "../model/types/types";
+} from "../model/connectors";
+import type { UnifiedNote } from "../model/types";
 
 /**
  * Native Misty notes are server-backed Space documents. The collaborative Yjs
@@ -120,7 +120,7 @@ export function createMistyNotesConnector(
   };
 }
 
-export async function listMistySpaceNotesWithApi(
+async function listMistySpaceNotesWithApi(
   notesApi: NativeNotesApi,
   spaceId: string,
   spaceName: string,

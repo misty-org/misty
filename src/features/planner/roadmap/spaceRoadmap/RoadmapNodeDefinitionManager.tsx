@@ -3,7 +3,7 @@ import type {
   SpaceRoadmapFieldType,
   SpaceRoadmapNodeColor,
   SpaceRoadmapNodeDefinition,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+} from "@/api/spaces/dto/plannerExpansionTypes";
 import { errorText } from "@/shared/lib/format";
 import {
   Button,

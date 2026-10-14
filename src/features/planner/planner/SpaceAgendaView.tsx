@@ -1,13 +1,13 @@
 import type { AccountConnection } from "@/api/connections";
-import type { SpaceAgendaEntry } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceAgendaEntry } from "@/api/spaces/dto/plannerExpansionTypes";
 import type {
   GoogleCalendarChoice,
   SpaceCalendarEvent,
   SpaceCalendarSource,
   SpaceIntegration,
   SpaceTask,
-} from "@/api/spaces/dto/interfaces/types";
-import type { TaskDraft } from "@/api/spaces/dto/types/SpaceTaskPrimitives";
+} from "@/api/spaces/dto/entities";
+import type { TaskDraft } from "@/api/spaces/dto/SpaceTaskPrimitives";
 import { errorText } from "@/shared/lib/format";
 import {
   Button,

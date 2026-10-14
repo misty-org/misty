@@ -9,13 +9,14 @@ import { useEffect } from "react";
 import { windowSurfaceBackground } from "./windowSurfaceBackground";
 
 /** Prepare native chrome and saved zoom once, independently of the active route.
- * macOS starts hidden and reveals after native traffic-light layout completes.
+ * The window starts hidden and reveals once its background matches the theme
+ * (on macOS, also after native traffic-light layout completes).
  */
 export function DesktopWindowReady() {
   useEffect(() => {
-    if (!hasTauriInternals() || platform() !== "macos") return;
+    if (!hasTauriInternals() || !["macos", "windows"].includes(platform())) return;
     let disposed = false;
-    // Color the NSWindow behind the renderer without making the renderer
+    // Color the native window behind the renderer without making the renderer
     // opaque: embedded Browser views need transparency.
     let lastBackground = "";
     let backgroundTimer: ReturnType<typeof setTimeout> | undefined;
@@ -49,7 +50,7 @@ export function DesktopWindowReady() {
       // the product baseline (displayed 100% currently renders at 1.1x).
       await getCurrentWebview().setZoom(getAppliedAppRenderScale());
       if (!disposed) window.dispatchEvent(new Event(appZoomChangedEvent));
-      // A hidden WKWebView may not deliver animation frames. Let the committed
+      // A hidden webview may not deliver animation frames. Let the committed
       // React tree finish layout without depending on requestAnimationFrame.
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       if (!disposed) await revealMainWindow();

@@ -4,7 +4,7 @@ import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import { NoteReadingPaneView, type NoteReadingRuntime } from "./NoteReadingPaneView";
 import type { NoteEditorSession } from "./NoteBlockEditorView";
-import type { UnifiedNote } from "../model/types/types";
+import type { UnifiedNote } from "../model/types";
 
 it("does not seed a title before sync or let a viewer edit it", () => {
   const doc = new Y.Doc(),

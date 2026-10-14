@@ -1,4 +1,4 @@
-import type { LibrarySearchFacets } from "@/api/spaces/dto/interfaces/types";
+import type { LibrarySearchFacets } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 
 type Facet = LibrarySearchFacets["tags"][number];

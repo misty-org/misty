@@ -1,4 +1,4 @@
-import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemQuery } from "@/api/spaces/dto/entities";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";

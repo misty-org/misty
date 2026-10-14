@@ -1,5 +1,5 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemQuery, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useEffect, useMemo, useState } from "react";
 import type { LibraryCollectionKind } from "../types/useSpaceLibraryData";
 import {

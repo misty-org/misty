@@ -19,17 +19,11 @@ export interface LaunchOnLoginSnapshot {
   target: string;
   detail: string;
 }
-
-export interface OpenWithAssociation {
-  key: string;
-  applicationPath: string;
-}
-
 export interface SaveSettingsRequest {
   document: Record<string, unknown>;
 }
 
-export interface NativeShortcutOverride {
+interface NativeShortcutOverride {
   commandId: string;
   primary?: string | null;
   alternate?: string | null;
@@ -49,7 +43,7 @@ export interface ShortcutBindingSet {
 }
 
 /** @deprecated Use effectiveBindings. Kept while focused tools move to the dispatcher. */
-export interface ShortcutBinding {
+interface ShortcutBinding {
   commandId: string;
   shortcut: string;
   source: "default" | "user";

@@ -1,5 +1,8 @@
 import { useLayoutEffect, useRef, type RefObject } from "react";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import {
+  browserRuntimeResumeEvent,
+  setBrowserWebviewsSuspended,
+} from "@/features/webviews/browserRuntime";
 import { dockingMotion } from "./dockingGeometry";
 
 const surfaces =
@@ -63,6 +66,12 @@ export function useDockingTransition(ref: RefObject<HTMLElement | null>, layoutK
           moving = false;
           remember();
           setBrowserWebviewsSuspended(false, "docking-layout");
+          // Pages may have measured their bounds mid-slide, from the old position, and no
+          // size change follows the slide's end. Measure again once the layout is at rest;
+          // a second pass covers chrome that mounts a frame later (the sidebar's toolbar).
+          const remeasure = () => window.dispatchEvent(new Event(browserRuntimeResumeEvent));
+          requestAnimationFrame(() => requestAnimationFrame(remeasure));
+          window.setTimeout(remeasure, 400);
         });
       });
     }

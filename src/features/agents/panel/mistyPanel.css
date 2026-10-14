@@ -1,6 +1,12 @@
-/* Misty panel: a box docked beside the workspace */
+/* Misty panel: the app's dark surface beside the content, as a panel of its own */
 aside[data-misty-panel] {
-  background: var(--color-charcoal-bg, #131313);
+  --misty-panel-bg: var(--color-charcoal-bg, #131313);
+  background: var(--misty-panel-bg);
+}
+/* Its own rounded panel, set off from the page by a margin of window chrome. */
+aside[data-misty-panel] {
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
 }
 
 aside[data-misty-panel] .agent-studio,
@@ -11,6 +17,37 @@ aside[data-misty-panel] .agents-body {
   background: transparent;
 }
 
+/* The sticky header and composer paint the panel's own color so the
+   conversation scrolls beneath them instead of showing through. */
 aside[data-misty-panel] .agents-body {
-  --agents-canvas: transparent;
+  --agents-canvas: var(--misty-panel-bg);
+}
+
+/* The chat column keeps a 360px floor in the Agents page; here the panel's own minimum
+   width governs, so the column never outgrows the panel and clips its right edge. */
+aside[data-misty-panel] .agents-chat {
+  min-width: 0;
+}
+
+/* The panel's outline is the resize handle: drag it, or focus it and use the arrow keys. Like the
+   tab drawer's, it draws nothing of its own, only the resize cursor. */
+.misty-panel-resizer {
+  position: absolute;
+  inset-block: 0;
+  z-index: 2;
+  width: 12px;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+/* On the panel's own outline, 8px in from the dock's edge, not on the page beside it. */
+.misty-panel-resizer[data-side="right"] {
+  left: 2px;
+}
+.misty-panel-resizer[data-side="left"] {
+  right: 2px;
+}
+html:has(.misty-panel-resizer[data-dragging]) {
+  cursor: col-resize;
+  user-select: none;
 }

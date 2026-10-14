@@ -22,6 +22,13 @@ pub fn allows(label: &str, command: &str) -> bool {
         _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
             true
         }
+        // A detached tab's window: its bar can dock it, bring the tab back or stop.
+        _ if label
+            .strip_prefix("misty-dock-")
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()) =>
+        {
+            command == "agent_dock_host_action"
+        }
         _ => false,
     }
 }
@@ -43,7 +50,6 @@ mod tests {
                 "cursor_companion_snap",
                 "cursor_companion_capture_region",
                 "cursor_companion_watch_clicks",
-                "ensure_local_access_token",
                 "browser_sync_state",
                 "code_read_text_file",
             ] {
@@ -58,6 +64,20 @@ mod tests {
         ] {
             assert!(!allows(label, "cursor_companion_snapshot"));
         }
+    }
+
+    #[test]
+    fn dock_hosts_can_only_press_their_own_bar() {
+        let host = "misty-dock-01951d32-40ac-7000-8000-000000000001";
+        assert!(allows(host, "agent_dock_host_action"));
+        for command in [
+            "agent_tab_detach",
+            "agent_dock_status",
+            "browser_webview_create",
+        ] {
+            assert!(!allows(host, command), "{command}");
+        }
+        assert!(!allows("misty-dock-spoof", "agent_dock_host_action"));
     }
 
     #[test]
@@ -82,6 +102,7 @@ mod tests {
             "browser_sync_edit",
             "browser_sync_activate",
             "browser_sync_claim",
+            "browser_sync_flush",
             "browser_sync_lock",
             "browser_sync_forget_key",
             "browser_recovery_open",
@@ -92,7 +113,6 @@ mod tests {
             assert!(allows("main", command));
             for label in [
                 "browser-a",
-                "misty-mini-app-a",
                 "misty-agent-01951d32-40ac-7000-8000-000000000001",
                 "main-spoof",
             ] {
@@ -149,13 +169,10 @@ mod tests {
 
     #[test]
     fn content_views_cannot_inherit_host_commands() {
-        for label in ["misty-mini-app-a", "browser-a", "unknown", "main-spoof"] {
+        for label in ["browser-a", "unknown", "main-spoof"] {
             for command in [
-                "ensure_local_access_token",
                 "code_read_text_file",
                 "terminal_create",
-                "builtin_service_open",
-                "mini_app_close",
                 "save_authenticated_user",
                 "auth_cookie_restore",
                 "auth_cookie_capture",
@@ -167,9 +184,6 @@ mod tests {
                 assert!(!allows(label, command), "{label}: {command}");
             }
         }
-        assert!(allows("main", "builtin_service_open"));
         assert!(!allows("misty-bot-pet", "app_snapshot"));
-        assert!(!allows("misty-mini-app-a", "mini_app_rpc"));
-        assert!(!allows("browser-a", "mini_app_rpc"));
     }
 }

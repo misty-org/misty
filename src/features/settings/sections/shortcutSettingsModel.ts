@@ -50,12 +50,8 @@ export function groupShortcutsByCategory<T extends { category: string }>(
   return [...groups.entries()];
 }
 
-export function shortcutScopeLabel(scope: string): string {
+function shortcutScopeLabel(scope: string): string {
   if (scope === "global") return "Everywhere";
   if (scope === "workspace") return "Workspace";
   return scope.slice(5).replace(/^./, (character) => character.toUpperCase());
-}
-
-export function shortcutCategorySlug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }

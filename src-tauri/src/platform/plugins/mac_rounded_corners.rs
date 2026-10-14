@@ -21,20 +21,11 @@ use objc::{class, msg_send, sel, sel_impl};
 use std::ffi::c_void;
 
 #[cfg(target_os = "macos")]
+use super::mac_traffic_lights::position_traffic_lights;
+
+#[cfg(target_os = "macos")]
 #[link(name = "QuartzCore", kind = "framework")]
 unsafe extern "C" {}
-
-#[cfg(target_os = "macos")]
-unsafe extern "C" {
-    fn objc_setAssociatedObject(object: id, key: *const c_void, value: id, policy: usize);
-    fn objc_getAssociatedObject(object: id, key: *const c_void) -> id;
-}
-
-#[cfg(target_os = "macos")]
-static TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY: u8 = 0;
-
-#[cfg(target_os = "macos")]
-const OBJC_ASSOCIATION_RETAIN_NONATOMIC: usize = 1;
 
 /// Configuration for Traffic Lights positioning
 pub struct TrafficLightsConfig {
@@ -207,18 +198,19 @@ pub(crate) unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSVi
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 static MAIN_WINDOW_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn main_window_ready() -> bool {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     return MAIN_WINDOW_READY.load(std::sync::atomic::Ordering::Acquire);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     true
 }
 
 /// Completes window preparation after React, fonts, and saved zoom are ready.
-/// The macOS window starts hidden so its first frame has positioned traffic lights.
+/// The window starts hidden so its first frame already has the theme's
+/// background (and, on macOS, positioned traffic lights).
 #[tauri::command]
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     // The main window can already contain embedded provider views on reload.
@@ -237,7 +229,7 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
                 if !main_window_ready() {
                     let ns_window = webview.ns_window() as id;
                     configure_main_renderer_resize(webview.inner() as id);
-                    apply_modern_window_style(ns_window, -4.0, 0.0);
+                    apply_modern_window_style(ns_window, -1.0, 0.0);
                     let _: () = msg_send![ns_window, displayIfNeeded];
                     MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
                     ns_window.makeKeyAndOrderFront_(nil);
@@ -246,6 +238,13 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
             })
             .map_err(|error| error.to_string())?;
         receive.await.map_err(|error| error.to_string())?;
+    }
+    #[cfg(windows)]
+    {
+        let window = webview.window();
+        MAIN_WINDOW_READY.store(true, std::sync::atomic::Ordering::Release);
+        window.show().map_err(|error| error.to_string())?;
+        window.set_focus().map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -364,78 +363,5 @@ unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
     if supports_continuous_corners {
         let continuous = NSString::alloc(nil).init_str("continuous");
         let _: () = msg_send![layer, setCornerCurve: continuous];
-    }
-}
-
-#[cfg(target_os = "macos")]
-pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
-    let style_mask = ns_window.styleMask();
-    if style_mask.contains(NSWindowStyleMask::NSFullScreenWindowMask) {
-        return;
-    }
-
-    let default_x = 20.0;
-    let button_spacing = 23.0;
-
-    let close_button: id = msg_send![ns_window, standardWindowButton: 0];
-    let miniaturize_button: id = msg_send![ns_window, standardWindowButton: 1];
-    let zoom_button: id = msg_send![ns_window, standardWindowButton: 2];
-
-    if close_button.is_null() {
-        return;
-    }
-
-    // Pin the native controls to the 38-point custom titlebar. One-time frame
-    // writes are replaced by AppKit's next layout; resize callbacks correcting
-    // those frames in turn cause jitter. Native anchors keep the same position
-    // as part of layout, without a Misty resize handler or frame rewrites.
-    let content_view = ns_window.contentView();
-    if content_view.is_null() {
-        return;
-    }
-    let key = &TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY as *const u8 as *const c_void;
-    let previous = objc_getAssociatedObject(ns_window, key);
-    if !previous.is_null() {
-        let _: () = msg_send![class!(NSLayoutConstraint), deactivateConstraints: previous];
-    }
-    let leading: id = msg_send![content_view, leadingAnchor];
-    let top: id = msg_send![content_view, topAnchor];
-    let mut constraints: Vec<id> = Vec::with_capacity(12);
-    for (index, button) in [close_button, miniaturize_button, zoom_button]
-        .iter()
-        .enumerate()
-    {
-        if button.is_null() {
-            continue;
-        }
-        let button = *button;
-        let frame: cocoa::foundation::NSRect = msg_send![button, frame];
-        let _: () =
-            msg_send![button, setTranslatesAutoresizingMaskIntoConstraints: cocoa::base::NO];
-        let button_leading: id = msg_send![button, leadingAnchor];
-        let button_top: id = msg_send![button, topAnchor];
-        let width: id = msg_send![button, widthAnchor];
-        let height: id = msg_send![button, heightAnchor];
-        constraints.push(msg_send![button_leading,
-            constraintEqualToAnchor: leading
-            constant: default_x + offset_x + button_spacing * index as f64]);
-        constraints.push(msg_send![button_top,
-            constraintEqualToAnchor: top
-            constant: 19.0 + offset_y - frame.size.height / 2.0]);
-        constraints.push(msg_send![width, constraintEqualToConstant: frame.size.width]);
-        constraints.push(msg_send![height, constraintEqualToConstant: frame.size.height]);
-    }
-    let constraints: id = msg_send![class!(NSArray),
-        arrayWithObjects: constraints.as_ptr() count: constraints.len()];
-    let _: () = msg_send![class!(NSLayoutConstraint), activateConstraints: constraints];
-    objc_setAssociatedObject(
-        ns_window,
-        key,
-        constraints,
-        OBJC_ASSOCIATION_RETAIN_NONATOMIC,
-    );
-    let root: id = msg_send![content_view, superview];
-    if !root.is_null() {
-        let _: () = msg_send![root, layoutSubtreeIfNeeded];
     }
 }

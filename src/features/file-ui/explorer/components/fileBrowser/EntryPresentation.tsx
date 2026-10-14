@@ -1,6 +1,6 @@
 import type { DirectorySizeRecord, FileEntry } from "@/native/ipc";
 import type { ReactNode } from "react";
-import type { PassiveRenameDraft } from "../../model/types/components/FileBrowserInline";
+import type { PassiveRenameDraft } from "../../model/FileBrowser";
 import type { ExplorerInlineEditState } from "../../store";
 import { directorySizeRecordForPath } from "../../utils/entrySize";
 import { formatBytes } from "../../utils/fileFormat";
@@ -18,7 +18,7 @@ export function formatEntrySize(
   return formatBytes(null);
 }
 
-export function DirectorySizeDots() {
+function DirectorySizeDots() {
   return (
     <span className={fileBrowserStyles.directorySizeDots} aria-label="Calculating folder size">
       {[0, 1, 2].map((index) => (

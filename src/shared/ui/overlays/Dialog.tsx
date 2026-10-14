@@ -97,8 +97,10 @@ const DialogContent = React.forwardRef<
     container?: HTMLElement | null;
     /** `top` sits the panel in the upper part of the window, for search-style dialogs. */
     placement?: "center" | "top";
+    /** Leaves the page undimmed, for panels that open over one control. */
+    backdrop?: boolean;
   }
->(({ className, children, container, placement = "center", ...props }, ref) => {
+>(({ className, children, container, placement = "center", backdrop = true, ...props }, ref) => {
   React.useEffect(() => {
     return () => {
       cleanupPointerEvents();
@@ -110,7 +112,7 @@ const DialogContent = React.forwardRef<
 
   return (
     <DialogPortal container={container}>
-      <DialogOverlay className={container ? "absolute inset-0" : undefined} />
+      {backdrop ? <DialogOverlay className={container ? "absolute inset-0" : undefined} /> : null}
       {/* Flex layout centers the panel on whole pixels; a 50% translate would land odd
           sizes on a half pixel and blur their text on 1x displays. */}
       <div
@@ -118,7 +120,9 @@ const DialogContent = React.forwardRef<
         className={cn(
           container ? "absolute" : "fixed",
           "inset-0 layer-dialog pointer-events-none flex justify-center",
-          placement === "top" ? "items-start pt-[12vh]" : "items-center",
+          placement === "top" ? "items-start" : "items-center",
+          placement === "top" && backdrop && "pt-[12vh]",
+          !backdrop && "justify-start",
         )}
       >
         <DialogPrimitive.Content

@@ -265,7 +265,29 @@
   gap: 4px;
 }
 
-/* Task drawer sections. */
+/* The Goal dialog: the goal, then the live plan under a hairline. */
+.agent-goal-dialog {
+  display: grid;
+  gap: 20px;
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+.agent-goal-dialog h3 {
+  margin-bottom: 2px;
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  font-weight: 600;
+}
+.agent-goal-dialog > section + section {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-goal-note {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .agent-goal-section,
 .agent-plan-checklist {
   display: grid;

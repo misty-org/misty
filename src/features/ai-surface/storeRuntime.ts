@@ -105,7 +105,8 @@ export function consumeInvocationEvent(
   if (
     event.type === "tool.started" ||
     event.type === "tool.completed" ||
-    event.type === "tool.failed"
+    event.type === "tool.failed" ||
+    event.type === "tool.detail"
   ) {
     return;
   }
@@ -210,7 +211,7 @@ export function makeSpeech(
   };
 }
 
-export function conciseSpeech(value: string) {
+function conciseSpeech(value: string) {
   // The compact presence bubble is plain text; the durable task transcript
   // renders the complete response as Markdown. Strip common Markdown syntax so
   // emphasis/list markers never leak into this one-line preview.

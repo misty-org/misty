@@ -2,7 +2,7 @@ import { useFileBrowserRuntime } from "./FileBrowserRuntime";
 import type { DirectoryListing, FileEntry } from "@/native/ipc";
 import type { CSSProperties, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FileBrowserProps } from "../../model/interfaces/components/FileBrowser";
+import type { FileBrowserProps } from "../../model/FileBrowser";
 import { dragItemsForEntry } from "../FileBrowserDrag";
 import { GenericFileIcon } from "../FileBrowserIcons";
 import { InlineNameEditor } from "../FileBrowserInline";

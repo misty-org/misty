@@ -1,4 +1,4 @@
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 
 /** The account's protected default Space is the home fallback. */
 export function preferredDefaultSpace(spaces: Space[]): Space | undefined {

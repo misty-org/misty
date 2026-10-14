@@ -37,13 +37,64 @@ fn with_engine<T>(
         .map_err(|_| "File organizer is unavailable")?;
     if engine.is_none() {
         let runtime = app.state::<MistyRuntime>();
-        let directory = runtime
-            .environment
-            .misty_db_path()
+        // The organizer's write-ahead journal is in `misty.db`; each save is a committed
+        // transaction before the effect it guards. Journal files an earlier layout kept in
+        // a folder (under `db/`, or beside the database) are imported once.
+        let store = runtime.environment.store();
+        let data = store
+            .path()
             .parent()
             .ok_or("Device storage is unavailable")?
-            .join("agent-file-journal");
-        *engine = Some(Organizer::new(directory)?);
+            .to_path_buf();
+        let earlier = [
+            runtime
+                .environment
+                .misty_db_path()
+                .parent()
+                .map(|db| db.join("agent-file-journal")),
+            Some(data.join("agent-file-journal")),
+        ];
+        store
+            .import_once("agent-file-journal", |connection| -> Result<(), rusqlite::Error> {
+                for folder in earlier.iter().flatten().filter(|path| path.is_dir()) {
+                    let Ok(entries) = std::fs::read_dir(folder) else {
+                        continue;
+                    };
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let (Some(id), Some(extension)) = (
+                            path.file_stem().and_then(|name| name.to_str()),
+                            path.extension().and_then(|name| name.to_str()),
+                        ) else {
+                            continue;
+                        };
+                        let Ok(document) = std::fs::read_to_string(&path) else {
+                            continue;
+                        };
+                        let saved_at = entry
+                            .metadata()
+                            .and_then(|meta| meta.modified())
+                            .ok()
+                            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map_or(0, |elapsed| elapsed.as_millis() as i64);
+                        match extension {
+                            "grant" => connection.execute(
+                                "INSERT OR IGNORE INTO agent_file_grants (id, document) VALUES (?1, ?2)",
+                                rusqlite::params![id, document],
+                            )?,
+                            "manifest" => connection.execute(
+                                "INSERT OR IGNORE INTO agent_file_manifests (id, document, saved_at)
+                                 VALUES (?1, ?2, ?3)",
+                                rusqlite::params![id, document, saved_at],
+                            )?,
+                            _ => 0,
+                        };
+                    }
+                }
+                Ok(())
+            })
+            .map_err(|error| error.to_string())?;
+        *engine = Some(Organizer::new(store.path().to_path_buf())?);
     }
     operation(engine.as_mut().unwrap())
 }

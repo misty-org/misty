@@ -1,5 +1,6 @@
 //! The encrypted local outbox of an installation's extension storage values.
 use super::*;
+use rusqlite::OptionalExtension;
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce,
@@ -21,15 +22,26 @@ pub(super) fn ciphers() -> &'static std::sync::Mutex<BTreeMap<String, Aes256Gcm>
     static CIPHERS: OnceLock<std::sync::Mutex<BTreeMap<String, Aes256Gcm>>> = OnceLock::new();
     CIPHERS.get_or_init(Default::default)
 }
+fn db() -> Result<rusqlite::Connection, String> {
+    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
+        .connect()
+        .map_err(|e| e.to_string())
+}
+fn slot(installation: &Installation) -> String {
+    format!("{}-{}", installation.id, installation.generation)
+}
 pub(super) fn remove_local(
-    app: &tauri::AppHandle,
+    _app: &tauri::AppHandle,
     account: &str,
     installation: &Installation,
 ) -> Result<(), String> {
-    let path = journal_path(app, account, installation)?;
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|e| e.to_string())?;
-    }
+    db()?
+        .execute(
+            "DELETE FROM extension_journal WHERE account = ?1 AND installation = ?2",
+            [account, &slot(installation)],
+        )
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 fn cipher(account: &str) -> Result<Aes256Gcm, String> {
@@ -64,26 +76,36 @@ fn cipher(account: &str) -> Result<Aes256Gcm, String> {
     cache.insert(account.to_owned(), cipher.clone());
     Ok(cipher)
 }
-pub(super) fn journal_path(
-    app: &tauri::AppHandle,
+/// Whether this installation generation already has a journal.
+pub(super) fn journal_exists(
+    _app: &tauri::AppHandle,
     account: &str,
     installation: &Installation,
-) -> Result<PathBuf, String> {
-    Ok(root(app, account)?.join("sync").join(format!(
-        "{}-{}.sealed",
-        installation.id, installation.generation
-    )))
+) -> Result<bool, String> {
+    db()?
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM extension_journal WHERE account = ?1 AND installation = ?2)",
+            [account, &slot(installation)],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())
 }
 pub(super) fn read(
-    app: &tauri::AppHandle,
+    _app: &tauri::AppHandle,
     account: &str,
     installation: &Installation,
 ) -> Result<Journal, String> {
-    let path = journal_path(app, account, installation)?;
-    if !path.exists() {
+    let bytes: Option<Vec<u8>> = db()?
+        .query_row(
+            "SELECT sealed FROM extension_journal WHERE account = ?1 AND installation = ?2",
+            [account, &slot(installation)],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    let Some(bytes) = bytes else {
         return Ok(Journal::default());
-    }
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    };
     if bytes.len() < 28 {
         return Err("The extension sync journal is incomplete.".into());
     }
@@ -102,14 +124,11 @@ pub(super) fn read(
     serde_json::from_slice(&plain).map_err(|_| "The extension sync journal is invalid.".into())
 }
 pub(super) fn write(
-    app: &tauri::AppHandle,
+    _app: &tauri::AppHandle,
     account: &str,
     installation: &Installation,
     journal: &Journal,
 ) -> Result<(), String> {
-    let path = journal_path(app, account, installation)?;
-    let parent = path.parent().ok_or("Invalid journal directory.")?;
-    std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let plain = zeroize::Zeroizing::new(serde_json::to_vec(journal).map_err(|e| e.to_string())?);
     let mut sealed = nonce.to_vec();
@@ -125,9 +144,12 @@ pub(super) fn write(
             )
             .map_err(|_| "Could not encrypt extension settings.")?,
     );
-    let temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-    std::fs::write(temp.path(), sealed).map_err(|e| e.to_string())?;
-    temp.as_file().sync_all().map_err(|e| e.to_string())?;
-    temp.persist(path).map_err(|e| e.to_string())?;
+    db()?
+        .execute(
+            "INSERT INTO extension_journal (account, installation, sealed) VALUES (?1, ?2, ?3)
+             ON CONFLICT (account, installation) DO UPDATE SET sealed = excluded.sealed",
+            rusqlite::params![account, slot(installation), sealed],
+        )
+        .map_err(|e| e.to_string())?;
     Ok(())
 }

@@ -71,9 +71,11 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     const firstWindowId = useWorkspaceStore.getState().activeWindowId;
     expect(animate).not.toHaveBeenCalled();
 
+    // No window menu is on screen to open the picker beside, so the window gets an unused color.
     fireEvent.keyDown(window, { key: "n", code: "KeyN", metaKey: true });
     const windows = useWorkspaceStore.getState().windowsByScope.global ?? [];
     expect(windows).toHaveLength(2);
+    expect(windows[1].color).toBeDefined();
     expect(useWorkspaceStore.getState().activeWindowId).not.toBe(firstWindowId);
     expect(animate).toHaveBeenLastCalledWith(expect.any(Array), windowTransition);
 

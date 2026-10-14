@@ -7,13 +7,11 @@ import {
   useBrowserDownloadsStore,
 } from "../library/downloadsStore";
 import { browserLibrary, type BrowserDownloadEntry } from "../library/native";
+import { fileManagerName } from "@/shared/platform/desktopOs";
 import { InternalPageEmpty, InternalPageFrame } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 
-const revealLabel =
-  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)
-    ? "Show in Finder"
-    : "Show in folder";
+const revealLabel = `Show in ${fileManagerName()}`;
 
 export function downloadStatusText(entry: BrowserDownloadEntry): string {
   switch (entry.state) {

@@ -32,6 +32,8 @@ API_AVAILABLE(macos(15.4))
 @property (weak) NSWindow *native;
 @property (weak) MistyExtensionHost *host;
 @property BOOL privateWindow;
+/// A popup window an extension opened for its own page (windows.create type "popup").
+@property BOOL popupWindow;
 @property NSString *identifier;
 @end
 
@@ -53,6 +55,7 @@ API_AVAILABLE(macos(15.4))
 @property NSMutableDictionary<NSString *, id> *openRequests;
 @property NSMutableDictionary<NSString *, NSString *> *openingTabs;
 @property NSMutableArray<NSWindow *> *optionsWindows;
+@property NSMutableArray<NSWindow *> *popupWindows;
 @property NSMutableDictionary<NSString *, NSMutableArray<NSTask *> *> *nativeTasks;
 @property NSMutableDictionary<NSString *, NSMutableArray<MistyExtensionNativeMessaging *> *> *nativeConnections;
 @property NSString *activeTab;
@@ -83,6 +86,14 @@ API_AVAILABLE(macos(15.4))
 - (NSURL *)identityRedirect:(NSURL *)url;
 /// Sends an extension API event to one extension, if its grants allow it.
 - (void)deliverCompatEvent:(NSString *)event args:(NSArray *)args to:(NSString *)identifier;
+@end
+
+/// Native popup windows for extension pages. Implemented in MistyExtensionPopupWindows.m.
+API_AVAILABLE(macos(15.4))
+@interface MistyExtensionHost (PopupWindows)
+/// Opens a popup-type window for one of the extension's own pages. Returns NO,
+/// without calling `done`, for any other window, which Misty's workspace opens.
+- (BOOL)openPopupWindow:(WKWebExtensionWindowConfiguration *)configuration context:(WKWebExtensionContext *)context done:(void (^)(id<WKWebExtensionWindow>, NSError *))done;
 @end
 
 /// Extension notifications through UNUserNotificationCenter, so clicks and

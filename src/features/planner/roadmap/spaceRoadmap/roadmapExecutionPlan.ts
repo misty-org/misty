@@ -2,8 +2,8 @@ import type {
   SpaceRoadmapEdge,
   SpaceRoadmapGoal,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 
 export type RoadmapExecutionState = "done" | "ready" | "blocked";
 

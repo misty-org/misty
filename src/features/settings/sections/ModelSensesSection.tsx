@@ -70,7 +70,8 @@ export function ModelSensesSection() {
               options={sense.options}
               value={sense.model}
               defaultModel={sense.default_model}
-              defaultLabel="Misty default"
+              // Browsing follows the Seeing model until one is chosen for it.
+              defaultLabel={sense.id === "browsing" ? "Same as Seeing" : "Misty default"}
               disabled={saving === sense.id}
               className="justify-self-end max-w-full"
               onChange={(model) => void choose(sense, model)}

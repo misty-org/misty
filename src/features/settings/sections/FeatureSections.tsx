@@ -1,7 +1,7 @@
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
-  agentsRevokeFolderScope,
+  codeRemoveProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { useSpacesStore } from "@/features/spaces";
@@ -14,47 +14,17 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "../components/DesktopSettingsUI";
-import { definitionById, fromLegacy, type SettingDefinition } from "../profiles/registry";
+import { definitionById, fromLegacy } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
+import { ChoiceControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AppActionsSection } from "./AppActionsSection";
+import { AgentSitesSection } from "./AgentSitesSection";
+import { InboundTasksSection } from "./InboundTasksSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
-export function PreferenceRow({ id, description }: { id: string; description?: string }) {
-  const d = definitionById.get(id)!;
-  const store = useSettingsStore();
-  const ready = useSettingsProfiles((s) => s.ready);
-  const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
-  const value = fromLegacy(d, section?.[d.key]);
-  const update = (next: string | number | boolean) =>
-    store.updateSetting(
-      d.section,
-      d.key,
-      d.legacyValues ? d.legacyValues.indexOf(String(next)) : next,
-    );
-  return (
-    <Row label={d.label} description={description}>
-      {d.type === "boolean" ? (
-        <SwitchControl
-          checked={Boolean(value)}
-          disabled={store.working || !ready}
-          onChange={update}
-        />
-      ) : d.enum ? (
-        <ChoiceControl
-          disabled={store.working || !ready}
-          value={String(value)}
-          onValueChange={update}
-          options={d.enum.map((v) => ({ value: v, label: v || "Model default" }))}
-        />
-      ) : (
-        <TextControl value={String(value)} disabled={store.working || !ready} onCommit={update} />
-      )}
-    </Row>
-  );
-}
+import { PreferenceRow } from "./PreferenceRow";
 export function SpaceDefaultsSection() {
   return (
     <Section
@@ -183,6 +153,8 @@ export function AgentConnectionsSection() {
     <>
       <AppActionsSection />
       <ScreenLocationSection />
+      <AgentSitesSection />
+      <InboundTasksSection />
     </>
   );
 }
@@ -215,24 +187,32 @@ function AgentScopeList() {
   }, []);
   return (
     <Section
-      title="Folder access"
-      description="Agents use explicitly granted folders. External and destructive actions still require review."
+      title="Projects"
+      description="Folders on this computer agents can work in when a chat picks them. Add projects in Agents › Integrations."
     >
       {scopes.map((s) => (
-        <Row key={s.id} label={s.displayName}>
+        <Row
+          key={s.id}
+          label={s.displayName}
+          description={
+            s.kind === "project_folder"
+              ? "Agents can edit files and run sandboxed commands here."
+              : "Read only: agents can list and read files here."
+          }
+        >
           <Button
             variant="outline"
             onClick={() =>
               void (async () => {
                 if (
                   !(await confirmAction(
-                    `Remove access to “${s.displayName}”? Files remain on this device.`,
-                    "Remove folder access",
+                    `Stop using “${s.displayName}” as a project? Its files stay on this computer; undo history for it is deleted.`,
+                    "Remove project",
                   ))
                 )
                   return;
                 try {
-                  await agentsRevokeFolderScope(s.id);
+                  await codeRemoveProject(s.id);
                   await refresh();
                 } catch (e) {
                   setError(String(e));
@@ -246,7 +226,7 @@ function AgentScopeList() {
       ))}
       {!scopes.length && (
         <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No folders have been granted. Choose a folder when starting an agent task.
+          No projects yet. Add one in Agents › Integrations.
         </p>
       )}
       {error && (
@@ -266,4 +246,3 @@ export function AboutSection(props: SettingsContentProps) {
     </Section>
   );
 }
-export type { SettingDefinition };

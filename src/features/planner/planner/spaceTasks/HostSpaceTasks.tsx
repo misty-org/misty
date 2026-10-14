@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { spacesApi } from "@/api/spaces/api";
-import type { SpaceMember } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMember } from "@/api/spaces/dto/entities";
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { SystemErrorNotice } from "@/features/support/systemErrors";

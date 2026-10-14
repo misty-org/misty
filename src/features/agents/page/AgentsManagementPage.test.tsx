@@ -39,10 +39,6 @@ vi.mock("../AgentsRuntime", async (original) => ({
   runtimeAiApi: { activity: async () => ({ entries: [] }) },
 }));
 
-vi.mock("../components/MistyDashboard", () => ({
-  MistyDashboard: () => <section aria-label="Agent work">Independent task activity</section>,
-}));
-
 describe("Agents conversation page", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -71,7 +67,7 @@ describe("Agents conversation page", () => {
     await act(async () => root.unmount());
   });
 
-  it("shows automations from the navigation route without a duplicate page switcher", async () => {
+  it("opens Workflows for retired automation links without a duplicate page switcher", async () => {
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
@@ -84,7 +80,8 @@ describe("Agents conversation page", () => {
     );
 
     expect(container.querySelector('[aria-label="Automations workspace"]')).toBeNull();
-    expect(document.body.querySelector('[aria-label="Agent work"]')).not.toBeNull();
+    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
+    expect(pages?.querySelector('[aria-current="page"]')?.textContent).toBe("Workflows");
     expect(container.querySelector('[role="tablist"]')).toBeNull();
 
     await act(async () => root.unmount());
@@ -101,7 +98,6 @@ describe("Agents conversation page", () => {
         </MemoryRouter>,
       ),
     );
-    expect(document.body.querySelector('[aria-label="Agent work"]')).not.toBeNull();
     const pages = container.querySelector('[aria-label="Agent workspace pages"]');
     expect(pages?.textContent).not.toContain("Connect");
     expect(document.body.querySelector('[aria-label="Tool connections sheet"]')).toBeNull();

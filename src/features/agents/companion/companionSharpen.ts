@@ -23,7 +23,7 @@ interface RegionCapture {
 /** Accessibility usually answers in tens of milliseconds; never hold a point for long. */
 const SNAP_TIMEOUT_MS = 700;
 /** The crop around a model's estimate, in display units (points on macOS). */
-export const REFINE_REGION = 280;
+const REFINE_REGION = 280;
 /** A refined point closer than this to the estimate is the same spot. */
 export const REFINE_MIN_MOVE = 6;
 

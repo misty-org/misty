@@ -1,4 +1,4 @@
-import type { TaskViewMode } from "@/api/spaces/dto/types/SpacePlanner";
+import type { TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
 import { SpaceViewModeToggle } from "@/features/spaces";
 import {
   Badge,

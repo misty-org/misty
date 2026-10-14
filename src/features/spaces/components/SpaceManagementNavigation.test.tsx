@@ -1,4 +1,4 @@
-import type { Space } from "@/api/spaces/dto/interfaces/types";
+import type { Space } from "@/api/spaces/dto/entities";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -23,7 +23,7 @@ describe("SpaceManagementNavigation", () => {
     container.remove();
   });
 
-  it("offers members and usage, with no Space settings entry", async () => {
+  it("offers members, with no usage or Space settings entry", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/spaces/space-1/chat"]}>
@@ -34,7 +34,7 @@ describe("SpaceManagementNavigation", () => {
 
     const management = container.querySelector('nav[aria-label="Space management"]');
     expect(management?.querySelector('button[aria-label="Members"]')).not.toBeNull();
-    expect(management?.querySelector('button[aria-label="Usage"]')).not.toBeNull();
+    expect(management?.querySelector('button[aria-label="Usage"]')).toBeNull();
     expect(management?.querySelectorAll("a")).toHaveLength(0);
     expect(container.querySelector('[aria-label="Settings"]')).toBeNull();
   });

@@ -1,4 +1,4 @@
-import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
+import type { SpaceRoadmapSnapshot } from "@/api/spaces/dto/plannerExpansionTypes";
 import { Button, cn, IconButton, Pressable } from "@/shared/ui";
 import {
   ArrowRight,

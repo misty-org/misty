@@ -20,7 +20,7 @@ const storage: RoadmapRuntime["storage"] = {
   getItem: readDeploymentStorageItem,
   setItem: (key, value) => window.localStorage.setItem(deploymentStorageKey(key), value),
 };
-export function HostRoadmapRuntimeProvider(props: {
+function HostRoadmapRuntimeProvider(props: {
   spaceId: string;
   workspaceTabId?: string;
   children: ReactNode;

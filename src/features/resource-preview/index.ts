@@ -4,4 +4,3 @@ export * from "./PreviewPrimitives";
 export * from "./previewDocument";
 export * from "./previewFormat";
 export * from "./previewMediaTables";
-export const loadPdfPreview = () => import("./PdfViewerView");

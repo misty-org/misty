@@ -50,7 +50,7 @@ export function searchExtensions(query: string): ScopedSearchResult[] {
       kind: "extension",
       title: item.name,
       subtitle: item.enabled ? "Extension" : "Extension · Off",
-      target: { kind: "route", route: `/extensions/addon/${item.id}` },
+      target: { kind: "run", run: openSettings("browser-extensions") },
     }));
   if (needle) return installed;
   return [
@@ -59,7 +59,7 @@ export function searchExtensions(query: string): ScopedSearchResult[] {
       kind: "action",
       title: "Manage extensions",
       subtitle: "Installed extensions",
-      target: { kind: "route", route: "/extensions/installed" },
+      target: { kind: "run", run: openSettings("browser-extensions") },
     },
     ...installed.slice(0, resultLimit - 1),
   ];

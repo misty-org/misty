@@ -2,7 +2,7 @@ import type {
   LibraryAssetStack,
   LibraryEditVersion,
   SpaceLibraryItem,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { Button, DialogClose, IconButton } from "@/shared/ui";
 import { ClipboardCopy, Copy, EyeOff, SlidersHorizontal, Star, Trash2, X } from "lucide-react";
 

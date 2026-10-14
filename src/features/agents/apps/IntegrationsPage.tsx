@@ -1,16 +1,16 @@
 import { Laptop } from "lucide-react";
 import { useState, type ComponentProps } from "react";
 import { Button } from "@/shared/ui";
-import { SharedFoldersSection, useSharedFolders } from "../components/SharedFolders";
+import { CodeProjectsSection, useCodeProjects } from "../components/CodeProjects";
 import { AgentMethodsCatalog } from "../workspace/AgentMethodsCatalog";
 import { ConnectedAppsCatalog } from "./ConnectedAppsCatalog";
 import "./integrationsApps.css";
 
-type Section = "apps" | "skills" | "folders" | "computer";
+type Section = "apps" | "skills" | "projects";
 
 /**
- * Everything an agent can reach and do: account apps, its skills, folders shared from this
- * computer, and the computer itself, one tab each. The conversation only summarizes it.
+ * Everything an agent can reach and do: account apps, its skills and projects on this
+ * computer, one tab each. The conversation only summarizes it.
  */
 export function IntegrationsPage({
   onCompanion,
@@ -19,19 +19,14 @@ export function IntegrationsPage({
   ComponentProps<typeof AgentMethodsCatalog>,
   "kind" | "embedded" | "children"
 >) {
-  const shared = useSharedFolders();
-  const device = shared.device;
+  const projects = useCodeProjects();
+  const device = projects.device;
   const [chosen, setChosen] = useState<Section>("apps");
-  // Folders and the computer exist only on the desktop.
+  // Projects exist only on the desktop.
   const sections: { value: Section; label: string }[] = [
     { value: "apps", label: "Apps" },
     { value: "skills", label: "Skills" },
-    ...(shared.available
-      ? [
-          { value: "folders" as const, label: "Shared folders" },
-          { value: "computer" as const, label: "This computer" },
-        ]
-      : []),
+    ...(projects.available ? [{ value: "projects" as const, label: "Projects" }] : []),
   ];
   const section = sections.some((s) => s.value === chosen) ? chosen : "apps";
   return (
@@ -66,38 +61,29 @@ export function IntegrationsPage({
       <div className="agent-integrations-panel" hidden={section !== "skills"}>
         <AgentMethodsCatalog {...skills} kind="skill" embedded />
       </div>
-      <div className="agent-integrations-panel" hidden={section !== "folders"}>
-        <SharedFoldersSection shared={shared} />
-      </div>
-      {shared.available && (
-        <div className="agent-integrations-panel" hidden={section !== "computer"}>
-          <section aria-labelledby="this-computer-heading" className="agent-integrations-section">
-            <header>
-              <h2 id="this-computer-heading">This computer</h2>
-            </header>
-            <div className="agent-integrations-list">
-              <div className="agent-integrations-row">
-                <Laptop size={18} aria-hidden="true" />
-                <div className="agent-integrations-row-text">
-                  <strong>{device?.displayName || "Desktop companion"}</strong>
-                  <span>
-                    {!device
-                      ? "Not paired yet"
-                      : device.status === "online"
-                        ? "Online"
-                        : device.status === "revoked"
-                          ? "Access revoked"
-                          : "Offline"}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={onCompanion}>
-                  Companion settings
-                </Button>
-              </div>
+      <div className="agent-integrations-panel" hidden={section !== "projects"}>
+        <div className="agent-integrations-list">
+          <div className="agent-integrations-row">
+            <Laptop size={18} aria-hidden="true" />
+            <div className="agent-integrations-row-text">
+              <strong>{device?.displayName || "Desktop companion"}</strong>
+              <span>
+                {!device
+                  ? "Not paired yet"
+                  : device.status === "online"
+                    ? "Online"
+                    : device.status === "revoked"
+                      ? "Access revoked"
+                      : "Offline"}
+              </span>
             </div>
-          </section>
+            <Button variant="ghost" size="sm" onClick={onCompanion}>
+              Companion settings
+            </Button>
+          </div>
         </div>
-      )}
+        <CodeProjectsSection projects={projects} />
+      </div>
     </div>
   );
 }

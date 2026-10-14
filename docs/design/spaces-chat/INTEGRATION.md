@@ -1,6 +1,6 @@
 # Production integration — October 1, 2026
 
-The approved layout now lives in the application. `mockups/production.html` renders the production message row, composer, conversation switcher, All collection, and sidebar against isolated fixture adapters. Its mutations affect memory only. The original prototype remains available at `/`. The native `dev1` application was also inspected at its real `/spaces/.../social/misty` route; this confirmed the application layout and switcher interaction, while exposing the live development API rollout gap described below.
+The approved layout now lives in the application. An isolated fixture page (since removed) rendered the production message row, composer, conversation switcher, All collection, and sidebar against fixture adapters. The native `dev1` application was also inspected at its real `/spaces/.../social/misty` route; this confirmed the application layout and switcher interaction, while exposing the live development API rollout gap described below.
 
 ## Implemented behavior
 

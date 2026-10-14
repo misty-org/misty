@@ -4,7 +4,7 @@
  * their kind as an icon and a label. Base paragraph, list, inline code and link styles
  * live with .misty-markdown-message in aiSurface.css.
  */
-:is(.misty-markdown-message, .agent-step-text) {
+.misty-markdown-message {
   & :is(h1, h2, h3, h4, h5, h6) {
     margin: 1.1em 0 0.45em;
     color: var(--color-cream-bright);
@@ -71,7 +71,7 @@
 }
 
 /* Task lists: a monochrome box, filled with a check when done. */
-:is(.misty-markdown-message, .agent-step-text) {
+.misty-markdown-message {
   & li:has(> input[type="checkbox"]) {
     list-style: none;
     margin-left: -1.25rem;
@@ -170,7 +170,6 @@
   color: var(--color-cream);
 }
 .misty-markdown-message .misty-markdown-code pre,
-.agent-step-text .misty-markdown-code pre,
 .misty-markdown-code pre {
   margin: 0;
   padding: 0.75rem 12px;
@@ -251,18 +250,18 @@
 }
 
 /* Math: display equations scroll rather than overflow the bubble. */
-:is(.misty-markdown-message, .agent-step-text) .katex-display {
+.misty-markdown-message .katex-display {
   margin: 0.7em 0;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0.2em 0;
 }
-:is(.misty-markdown-message, .agent-step-text) .katex {
+.misty-markdown-message .katex {
   font-size: 1.05em;
 }
 
 /* Footnotes (GFM): a quiet section after a rule. */
-:is(.misty-markdown-message, .agent-step-text) .footnotes {
+.misty-markdown-message .footnotes {
   margin-top: 1em;
   padding-top: 0.6em;
   border-top: 1px solid var(--color-charcoal-border);

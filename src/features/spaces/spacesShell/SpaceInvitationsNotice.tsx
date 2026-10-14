@@ -1,4 +1,4 @@
-import type { SpaceInvitation } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceInvitation } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 import { Check } from "lucide-react";
 

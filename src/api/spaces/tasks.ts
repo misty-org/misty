@@ -5,8 +5,8 @@ import type {
   SpaceTask,
   SpaceTaskMoveResult,
   SpaceTaskPage,
-} from "@/api/spaces/dto/interfaces/types";
-import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+} from "@/api/spaces/dto/entities";
+import type { SpaceTaskPriority, SpaceTaskStatus } from "@/api/spaces/dto/common";
 
 import type { SpaceRequest } from "./types";
 

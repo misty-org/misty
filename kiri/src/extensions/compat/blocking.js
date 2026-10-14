@@ -226,7 +226,13 @@
     target.addListener = (listener, filter, spec) => {
       const blocking = Array.isArray(spec) && (spec.includes("blocking") || spec.includes("asyncBlocking"));
       if (!blocking || typeof listener !== "function") return add(listener, filter, spec);
-      const wrapped = (details) => {
+      const wrapped = (raw) => {
+        // A document loading in a frame is a sub_frame, never the page itself, so
+        // blocking it can't replace the page the person is on.
+        const details =
+          raw?.type === "main_frame" && Number.isInteger(raw.frameId) && raw.frameId !== 0
+            ? { ...raw, type: "sub_frame" }
+            : raw;
         const before = original(details)?.map((header) => ({ ...header }));
         const answer = listener(details);
         Promise.resolve(answer)

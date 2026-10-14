@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Plus, X } from "lucide-react";
-import type { SpacePerson } from "@/api/spaces/dto/interfaces/types";
+import type { SpacePerson } from "@/api/spaces/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { Avatar, AvatarFallback, Button, Input, cn } from "@/shared/ui";
 

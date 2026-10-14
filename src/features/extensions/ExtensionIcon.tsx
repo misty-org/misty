@@ -1,14 +1,15 @@
 import { Puzzle } from "lucide-react";
 import type { CatalogEntry } from "./types";
 
-export function plainDescription(html: string): string {
-  return new DOMParser().parseFromString(html, "text/html").body.textContent?.trim() ?? "";
-}
+/** Store icons load over HTTPS; Chrome packages carry their own PNG icon. */
+const iconSource = (url = "") =>
+  url.startsWith("https://") || url.startsWith("data:image/png;base64,") ? url : null;
 
 export function ExtensionIcon({ entry }: { entry?: Pick<CatalogEntry, "iconUrl"> }) {
-  return entry?.iconUrl.startsWith("https://") ? (
+  const source = iconSource(entry?.iconUrl);
+  return source ? (
     <img
-      src={entry.iconUrl}
+      src={source}
       alt=""
       className="size-5 object-contain"
       loading="lazy"

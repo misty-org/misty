@@ -10,8 +10,8 @@ import {
   Label,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import type { NewNoteDialogProps } from "../model/interfaces/components/NotesIntegrationsDialog";
-export type { NewNoteDialogProps } from "../model/interfaces/components/NotesIntegrationsDialog";
+import type { NewNoteDialogProps } from "../model/NotesIntegrationsDialog";
+export type { NewNoteDialogProps } from "../model/NotesIntegrationsDialog";
 export function NewNoteDialogView(props: NewNoteDialogProps) {
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);

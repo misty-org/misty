@@ -58,9 +58,7 @@ pub(crate) fn init(app: &AppHandle) {
 }
 
 pub(super) fn install(webview: &Webview) -> Result<(), String> {
-    engine::install_media_permissions(webview)?;
-    // Ad and tracker blocking covers every page and popup Misty shows.
-    engine::install_content_filter(webview)
+    engine::install_media_permissions(webview)
 }
 
 /// The store a tab's choices live in, from the profile Misty opened it with.
@@ -335,6 +333,8 @@ pub(crate) fn import_decisions(
     Ok(added)
 }
 
+#[path = "browser_site_permissions_db.rs"]
+mod db;
 #[cfg(target_os = "macos")]
 #[path = "browser_site_permissions_store.rs"]
 mod store;

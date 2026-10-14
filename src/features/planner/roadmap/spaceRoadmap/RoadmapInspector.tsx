@@ -4,8 +4,8 @@ import type {
   SpaceRoadmapMilestone,
   SpaceRoadmapNode,
   SpaceRoadmapSnapshot,
-} from "@/api/spaces/dto/interfaces/plannerExpansionTypes";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/plannerExpansionTypes";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
 import { Button, Checkbox, Input, Textarea } from "@/shared/ui";
 import { Archive, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -215,7 +215,7 @@ function EdgeForm({
   );
 }
 
-export function MilestoneForm({
+function MilestoneForm({
   milestone,
   canManage,
   onSave,
@@ -281,7 +281,7 @@ export function MilestoneForm({
   );
 }
 
-export function GoalForm({
+function GoalForm({
   goal,
   tasks,
   canManage,

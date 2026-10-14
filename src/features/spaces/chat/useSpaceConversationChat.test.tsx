@@ -1,4 +1,4 @@
-import type { SpaceEvent, SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceEvent, SpaceMessage } from "@/api/spaces/dto/entities";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

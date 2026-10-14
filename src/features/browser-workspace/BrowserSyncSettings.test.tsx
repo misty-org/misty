@@ -114,7 +114,6 @@ it("groups every sync concern on one page and explains the publisher", async () 
     "Workspace devices",
     "Website sign-ins",
     "Switching devices",
-    "Settings sync",
     "Sync account",
   ])
     expect(screen.getByRole("region", { name })).toBeTruthy();
@@ -123,7 +122,6 @@ it("groups every sync concern on one page and explains the publisher", async () 
   ).toContain("MacBook");
   expect(screen.queryByRole("tablist")).toBeNull();
   expect(screen.queryByRole("combobox")).toBeNull();
-  expect(screen.getByText(/saved to your account on the server/)).toBeTruthy();
 });
 it("writes restore preferences through the settings callback and disables dependent restore", async () => {
   await mount();

@@ -1,5 +1,5 @@
-import type { LibraryItemViewerProps } from "@/api/spaces/dto/interfaces/SpaceLibraryViewer";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemViewerProps } from "@/api/spaces/dto/SpaceLibraryViewer";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { cn, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
 import { useState } from "react";
 import { copyLibraryItemsToClipboard } from "./libraryClipboard";

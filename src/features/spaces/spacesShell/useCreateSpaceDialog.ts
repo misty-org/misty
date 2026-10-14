@@ -8,7 +8,7 @@ import type {
   Space,
   SpacePerson,
   SpaceTemplate,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { restoreDocumentInteractivityAfterModalClose } from "./spacesShellStorage";

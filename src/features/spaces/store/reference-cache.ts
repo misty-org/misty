@@ -1,28 +1,5 @@
-import type { UnifiedNote } from "@/features/journal/notes";
-import type {
-  LibraryItemsResult,
-  SpaceMember,
-  SpaceMessage,
-  SpaceNode,
-  SpaceTaskPage,
-  SpacesSnapshot,
-} from "@/api/spaces/dto/interfaces/types";
 const cacheDatabaseName = "misty-space-reference-cache-v1";
 const cacheStoreName = "entries";
-
-export interface SpaceReferenceCache {
-  version: 1;
-  accountId: string;
-  savedAt: string;
-  snapshot: Pick<SpacesSnapshot, "spaces" | "entitlements" | "owner_storage">;
-  membersBySpace: Record<string, SpaceMember[]>;
-  messagesBySpace: Record<string, SpaceMessage[]>;
-  nodesBySpace: Record<string, SpaceNode[]>;
-  tasksBySpace: Record<string, SpaceTaskPage>;
-  notesBySpace: Record<string, UnifiedNote[]>;
-  libraryQueriesBySpace: Record<string, Record<string, LibraryItemsResult>>;
-}
-
 export async function removeSpaceReferenceCache(accountId: string): Promise<void> {
   const normalized = accountId.trim();
   if (!normalized) return;

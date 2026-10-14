@@ -6,11 +6,7 @@ The current dialog is a two-step stepper (name, then template). It looks sparse,
 
 ## Preview
 
-```sh
-node node_modules/vite/bin/vite.js --config docs/design/space-creation/mockups/vite.config.mjs
-```
-
-The preview runs at http://127.0.0.1:5219 (also `space-creation` in `.claude/launch.json`). It renders the shared UI components with fixture data and never touches an account. The two "Current" views mount the production `CreateSpaceDialog`.
+The runnable React/Vite previews were removed from the repository. They remain in git history (before the dead-code cleanup of 2026-10-13); this document keeps the decisions and captured evidence.
 
 | Query | Shows |
 | --- | --- |

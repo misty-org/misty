@@ -19,13 +19,13 @@ export interface OmniboxInput {
   sessionHistory: string[];
 }
 
-export type OmniboxTarget =
+type OmniboxTarget =
   | { type: "navigate"; url: string }
   | { type: "switch-tab"; tabId: string; url: string }
   /** A place inside Misty, such as a note; `url` is its app route. */
   | { type: "open-in-app"; url: string };
 
-export type OmniboxMatchKind =
+type OmniboxMatchKind =
   "url" | "history" | "bookmark" | "tab" | "search" | "suggestion" | "action" | "content";
 
 export interface OmniboxMatch {

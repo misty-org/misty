@@ -101,7 +101,22 @@ fn build_tray(app: &AppHandle<Wry>) -> Result<MistyTrayState, String> {
         .icon_as_template(false)
         .tooltip("Misty")
         .menu(&menu)
-        .show_menu_on_left_click(true)
+        // The macOS menu bar opens menus on click; the Windows notification
+        // area shows the app on left click and the menu on right click.
+        .show_menu_on_left_click(cfg!(not(windows)))
+        .on_tray_icon_event(|tray, event| {
+            #[cfg(windows)]
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event
+            {
+                let _ = show_main_window(tray.app_handle());
+            }
+            #[cfg(not(windows))]
+            let _ = (tray, event);
+        })
         .build(app)
         .map_err(|error| format!("Could not create Misty tray icon: {error}"))?;
 

@@ -1,20 +1,22 @@
 use std::{
     collections::BTreeMap,
     fs,
-    io::Write,
     path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
-use tempfile::NamedTempFile;
 
-use super::command_defaults::default_command_entries;
+use super::store::Store;
 use crate::error::{ApiError, ApiResult};
 use crate::infra::environment::AppEnvironmentService;
 
+/// Keyboard shortcut overrides, in `misty.db`. Only changes are stored: a command with no
+/// row uses the platform default.
 #[derive(Debug, Clone)]
 pub struct CommandService {
-    path: PathBuf,
+    store: Store,
+    /// `commands.msy` from an earlier layout, imported once.
+    legacy_path: PathBuf,
 }
 
 /// A missing field inherits the platform default. A present `null` field is
@@ -86,74 +88,77 @@ pub struct ResetShortcutRequest {
 impl CommandService {
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
-            path: environment.commands_path(),
+            store: environment.store(),
+            legacy_path: environment.commands_path(),
         }
     }
 
     pub async fn snapshot(&self) -> ApiResult<ShortcutsSnapshot> {
-        run_command_worker(self.path.clone(), load_shortcuts).await
+        let legacy = self.legacy_path.clone();
+        run_command_worker(self.store.clone(), move |store| {
+            load_shortcuts(store, &legacy)
+        })
+        .await
     }
 
     pub async fn update(&self, request: UpdateShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
-        run_command_worker(self.path.clone(), move |path| {
-            update_shortcut(path, request)
+        run_command_worker(self.store.clone(), move |store| {
+            update_shortcut(store, request)
         })
         .await
     }
 
     pub async fn reassign(&self, request: ReassignShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
-        run_command_worker(self.path.clone(), move |path| {
-            reassign_shortcut(path, request)
+        run_command_worker(self.store.clone(), move |store| {
+            reassign_shortcut(store, request)
         })
         .await
     }
 
     pub async fn replace(&self, entries: Vec<ShortcutOverride>) -> ApiResult<ShortcutsSnapshot> {
-        run_command_worker(self.path.clone(), move |path| {
+        run_command_worker(self.store.clone(), move |store| {
             let mut overrides = BTreeMap::new();
             for entry in entries {
                 validate_command_id(&entry.command_id)?;
                 overrides.insert(entry.command_id.clone(), entry);
             }
             remove_empty_overrides(&mut overrides);
-            write_overrides(&path, &overrides)?;
-            snapshot_from(path, overrides)
+            write_overrides(&store, &overrides)?;
+            snapshot_from(store, overrides)
         })
         .await
     }
 
     pub async fn reset(&self, request: ResetShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
-        run_command_worker(self.path.clone(), move |path| {
-            reset_shortcuts(path, request)
+        run_command_worker(self.store.clone(), move |store| {
+            reset_shortcuts(store, request)
         })
         .await
     }
 }
 
-async fn run_command_worker<F>(path: PathBuf, worker: F) -> ApiResult<ShortcutsSnapshot>
+async fn run_command_worker<F>(store: Store, worker: F) -> ApiResult<ShortcutsSnapshot>
 where
-    F: FnOnce(PathBuf) -> ApiResult<ShortcutsSnapshot> + Send + 'static,
+    F: FnOnce(Store) -> ApiResult<ShortcutsSnapshot> + Send + 'static,
 {
-    tokio::task::spawn_blocking(move || worker(path))
+    tokio::task::spawn_blocking(move || worker(store))
         .await
         .map_err(|err| ApiError::Message(format!("Command worker failed: {err}")))?
 }
 
-fn load_shortcuts(path: PathBuf) -> ApiResult<ShortcutsSnapshot> {
-    ensure_user_commands_file(&path)?;
-    let parsed = parse_command_file(&path);
-    if parsed.used_legacy_format {
-        let migrated = migrate_legacy_defaults(parsed.overrides);
-        write_overrides(&path, &migrated)?;
-        return snapshot_from(path, migrated);
-    }
-    snapshot_from(path, parsed.overrides)
+fn db_error(error: rusqlite::Error) -> ApiError {
+    ApiError::Message(format!("Shortcut persistence failed: {error}"))
 }
 
-fn update_shortcut(path: PathBuf, request: UpdateShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
+fn load_shortcuts(store: Store, legacy: &Path) -> ApiResult<ShortcutsSnapshot> {
+    import_legacy(&store, legacy)?;
+    let overrides = read_overrides(&store)?;
+    snapshot_from(store, overrides)
+}
+
+fn update_shortcut(store: Store, request: UpdateShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
     validate_command_id(&request.command_id)?;
-    ensure_user_commands_file(&path)?;
-    let mut overrides = parse_command_file(&path).overrides;
+    let mut overrides = read_overrides(&store)?;
     set_slot(
         overrides
             .entry(request.command_id.clone())
@@ -165,18 +170,17 @@ fn update_shortcut(path: PathBuf, request: UpdateShortcutRequest) -> ApiResult<S
         Some(request.value.map(normalize_binding).transpose()?),
     );
     remove_empty_overrides(&mut overrides);
-    write_overrides(&path, &overrides)?;
-    snapshot_from(path, overrides)
+    write_overrides(&store, &overrides)?;
+    snapshot_from(store, overrides)
 }
 
 fn reassign_shortcut(
-    path: PathBuf,
+    store: Store,
     request: ReassignShortcutRequest,
 ) -> ApiResult<ShortcutsSnapshot> {
     validate_command_id(&request.command_id)?;
     validate_command_id(&request.conflicting_command_id)?;
-    ensure_user_commands_file(&path)?;
-    let mut overrides = parse_command_file(&path).overrides;
+    let mut overrides = read_overrides(&store)?;
 
     let conflict = overrides
         .entry(request.conflicting_command_id.clone())
@@ -199,13 +203,12 @@ fn reassign_shortcut(
     );
 
     remove_empty_overrides(&mut overrides);
-    write_overrides(&path, &overrides)?;
-    snapshot_from(path, overrides)
+    write_overrides(&store, &overrides)?;
+    snapshot_from(store, overrides)
 }
 
-fn reset_shortcuts(path: PathBuf, request: ResetShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
-    ensure_user_commands_file(&path)?;
-    let mut overrides = parse_command_file(&path).overrides;
+fn reset_shortcuts(store: Store, request: ResetShortcutRequest) -> ApiResult<ShortcutsSnapshot> {
+    let mut overrides = read_overrides(&store)?;
     if let Some(command_id) = request.command_id {
         overrides.remove(&command_id);
     } else if !request.command_ids.is_empty() {
@@ -215,91 +218,100 @@ fn reset_shortcuts(path: PathBuf, request: ResetShortcutRequest) -> ApiResult<Sh
     } else {
         overrides.clear();
     }
-    write_overrides(&path, &overrides)?;
-    snapshot_from(path, overrides)
+    write_overrides(&store, &overrides)?;
+    snapshot_from(store, overrides)
 }
 
 fn snapshot_from(
-    path: PathBuf,
+    store: Store,
     overrides: BTreeMap<String, ShortcutOverride>,
 ) -> ApiResult<ShortcutsSnapshot> {
     Ok(ShortcutsSnapshot {
-        path: path.display().to_string(),
+        path: store.path().display().to_string(),
         overrides: overrides.into_values().collect(),
     })
 }
 
-fn ensure_user_commands_file(path: &Path) -> ApiResult<()> {
-    if path.as_os_str().is_empty() || path.exists() {
-        return Ok(());
+/// A slot is stored as NULL (use the default), '' (deliberately unbound) or a binding.
+fn slot_to_column(slot: &Option<Option<String>>) -> Option<String> {
+    slot.as_ref().map(|value| value.clone().unwrap_or_default())
+}
+
+fn column_to_slot(column: Option<String>) -> Option<Option<String>> {
+    column.map(binding_value)
+}
+
+fn read_overrides(store: &Store) -> ApiResult<BTreeMap<String, ShortcutOverride>> {
+    let connection = store.connect().map_err(db_error)?;
+    let mut statement = connection
+        .prepare("SELECT command_id, primary_binding, alternate_binding FROM shortcut_overrides")
+        .map_err(db_error)?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok(ShortcutOverride {
+                command_id: row.get(0)?,
+                primary: column_to_slot(row.get(1)?),
+                alternate: column_to_slot(row.get(2)?),
+            })
+        })
+        .map_err(db_error)?;
+    let mut overrides = BTreeMap::new();
+    for entry in rows {
+        let entry = entry.map_err(db_error)?;
+        overrides.insert(entry.command_id.clone(), entry);
     }
-    write_overrides(path, &BTreeMap::new())
+    Ok(overrides)
 }
 
-fn write_overrides(path: &Path, overrides: &BTreeMap<String, ShortcutOverride>) -> ApiResult<()> {
-    let parent = path.parent().ok_or_else(|| {
-        ApiError::Message("Shortcut config path has no parent directory.".to_owned())
-    })?;
-    fs::create_dir_all(parent).map_err(|err| {
-        ApiError::Message(format!("Failed to create shortcut config directory: {err}"))
-    })?;
-
-    let mut temporary = NamedTempFile::new_in(parent).map_err(|err| {
-        ApiError::Message(format!("Failed to create temporary shortcut config: {err}"))
-    })?;
-    temporary
-        .write_all(command_file(overrides).as_bytes())
-        .and_then(|_| temporary.flush())
-        .map_err(|err| ApiError::Message(format!("Failed to write shortcut config: {err}")))?;
-    temporary.persist(path).map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to replace shortcut config atomically: {err}"
-        ))
-    })?;
-    Ok(())
-}
-
-fn command_file(overrides: &BTreeMap<String, ShortcutOverride>) -> String {
-    let mut output = "# Misty keyboard command overrides\n\
-        # Missing commands and slots use Misty's defaults for this operating system.\n\
-        # An empty value explicitly unbinds a slot.\n\n"
-        .to_owned();
+fn write_overrides(store: &Store, overrides: &BTreeMap<String, ShortcutOverride>) -> ApiResult<()> {
+    let mut connection = store.connect().map_err(db_error)?;
+    let transaction = connection.transaction().map_err(db_error)?;
+    transaction
+        .execute("DELETE FROM shortcut_overrides", [])
+        .map_err(db_error)?;
     for entry in overrides.values() {
-        output.push_str(&entry.command_id);
-        output.push_str(" {\n");
-        if let Some(value) = &entry.primary {
-            write_slot(&mut output, "primary", value.as_deref());
-        }
-        if let Some(value) = &entry.alternate {
-            write_slot(&mut output, "alternate", value.as_deref());
-        }
-        output.push_str("}\n\n");
+        transaction
+            .execute(
+                "INSERT INTO shortcut_overrides (command_id, primary_binding, alternate_binding)
+                 VALUES (?1, ?2, ?3)",
+                rusqlite::params![
+                    entry.command_id,
+                    slot_to_column(&entry.primary),
+                    slot_to_column(&entry.alternate)
+                ],
+            )
+            .map_err(db_error)?;
     }
-    output
+    transaction.commit().map_err(db_error)
 }
 
-fn write_slot(output: &mut String, slot: &str, value: Option<&str>) {
-    output.push_str("  ");
-    output.push_str(slot);
-    output.push_str(" = \"");
-    output.push_str(&escape_shortcut(value.unwrap_or_default()));
-    output.push_str("\"\n");
+/// Imports `commands.msy` from an earlier layout, once.
+fn import_legacy(store: &Store, legacy: &Path) -> ApiResult<()> {
+    store
+        .import_once("commands.msy", |connection| -> Result<(), rusqlite::Error> {
+            for entry in parse_command_file(legacy).into_values() {
+                connection.execute(
+                    "INSERT OR IGNORE INTO shortcut_overrides (command_id, primary_binding, alternate_binding)
+                     VALUES (?1, ?2, ?3)",
+                    rusqlite::params![
+                        entry.command_id,
+                        slot_to_column(&entry.primary),
+                        slot_to_column(&entry.alternate)
+                    ],
+                )?;
+            }
+            Ok(())
+        })
+        .map_err(db_error)
 }
 
-#[derive(Default)]
-struct ParsedCommandFile {
-    overrides: BTreeMap<String, ShortcutOverride>,
-    used_legacy_format: bool,
-}
-
-fn parse_command_file(path: &Path) -> ParsedCommandFile {
-    let raw = match fs::read_to_string(path) {
-        Ok(raw) => raw,
-        Err(_) => return ParsedCommandFile::default(),
+/// The `commands.msy` text format: `command.id { primary = "Cmd+K"  alternate = "" }`.
+fn parse_command_file(path: &Path) -> BTreeMap<String, ShortcutOverride> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return BTreeMap::new();
     };
-    let mut parsed = ParsedCommandFile::default();
+    let mut overrides: BTreeMap<String, ShortcutOverride> = BTreeMap::new();
     let mut current_command = String::new();
-
     for line in raw.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
@@ -316,19 +328,12 @@ fn parse_command_file(path: &Path) -> ParsedCommandFile {
         let Some(eq) = trimmed.find('=') else {
             continue;
         };
-        let key = trimmed[..eq].trim();
-        let value = unquote(trimmed[eq + 1..].trim()).to_owned();
-
-        if current_command.is_empty() {
-            parsed.used_legacy_format = true;
-            if !key.is_empty() {
-                insert_legacy_primary(&mut parsed.overrides, key, value);
-            }
+        if current_command.is_empty() || validate_command_id(&current_command).is_err() {
             continue;
         }
-
-        let entry = parsed
-            .overrides
+        let key = trimmed[..eq].trim();
+        let value = unquote(trimmed[eq + 1..].trim()).to_owned();
+        let entry = overrides
             .entry(current_command.clone())
             .or_insert_with(|| ShortcutOverride {
                 command_id: current_command.clone(),
@@ -337,53 +342,10 @@ fn parse_command_file(path: &Path) -> ParsedCommandFile {
         match key {
             "primary" => entry.primary = Some(binding_value(value)),
             "alternate" => entry.alternate = Some(binding_value(value)),
-            "key" => {
-                parsed.used_legacy_format = true;
-                if entry.primary.is_none() {
-                    entry.primary = Some(Some(value));
-                }
-            }
-            "mac" if cfg!(target_os = "macos") => {
-                parsed.used_legacy_format = true;
-                entry.primary = Some(Some(value));
-            }
-            "mac" => parsed.used_legacy_format = true,
             _ => {}
         }
     }
-    parsed
-}
-
-fn insert_legacy_primary(
-    overrides: &mut BTreeMap<String, ShortcutOverride>,
-    command_id: &str,
-    value: String,
-) {
-    overrides.insert(
-        command_id.to_owned(),
-        ShortcutOverride {
-            command_id: command_id.to_owned(),
-            primary: Some(Some(value)),
-            alternate: None,
-        },
-    );
-}
-
-fn migrate_legacy_defaults(
-    mut overrides: BTreeMap<String, ShortcutOverride>,
-) -> BTreeMap<String, ShortcutOverride> {
-    let defaults = default_command_entries()
-        .iter()
-        .map(|entry| (entry.id, entry.shortcut))
-        .collect::<BTreeMap<_, _>>();
-    overrides.retain(|command_id, entry| {
-        let unchanged_default = entry.alternate.is_none()
-            && matches!(
-                &entry.primary,
-                Some(Some(value)) if defaults.get(command_id.as_str()).is_some_and(|default| value == default)
-            );
-        !unchanged_default
-    });
+    overrides.retain(|_, entry| entry.primary.is_some() || entry.alternate.is_some());
     overrides
 }
 
@@ -425,10 +387,6 @@ fn validate_command_id(command_id: &str) -> ApiResult<()> {
 
 fn binding_value(value: String) -> Option<String> {
     (!value.is_empty()).then_some(value)
-}
-
-fn escape_shortcut(shortcut: &str) -> String {
-    shortcut.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn unquote(value: &str) -> &str {

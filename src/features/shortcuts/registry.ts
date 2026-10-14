@@ -8,11 +8,11 @@ import {
 import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
-  command("search.toggle", "Search", {
+  command("search.toggle", "New tab", {
     description:
-      "Search the web, open an address, or type ! to search your files, spaces and bookmarks.",
+      "Open a new tab: search the web, open an address, or type ! to search your files, spaces and bookmarks.",
     category: "Navigation",
-    aliases: ["search", "url", "website", "google", "bangs", "shortcuts"],
+    aliases: ["new tab", "search", "url", "website", "google", "bangs", "shortcuts"],
     mac: "Cmd+T",
     macAlternate: "Cmd+K",
     windows: "Ctrl+T",
@@ -56,15 +56,6 @@ const shellCommands: ShortcutCommandDefinition[] = [
     aliases: ["preferences", "configuration"],
     mac: "Cmd+Comma",
     windows: "Ctrl+Comma",
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-  command("app.toggle_navigator", "Toggle navigation auto-hide", {
-    description: "Switch between an always-visible icon rail and edge-hover auto-hide.",
-    category: "View",
-    aliases: ["sidebar", "navigation"],
-    mac: "Cmd+Shift+B",
-    windows: "Ctrl+Shift+B",
     allowInEditable: true,
     nativeMenu: true,
   }),
@@ -164,8 +155,9 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
       allowInEditable: true,
     });
   }),
-  command("workspace.swap_panel_next", "Swap panel with next", {
-    description: "Swap the focused panel's complete tab group with the next panel.",
+  command("workspace.swap_panel_next", "Swap panel", {
+    description:
+      "Choose a panel with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
     category: "Virtual windows",
     scope: "workspace",
     aliases: ["reorder panels", "move panel"],
@@ -176,7 +168,6 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
     scope: "workspace",
     aliases: ["add tab", "tool picker"],
     allowInEditable: true,
-    nativeMenu: true,
   }),
   command("workspace.close_tab", "Close tab", {
     description: "Close the active tab in the focused pane.",

@@ -11,8 +11,25 @@ export interface ScreenRequest {
   kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
-  /** current: the user's tab; window: a new tab in their window; separate: an agent window. */
-  location: "current" | "separate" | "window" | "ask";
+  /** current: the user's tab; window: a new tab in their window; separate: an agent window;
+   * remote: a browser another of the person's devices opened for this request. */
+  location: "current" | "separate" | "window" | "ask" | "remote";
+  /** The user named where to work; otherwise a matching open tab is reused first. */
+  chosen?: boolean;
+  /** The browser session another device opened, with the tab it signed for. */
+  remote?: {
+    deviceId: string;
+    deviceName: string;
+    contexts: Array<{
+      device_id: string;
+      kind: "browser_tab";
+      opaque_ref: string;
+      display_name?: string;
+      capabilities: string[];
+      metadata?: Record<string, string | number | boolean>;
+      run_grant?: { payload: string; signature: string };
+    }>;
+  };
   /** Client progress: waiting for a choice, opening, or done. */
   state?: "pending" | "opening" | "opened" | "declined" | "failed";
   error?: string;
@@ -35,11 +52,19 @@ export type AiSurfaceId =
   | "scheduled"
   | "agents"
   | "settings";
-export type AiInvocationMode = "quick" | "drawer" | "companion";
-export type AiTrigger = "message" | "selection" | "object" | "schedule" | "event" | "handoff";
-export type AiPrivacyClass = "shared" | "private" | "device" | "provider";
-export type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
-export type AiApprovalPolicy =
+type AiInvocationMode = "quick" | "drawer" | "companion";
+type AiTrigger =
+  | "message"
+  | "selection"
+  | "object"
+  | "schedule"
+  | "scheduled_task"
+  | "event"
+  | "handoff"
+  | "continuation";
+type AiPrivacyClass = "shared" | "private" | "device" | "provider";
+type AiRisk = "observe" | "draft" | "consequential" | "dangerous";
+type AiApprovalPolicy =
   "none" | "auto_apply_with_undo" | "visible_apply" | "confirm" | "always_confirm";
 export interface AiContextReference {
   kind: string;
@@ -55,9 +80,8 @@ export interface AiContextReference {
 }
 export interface AiInvocationDeviceContext {
   deviceId: string;
-  /** A browser tab, a folder shared with agents, the Misty browser itself, or
-   * the device's inbox for files its other devices send it. */
-  kind: "browser_tab" | "local_folder" | "workspace" | "inbox";
+  /** A browser tab, a folder shared with agents, a project, or the Misty browser itself. */
+  kind: "browser_tab" | "local_folder" | "project_folder" | "workspace";
   opaqueRef: string;
   displayName?: string;
   capabilities: string[];
@@ -95,7 +119,7 @@ export type AiArtifactKind =
   | "transfer_plan"
   | "extension_action"
   | "image_edit";
-export interface AiArtifactTarget {
+interface AiArtifactTarget {
   kind: string;
   id: string;
   spaceId?: string;
@@ -156,7 +180,7 @@ export interface MistyUndoReceipt {
   title: string;
   expiresAt: string;
 }
-export interface AiCompanionRect {
+interface AiCompanionRect {
   x: number;
   y: number;
   width: number;
@@ -187,6 +211,9 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  /** A scheduled run this computer claimed and is starting (roadmap C1). */
+  scheduleId?: string;
+  scheduleClaim?: string;
   methodVersionId?: string;
   methodInputs?: Record<string, string | number | boolean>;
   skillVersionIds?: string[];
@@ -228,30 +255,6 @@ export interface AiInvocationCreated {
   state: AiInvocationState;
   eventsUrl: string;
 }
-export interface AiRunRoutingOption {
-  space_id: string;
-  space_name: string;
-  agent_id: string;
-  agent_name: string;
-  capability_id: string;
-  capability_name: string;
-}
-export interface AiRunCreated {
-  status: string;
-  agents_href?: string;
-  replayed?: boolean;
-  run?: {
-    id: string;
-    state: string;
-    error_message?: string;
-  };
-  routing?: {
-    needs_clarification?: boolean;
-    question?: string;
-    options?: AiRunRoutingOption[];
-    selected?: AiRunRoutingOption;
-  };
-}
 export type AiInvocationState =
   | "queued"
   | "running"
@@ -262,6 +265,22 @@ export type AiInvocationState =
   | "completed"
   | "failed"
   | "canceled";
+/** A run's plan and findings, shown in the conversation as the run works. */
+export interface AgentNotebook {
+  plan: string;
+  findings: string;
+  /** The note it is mirrored to in the personal Space. */
+  noteId?: string;
+}
+
+/** One sub-agent a run started with agents_delegate. */
+export interface AgentSubagent {
+  invocationId: string;
+  goal: string;
+  state: string;
+  summary?: string;
+}
+
 export type AiInvocationEvent =
   | { id: string; type: "user.steering"; text: string }
   | ({ id: string } & CollaborationEvent)
@@ -313,6 +332,16 @@ export type AiInvocationEvent =
     }
   | {
       id: string;
+      type: "notebook.updated";
+      notebook: AgentNotebook;
+    }
+  | {
+      id: string;
+      type: "delegation.updated";
+      delegation: { children: AgentSubagent[] };
+    }
+  | {
+      id: string;
       type: "artifact.proposed";
       artifact: AiArtifact;
     }
@@ -342,6 +371,15 @@ export type AiInvocationEvent =
       type: "tool.started" | "tool.completed" | "tool.failed";
       toolCallId: string;
       toolName: string;
+      durationMs?: number;
+      error?: string;
+    }
+  | {
+      id: string;
+      type: "tool.detail";
+      toolCallId: string;
+      toolName: string;
+      activity: AiToolActivity;
     }
   | {
       id: string;
@@ -369,3 +407,28 @@ export interface AiTranscriptMessage {
   invocationId?: string;
   taskId?: string;
 }
+
+/**
+ * What a tool call targeted and got back, summarized by the server from known
+ * fields only: a short target, a short result, a few rows, or printed output.
+ */
+interface AiToolActivity {
+  detail?: string;
+  result?: string;
+  rows?: { title: string; meta?: string }[];
+  output?: string;
+}
+
+/** One entry of a reply's work, in order: something Misty said while working, or a tool it ran. */
+export type AiProgressItem =
+  | { type: "note"; text: string }
+  | {
+      type: "tool";
+      id: string;
+      name: string;
+      state: "running" | "completed" | "failed";
+      activity?: AiToolActivity;
+      durationMs?: number;
+      /** Why it failed, in plain words. */
+      error?: string;
+    };

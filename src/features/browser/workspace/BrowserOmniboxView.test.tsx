@@ -12,6 +12,7 @@ function providers(overrides: Partial<OmniboxDeps> = {}) {
     searchSuggestionsEnabled: () => false,
     fetchSearchSuggestions: async () => [],
     historySuggestions: async () => [],
+    recentVisits: async () => [],
     bookmarks: () => [],
     mistyContent: () => [],
     clipboardUrl: async () => null,
@@ -64,7 +65,7 @@ it("searches typed text and does not count it as a typed address", async () => {
   const input = screen.getByLabelText("Search or enter address");
   fireEvent.focus(input);
   fireEvent.change(input, { target: { value: "misty weather" } });
-  await screen.findByText("Search with Google");
+  await screen.findByRole("option", { name: /misty weather/ });
   fireEvent.submit(input.closest("form")!);
   expect(props.onNavigate).toHaveBeenCalledWith("https://www.google.com/search?q=misty%20weather", {
     typed: false,
@@ -92,26 +93,6 @@ it("completes a familiar address inline and opens it on Enter", async () => {
   await waitFor(() => expect(input.value).toBe("github.com"));
   fireEvent.submit(input.closest("form")!);
   expect(props.onNavigate).toHaveBeenCalledWith("https://github.com/", { typed: true });
-});
-
-it("reveals a saved website address on request and hides it after Escape without navigating", async () => {
-  const props = baseProps({
-    currentUrl: "https://example.com/private/page",
-    compact: true,
-    pageTitle: "Example",
-  });
-  const { rerender } = render(<BrowserOmniboxView {...props} focusRequest={0} />);
-  const input = screen.getByLabelText("Search or enter address") as HTMLInputElement;
-  expect(input.hidden).toBe(true);
-  expect(screen.getByRole("button", { name: "Show current address" })).toBeTruthy();
-  rerender(<BrowserOmniboxView {...props} focusRequest={1} />);
-  await waitFor(() => expect(document.activeElement).toBe(input));
-  expect(input.hidden).toBe(false);
-  expect(input.value).toBe(props.currentUrl);
-  fireEvent.change(input, { target: { value: "https://other.example" } });
-  fireEvent.keyDown(input, { key: "Escape" });
-  expect(input.hidden).toBe(true);
-  expect(props.onNavigate).not.toHaveBeenCalled();
 });
 
 it("opens a typed address that is also open in another tab instead of switching to it", async () => {

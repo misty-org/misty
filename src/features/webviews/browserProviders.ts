@@ -1,7 +1,7 @@
 import { MistyBrowserUrlSchema, type MistyBrowserProvider } from "@/shared/schemas";
 
 // Host-only continuity for popup tabs. Package code cannot select or copy a profile.
-export interface ProviderBrowserProfile {
+interface ProviderBrowserProfile {
   originSpaceId?: string;
   scopeId?: string;
   ownerAppId?: string;

@@ -1,4 +1,4 @@
 export * from "./downloadsStore";
 export * from "./historyRecorder";
 export * from "./mediaStore";
-export { browserPageTools } from "./native";
+export { browserPageTools, type BrowserMediaInfo } from "./native";

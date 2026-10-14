@@ -7,7 +7,11 @@ import {
 } from "./tabGroups";
 import { pinnedTabActions, type PinnedTabActions } from "./pinnedTabs";
 import { browserProfileSlice, scopeTarget, type BrowserProfileStore } from "./browserProfiles";
-import { validDockingLayout, type DockingLayout } from "@/features/app-shell/dockingLayout";
+import {
+  normalizeDockingLayout,
+  validDockingLayout,
+  type DockingLayout,
+} from "@/features/app-shell/dockingLayout";
 import {
   initialBookmarkNavigation,
   type BookmarkNavigationState,
@@ -92,8 +96,8 @@ import {
   restoreClosedWorkspaceItem,
   type ClosedWorkspaceItem,
 } from "./closedWorkspaceItems";
+import { browserNewTabUrl } from "./browserHome";
 import {
-  browserHomeUrl,
   browserViewTitle,
   createBrowserViewState,
   maxWorkspacePanels,
@@ -157,10 +161,10 @@ export interface WorkspaceStore
   swapPanes: (firstPaneId: string, secondPaneId: string) => boolean;
   movePane: (paneId: string, direction: DockSplitDirection, targetPaneId?: string) => boolean;
   setWindowDockingLayout: (layout: DockingLayout) => void;
-  createWindow: (title?: string) => WorkspaceWindow;
+  createWindow: (title?: string, color?: WorkspaceWindow["color"]) => WorkspaceWindow;
   switchWindow: (windowId: string) => boolean;
   closeWindow: (windowId: string) => boolean;
-  reopenClosedWindow: () => WorkspaceWindow | null;
+  reopenClosedWindow: (windowId?: string) => WorkspaceWindow | null;
   extractPaneToWindow: (paneId: string) => WorkspaceWindow | null;
   renameWindow: (windowId: string, title: string) => void;
   fillEmptyPanes: () => void;
@@ -323,7 +327,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         return next.views[0] ?? null;
       },
       openBrowserView: (request = {}) => {
-        const url = request.url?.trim() || browserHomeUrl();
         let sourcePrivate = false;
         if (request.sourceViewId) {
           mapAllWorkspaceWindowViews(get(), (candidate) => {
@@ -333,6 +336,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
         }
         const isPrivate = request.private || sourcePrivate;
+        const url = request.url?.trim() || browserNewTabUrl(Boolean(isPrivate));
         const tab = get().openSurface({
           surfaceId: "browser",
           groupKey: "tool:browser",
@@ -828,18 +832,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               window.id === state.activeWindowId
                 ? {
                     ...window,
-                    dockingLayout: {
-                      navigation: dockingLayout.navigation,
-                      tabs: dockingLayout.tabs,
-                    },
+                    dockingLayout: normalizeDockingLayout(dockingLayout),
                   }
                 : window,
             ),
           },
         }));
       },
-      createWindow: (title) => {
-        const { window, update } = addWindow(get(), title);
+      createWindow: (title, color) => {
+        const { window, update } = addWindow(get(), title, color);
         set(update);
         return window;
       },
@@ -859,8 +860,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         set(update);
         return true;
       },
-      reopenClosedWindow: () => {
-        const result = reopenRememberedWindow(get());
+      reopenClosedWindow: (windowId) => {
+        const result = reopenRememberedWindow(get(), windowId);
         if (!result) return null;
         set(result.update);
         return result.window;

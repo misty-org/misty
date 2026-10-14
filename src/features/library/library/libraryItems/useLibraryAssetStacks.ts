@@ -1,5 +1,5 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
-import type { LibraryAssetStack } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryAssetStack } from "@/api/spaces/dto/entities";
 import { confirmLibraryAction as confirmAction } from "../LibraryRuntime";
 import { buildLibraryAssetStack } from "../SpaceLibraryPrimitives";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";

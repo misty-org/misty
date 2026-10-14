@@ -30,7 +30,7 @@ export function MistyFolderWork({
   useEffect(() => {
     if (hasTauriInternals() && accountId) void loadFolderHistory(accountId).catch(() => {});
   }, [accountId]);
-  if (!hasTauriInternals() || !accountId || /Win/.test(navigator.platform)) return null;
+  if (!hasTauriInternals() || !accountId) return null;
   const snapshot = state.accountId === accountId ? state.snapshot : undefined;
   const manifest = state.accountId === accountId ? state.manifest : undefined;
   const idle = !snapshot && (!manifest || manifest.state === "undone") && !state.applying;

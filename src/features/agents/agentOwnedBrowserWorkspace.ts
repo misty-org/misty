@@ -7,6 +7,7 @@ import { browserSearchUrl, dockLeaves, useWorkspaceStore } from "@/features/work
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
+import { browserTabAgentCapabilities } from "./browserTabCapabilities";
 
 export interface AgentOwnedBrowserWorkspace {
   context: GlobalAiContextRef;
@@ -40,8 +41,8 @@ export async function createAgentOwnedBrowserWorkspace(
 
   const scopeId = browserScopeId(tab);
   const label = `Misty research: ${query.slice(0, 80)}`;
-  // The agent acts through browser.act: Midscene on this device, with its own cursor.
-  const capabilities = ["browser.inspect", "browser.visual", "browser.navigate", "browser.act"];
+  // The agent reads the page as text and acts by ref; browser.act stays for visual work.
+  const capabilities = browserTabAgentCapabilities;
   return {
     context: {
       id: tab.id,

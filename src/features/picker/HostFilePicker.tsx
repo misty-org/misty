@@ -1,8 +1,5 @@
-import { SystemErrorNotice } from "@/features/support/systemErrors";
 import type { FileEntry } from "@/native/ipc";
-import { explorerPrepareOpenItem } from "@/native/filesystem";
 import { formatBytes } from "@/shared/lib/fileFormat";
-import { errorText } from "@/shared/lib/format";
 import {
   Badge,
   Button,
@@ -11,15 +8,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  Spinner,
 } from "@/shared/ui";
 import { Check, FileText, Folder } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
-import {
-  preparePickerSelections,
-  type MistyFilePickerPreparedSelection,
-} from "./preparePickerSelections";
 
 export type MistyFilePickerMode = "file" | "folder";
 
@@ -32,11 +24,9 @@ export interface MistyFilePickerProps {
   initialPath?: string | null;
   allowedExtensions?: string[];
   sourceToggle?: ReactNode;
-  allowDeviceFiles?: boolean;
   onCancel: () => void;
   onSelect: (path: string) => void;
   onSelectMany?: (paths: string[]) => void;
-  onSelectPreparedMany?: (selection: MistyFilePickerPreparedSelection[]) => void;
 }
 
 const standaloneDialogClassName = [
@@ -54,20 +44,15 @@ export function MistyFilePicker({
   initialPath,
   allowedExtensions,
   sourceToggle,
-  allowDeviceFiles = false,
   onCancel,
   onSelect,
   onSelectMany,
-  onSelectPreparedMany,
 }: MistyFilePickerProps) {
   const [pane, setPane] = useState<PickerBrowserState>({
     listing: null,
     selectedIds: [],
     loading: true,
   });
-
-  const [preparing, setPreparing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const activePath = pane?.listing?.path ?? "";
   const selectedEntries = useMemo(() => {
@@ -85,15 +70,11 @@ export function MistyFilePicker({
   const isValidFileEntry = useCallback(
     (entry: FileEntry) => {
       if (entry.kind !== "file") return false;
-      if (
-        entry.location.kind !== "local" &&
-        !(allowDeviceFiles && entry.location.kind === "peer_device")
-      )
-        return false;
+      if (entry.location.kind !== "local") return false;
       if (!selectableExtensions) return true;
       return selectableExtensions.has(entry.extension.toLowerCase().replace(/^\./, ""));
     },
-    [allowDeviceFiles, selectableExtensions],
+    [selectableExtensions],
   );
 
   const selectedFiles = useMemo(
@@ -107,7 +88,7 @@ export function MistyFilePicker({
   );
 
   const canChoose = useMemo(() => {
-    if (preparing || pane.loading) return false;
+    if (pane.loading) return false;
     if (mode === "folder") {
       return Boolean(selectedFolder?.path || activePath);
     }
@@ -115,19 +96,10 @@ export function MistyFilePicker({
       return selectedFiles.length > 0;
     }
     return selectedFiles.length === 1;
-  }, [
-    activePath,
-    mode,
-    multiple,
-    preparing,
-    pane.loading,
-    selectedFiles.length,
-    selectedFolder?.path,
-  ]);
+  }, [activePath, mode, multiple, pane.loading, selectedFiles.length, selectedFolder?.path]);
 
-  const handleChoose = async () => {
+  const handleChoose = () => {
     if (!canChoose) return;
-    setError(null);
 
     if (mode === "folder") {
       const targetFolder = selectedFolder?.path || activePath;
@@ -137,32 +109,12 @@ export function MistyFilePicker({
       return;
     }
 
-    const chosen = multiple ? selectedFiles : selectedFiles.slice(0, 1);
+    const chosen = (multiple ? selectedFiles : selectedFiles.slice(0, 1)).map(
+      (entry) => entry.path,
+    );
     if (chosen.length === 0) return;
-
-    setPreparing(true);
-    try {
-      const prepared = await preparePickerSelections(chosen, async (entry) => {
-        const local = await explorerPrepareOpenItem({
-          path: entry.path,
-          sizeBytes: entry.sizeBytes,
-          remoteModified: entry.remoteModified,
-        });
-        return local.localPath;
-      });
-
-      if (onSelectPreparedMany) {
-        onSelectPreparedMany(prepared);
-      } else if (multiple && onSelectMany) {
-        onSelectMany(prepared.map((item) => item.localPath));
-      } else if (prepared[0]) {
-        onSelect(prepared[0].localPath);
-      }
-    } catch (err) {
-      setError(errorText(err));
-    } finally {
-      setPreparing(false);
-    }
+    if (multiple && onSelectMany) onSelectMany(chosen);
+    else onSelect(chosen[0]);
   };
 
   const selectionSummary = useMemo(() => {
@@ -219,19 +171,10 @@ export function MistyFilePicker({
 
   const bottomActionBar = (
     <footer className="flex items-center justify-between gap-4 border-t border-charcoal-border bg-charcoal-card/80 px-4 py-3 shrink-0">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        {selectionSummary}
-        {error ? (
-          <SystemErrorNotice
-            error={error}
-            scope="file-picker:prepare"
-            title="File selection failed"
-          />
-        ) : null}
-      </div>
+      <div className="flex items-center gap-3 min-w-0 flex-1">{selectionSummary}</div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={preparing}>
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancel
         </Button>
         <Button
@@ -239,24 +182,15 @@ export function MistyFilePicker({
           variant="default"
           size="sm"
           disabled={!canChoose}
-          onClick={() => void handleChoose()}
+          onClick={handleChoose}
           className="gap-1.5 min-w-[90px]"
         >
-          {preparing ? (
-            <>
-              <Spinner size="sm" label={false} />
-              Preparing…
-            </>
-          ) : (
-            <>
-              <Check size={14} />
-              {mode === "folder"
-                ? "Choose Folder"
-                : multiple && selectedFiles.length > 1
-                  ? `Choose (${selectedFiles.length})`
-                  : "Choose"}
-            </>
-          )}
+          <Check size={14} />
+          {mode === "folder"
+            ? "Choose Folder"
+            : multiple && selectedFiles.length > 1
+              ? `Choose (${selectedFiles.length})`
+              : "Choose"}
         </Button>
       </div>
     </footer>

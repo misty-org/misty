@@ -1,6 +1,5 @@
 import * as React from "react";
 import { Button, type ButtonProps } from "./Button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../overlays/Tooltip";
 import { cn } from "../utils";
 
 const iconButtonSizes = {
@@ -19,7 +18,7 @@ export const toolbarIconProps = { size: 18, strokeWidth: 1.75, "aria-hidden": tr
 
 /**
  * The one icon-only button. Defaults to the browser chrome's toolbar look at 32px;
- * `label` is required and doubles as the tooltip unless `tooltip={false}`. With `asChild` it
+ * `label` is required and doubles as the native title unless `tooltip` says otherwise. With `asChild` it
  * styles its child, such as a router Link. `shape="round"` is for tab closers and media controls.
  */
 const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -38,7 +37,8 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     },
     ref,
   ) => {
-    const button = (
+    // The tooltip is the browser's own title, so there is nothing to wrap.
+    return (
       <Button
         ref={ref}
         type={type}
@@ -46,7 +46,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         size="none"
         aria-label={ariaLabel ?? label}
         data-icon-size={size}
-        title={tooltip === false ? label : undefined}
+        title={tooltip === false ? label : tooltip}
         className={cn(
           "shrink-0 p-0 shadow-none",
           iconButtonSizes[size],
@@ -57,17 +57,6 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       >
         {children}
       </Button>
-    );
-
-    if (tooltip === false) return button;
-
-    return (
-      <TooltipProvider delayDuration={450}>
-        <Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent>{tooltip}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
     );
   },
 );

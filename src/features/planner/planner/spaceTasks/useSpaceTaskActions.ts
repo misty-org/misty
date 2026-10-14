@@ -1,6 +1,6 @@
 import type { PlannerTaskServices } from "./taskServices";
-import type { SpaceTask } from "@/api/spaces/dto/interfaces/types";
-import type { SpaceTaskStatus } from "@/api/spaces/dto/types/types";
+import type { SpaceTask } from "@/api/spaces/dto/entities";
+import type { SpaceTaskStatus } from "@/api/spaces/dto/common";
 import { errorText } from "@/shared/lib/format";
 import { useCallback, useState, type FormEvent } from "react";
 import type { TaskDraft } from "../SpacePlannerViews";

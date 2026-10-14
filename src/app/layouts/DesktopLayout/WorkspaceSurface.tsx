@@ -1,4 +1,3 @@
-import { ExtensionsWorkspace } from "@/features/extensions/ExtensionsWorkspace";
 import { SpaceWorkspaceSurface } from "@/features/spaces/SpaceWorkspaceSurface";
 import { BrowserWorkspace } from "@/features/browser/workspace";
 import { AgentsPage } from "@/features/agents";
@@ -20,9 +19,7 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         onClickCapture={() => useWorkspaceStore.getState().commitPlaceholder(current.id)}
       >
         <WorkspaceViewRouteScope tab={current}>
-          {current.surfaceId === "extensions" ? (
-            <ExtensionsWorkspace />
-          ) : current.surfaceId === "space" ? (
+          {current.surfaceId === "space" ? (
             <SpaceWorkspaceSurface tab={current} />
           ) : current.surfaceId === "agents" || current.surfaceId === "scheduled" ? (
             <AgentsPage />

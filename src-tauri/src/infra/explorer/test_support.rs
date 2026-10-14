@@ -30,9 +30,8 @@ pub(super) fn test_explorer_service_for_home(home_dir: PathBuf) -> ExplorerServi
     if let Some(db_dir) = environment.misty_db_path().parent() {
         let _ = std::fs::create_dir_all(db_dir);
     }
-    let transfers = TransferService::new(environment.clone());
     let explorer_library = ExplorerLibraryService::new(environment.clone());
-    ExplorerService::new(environment, transfers, explorer_library)
+    ExplorerService::new(environment, explorer_library)
 }
 
 pub(super) async fn wait_until_path_exists(path: &Path) {

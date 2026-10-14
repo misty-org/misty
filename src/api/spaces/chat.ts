@@ -1,5 +1,5 @@
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
-import type { MessageSpan } from "@/api/spaces/dto/types/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
+import type { MessageSpan } from "@/api/spaces/dto/common";
 
 import type { SpaceRequest } from "./types";
 

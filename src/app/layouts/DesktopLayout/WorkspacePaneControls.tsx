@@ -1,28 +1,16 @@
 import { liftPanePresentation } from "@/features/workspace/paneDragPresentation";
-import { useLayoutEffect, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  ArrowLeftRight,
-  ArrowLeftToLine,
-  ArrowRightToLine,
-  ArrowUpToLine,
-  Move,
-  LayoutPanelTop,
-  X,
-} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Move, X } from "lucide-react";
 import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/workspace";
-import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
 import {
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  IconButton,
-  MenuItem,
-  MenuTrigger,
-  Portal,
-} from "@/shared/ui";
+  setBrowserPointerTrackingEnabled,
+  setBrowserWebviewsSuspended,
+} from "@/features/webviews/browserRuntime";
+import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
+import { cn, IconButton, Portal } from "@/shared/ui";
+
+/** How long the pointer must rest before the pane controls fade out. */
+const CONTROLS_IDLE_MS = 1500;
 
 export function WorkspacePaneControls({
   pane,
@@ -45,10 +33,15 @@ export function WorkspacePaneControls({
   const anchor = useRef<HTMLSpanElement>(null);
   const [bounds, setBounds] = useState({ top: 0, right: 0 });
   const [hovered, setHovered] = useState(false);
-  const [open, setOpen] = useState(false);
+  // The pointer is on the tray itself: only then is the app raised above the pages. Anywhere
+  // else over a page it must stay beneath, or the page could not be clicked.
+  const [onTray, setOnTray] = useState(false);
+  const trayBounds = useRef(bounds);
+  trayBounds.current = bounds;
+  const multiple = panes.length >= 2;
   useLayoutEffect(() => {
     const paneElement = anchor.current?.closest<HTMLElement>("[data-workspace-pane]");
-    if (!paneElement) return;
+    if (!paneElement || !multiple) return;
     const update = () => {
       const rect = paneElement.getBoundingClientRect();
       // The tray straddles the pane's top edge, except under another pane: that pane's
@@ -60,23 +53,45 @@ export function WorkspacePaneControls({
         previous.top === top && previous.right === right ? previous : { top, right },
       );
     };
-    const move = (event: PointerEvent) => {
+    // Shows while the pointer moves over the pane (or its tray strip), then fades once
+    // the pointer has been still for a moment.
+    let idle: number | undefined;
+    const track = (x: number, y: number) => {
       const rect = paneElement.getBoundingClientRect();
-      setHovered(
+      const inside =
         rect.width > 0 &&
-          rect.height > 0 &&
-          event.clientX >= rect.right - 112 &&
-          event.clientX <= rect.right + 4 &&
-          event.clientY >= rect.top - 20 &&
-          event.clientY <= rect.top + 44,
+        rect.height > 0 &&
+        x >= rect.left &&
+        x <= rect.right + 4 &&
+        y >= rect.top - 20 &&
+        y <= rect.bottom;
+      window.clearTimeout(idle);
+      setHovered(inside);
+      const tray = trayBounds.current;
+      const right = window.innerWidth - tray.right;
+      setOnTray(
+        inside && x >= right - 96 && x <= right + 8 && y >= tray.top - 8 && y <= tray.top + 36,
       );
+      if (inside) idle = window.setTimeout(() => setHovered(false), CONTROLS_IDLE_MS);
     };
-    const leave = () => setHovered(false);
+    const move = (event: PointerEvent) => track(event.clientX, event.clientY);
+    // A native page swallows the pointer, so the host reports where it is while it is over one.
+    const nativeMove = (event: Event) => {
+      const { x, y } = (event as CustomEvent<{ x: number; y: number }>).detail;
+      if (Number.isFinite(x) && Number.isFinite(y)) track(x, y);
+    };
+    const leave = () => {
+      window.clearTimeout(idle);
+      setHovered(false);
+      setOnTray(false);
+    };
     update();
     const observer = new ResizeObserver(update);
     for (let element: HTMLElement | null = paneElement; element; element = element.parentElement)
       observer.observe(element);
     window.addEventListener("pointermove", move);
+    window.addEventListener("misty:browser-pointer", nativeMove);
+    setBrowserPointerTrackingEnabled(true);
     window.addEventListener("blur", leave);
     window.addEventListener("resize", update);
     // Scrolling inside the pane cannot move it; only an enclosing scroller can.
@@ -85,21 +100,31 @@ export function WorkspacePaneControls({
     };
     window.addEventListener("scroll", scrolled, true);
     return () => {
+      window.clearTimeout(idle);
       observer.disconnect();
       window.removeEventListener("pointermove", move);
+      window.removeEventListener("misty:browser-pointer", nativeMove);
+      setBrowserPointerTrackingEnabled(false);
       window.removeEventListener("blur", leave);
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", scrolled, true);
     };
-  }, [root]);
-  if (panes.length < 2) return null;
+  }, [root, multiple]);
+  // While the pointer is on the tray, the app's layer is raised above the native pages, so the
+  // tray is never hidden behind one.
+  useEffect(() => {
+    if (!hovered || !onTray) return;
+    setBrowserWebviewsSuspended(true, "pane-controls");
+    return () => setBrowserWebviewsSuspended(false, "pane-controls");
+  }, [hovered, onTray]);
+  if (!multiple) return null;
   return (
     <>
       <span ref={anchor} className="pointer-events-none absolute right-0 top-0" aria-hidden />
       <Portal>
         <div
           style={bounds}
-          data-visible={hovered || open}
+          data-visible={hovered}
           className={cn(
             "pointer-events-none fixed layer-blocking-popup flex items-center gap-0.5",
             "rounded-md border border-charcoal-border bg-charcoal-card p-0.5",
@@ -123,46 +148,6 @@ export function WorkspacePaneControls({
           >
             <Move className="size-3.5" size={14} />
           </IconButton>
-          <DropdownMenu open={open} onOpenChange={setOpen}>
-            <MenuTrigger
-              iconOnly
-              size="xs"
-              label="Arrange pane"
-              title="Arrange pane"
-              icon={<LayoutPanelTop className="size-3.5" size={14} />}
-            />
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Move pane to workspace edge</DropdownMenuLabel>
-              {(
-                [
-                  ["left", "Push left", ArrowLeftToLine],
-                  ["right", "Push right", ArrowRightToLine],
-                  ["up", "Push above", ArrowUpToLine],
-                  ["down", "Push below", ArrowDownToLine],
-                ] as const
-              ).map(([direction, label, Icon]) => (
-                <MenuItem
-                  key={direction}
-                  icon={<Icon />}
-                  label={label}
-                  onSelect={() => useWorkspaceStore.getState().movePane(pane.id, direction)}
-                />
-              ))}
-              <DropdownMenuSeparator />
-              {panes.map((target, index) =>
-                target.id === pane.id ? null : (
-                  <MenuItem
-                    key={target.id}
-                    icon={<ArrowLeftRight />}
-                    label={`Swap with pane ${index + 1}: ${
-                      target.views.find((tab) => tab.id === target.activeViewId)?.title ?? "Empty"
-                    }`}
-                    onSelect={() => useWorkspaceStore.getState().swapPanes(pane.id, target.id)}
-                  />
-                ),
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
           <IconButton
             size="xs"
             tooltip={false}

@@ -1,5 +1,5 @@
-import type { LibraryItemMetadataPatch } from "@/api/spaces/dto/interfaces/SpaceLibraryViewer";
-import type { SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemMetadataPatch } from "@/api/spaces/dto/SpaceLibraryViewer";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { Button, Input, Textarea } from "@/shared/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { LibraryMetadataRow } from "../SpaceLibraryViewerUtils";

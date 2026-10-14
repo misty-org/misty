@@ -2,7 +2,7 @@ import type * as ReactRouterDom from "react-router-dom";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpaceTemplate } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceTemplate } from "@/api/spaces/dto/entities";
 import { CreateSpaceDialog } from "./CreateSpaceDialog";
 import { useCreateSpaceDialog } from "./useCreateSpaceDialog";
 

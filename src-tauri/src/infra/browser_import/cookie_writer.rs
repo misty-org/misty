@@ -66,40 +66,30 @@ pub async fn write(
         .map_err(|_| "Saving sign-ins stopped unexpectedly.".to_owned())
 }
 
-/// WebView2 writes through an open browser tab of the same profile.
+/// WebView2 writes through a page of the profile: a hidden one, so no tab
+/// needs to be open. It shares the profile's engine with any open tabs.
 #[cfg(windows)]
 pub async fn write(
     app: &AppHandle,
     profile: Option<&str>,
     cookies: Vec<Cookie>,
 ) -> Result<usize, String> {
-    use super::super::browser_cookie_store::{self as store, CookieStoreError};
-    use tauri::Manager;
-    let profile = profile
+    use super::super::{browser_cookie_store as store, browser_profile_view::ProfileView};
+    let identity = profile
         .map(str::to_owned)
         .unwrap_or_else(super::super::browser_profile::legacy_profile_identity);
-    for (label, view) in app.webviews() {
-        if !label.starts_with("misty-browser-") {
-            continue;
-        }
-        let mut written = 0;
-        let mut matched = false;
-        for cookie in &cookies {
-            match store::write(&view, &profile, cookie.clone(), false).await {
-                Ok(()) => {
-                    written += 1;
-                    matched = true;
-                }
-                // Another profile's tab: try the next one.
-                Err(CookieStoreError::Profile) if !matched => break,
-                Err(_) => {}
-            }
-        }
-        if matched {
-            return Ok(written);
+    let view = ProfileView::open(app, profile)?;
+    let total = cookies.len();
+    let mut written = 0;
+    for cookie in cookies {
+        if store::write(&view, &identity, cookie, false).await.is_ok() {
+            written += 1;
         }
     }
-    Err("Open a browser tab in Misty, then import sign-ins again.".into())
+    if total > 0 && written == 0 {
+        return Err("Misty could not save those sign-ins. Try again.".into());
+    }
+    Ok(written)
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]

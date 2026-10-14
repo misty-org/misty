@@ -50,7 +50,6 @@ vi.mock("@/api/agents/native", () => ({
 vi.mock("@/api/assistant/api", () => ({
   assistantApi: { frontierModels: async () => ({ models: [] }) },
 }));
-vi.mock("./components/MistyDashboard", () => ({ MistyDashboard: () => null }));
 vi.mock("./mcp/McpConnectionsSheet", () => ({ McpConnectionsSheet: () => null }));
 vi.mock("@/features/misty/handoff", () => ({ openMisty: async () => {} }));
 

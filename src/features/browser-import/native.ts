@@ -13,7 +13,7 @@ export type ImportBrowser =
   | "firefox"
   | "zen"
   | "safari";
-export interface ImportProfile {
+interface ImportProfile {
   id: string;
   name: string;
   /** When its browsing data last changed (ms); sources and profiles come newest first. */
@@ -43,7 +43,7 @@ export interface ImportedBookmarks {
 }
 
 /** A kind a source has, or why it can't come across. */
-export interface Available<T> {
+interface Available<T> {
   value?: T | null;
   issue?: string | null;
 }

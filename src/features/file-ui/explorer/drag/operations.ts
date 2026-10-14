@@ -1,6 +1,6 @@
 import type { MountedDevice } from "@/native/ipc";
 import type { ClipboardOperation } from "@/native/ipc/primitives";
-import type { ExplorerDragItem } from "../model/interfaces/drag/types";
+import type { ExplorerDragItem } from "../model/drag";
 import { normalizedDragPath, pathContainsPath } from "./geometry";
 
 export function storageIdForPath(

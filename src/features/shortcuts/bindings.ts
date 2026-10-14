@@ -1,5 +1,4 @@
-import { platform as osPlatform } from "@tauri-apps/plugin-os";
-import { hasTauriInternals } from "@/shared/platform/tauri";
+import { desktopOs } from "@/shared/platform/desktopOs";
 import type { ShortcutBindingPair, ShortcutPlatform, ShortcutScope } from "./registry";
 
 export type ShortcutSlot = "primary" | "alternate";
@@ -13,17 +12,7 @@ export interface ParsedShortcut {
 }
 
 export function detectShortcutPlatform(): ShortcutPlatform {
-  if (hasTauriInternals()) {
-    try {
-      const value = osPlatform();
-      if (value === "macos" || value === "windows" || value === "linux") return value;
-    } catch {
-      // The browser fallback below keeps tests and web previews usable.
-    }
-  }
-  if (/mac/i.test(navigator.platform)) return "macos";
-  if (/win/i.test(navigator.platform)) return "windows";
-  return "linux";
+  return desktopOs();
 }
 
 export function parseShortcut(shortcut: string | null | undefined): ParsedShortcut | null {

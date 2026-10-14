@@ -4,11 +4,14 @@ import { deviceStatusLabel, useOptionalConnectedDevices } from "@/features/conne
 import { Button } from "@/shared/ui";
 import { useAgentDeviceTargets } from "../store/useAgentDeviceTargets";
 
+const staleAfterMs = 7 * 24 * 3600 * 1000;
+
 /**
- * Which of the person's other devices the agent may also work on
- * (docs/design/devices/BRIEF.md). Only devices whose own policy lets agents in
- * are listed; each pick is signed by this device when a request is sent, and
- * the other device checks it before acting.
+ * Which device the agent works on (docs/design/agents-on-devices/BRIEF.md):
+ * this computer, or one of the person's other devices whose own policy lets
+ * agents in. Offline devices are shown but can't be picked. The pick is signed
+ * by this device when a request is sent, and the other device checks it
+ * before opening anything.
  */
 export function AgentDeviceTargets() {
   const devices = useOptionalConnectedDevices();
@@ -16,15 +19,19 @@ export function AgentDeviceTargets() {
   const candidates = (devices?.peers ?? []).filter(
     (peer) =>
       !peer.isSelf &&
+      // An install unseen for a week (an old build, a wiped Mac) is not offered;
+      // Settings › Devices still lists it for removal.
+      (peer.online || Date.now() - Date.parse(peer.lastSeenAt) < staleAfterMs) &&
       peer.policy &&
       (peer.policy.agentSurfaces.includes("folders") ||
         peer.policy.agentSurfaces.includes("browser")),
   );
-  // Keep picks current with each device's latest policy; drop removed ones.
+  // Keep the pick current with its device's latest policy; drop it when the
+  // device is removed or goes offline.
   useEffect(() => {
     const next = targets.flatMap((target) => {
       const peer = candidates.find((candidate) => candidate.id === target.deviceId);
-      return peer?.policy
+      return peer?.policy && peer.online
         ? [
             {
               deviceId: peer.id,
@@ -39,43 +46,43 @@ export function AgentDeviceTargets() {
   }, [candidates, targets, setTargets]);
 
   if (!devices?.view?.admitted || candidates.length === 0) return null;
+  const picked = targets[0]?.deviceId;
   return (
-    <div className="agent-context-chips" aria-label="Other devices this agent can use">
-      {candidates.map((peer) => {
-        const picked = targets.some((target) => target.deviceId === peer.id);
-        return (
-          <Button
-            key={peer.id}
-            variant={picked ? "outline" : "chip"}
-            size="chip"
-            aria-pressed={picked}
-            title={
-              peer.online
-                ? `Let the agent use ${peer.name}`
-                : `${peer.name} is offline; work there waits until it's back`
-            }
-            onClick={() =>
-              setTargets(
-                picked
-                  ? targets.filter((target) => target.deviceId !== peer.id)
-                  : [
-                      ...targets,
-                      {
-                        deviceId: peer.id,
-                        name: peer.name,
-                        agentSurfaces: peer.policy?.agentSurfaces ?? [],
-                        sharedFolders: peer.policy?.sharedFolders ?? [],
-                      },
-                    ],
-              )
-            }
-          >
-            <Monitor size={13} aria-hidden="true" />
-            <strong>{peer.name}</strong>
-            {picked ? "Included" : deviceStatusLabel(peer.status)}
-          </Button>
-        );
-      })}
+    <div className="agent-context-chips" role="group" aria-label="Where the agent works">
+      <Button
+        variant="chip"
+        size="chip"
+        aria-pressed={!picked}
+        title="The agent works on this computer"
+        onClick={() => setTargets([])}
+      >
+        <Monitor size={13} aria-hidden="true" />
+        <strong>This computer</strong>
+      </Button>
+      {candidates.map((peer) => (
+        <Button
+          key={peer.id}
+          variant="chip"
+          size="chip"
+          aria-pressed={picked === peer.id}
+          disabled={!peer.online}
+          title={peer.online ? `The agent works on ${peer.name}` : `${peer.name} is offline`}
+          onClick={() =>
+            setTargets([
+              {
+                deviceId: peer.id,
+                name: peer.name,
+                agentSurfaces: peer.policy?.agentSurfaces ?? [],
+                sharedFolders: peer.policy?.sharedFolders ?? [],
+              },
+            ])
+          }
+        >
+          <Monitor size={13} aria-hidden="true" />
+          <strong>{peer.name}</strong>
+          {peer.online ? null : deviceStatusLabel(peer.status)}
+        </Button>
+      ))}
     </div>
   );
 }

@@ -10,7 +10,7 @@ export const MistyBrowserUrlSchema = z
     try {
       const url = new URL(value);
       return (
-        ["https:", "http:", "webkit-extension:"].includes(url.protocol) &&
+        ["https:", "http:", "webkit-extension:", "chrome-extension:"].includes(url.protocol) &&
         !url.username &&
         !url.password
       );

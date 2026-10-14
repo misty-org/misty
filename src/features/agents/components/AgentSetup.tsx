@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
 import { agentCloudVariants } from "./agentCloudAvatars";
 import { AgentAccess, type AgentAccessState } from "./AgentAccess";
+import { AgentSpaceField } from "./AgentSpaceField";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 export function AgentSetup(props: {
@@ -161,6 +162,12 @@ export function AgentSetup(props: {
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               />
             </Field>
+            <AgentSpaceField
+              value={draft.space_id ?? ""}
+              locked={false}
+              moving={false}
+              onChange={(spaceId) => setDraft({ ...draft, space_id: spaceId })}
+            />
             <details className="agent-advanced-settings">
               <summary>Instructions</summary>
               <div>

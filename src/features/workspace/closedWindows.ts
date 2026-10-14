@@ -32,9 +32,10 @@ export function closeWindowRemembering(
   };
 }
 
-export function reopenRememberedWindow(state: ClosedWindowState) {
+/** Reopens the most recently closed window, or the one named by `windowId`. */
+export function reopenRememberedWindow(state: ClosedWindowState, windowId?: string) {
   const closed = state.closedWindowsByScope[state.activeScopeKey] ?? [];
-  const window = closed[0];
+  const window = windowId ? closed.find((item) => item.id === windowId) : closed[0];
   if (!window) return null;
   return {
     window,
@@ -42,7 +43,7 @@ export function reopenRememberedWindow(state: ClosedWindowState) {
       ...restoreWindow(state, window),
       closedWindowsByScope: {
         ...state.closedWindowsByScope,
-        [state.activeScopeKey]: closed.slice(1),
+        [state.activeScopeKey]: closed.filter((item) => item.id !== window.id),
       },
     },
   };

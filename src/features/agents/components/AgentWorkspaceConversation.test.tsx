@@ -21,8 +21,8 @@ vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
     return voiceMock;
   },
 }));
-vi.mock("@/features/global-search/MistyModelPicker", () => ({
-  MistyModelPicker: () => null,
+vi.mock("../models/ConversationReasoningPicker", () => ({
+  ConversationReasoningPicker: () => null,
 }));
 vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,

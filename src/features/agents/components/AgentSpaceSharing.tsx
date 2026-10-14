@@ -1,88 +1,74 @@
-import { spacesApi } from "@/api/spaces/api";
 import { agentMemberRequestsApi, type AcceptPolicy } from "@/features/agent-member-requests/api";
-import { OptionSelect, SkeletonList } from "@/shared/ui";
-import { useCallback, useEffect, useState } from "react";
-
-type Row = { spaceId: string; spaceName: string; policy: AcceptPolicy };
+import { OptionSelect, Skeleton } from "@/shared/ui";
+import { useEffect, useState } from "react";
 
 const options = [
-  { value: "off", label: "Off" },
   { value: "ask", label: "Ask me first" },
   { value: "auto", label: "Start right away" },
+  { value: "off", label: "Off" },
 ];
 
 /**
- * Publishes this agent to shared Spaces so other members' agents can ask it
- * for work. The agent acts only in that Space, and the owner pays for it.
+ * How the agent takes requests from its Space: members can @mention it in the
+ * Space chat and their agents can ask it for help. It works only in that Space
+ * with your permissions there, and whoever asks pays for the work.
  */
-export function AgentSpaceSharing({ agentId }: { agentId: string }) {
-  const [rows, setRows] = useState<Row[]>();
-  const [saving, setSaving] = useState("");
+export function AgentSpaceSharing({ agentId, spaceId }: { agentId: string; spaceId: string }) {
+  const [policy, setPolicy] = useState<AcceptPolicy>();
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    const snapshot = await spacesApi.snapshot();
-    const shared = snapshot.spaces.filter((space) => space.is_shared || space.member_count > 1);
-    return Promise.all(
-      shared.map(async (space): Promise<Row> => {
-        const { listings } = await agentMemberRequestsApi.listings(space.id);
-        const mine = listings.find((listing) => listing.agent_id === agentId);
-        return { spaceId: space.id, spaceName: space.name, policy: mine?.accept_policy ?? "off" };
-      }),
-    );
-  }, [agentId]);
   useEffect(() => {
     let live = true;
-    setRows(undefined);
-    load()
-      .then((next) => live && setRows(next))
-      .catch(() => live && setError("Shared Spaces couldn’t load."));
+    setPolicy(undefined);
+    setError("");
+    agentMemberRequestsApi
+      .listings(spaceId)
+      .then(({ listings }) => {
+        if (!live) return;
+        setPolicy(listings.find((listing) => listing.agent_id === agentId)?.accept_policy ?? "ask");
+      })
+      .catch(() => live && setError("Request settings couldn’t load."));
     return () => {
       live = false;
     };
-  }, [load]);
-  const change = async (row: Row, policy: AcceptPolicy) => {
-    setSaving(row.spaceId);
+  }, [agentId, spaceId]);
+  const change = async (next: AcceptPolicy) => {
+    const previous = policy;
+    setPolicy(next);
+    setSaving(true);
     setError("");
     try {
-      if (policy === "off") await agentMemberRequestsApi.unpublish(row.spaceId, agentId);
-      else await agentMemberRequestsApi.publish(row.spaceId, agentId, policy);
-      setRows((current) =>
-        current?.map((item) => (item.spaceId === row.spaceId ? { ...item, policy } : item)),
-      );
+      if (next === "off") await agentMemberRequestsApi.unpublish(spaceId, agentId);
+      else await agentMemberRequestsApi.publish(spaceId, agentId, next);
     } catch {
-      setError(`Sharing in ${row.spaceName} couldn’t be saved.`);
+      setPolicy(previous);
+      setError("That change couldn’t be saved. Try again.");
     } finally {
-      setSaving("");
+      setSaving(false);
     }
   };
   return (
-    <section aria-label="Shared Spaces" className="border-t border-charcoal-border pt-5">
-      <h3 className="mb-1 text-sm font-medium">Shared Spaces</h3>
-      <p className="mb-3 text-xs text-cream-muted">
-        Members’ agents in these Spaces can ask this agent for help. It works only in that Space
-        with your permissions there, and you pay for its work.
-      </p>
-      {!rows && !error ? (
-        <SkeletonList label="Spaces" rows={2} leading="none" lines={1} trailing />
-      ) : null}
-      {rows && !rows.length ? (
-        <p className="text-xs text-cream-muted">You’re not in any Spaces with other members yet.</p>
-      ) : null}
-      <div className="grid gap-2">
-        {rows?.map((row) => (
-          <div key={row.spaceId} className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate text-sm">{row.spaceName}</span>
-            <OptionSelect
-              className="w-44 shrink-0"
-              aria-label={`Requests from ${row.spaceName}`}
-              value={row.policy}
-              options={options}
-              disabled={saving === row.spaceId}
-              onValueChange={(value) => void change(row, value as AcceptPolicy)}
-            />
-          </div>
-        ))}
+    <section aria-label="Requests from the Space" className="border-t border-charcoal-border pt-5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">Requests from the Space</h3>
+        {policy ? (
+          <OptionSelect
+            className="w-44 shrink-0"
+            aria-label="Requests from the Space"
+            value={policy}
+            options={options}
+            disabled={saving}
+            onValueChange={(value) => void change(value as AcceptPolicy)}
+          />
+        ) : error ? null : (
+          <Skeleton className="h-8 w-44" />
+        )}
       </div>
+      <p className="mt-1 text-xs text-cream-muted">
+        Members can @mention this agent in the Space chat, and their agents can ask it for help. It
+        works only in this Space, never sees your private chats or apps, and whoever asks pays for
+        the work.
+      </p>
       {error ? (
         <p role="alert" className="mt-2 text-xs text-cream-muted">
           {error}

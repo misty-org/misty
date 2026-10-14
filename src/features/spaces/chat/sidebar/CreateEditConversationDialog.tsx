@@ -1,10 +1,6 @@
 import { spacesApi } from "@/api/spaces/api";
 import { SystemErrorNotice } from "@/features/support/systemErrors";
-import type {
-  SpaceActorRef,
-  SpaceConversation,
-  SpaceMember,
-} from "@/api/spaces/dto/interfaces/types";
+import type { SpaceActorRef, SpaceConversation, SpaceMember } from "@/api/spaces/dto/entities";
 import {
   Button,
   Checkbox,

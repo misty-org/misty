@@ -1,5 +1,22 @@
 use super::*;
 use tempfile::TempDir;
+
+/// A link to a folder: a symlink on unix, a junction on Windows (which needs
+/// no privilege, unlike a Windows symlink).
+fn link_folder(target: &Path, link: &Path) {
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(target, link).unwrap();
+    #[cfg(windows)]
+    {
+        let made = std::process::Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(link)
+            .arg(target)
+            .output()
+            .unwrap();
+        assert!(made.status.success(), "{made:?}");
+    }
+}
 struct Fixture {
     temp: TempDir,
     root: PathBuf,
@@ -14,7 +31,7 @@ impl Fixture {
         fs::write(root.join("invoice.txt"), "original invoice").unwrap();
         fs::create_dir(root.join("nested")).unwrap();
         fs::write(root.join("nested/invoice.txt"), "second invoice").unwrap();
-        let mut engine = Organizer::new(temp.path().join("journal")).unwrap();
+        let mut engine = Organizer::new(temp.path().join("journal.db")).unwrap();
         let snapshot = engine.grant("alice", &root).unwrap();
         Self {
             temp,
@@ -121,7 +138,7 @@ fn pause_restart_and_revocation() {
         .unwrap();
     assert_eq!(paused.state, "paused");
     assert!(f.root.join("invoice.txt").exists());
-    let restored = Organizer::new(f.temp.path().join("journal")).unwrap();
+    let restored = Organizer::new(f.temp.path().join("journal.db")).unwrap();
     assert_eq!(
         restored.apply("alice", &plan.id, || false).unwrap().state,
         "completed"
@@ -142,7 +159,7 @@ fn pause_restart_and_revocation() {
 #[test]
 fn rejects_escapes_symlinks_and_reused_plan_identity() {
     let f = Fixture::new();
-    std::os::unix::fs::symlink(f.temp.path(), f.root.join("escape")).unwrap();
+    link_folder(f.temp.path(), &f.root.join("escape"));
     for destination in [
         "../escape.txt",
         "/tmp/escape.txt",
@@ -220,7 +237,7 @@ fn destination_symlink_inserted_after_planning_is_never_followed() {
     let plan = f.plan();
     let outside = f.temp.path().join("outside");
     fs::create_dir(&outside).unwrap();
-    std::os::unix::fs::symlink(&outside, f.root.join("Invoices")).unwrap();
+    link_folder(&outside, &f.root.join("Invoices"));
     assert_eq!(
         f.engine.apply("alice", &plan.id, || false).unwrap().state,
         "needs_review"
@@ -240,6 +257,8 @@ fn root_replacement_is_denied_and_receipts_survive_revocation() {
     assert!(f.engine.history("bob").unwrap().is_empty());
 }
 
+/// Unix permission bits; Windows has no equivalent a test can set.
+#[cfg(unix)]
 #[test]
 fn inaccessible_items_are_excluded_without_losing_readable_files() {
     use std::os::unix::fs::PermissionsExt;

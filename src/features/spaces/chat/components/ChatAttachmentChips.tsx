@@ -1,4 +1,4 @@
-import type { MessageAttachment, SpaceLibraryItem } from "@/api/spaces/dto/interfaces/types";
+import type { MessageAttachment, SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { Button } from "@/shared/ui";
 import { LibraryBig, X } from "lucide-react";
 

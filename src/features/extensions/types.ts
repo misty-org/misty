@@ -1,5 +1,10 @@
+/** Where an extension installs from. */
+export type ExtensionStore = "firefox" | "chrome";
+/** One extension's current package, as its store describes it. */
 export interface CatalogEntry {
-  id: number;
+  /** A Firefox Add-ons ID (digits) or a Chrome Web Store ID (32 letters a–p). */
+  id: string;
+  store: ExtensionStore;
   guid: string;
   slug: string;
   name: string;
@@ -15,7 +20,7 @@ export interface CatalogEntry {
   digest: string;
 }
 export interface Installation {
-  id: number;
+  id: string;
   guid: string;
   generation: string;
   name: string;
@@ -23,6 +28,8 @@ export interface Installation {
   enabled: boolean;
   privateAccess: boolean;
   agentAccess: boolean;
+  /** Shown as its own button in the browser toolbar, as Chrome's pin does. */
+  pinned?: boolean;
   permissions: string[];
   hosts: string[];
 }
@@ -40,11 +47,13 @@ export interface ExtensionReview {
   manifestVersion: number;
 }
 export interface InstalledState {
-  id: number;
+  id: string;
   status: "enabled" | "disabled" | "needs-review" | "needs-attention";
   version: string | null;
   detail: string | null;
   review: ExtensionReview | null;
+  /** The page new tabs open while this extension runs, if it replaces it. */
+  newTab?: string | null;
 }
 export interface ExtensionAction {
   id: string;
@@ -53,11 +62,6 @@ export interface ExtensionAction {
   enabled: boolean;
   icon: string;
 }
-export interface CatalogPage {
-  entries: CatalogEntry[];
-  count: number;
-  hasMore: boolean;
-}
 export interface ExtensionEvent {
   requestId?: string;
   generation?: string;
@@ -65,6 +69,11 @@ export interface ExtensionEvent {
   urls?: string[];
   tabs?: string[];
   focused?: boolean;
+  /** open-window: a small floating page of the given size, as Chrome opens popup windows. */
+  popup?: boolean;
+  width?: number;
+  height?: number;
+  name?: string;
   index?: number;
   account: string;
   kind: string;

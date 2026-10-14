@@ -1,6 +1,6 @@
 import { Check, CircleAlert } from "lucide-react";
-import { useNavigate } from "react-router";
 import { Button, Spinner, cn } from "@/shared/ui";
+import { openStorePage } from "@/features/extensions/openStorePage";
 import { enter } from "./ImportSourceList";
 import type { ImportKind, ImportOutcome } from "./runImport";
 
@@ -12,13 +12,19 @@ const labels: Record<ImportKind, string> = {
   extensions: "Extensions",
 };
 
+/** Chromium browsers report Chrome Web Store IDs; Firefox reports add-on IDs. */
+function storePageFor(id: string) {
+  return /^[a-p]{32}$/.test(id)
+    ? `https://chromewebstore.google.com/detail/${id}`
+    : `https://addons.mozilla.org/firefox/addon/${encodeURIComponent(id)}/`;
+}
+
 /** Each chosen kind with its outcome as it finishes. Status reads as text and icons. */
 export function ImportResults(props: {
   kinds: ImportKind[];
   outcomes: ImportOutcome[];
   onLeave?(): void;
 }) {
-  const navigate = useNavigate();
   return (
     <ul className="grid gap-1" aria-label="Import progress" aria-live="polite">
       {props.kinds.map((kind, index) => {
@@ -55,10 +61,10 @@ export function ImportResults(props: {
                         variant="ghost"
                         onClick={() => {
                           props.onLeave?.();
-                          navigate(`/extensions?q=${encodeURIComponent(extension.name)}`);
+                          openStorePage(storePageFor(extension.id));
                         }}
                       >
-                        Find
+                        Open
                       </Button>
                     </li>
                   ))}

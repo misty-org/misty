@@ -1,5 +1,5 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
-import type { LibraryItemQuery } from "@/api/spaces/dto/interfaces/types";
+import type { LibraryItemQuery } from "@/api/spaces/dto/entities";
 import { mediaTypeOptions, sortOptions } from "./SpaceLibraryChrome";
 import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 import {

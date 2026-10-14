@@ -1,5 +1,5 @@
 /** Page-state restore preferences, mirrored from Settings → Privacy. */
-export interface PageRestoreSettings {
+interface PageRestoreSettings {
   enabled: boolean;
   agent: boolean;
   excludedSites: string[];

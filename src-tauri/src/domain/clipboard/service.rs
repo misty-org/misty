@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use super::{ClipboardOrigin, ClipboardPayload, ClipboardPayloadKind};
-use crate::domain::file_transfer::now_epoch_ms;
+use crate::domain::clock::now_epoch_ms;
 
 pub type ClipboardChangeCallback = Arc<dyn Fn(ClipboardPayload) + Send + Sync + 'static>;
 

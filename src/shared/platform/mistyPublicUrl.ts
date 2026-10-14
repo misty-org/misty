@@ -19,7 +19,7 @@ export function normalizeMistyPublicUrl(
 
 const defaultResolvedPublicUrl = import.meta.env.DEV ? devMistyPublicUrl : defaultMistyPublicUrl;
 
-export const mistyPublicUrl = normalizeMistyPublicUrl(
+const mistyPublicUrl = normalizeMistyPublicUrl(
   import.meta.env.VITE_MISTY_PUBLIC_URL || defaultResolvedPublicUrl,
 );
 

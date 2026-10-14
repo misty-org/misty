@@ -27,7 +27,7 @@ Current desktop sync work targets **macOS and Windows**. To build from source, y
 
 There is no GitHub CI. Git hooks run the checks on this computer:
 
-- **Every commit** runs a secret scan of the staged changes and each test suite the commit touches: frontend (`src/`), server (`server/`: Go against a disposable Postgres, the agent runtime, journal collaboration), CLI (`cli/`) and desktop (`src-tauri/`).
+- **Every commit** runs a secret scan of the staged changes and each test suite the commit touches: frontend (`src/`), server (`server/`: Go against a disposable Postgres, the agent runtime, journal collaboration), CLI (`cli/`) and desktop (`src-tauri/`). On macOS the desktop suite also checks the Windows build through [cargo-xwin](https://github.com/rust-cross/cargo-xwin) (`cargo install --locked cargo-xwin` and `rustup target add x86_64-pc-windows-msvc`).
 - **Every push** requires a clean tree, scans the new commits for secrets, and runs every suite.
 - Turn the hooks on once per clone: `git config core.hooksPath .githooks`. Run a suite by hand with `.githooks/checks.sh frontend|server|rust-cli|rust-desktop|all`. Skip once with `--no-verify`.
 

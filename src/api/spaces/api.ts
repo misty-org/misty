@@ -22,7 +22,7 @@ import type {
   SpaceSetup,
   SpacesSnapshot,
   SpaceTemplate,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import { createSpaceMembersApi } from "@/api/spaces/members";
 import { createSpacePlannerExpansionApi } from "@/api/spaces/planner";
 import { createSpaceChatApi } from "./chat";

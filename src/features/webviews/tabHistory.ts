@@ -2,8 +2,8 @@ import type { BrowserHistory } from "./browserRuntime";
 
 /** Size budget for one tab's saved history. Settings → Browser controls it;
  * 1 MB is the ceiling so saved history never costs much memory or storage. */
-export const TAB_HISTORY_MAX_KB = 1024;
-export const TAB_HISTORY_DEFAULT_KB = 256;
+const TAB_HISTORY_MAX_KB = 1024;
+const TAB_HISTORY_DEFAULT_KB = 256;
 let budgetBytes = TAB_HISTORY_DEFAULT_KB * 1024;
 
 export function configureTabHistoryBudget(kb: number) {

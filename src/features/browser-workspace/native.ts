@@ -15,7 +15,7 @@ export interface SyncDeviceInfo {
 }
 /** One workspace: a device sign-in's windows and tabs, and which machine
  * holds its sign-in lease. */
-export interface SyncWorkspace {
+interface SyncWorkspace {
   workspace_id: string;
   shared: boolean;
   driver_device_id: string | null;

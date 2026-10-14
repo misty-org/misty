@@ -1,6 +1,6 @@
 /** Per-site report of which website data synced and which was skipped. */
-export type WebsiteDataKind = "cookies" | "local_storage" | "session_storage" | "indexed_db";
-export type WebsiteDataSkipReason =
+type WebsiteDataKind = "cookies" | "local_storage" | "session_storage" | "indexed_db";
+type WebsiteDataSkipReason =
   | "partitioned"
   | "unsupported_attributes"
   | "not_supported_here"

@@ -1,6 +1,6 @@
 import definitions from "./definitions.json";
 export type SettingOwnership = "account" | "resource";
-export type SettingsPlatform = "desktop";
+type SettingsPlatform = "desktop";
 export type PreferenceValue = string | number | boolean;
 export type PreferenceValues = Record<string, PreferenceValue>;
 export interface SettingDefinition {
@@ -29,19 +29,8 @@ export type SettingSearchEntry = Pick<
 // Controls with their own server APIs are searchable alongside preferences.
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Tab orders are edited in place; hidden destinations are searched as "Show in navigation".
-  ...settingDefinitions.filter(
-    (definition) =>
-      definition.id !== "app.navigation.hidden" && !definition.id.startsWith("collections.tabs."),
-  ),
-  {
-    id: "app.navigation.show",
-    label: "Show in navigation",
-    page: "layout",
-    owner: "account",
-    platforms: ["desktop"],
-    keywords: ["rail", "sidebar", "hide", "Browser", "Agents", "Extensions", "Spaces"],
-  },
+  // Tab orders are edited in place.
+  ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -93,9 +82,8 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
     (value.length > (d.maxLength ?? 4096) || (d.enum && !d.enum.includes(value)))
   )
     return false;
-  if (d.id === "app.appearance.accent" && !/^(#[0-9a-f]{6})?$/.test(String(value))) return false;
   if (
-    (d.id === "app.appearance.theme_light_start" || d.id === "app.appearance.theme_dark_start") &&
+    (d.id === "app.appearance.night_light_start" || d.id === "app.appearance.night_light_end") &&
     !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value))
   )
     return false;
@@ -103,11 +91,7 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
     try {
       const parsed: unknown = JSON.parse(String(value));
       if (!Array.isArray(parsed)) return false;
-      if (
-        d.id.startsWith("collections.tabs.") ||
-        d.id === "app.navigation.hidden" ||
-        d.id === "browser.toolbarHidden"
-      )
+      if (d.id.startsWith("collections.tabs.") || d.id === "browser.toolbarHidden")
         return (
           parsed.length <= 40 &&
           new Set(parsed).size === parsed.length &&
@@ -132,14 +116,6 @@ export function validPreference(d: SettingDefinition, value: unknown): value is 
             typeof entry.css === "string" &&
             entry.css.length <= 32768 &&
             typeof entry.dark === "boolean",
-        );
-      if (d.id === "browser.contentBlockingAllowedSites")
-        return parsed.every(
-          (entry) =>
-            entry &&
-            typeof entry.host === "string" &&
-            entry.host.length > 0 &&
-            entry.host.length <= 253,
         );
       if (d.id === "browser.siteZoom")
         return parsed.every(

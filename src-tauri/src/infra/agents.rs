@@ -10,14 +10,21 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use super::store::Store;
 use crate::{
     error::{ApiError, ApiResult},
     infra::environment::AppEnvironmentService,
 };
 
+/// A folder's canonical path as it is stored and compared: on Windows without
+/// the `\\?\` prefix canonicalizing adds, so every path here has one form.
+pub(crate) fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
+    fs::canonicalize(path).map(|path| misty_agent_code::plain_path(&path))
+}
+
 #[derive(Clone)]
 pub struct AgentService {
-    database_path: PathBuf,
+    pub(crate) database_path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,8 +59,13 @@ pub struct PrepareScopedAgentDocumentRequest {
 
 impl AgentService {
     pub fn new(environment: AppEnvironmentService) -> Self {
+        let store = environment.store();
+        // Folders shared before the database moved come along once.
+        if let Err(error) = import_legacy(&store, &environment.misty_db_path()) {
+            eprintln!("Could not import earlier shared folders: {error}");
+        }
         Self {
-            database_path: environment.misty_db_path(),
+            database_path: store.path().to_path_buf(),
         }
     }
 
@@ -72,7 +84,7 @@ impl AgentService {
     /// Records a folder the person chose in the native picker. Agents can then
     /// list and read inside it, never outside it.
     pub async fn register_folder_scope(&self, path: PathBuf) -> ApiResult<Value> {
-        let root = fs::canonicalize(&path)
+        let root = canonical(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         if !root.is_dir() {
             return Err(ApiError::Message("Choose a folder, not a file.".into()));
@@ -115,7 +127,7 @@ impl AgentService {
                 [&request.scope_id],
                 |row| row.get(0),
             )?;
-            let root = fs::canonicalize(root).map_err(io_error)?;
+            let root = canonical(root).map_err(io_error)?;
             let relative = request.relative_path.trim().trim_matches('/');
             let relative_path = Path::new(relative);
             if relative_path.is_absolute()
@@ -128,7 +140,7 @@ impl AgentService {
             {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
-            let directory = fs::canonicalize(root.join(relative_path)).map_err(io_error)?;
+            let directory = canonical(root.join(relative_path)).map_err(io_error)?;
             if !directory.starts_with(&root) || !directory.is_dir() {
                 return Err(validation_error("Folder path is outside its device scope."));
             }
@@ -189,22 +201,14 @@ impl AgentService {
     }
 }
 
-async fn run_db<T, F>(path: PathBuf, operation: F) -> ApiResult<T>
+pub(crate) async fn run_db<T, F>(path: PathBuf, operation: F) -> ApiResult<T>
 where
     T: Send + 'static,
     F: FnOnce(&mut Connection) -> Result<T, rusqlite::Error> + Send + 'static,
 {
     tokio::task::spawn_blocking(move || {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                ApiError::Message(format!("Could not create device scope directory: {error}"))
-            })?;
-        }
-        let mut connection = Connection::open(path).map_err(|error| {
+        let mut connection = Store::at(path).connect().map_err(|error| {
             ApiError::Message(format!("Could not open device scope database: {error}"))
-        })?;
-        ensure_schema(&connection).map_err(|error| {
-            ApiError::Message(format!("Could not initialize device scopes: {error}"))
         })?;
         operation(&mut connection)
             .map_err(|error| ApiError::Message(format!("Device scope operation failed: {error}")))
@@ -213,46 +217,93 @@ where
     .map_err(|error| ApiError::Message(format!("Device scope worker failed: {error}")))?
 }
 
-fn ensure_schema(connection: &Connection) -> rusqlite::Result<()> {
+/// Windows folders were stored with the `\\?\` prefix canonicalizing adds; they are stored
+/// without it now (see `canonical`).
+fn strip_verbatim_prefixes(connection: &Connection) -> rusqlite::Result<()> {
     connection.execute_batch(
-        "CREATE TABLE IF NOT EXISTS local_agent_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS local_agent_scopes (
-            id TEXT PRIMARY KEY,
-            device_id TEXT NOT NULL,
-            display_name TEXT NOT NULL,
-            local_path TEXT NOT NULL UNIQUE,
-            created_at TEXT NOT NULL
-        );
-
-        -- Scoped one-time cleanup of the retired whole-Agent runtime. Keep
-        -- settings and scopes because v2 Read content leases reference them.
-        DROP TABLE IF EXISTS local_agent_mutations;
-        DROP TABLE IF EXISTS local_agent_file_outbox;
-        DROP TABLE IF EXISTS local_agent_file_checkpoints;
-        DROP TABLE IF EXISTS local_agent_scope_checkpoints;
-        DROP TABLE IF EXISTS local_agent_artifacts;
-        DROP TABLE IF EXISTS local_agent_approvals;
-        DROP TABLE IF EXISTS local_agent_jobs;
-        DROP TABLE IF EXISTS local_agent_definitions;",
+        r"UPDATE OR IGNORE local_agent_scopes SET local_path = '\\' || substr(local_path, 9)
+              WHERE local_path LIKE '\\?\UNC\%';
+          UPDATE OR IGNORE local_agent_scopes SET local_path = substr(local_path, 5)
+              WHERE local_path LIKE '\\?\%';",
     )
+}
+
+/// Imports the shared folders and the device id from `db/data.db` of an earlier layout,
+/// once.
+fn import_legacy(store: &Store, legacy: &Path) -> rusqlite::Result<()> {
+    store.import_once("agents/data.db", |connection| {
+        if !legacy.is_file() {
+            return Ok(());
+        }
+        let old = Connection::open_with_flags(legacy, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        // A column an older build never added falls back to the new table's default.
+        let columns: Vec<String> = old
+            .prepare("PRAGMA table_info(local_agent_scopes)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<_, _>>()?;
+        if let Ok(mut statement) = old.prepare("SELECT key,value FROM local_agent_settings") {
+            for row in statement.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))? {
+                let (key, value) = row?;
+                connection.execute(
+                    "INSERT OR IGNORE INTO local_agent_settings(key,value) VALUES(?1,?2)",
+                    [key, value],
+                )?;
+            }
+        }
+        let has = |name: &str| columns.iter().any(|column| column == name);
+        let select = format!(
+            "SELECT id,device_id,display_name,local_path,created_at,{},{},{},{} FROM local_agent_scopes",
+            if has("access") { "access" } else { "'read'" },
+            if has("allow_installs") { "allow_installs" } else { "0" },
+            if has("allow_push") { "allow_push" } else { "0" },
+            if has("allow_push_default") { "allow_push_default" } else { "0" },
+        );
+        if let Ok(mut statement) = old.prepare(&select) {
+            let rows = statement.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, i64>(8)?,
+                ))
+            })?;
+            for row in rows {
+                let row = row?;
+                connection.execute(
+                    "INSERT OR IGNORE INTO local_agent_scopes
+                     (id,device_id,display_name,local_path,created_at,access,allow_installs,allow_push,allow_push_default)
+                     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    rusqlite::params![row.0, row.1, row.2, row.3, row.4, row.5, row.6, row.7, row.8],
+                )?;
+            }
+        }
+        strip_verbatim_prefixes(connection)
+    })
 }
 
 fn device_snapshot_sync(connection: &mut Connection) -> rusqlite::Result<Value> {
     let device_id = device_id(connection)?;
     let scopes = {
         let mut statement = connection.prepare(
-            "SELECT id,device_id,display_name FROM local_agent_scopes ORDER BY created_at",
+            "SELECT id,device_id,display_name,access,allow_installs,allow_push,allow_push_default,local_path FROM local_agent_scopes ORDER BY created_at",
         )?;
         let rows = statement
             .query_map([], |row| {
+                let project = row.get::<_, String>(3)? == "write";
                 Ok(json!({
                     "id": row.get::<_, String>(0)?,
                     "deviceId": row.get::<_, String>(1)?,
                     "displayName": row.get::<_, String>(2)?,
-                    "kind": "local_folder",
+                    "kind": if project { "project_folder" } else { "local_folder" },
+                    "allowInstalls": project && row.get::<_, i64>(4)? != 0,
+                    "allowPush": project && row.get::<_, i64>(5)? != 0,
+                    "allowPushDefault": project && row.get::<_, i64>(6)? != 0,
+                    "git": project && Path::new(&row.get::<_, String>(7)?).join(".git").is_dir(),
                     "relativePath": Value::Null,
                     "available": true,
                 }))
@@ -298,8 +349,8 @@ fn scoped_file_path_sync(
             "Document path is outside its device scope.",
         ));
     }
-    let root = fs::canonicalize(root).map_err(io_error)?;
-    let target = fs::canonicalize(root.join(relative_path)).map_err(io_error)?;
+    let root = canonical(root).map_err(io_error)?;
+    let target = canonical(root.join(relative_path)).map_err(io_error)?;
     if !target.starts_with(&root) || !target.is_file() {
         return Err(validation_error(
             "Document path is outside its device scope.",
@@ -308,7 +359,7 @@ fn scoped_file_path_sync(
     Ok(target)
 }
 
-fn device_id(connection: &Connection) -> rusqlite::Result<String> {
+pub(crate) fn device_id(connection: &Connection) -> rusqlite::Result<String> {
     if let Some(value) = connection
         .query_row(
             "SELECT value FROM local_agent_settings WHERE key='device_id'",
@@ -327,14 +378,23 @@ fn device_id(connection: &Connection) -> rusqlite::Result<String> {
     Ok(value)
 }
 
-fn io_error(error: std::io::Error) -> rusqlite::Error {
+pub(crate) fn io_error(error: std::io::Error) -> rusqlite::Error {
     rusqlite::Error::ToSqlConversionFailure(Box::new(error))
 }
 
-fn validation_error(message: &str) -> rusqlite::Error {
+pub(crate) fn validation_error(message: &str) -> rusqlite::Error {
     rusqlite::Error::InvalidParameterName(message.to_owned())
 }
 
+/// Windows opens the file with its default app. Explorer's exit code says
+/// nothing about success, and file associations drop `#page=` fragments.
+#[cfg(windows)]
+fn open_path(path: &Path, _pdf_page: Option<u64>) -> ApiResult<()> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|_| ApiError::Message("The citation could not be opened.".to_owned()))
+}
+
+#[cfg(not(windows))]
 fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
     let page_url = pdf_page.and_then(|page| {
         url::Url::from_file_path(path).ok().map(|mut value| {
@@ -347,8 +407,6 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
         .unwrap_or_else(|| path.to_str().unwrap_or_default());
     #[cfg(target_os = "macos")]
     let status = Command::new("open").arg(target).status();
-    #[cfg(target_os = "windows")]
-    let status = Command::new("explorer").arg(target).status();
     #[cfg(all(unix, not(target_os = "macos")))]
     let status = Command::new("xdg-open").arg(target).status();
     status
@@ -362,68 +420,5 @@ fn open_path(path: &Path, pdf_page: Option<u64>) -> ApiResult<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn folder_scopes_list_only_inside_the_chosen_folder() {
-        let state = tempfile::tempdir().unwrap();
-        let folder = tempfile::tempdir().unwrap();
-        fs::create_dir(folder.path().join("Reports")).unwrap();
-        fs::write(folder.path().join("Reports/q3.txt"), "Revenue grew").unwrap();
-        fs::write(folder.path().join("notes.md"), "Plan").unwrap();
-        fs::write(folder.path().join(".secret"), "hidden").unwrap();
-        let service = AgentService {
-            database_path: state.path().join("misty.db"),
-        };
-        let scope = service
-            .register_folder_scope(folder.path().to_path_buf())
-            .await
-            .unwrap();
-        let again = service
-            .register_folder_scope(folder.path().to_path_buf())
-            .await
-            .unwrap();
-        assert_eq!(scope["id"], again["id"], "a folder is granted once");
-        let id = scope["id"].as_str().unwrap().to_owned();
-        let root = service
-            .list_scoped_files(ListScopedFilesRequest {
-                scope_id: id.clone(),
-                relative_path: String::new(),
-            })
-            .await
-            .unwrap();
-        let names: Vec<_> = root["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|entry| entry["relativePath"].as_str().unwrap().to_owned())
-            .collect();
-        assert_eq!(names, vec!["Reports", "notes.md"]);
-        let nested = service
-            .list_scoped_files(ListScopedFilesRequest {
-                scope_id: id.clone(),
-                relative_path: "Reports".into(),
-            })
-            .await
-            .unwrap();
-        assert_eq!(nested["entries"][0]["relativePath"], "Reports/q3.txt");
-        for outside in ["..", "../..", "/etc"] {
-            assert!(service
-                .list_scoped_files(ListScopedFilesRequest {
-                    scope_id: id.clone(),
-                    relative_path: outside.into(),
-                })
-                .await
-                .is_err());
-        }
-        let document = service
-            .scoped_document_path(PrepareScopedAgentDocumentRequest {
-                scope_id: id,
-                relative_path: "Reports/q3.txt".into(),
-            })
-            .await
-            .unwrap();
-        assert!(document.ends_with("Reports/q3.txt"));
-    }
-}
+#[path = "agents_tests.rs"]
+mod tests;

@@ -19,8 +19,7 @@ const statusText: Record<CloudClipboardView["status"], string> = {
   locked: "Unlock sync on this device to share your clipboard.",
   connecting: "Connecting to your shared clipboard.",
   ready: "",
-  unavailable:
-    "Your shared clipboard can't be reached right now. Paired devices on this network still share it.",
+  unavailable: "Your shared clipboard can't be reached right now.",
 };
 
 /**
@@ -34,7 +33,7 @@ export function BrowserClipboardButton() {
     if (!hasTauriInternals()) return;
     void cloudClipboardView()
       .then(setView)
-      .catch(() => setView({ status: "unavailable", clips: [] }));
+      .catch(() => setView({ status: "unavailable", clips: [], notice: null }));
   }, []);
 
   useEffect(() => {
@@ -69,6 +68,9 @@ export function BrowserClipboardButton() {
             {statusText[view.status] ? (
               <p className="px-2 py-1 text-sm text-cream-muted">{statusText[view.status]}</p>
             ) : null}
+            {view.notice ? (
+              <p className="px-2 py-1 text-xs text-cream-muted">{view.notice}</p>
+            ) : null}
             {view.status === "off" ? (
               <Button
                 variant="ghost"
@@ -102,10 +104,8 @@ export function BrowserClipboardButton() {
                   }
                   onSave={() =>
                     run(async () => {
-                      const saved = await cloudClipboardSave(clip.clipId);
-                      return saved.length === 1
-                        ? "Saved to Downloads."
-                        : `Saved ${saved.length} files to Downloads.`;
+                      await cloudClipboardSave(clip.clipId);
+                      return "Saved to Downloads.";
                     })
                   }
                 />
@@ -125,13 +125,13 @@ export function BrowserClipboardButton() {
 
 function ClipRow(props: { clip: CloudClip; onCopy: () => void; onSave: () => void }) {
   const { clip } = props;
-  const hasFiles = clip.fileNames.length > 0 || clip.kind === "image";
-  const title =
-    clip.kind === "file_refs"
-      ? clip.fileNames.join(", ") || "Files"
-      : clip.kind === "image"
-        ? "Image"
-        : clip.preview || "Text";
+  // Copied files cross as their names only; only images can be saved.
+  const isImage = clip.kind === "image";
+  const title = isImage
+    ? "Image"
+    : clip.fileNames.length > 0
+      ? clip.fileNames.join(", ")
+      : clip.preview || "Text";
   const source = clip.fromThisDevice ? "This device" : clip.deviceName || "Another device";
   return (
     <li className="flex items-center gap-2 px-2 py-1.5">
@@ -139,10 +139,10 @@ function ClipRow(props: { clip: CloudClip; onCopy: () => void; onSave: () => voi
         <p className="truncate text-sm text-cream-bright">{title}</p>
         <p className="truncate text-xs text-cream-muted">
           {source} · {clipAge(clip.createdAt)}
-          {hasFiles && clip.size ? ` · ${formatBytes(clip.size)}` : ""}
+          {isImage && clip.size ? ` · ${formatBytes(clip.size)}` : ""}
         </p>
       </div>
-      {hasFiles ? (
+      {isImage ? (
         <Button variant="toolbar" size="xs" onClick={props.onSave}>
           Save
         </Button>

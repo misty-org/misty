@@ -6,7 +6,6 @@ import {
 } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useSettingsProfiles } from "@/features/settings/sync";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import {
   lockNativeSync,
@@ -20,9 +19,8 @@ import { retrySync } from "./retrySync";
 import { useBrowserSyncStore } from "./store";
 import type { VaultUnlockRequest } from "./SyncVaultForm";
 
-export function useSyncController(accountId: string, settingsOnly = false) {
+export function useSyncController(accountId: string) {
   const sync = useBrowserSyncStore();
-  const prefs = useSettingsProfiles();
   const recovery = useWorkspaceRecoveryState();
   const desktop = hasTauriInternals();
   const [online, setOnline] = useState(navigator.onLine);
@@ -55,7 +53,7 @@ export function useSyncController(accountId: string, settingsOnly = false) {
     setAvailable(null);
     setForm(false);
     setError(null);
-    if (!desktop || !accountId || settingsOnly) return;
+    if (!desktop || !accountId) return;
     let active = true;
     const generation = readApiSessionGeneration();
     const valid = () =>
@@ -82,7 +80,7 @@ export function useSyncController(accountId: string, settingsOnly = false) {
       active = false;
       window.removeEventListener("online", check);
     };
-  }, [accountId, desktop, settingsOnly, attempt]);
+  }, [accountId, desktop, attempt]);
   const vault =
     available?.account.accountId === accountId &&
     available.generation === readApiSessionGeneration()
@@ -100,15 +98,6 @@ export function useSyncController(accountId: string, settingsOnly = false) {
     online,
     recovery,
     vault,
-    scope: settingsOnly ? "settings" : "all",
-    preferences: {
-      accountId: prefs.accountId,
-      ready: prefs.ready,
-      syncing: prefs.syncing,
-      error: prefs.error,
-      pending: prefs.state?.outbox.length ?? 0,
-      synced: !!prefs.state?.profile,
-    },
   });
   const execute = async (work: (valid: () => boolean) => Promise<void>) => {
     if (pending.current || isApiSessionTransitioning()) return;
@@ -130,7 +119,7 @@ export function useSyncController(accountId: string, settingsOnly = false) {
   };
   const retry = () =>
     execute(async (valid) => {
-      const result = await retrySync(accountId, status.action?.kind, settingsOnly || !desktop);
+      const result = await retrySync(accountId, status.action?.kind, !desktop);
       if (!valid()) return;
       if (result === "sign-in") {
         window.location.assign("/signin");

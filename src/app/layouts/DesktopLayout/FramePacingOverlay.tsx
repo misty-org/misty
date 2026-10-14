@@ -1,4 +1,4 @@
-import type { FramePacingState } from "@/app/layouts/model/types";
+import type { FramePacingState } from "@/app/layouts/model";
 import { useEffect, useState } from "react";
 import { frameOverlayBaseClass, frameOverlayLevelClass } from "./styles";
 

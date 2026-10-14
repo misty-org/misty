@@ -97,12 +97,32 @@ fn kura_handler_installed() -> bool {
     }
 }
 
+/// A `kura` key under HKEY_CLASSES_ROOT marked as a URL protocol.
 #[cfg(windows)]
 fn kura_handler_installed() -> bool {
-    std::process::Command::new("reg")
-        .args(["query", r"HKCR\kura", "/ve"])
-        .output()
-        .is_ok_and(|output| output.status.success())
+    use crate::platform::windows::wide;
+    use windows_sys::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CLASSES_ROOT, KEY_READ,
+    };
+    let key_name = wide("kura");
+    let value_name = wide("URL Protocol");
+    let mut key: HKEY = std::ptr::null_mut();
+    // SAFETY: NUL-terminated names; the opened key is closed below.
+    unsafe {
+        if RegOpenKeyExW(HKEY_CLASSES_ROOT, key_name.as_ptr(), 0, KEY_READ, &mut key) != 0 {
+            return false;
+        }
+        let found = RegQueryValueExW(
+            key,
+            value_name.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        ) == 0;
+        RegCloseKey(key);
+        found
+    }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -126,14 +146,23 @@ mod tests {
             search.url().unwrap(),
             "kura://search?q=tax%202026%20%26%20receipts"
         );
-        let open = KuraLink::Open {
-            path: "/Users/ada/My Docs".into(),
-            select: Some("/Users/ada/My Docs/a.pdf".into()),
-        };
-        assert_eq!(
-            open.url().unwrap(),
-            "kura://open?path=%2FUsers%2Fada%2FMy%20Docs&select=%2FUsers%2Fada%2FMy%20Docs%2Fa%2Epdf"
+        #[cfg(not(windows))]
+        let (path, select, expected) = (
+            "/Users/ada/My Docs",
+            "/Users/ada/My Docs/a.pdf",
+            "kura://open?path=%2FUsers%2Fada%2FMy%20Docs&select=%2FUsers%2Fada%2FMy%20Docs%2Fa%2Epdf",
         );
+        #[cfg(windows)]
+        let (path, select, expected) = (
+            r"C:\Users\ada\My Docs",
+            r"C:\Users\ada\My Docs\a.pdf",
+            "kura://open?path=C%3A%5CUsers%5Cada%5CMy%20Docs&select=C%3A%5CUsers%5Cada%5CMy%20Docs%5Ca%2Epdf",
+        );
+        let open = KuraLink::Open {
+            path: path.into(),
+            select: Some(select.into()),
+        };
+        assert_eq!(open.url().unwrap(), expected);
     }
 
     #[test]

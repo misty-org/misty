@@ -1,6 +1,6 @@
 import { apiRequest } from "@/api/client";
 
-export interface FrontierModel {
+interface FrontierModel {
   id: string;
   name: string;
   provider_id: string;

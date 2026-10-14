@@ -3,8 +3,8 @@ import type {
   LibraryEditVersion,
   LibraryRenditionRequest,
   SpaceLibraryItem,
-} from "@/api/spaces/dto/interfaces/types";
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+} from "@/api/spaces/dto/entities";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 
 import { libraryReauthenticationHeaders } from "./library-transfer-paths";
 import type { SpaceRequest } from "./types";

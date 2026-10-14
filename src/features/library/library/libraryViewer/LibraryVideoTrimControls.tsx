@@ -1,4 +1,4 @@
-import type { LibraryEditDefinition } from "@/api/spaces/dto/types/types";
+import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { Button, Input } from "@/shared/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";

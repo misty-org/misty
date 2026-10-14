@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
@@ -15,15 +16,19 @@ use crate::infra::system_dependencies::detected_login_shell_path;
 
 #[path = "settings/open_with.rs"]
 mod open_with;
+use super::store::Store;
 use open_with::{
-    approved_applications, association_key_for_path, migrate_legacy_open_with_if_needed,
-    open_with_association_for_path, open_with_associations, remove_open_with_association,
-    set_open_with_association_for_path,
+    association_key_for_path, open_with_association_for_path, open_with_associations,
+    remove_open_with_association, set_open_with_association_for_path,
 };
 
+/// This device's settings: one JSON document (sections and keys) in `misty.db`. Settings
+/// never leave the device; nothing here talks to the server.
 #[derive(Debug, Clone)]
 pub struct SettingsService {
-    path: PathBuf,
+    store: Store,
+    /// The settings file of an earlier layout, imported once if present.
+    legacy_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -46,48 +51,51 @@ pub struct SaveSettingsRequest {
     pub document: Value,
 }
 
+async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> ApiResult<T> + Send + 'static,
+) -> ApiResult<T> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+}
+
 impl SettingsService {
     pub async fn profile_state(
         &self,
         scope: String,
         update: Option<(i64, Value)>,
     ) -> ApiResult<super::settings_profile_store::ProfileStateSnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || {
-            super::settings_profile_store::profile_state(&path, &scope, update)
-        })
-        .await
-        .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || super::settings_profile_store::profile_state(&store, &scope, update)).await
     }
 
     pub fn new(environment: AppEnvironmentService) -> Self {
         Self {
-            path: environment.settings_path(),
+            store: environment.store(),
+            legacy_path: environment.settings_path(),
         }
     }
 
     pub async fn snapshot(&self) -> ApiResult<SettingsSnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || load_settings(path))
-            .await
-            .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let (store, legacy) = (self.store.clone(), self.legacy_path.clone());
+        blocking(move || {
+            import_legacy_settings(&store, &legacy)?;
+            load_settings(&store)
+        })
+        .await
     }
 
     pub async fn save(&self, request: SaveSettingsRequest) -> ApiResult<SettingsSnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || save_settings(path, request.document))
-            .await
-            .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || save_settings(&store, request.document)).await
     }
 
     pub async fn open_with_association_for_path(
         &self,
         file_path: String,
     ) -> ApiResult<Option<String>> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || open_with_association_for_path(path, file_path))
-            .await
-            .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || open_with_association_for_path(&store, file_path)).await
     }
 
     pub async fn set_open_with_association_for_path(
@@ -95,78 +103,84 @@ impl SettingsService {
         file_path: String,
         application_path: String,
     ) -> ApiResult<SettingsSnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || {
-            set_open_with_association_for_path(path, file_path, application_path)
-        })
-        .await
-        .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || set_open_with_association_for_path(&store, file_path, application_path))
+            .await
     }
 
     pub async fn open_with_associations(&self) -> ApiResult<Vec<OpenWithAssociation>> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || open_with_associations(path))
-            .await
-            .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || open_with_associations(&store)).await
     }
 
     pub async fn remove_open_with_association(&self, key: String) -> ApiResult<SettingsSnapshot> {
-        let path = self.path.clone();
-        tokio::task::spawn_blocking(move || remove_open_with_association(path, key))
-            .await
-            .map_err(|err| ApiError::Message(format!("Settings worker failed: {err}")))?
+        let store = self.store.clone();
+        blocking(move || remove_open_with_association(&store, key)).await
     }
+}
+
+fn db_error(error: rusqlite::Error) -> ApiError {
+    ApiError::Message(format!("Settings persistence failed: {error}"))
+}
+
+/// Imports `config/settings.json` from an earlier layout, once. The old file is left
+/// where it is.
+fn import_legacy_settings(store: &Store, legacy: &Path) -> ApiResult<()> {
+    store
+        .import_once(
+            "settings.json",
+            |connection| -> Result<(), rusqlite::Error> {
+                let Ok(raw) = fs::read_to_string(legacy) else {
+                    return Ok(());
+                };
+                if let Some(document) = serde_json::from_str::<Value>(&raw)
+                    .ok()
+                    .filter(Value::is_object)
+                {
+                    connection.execute(
+                        "INSERT OR IGNORE INTO settings_document (id, document) VALUES (1, ?1)",
+                        [document.to_string()],
+                    )?;
+                }
+                Ok(())
+            },
+        )
+        .map_err(db_error)
 }
 
 /// Sites whose page state is never captured by default (banking, payment,
 /// health). Users edit this list in Settings → Privacy.
 const DEFAULT_PAGE_STATE_EXCLUSIONS: &str = "paypal.com\nstripe.com\nchase.com\nbankofamerica.com\nwellsfargo.com\nciti.com\ncapitalone.com\namex.com\nschwab.com\nfidelity.com\nvanguard.com\ncoinbase.com\nmychart.org\nkp.org\nirs.gov\nssa.gov";
 
-fn load_settings(path: PathBuf) -> ApiResult<SettingsSnapshot> {
-    let mut document = load_settings_document(&path)?;
-    migrate_legacy_open_with_if_needed(&path, &mut document)?;
-    // Seed Open With approvals at startup, before newly synced values arrive.
-    let current: Vec<String> = document
-        .get("open_with")
-        .and_then(Value::as_object)
-        .map(|open_with| {
-            open_with
-                .values()
-                .filter_map(Value::as_str)
-                .map(str::to_owned)
-                .collect()
-        })
-        .unwrap_or_default();
-    approved_applications(&path, &current)?;
+fn load_settings(store: &Store) -> ApiResult<SettingsSnapshot> {
+    let mut document = load_settings_document(store)?;
     if normalize_settings_document(&mut document) {
-        save_settings_document(&path, &document)?;
+        save_settings_document(store, &document)?;
     }
 
     Ok(SettingsSnapshot {
-        path: path.display().to_string(),
+        path: store.path().display().to_string(),
         document,
     })
 }
 
-fn load_settings_document(path: &Path) -> ApiResult<Value> {
-    super::settings_profile_store::backup_legacy_settings(path)
-        .map_err(|err| ApiError::Message(format!("Settings backup failed: {err}")))?;
-
-    match fs::read_to_string(path) {
-        Ok(raw) => Ok(serde_json::from_str::<Value>(&raw)
-            .ok()
-            .filter(Value::is_object)
-            .unwrap_or_else(|| Value::Object(Default::default()))),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            Ok(Value::Object(Default::default()))
-        }
-        Err(err) => Err(ApiError::Message(format!(
-            "Failed to read ~/.misty/config/settings.json: {err}"
-        ))),
-    }
+fn load_settings_document(store: &Store) -> ApiResult<Value> {
+    let connection = store.connect().map_err(db_error)?;
+    let stored: Option<String> = connection
+        .query_row(
+            "SELECT document FROM settings_document WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(db_error)?;
+    Ok(stored
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .filter(Value::is_object)
+        .unwrap_or_else(|| Value::Object(Default::default())))
 }
 
-fn save_settings(path: PathBuf, mut document: Value) -> ApiResult<SettingsSnapshot> {
+fn save_settings(store: &Store, mut document: Value) -> ApiResult<SettingsSnapshot> {
     if !document.is_object() {
         return Err(ApiError::Message(
             "Settings document must be a JSON object.".to_owned(),
@@ -174,27 +188,25 @@ fn save_settings(path: PathBuf, mut document: Value) -> ApiResult<SettingsSnapsh
     }
 
     normalize_settings_document(&mut document);
-    save_settings_document(&path, &document)?;
+    save_settings_document(store, &document)?;
 
     Ok(SettingsSnapshot {
-        path: path.display().to_string(),
+        path: store.path().display().to_string(),
         document,
     })
 }
 
-fn save_settings_document(path: &Path, document: &Value) -> ApiResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|err| {
-            ApiError::Message(format!("Failed to create settings directory: {err}"))
-        })?;
-    }
-
-    let encoded = serde_json::to_string_pretty(document)?;
-    fs::write(path, format!("{encoded}\n")).map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to write ~/.misty/config/settings.json: {err}"
-        ))
-    })
+fn save_settings_document(store: &Store, document: &Value) -> ApiResult<()> {
+    let encoded = serde_json::to_string(document)?;
+    let connection = store.connect().map_err(db_error)?;
+    connection
+        .execute(
+            "INSERT INTO settings_document (id, document) VALUES (1, ?1)
+             ON CONFLICT (id) DO UPDATE SET document = excluded.document",
+            [encoded],
+        )
+        .map_err(db_error)?;
+    Ok(())
 }
 
 fn normalize_settings_document(document: &mut Value) -> bool {
@@ -321,29 +333,24 @@ fn ensure_object(root: &mut Map<String, Value>, key: &str) -> bool {
 mod tests {
     use super::*;
     use serde_json::json;
-    use uuid::Uuid;
 
-    fn test_settings_path() -> PathBuf {
-        let root = std::env::temp_dir().join(format!("misty-settings-test-{}", Uuid::new_v4()));
-        root.join("config").join("settings.json")
+    fn test_store() -> (tempfile::TempDir, Store) {
+        let directory = tempfile::tempdir().expect("temp dir");
+        let store = Store::at(directory.path().join("misty.db"));
+        (directory, store)
     }
 
-    fn make_existing_app(settings_path: &Path, name: &str) -> PathBuf {
-        let app_path = settings_path
-            .parent()
-            .and_then(Path::parent)
-            .expect("test settings root")
-            .join(name);
-        fs::create_dir_all(app_path.parent().expect("test app parent")).expect("create app parent");
+    fn make_existing_app(directory: &Path, name: &str) -> PathBuf {
+        let app_path = directory.join(name);
         fs::write(&app_path, "test app").expect("write test app");
         app_path
     }
 
     #[test]
     fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_values() {
-        let settings_path = test_settings_path();
+        let (_directory, store) = test_store();
         save_settings_document(
-            &settings_path,
+            &store,
             &json!({
                 "general": {
                     "preferred_terminal_app": "Ghostty",
@@ -370,7 +377,7 @@ mod tests {
         )
         .expect("write partial settings");
 
-        let snapshot = load_settings(settings_path.clone()).expect("load settings");
+        let snapshot = load_settings(&store).expect("load settings");
         let document = snapshot.document;
         assert_eq!(
             document.get("schema_version").and_then(Value::as_i64),
@@ -450,13 +457,34 @@ mod tests {
                 "{section}.{key} should have been backfilled",
             );
         }
+    }
 
-        let _ = fs::remove_dir_all(
-            settings_path
-                .parent()
-                .and_then(Path::parent)
-                .expect("test root"),
+    #[test]
+    fn an_earlier_settings_file_is_imported_once_and_left_in_place() {
+        let (directory, store) = test_store();
+        let legacy = directory.path().join("settings.json");
+        fs::write(
+            &legacy,
+            r#"{"general":{"custom_general_value":"from file"}}"#,
+        )
+        .unwrap();
+        import_legacy_settings(&store, &legacy).unwrap();
+        assert_eq!(
+            load_settings_document(&store).unwrap()["general"]["custom_general_value"],
+            "from file"
         );
+        // Later edits are never overwritten by the old file.
+        save_settings_document(
+            &store,
+            &json!({"general":{"custom_general_value":"edited"}}),
+        )
+        .unwrap();
+        import_legacy_settings(&store, &legacy).unwrap();
+        assert_eq!(
+            load_settings_document(&store).unwrap()["general"]["custom_general_value"],
+            "edited"
+        );
+        assert!(legacy.exists());
     }
 
     #[test]
@@ -470,119 +498,50 @@ mod tests {
 
     #[test]
     fn set_and_get_open_with_association_uses_settings_document() {
-        let settings_path = test_settings_path();
-        let app_path = make_existing_app(&settings_path, "Preview.app");
+        let (directory, store) = test_store();
+        let app_path = make_existing_app(directory.path(), "Preview.app");
 
         set_open_with_association_for_path(
-            settings_path.clone(),
+            &store,
             "/tmp/report.PDF".to_owned(),
             app_path.display().to_string(),
         )
         .expect("set association");
 
-        let association =
-            open_with_association_for_path(settings_path.clone(), "/tmp/other.pdf".to_owned())
-                .expect("get association");
+        let association = open_with_association_for_path(&store, "/tmp/other.pdf".to_owned())
+            .expect("get association");
         assert_eq!(association, Some(app_path.display().to_string()));
 
-        // A synced association to an application not chosen here is ignored.
-        let other = make_existing_app(&settings_path, "Other.app");
-        let mut synced = load_settings_document(&settings_path).expect("load settings");
-        synced["open_with"][".txt"] = Value::String(other.display().to_string());
-        save_settings_document(&settings_path, &synced).expect("save settings");
+        let saved = load_settings_document(&store).expect("load settings");
         assert_eq!(
-            open_with_association_for_path(settings_path.clone(), "/tmp/notes.txt".to_owned())
-                .expect("get association"),
-            None
-        );
-
-        let saved = load_settings_document(&settings_path).expect("load settings");
-        assert_eq!(
-            saved
-                .get("open_with")
-                .and_then(Value::as_object)
-                .and_then(|open_with| open_with.get(".pdf"))
-                .and_then(Value::as_str),
+            saved["open_with"][".pdf"].as_str(),
             Some(app_path.to_str().expect("utf-8 app path")),
-        );
-
-        let _ = fs::remove_dir_all(
-            settings_path
-                .parent()
-                .and_then(Path::parent)
-                .expect("test root"),
         );
     }
 
     #[test]
     fn missing_open_with_application_is_pruned() {
-        let settings_path = test_settings_path();
+        let (_directory, store) = test_store();
         save_settings(
-            settings_path.clone(),
+            &store,
             json!({ "open_with": { ".txt": "/definitely/missing/app" } }),
         )
         .expect("save settings");
 
-        let association =
-            open_with_association_for_path(settings_path.clone(), "/tmp/note.txt".to_owned())
-                .expect("get association");
+        let association = open_with_association_for_path(&store, "/tmp/note.txt".to_owned())
+            .expect("get association");
         assert_eq!(association, None);
 
-        let saved = load_settings_document(&settings_path).expect("load settings");
-        assert!(saved
-            .get("open_with")
-            .and_then(Value::as_object)
-            .and_then(|open_with| open_with.get(".txt"))
-            .is_none(),);
-
-        let _ = fs::remove_dir_all(
-            settings_path
-                .parent()
-                .and_then(Path::parent)
-                .expect("test root"),
-        );
-    }
-
-    #[test]
-    fn legacy_open_with_file_migrates_into_settings() {
-        let settings_path = test_settings_path();
-        let root = settings_path
-            .parent()
-            .and_then(Path::parent)
-            .expect("test root");
-        fs::create_dir_all(root).expect("create test root");
-        let app_path = make_existing_app(&settings_path, "Editor.app");
-        fs::write(
-            root.join("open_with.json"),
-            json!({ ".md": app_path.display().to_string() }).to_string(),
-        )
-        .expect("write legacy open_with");
-
-        let association =
-            open_with_association_for_path(settings_path.clone(), "/tmp/readme.md".to_owned())
-                .expect("get association");
-        assert_eq!(association, Some(app_path.display().to_string()));
-        assert!(!root.join("open_with.json").exists());
-
-        let saved = load_settings_document(&settings_path).expect("load settings");
-        assert_eq!(
-            saved
-                .get("open_with")
-                .and_then(Value::as_object)
-                .and_then(|open_with| open_with.get(".md"))
-                .and_then(Value::as_str),
-            Some(app_path.to_str().expect("utf-8 app path")),
-        );
-
-        let _ = fs::remove_dir_all(root);
+        let saved = load_settings_document(&store).expect("load settings");
+        assert!(saved["open_with"].get(".txt").is_none());
     }
 
     #[test]
     fn lists_open_with_associations_and_prunes_missing_apps() {
-        let settings_path = test_settings_path();
-        let app_path = make_existing_app(&settings_path, "TextEdit.app");
+        let (directory, store) = test_store();
+        let app_path = make_existing_app(directory.path(), "TextEdit.app");
         save_settings(
-            settings_path.clone(),
+            &store,
             json!({
                 "open_with": {
                     ".txt": app_path.display().to_string(),
@@ -592,8 +551,7 @@ mod tests {
         )
         .expect("save settings");
 
-        let associations =
-            open_with_associations(settings_path.clone()).expect("list associations");
+        let associations = open_with_associations(&store).expect("list associations");
         assert_eq!(associations.len(), 1);
         assert_eq!(associations[0].key, ".txt");
         assert_eq!(
@@ -601,46 +559,23 @@ mod tests {
             app_path.display().to_string()
         );
 
-        let saved = load_settings_document(&settings_path).expect("load settings");
-        assert!(saved
-            .get("open_with")
-            .and_then(Value::as_object)
-            .and_then(|open_with| open_with.get(".bad"))
-            .is_none());
-
-        let _ = fs::remove_dir_all(
-            settings_path
-                .parent()
-                .and_then(Path::parent)
-                .expect("test root"),
-        );
+        let saved = load_settings_document(&store).expect("load settings");
+        assert!(saved["open_with"].get(".bad").is_none());
     }
 
     #[test]
     fn removes_open_with_association_by_key() {
-        let settings_path = test_settings_path();
-        let app_path = make_existing_app(&settings_path, "Preview.app");
+        let (directory, store) = test_store();
+        let app_path = make_existing_app(directory.path(), "Preview.app");
         save_settings(
-            settings_path.clone(),
+            &store,
             json!({ "open_with": { ".pdf": app_path.display().to_string() } }),
         )
         .expect("save settings");
 
-        remove_open_with_association(settings_path.clone(), ".pdf".to_owned())
-            .expect("remove association");
+        remove_open_with_association(&store, ".pdf".to_owned()).expect("remove association");
 
-        let saved = load_settings_document(&settings_path).expect("load settings");
-        assert!(saved
-            .get("open_with")
-            .and_then(Value::as_object)
-            .and_then(|open_with| open_with.get(".pdf"))
-            .is_none());
-
-        let _ = fs::remove_dir_all(
-            settings_path
-                .parent()
-                .and_then(Path::parent)
-                .expect("test root"),
-        );
+        let saved = load_settings_document(&store).expect("load settings");
+        assert!(saved["open_with"].get(".pdf").is_none());
     }
 }

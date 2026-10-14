@@ -49,7 +49,7 @@ pub(super) fn check(workspace: &Workspace) -> Result<()> {
     let required_targets: &[&str] = if cfg!(target_os = "macos") {
         &["aarch64-apple-darwin", "x86_64-apple-darwin"]
     } else if cfg!(windows) {
-        &["x86_64-pc-windows-msvc"]
+        &["x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"]
     } else {
         bail!("Desktop releases must be built on macOS or Windows");
     };
@@ -81,6 +81,13 @@ pub(super) fn check(workspace: &Workspace) -> Result<()> {
         CommandSpec::new("xcrun")
             .args(["--find", "notarytool"])
             .capture(&workspace.misty)?;
+    }
+    if cfg!(windows) {
+        super::windows_signing::signtool()?;
+        super::windows_signing::check_certificate(
+            workspace,
+            values["WINDOWS_CERTIFICATE_THUMBPRINT"].trim(),
+        )?;
     }
     println!("Local release inputs and build tools are ready. Notarization credentials are checked by Apple during submission.");
     Ok(())

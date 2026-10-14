@@ -19,13 +19,7 @@ impl Snapshot {
             .tempdir()
             .map_err(|_| "Misty could not make room to read that browser.".to_owned())?;
         let path = dir.path().join(name);
-        std::fs::copy(source, &path).map_err(|error| match error.kind() {
-            std::io::ErrorKind::NotFound => "That browser has none of this data yet.".to_owned(),
-            std::io::ErrorKind::PermissionDenied => {
-                "Misty isn't allowed to read that browser's files. On a Mac, allow Misty under Privacy & Security > Full Disk Access.".to_owned()
-            }
-            _ => "That browser's data could not be copied.".to_owned(),
-        })?;
+        std::fs::copy(source, &path).map_err(|error| copy_error(&error))?;
         for suffix in ["-wal", "-shm"] {
             let mut side = source.as_os_str().to_owned();
             side.push(suffix);
@@ -43,5 +37,26 @@ impl Snapshot {
             OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .map_err(|_| "That browser's data could not be opened.".to_owned())
+    }
+}
+
+/// Plain words for why a browser's file could not be copied.
+fn copy_error(error: &std::io::Error) -> String {
+    // Windows reports a file another process holds open, as Chrome and Edge
+    // do with their databases while running, as a sharing or lock violation.
+    #[cfg(windows)]
+    if matches!(error.raw_os_error(), Some(32 | 33)) {
+        return "That browser is still using its files. Quit it completely, then try again."
+            .to_owned();
+    }
+    match error.kind() {
+        std::io::ErrorKind::NotFound => "That browser has none of this data yet.".to_owned(),
+        std::io::ErrorKind::PermissionDenied if cfg!(target_os = "macos") => {
+            "Misty isn't allowed to read that browser's files. Allow Misty under System Settings > Privacy & Security > Full Disk Access.".to_owned()
+        }
+        std::io::ErrorKind::PermissionDenied => {
+            "Misty isn't allowed to read that browser's files.".to_owned()
+        }
+        _ => "That browser's data could not be copied.".to_owned(),
     }
 }

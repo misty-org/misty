@@ -5,7 +5,6 @@ mod platform;
 #[path = "pointing.rs"]
 mod pointing;
 use base64::{engine::general_purpose::STANDARD, Engine};
-pub use pointing::*;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -16,6 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{AppHandle, Emitter, Manager, Webview, WebviewUrl, WebviewWindowBuilder};
+pub use {platform::show_overlay, pointing::*};
 
 const PREFIX: &str = "misty-cursor-";
 #[derive(Clone, Serialize, PartialEq)]
@@ -180,7 +180,7 @@ pub async fn cursor_companion_present(
             let _ = window.emit("misty://cursor-presentation", &presentation);
             if label != "misty-cursor-controls" && !state.capture.load(Ordering::SeqCst) {
                 if visible {
-                    let _ = window.show();
+                    platform::show_overlay(&window);
                 } else {
                     let app = app.clone();
                     let label = label.clone();
@@ -243,50 +243,70 @@ fn displays() -> Result<Vec<Display>, String> {
         .collect()
 }
 async fn rebuild(app: &AppHandle) -> Result<(), String> {
-    on_main(app, |app| {
+    if !host_state(app).enabled.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    // Enumerating monitors makes GDI calls per display (on Windows each
+    // property query opens a device context). Never do that on the UI thread:
+    // this runs every two seconds and on every reload or sign-out.
+    let frames = tauri::async_runtime::spawn_blocking(displays)
+        .await
+        .map_err(|e| e.to_string())??;
+    // Reloads, sign-out and the topology poll can overlap; build one set at a time.
+    static REBUILD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _serialized = REBUILD.lock().await;
+    let state = host_state(app);
+    if !state.enabled.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let old = state
+        .data
+        .lock()
+        .map_err(|_| "Companion unavailable")?
+        .displays
+        .clone();
+    if old == frames
+        && frames
+            .iter()
+            .all(|d| app.get_webview_window(&format!("{PREFIX}{}", d.id)).is_some())
+    {
+        return Ok(());
+    }
+    // Create the webviews here, off the UI thread. WebView2 creation needs the
+    // UI thread's message loop to run; building from inside a task on that
+    // thread waits on itself and freezes the app on Windows. The build call
+    // hands the work to the UI thread and waits for it from a worker instead.
+    for (label, window) in app.webview_windows() {
+        if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
+            let _ = window.destroy();
+        }
+    }
+    for d in &frames {
+        WebviewWindowBuilder::new(
+            app,
+            format!("{PREFIX}{}", d.id),
+            WebviewUrl::App("companion.html".into()),
+        )
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
+        .title("Misty cursor")
+        .transparent(true)
+        .decorations(false)
+        .shadow(false)
+        .resizable(false)
+        .visible(false)
+        .focused(false)
+        .focusable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    }
+    on_main(app, move |app| {
         let state = host_state(&app);
-        if !state.enabled.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        let frames = displays()?;
-        let old = state
-            .data
-            .lock()
-            .map_err(|_| "Companion unavailable")?
-            .displays
-            .clone();
-        if old == frames
-            && frames.iter().all(|d| {
-                app.get_webview_window(&format!("{PREFIX}{}", d.id))
-                    .is_some()
-            })
-        {
-            return Ok(());
-        }
-        for (label, window) in app.webview_windows() {
-            if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
-                let _ = window.destroy();
-            }
-        }
         for d in &frames {
-            let window = WebviewWindowBuilder::new(
-                &app,
-                format!("{PREFIX}{}", d.id),
-                WebviewUrl::App("companion.html".into()),
-            )
-            .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
-            .title("Misty cursor")
-            .transparent(true)
-            .decorations(false)
-            .shadow(false)
-            .resizable(false)
-            .visible(false)
-            .focused(false)
-            .focusable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .build()
-            .map_err(|e| e.to_string())?;
+            let Some(window) = app.get_webview_window(&format!("{PREFIX}{}", d.id)) else {
+                continue;
+            };
             #[cfg(target_os = "macos")]
             platform::position_overlay(&window, d)?;
             #[cfg(windows)]
@@ -304,7 +324,7 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
                 .unwrap_or(true)
                 && !state.capture.load(Ordering::SeqCst)
             {
-                let _ = window.show();
+                platform::show_overlay(&window);
             }
         }
         state
@@ -428,7 +448,7 @@ impl Drop for CaptureGuard {
             if visible && !state.capture.load(Ordering::SeqCst) {
                 for (label, w) in app.webview_windows() {
                     if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
-                        let _ = w.show();
+                        platform::show_overlay(&w);
                     }
                 }
             }

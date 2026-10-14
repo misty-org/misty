@@ -1,4 +1,4 @@
-import type { TextDialogModel } from "@/api/spaces/dto/types/SpaceLibraryDialogs";
+import type { TextDialogModel } from "@/api/spaces/dto/SpaceLibraryDialogs";
 import {
   Button,
   Dialog,

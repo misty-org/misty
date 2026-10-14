@@ -37,6 +37,12 @@ pub(crate) fn plugin() -> TauriPlugin<Wry> {
         super::browser_site_permissions::init(app);
         // Focus, shortcuts, pointer and status from Misty's own page scripts.
         super::browser::init_host_messages(app);
+        // Clicks on a page activate its pane natively, before the page sees them.
+        #[cfg(target_os = "macos")]
+        super::browser::install_click_focus(app);
+        // Web scrollbars reach into the window's rounded corners.
+        #[cfg(target_os = "macos")]
+        super::browser::install_corner_scrollbars();
         kiri::Kiri::new(WEBVIEW_PREFIX, MistyHost { app: app.clone() })
     })
 }

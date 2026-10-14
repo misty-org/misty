@@ -1,4 +1,4 @@
-import type { UnifiedNote } from "./model/types/types";
+import type { UnifiedNote } from "./model/types";
 
 export function nowIso(): string {
   return new Date().toISOString();

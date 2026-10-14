@@ -1,5 +1,5 @@
 import { readApiSessionGeneration } from "@/api/client/session";
-import type { SpaceMessage } from "@/api/spaces/dto/interfaces/types";
+import type { SpaceMessage } from "@/api/spaces/dto/entities";
 import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
 import type { MistyPickerSource } from "@/features/picker";
@@ -31,6 +31,7 @@ import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatPermissions } from "./hooks/useSpaceChatPermissions";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { spaceChatSuggestedActions } from "./spaceChatAiActions";
+import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 export function SpaceSocial({
   spaceId,
   spaceName,
@@ -68,9 +69,11 @@ export function SpaceSocial({
   useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
+  const { agents } = useSpaceAgentMembers(spaceId);
   const suggestions = useChatSuggestions({
     spaceId,
     members: scope.members,
+    agents,
     currentUserId: user?.id,
     canBrowseLibrary: access.canBrowseLibrary,
     canReadLibrary: access.permissions?.["library.view"] !== false,
@@ -106,8 +109,11 @@ export function SpaceSocial({
     openPicker,
   });
   const mentionNames = useMemo(
-    () => [...scope.members.map((member) => member.name)],
-    [scope.members],
+    () => [
+      ...scope.members.map((member) => member.name),
+      ...(agents ?? []).map((agent) => agent.agent_name),
+    ],
+    [agents, scope.members],
   );
   const actions = useSpaceChatMessageActions({
     spaceId,
@@ -120,6 +126,7 @@ export function SpaceSocial({
       : undefined,
     activeConversation: scope.activeConversation,
     members: scope.members,
+    agents,
     draft,
     editing,
     setGroupMessages: conversationChat.setMessages,

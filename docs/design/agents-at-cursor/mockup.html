@@ -1,0 +1,171 @@
+<title>Companion Mist Mockup</title>
+<style>
+/* Layout: one mock Mac display per state; a segmented switch picks the state. Single dark look, like the reference. */
+:root {
+  --bg: #0b0d10; --panel: #13161b; --win: #0d1117; --win-2: #161b22; --line: #2a3038; --ink: #e6edf3; --muted: #8b949e;
+  --mist: 236, 240, 245;
+  --desk-a: #1d2733; --desk-b: #31263a;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 1100px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; display: grid; gap: 18px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0; color: var(--muted); max-width: 72ch; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; border: 1px solid var(--line); border-radius: 9px; padding: 3px; background: var(--panel); justify-self: start; }
+.seg button { font: 500 13px var(--sans); color: var(--muted); background: none; border: 0; border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.caption { display: grid; gap: 4px; }
+.caption strong { font-size: 15px; }
+.stage { overflow-x: auto; }
+.display { position: relative; width: 1040px; height: 640px; margin: 0 auto; border-radius: 12px; overflow: hidden;
+  background: radial-gradient(120% 90% at 20% 10%, var(--desk-a), transparent 60%), radial-gradient(100% 80% at 90% 100%, var(--desk-b), transparent 60%), #12161c; }
+.menubar { position: absolute; inset: 0 0 auto 0; height: 26px; background: rgba(20, 22, 26, 0.7); display: flex; align-items: center; gap: 18px; padding-inline: 14px; font-size: 12.5px; color: #cfd6de; }
+.menubar b { font-weight: 600; }
+.window { position: absolute; left: 230px; top: 50px; width: 580px; height: 470px; border-radius: 12px; background: var(--win); border: 1px solid #30363d; overflow: hidden; }
+.window.back { left: 60px; top: 110px; width: 300px; height: 260px; opacity: 0.85; }
+.titlebar { height: 34px; display: flex; align-items: center; gap: 7px; padding-inline: 12px; background: var(--win-2); border-bottom: 1px solid #30363d; }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: #3b4048; }
+.url { margin-left: 14px; flex: 1; height: 20px; border-radius: 6px; background: #0d1117; border: 1px solid #30363d; font-size: 11px; color: var(--muted); display: flex; align-items: center; padding-inline: 8px; }
+.content { display: grid; grid-template-columns: 150px 1fr; gap: 14px; padding: 14px; }
+.side { display: grid; gap: 4px; align-content: start; }
+.side div { font-size: 12px; color: #c9d1d9; padding: 5px 8px; border-radius: 6px; border: 1px solid transparent; }
+.side .on { border-color: #30363d; background: #161b22; }
+.main { display: grid; gap: 10px; align-content: start; }
+.main h2 { margin: 0; font-size: 16px; }
+.pillrow { display: flex; gap: 8px; }
+.fake { font-size: 11.5px; padding: 4px 9px; border: 1px solid #30363d; border-radius: 6px; background: #21262d; color: #c9d1d9; }
+.chart { height: 190px; border: 1px solid #30363d; border-radius: 8px; padding: 12px; display: flex; align-items: flex-end; gap: 10px; }
+.chart i { flex: 1; background: #2f6feb; border-radius: 2px 2px 0 0; display: block; }
+.btn-export { justify-self: start; font-size: 12px; padding: 6px 12px; border-radius: 6px; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+
+/* The mist: soft white fog gathered along the inner edges, no blur, nothing outside the frame. */
+.mist { position: absolute; pointer-events: none; overflow: hidden; border-radius: 12px; }
+.mist .fog { position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: inset 0 0 26px 6px rgba(var(--mist), 0.30), inset 0 0 70px 22px rgba(var(--mist), 0.13), inset 0 0 0 1px rgba(var(--mist), 0.28); }
+.mist .drift { position: absolute; inset: -20%; opacity: 0.55;
+  background: radial-gradient(30% 22% at 12% 18%, rgba(var(--mist), 0.20), transparent 70%), radial-gradient(26% 20% at 88% 30%, rgba(var(--mist), 0.16), transparent 70%),
+              radial-gradient(34% 22% at 70% 92%, rgba(var(--mist), 0.18), transparent 70%), radial-gradient(28% 24% at 18% 84%, rgba(var(--mist), 0.16), transparent 70%);
+  -webkit-mask-image: radial-gradient(closest-side, transparent 62%, #000 100%); mask-image: radial-gradient(closest-side, transparent 62%, #000 100%); }
+.mist.display-mist { inset: 0; border-radius: 12px; }
+.mist.waiting { opacity: 0.45; }
+@media (prefers-reduced-motion: no-preference) {
+  .mist.acting .fog { animation: breathe 3.5s ease-in-out infinite; }
+  .mist.acting .drift { animation: drift 14s ease-in-out infinite alternate; }
+  @keyframes breathe { 50% { box-shadow: inset 0 0 34px 10px rgba(var(--mist), 0.40), inset 0 0 95px 30px rgba(var(--mist), 0.18), inset 0 0 0 1px rgba(var(--mist), 0.36); } }
+  @keyframes drift { to { transform: translate(3%, -2%) scale(1.04); } }
+}
+
+/* The control island. */
+.island { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: 560px; display: grid; gap: 8px; padding: 10px;
+  border-radius: 16px; background: rgba(18, 20, 24, 0.94); border: 1px solid #343b45; box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5); }
+.island .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.island .status { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ink); display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.island .status svg { flex: none; }
+.island .meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.island .field { flex: 1; min-width: 0; height: 32px; border-radius: 9px; border: 1px solid #343b45; background: #0e1013; color: var(--muted); font-size: 12.5px; display: flex; align-items: center; padding-inline: 10px; gap: 8px; }
+.island .field span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.island button { font: 500 12px var(--sans); border-radius: 8px; padding: 6px 10px; border: 1px solid #343b45; background: #1b1f25; color: var(--ink); white-space: nowrap; cursor: default; }
+.island button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.island kbd { font: 11px var(--sans); color: var(--muted); border: 1px solid #343b45; border-radius: 4px; padding: 0 5px; }
+.island .icon { width: 30px; padding: 6px 0; display: grid; place-items: center; }
+.island.quiet { width: auto; padding: 8px 12px; border-radius: 999px; }
+
+.agent-cursor { position: absolute; width: 18px; height: 18px; }
+.cloud { position: absolute; width: 34px; height: 24px; }
+.bubble { position: absolute; background: #f4f6f8; color: #0b0d10; font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+.target { position: absolute; border: 2px solid #f4f6f8; border-radius: 8px; pointer-events: none; }
+</style>
+
+<div class="wrap">
+  <h1>Companion mist and control island</h1>
+  <p>Revision 2 of the companion-as-orchestrator mockup. The mist stays inside the controlled window and breathes; the island at the bottom holds status, steering, a new prompt, take over and Stop. Pick a state.</p>
+  <div class="seg" role="group" aria-label="State" id="states">
+    <button type="button" id="s-window" data-s="window" aria-pressed="true">Agent controls a window</button>
+    <button type="button" id="s-desktop" data-s="desktop" aria-pressed="false">Agent controls the desktop</button>
+    <button type="button" id="s-waiting" data-s="waiting" aria-pressed="false">Waiting for you</button>
+    <button type="button" id="s-teach" data-s="teach" aria-pressed="false">Teaching</button>
+    <button type="button" id="s-background" data-s="background" aria-pressed="false">Agents in the background</button>
+  </div>
+  <div class="caption"><strong id="cap-t"></strong><p id="cap-d"></p></div>
+  <div class="stage">
+    <div class="display" id="display">
+      <div class="menubar"><b>Misty</b><span>File</span><span>Edit</span><span>View</span><span>Window</span></div>
+      <div class="window back"><div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>
+      <div class="window" id="win">
+        <div class="titlebar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">github.com/nvidia/nccl/graphs/contributors</span></div>
+        <div class="content">
+          <div class="side"><div>Pulse</div><div class="on">Contributors</div><div>Community standards</div><div>Commits</div><div>Code frequency</div><div>Dependency graph</div><div>Network</div><div>Forks</div></div>
+          <div class="main">
+            <h2>Contributors</h2>
+            <div class="pillrow"><span class="fake" id="period">Period: Last 3 months ▾</span><span class="fake">Contributions: Commits ▾</span></div>
+            <div class="chart"><i style="height:8%"></i><i style="height:5%"></i><i style="height:12%"></i><i style="height:30%"></i><i style="height:62%"></i><i style="height:92%"></i><i style="height:38%"></i><i style="height:16%"></i><i style="height:7%"></i><i style="height:4%"></i><i style="height:9%"></i></div>
+            <span class="btn-export">Export CSV</span>
+          </div>
+        </div>
+      </div>
+      <div id="overlay"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATES = {
+  window: { t: "An agent controls a window", d: "Mist breathes along the window's inner edges and nothing glows outside it. The island shows what's happening and lets you steer, start something new, take over or stop." },
+  desktop: { t: "An agent controls the desktop", d: "Desktop control (another app, or several) puts the mist along the display's edges. The island stays in the same place." },
+  waiting: { t: "Waiting for you", d: "The agent still holds control but needs you. The mist thins and the island says exactly what's needed, with Done to continue." },
+  teach: { t: "Teaching", d: "No mist and no island: nothing is being controlled. The companion outlines the real element it read from the page and says what to do." },
+  background: { t: "Agents in the background", d: "Agents in hidden tabs or on another device aren't touching your screen: no mist, just a quiet line you can open." },
+};
+const cloud = `<svg class="cloud" viewBox="0 0 34 24" aria-hidden="true"><path d="M9 22h17a7 7 0 0 0 .8-13.96A9 9 0 0 0 9.4 6.2 8 8 0 0 0 9 22z" fill="#f4f6f8" stroke="#0b0d10" stroke-width="1.2"/></svg>`;
+const cursor = `<svg class="agent-cursor" viewBox="0 0 18 18" aria-hidden="true"><path d="M2 1l13 7-6 1.5L6.5 16z" fill="#f4f6f8" stroke="#0b0d10" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+const spinner = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#8b949e" stroke-width="1.5" stroke-dasharray="20 14"/></svg>`;
+const pause = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="3" y="2.5" width="2.6" height="9" rx="1" fill="#e6edf3"/><rect x="8.4" y="2.5" width="2.6" height="9" rx="1" fill="#e6edf3"/></svg>`;
+const mic = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="4.5" y="1.5" width="5" height="8" rx="2.5" fill="none" stroke="#8b949e" stroke-width="1.3"/><path d="M2.5 7a4.5 4.5 0 0 0 9 0M7 11.5V13" fill="none" stroke="#8b949e" stroke-width="1.3"/></svg>`;
+const waitIcon = `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#e6edf3" stroke-width="1.4"/><path d="M7 4v3.3l2 1.4" fill="none" stroke="#e6edf3" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+
+function mist(cls, box) {
+  const style = box ? `left:${box.l}px;top:${box.t}px;width:${box.w}px;height:${box.h}px` : "";
+  return `<div class="mist ${cls}" style="${style}"><div class="drift"></div><div class="fog"></div></div>`;
+}
+function island(status, meta) {
+  return `<div class="island" role="group" aria-label="Agent controls">
+    <div class="row"><div class="status">${spinner}<span>${status}</span></div><span class="meta">${meta}</span></div>
+    <div class="row"><div class="field">${mic}<span>Tell Misty what to change, or ask for something new</span></div>
+      <button type="button" tabindex="-1">Steer</button><button type="button" tabindex="-1">New task</button></div>
+    <div class="row"><button type="button" tabindex="-1" class="icon" aria-label="Take over">${pause}</button><button type="button" tabindex="-1">Take over</button>
+      <span style="flex:1"></span><kbd>esc</kbd><button type="button" tabindex="-1" class="primary">Stop</button></div>
+  </div>`;
+}
+function show(s) {
+  document.querySelectorAll("#states button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.s === s)));
+  document.getElementById("cap-t").textContent = STATES[s].t;
+  document.getElementById("cap-d").textContent = STATES[s].d;
+  const o = document.getElementById("overlay"), win = { l: 230, t: 50, w: 580, h: 470 };
+  let html = "";
+  if (s === "window") {
+    html += mist("acting", win) + `<div style="position:absolute;left:${win.l + 214}px;top:${win.t + 104}px">${cursor}</div>`;
+    html += island("Exporting the contributor data from the last 3 months", "2 helpers · this Mac");
+  } else if (s === "waiting") {
+    html += mist("waiting", win);
+    html += `<div class="island"><div class="row"><div class="status">${waitIcon}<span>Sign in to GitHub in this window, then press Done</span></div></div>
+      <div class="row"><span style="flex:1"></span><button type="button" tabindex="-1">Take over</button><kbd>esc</kbd><button type="button" tabindex="-1">Stop</button><button type="button" tabindex="-1" class="primary">Done</button></div></div>`;
+  } else if (s === "desktop") {
+    html += mist("display-mist acting") + `<div style="position:absolute;left:${win.l + 470}px;top:${win.t + 432}px">${cursor}</div>`;
+    html += island("Moving the chart into Keynote", "Desktop · this Mac");
+  } else if (s === "teach") {
+    const p = document.getElementById("period"), d = document.getElementById("display").getBoundingClientRect(), r = p.getBoundingClientRect();
+    const x = r.left - d.left, y = r.top - d.top;
+    html += `<div class="target" style="left:${x - 4}px;top:${y - 4}px;width:${r.width + 8}px;height:${r.height + 8}px"></div>`;
+    html += `<div style="position:absolute;left:${x + r.width + 10}px;top:${y + r.height - 2}px">${cloud}</div>`;
+    html += `<div class="bubble" style="left:${x + r.width + 46}px;top:${y + r.height + 14}px">Step 1 of 2 · Open Period and choose Last month</div>`;
+  } else {
+    html += `<div class="island quiet"><div class="status">${spinner}<span>2 agents working in the background · this Mac and Mac mini</span></div></div>`;
+  }
+  o.innerHTML = html;
+}
+document.querySelectorAll("#states button").forEach((b) => b.addEventListener("click", () => show(b.dataset.s)));
+show("window");
+</script>

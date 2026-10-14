@@ -48,6 +48,11 @@ pub(super) fn render_image_thumbnail_file_blocking(
             }
         }
         PreviewFormat::Psd => {
+            if std::fs::metadata(path).is_ok_and(|metadata| metadata.len() > MAX_PSD_BYTES) {
+                return Err(ApiError::Message(
+                    "This image is too large to preview.".to_string(),
+                ));
+            }
             let bytes = std::fs::read(path).map_err(|error| {
                 ApiError::Message(format!(
                     "Failed to read PSD thumbnail {}: {error}",
@@ -168,9 +173,19 @@ pub(super) fn transcode_psd_preview_png_with_dimension(
     path: &Path,
     max_dimension: u32,
 ) -> ApiResult<Vec<u8>> {
-    use zune_psd::zune_core::{bytestream::ZCursor, result::DecodingResult};
+    use zune_psd::zune_core::{
+        bytestream::ZCursor, options::DecoderOptions, result::DecodingResult,
+    };
 
-    let mut decoder = zune_psd::PSDDecoder::new(ZCursor::new(bytes));
+    if bytes.len() as u64 > MAX_PSD_BYTES {
+        return Err(ApiError::Message(
+            "This image is too large to preview.".to_string(),
+        ));
+    }
+    let options = DecoderOptions::default()
+        .set_max_width(MAX_SOURCE_DIMENSION as usize)
+        .set_max_height(MAX_SOURCE_DIMENSION as usize);
+    let mut decoder = zune_psd::PSDDecoder::new_with_options(ZCursor::new(bytes), options);
     let decoded = decoder.decode().map_err(|error| {
         ApiError::Message(format!(
             "Failed to decode PSD preview {}: {error:?}",
@@ -254,38 +269,4 @@ pub(super) fn pdf_preview_path(path: &Path, metadata: &std::fs::Metadata) -> Pat
     }
     let digest = hasher.finalize();
     std::env::temp_dir().join(format!("misty-preview-{}.png", hex::encode(&digest[..16])))
-}
-
-#[cfg(target_os = "macos")]
-pub(super) fn render_packaged_image_thumbnail(
-    path: &Path,
-    output: &Path,
-    dimension: u32,
-    service: &crate::infra::document_intelligence::ServiceLease,
-) -> ApiResult<GeneratedImageThumbnail> {
-    let bytes = service
-        .process_explorer_image(path, dimension)
-        .map_err(ApiError::Message)?;
-    if service.cancelled() {
-        return Err(ApiError::Message("Files preview access changed.".into()));
-    }
-    let temp = temporary_image_thumbnail_path(output);
-    std::fs::write(&temp, bytes).map_err(|e| ApiError::Message(e.to_string()))?;
-    let result = (|| {
-        let _lock = IMAGE_THUMBNAIL_CACHE_FILE_LOCK
-            .lock()
-            .map_err(|e| ApiError::Message(e.to_string()))?;
-        if service.cancelled() {
-            return Err(ApiError::Message("Files preview access changed.".into()));
-        }
-        if !output.exists() {
-            std::fs::rename(&temp, output).map_err(|e| ApiError::Message(e.to_string()))?;
-        }
-        Ok(GeneratedImageThumbnail {
-            path: display_path(output),
-            mime_type: "image/png".into(),
-        })
-    })();
-    let _ = std::fs::remove_file(temp);
-    result
 }

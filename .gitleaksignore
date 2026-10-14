@@ -34,3 +34,5 @@ da8b0aa403f351c852996524d098a1c6740f1ff8:src-tauri/src/core/clipboard/cache.rs:g
 72cd568a43b215f67379097802dd78a6570bfaa4:proxy/core/setup/default/commands.msy:generic-api-key:41
 # base64 of "secret-secret-secret-secret-secret" in a runtime-secret strength test
 3feafe4cdf8263a6b73b24f00fc04c420d705a6a:server/internal/modelruntime/client_test.go:generic-api-key:34
+# reviewed 2026-10-11: an aria-keyshortcuts attribute, not a key
+84b8d6e61faf9e69b1573f460ff79df88cb2e843:src/features/agents/workspace/AgentRecentRow.tsx:generic-api-key:75

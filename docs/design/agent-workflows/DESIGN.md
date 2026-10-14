@@ -9,7 +9,7 @@ description: Native Polar page geometry with Misty shared controls and floating 
 
 Revision three is the current **mockup proposal**. The user rejected revisions one and two because the pages did not look like Polar's layout. This revision takes its page geometry from screenshots of the installed Polar app, while retaining Misty's shared controls, monochrome treatment, optional context, and floating execution. These are local study decisions; the existing [Agents product direction](../../../src/features/agents/PRODUCT.md) remains authoritative for production.
 
-The direction contract is [mockups/index.html](mockups/index.html). The implementation is [revision-three.tsx](mockups/revision-three.tsx), [revision-three.css](mockups/revision-three.css), and [polar-pages.tsx](mockups/polar-pages.tsx). Start review in the [same-size comparison viewer](http://127.0.0.1:5207/comparison.html), which pairs native Polar references with rendered Misty pages. Revisions one and two remain historical evidence, not approved alternatives.
+The direction contract is [mockups/index.html](mockups/index.html). The implementation was an isolated React preview, since removed (see [mockups/README.md](mockups/README.md)). The [same-size comparison viewer](mockups/comparison.html) pairs native Polar references with rendered Misty pages. Revisions one and two remain historical evidence, not approved alternatives.
 
 ## Colors
 

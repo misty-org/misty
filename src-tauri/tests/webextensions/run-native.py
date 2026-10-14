@@ -62,7 +62,8 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
     compat = root / "compat-probe"
     executable = root / "native-host"
     production = [NATIVE / "MistyExtensions.m", NATIVE / "MistyExtensionNativeMessaging.m",
-                  NATIVE / "MistyExtensionTabs.m", NATIVE / "MistyExtensionCompat.m",
+                  NATIVE / "MistyExtensionTabs.m", NATIVE / "MistyExtensionPopupWindows.m",
+                  NATIVE / "MistyExtensionCompat.m",
                   NATIVE / "MistyExtensionNotifications.m"]
     run(*FLAGS, HERE / "probe.m", "-o", probe)
     run(*FLAGS, HERE / "host-probe.m", *production, "-o", host)

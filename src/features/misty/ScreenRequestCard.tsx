@@ -11,6 +11,15 @@ import { useMistyStore } from "./useMistyStore";
 
 function status(request: ScreenRequest) {
   const look = request.kind === "look";
+  const remote = request.remote?.deviceName;
+  if (remote)
+    return {
+      opening: `Continuing on ${remote}`,
+      opened: `Continuing on ${remote}`,
+      declined: "Not continued",
+      failed: request.error || `The browser on ${remote} could not be used.`,
+      pending: `Continuing on ${remote}`,
+    }[request.state ?? "pending"];
   if (request.kind === "desktop")
     return {
       opening: "Starting desktop control…",

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useBrowserSyncStore } from "./store";
+import { startRestoreAfterReload } from "./restore/afterReload";
 import { startPageStateCapture } from "./restore/capture";
 import { restoreAfterSwitch } from "./restore/restorer";
 import { hydrateViewHistories, startViewHistorySync } from "./restore/history";
@@ -11,7 +12,7 @@ const shownWorkspace = () => {
 };
 
 /** Saves page state and tab histories for the workspace this machine is on,
- * and restores tabs after it opens another device's tabs. */
+ * and restores tabs after it opens another device's tabs or WebKit reloads a page. */
 export function PageStateBridge({ accountId }: { accountId: string }) {
   const driving = useBrowserSyncStore((state) =>
     state.session?.account_id === accountId && state.session.sync
@@ -24,9 +25,11 @@ export function PageStateBridge({ accountId }: { accountId: string }) {
     if (!hasTauriInternals() || !accountId) return;
     const stopCapture = startPageStateCapture(() => Boolean(current.current));
     const stopHistory = startViewHistorySync(() => Boolean(current.current));
+    const stopReloadRestore = startRestoreAfterReload(() => Boolean(current.current));
     return () => {
       stopCapture();
       stopHistory();
+      stopReloadRestore();
     };
   }, [accountId]);
   // Any new seat, including the first one after startup, brings back tab

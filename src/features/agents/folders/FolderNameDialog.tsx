@@ -10,7 +10,7 @@ import {
   Input,
 } from "@/shared/ui";
 
-/** Names a new folder or renames one. Stays open with the error if saving fails. */
+/** Names a new project or renames one. Stays open with the error if saving fails. */
 export function FolderNameDialog({
   open,
   title,
@@ -62,7 +62,7 @@ export function FolderNameDialog({
           }}
         >
           <Input
-            aria-label="Folder name"
+            aria-label="Project name"
             value={name}
             maxLength={80}
             disabled={busy}

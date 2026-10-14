@@ -1,4 +1,4 @@
-import type { FramePacingState } from "@/app/layouts/model/types";
+import type { FramePacingState } from "@/app/layouts/model";
 
 // The drawer, tab inset, and titlebar controls must move on the same timeline.
 export const navigatorMotionClass = "misty-shell-motion motion-reduce:transition-none";
@@ -25,8 +25,6 @@ export const navigatorIslandActionClass = [
 export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
-
-export const workStatusToastDurationMs = 3500;
 export const desktopTitlebarNavigationInset = 84;
 export const windowsTitlebarNavigationInset = 8;
 

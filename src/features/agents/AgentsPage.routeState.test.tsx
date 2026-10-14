@@ -4,10 +4,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./components/MistyDashboard", () => ({
-  MistyDashboard: () => <section data-testid="activity">Misty activity</section>,
-}));
-
 vi.mock("./mcp/McpConnectionsSheet", () => ({
   McpConnectionsSheet: () => null,
 }));
@@ -72,9 +68,10 @@ describe("Agents automation route state", () => {
     container.remove();
   });
 
-  it("opens Activity for old automation links without removing saved workflow data", async () => {
+  it("opens Workflows for old automation links without removing saved workflow data", async () => {
     await act(async () => root.render(agentsSurface("/agents?view=automations&automation=flow-1")));
-    expect(document.body.querySelector('[data-testid="activity"]')).not.toBeNull();
+    const pages = container.querySelector('[aria-label="Agent workspace pages"]');
+    expect(pages?.querySelector('[aria-current="page"]')?.textContent).toBe("Workflows");
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toBe(
       "/agents?view=automations&automation=flow-1",
     );

@@ -6,7 +6,7 @@ const maximumOpenTabs = 16;
 const maximumTabTitleLength = 60;
 const pendingSpaceId = "__pending__";
 
-export type WorkspaceTabKind = "space" | "file-manager" | "agents" | "developer" | "marketplace";
+type WorkspaceTabKind = "space" | "file-manager" | "agents" | "developer" | "marketplace";
 
 interface WorkspaceTabBase {
   id: string;
@@ -19,20 +19,20 @@ export interface SpaceWorkspaceTab extends WorkspaceTabBase {
   route: string;
 }
 
-export interface FileManagerWorkspaceTab extends WorkspaceTabBase {
+interface FileManagerWorkspaceTab extends WorkspaceTabBase {
   kind: "file-manager";
   workspaceId: string;
 }
 
-export interface MarketplaceWorkspaceTab extends WorkspaceTabBase {
+interface MarketplaceWorkspaceTab extends WorkspaceTabBase {
   kind: "marketplace";
 }
 
-export interface AgentsWorkspaceTab extends WorkspaceTabBase {
+interface AgentsWorkspaceTab extends WorkspaceTabBase {
   kind: "agents";
 }
 
-export interface DeveloperWorkspaceTab extends WorkspaceTabBase {
+interface DeveloperWorkspaceTab extends WorkspaceTabBase {
   kind: "developer";
 }
 
@@ -282,7 +282,7 @@ export function defaultSpaceRoute(spaceId: string): string {
   return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
 
-export function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
+function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
   const fallback = spaceId ? defaultSpaceRoute(spaceId) : "/spaces";
   const trimmed = route.trim();
   if (!trimmed) return fallback;

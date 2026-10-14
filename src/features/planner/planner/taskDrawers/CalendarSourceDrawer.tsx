@@ -3,7 +3,7 @@ import type {
   GoogleCalendarChoice,
   SpaceCalendarSource,
   SpaceIntegration,
-} from "@/api/spaces/dto/interfaces/types";
+} from "@/api/spaces/dto/entities";
 import type { SpaceAgendaVisibility } from "@/features/spaces";
 import {
   Button,

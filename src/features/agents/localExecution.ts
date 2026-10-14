@@ -12,6 +12,7 @@ import type { AiInvocationDeviceContext } from "@/features/ai-surface";
 import type { GlobalAiContextRef } from "@/features/global-search/types";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { lease, releaseLease, remoteLease } from "./executionLease";
+import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
 
 export const agentWorkerParameters = new URLSearchParams(
   typeof location === "undefined" ? "" : location.search,
@@ -29,6 +30,8 @@ export interface Execution {
    * screen, but input, the control ring and Misty's cursor go back to the user. */
   state: "running" | "waiting" | "paused" | "finished";
   views: string[];
+  /** Tabs opened for this task's sub-agents; closed with the task. */
+  childViews?: string[];
   autopilot?: boolean;
   desktopControl?: boolean;
   normalTabs?: boolean;
@@ -118,6 +121,7 @@ export async function startLocalExecution(
       getCurrentWindow().label === "main",
     state: "running",
     views: [...(previous?.ready ? previous.views : [])],
+    childViews: [...(previous?.ready ? (previous.childViews ?? []) : [])],
     context: [...(previous?.ready ? previous.context : [])],
     deviceContexts: [...(previous?.ready ? previous.deviceContexts : [])],
   };
@@ -282,18 +286,11 @@ export async function startLocalExecution(
         kind: "browser_tab",
         opaqueRef: scopeId,
         displayName: execution.desktopControl ? "Desktop screen control" : "Browser workspace",
-        // Screens act through browser_act goals with Misty's own cursor; the
-        // act job grants itself the low-level input it needs.
+        // Desktop and Misty-window screens act through browser_act goals with
+        // Misty's own cursor. Browser tabs are read as text and acted on by ref.
         capabilities: execution.autopilot
           ? ["browser.workspace.visual", "browser.act"]
-          : [
-              "browser.inspect",
-              "browser.visual",
-              "browser.navigate",
-              "browser.act",
-              "browser.downloads.list",
-              "browser.upload",
-            ],
+          : browserTabAgentFileCapabilities,
         metadata: {
           ...(execution.autopilot ? { workspace_control: true } : {}),
           ...(execution.desktopControl ? { desktop_control: true } : {}),
@@ -355,7 +352,9 @@ export async function finishLocalExecution() {
   if (useLocalExecution.getState().execution?.taskId !== execution.taskId) return;
   useLocalExecution.setState({ execution: null });
   await Promise.allSettled(
-    execution.views.map((id) => invoke("browser_webview_close", { request: { id } })),
+    [...execution.views, ...(execution.childViews ?? [])].map((id) =>
+      invoke("browser_webview_close", { request: { id } }),
+    ),
   );
 }
 
@@ -440,15 +439,7 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
     throw new Error("The active task changed. The follow-up was not applied.");
   if (route === "stop") return "Stopped. Completed changes have not been undone.";
   if (route === "queue") {
-    await invoke("agent_foreground_queue", {
-      task: {
-        accountId: execution.accountId,
-        agentId: execution.agentId,
-        spaceId: execution.spaceId,
-        mode: execution.mode,
-        prompt,
-      },
-    });
+    await enqueueForegroundTask(execution, prompt);
     await steerLocalExecution(
       "Continue the current task, preserving all earlier constraints. Inspect the current state before repeating any write.",
     );
@@ -456,6 +447,16 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
   }
   await steerLocalExecution(prompt);
   return "Follow-up applied to this task.";
+}
+
+const enqueueForegroundTask = ({ accountId, agentId, spaceId, mode }: Execution, prompt: string) =>
+  invoke("agent_foreground_queue", { task: { accountId, agentId, spaceId, mode, prompt } });
+/** Queues an independent request after the current task, which keeps running. */
+export async function queueLocalFollowup(prompt: string) {
+  const execution = useLocalExecution.getState().execution;
+  if (!execution || execution.method)
+    throw new Error("This task can't take new requests. Start a new task after it finishes.");
+  await enqueueForegroundTask(execution, prompt);
 }
 
 let drainingQueue = false;

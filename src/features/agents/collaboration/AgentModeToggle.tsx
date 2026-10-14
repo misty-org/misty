@@ -1,10 +1,15 @@
+import { Flag } from "lucide-react";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   MenuTrigger,
 } from "@/shared/ui";
+import { AgentGoalDialog } from "./AgentGoalDialog";
 import { useCollaborationStore } from "./store";
 import type { ConversationMode } from "./types";
 
@@ -21,7 +26,7 @@ const modes: { id: ConversationMode; label: string; description: string }[] = [
  * The composer toolbar's mode menu, beside Attach. Plan researches read-only, asks
  * questions and proposes a plan; Act works directly. Shift+Tab in the composer
  * switches too. The next message uses the new mode; a running turn keeps the mode it
- * started in.
+ * started in. Goal, under the modes, opens the conversation's goal and live plan.
  */
 export function AgentModeToggle({
   conversationId,
@@ -32,32 +37,56 @@ export function AgentModeToggle({
   mode: ConversationMode;
   disabled?: boolean;
 }) {
+  const [goalOpen, setGoalOpen] = useState(false);
+  const goal = useCollaborationStore((s) =>
+    conversationId ? s.byConversation[conversationId]?.goal : undefined,
+  );
+  const goalActive = goal?.status === "pursuing" || goal?.status === "paused";
   return (
-    <DropdownMenu>
-      <MenuTrigger
-        label="Mode"
-        value={modes.find((m) => m.id === mode)?.label ?? "Act"}
-        title="Mode · Shift+Tab to switch"
-        disabled={disabled}
-        className="agent-mode-toggle h-7 px-2 text-xs font-normal text-cream-muted"
-      />
-      <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
-        <DropdownMenuRadioGroup
-          value={mode}
-          onValueChange={(next) =>
-            void useCollaborationStore.getState().setMode(conversationId, next as ConversationMode)
-          }
-        >
-          {modes.map((option) => (
-            <DropdownMenuRadioItem key={option.id} value={option.id}>
-              <span className="grid min-w-0 gap-0.5">
-                <span>{option.label}</span>
-                <span className="text-xs text-cream-muted">{option.description}</span>
+    <>
+      <DropdownMenu>
+        <MenuTrigger
+          label="Mode"
+          value={modes.find((m) => m.id === mode)?.label ?? "Act"}
+          title="Mode · Shift+Tab to switch"
+          disabled={disabled}
+          className="agent-mode-toggle h-7 px-2 text-xs font-normal text-cream-muted"
+        />
+        <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
+          <DropdownMenuRadioGroup
+            value={mode}
+            onValueChange={(next) =>
+              void useCollaborationStore
+                .getState()
+                .setMode(conversationId, next as ConversationMode)
+            }
+          >
+            {modes.map((option) => (
+              <DropdownMenuRadioItem key={option.id} value={option.id}>
+                <span className="grid min-w-0 gap-0.5">
+                  <span>{option.label}</span>
+                  <span className="text-xs text-cream-muted">{option.description}</span>
+                </span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={!conversationId} onSelect={() => setGoalOpen(true)}>
+            <Flag aria-hidden="true" />
+            <span className="grid min-w-0 gap-0.5">
+              <span>Goal</span>
+              <span className="text-xs text-cream-muted">
+                {goal && goalActive
+                  ? goal.objective
+                  : conversationId
+                    ? "Keeps working toward an objective across turns"
+                    : "Start a conversation, then set a goal"}
               </span>
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AgentGoalDialog conversationId={conversationId} open={goalOpen} onOpenChange={setGoalOpen} />
+    </>
   );
 }

@@ -11,7 +11,6 @@ export function SpaceLibraryOverlays() {
   const {
     spaceId,
     canUploadLibrary,
-    canImportLibrary,
     canEditLibrary,
     canCopyLibrary,
     items,
@@ -158,7 +157,6 @@ export function SpaceLibraryOverlays() {
           mode="file"
           multiple
           title="Add files to this Space"
-          allowDeviceFiles={canImportLibrary}
           onCancel={() => setFilePickerOpen(false)}
           onSelect={(path) => {
             setFilePickerOpen(false);
@@ -167,16 +165,6 @@ export function SpaceLibraryOverlays() {
           onSelectMany={(paths) => {
             setFilePickerOpen(false);
             void uploadFiles(paths);
-          }}
-          onSelectPreparedMany={(selection) => {
-            setFilePickerOpen(false);
-            const provenance = Object.fromEntries(
-              selection.filter((item) => item.source).map((item) => [item.localPath, item.source!]),
-            );
-            void uploadFiles(
-              selection.map((item) => item.localPath),
-              provenance,
-            );
           }}
         />
       ) : null}

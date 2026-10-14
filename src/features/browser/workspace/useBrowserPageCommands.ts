@@ -11,6 +11,7 @@ import {
   useWorkspaceStore,
 } from "@/features/workspace";
 import { save } from "@tauri-apps/plugin-dialog";
+import { desktopOs } from "@/shared/platform/desktopOs";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
 import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
@@ -51,6 +52,18 @@ function report(tabId: string, error: unknown) {
 
 function notice(tabId: string, message: string) {
   useBrowserRuntimeStore.getState().setNotice(tabId, message);
+}
+
+/** The single-file page format the engine saves natively, if any. */
+function webArchiveFormat(): { name: string; extensions: string[] } | null {
+  switch (desktopOs()) {
+    case "macos":
+      return { name: "Web Archive", extensions: ["webarchive"] };
+    case "windows":
+      return { name: "Web Page, single file", extensions: ["mhtml"] };
+    default:
+      return null;
+  }
 }
 
 function safeFileName(title: string): string {
@@ -145,16 +158,12 @@ export function useBrowserPageCommands(input: {
     };
     commands.savePage = () =>
       void (async () => {
-        const mac = /Mac/i.test(navigator.platform);
+        const archive = webArchiveFormat();
+        const html = { name: "HTML", extensions: ["html"] };
         const path = await save({
           title: "Save page as",
-          defaultPath: `${safeFileName(tab.title)}.${mac ? "webarchive" : "html"}`,
-          filters: mac
-            ? [
-                { name: "Web Archive", extensions: ["webarchive"] },
-                { name: "HTML", extensions: ["html"] },
-              ]
-            : [{ name: "HTML", extensions: ["html"] }],
+          defaultPath: `${safeFileName(tab.title)}.${archive?.extensions[0] ?? "html"}`,
+          filters: archive ? [archive, html] : [html],
         });
         if (!path) return;
         await browserPageTools.savePage(id, path);

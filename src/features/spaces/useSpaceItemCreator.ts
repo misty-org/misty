@@ -5,8 +5,8 @@ import { useSpacesStore } from "./store/useSpacesStore";
 export function useSpaceItemCreator(spaceId: string) {
   const { user } = useAuth();
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
-  return (userId?: string, agentId?: string) => {
-    if (agentId) return "Agent";
+  return (userId?: string, agentId?: string, agentName?: string) => {
+    if (agentId) return agentName || "Agent";
     if (!userId) return "Unknown";
     if (userId === user?.id) return user.name?.trim() || "You";
     return members?.find((member) => member.user_id === userId)?.name?.trim() || "Unknown member";

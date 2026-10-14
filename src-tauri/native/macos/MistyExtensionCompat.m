@@ -10,6 +10,10 @@
 #import "MistyExtensionsInternal.h"
 #import <objc/message.h>
 #import <NaturalLanguage/NaturalLanguage.h>
+#import <CommonCrypto/CommonDigest.h>
+
+/// Where user scripts' code is stored inside an extension's own package.
+static NSString *const UserScriptDirectory = @"__misty_user_scripts__";
 
 static NSString *const IdentitySuffix = @".extensions.misty.invalid";
 
@@ -17,11 +21,12 @@ static NSString *const IdentitySuffix = @".extensions.misty.invalid";
 /// means any extension may call it, as in Firefox.
 static NSString *CompatPermission(id method) {
     if (![method isKindOfClass:NSString.class]) return nil;
-    if ([@[@"i18n.detectLanguage", @"tabs.move"] containsObject:method]) return @"";
+    if ([@[@"i18n.detectLanguage", @"tabs.move", @"tabs.group", @"tabs.ungroup", @"runtime.reportError"] containsObject:method]) return @"";
     NSString *namespace = [method componentsSeparatedByString:@"."].firstObject;
     return @{@"notifications":@"notifications", @"downloads":@"downloads", @"history":@"history",
              @"topSites":@"topSites", @"search":@"search", @"sessions":@"sessions",
-             @"browsingData":@"browsingData", @"find":@"find", @"idle":@"idle", @"tts":@"tts"}[namespace];
+             @"browsingData":@"browsingData", @"find":@"find", @"idle":@"idle", @"tts":@"tts",
+             @"bookmarks":@"bookmarks", @"tabGroups":@"tabGroups", @"userScripts":@"userScripts"}[namespace];
 }
 
 /// WebKit data types for each browsingData key.
@@ -109,9 +114,35 @@ void misty_extensions_set_compat_channel(MistyCompatChannelInstaller install) { 
     }
     if ([method isEqual:@"tts.allowed"]) { reply(NSNull.null, nil); return; }
     if ([method isEqual:@"idle.queryState"]) { reply([self idleState:args.firstObject], nil); return; }
+    if ([method isEqual:@"runtime.reportError"]) {
+        NSString *message = [args.firstObject isKindOfClass:NSString.class] ? args.firstObject : @"";
+        [self event:@"background-error" data:@{@"id":identifier, @"detail":[message substringToIndex:MIN(message.length, 2000)]}];
+        reply(NSNull.null, nil);
+        return;
+    }
+    if ([method isEqual:@"userScripts.write"]) {
+        NSString *path = [self writeUserScript:args.firstObject identifier:identifier];
+        reply(path, path ? nil : @"Misty could not store that user script.");
+        return;
+    }
     if ([method isEqual:@"i18n.detectLanguage"]) { reply([self detectLanguage:args.firstObject], nil); return; }
     if ([method hasPrefix:@"notifications."] && [self handleNotification:method args:args identifier:identifier reply:reply]) return;
     if ([method isEqual:@"tabs.move"]) { NSString *failure = [self moveTab:args.firstObject context:context]; reply(failure ? nil : NSNull.null, failure); return; }
+    if ([method isEqual:@"tabs.group"] || [method isEqual:@"tabs.ungroup"]) {
+        // Misty's app knows tabs by their runtime ids; send those, never the extension's view of them.
+        NSArray *located = [args.firstObject isKindOfClass:NSArray.class] ? args.firstObject : @[];
+        NSMutableArray *ids = [NSMutableArray array];
+        for (id request in located) {
+            MistyExtensionTab *tab = [self locateTab:request context:context];
+            if (!tab) { reply(nil, @"Misty could not identify that tab."); return; }
+            [ids addObject:tab.identifier];
+        }
+        if (!ids.count) { reply(nil, @"Choose at least one tab."); return; }
+        NSMutableArray *forwarded = [NSMutableArray arrayWithObject:ids];
+        if (args.count > 1) [forwarded addObject:args[1]];
+        [self forwardCompat:method args:forwarded identifier:identifier context:context reply:reply];
+        return;
+    }
     if ([method isEqual:@"browsingData.remove"]) {
         NSDictionary *options = [args.firstObject isKindOfClass:NSDictionary.class] ? args.firstObject : @{};
         NSDictionary *types = args.count > 1 && [args[1] isKindOfClass:NSDictionary.class] ? args[1] : @{};
@@ -218,8 +249,18 @@ void misty_extensions_set_compat_channel(MistyCompatChannelInstaller install) { 
 /// asks Misty's workspace to move it. WebKit keeps its tab ids private.
 - (NSString *)moveTab:(id)request context:(WKWebExtensionContext *)context {
     if (![request isKindOfClass:NSDictionary.class] || ![request[@"urls"] isKindOfClass:NSArray.class]) return @"Invalid tab move.";
+    MistyExtensionTab *found = [self locateTab:request context:context];
+    if (!found) return @"Misty could not identify that tab.";
+    [self event:@"move-tab" data:@{@"tabId":found.identifier, @"index":@([request[@"to"] unsignedIntegerValue])}];
+    return nil;
+}
+
+/// The one tab at `from` in the only window whose tabs show these addresses, as
+/// this extension sees them. Nil when no window, or more than one, matches.
+- (MistyExtensionTab *)locateTab:(id)request context:(WKWebExtensionContext *)context {
+    if (![request isKindOfClass:NSDictionary.class] || ![request[@"urls"] isKindOfClass:NSArray.class]) return nil;
     NSArray *urls = request[@"urls"];
-    NSUInteger from = [request[@"from"] unsignedIntegerValue], to = [request[@"to"] unsignedIntegerValue];
+    NSUInteger from = [request[@"from"] unsignedIntegerValue];
     MistyExtensionTab *found = nil;
     NSUInteger candidates = 0;
     for (MistyExtensionWindow *window in [NSSet setWithArray:[self.tabs.allValues valueForKey:@"window"]]) {
@@ -234,9 +275,31 @@ void misty_extensions_set_compat_channel(MistyCompatChannelInstaller install) { 
         }
         if (same) { found = tabs[from]; candidates++; }
     }
-    if (candidates != 1) return @"Misty could not identify that tab.";
-    [self event:@"move-tab" data:@{@"tabId":found.identifier, @"index":@(to)}];
-    return nil;
+    return candidates == 1 ? found : nil;
+}
+
+/// Stores a user script's code as a file in the extension's own package, named by
+/// its SHA-256, and returns its package path. WebKit registers scripts only from
+/// files. Bounded: 4 MiB a script and 2,000 scripts an extension.
+- (NSString *)writeUserScript:(id)code identifier:(NSString *)identifier {
+    if (![code isKindOfClass:NSString.class]) return nil;
+    NSData *data = [(NSString *)code dataUsingEncoding:NSUTF8StringEncoding];
+    NSString *root = self.descriptors[identifier][@"runtimePath"];
+    if (!data || data.length > 4 * 1024 * 1024 || ![root isKindOfClass:NSString.class]) return nil;
+    unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+    CC_SHA256(data.bytes, (CC_LONG)data.length, digest);
+    NSMutableString *name = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2 + 3];
+    for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) [name appendFormat:@"%02x", digest[i]];
+    [name appendString:@".js"];
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSString *directory = [root stringByAppendingPathComponent:UserScriptDirectory];
+    NSString *file = [directory stringByAppendingPathComponent:name];
+    if (![files fileExistsAtPath:file]) {
+        if (![files createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil]) return nil;
+        if ([files contentsOfDirectoryAtPath:directory error:nil].count >= 2000) return nil;
+        if (![data writeToFile:file atomically:YES]) return nil;
+    }
+    return [NSString stringWithFormat:@"%@/%@", UserScriptDirectory, name];
 }
 
 - (NSString *)idleState:(id)threshold {
