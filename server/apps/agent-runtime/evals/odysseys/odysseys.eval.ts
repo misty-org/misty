@@ -75,11 +75,16 @@ async function runTask(client: EvalClient, task: OdysseysTask, agentId: string, 
 
 /** Four failures among a batch's first six finished tasks stop the pass: fix before spending more. */
 export function shouldStop(batch: OdysseysRun[]): boolean {
-  const first = batch.slice(0, 6);
+  // Runs that never reached the agent (the stack refused them) say nothing about it.
+  const first = batch.filter((run) => !infrastructure(run)).slice(0, 6);
   return first.length === 6 && first.filter((run) => !run.perfect).length >= 4;
 }
 
-function summary(runs: OdysseysRun[]) {
+/** A run the stack refused before the agent worked on it. */
+const infrastructure = (run: OdysseysRun) => run.terminal.startsWith("error:") && run.tools.length === 0;
+
+function summary(all: OdysseysRun[]) {
+  const runs = all.filter((run) => !infrastructure(run));
   const median = (values: number[]) => values.length ? [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]! : 0;
   return {
     runs: runs.length,
@@ -119,6 +124,10 @@ it.skipIf(env("MISTY_ODYSSEYS") !== "1")("runs Odysseys tasks through the produc
     }
     runs.push(run);
     process.stderr.write(`${run.perfect ? "PERFECT" : "FAIL"} ${task.level} ${task.id.slice(0, 10)} rubric ${run.average.toFixed(2)} ${run.seconds}s ${run.tools.length} tools $${run.costUsd.toFixed(3)} ${run.terminal}${run.failed.length ? ` — missed ${run.failed.map((item) => item.id).join(",")}` : ""}\n`);
+    if (runs.slice(-3).length === 3 && runs.slice(-3).every(infrastructure)) {
+      stopped = `three runs in a row never reached the agent (${run.terminal}): check the stack's logs and disk`;
+      break;
+    }
     if (earlyStop && shouldStop(runs)) {
       stopped = "4 of the first 6 tasks failed: attribute and fix before running more";
       break;

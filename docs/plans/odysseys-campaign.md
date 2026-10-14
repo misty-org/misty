@@ -39,7 +39,7 @@ official judge only sees screenshots.
 6. **Safe on the live web.** The eval uses its own Misty browser profile with no sign-ins. Pay,
    send, post, delete and sign-up are refused, never auto-approved. Tasks that need an account
    are flagged and reported apart, not faked.
-7. **Spend stays under the cap**, enforced by the eval's AI Gateway budget.
+7. **Spend stays under the $50 cap**, metered by the eval from token usage (see Decisions).
 8. **No Chromium, no cloud browsers.** Everything runs in Misty's own browser.
 
 ## Data and splits
@@ -103,6 +103,27 @@ Harness changes waiting for evidence, pulled in when attribution points at them:
 A full campaign to milestone C is likely about 15–25 dev batches, 4–6 holdout runs and 2–3 full
 passes: on the order of $100–200.
 
+## Decisions (October 17, 2026)
+
+- **Budget: $50 for the whole campaign**, on Misty's own Anthropic API key (about $100 of free
+  credit), not the AI Gateway. The agent runs on Haiku 5.5 through the runtime's direct Anthropic
+  route. The eval meters spend itself from token usage at Anthropic's prices, since the Gateway
+  balance no longer sees it. The official judge (Gemini 3.1 Flash-Lite) is the only Gateway
+  spend, a few cents a task, within the remaining Gateway balance.
+- At $50 the plan is: dev batches first (about $1–3 each), the holdout at milestones, and one
+  full 200-task pass when the dev split justifies it. More full passes need a higher cap.
+- **Profile:** a fresh Misty browser profile with no sign-ins.
+- **Git:** all earlier work was committed to `main` and pushed (`4fd0a3c1`); every other local
+  branch and linked worktree was removed (all merged except a Spaces spike with no UI changes).
+  The campaign works on the `odysseys-campaign` branch in the main checkout, where the dev stack's
+  env files, sign-in file and build caches live, and commits there. Nothing is pushed or merged
+  without asking.
+- **Apps:** the campaign starts and restarts the dev stack and the desktop debug app itself.
+- **Known failing suites at the start** (inherited, in the commit messages): frontend
+  typecheck, lint and unit; server-go `TestEnvironmentContractIsExplicit`; desktop crate
+  (`misty::CurrentUser` has no field `name`). The desktop one blocks building the app, so it is
+  fixed first.
+
 ## Reporting
 
 This file holds the iteration log. Each fix is one commit on the campaign branch, with its batch
@@ -110,4 +131,32 @@ results in the message.
 
 | # | Date | Change | Dev perfect | Dev rubric avg | Holdout | Median steps / time | Spend |
 |---|---|---|---|---|---|---|---|
-| — | | Not started | | | | | |
+| 0 | Oct 17 | Setup and the fixes below; one smoke task | 0/1 | 0.00 | — | 13 calls / 130 s | $0.11 |
+
+### Fixes before the first batch (October 17)
+
+Found while getting one task to run end to end, in the order they blocked it:
+
+1. **The agent's own tab joins the run** (`0fd49407`). `screen_open` used to end the run and hand off
+   to a new one that re-planned; the eval could not follow it, and in the product one task became
+   several runs. Now, with no place named, a device opens the agent's own hidden tab as a job, the
+   tab is attached to the running task, and the runtime reads the catalog again so browser tools
+   appear from the next turn. Hidden sessions take background leases (no more `agent_busy` for a
+   second request), and an uncertain, non-consequential click is looked at again instead of ending
+   the run.
+2. **Every browsing run failed on the direct Anthropic route**: `browser.upload`'s schema had a
+   top-level `oneOf`, which Anthropic refuses. The runtime now drops top-level combinators.
+3. **The model never learned the browser tools** when its tab joined mid-run, since the prompt is
+   written at the start. Runs that can open their own tab now get the browser guidance up front.
+4. **Navigation was blind** (`f98eab92`): `browser_navigate` returned only `{ok, url}`. It now waits
+   for the page and returns its snapshot. Weak `browser_find` matches say so.
+5. **The research budget pushed the agent to answer** at exactly the point it should have opened a
+   page; its note now names `screen_open` for facts behind toggles and JavaScript.
+6. **Guessed URLs** (`0c4bbf0a`): guidance to find pages by searching instead.
+7. **Eval infrastructure**: the dev stack ran GPT-6 Luna, not Haiku; the CLI refused the Anthropic
+   key; agent tabs used the owner's signed-in profile (now a throwaway session); the bridge could
+   not picture agent tabs; the Docker disk filled with build cache and failed every request.
+
+Effort, on the pricing task with the agent's own tab: at `low`, Haiku opens one page and stops; at
+`medium` and `high` it visits and toggles all three vendors' pages. The first batch runs at `medium`,
+Haiku's own default, while the per-turn effort policy is built.
