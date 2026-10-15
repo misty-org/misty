@@ -32,7 +32,10 @@ pub struct LeaseMeter {
 
 impl LeaseMeter {
     pub fn new(lease: Lease) -> Self {
-        Self { lease: Some(lease), spent: 0 }
+        Self {
+            lease: Some(lease),
+            spent: 0,
+        }
     }
 
     pub fn lease(&self) -> Option<&Lease> {
@@ -41,7 +44,9 @@ impl LeaseMeter {
 
     /// Valid when there is a lease, it has not expired and budget is left.
     pub fn valid(&self, now: i64) -> bool {
-        self.lease.as_ref().is_some_and(|lease| now < lease.expires_at && self.spent < lease.token_budget)
+        self.lease
+            .as_ref()
+            .is_some_and(|lease| now < lease.expires_at && self.spent < lease.token_budget)
     }
 
     /// Records a turn's usage; returns whether the next turn may start.

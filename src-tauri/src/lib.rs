@@ -4,6 +4,7 @@
 // failures.
 #![allow(dead_code, unused_imports, unused_variables)]
 
+mod agents;
 mod app;
 #[cfg(all(desktop, debug_assertions))]
 mod development_profile;
@@ -40,6 +41,8 @@ use app::device_commands::{devices_refresh, devices_start, devices_stop, devices
 use app::device_job_commands::{
     device_read_shared_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
+#[cfg(desktop)]
+use app::runner_commands::{coding_engines_detect, coding_runner_stop};
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
 #[cfg(desktop)]
@@ -449,6 +452,10 @@ pub fn run() {
                     device_sign_run_grants,
                     #[cfg(desktop)]
                     device_verify_job,
+                    #[cfg(desktop)]
+                    coding_engines_detect,
+                    #[cfg(desktop)]
+                    coding_runner_stop,
                     #[cfg(desktop)]
                     device_read_shared_file,
                     #[cfg(desktop)]

@@ -21,13 +21,24 @@ fn running() -> &'static Mutex<HashMap<String, RunningTool>> {
 
 /// Records a run's tool. Returns the receiver its session waits on to stop,
 /// or None when this run already has a tool running.
-pub fn register(run_id: &str, engine: &'static str, project_root: &str) -> Option<oneshot::Receiver<()>> {
+pub fn register(
+    run_id: &str,
+    engine: &'static str,
+    project_root: &str,
+) -> Option<oneshot::Receiver<()>> {
     let mut map = running().lock().ok()?;
     if map.contains_key(run_id) {
         return None;
     }
     let (send, receive) = oneshot::channel();
-    map.insert(run_id.to_owned(), RunningTool { engine, project_root: project_root.to_owned(), stop: Some(send) });
+    map.insert(
+        run_id.to_owned(),
+        RunningTool {
+            engine,
+            project_root: project_root.to_owned(),
+            stop: Some(send),
+        },
+    );
     Some(receive)
 }
 
@@ -54,7 +65,10 @@ pub fn stop(run_id: &str) -> bool {
 
 /// Stops every tool, when Misty quits.
 pub fn stop_all() {
-    let ids: Vec<String> = running().lock().map(|map| map.keys().cloned().collect()).unwrap_or_default();
+    let ids: Vec<String> = running()
+        .lock()
+        .map(|map| map.keys().cloned().collect())
+        .unwrap_or_default();
     for id in ids {
         stop(&id);
     }
@@ -64,6 +78,10 @@ pub fn stop_all() {
 pub fn active() -> Vec<(String, &'static str)> {
     running()
         .lock()
-        .map(|map| map.iter().map(|(id, tool)| (id.clone(), tool.engine)).collect())
+        .map(|map| {
+            map.iter()
+                .map(|(id, tool)| (id.clone(), tool.engine))
+                .collect()
+        })
         .unwrap_or_default()
 }

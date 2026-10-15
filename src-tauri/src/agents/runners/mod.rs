@@ -67,7 +67,9 @@ impl EngineId {
     }
 
     pub fn parse(value: &str) -> Option<EngineId> {
-        EngineId::ALL.into_iter().find(|engine| engine.as_str() == value)
+        EngineId::ALL
+            .into_iter()
+            .find(|engine| engine.as_str() == value)
     }
 }
 
@@ -153,7 +155,10 @@ pub struct Step {
 
 impl Step {
     pub fn events(events: Vec<RunnerEvent>) -> Self {
-        Self { events, writes: Vec::new() }
+        Self {
+            events,
+            writes: Vec::new(),
+        }
     }
 }
 
@@ -200,5 +205,9 @@ pub const BYPASS_MARKERS: [&str; 7] = [
     "--full-auto",
 ];
 
+#[cfg(test)]
+mod adapter_tests;
+#[cfg(test)]
+mod session_tests;
 #[cfg(test)]
 mod tests;

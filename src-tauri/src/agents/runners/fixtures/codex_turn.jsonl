@@ -1,0 +1,12 @@
+{"jsonrpc":"2.0","id":1,"result":{"userAgent":"codex"}}
+{"jsonrpc":"2.0","id":2,"result":{"thread":{"id":"thr-9"},"model":"gpt-codex-x"}}
+{"jsonrpc":"2.0","id":3,"result":{"turn":{"id":"turn-1","status":"inProgress"}}}
+{"jsonrpc":"2.0","method":"turn/plan/updated","params":{"plan":[{"step":"Read the code","status":"completed"},{"step":"Edit the parser","status":"inProgress"}]}}
+{"jsonrpc":"2.0","method":"item/started","params":{"item":{"id":"fc1","type":"fileChange","changes":[{"path":"/work/app/src/parse.rs","kind":"update"}]}}}
+{"jsonrpc":"2.0","id":7,"method":"item/fileChange/requestApproval","params":{"threadId":"thr-9","turnId":"turn-1","itemId":"fc1"}}
+{"jsonrpc":"2.0","id":8,"method":"item/commandExecution/requestApproval","params":{"threadId":"thr-9","itemId":"ce1","command":"npm install left-pad","cwd":"/work/app"}}
+{"jsonrpc":"2.0","id":9,"method":"mcpServer/elicitation/request","params":{}}
+{"jsonrpc":"2.0","method":"item/agentMessage/delta","params":{"itemId":"m1","delta":"Done "}}
+{"jsonrpc":"2.0","method":"thread/tokenUsage/updated","params":{"tokenUsage":{"last":{"inputTokens":3000,"cachedInputTokens":1000,"outputTokens":400,"totalTokens":3400}}}}
+{"jsonrpc":"2.0","method":"account/rateLimits/updated","params":{"rateLimits":{"primary":{"usedPercent":42.5,"windowDurationMins":300,"resetsAt":1760000000}}}}
+{"jsonrpc":"2.0","method":"turn/completed","params":{"turn":{"id":"turn-1","status":"completed"}}}

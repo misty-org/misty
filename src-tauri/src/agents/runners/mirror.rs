@@ -23,18 +23,27 @@ pub struct Mirror {
 
 impl Mirror {
     pub fn push(&mut self, event: RunnerEvent) {
-        if let (RunnerEvent::Delta { text }, Some(MirroredEvent { event: RunnerEvent::Delta { text: last }, .. })) =
-            (&event, self.pending.last_mut())
+        if let (
+            RunnerEvent::Delta { text },
+            Some(MirroredEvent {
+                event: RunnerEvent::Delta { text: last },
+                ..
+            }),
+        ) = (&event, self.pending.last_mut())
         {
             last.push_str(text);
             return;
         }
         // A newer todo list replaces one not yet sent.
         if matches!(event, RunnerEvent::Todos { .. }) {
-            self.pending.retain(|item| !matches!(item.event, RunnerEvent::Todos { .. }));
+            self.pending
+                .retain(|item| !matches!(item.event, RunnerEvent::Todos { .. }));
         }
         self.next_seq += 1;
-        self.pending.push(MirroredEvent { seq: self.next_seq, event });
+        self.pending.push(MirroredEvent {
+            seq: self.next_seq,
+            event,
+        });
     }
 
     /// Takes the events to post, oldest first.
