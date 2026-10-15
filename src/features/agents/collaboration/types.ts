@@ -42,6 +42,25 @@ export interface AgentQuestionSet {
 export type PlanRisk = "read" | "write" | "draft" | "consequential" | "dangerous";
 export type PlanStepStatus = "pending" | "in_progress" | "done" | "skipped" | "blocked";
 
+/** One step of a run's live checklist; delegated steps nest another run's checklist. */
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  status: PlanStepStatus;
+  note?: string;
+  delegated?: boolean;
+}
+
+/** The live checklist one run published. Newer versions replace older ones. */
+export interface AgentChecklist {
+  invocationId: string;
+  conversationId: string;
+  parentInvocationId?: string;
+  items: ChecklistItem[];
+  version: number;
+  updatedAt: string;
+}
+
 export interface AgentPlanStep {
   id: string;
   title: string;
@@ -113,6 +132,8 @@ export interface ConversationCollaboration {
   permissionMode: PermissionMode | "";
   /** The agent's default, used while the chat has none of its own. */
   agentPermissionMode: PermissionMode;
+  /** The latest run's live checklist and those of the runs it delegated to. */
+  checklists: AgentChecklist[];
   plan: AgentPlan | null;
   /** Every version of the plan, newest first. */
   planHistory: AgentPlanVersion[];
@@ -126,7 +147,8 @@ export interface ConversationCollaboration {
 export type CollaborationEvent =
   | { type: "question.requested" | "question.answered"; questionSet: AgentQuestionSet }
   | { type: "plan.proposed" | "plan.updated"; plan: AgentPlan }
-  | { type: "goal.updated"; goal: AgentGoal };
+  | { type: "goal.updated"; goal: AgentGoal }
+  | { type: "checklist.updated"; checklist: AgentChecklist };
 
 export const collaborationEventTypes = new Set([
   "question.requested",
@@ -134,4 +156,5 @@ export const collaborationEventTypes = new Set([
   "plan.proposed",
   "plan.updated",
   "goal.updated",
+  "checklist.updated",
 ]);

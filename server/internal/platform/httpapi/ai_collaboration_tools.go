@@ -23,10 +23,10 @@ func collaborationDescriptor(name, description string, properties map[string]any
 }
 
 func (s *SpacesService) collaborationToolRegistrations(record *db.AIInvocationRecord, state collaborationState) []agenttools.Registration {
+	registrations := s.checklistToolRegistrations(record, state)
 	if record == nil || record.ConversationID == "" {
-		return nil
+		return registrations
 	}
-	registrations := []agenttools.Registration{}
 	if state.canAsk {
 		registrations = append(registrations, agenttools.Registration{Descriptor: collaborationDescriptor(collaborationAskUser,
 			"Ask the user 1-4 structured questions and wait for their answers. Use only for a decision that materially changes the result, an important assumption, or a fact no tool can find; explore with read tools first. Each question has a short header, a full question and 2-4 distinct options; put the recommended option first and add \"(Recommended)\" to its label. Do not add an Other option: the user can always write their own answer. Never ask whether to proceed.",
@@ -76,7 +76,7 @@ func (s *SpacesService) collaborationToolRegistrations(record *db.AIInvocationRe
 					"status": map[string]any{"type": "string", "enum": []string{"pending", "in_progress", "done", "skipped", "blocked"}},
 					"note":   map[string]any{"type": "string", "maxLength": 500},
 				},
-			}}}, []string{"steps"}), Handler: s.updatePlanHandler(record)})
+			}}}, []string{"steps"}), Handler: s.updatePlanHandler(record, state)})
 	}
 	if goal := state.pursuedGoal(); goal != nil {
 		registrations = append(registrations, agenttools.Registration{Descriptor: collaborationDescriptor(collaborationUpdateGoal,
@@ -195,7 +195,7 @@ func (s *SpacesService) proposePlanHandler(record *db.AIInvocationRecord) agentt
 	}
 }
 
-func (s *SpacesService) updatePlanHandler(record *db.AIInvocationRecord) agenttools.Handler {
+func (s *SpacesService) updatePlanHandler(record *db.AIInvocationRecord, state collaborationState) agenttools.Handler {
 	return func(ctx context.Context, _ agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 		var input struct {
 			Steps []db.AgentPlanProgressUpdate `json:"steps"`
@@ -214,6 +214,13 @@ func (s *SpacesService) updatePlanHandler(record *db.AIInvocationRecord) agentto
 			return nil, err
 		}
 		s.showCollaborationEvent(ctx, record, aiInvocationEvent{Type: "plan.updated", aiCollaborationEventFields: aiCollaborationEventFields{Plan: plan}})
+		// plan.update is an alias of the live checklist, seeded from the plan.
+		items := make([]db.ChecklistItem, 0, len(input.Steps))
+		for _, step := range input.Steps {
+			items = append(items, db.ChecklistItem{ID: step.ID, Status: step.Status, Note: step.Note})
+		}
+		state.plan = plan
+		_, _ = s.publishChecklist(ctx, record, state, items, false)
 		remaining := []string{}
 		for _, step := range plan.Payload.Steps {
 			if status := plan.Progress[step.ID].Status; status != "done" && status != "skipped" {

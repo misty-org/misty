@@ -361,6 +361,15 @@
 .agent-plan-checklist li[data-status="done"] .agent-plan-check {
   color: var(--color-cream-bright);
 }
+/* A run's live checklist above its progress lines; delegated runs indent under their step. */
+.agent-live-checklist {
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.agent-live-checklist ol ol {
+  margin-top: 6px;
+  padding-left: 4px;
+}
 
 /* Answers given inside a run, under that run's answer. */
 .agent-answered-questions p {

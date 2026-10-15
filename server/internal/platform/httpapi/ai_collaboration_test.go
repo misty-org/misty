@@ -77,7 +77,7 @@ func TestCollaborationInstructions(t *testing.T) {
 	}
 	approved := &db.AgentPlan{Version: 2, State: "approved", Payload: db.AgentPlanPayload{Title: "Review", Steps: []db.AgentPlanStep{{ID: "s1", Title: "Read", Risk: "read"}}}, Progress: map[string]db.AgentPlanStepProgress{"s1": {Status: "done"}}}
 	acting := collaborationInstructions(collaborationState{mode: db.ConversationModeAct, plan: approved})
-	if !strings.Contains(acting, "plan_update") || !strings.Contains(acting, "[s1] Read (read, done)") {
+	if !strings.Contains(acting, "checklist_update") || !strings.Contains(acting, "[s1] Read (read, done)") {
 		t.Errorf("act instructions = %s", acting)
 	}
 	goal := &db.AgentGoal{Status: "pursuing", Objective: "Inbox zero", BudgetTokens: 100, UsedTokens: 85, MaxContinuations: 20, SuccessCriteria: []string{"Inbox is empty"}}

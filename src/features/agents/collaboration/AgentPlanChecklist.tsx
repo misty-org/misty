@@ -1,28 +1,15 @@
-import { Check, Circle, CircleAlert, CircleMinus, Flag } from "lucide-react";
+import { Flag } from "lucide-react";
 import { useState } from "react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { Button, Spinner } from "@/shared/ui";
+import { Button } from "@/shared/ui";
+import { statusText, StepIcon } from "./ChecklistStatus";
 import { PlanRiskTag } from "./PlanRiskTag";
 import { useCollaborationStore } from "./store";
 import type { AgentGoal, AgentPlan, PlanStepStatus } from "./types";
 
-const statusText: Record<PlanStepStatus, string> = {
-  pending: "Not started",
-  in_progress: "In progress",
-  done: "Done",
-  skipped: "Skipped",
-  blocked: "Blocked",
-};
-
-function StepIcon({ status }: { status: PlanStepStatus }) {
-  if (status === "in_progress") return <Spinner size="sm" label={false} />;
-  const Icon = { pending: Circle, done: Check, skipped: CircleMinus, blocked: CircleAlert }[status];
-  return <Icon size={14} aria-hidden="true" />;
-}
-
 /**
  * The plan in the Goal dialog. Once approved it is a live checklist the agent
- * ticks off with plan_update; a proposed plan points back to the conversation.
+ * ticks off with checklist_update; a proposed plan points back to the conversation.
  */
 export function AgentPlanChecklist({
   plan,
