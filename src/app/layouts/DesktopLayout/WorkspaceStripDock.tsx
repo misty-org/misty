@@ -19,18 +19,17 @@ import {
   CommandList,
   CommandSeparator,
   AvatarShuffleStack,
-  Button,
   cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  MenuTrigger,
   IconButton,
   MenuItem,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  SplitMenuPill,
   toolbarIconProps,
 } from "@/shared/ui";
 import { ProfileNavButton } from "./NavRail";
@@ -169,42 +168,30 @@ export function AgentsMenuButton() {
     agents.find((agent) => agent.id === selectedAgentId) ??
     agents.find((agent) => agent.system_managed) ??
     agents[0];
-  const pill =
-    "!h-[var(--shell-tab-height,36px)] max-w-full rounded-full bg-cream/[0.07] pl-1 pr-2.5 hover:bg-cream/[0.12]";
-  // Before the agents load, the pill still opens the Misty panel.
-  if (!selected)
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className={cn("gap-1.5", pill)}
-        onClick={() => useMistyPanelStore.getState().setOpen(true, paneId ?? null)}
-      >
-        <MistyPanelSprite size={20} />
-        Agents
-      </Button>
-    );
   return (
     <div className="flex min-w-0 items-center" data-misty-window-drag-block="true">
       <DropdownMenu>
-        <MenuTrigger
-          label="Agents"
-          title={`Agents: ${selected.name}`}
-          value={selected.name}
-          className={pill}
+        <SplitMenuPill
+          label={selected?.name ?? "Agents"}
+          actionLabel={selected ? `Open ${selected.name}` : "Open Agents"}
+          menuLabel="Choose Agent"
+          onAction={() => useMistyPanelStore.getState().setOpen(true, paneId ?? null)}
           icon={
-            <AvatarShuffleStack
-              activeId={selected.id}
-              items={agents.map((agent) => ({
-                id: agent.id,
-                node: (
-                  <span className="[&_.agent-avatar]:!size-5">
-                    <AgentAvatar agent={agent} />
-                  </span>
-                ),
-              }))}
-            />
+            selected ? (
+              <AvatarShuffleStack
+                activeId={selected.id}
+                items={agents.map((agent) => ({
+                  id: agent.id,
+                  node: (
+                    <span className="[&_.agent-avatar]:!size-5">
+                      <AgentAvatar agent={agent} />
+                    </span>
+                  ),
+                }))}
+              />
+            ) : (
+              <MistyPanelSprite size={20} />
+            )
           }
         />
         <DropdownMenuContent align="start" className="w-64 max-w-[calc(100vw-16px)]">
@@ -220,7 +207,7 @@ export function AgentsMenuButton() {
                 <AgentAvatar agent={agent} />
               </span>
               <span className="min-w-0 flex-1 truncate">{agent.name}</span>
-              {agent.id === selected.id ? <Check className="size-4" aria-hidden="true" /> : null}
+              {agent.id === selected?.id ? <Check className="size-4" aria-hidden="true" /> : null}
             </DropdownMenuItem>
           ))}
           <DropdownMenuItem

@@ -325,7 +325,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   // the sidebar's top slot.
   const toolbar = (
     <div
-      className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
+      className={cn(browserToolbarStyles.bar, "border-cream/[0.1]")}
       style={{ backgroundColor: browserChromeBackground }}
       data-window-toolbar
       data-browser-toolbar
