@@ -8,7 +8,7 @@ const store = vi.hoisted(() => ({
       { id: "scope_docs", displayName: "Docs", kind: "local_folder", available: true },
     ],
   })),
-  codeChooseProject: vi.fn(async () => ({ id: "scope_new", displayName: "new" })),
+  chooseProject: vi.fn(async () => ({ id: "scope_new", displayName: "new" })),
 }));
 vi.mock("../store/useAgentsStore", () => store);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));

@@ -1,32 +1,22 @@
-import { Laptop } from "lucide-react";
 import { useState, type ComponentProps } from "react";
 import { Button } from "@/shared/ui";
-import { CodeProjectsSection, useCodeProjects } from "../components/CodeProjects";
 import { AgentMethodsCatalog } from "../workspace/AgentMethodsCatalog";
 import { ConnectedAppsCatalog } from "./ConnectedAppsCatalog";
 import "./integrationsApps.css";
 
-type Section = "apps" | "skills" | "projects";
+type Section = "apps" | "skills";
 
 /**
- * Everything an agent can reach and do: account apps, its skills and projects on this
- * computer, one tab each. The conversation only summarizes it.
+ * Everything an agent can reach and do: account apps and its skills, one tab each.
+ * Projects are attached per chat from the composer's Project menu.
  */
-export function IntegrationsPage({
-  onCompanion,
-  ...skills
-}: { onCompanion(): void } & Omit<
-  ComponentProps<typeof AgentMethodsCatalog>,
-  "kind" | "embedded" | "children"
->) {
-  const projects = useCodeProjects();
-  const device = projects.device;
+export function IntegrationsPage(
+  skills: Omit<ComponentProps<typeof AgentMethodsCatalog>, "kind" | "embedded" | "children">,
+) {
   const [chosen, setChosen] = useState<Section>("apps");
-  // Projects exist only on the desktop.
   const sections: { value: Section; label: string }[] = [
     { value: "apps", label: "Apps" },
     { value: "skills", label: "Skills" },
-    ...(projects.available ? [{ value: "projects" as const, label: "Projects" }] : []),
   ];
   const section = sections.some((s) => s.value === chosen) ? chosen : "apps";
   return (
@@ -60,29 +50,6 @@ export function IntegrationsPage({
       </div>
       <div className="agent-integrations-panel" hidden={section !== "skills"}>
         <AgentMethodsCatalog {...skills} kind="skill" embedded />
-      </div>
-      <div className="agent-integrations-panel" hidden={section !== "projects"}>
-        <div className="agent-integrations-list">
-          <div className="agent-integrations-row">
-            <Laptop size={18} aria-hidden="true" />
-            <div className="agent-integrations-row-text">
-              <strong>{device?.displayName || "Desktop companion"}</strong>
-              <span>
-                {!device
-                  ? "Not paired yet"
-                  : device.status === "online"
-                    ? "Online"
-                    : device.status === "revoked"
-                      ? "Access revoked"
-                      : "Offline"}
-              </span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={onCompanion}>
-              Companion settings
-            </Button>
-          </div>
-        </div>
-        <CodeProjectsSection projects={projects} />
       </div>
     </div>
   );

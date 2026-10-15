@@ -61,7 +61,6 @@ export function AgentWorkspaceCatalog({
           <IntegrationsPage
             key={agentId}
             agentId={agentId}
-            onCompanion={onCompanion}
             onUse={onUse}
             onConversation={onConversation}
             onStartWork={onStartWork}

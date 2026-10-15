@@ -40,27 +40,3 @@ export async function saveAgentArtifact(input: AgentArtifactInput) {
   });
   return { space, itemId: result.item?.id };
 }
-
-/**
- * Saves a snapshot of a code project after an agent changed it. The project
- * folder stays local; the Space keeps the snapshot. Build, package and .env
- * files are left out.
- */
-export async function saveProjectSnapshot(input: {
-  agentId: string;
-  scopeId: string;
-  runId: string;
-  conversationId?: string;
-}) {
-  const snapshot = await invoke<{ path: string; name: string }>("code_project_snapshot", {
-    scopeId: input.scopeId,
-    runId: input.runId,
-  });
-  return saveAgentArtifact({
-    agentId: input.agentId,
-    path: snapshot.path,
-    kind: "code",
-    conversationId: input.conversationId,
-    runId: input.runId,
-  });
-}

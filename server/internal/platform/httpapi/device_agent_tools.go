@@ -61,9 +61,9 @@ func (s *SpacesService) deviceToolRegistrations(ctx context.Context, record *db.
 	if len(folders) > 0 {
 		registrations = append(registrations, s.folderToolRegistrations(folders)...)
 	}
-	if len(projects) > 0 {
-		registrations = append(registrations, s.projectToolRegistrations(projects)...)
-	}
+	// Projects are coded through the person's own coding tools (code.delegate),
+	// not through tools of Misty's own.
+	_ = projects
 	if len(workspaces) > 0 {
 		registrations = append(registrations, s.workspaceToolRegistrations(workspaces)...)
 	}

@@ -44,8 +44,6 @@ hex = "0.4"
 misty-credential-store = { path = "vendor/misty-credential-store" }
 misty-browser-sync = { path = "crates/browser-sync" }
 misty-agent-files = { path = "crates/agent-files" }
-# Code projects: sandboxed commands and file tools (docs/plans/agent-code-projects.md).
-misty-agent-code = { path = "crates/agent-code" }
 kiri = { path = "../kiri" }
 libc = "0.2"
 rand = "0.8"

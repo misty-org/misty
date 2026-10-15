@@ -98,6 +98,11 @@ func TestCodingDelegationPostgres(t *testing.T) {
 		t.Fatalf("used after the run = %d", used)
 	}
 
+	// A project grant needs the project attached from the person's own device.
+	if err := service.validateCodingScope(ctx, owner.ID, agent.ScopeProject, "scope_app"); err == nil {
+		t.Fatal("a project never attached to a chat can't be remembered")
+	}
+
 	// Leases: a wrong token is refused; usage counts toward the weekly allowance.
 	lease, token, err := database.IssueCodingLease(ctx, owner.ID, db.CodingLease{InvocationID: child.ID, DeviceID: device, Engine: "claude", TokenBudget: 1000, ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {

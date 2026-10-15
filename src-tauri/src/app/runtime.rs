@@ -22,8 +22,6 @@ pub struct MistyRuntime {
     pub cloud_clipboard: CloudClipboard,
     pub explorer: ExplorerService,
     pub agents: AgentService,
-    /// Code projects: file tools, sandboxed commands, undo and previews.
-    pub code: Arc<misty_agent_code::CodeService>,
 }
 
 impl MistyRuntime {
@@ -63,10 +61,6 @@ impl MistyRuntime {
         let explorer_library = ExplorerLibraryService::new(environment.clone());
         let explorer = ExplorerService::new(environment.clone(), explorer_library.clone());
         let agents = AgentService::new(environment.clone());
-        let code = Arc::new(
-            misty_agent_code::CodeService::new(environment.agent_code_dir(), dirs::home_dir())
-                .with_protected(vec![environment.misty_dir()]),
-        );
 
         Self {
             navigation_names: crate::infra::navigation_names::NavigationNamesService::new(
@@ -82,7 +76,6 @@ impl MistyRuntime {
             cloud_clipboard,
             explorer,
             agents,
-            code,
         }
     }
 }

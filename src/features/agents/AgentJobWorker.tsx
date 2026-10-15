@@ -19,6 +19,10 @@ export function AgentJobWorker() {
       if (canceled || !token) return;
       worker = new DesktopAgentJobWorker();
       worker.start(user.id);
+      // Old project switches become remembered approvals, once.
+      void import("./coding/projectMigration")
+        .then(({ migrateProjectSwitches }) => migrateProjectSwitches())
+        .catch(() => undefined);
     });
     // This computer stays awake while its own agent task runs.
     const unwatch = watchLocalExecutionForKeepAwake((listener) => {
