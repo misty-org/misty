@@ -166,157 +166,22 @@ pub fn cursor() -> Option<(f64, f64)> {
         }
     }
 }
-#[cfg(target_os = "macos")]
+/// Control+Option for the agent at your cursor, through the shared global
+/// hotkey hook so dictation's chord can run beside it.
 pub fn shortcut(tx: Sender<Shortcut>) {
-    use core_foundation::runloop::{kCFRunLoopCommonModes, kCFRunLoopDefaultMode, CFRunLoop};
-    use core_graphics::event::*;
-    use std::cell::Cell;
-    #[link(name = "CoreGraphics", kind = "framework")]
-    extern "C" {
-        fn CGPreflightListenEventAccess() -> bool;
-        fn CGRequestListenEventAccess() -> bool;
-    }
-    unsafe {
-        if !CGPreflightListenEventAccess() {
-            CGRequestListenEventAccess();
+    use crate::infra::global_hotkey::{subscribe, Chord, HotkeyEvent};
+    let subscription = subscribe(Chord::companion());
+    while let Ok(event) = subscription.events.recv() {
+        let shortcut = match event {
+            HotkeyEvent::Down => Shortcut::Held(true),
+            HotkeyEvent::Up => Shortcut::Held(false),
+            HotkeyEvent::KeyboardActivity => Shortcut::KeyboardActivity,
+            HotkeyEvent::Click(x, y) => Shortcut::Click(x, y),
+            HotkeyEvent::Error(message) => Shortcut::Error(message),
+        };
+        if tx.send(shortcut).is_err() {
+            break;
         }
-    }
-    loop {
-        let held = Cell::new(false);
-        let send = tx.clone();
-        let tap = CGEventTap::new(
-            CGEventTapLocation::Session,
-            CGEventTapPlacement::HeadInsertEventTap,
-            CGEventTapOptions::ListenOnly,
-            vec![
-                CGEventType::FlagsChanged,
-                CGEventType::KeyDown,
-                CGEventType::LeftMouseDown,
-            ],
-            move |_, kind, event| {
-                if matches!(kind, CGEventType::KeyDown) {
-                    let _ = send.send(Shortcut::KeyboardActivity);
-                }
-                if matches!(kind, CGEventType::LeftMouseDown) {
-                    // Only a position; the host forwards it while a walkthrough waits.
-                    let p = event.location();
-                    let _ = send.send(Shortcut::Click(p.x, p.y));
-                }
-                if matches!(kind, CGEventType::FlagsChanged) {
-                    let flags = event.get_flags();
-                    let next = flags.contains(
-                        CGEventFlags::CGEventFlagControl | CGEventFlags::CGEventFlagAlternate,
-                    );
-                    if next != held.replace(next) {
-                        let _ = send.send(Shortcut::Held(next));
-                    }
-                }
-                None // Listen-only taps always preserve the original event.
-            },
-        );
-        match tap {
-            Ok(tap) => unsafe {
-                if let Ok(source) = tap.mach_port.create_runloop_source(0) {
-                    CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
-                    // Re-enable after OS tap timeouts; the monitor never consumes input.
-                    loop {
-                        tap.enable();
-                        CFRunLoop::run_in_mode(
-                            kCFRunLoopDefaultMode,
-                            std::time::Duration::from_secs(1),
-                            false,
-                        );
-                    }
-                }
-            },
-            Err(_) => {
-                let _ = tx.send(Shortcut::Error("Allow Misty in System Settings → Privacy & Security → Input Monitoring to use Control + Option.".into()));
-            }
-        }
-        std::thread::sleep(std::time::Duration::from_secs(3));
-    }
-}
-#[cfg(windows)]
-pub fn shortcut(tx: Sender<Shortcut>) {
-    use std::{cell::RefCell, ptr::null_mut};
-    use windows_sys::Win32::{
-        Foundation::*,
-        UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*},
-    };
-    thread_local! { static TARGET: RefCell<Option<(Sender<Shortcut>,[bool;4],bool)>> = const { RefCell::new(None) }; }
-    unsafe extern "system" fn hook(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
-        if code >= 0 {
-            let event = &*(data as *const KBDLLHOOKSTRUCT);
-            if event.flags & LLKHF_INJECTED == 0 {
-                TARGET.with(|target| {
-                    if let Some((tx, keys, held)) = target.borrow_mut().as_mut() {
-                        let index = match event.vkCode as u16 {
-                            VK_LCONTROL => Some(0),
-                            VK_RCONTROL => Some(1),
-                            VK_LMENU => Some(2),
-                            VK_RMENU => Some(3),
-                            _ => None,
-                        };
-                        if let Some(index) = index {
-                            keys[index] =
-                                message as u32 == WM_KEYDOWN || message as u32 == WM_SYSKEYDOWN;
-                        }
-                        if index.is_none()
-                            && !matches!(
-                                event.vkCode as u16,
-                                VK_LSHIFT | VK_RSHIFT | VK_LWIN | VK_RWIN
-                            )
-                            && matches!(message as u32, WM_KEYDOWN | WM_SYSKEYDOWN)
-                        {
-                            let _ = tx.send(Shortcut::KeyboardActivity);
-                        }
-                        let next = (keys[0] || keys[1]) && (keys[2] || keys[3]);
-                        if next != *held {
-                            *held = next;
-                            let _ = tx.send(Shortcut::Held(next));
-                        }
-                    }
-                });
-            }
-        }
-        CallNextHookEx(null_mut(), code, message, data)
-    }
-    thread_local! { static CLICKS: RefCell<Option<Sender<Shortcut>>> = const { RefCell::new(None) }; }
-    // Only a position; the host forwards it while a walkthrough waits.
-    unsafe extern "system" fn mouse(code: i32, message: WPARAM, data: LPARAM) -> LRESULT {
-        if code >= 0 && message as u32 == WM_LBUTTONDOWN {
-            let event = &*(data as *const MSLLHOOKSTRUCT);
-            if event.flags & LLMHF_INJECTED == 0 {
-                CLICKS.with(|target| {
-                    if let Some(tx) = target.borrow().as_ref() {
-                        let _ = tx.send(Shortcut::Click(event.pt.x as f64, event.pt.y as f64));
-                    }
-                });
-            }
-        }
-        CallNextHookEx(null_mut(), code, message, data)
-    }
-    TARGET.with(|target| *target.borrow_mut() = Some((tx.clone(), [false; 4], false)));
-    CLICKS.with(|target| *target.borrow_mut() = Some(tx.clone()));
-    unsafe {
-        let handle = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), null_mut(), 0);
-        if handle.is_null() {
-            let _ = tx.send(Shortcut::Error(
-                "The global voice shortcut could not start. Restart Misty.".into(),
-            ));
-            return;
-        }
-        // Walkthroughs fall back to "next" by voice or text without click hints.
-        let clicks = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), null_mut(), 0);
-        let mut message: MSG = std::mem::zeroed();
-        while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
-        }
-        if !clicks.is_null() {
-            UnhookWindowsHookEx(clicks);
-        }
-        UnhookWindowsHookEx(handle);
     }
 }
 #[cfg(target_os = "macos")]

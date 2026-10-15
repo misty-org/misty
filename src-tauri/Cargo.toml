@@ -87,7 +87,9 @@ percent-encoding = "2"
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
-cpal = "0.16"
+# Microphone, system and per-process capture (github.com/kannachi323/audeeo,
+# crates/audeeo-core). The vendored @audeeo/core packages pin the same commit.
+audeeo-core = { git = "https://github.com/kannachi323/audeeo", rev = "2be9ad63e1c6c42c3ac42d641e79681e10531a97" }
 xcap = "0.9"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]

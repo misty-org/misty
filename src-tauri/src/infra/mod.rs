@@ -79,6 +79,7 @@ pub mod extensions;
 pub mod kura;
 pub mod misty;
 pub mod misty_home;
+pub mod global_hotkey;
 pub mod native_clipboard;
 pub mod paths;
 #[cfg(desktop)]

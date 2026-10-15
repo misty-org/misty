@@ -140,7 +140,7 @@ func defaultAIRoutes(model, reasoning string) []aimodels.Route {
 		reasoning = "low"
 	}
 	// Browsing is empty by default: it follows the run's vision route.
-	defaults := map[string]string{"agent": model, "vision": model, "browsing": "", "routing": envOr("MISTY_AI_LOW_MODEL", agent.TestingDefaultAgentLowGatewayModel), "realtime": agent.AgentRealtimeModel, "library": envOr("SMART_LIBRARY_PRIMARY_MODEL", agent.SmartLibraryPrimaryModel), "library-fallback": envOr("SMART_LIBRARY_FALLBACK_MODEL", agent.SmartLibraryFallbackModel), "embedding": envOr("SMART_LIBRARY_EMBEDDING_MODEL", agent.SmartLibraryEmbeddingModel), "transcription": envOr("AGENT_TRANSCRIPTION_MODEL", "openai/gpt-4o-mini-transcribe"), "transcription-fallback": agent.MediaSearchTranscriptionFallbackModel, "media-transcription": envOr("MEDIA_SEARCH_TRANSCRIPTION_MODEL", agent.MediaSearchTranscriptionModel), "media-transcription-fallback": envOr("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL", agent.MediaSearchTranscriptionFallbackModel), "speech": agent.AgentSpeechModel}
+	defaults := map[string]string{"agent": model, "vision": model, "browsing": "", "routing": envOr("MISTY_AI_LOW_MODEL", agent.TestingDefaultAgentLowGatewayModel), "realtime": agent.AgentRealtimeModel, "library": envOr("SMART_LIBRARY_PRIMARY_MODEL", agent.SmartLibraryPrimaryModel), "library-fallback": envOr("SMART_LIBRARY_FALLBACK_MODEL", agent.SmartLibraryFallbackModel), "embedding": envOr("SMART_LIBRARY_EMBEDDING_MODEL", agent.SmartLibraryEmbeddingModel), "transcription": envOr("AGENT_TRANSCRIPTION_MODEL", "openai/gpt-4o-mini-transcribe"), "transcription-fallback": agent.MediaSearchTranscriptionFallbackModel, "media-transcription": envOr("MEDIA_SEARCH_TRANSCRIPTION_MODEL", agent.MediaSearchTranscriptionModel), "media-transcription-fallback": envOr("MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL", agent.MediaSearchTranscriptionFallbackModel), "speech": agent.AgentSpeechModel, "live-transcription": envOr("MISTY_LIVE_TRANSCRIPTION_MODEL", "soniox/stt-rt-v4"), "diarized-transcription": envOr("MISTY_DIARIZED_TRANSCRIPTION_MODEL", "soniox/stt-async-v4")}
 	result := make([]aimodels.Route, 0, len(aimodels.Roles))
 	for _, role := range aimodels.Roles {
 		effort := ""
@@ -154,6 +154,12 @@ func defaultAIRoutes(model, reasoning string) []aimodels.Route {
 	}
 	return result
 }
+// defaultRoleModel is Misty's model for a role no account chooses, so callers
+// never name a model themselves.
+func defaultRoleModel(role string) string {
+	return modelRoute(defaultAIRoutes("", ""), role).Model
+}
+
 func envOr(key, fallback string) string {
 	if v := strings.TrimSpace(envconfig.Getenv(key)); v != "" {
 		return v

@@ -211,6 +211,46 @@ func (c *Client) Transcribe(ctx context.Context, route Route, model, mediaType s
 	return result, err
 }
 
+// DiarizedRequest transcribes a file with speaker labels. Context carries the
+// person's terms and what the audio is about, which improves names.
+type DiarizedRequest struct {
+	Route     Route            `json:"route"`
+	Model     string           `json:"model"`
+	MediaType string           `json:"mediaType"`
+	Audio     string           `json:"audio"`
+	Languages []string         `json:"languages,omitempty"`
+	Context   *DiarizedContext `json:"context,omitempty"`
+}
+
+type DiarizedContext struct {
+	Text  string   `json:"text,omitempty"`
+	Terms []string `json:"terms,omitempty"`
+}
+
+// Turn is one speaker's continuous speech, in seconds from the start.
+type Turn struct {
+	Speaker  string  `json:"speaker"`
+	Language string  `json:"language,omitempty"`
+	Start    float64 `json:"start"`
+	End      float64 `json:"end"`
+	Text     string  `json:"text"`
+}
+
+type DiarizedResult struct {
+	Text              string   `json:"text"`
+	Language          string   `json:"language"`
+	DurationInSeconds *float64 `json:"durationInSeconds"`
+	Turns             []Turn   `json:"turns"`
+}
+
+func (c *Client) TranscribeDiarized(ctx context.Context, model, mediaType string, audio []byte, languages []string, context *DiarizedContext) (DiarizedResult, error) {
+	var result DiarizedResult
+	err := c.post(ctx, "/v1/models/transcribe-diarized", DiarizedRequest{
+		Route: Instance(), Model: model, MediaType: mediaType, Audio: base64.StdEncoding.EncodeToString(audio), Languages: languages, Context: context,
+	}, &result)
+	return result, err
+}
+
 // SearchRequest runs one web search through the AI Gateway's search tools.
 // Model is the small model that issues the search call; Engine is parallel,
 // perplexity or exa.
