@@ -329,7 +329,7 @@ func (s *AIService) storeInvocationRecord(w http.ResponseWriter, r *http.Request
 		recordTrigger = "schedule"
 	}
 	stored, created, err := s.database.CreateAIInvocationRecord(r.Context(), db.AIInvocationRecord{
-		DispatchRuntime: true, ModelTurnLimit: planTurnLimit(r.Context(), s.database, userID),
+		DispatchRuntime: true, ModelTurnLimit: evalTurnLimit(body.EvalTurnLimit, planTurnLimit(r.Context(), s.database, userID)),
 		ID: "invocation_" + uuid.NewString(), UserID: userID, SpaceID: st.spaceID, ConversationID: st.conversationID,
 		SurfaceID: body.SurfaceID, Mode: body.Mode, Trigger: recordTrigger, State: "queued",
 		IdempotencyKey: body.IdempotencyKey, RequestPayload: requestPayload, ExpiresAt: now.Add(aiInvocationTTL),

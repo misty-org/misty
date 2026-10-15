@@ -20,6 +20,8 @@ const env = (name: string, fallback = "") => process.env[name]?.trim() || fallba
 const list = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 const model = env("MISTY_ODYSSEYS_MODEL", "anthropic/claude-haiku-5.5");
 const effort = env("MISTY_ODYSSEYS_EFFORT", "low");
+// Model turns per task: Ultra+'s 90 by default, near the paper's 100-step budget.
+const turns = Number(env("MISTY_ODYSSEYS_TURNS", "90"));
 const judgeModel = env("MISTY_ODYSSEYS_JUDGE", "anthropic/claude-haiku-5.5");
 const split = env("MISTY_ODYSSEYS_SPLIT", "dev");
 const limit = Number(env("MISTY_ODYSSEYS_LIMIT", "10"));
@@ -53,7 +55,7 @@ async function runTask(client: EvalClient, task: OdysseysTask, agentId: string, 
   const started = performance.now();
   const body = {
     prompt: task.prompt, model_override: model, reasoning_effort: effort, window_label: "main", agent_id: agentId,
-    device_contexts: await deviceContexts(userId, agentId), mode: "drawer", surface_id: "global",
+    device_contexts: await deviceContexts(userId, agentId), mode: "drawer", surface_id: "global", eval_turn_limit: turns,
   };
   const result = await client.run(body, 20 * 60_000, [], (event) => recorder.observe(event));
   const seconds = (performance.now() - started) / 1000;

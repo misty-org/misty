@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/aimodels"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
@@ -75,4 +76,14 @@ func planTurnLimit(ctx context.Context, database *db.Database, user string) int 
 		return 90
 	}
 	return 0
+}
+
+// evalTurnLimit is the plan's turn limit, or a development eval's own (at most 120, the
+// agent-mode ceiling) where the stack allows client model choice. Evals compare against
+// benchmarks run with long step budgets (docs/plans/odysseys-campaign.md).
+func evalTurnLimit(requested, plan int) int {
+	if requested <= 0 || !serveragent.ClientModelChoice() {
+		return plan
+	}
+	return min(requested, 120)
 }

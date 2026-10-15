@@ -38,6 +38,7 @@ Differences from the paper's setup, kept on purpose:
 | `MISTY_ODYSSEYS_TASKS` | Task ids or id prefixes, instead of a split |
 | `MISTY_ODYSSEYS_LIMIT`, `_OFFSET` | How many tasks, from where (default 10 from 0) |
 | `MISTY_ODYSSEYS_MODEL`, `_EFFORT` | The agent's model and effort (Haiku 5.5, `low`) |
+| `MISTY_ODYSSEYS_TURNS` | Model turns per task (90, Ultra+'s limit); the dev stack honors it only with `MISTY_ALLOW_MODEL_OVERRIDE` |
 | `MISTY_ODYSSEYS_JUDGE` | The judge model (Haiku 5.5) |
 | `MISTY_ODYSSEYS_EARLY_STOP` | `1` (default) stops when 4 of the first 6 tasks fail |
 | `MISTY_ODYSSEYS_CAP` | The campaign's spend cap in dollars (50), kept across passes in `reports/ledger.json` |

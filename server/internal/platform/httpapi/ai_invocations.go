@@ -25,37 +25,40 @@ type aiInvocationInput struct {
 	CompanionModel  string         `json:"companion_model,omitempty"`
 	// ModelOverride pins a new conversation's Thinking model with its first
 	// message; an existing conversation sets it with PATCH instead.
-	ModelOverride     string             `json:"model_override,omitempty"`
-	DisplayCaptures   []aiDisplayCapture `json:"display_captures,omitempty"`
-	ThinkingMode      string             `json:"thinking_mode,omitempty"`
-	TaskID            string             `json:"task_id,omitempty"`
-	AgentID           string             `json:"agent_id,omitempty"`
+	ModelOverride   string             `json:"model_override,omitempty"`
+	DisplayCaptures []aiDisplayCapture `json:"display_captures,omitempty"`
+	ThinkingMode    string             `json:"thinking_mode,omitempty"`
+	TaskID          string             `json:"task_id,omitempty"`
+	AgentID         string             `json:"agent_id,omitempty"`
 	// SpaceID is the Space of the window the request came from. Memory tools
 	// read and write that Space's tree; empty is the asker's personal Space.
-	SpaceID string `json:"space_id,omitempty"`
-	ExecutionMode     string             `json:"execution_mode,omitempty"`
-	CollaborationMode string             `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
-	PermissionMode    string             `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
+	SpaceID           string `json:"space_id,omitempty"`
+	ExecutionMode     string `json:"execution_mode,omitempty"`
+	CollaborationMode string `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
+	PermissionMode    string `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
 	// CodingProject is the attached project a delegated coding run works in.
 	CodingProject string `json:"coding_project,omitempty"`
 	// CodingTool is the coding tool the person picked for this chat; empty uses the Settings default.
-	CodingTool            string                      `json:"coding_tool,omitempty"`
-	WindowLabel           string                      `json:"window_label,omitempty"`
-	Mode                  string                      `json:"mode"`
-	SurfaceID             string                      `json:"surface_id"`
-	Trigger               string                      `json:"trigger"`
-	Prompt                string                      `json:"prompt"`
-	Context               []aiContextReference        `json:"context"`
-	Selection             *aiSelectionSnapshot        `json:"selection,omitempty"`
-	Capture               *aiCaptureAttachment        `json:"capture,omitempty"`
-	AttachmentIDs         []string                    `json:"attachment_ids,omitempty"`
-	DeviceContexts        []aiInvocationDeviceContext `json:"device_contexts,omitempty"`
-	ModelID               string                      `json:"model_id,omitempty"`
-	ReasoningEffort       string                      `json:"reasoning_effort,omitempty"`
-	RequestedArtifactKind string                      `json:"requested_artifact_kind,omitempty"`
-	ConversationID        string                      `json:"conversation_id,omitempty"`
-	IdempotencyKey        string                      `json:"idempotency_key"`
-	Timezone              string                      `json:"timezone,omitempty"`
+	CodingTool      string                      `json:"coding_tool,omitempty"`
+	WindowLabel     string                      `json:"window_label,omitempty"`
+	Mode            string                      `json:"mode"`
+	SurfaceID       string                      `json:"surface_id"`
+	Trigger         string                      `json:"trigger"`
+	Prompt          string                      `json:"prompt"`
+	Context         []aiContextReference        `json:"context"`
+	Selection       *aiSelectionSnapshot        `json:"selection,omitempty"`
+	Capture         *aiCaptureAttachment        `json:"capture,omitempty"`
+	AttachmentIDs   []string                    `json:"attachment_ids,omitempty"`
+	DeviceContexts  []aiInvocationDeviceContext `json:"device_contexts,omitempty"`
+	ModelID         string                      `json:"model_id,omitempty"`
+	ReasoningEffort string                      `json:"reasoning_effort,omitempty"`
+	// EvalTurnLimit lets a development eval give a run the turns of a higher plan
+	// (see evalTurnLimit); production never reads it.
+	EvalTurnLimit         int    `json:"eval_turn_limit,omitempty"`
+	RequestedArtifactKind string `json:"requested_artifact_kind,omitempty"`
+	ConversationID        string `json:"conversation_id,omitempty"`
+	IdempotencyKey        string `json:"idempotency_key"`
+	Timezone              string `json:"timezone,omitempty"`
 	// NotebookKey and DelegatedFrom are set by the server for sub-agents
 	// (agent_delegate); requests from clients never carry them.
 	NotebookKey   string `json:"notebook_key,omitempty"`
