@@ -28,6 +28,7 @@ export function AgentSetup(props: {
 }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<AgentProfileInput>({
+    default_run_mode: "ask",
     name: "",
     role: "",
     description: "",

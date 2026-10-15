@@ -246,6 +246,8 @@ export interface AiInvocationRequest {
   conversationId?: string;
   /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
   collaborationMode?: "act" | "plan";
+  /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
+  permissionMode?: "ask" | "auto";
   idempotencyKey: string;
   timezone?: string;
 }

@@ -677,6 +677,7 @@ POST /api/integrations/github/git
 POST /api/internal/journal/note-projections
 POST /api/login
 POST /api/logout
+POST /api/me/agent-grants/site
 POST /api/me/agent-interventions/{waitID}
 POST /api/me/agent-plans/{planID}/{action}
 POST /api/me/agent-questions/{questionID}/answer
@@ -798,6 +799,7 @@ POST /internal/journal/note-projections
 POST /login
 POST /logout
 POST /mcp
+POST /me/agent-grants/site
 POST /me/agent-interventions/{waitID}
 POST /me/agent-plans/{planID}/{action}
 POST /me/agent-questions/{questionID}/answer
@@ -938,6 +940,7 @@ POST /v1/integrations/github/git
 POST /v1/internal/journal/note-projections
 POST /v1/login
 POST /v1/logout
+POST /v1/me/agent-grants/site
 POST /v1/me/agent-interventions/{waitID}
 POST /v1/me/agent-plans/{planID}/{action}
 POST /v1/me/agent-questions/{questionID}/answer

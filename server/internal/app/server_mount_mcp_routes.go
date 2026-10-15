@@ -18,6 +18,7 @@ func (s *Server) mountMCPRoutes(prefix string, spaces *api.SpacesService) {
 	s.Router.Get(prefix+"/me/agent-grants", spaces.AgentGrants())
 	s.Router.Delete(prefix+"/me/agent-grants", spaces.AgentGrants())
 	s.Router.Delete(prefix+"/me/agent-grants/{grantID}", spaces.AgentGrant())
+	s.Router.Post(prefix+"/me/agent-grants/site", spaces.AgentSiteGrant())
 	s.Router.Post(prefix+"/me/screen-model/{jobID}", spaces.ScreenModel())
 	s.Router.Post(prefix+"/me/companion/refine-point/{invocationID}", spaces.CompanionRefinePoint())
 	// Collaboration: Plan/Act mode, agent questions, plans and goals.

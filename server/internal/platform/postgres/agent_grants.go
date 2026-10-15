@@ -179,3 +179,29 @@ func (db *Database) AgentDefaultRunMode(ctx context.Context, user, agentID strin
 	})
 	return mode, err
 }
+
+// CreateAgentGrant stores a grant the person made directly, outside an app
+// request: a page grant answered in the device's island. The caller validates
+// the action and scope.
+func (db *Database) CreateAgentGrant(ctx context.Context, grantor, agentID, action, scopeKind, scopeID string) (*AgentGrant, error) {
+	out := &AgentGrant{}
+	err := db.TestingWithRLSContext(ctx, userRLSSettings(grantor), func(tx *sql.Tx) error {
+		var owned bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM misty_ask_identities WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL)`,
+			agentID, grantor).Scan(&owned); err != nil {
+			return err
+		}
+		if !owned {
+			return ErrPersonalAgentNotFound
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO agent_grants(id,agent_id,grantor_user_id,action,scope_kind,scope_id)
+			VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (agent_id,grantor_user_id,action,scope_kind,scope_id) WHERE revoked_at IS NULL DO NOTHING`,
+			"grant_"+uuid.NewString(), agentID, grantor, action, scopeKind, scopeID); err != nil {
+			return err
+		}
+		return scanAgentGrant(tx.QueryRowContext(ctx, `SELECT `+agentGrantColumns+agentGrantFrom+`
+			WHERE g.grantor_user_id=$1 AND g.agent_id=$2 AND g.action=$3 AND g.scope_kind=$4 AND g.scope_id=$5 AND g.revoked_at IS NULL`,
+			grantor, agentID, action, scopeKind, scopeID), out)
+	})
+	return out, err
+}

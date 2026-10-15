@@ -1,8 +1,9 @@
-import { Check, ExternalLink, Plug, ShieldQuestion } from "lucide-react";
+import { ExternalLink, Plug, ShieldQuestion } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { Button } from "@/shared/ui";
-import { appsApi, type AppRequest } from "./api";
+import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
+import { ApprovalActions } from "./ApprovalActions";
 
 function stateLabel(request: AppRequest, expired: boolean) {
   if (expired) return "Expired";
@@ -10,11 +11,11 @@ function stateLabel(request: AppRequest, expired: boolean) {
     case "connected":
       return "Connected";
     case "approved":
-      return "Approved";
+      return "Accepted";
     case "used":
-      return "Approved and done";
+      return "Accepted and done";
     case "declined":
-      return request.kind === "connect" ? "Not connected" : "Declined";
+      return request.kind === "connect" ? "Not connected" : "Denied";
     default:
       return "Expired";
   }
@@ -84,7 +85,7 @@ export function AppRequestCard({
       await openExternalLink(url);
       setOpened(true);
     });
-  const decide = (decision: "approve" | "decline") =>
+  const decide = (decision: AppRequestDecision) =>
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
   const Icon = current.kind === "connect" ? Plug : ShieldQuestion;
@@ -112,7 +113,7 @@ export function AppRequestCard({
             variant="ghost"
             className="h-7"
             disabled={busy}
-            onClick={() => void decide("decline")}
+            onClick={() => void decide("deny")}
           >
             Not now
           </Button>
@@ -123,20 +124,11 @@ export function AppRequestCard({
           ) : null}
         </div>
       ) : pending ? (
-        <div className="mt-3 flex gap-2">
-          <Button size="sm" className="h-7" disabled={busy} onClick={() => void decide("approve")}>
-            <Check className="size-3.5" /> Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7"
-            disabled={busy}
-            onClick={() => void decide("decline")}
-          >
-            Decline
-          </Button>
-        </div>
+        <ApprovalActions
+          request={current}
+          busy={busy}
+          onDecide={(decision) => void decide(decision)}
+        />
       ) : (
         <p className="mt-2 text-[11px] text-cream-muted">{stateLabel(current, expired)}</p>
       )}

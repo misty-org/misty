@@ -53,6 +53,8 @@ const questionSet = (state: AgentQuestionSet["state"]): AgentQuestionSet => ({
 
 const loaded = (overrides: Partial<ConversationCollaboration> = {}): ConversationCollaboration => ({
   mode: "act",
+  permissionMode: "",
+  agentPermissionMode: "ask",
   plan: null,
   planHistory: [],
   goal: null,

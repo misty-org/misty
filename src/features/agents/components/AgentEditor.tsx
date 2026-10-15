@@ -1,4 +1,5 @@
 import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentSpaceField } from "./AgentSpaceField";
 import { AgentSpaceSharing } from "./AgentSpaceSharing";
 import { openMisty } from "@/features/misty/handoff";
@@ -20,6 +21,7 @@ const emptyProfile: AgentProfileInput = {
   model_id: "",
   reasoning_effort: "",
   enabled: true,
+  default_run_mode: "ask",
 };
 
 export function AgentEditor({
@@ -100,6 +102,7 @@ export function AgentEditor({
         reasoning_effort,
         enabled,
         space_id,
+        default_run_mode,
       } = draft;
       const saved = await personalAgentsApi.save(
         {
@@ -113,6 +116,7 @@ export function AgentEditor({
           model_id,
           reasoning_effort,
           enabled,
+          default_run_mode,
           space_id: space_id || undefined,
           version: profile?.version,
         },
@@ -273,6 +277,10 @@ export function AgentEditor({
         locked={Boolean(profile?.system_managed)}
         moving={Boolean(profile?.space_id && draft.space_id && draft.space_id !== profile.space_id)}
         onChange={(spaceId) => update("space_id", spaceId)}
+      />
+      <AgentPermissionsField
+        value={draft.default_run_mode ?? "ask"}
+        onChange={(mode) => update("default_run_mode", mode)}
       />
       <details className="agent-advanced-settings">
         <summary>Instructions and memory</summary>

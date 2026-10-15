@@ -40,3 +40,5 @@ export { settleProgress, withToolEvent } from "./progress/progressTimeline";
 export { describeNextRun } from "./workflows/scheduleSummary";
 export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
+export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
+export type { AgentGrant } from "./grants/api";

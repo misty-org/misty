@@ -9,10 +9,13 @@ import type {
   CollaborationEvent,
   ConversationCollaboration,
   ConversationMode,
+  PermissionMode,
 } from "./types";
 
 const empty = (): ConversationCollaboration => ({
   mode: "act",
+  permissionMode: "",
+  agentPermissionMode: "ask",
   plan: null,
   planHistory: [],
   goal: null,
@@ -29,6 +32,8 @@ interface CollaborationStore {
   defaultMode: ConversationMode;
   /** The composer picked a mode for the next new conversation. */
   draftChosen: boolean;
+  /** Ask or Auto for the next new conversation; empty follows its agent. */
+  draftPermissionMode: PermissionMode | "";
   setDefaultMode(mode: ConversationMode): void;
   error: string;
   /**
@@ -118,6 +123,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     draftMode: "act",
     defaultMode: "act",
     draftChosen: false,
+    draftPermissionMode: "",
     error: "",
     queuedTurn: undefined,
     setDefaultMode(mode) {
@@ -141,6 +147,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
         byConversation: {},
         draftMode: get().defaultMode,
         draftChosen: false,
+        draftPermissionMode: "",
         error: "",
         queuedTurn: undefined,
       });
@@ -190,8 +197,11 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     },
     adoptDraftMode(conversationId) {
       if (!conversationId || get().byConversation[conversationId]) return;
-      patch(conversationId, () => ({ mode: get().draftMode }));
-      set({ draftMode: get().defaultMode, draftChosen: false });
+      patch(conversationId, () => ({
+        mode: get().draftMode,
+        permissionMode: get().draftPermissionMode,
+      }));
+      set({ draftMode: get().defaultMode, draftChosen: false, draftPermissionMode: "" });
     },
     applyEvent(conversationId, event) {
       if (!conversationId) return;

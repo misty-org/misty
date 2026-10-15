@@ -18,7 +18,12 @@ import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ConversationModelPicker } from "../models/ConversationModelPicker";
 import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
 import { ComposerOptions } from "./ComposerOptions";
-import { AgentModeToggle } from "../collaboration/AgentModeToggle";
+import {
+  AgentGoalButton,
+  AgentModeToggle,
+  AgentPermissionMenu,
+} from "../collaboration/AgentModeToggle";
+import { usePermissionMode } from "../collaboration/permissionMode";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
@@ -89,6 +94,7 @@ export function AgentWorkspaceConversation({
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === (conversationId ?? state.activeConversationId));
+  const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
   const reportError = (error: string) =>
     useMistyStore.setState({
       error: error || null,
@@ -364,7 +370,11 @@ export function AgentWorkspaceConversation({
           // the left; usage, voice and send on the right.
           leadingControl={
             <ComposerOptions
-              mode={<AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />}
+              plan={<AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />}
+              permissions={
+                <AgentPermissionMenu conversationId={conversation?.id} permission={permission} />
+              }
+              goal={<AgentGoalButton conversationId={conversation?.id} />}
               project={<AgentProjectMenu conversationId={conversation?.id} />}
               model={
                 <ConversationModelPicker
@@ -391,7 +401,7 @@ export function AgentWorkspaceConversation({
           onError={reportError}
           onKeyDown={(e) => {
             if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
-              // Shift+Tab switches between Plan and Act, as in other agent tools.
+              // Shift+Tab turns Plan on or off, as in other agent tools.
               e.preventDefault();
               collaboration.toggleMode();
               return;

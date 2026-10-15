@@ -11,6 +11,8 @@ export const AgentProfileInputSchema = z.strictObject({
   model_id: z.string().max(200).default(""),
   reasoning_effort: z.string().max(32).default(""),
   enabled: z.boolean().default(true),
+  /** How new chats with this agent start: Ask pauses before every change, Auto continues on remembered approvals. */
+  default_run_mode: z.enum(["ask", "auto"]).default("ask"),
   /** The one Space the agent lives in. Omit to create it in the personal Space. */
   space_id: z.string().max(200).optional(),
 });
@@ -19,6 +21,8 @@ export const AgentProfileSchema = AgentProfileInputSchema.extend({
   id: z.string(),
   owner_user_id: z.string(),
   system_managed: z.boolean(),
+  /** Who does the work: Misty's cloud loop, or a coding tool on the person's device. */
+  runner: z.string().default("misty"),
   version: z.number().int().positive(),
   created_at: z.string(),
   updated_at: z.string(),

@@ -32,7 +32,7 @@ Browser:
 
 Misty panel and Agents:
 - Cmd+Shift+K toggles the Misty panel beside the workspace, the quickest way to ask Misty something about the current page.
-- The Agents destination lists conversations under Recents. "New task" starts one. The composer's "Mode" menu beside the plus shows Act or Plan and switches between them; Shift+Tab does the same while typing.
+- The Agents destination lists conversations under Recents. "New task" starts one. The composer's "Message options" button holds "Plan", which researches and proposes a plan before changing anything (Shift+Tab turns it on or off while typing), and "Permissions": Ask pauses before every change for the person's OK, Auto continues on approvals they remembered and asks for the rest.
 
 Settings:
 - Open with "Settings" in the account panel or Cmd+,. Areas in the sidebar: General, Appearance, Layout, Shortcuts, Browser, Spaces, Agents, Sync, Devices, Privacy and About. Each area is one scrolling page; the search field at the top finds any setting.
