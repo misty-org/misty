@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
@@ -32,5 +33,13 @@ func TestRecallToolsAreOfferedOnlyWithMemoryAndGateThemselves(t *testing.T) {
 	// Forgetting everything is for Settings, never an agent.
 	if _, err := forget.Handler(context.Background(), agenttools.Invocation{UserID: "u"}, serveragent.ToolRequest{Name: recallForgetTool, Arguments: []byte(`{}`)}); err == nil {
 		t.Fatal("forget without a site or range was accepted")
+	}
+}
+
+func TestCursorCompanionMentionsMemoryOnlyWhenRecallIsOffered(t *testing.T) {
+	with := companionSystemPrompt(aiInvocationInput{Mode: "companion"}, []string{screenLookTool, recallSearchTool})
+	without := companionSystemPrompt(aiInvocationInput{Mode: "companion"}, []string{screenLookTool})
+	if !strings.Contains(with, "recall_search") || strings.Contains(without, "recall_search") {
+		t.Fatal("the cursor prompt should mention Memory only when recall.search is in the run")
 	}
 }
