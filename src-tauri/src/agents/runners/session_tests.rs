@@ -92,6 +92,7 @@ fn setup(allow: bool) -> (ScriptedClaude, Launch, Arc<Host>, PathBuf) {
         mode: LaunchMode::Ask,
         model: None,
         session: None,
+        grants: vec![],
     };
     (
         runner,
@@ -137,7 +138,12 @@ async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
     )
     .await
     .unwrap();
-    assert_eq!(outcome, Outcome::Finished, "{:?}", host.events.lock().unwrap());
+    assert_eq!(
+        outcome,
+        Outcome::Finished,
+        "{:?}",
+        host.events.lock().unwrap()
+    );
     assert_eq!(*host.asked.lock().unwrap(), ["git.push:r1"]);
     let reply: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(answer).unwrap()).unwrap();

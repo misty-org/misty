@@ -171,10 +171,28 @@ fn reads_the_github_remote_as_owner_and_name() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join(".git")).unwrap();
     let config = dir.path().join(".git/config");
-    std::fs::write(&config, "[core]\n\tbare = false\n[remote \"origin\"]\n\turl = git@github.com:misty-org/misty.git\n").unwrap();
-    assert_eq!(super::tauri_host::github_remote(dir.path()).as_deref(), Some("misty-org/misty"));
-    std::fs::write(&config, "[remote \"origin\"]\n\turl = https://github.com/misty-org/misty\n").unwrap();
-    assert_eq!(super::tauri_host::github_remote(dir.path()).as_deref(), Some("misty-org/misty"));
-    std::fs::write(&config, "[remote \"origin\"]\n\turl = https://gitlab.com/a/b.git\n").unwrap();
+    std::fs::write(
+        &config,
+        "[core]\n\tbare = false\n[remote \"origin\"]\n\turl = git@github.com:misty-org/misty.git\n",
+    )
+    .unwrap();
+    assert_eq!(
+        super::tauri_host::github_remote(dir.path()).as_deref(),
+        Some("misty-org/misty")
+    );
+    std::fs::write(
+        &config,
+        "[remote \"origin\"]\n\turl = https://github.com/misty-org/misty\n",
+    )
+    .unwrap();
+    assert_eq!(
+        super::tauri_host::github_remote(dir.path()).as_deref(),
+        Some("misty-org/misty")
+    );
+    std::fs::write(
+        &config,
+        "[remote \"origin\"]\n\turl = https://gitlab.com/a/b.git\n",
+    )
+    .unwrap();
     assert_eq!(super::tauri_host::github_remote(dir.path()), None);
 }

@@ -152,6 +152,7 @@ pub async fn coding_run_turn(
         mode,
         model: request.model,
         session: request.session,
+        grants: request.lease.grants.clone(),
     };
     let context = BridgeContext {
         mode: request.permission,

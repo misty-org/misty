@@ -72,6 +72,9 @@ pub fn refusal(
     need: &RouteNeed,
 ) -> Option<String> {
     let name = display_name(engine);
+    if super::runner_for(engine).is_none() {
+        return Some(format!("{name} isn't supported in Misty yet."));
+    }
     let Some(status) = status.filter(|status| status.installed) else {
         return Some(format!("{name} isn't installed on this computer."));
     };
