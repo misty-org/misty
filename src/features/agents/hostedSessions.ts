@@ -11,6 +11,7 @@ import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import {
+  addHostedChildViews,
   hostedSessionForTask,
   sessions,
   touchHostedSession,
@@ -104,6 +105,32 @@ function keepAlive(session: HostedSession) {
   );
 }
 
+/** How many tabs of its own one session may hold. */
+const maxOwnTabs = 8;
+
+/** Opens another hidden tab in a session, bound to its task, and returns the tab's scope. */
+async function openSessionTab(session: HostedSession, url: string, signal: AbortSignal): Promise<string> {
+  const id = `agent-${crypto.randomUUID()}`;
+  const scopeId = `agent-scope-${crypto.randomUUID()}`;
+  try {
+    signal.throwIfAborted();
+    await invoke("browser_webview_create", {
+      request: {
+        id, scopeId, url, originSpaceId: "", x: 0, y: 64, theme: "dark",
+        width: Math.max(200, window.innerWidth - 440),
+        height: Math.max(300, window.innerHeight - 128),
+      },
+    });
+    await invoke("agent_workspace_bind_scope", { taskId: session.taskId, scopeId });
+    await invoke("browser_webview_hide", { request: { id } });
+  } catch (error) {
+    await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
+    throw new DeviceOperationNotAttempted(error);
+  }
+  addHostedChildViews(session.taskId, [id]);
+  return scopeId;
+}
+
 function startUrl(value: unknown): string {
   if (typeof value !== "string" || !value) return browserHomeUrl();
   try {
@@ -123,7 +150,7 @@ export async function startHostedSession(
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const config = (job.config ?? {}) as { agentId?: unknown };
-  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown };
+  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown; newTab?: unknown };
   const agentId = typeof config.agentId === "string" ? config.agentId : "";
   const conversationId = typeof input.conversationId === "string" ? input.conversationId : "";
   const accountId = useUserStore.getState().me?.id ?? "";
@@ -189,6 +216,10 @@ export async function startHostedSession(
   } else {
     touchHostedSession(session.scopeId, job.runId);
   }
+  // Another tab of the agent's own beside the first, when the run asks to keep a page open.
+  let tabScope = session.scopeId;
+  if (input.newTab === true && typeof input.url === "string" && session.childViews.length < maxOwnTabs - 1)
+    tabScope = await openSessionTab(session, startUrl(input.url), signal);
   try {
     const [grant] = await devicesNative.signRunGrants(
       { apiBase: await resolveApiBase(), accountId },
@@ -197,7 +228,7 @@ export async function startHostedSession(
           targetDeviceId: device.id,
           agentId,
           capabilities: [...browserTabAgentFileCapabilities].sort(),
-          scopes: [session.scopeId],
+          scopes: [tabScope],
         },
       ],
     );
@@ -206,7 +237,7 @@ export async function startHostedSession(
         {
           device_id: device.id,
           kind: "browser_tab",
-          opaque_ref: session.scopeId,
+          opaque_ref: tabScope,
           display_name: `Browser on ${snapshot.device.displayName || "this computer"}`,
           capabilities: browserTabAgentFileCapabilities,
           metadata: {

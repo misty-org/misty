@@ -132,6 +132,8 @@ results in the message.
 | # | Date | Change | Dev perfect | Dev rubric avg | Holdout | Median steps / time | Spend |
 |---|---|---|---|---|---|---|---|
 | 0 | Oct 17 | Setup and the fixes below; one smoke task | 0/1 | 0.00 | — | 13 calls / 130 s | $0.11 |
+| 1 | Oct 18 | First dev batch, `medium` | 0/6, stopped early | 0.00 | — | 14 calls / 60 s | $0.14 |
+| 2 | Oct 18 | Budget scaling, persistence check, turn-limit fix, Ultra+ eval plan | 0/3, stopped by hand | 0.18 | — | 40 calls / 231 s | $0.25 |
 
 ### Fixes before the first batch (October 17)
 
@@ -156,6 +158,24 @@ Found while getting one task to run end to end, in the order they blocked it:
 7. **Eval infrastructure**: the dev stack ran GPT-6 Luna, not Haiku; the CLI refused the Anthropic
    key; agent tabs used the owner's signed-in profile (now a throwaway session); the bridge could
    not picture agent tabs; the Docker disk filled with build cache and failed every request.
+
+### Batches 1 and 2 (October 18)
+
+Every failure was the harness, not the model. In order found:
+
+| Cause | Label | Fix |
+|---|---|---|
+| `screen_open` called once per site in one turn raced for the one session tab; all but one failed | H | Later calls find the tab attached; calls take turns per run (`cfc3caca`, `0d1b4b32`) |
+| `browser_extract` always failed: browser tools ran on a bare service without the model client | H | Toolboxes pass the real service (`cfc3caca`) |
+| Once extraction worked, every run that used it failed at completion with a billing conflict: completion subtracted the extraction's tokens from the runtime's aggregate | H | Server-side model calls stay out of the aggregate (`0d1b4b32`, with a test) |
+| The research budget closed search and reading after 12 lookups on ten-part tasks | H | The budget scales with the run's checklist (`65665bd8`) |
+| Runs reported "partial" after one or two minutes with most turns unused | R/H | A partial finish is refused once while less than half the turns are used, unless the rest needs the person (`65665bd8`) |
+| Pro runs get 20 turns; a run hit the limit mid-browse and ended with no answer at all | H/E | The eval account runs on Ultra+ (90 turns) during passes; two turns before any limit the run must write its answer (`bfb50002`) |
+| Tasks ask for pages "kept open in tabs"; the agent had one tab and said so, failing those rubric items | H | `screen_open` opens more tabs of the agent's own (up to 8) (`0d1b4b32`) |
+| Docker's disk filled with build cache; the database refused writes | E | Prune build cache after rebuilds |
+
+The local eval plan was raised to Ultra+ by editing the local billing database (the active
+subscription row and the license record, both `pro` before); restore both after the campaign.
 
 Effort, on the pricing task with the agent's own tab: at `low`, Haiku opens one page and stops; at
 `medium` and `high` it visits and toggles all three vendors' pages. The first batch runs at `medium`,

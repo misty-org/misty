@@ -57,8 +57,8 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
   }));
   let inputTokens = 0;
   let outputTokens = 0;
-  const rubrics: RubricResult[] = [];
-  for (const rubric of task.rubrics) {
+  // Each rubric item is judged on its own, as the original does; the calls run together.
+  const rubrics: RubricResult[] = await Promise.all(task.rubrics.map(async (rubric) => {
     const lines = [`Rubric ID: ${rubric.id}`, `Requirement: ${rubric.requirement.trim()}`, ...(rubric.verification.trim() ? [`Verification: ${rubric.verification.trim()}`] : [])];
     const text = `User Task (context only): ${task.prompt.trim()}\n\nEvaluate ONLY this rubric item:\n${lines.join("\n")}` +
       `\n\nFull Action History:\n${history}\n\nScreenshots attached below: ${images.length} (trajectory had ${steps.length} total step(s)).` +
@@ -73,11 +73,11 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
       outputTokens += result.usage.outputTokens ?? 0;
       const status = /Status:\s*["']?(success|failure)["']?/i.exec(result.text);
       const thoughts = /Thoughts:\s*([\s\S]+?)(?:Status:|$)/.exec(result.text);
-      rubrics.push({ id: rubric.id, success: status?.[1]?.toLowerCase() === "success", reasoning: (thoughts?.[1] ?? result.text).trim().slice(0, 1_200) });
+      return { id: rubric.id, success: status?.[1]?.toLowerCase() === "success", reasoning: (thoughts?.[1] ?? result.text).trim().slice(0, 1_200) };
     } catch (error) {
-      rubrics.push({ id: rubric.id, success: false, reasoning: `Error judging rubric ${rubric.id}: ${String(error).slice(0, 300)}` });
+      return { id: rubric.id, success: false, reasoning: `Error judging rubric ${rubric.id}: ${String(error).slice(0, 300)}` };
     }
-  }
+  }));
   const passed = rubrics.filter((item) => item.success).length;
   return { rubrics, average: rubrics.length ? passed / rubrics.length : 0, perfect: rubrics.length > 0 && passed === rubrics.length, inputTokens, outputTokens };
 }

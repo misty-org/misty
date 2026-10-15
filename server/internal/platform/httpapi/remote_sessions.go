@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	serveragent "github.com/kannachi323/misty/server/internal/agents"
@@ -84,7 +85,7 @@ func (s *SpacesService) deviceDisplayName(ctx context.Context, userID, deviceID 
 
 // openRemoteSession asks the picked device to open a browser session for this
 // run and returns its tab, signed by that device.
-func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, target *db.AIInvocationContext, callID, url, reason string) (*remoteScreen, error) {
+func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, target *db.AIInvocationContext, callID, url, reason string, newTab bool) (*remoteScreen, error) {
 	name, online := s.deviceDisplayName(ctx, record.UserID, target.DeviceID)
 	if !online {
 		return nil, deviceOfflineError{name: name, reason: "is offline."}
@@ -95,7 +96,7 @@ func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvo
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, remoteSessionWait)
 	defer cancel()
-	input := TestingMustAPIRawJSON(map[string]any{"scopeId": target.OpaqueRef, "url": url, "reason": reason, "conversationId": record.ConversationID})
+	input := TestingMustAPIRawJSON(map[string]any{"scopeId": target.OpaqueRef, "url": url, "reason": reason, "conversationId": record.ConversationID, "newTab": newTab})
 	config := TestingMustAPIRawJSON(map[string]any{"agentId": agentID})
 	job, err := s.database.QueueAIInvocationDeviceNodeJob(waitCtx, record.UserID, record.ID, "browser_session_"+callID, 1, target.OpaqueRef, remoteSessionOp, remoteSessionOp, input, config,
 		TestingMustAPIRawJSON(map[string]any{"type": "object"}), agentToolObjectOutputSchema())
@@ -207,6 +208,11 @@ func (s *SpacesService) remoteScopeDevice(ctx context.Context, userID string, bo
 // keeps working in the same run with browser tools from its next step instead
 // of handing off to a new run. It returns nil, nil when no session applies.
 func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, callID, url, reason string, desktop bool, place string) (json.RawMessage, error) {
+	// Calls made together (one per site) take turns, so each sees the tabs the one before
+	// it opened and gets its own instead of racing for the first.
+	lock := &screenOpenLocks[fnv32(record.ID)%uint32(len(screenOpenLocks))]
+	lock.Lock()
+	defer lock.Unlock()
 	contexts, err := s.database.AIInvocationContexts(ctx, record.UserID, record.ID)
 	if err != nil {
 		return nil, err
@@ -222,13 +228,20 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 	if desktop {
 		return nil, serveragent.ErrInvalidRequest("Other apps can be used only on the device the person is asking from. Use a browser on " + name + " (omit target), or tell them to pick this device.")
 	}
+	// The agent's own tabs on that device in this run. A call with a url opens another
+	// one beside them (up to maxOwnTabs), so pages the person asked to keep open stay
+	// open; a call without one goes back to the first.
+	own := []string{}
 	for _, item := range contexts {
 		var metadata map[string]any
 		if item.Kind == "browser_tab" && item.State == "attached" && item.DeviceID == target.DeviceID && json.Unmarshal(item.Metadata, &metadata) == nil && metadata["remote_session"] == true {
-			return sessionOpened(item.OpaqueRef, name, url, true)
+			own = append(own, item.OpaqueRef)
 		}
 	}
-	remote, err := s.openRemoteSession(ctx, record, body, target, callID, url, strings.TrimSpace(reason))
+	if len(own) > 0 && (url == "" || len(own) >= maxOwnTabs) {
+		return sessionOpened(own[0], name, url, true, own...)
+	}
+	remote, err := s.openRemoteSession(ctx, record, body, target, callID, url, strings.TrimSpace(reason), len(own) > 0)
 	if err != nil {
 		return nil, err
 	}
@@ -246,27 +259,45 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 		if attached, readErr := s.database.AIInvocationContexts(ctx, record.UserID, record.ID); readErr == nil {
 			for _, item := range attached {
 				if item.OpaqueRef == tab.OpaqueRef {
-					return sessionOpened(tab.OpaqueRef, name, url, true)
+					return sessionOpened(tab.OpaqueRef, name, url, true, append(own, tab.OpaqueRef)...)
 				}
 			}
 		}
 		return nil, err
 	}
-	return sessionOpened(tab.OpaqueRef, name, url, false)
+	return sessionOpened(tab.OpaqueRef, name, url, false, append(own, tab.OpaqueRef)...)
 }
 
-// sessionOpened tells the agent where its own tab is and that browser tools now act on it.
-func sessionOpened(scopeID, name, url string, reused bool) (json.RawMessage, error) {
+// screenOpenLocks serialize screen_open per run (striped, so nothing accumulates).
+var screenOpenLocks [64]sync.Mutex
+
+func fnv32(text string) uint32 {
+	hash := uint32(2166136261)
+	for index := 0; index < len(text); index++ {
+		hash = (hash ^ uint32(text[index])) * 16777619
+	}
+	return hash
+}
+
+// maxOwnTabs is how many tabs of its own a run may keep open on one device.
+const maxOwnTabs = 8
+
+// sessionOpened tells the agent which of its own tabs it is in, and lists every one.
+func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json.RawMessage, error) {
 	opened := "Your own browser tab is open on " + name
 	if reused {
 		opened = "Your own browser tab on " + name + " is already open"
 	}
 	next := "Read it with browser_snapshot"
 	if url == "" || reused {
-		next = "It is one tab: visit pages one after another with browser_navigate, which returns each page's snapshot"
+		next = "Go to pages in it with browser_navigate, which returns each page's snapshot"
 	}
-	return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "catalog_changed": true,
-		"message": opened + " (scopeId " + scopeID + "). Browser tools act on it from your next step. " + next + ", and keep working in this run."})
+	if len(tabs) == 0 {
+		tabs = []string{scopeID}
+	}
+	return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "tabs": tabs, "catalog_changed": true,
+		"message": opened + " (scopeId " + scopeID + "). Browser tools act on it from your next step; pass its scopeId. " + next + ", and keep working in this run. " +
+			"Your open tabs: " + strings.Join(tabs, ", ") + ". To keep another page open beside these, call screen_open again with its url (up to 8 tabs)."})
 }
 
 // TestingOpenRemoteSession runs screen_open for a stored request.
