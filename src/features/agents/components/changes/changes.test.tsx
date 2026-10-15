@@ -5,6 +5,9 @@ import type { DiffSet } from "./diffTypes";
 const store = vi.hoisted(() => ({
   agentsDeviceSnapshot: vi.fn(),
   projectGitDiff: vi.fn(),
+  projectRunDiff: vi.fn(),
+  projectUndo: vi.fn(),
+  projectCheckpoints: vi.fn(),
 }));
 vi.mock("../../store/useAgentsStore", () => store);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
@@ -60,6 +63,14 @@ beforeEach(() => {
     ],
   });
   store.projectGitDiff.mockResolvedValue(diff);
+  store.projectRunDiff.mockRejectedValue("Misty no longer has this run's changes.");
+  store.projectCheckpoints.mockResolvedValue([]);
+  store.projectUndo.mockResolvedValue({
+    restored: 1,
+    removed: 1,
+    commitsRemoved: 0,
+    commitsPushed: 0,
+  });
   useConversationProject.setState({ byConversation: { c1: "scope_site" } });
 });
 afterEach(() => {
@@ -108,6 +119,35 @@ describe("AnswerChanges", () => {
     expect(useProjectReview.getState().scopeId).toBe("scope_site");
   });
 
+  it("shows a run's own changes and undoes them", async () => {
+    store.projectRunDiff.mockResolvedValue(diff);
+    store.projectUndo.mockResolvedValue({
+      restored: 1,
+      removed: 1,
+      commitsRemoved: 0,
+      commitsPushed: 2,
+    });
+    const subagents = [{ invocationId: "invocation_child", goal: "Fix", state: "completed" }];
+    render(<AnswerChanges message={answer({ subagents })} conversationId="c1" />);
+    await act(async () => {});
+    expect(store.projectRunDiff).toHaveBeenCalledWith("scope_site", "invocation_child");
+    expect(store.projectGitDiff).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await act(async () => {});
+    expect(store.projectUndo).toHaveBeenCalledWith("scope_site", "invocation_child");
+    expect(screen.getByRole("status").textContent).toBe(
+      "Changes to bakery-site undone. Its 2 commits were already pushed, so they stay; only the files went back.",
+    );
+  });
+
+  it("falls back to the project's uncommitted changes when a run can't be undone", async () => {
+    const subagents = [{ invocationId: "invocation_old", goal: "Fix", state: "completed" }];
+    render(<AnswerChanges message={answer({ subagents })} conversationId="c1" />);
+    await act(async () => {});
+    expect(screen.getByText(/2 files changed in bakery-site/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+
   it("shows nothing for answers that delegated no coding", async () => {
     render(<AnswerChanges message={answer({ progress: [] })} conversationId="c1" />);
     await act(async () => {});
@@ -122,6 +162,22 @@ describe("ProjectReview", () => {
     await act(async () => {});
     expect(screen.getByText("bakery-site")).toBeTruthy();
     expect(screen.getByRole("button", { name: /index\.html/ })).toBeTruthy();
+  });
+
+  it("lists the runs it can undo and reloads the changes after undoing one", async () => {
+    store.projectCheckpoints.mockResolvedValueOnce([
+      { runId: "invocation_child", createdAt: 1_760_000_000, complete: true },
+      { runId: "invocation_big", createdAt: 1_759_000_000, complete: false },
+    ]);
+    render(<ProjectReview scopeId="scope_site" name="bakery-site" />);
+    await act(async () => {});
+    expect(screen.getAllByText(/^Changes from /)).toHaveLength(2);
+    expect(screen.getByText("Too large to undo")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await act(async () => {});
+    expect(store.projectUndo).toHaveBeenCalledWith("scope_site", "invocation_child");
+    expect(screen.getByRole("status").textContent).toBe("Changes to bakery-site undone.");
+    expect(store.projectGitDiff).toHaveBeenCalledTimes(2);
   });
 
   it("says plainly when the folder isn't a Git repository", async () => {

@@ -1,5 +1,7 @@
 //! Application entry points: Tauri command handlers and shared runtime state.
 
+#[cfg(desktop)]
+pub mod checkpoint_commands;
 pub mod clipboard_commands;
 pub mod commands;
 #[cfg(desktop)]

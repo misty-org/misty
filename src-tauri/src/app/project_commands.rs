@@ -94,7 +94,8 @@ pub async fn project_new(
     Ok(Some(project))
 }
 
-/// Stops sharing a project. Its files stay where they are.
+/// Stops sharing a project and forgets its undo copies. Its files stay
+/// where they are.
 #[tauri::command]
 pub async fn project_remove(
     webview: tauri::Webview,
@@ -102,6 +103,7 @@ pub async fn project_remove(
     scope_id: String,
 ) -> ApiResult<()> {
     require_main(&webview)?;
+    crate::app::checkpoint_commands::checkpoints(&state).forget(&scope_id);
     state.agents.revoke_folder_scope(scope_id).await
 }
 

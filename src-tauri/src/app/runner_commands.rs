@@ -165,6 +165,17 @@ pub async fn coding_run_turn(
         grants: request.lease.grants.clone(),
         lease_valid: true,
     };
+    // Undo needs the project as it was before the run's first change.
+    if mode != LaunchMode::Plan {
+        let (store, scope, run, root) = (
+            crate::app::checkpoint_commands::checkpoints(&state),
+            request.scope_id.clone(),
+            request.run_id.clone(),
+            project.root.clone(),
+        );
+        // Without a copy the run still goes ahead; it just can't be undone.
+        let _ = tokio::task::spawn_blocking(move || store.ensure(&scope, &run, &root)).await;
+    }
     let stop = registry::register(
         &request.run_id,
         engine.as_str(),
