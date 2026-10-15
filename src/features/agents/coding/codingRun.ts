@@ -127,6 +127,8 @@ async function runTurns(job: CodingJob, deviceId: string) {
     task?: string;
     mode?: string;
     permissionMode?: string;
+    agentId?: string;
+    conversationId?: string;
   };
   const runId = String(input.childInvocationId ?? "");
   const permission = input.permissionMode === "auto" ? "auto" : "ask";
@@ -207,6 +209,8 @@ async function runTurns(job: CodingJob, deviceId: string) {
         },
       });
       await posting;
+      if (result.outcome === "finished" && input.mode !== "plan")
+        await saveSnapshot(job.scopeId, runId, input.agentId, input.conversationId);
       if (result.outcome !== "budget_exhausted") {
         if (result.outcome === "failed")
           await fail(result.message || "The coding tool stopped with an error.");
@@ -225,6 +229,22 @@ async function runTurns(job: CodingJob, deviceId: string) {
     unlistenEvents();
     unlistenAsk();
   }
+}
+
+/**
+ * Saves a snapshot of the project to the agent's Space after a run that could
+ * change it, so the Space keeps what it built. Misty's own agent has no Space.
+ * A failure only means no snapshot; the chat offers to save one again.
+ */
+async function saveSnapshot(
+  scopeId: string,
+  runId: string,
+  agentId?: string,
+  conversationId?: string,
+) {
+  if (!agentId || agentId === "misty-unified") return;
+  const { saveProjectSnapshot } = await import("../agentArtifacts");
+  await saveProjectSnapshot({ agentId, scopeId, runId, conversationId }).catch(() => undefined);
 }
 
 /** Starts the run and finishes the device job; the run reports on its own. */

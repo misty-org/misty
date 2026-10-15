@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/shared/ui";
 import { projectUndo } from "../../store/useAgentsStore";
 import { DiffCounts, DiffFile } from "./DiffView";
+import { SnapshotLine } from "./SnapshotLine";
 import type { DiffSet } from "./diffTypes";
 import { plainFailure, undoneText } from "./undoText";
 
@@ -45,12 +46,17 @@ export function RunChanges({
   runId,
   name,
   diff,
+  agentId,
+  conversationId,
   onReview,
 }: {
   scopeId: string;
   runId: string;
   name: string;
   diff: DiffSet;
+  /** The conversation's agent, whose Space keeps project snapshots. */
+  agentId?: string;
+  conversationId?: string;
   onReview(): void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -93,6 +99,15 @@ export function RunChanges({
         <p role="alert" className="misty-diff-note">
           {error}
         </p>
+      ) : null}
+      {agentId && agentId !== "misty-unified" ? (
+        <SnapshotLine
+          agentId={agentId}
+          scopeId={scopeId}
+          runId={runId}
+          conversationId={conversationId}
+          name={name}
+        />
       ) : null}
     </>
   );

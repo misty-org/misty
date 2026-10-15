@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GlobalAiMessage } from "@/features/global-search/types";
+import { useMistyStore } from "@/features/misty/useMistyStore";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Skeleton } from "@/shared/ui";
 import { agentsDeviceSnapshot, projectGitDiff, projectRunDiff } from "../../store/useAgentsStore";
@@ -61,6 +62,9 @@ export function AnswerChanges({
   const [name, setName] = useState("");
   const [changes, setChanges] = useState<Changes | null>();
   const openReview = useProjectReview((s) => s.open);
+  const agentId = useMistyStore(
+    (state) => state.conversations.find((item) => item.id === conversationId)?.agentId,
+  );
   useEffect(() => {
     if (!relevant || !scopeId) return;
     let current = true;
@@ -99,6 +103,8 @@ export function AnswerChanges({
             runId={run.runId}
             name={name}
             diff={run.diff}
+            agentId={agentId}
+            conversationId={conversationId}
             onReview={review}
           />
         ))}

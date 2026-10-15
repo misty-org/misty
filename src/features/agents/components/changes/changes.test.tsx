@@ -10,7 +10,13 @@ const store = vi.hoisted(() => ({
   projectCheckpoints: vi.fn(),
 }));
 vi.mock("../../store/useAgentsStore", () => store);
+const artifacts = vi.hoisted(() => ({
+  runSnapshotSpace: vi.fn(),
+  saveProjectSnapshot: vi.fn(),
+}));
+vi.mock("../../agentArtifacts", () => artifacts);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useConversationProject } from "../../store/useConversationProject";
 import { AnswerChanges } from "./AnswerChanges";
 import { DiffView } from "./DiffView";
@@ -72,6 +78,8 @@ beforeEach(() => {
     commitsPushed: 0,
   });
   useConversationProject.setState({ byConversation: { c1: "scope_site" } });
+  artifacts.runSnapshotSpace.mockResolvedValue(null);
+  artifacts.saveProjectSnapshot.mockResolvedValue({ space: { id: "space_1", name: "Bakery" } });
 });
 afterEach(() => {
   cleanup();
@@ -138,6 +146,29 @@ describe("AnswerChanges", () => {
     expect(screen.getByRole("status").textContent).toBe(
       "Changes to bakery-site undone. Its 2 commits were already pushed, so they stay; only the files went back.",
     );
+  });
+
+  it("says where the run's snapshot went, or saves one now", async () => {
+    store.projectRunDiff.mockResolvedValue(diff);
+    useMistyStore.setState({
+      conversations: [{ id: "c1", agentId: "agent_1" }],
+    } as unknown as Partial<ReturnType<typeof useMistyStore.getState>>);
+    const subagents = [{ invocationId: "invocation_child", goal: "Fix", state: "completed" }];
+    render(<AnswerChanges message={answer({ subagents })} conversationId="c1" />);
+    await act(async () => {});
+    expect(artifacts.runSnapshotSpace).toHaveBeenCalledWith("agent_1", "invocation_child");
+    fireEvent.click(screen.getByRole("button", { name: "Save a snapshot" }));
+    await act(async () => {});
+    expect(artifacts.saveProjectSnapshot).toHaveBeenCalledWith({
+      agentId: "agent_1",
+      scopeId: "scope_site",
+      runId: "invocation_child",
+      conversationId: "c1",
+    });
+    expect(screen.getByText("A snapshot of bakery-site is saved in Bakery.")).toBeTruthy();
+    useMistyStore.setState({ conversations: [] } as unknown as Partial<
+      ReturnType<typeof useMistyStore.getState>
+    >);
   });
 
   it("falls back to the project's uncommitted changes when a run can't be undone", async () => {

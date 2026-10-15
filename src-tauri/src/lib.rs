@@ -472,6 +472,8 @@ pub fn run() {
                     #[cfg(desktop)]
                     app::checkpoint_commands::project_undo,
                     #[cfg(desktop)]
+                    app::checkpoint_commands::project_snapshot,
+                    #[cfg(desktop)]
                     app::project_commands::project_legacy_flags,
                     #[cfg(desktop)]
                     app::project_commands::project_legacy_flags_done,
