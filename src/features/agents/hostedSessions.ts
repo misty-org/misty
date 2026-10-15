@@ -106,7 +106,7 @@ function keepAlive(session: HostedSession) {
 }
 
 /** How many tabs of its own one session may hold. */
-const maxOwnTabs = 8;
+const maxOwnTabs = 16;
 
 /** Opens another hidden tab in a session, bound to its task, and returns the tab's scope. */
 async function openSessionTab(session: HostedSession, url: string, signal: AbortSignal): Promise<string> {

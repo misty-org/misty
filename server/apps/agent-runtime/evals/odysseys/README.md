@@ -7,7 +7,7 @@ Each task is one composer request on the local stack, with this computer as the 
 Differences from the paper's setup, kept on purpose:
 
 - The agent is Misty's product (its tools, its own tab, web search and fetch), not a screenshot-only computer-use loop in a VM.
-- The judge runs on a Claude model on Misty's own key (`MISTY_ODYSSEYS_JUDGE`), not Gemini 3.1 Flash-Lite, and sees at most the last 24 screenshots.
+- The judge runs on a Claude model on Misty's own key (`MISTY_ODYSSEYS_JUDGE`), not Gemini 3.1 Flash-Lite, and sees at most the last 60 screenshots (unchanged pages are pictured once).
 - The browser profile has no saved sign-ins (`MISTY_EVAL_EPHEMERAL_PAGES=1` on the desktop).
 
 ## Splits

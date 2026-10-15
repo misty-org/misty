@@ -3,7 +3,8 @@
 // the trajectory's action history and every screenshot in order, and the same
 // success/failure parse. A rubric scores 1 when the trajectory satisfies it; a task is
 // perfect when every rubric does. Differences from the official runs are only the judge
-// model (MISTY_ODYSSEYS_JUDGE, a Claude model on Misty's own key) and a cap on pictures.
+// model (MISTY_ODYSSEYS_JUDGE, a Claude model on Misty's own key) and a cap of 60 pictures
+// (the recorder skips unchanged ones, so long runs rarely reach it).
 import { readFileSync } from "node:fs";
 import { generateText } from "ai";
 import { RoutedModel } from "../../src/model-calls.js";
@@ -47,7 +48,7 @@ export interface TaskVerdict {
 }
 
 /** Grades every rubric of one task; the last `maxImages` screenshots go to each call. */
-export async function judgeTask(model: string, task: OdysseysTask, steps: Step[], screenshots: string[], maxImages = 24): Promise<TaskVerdict> {
+export async function judgeTask(model: string, task: OdysseysTask, steps: Step[], screenshots: string[], maxImages = 60): Promise<TaskVerdict> {
   const history = steps.map((step, index) => {
     const parts = [step.response.trim() ? `Response: ${step.response.trim()}` : "", step.action ? `Action: ${step.action}` : ""].filter(Boolean);
     return parts.length ? `${index + 1}. ${parts.join("\n")}` : "";

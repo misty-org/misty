@@ -280,7 +280,7 @@ func fnv32(text string) uint32 {
 }
 
 // maxOwnTabs is how many tabs of its own a run may keep open on one device.
-const maxOwnTabs = 8
+const maxOwnTabs = 16
 
 // sessionOpened tells the agent which of its own tabs it is in, and lists every one.
 func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json.RawMessage, error) {
@@ -297,7 +297,7 @@ func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json
 	}
 	return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "tabs": tabs, "catalog_changed": true,
 		"message": opened + " (scopeId " + scopeID + "). Browser tools act on it from your next step; pass its scopeId. " + next + ", and keep working in this run. " +
-			"Your open tabs: " + strings.Join(tabs, ", ") + ". To keep another page open beside these, call screen_open again with its url (up to 8 tabs)."})
+			"Your open tabs: " + strings.Join(tabs, ", ") + ". Open a new tab (screen_open with its url, up to 16) only for a page the person wants kept open; read other pages by navigating a tab you have."})
 }
 
 // TestingOpenRemoteSession runs screen_open for a stored request.

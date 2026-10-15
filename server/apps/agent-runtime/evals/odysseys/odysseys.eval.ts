@@ -49,7 +49,16 @@ export interface OdysseysRun {
   dir: string;
 }
 
-async function runTask(client: EvalClient, task: OdysseysTask, agentId: string, userId: string, dir: string): Promise<OdysseysRun> {
+interface Performed {
+  task: OdysseysTask;
+  dir: string;
+  recorder: Recorder;
+  result: Awaited<ReturnType<EvalClient["run"]>>;
+  seconds: number;
+}
+
+/** Runs one task through the product path and records it; grading comes later. */
+async function perform(client: EvalClient, task: OdysseysTask, agentId: string, userId: string, dir: string): Promise<Performed> {
   const recorder = new Recorder(dir, bridge);
   await recorder.start();
   const started = performance.now();
@@ -60,6 +69,11 @@ async function runTask(client: EvalClient, task: OdysseysTask, agentId: string, 
   const result = await client.run(body, 20 * 60_000, [], (event) => recorder.observe(event));
   const seconds = (performance.now() - started) / 1000;
   await recorder.finish(result.answer);
+  return { task, dir, recorder, result, seconds };
+}
+
+/** Judges a recorded run and prices it; runs beside the next task's run. */
+async function grade({ task, dir, recorder, result, seconds }: Performed): Promise<OdysseysRun> {
   const verdict = await judgeTask(judgeModel, task, recorder.steps, recorder.screenshots);
   const usage = await runUsage(result.invocationId).catch(() => undefined);
   const searches = result.tools.filter((tool) => tool === "web_search").length;
@@ -74,6 +88,14 @@ async function runTask(client: EvalClient, task: OdysseysTask, agentId: string, 
   writeFileSync(join(dir, "result.json"), JSON.stringify({ ...run, prompt: task.prompt, rubrics: verdict.rubrics }, null, 2));
   return run;
 }
+
+const failedRun = (task: OdysseysTask, dir: string, error: unknown): OdysseysRun => ({
+  taskId: task.id, level: task.level, split: task.split, referenceLength: task.referenceLength, terminal: `error: ${String(error).slice(0, 200)}`,
+  perfect: false, average: 0, failed: [], tools: [], turns: 0, seconds: 0, costUsd: 0, answer: "", dir,
+});
+
+const line = (run: OdysseysRun) =>
+  `${run.perfect ? "PERFECT" : "FAIL"} ${run.level} ${run.taskId.slice(0, 10)} rubric ${run.average.toFixed(2)} ${run.seconds}s ${run.tools.length} tools $${run.costUsd.toFixed(3)} ${run.terminal}${run.failed.length ? ` — missed ${run.failed.map((item) => item.id).join(",")}` : ""}\n`;
 
 /** Four failures among a batch's first six finished tasks stop the pass: fix before spending more. */
 export function shouldStop(batch: OdysseysRun[]): boolean {
@@ -109,32 +131,42 @@ it.skipIf(env("MISTY_ODYSSEYS") !== "1")("runs Odysseys tasks through the produc
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const root = join(here, "reports", stamp);
   const runs: OdysseysRun[] = [];
+  const grading: Array<Promise<void>> = [];
   let stopped = "";
+  let refusedInARow = 0;
   for (const task of tasks) {
     if (!ledger.allows()) {
       stopped = `cap: $${ledger.spent.toFixed(2)} of $${ledger.cap.toFixed(2)} spent`;
       break;
     }
-    const dir = join(root, task.id.slice(0, 10));
-    mkdirSync(dir, { recursive: true });
-    let run: OdysseysRun;
-    try {
-      run = await runTask(client, task, agentId, me.id, dir);
-    } catch (error) {
-      run = { taskId: task.id, level: task.level, split: task.split, referenceLength: task.referenceLength, terminal: `error: ${String(error).slice(0, 200)}`,
-        perfect: false, average: 0, failed: [], tools: [], turns: 0, seconds: 0, costUsd: 0, answer: "", dir };
-    }
-    runs.push(run);
-    process.stderr.write(`${run.perfect ? "PERFECT" : "FAIL"} ${task.level} ${task.id.slice(0, 10)} rubric ${run.average.toFixed(2)} ${run.seconds}s ${run.tools.length} tools $${run.costUsd.toFixed(3)} ${run.terminal}${run.failed.length ? ` — missed ${run.failed.map((item) => item.id).join(",")}` : ""}\n`);
-    if (runs.slice(-3).length === 3 && runs.slice(-3).every(infrastructure)) {
-      stopped = `three runs in a row never reached the agent (${run.terminal}): check the stack's logs and disk`;
-      break;
-    }
+    // Stop on the judgments that have come back, without waiting for the rest.
     if (earlyStop && shouldStop(runs)) {
       stopped = "4 of the first 6 tasks failed: attribute and fix before running more";
       break;
     }
+    const dir = join(root, task.id.slice(0, 10));
+    mkdirSync(dir, { recursive: true });
+    let performed: Performed;
+    try {
+      performed = await perform(client, task, agentId, me.id, dir);
+      refusedInARow = 0;
+    } catch (error) {
+      const run = failedRun(task, dir, error);
+      runs.push(run);
+      process.stderr.write(line(run));
+      if (++refusedInARow >= 3) {
+        stopped = `three runs in a row never reached the agent (${run.terminal}): check the stack's logs and disk`;
+        break;
+      }
+      continue;
+    }
+    grading.push(grade(performed).catch((error) => failedRun(task, dir, error)).then((run) => {
+      runs.push(run);
+      process.stderr.write(line(run));
+    }));
   }
+  await Promise.all(grading);
+  if (!stopped && earlyStop && shouldStop(runs)) stopped = "4 of the first 6 tasks failed: attribute and fix before running more";
   mkdirSync(root, { recursive: true });
   const report = { model, effort, judgeModel, split, offset, limit, stopped, ledgerUsd: Number(ledger.spent.toFixed(4)), summary: summary(runs), runs };
   writeFileSync(join(root, "report.json"), JSON.stringify(report, null, 2));

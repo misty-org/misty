@@ -58,9 +58,10 @@ function stageFor(cost: number, scale = 1): ResearchStage {
 }
 
 /**
- * A long request earns a longer budget: one base allowance for every two steps of the
- * run's own checklist (log_work_checklist), never less than one. A quick question has no
- * checklist and keeps the base budget (docs/plans/odysseys-campaign.md).
+ * A long request earns a longer budget: one base allowance for every step of the run's
+ * own checklist (log_work_checklist), never less than one. A quick question has no
+ * checklist and keeps the base budget; a six-part task gets about 36 lookups before the
+ * wrap-up note (docs/plans/odysseys-campaign.md).
  */
 export function budgetScale(messages: ModelMessage[]): number {
   const steps = new Set<string>();
@@ -72,7 +73,7 @@ export function budgetScale(messages: ModelMessage[]): number {
       for (const item of items) if (typeof item?.id === "string") steps.add(item.id);
     }
   }
-  return Math.max(1, Math.ceil(steps.size / 2));
+  return Math.max(1, steps.size);
 }
 
 /** What the run has spent on research so far, read from its tool calls. */
