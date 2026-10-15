@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice and Memory Settings</title>
+<style>
+/* Monochrome only. Plain-list settings pages: no cards, hairlines between rows,
+   controls right-aligned to one edge, helper text under each label. */
+:root {
+  --bg: #0f0f10; --side: #141416; --line: #262629; --ink: #ececee; --muted: #8e8e93;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans); }
+.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+@media (max-width: 720px) { .shell { grid-template-columns: 1fr; } .side { display: none; } }
+.side { background: var(--side); border-right: 1px solid var(--line); padding: 14px 10px; display: grid; gap: 2px; align-content: start; }
+.search { height: 30px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 12.5px; display: flex; align-items: center; padding: 0 9px; margin-bottom: 8px; }
+.entry { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border-radius: 7px; color: #cfcfd2; font-size: 13.5px; cursor: pointer; border: 0; background: none; text-align: left; font-family: inherit; }
+.entry svg { width: 16px; height: 16px; }
+.entry[aria-current="page"] { background: #232326; color: var(--ink); }
+.page { padding: 26px 16px 60px; max-width: 760px; width: 100%; margin: 0 auto; }
+h2 { margin: 26px 0 2px; font-size: 13px; font-weight: 600; }
+h2:first-child { margin-top: 0; }
+.sec-help { color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
+.row .t { display: grid; gap: 1px; }
+.row .t span { color: var(--muted); font-size: 12.5px; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.switch { width: 34px; height: 20px; border-radius: 999px; background: #3a3a3e; position: relative; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #9a9aa0; }
+.switch.on { background: var(--ink); }
+.switch.on::after { left: 16px; background: var(--bg); }
+.segc { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; padding: 2px; }
+.segc span { padding: 3px 10px; font-size: 12.5px; color: var(--muted); border-radius: 5px; }
+.segc span.on { background: var(--ink); color: var(--bg); }
+.drop { border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; font-size: 12.5px; color: #d6d6d8; }
+.key { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; font-size: 12.5px; }
+.btn { font: 500 12.5px var(--sans); padding: 5px 11px; border-radius: 7px; border: 1px solid var(--line); background: #1e1e21; color: var(--ink); }
+.btn.danger { border-color: #4a4a4f; }
+.reset { color: var(--muted); font-size: 12px; }
+.list { display: grid; gap: 0; }
+.list div { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.notice { margin: 8px 0 0; padding: 9px 11px; border: 1px solid #3a3a3f; border-radius: 8px; font-size: 12.5px; color: #d6d6d8; display: flex; gap: 8px; }
+.notice svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="side" aria-label="Settings">
+    <div class="search">Search</div>
+    <button class="entry" data-page="voice" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10a7 7 0 0 1-14 0M12 17v5"/></svg>Voice</button>
+    <button class="entry" data-page="memory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Memory</button>
+  </nav>
+  <main class="page">
+    <section id="voice">
+      <h2>Dictation</h2>
+      <div class="sec-help">Hold a key, speak, release: the text lands wherever you're typing, in Misty or any app.</div>
+      <div class="row"><div class="t">Dictation shortcut<span>Hold to talk. Release to insert the text.</span></div><div class="ctl"><span class="reset">Reset</span><span class="key">Right ⌥</span></div></div>
+      <div class="row"><div class="t">Hands-free double-tap<span>Double-tap the shortcut to keep listening until you tap it again.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Hands-free double-tap"></span></div></div>
+      <div class="row"><div class="t">AI cleanup<span>Fixes punctuation and drops filler words before inserting. Uses your AI allowance.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="AI cleanup"></span></div></div>
+      <div class="row"><div class="t">Style<span>How cleaned-up text reads.</span></div><div class="ctl"><span class="segc"><span class="on">Plain</span><span>Casual</span><span>Formal</span></span></div></div>
+      <div class="row"><div class="t">Language<span>Detect automatically, or pin the language you speak.</span></div><div class="ctl"><span class="drop">Detect automatically ⌄</span></div></div>
+      <div class="row"><div class="t">Personal dictionary<span>Names and terms to spell your way. Also sent as context to transcription.</span></div><div class="ctl"><button class="btn">Edit…</button></div></div>
+      <div class="row"><div class="t">Hand off to agents by name<span>Starting with "Hey Juniper" sends the rest to that agent instead of typing it.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Hand off to agents by name"></span></div></div>
+      <h2>Captures</h2>
+      <div class="sec-help">Transcribing what you hear: a tab, system audio, the mic or a file.</div>
+      <div class="row"><div class="t">Default sources<span>Which audio a new capture starts with. You can change it each time.</span></div><div class="ctl"><span class="drop">Mic and this tab ⌄</span></div></div>
+      <div class="row"><div class="t">Keep recordings<span>Keep the audio with the transcript. Recordings count toward your storage.</span></div><div class="ctl"><span class="switch" role="switch" aria-checked="false" aria-label="Keep recordings"></span></div></div>
+    </section>
+    <section id="memory" hidden>
+      <h2>Memory</h2>
+      <div class="sec-help">Misty remembers what you did in Misty so you can ask "what was that, and when?". Only you can search it; it is never shared through a Space.</div>
+      <div class="row"><div class="t">Memory<span>Pages, agent conversations, voice, notes, drawings, downloads and recordings.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Memory"></span></div></div>
+      <div class="notice" role="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>Memory isn't being saved: this week's AI allowance is used. It resumes Monday.</div>
+      <h2>What to remember</h2>
+      <div class="sec-help">Turn off any kind you don't want kept.</div>
+      <div class="row"><div class="t">Pages<span>Readable text of pages you stay on for a few seconds.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Pages"></span></div></div>
+      <div class="row"><div class="t">Agent conversations<span>What you asked and a short summary of the reply.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Agent conversations"></span></div></div>
+      <div class="row"><div class="t">Voice and recordings<span>Dictations, capture transcripts and recordings.</span></div><div class="ctl"><span class="switch on" role="switch" aria-checked="true" aria-label="Voice and recordings"></span></div></div>
+      <h2>Never remember</h2>
+      <div class="sec-help">Private windows, password and payment fields are never remembered.</div>
+      <div class="row"><div class="t">Sensitive categories<span>Skipped by default. Turn one off only if you want it remembered.</span></div><div class="ctl"><span class="drop">4 skipped ⌄</span></div></div>
+      <div class="list" aria-label="Sensitive categories">
+        <div>Banking<span aria-label="Skipped">✓</span></div><div>Password managers<span aria-label="Skipped">✓</span></div><div>Health<span aria-label="Skipped">✓</span></div><div>Misty settings<span aria-label="Skipped">✓</span></div>
+      </div>
+      <div class="row"><div class="t">Excluded sites<span>Pages on these sites are never remembered.</span></div><div class="ctl"><button class="btn">Add site…</button></div></div>
+      <div class="list" aria-label="Excluded sites"><div>mail.example.com<span class="reset">Remove</span></div></div>
+      <h2>Your memory</h2>
+      <div class="sec-help">Forgetting deletes it from search and from the server. It can't be undone.</div>
+      <div class="row"><div class="t">Pause<span>Stop remembering for an hour. Also on the island.</span></div><div class="ctl"><button class="btn">Pause for an hour</button></div></div>
+      <div class="row"><div class="t">Forget a range<span>Delete everything remembered in a time range.</span></div><div class="ctl"><button class="btn">Forget…</button></div></div>
+      <div class="row"><div class="t">Export<span>A zip of Markdown and media for every day you choose.</span></div><div class="ctl"><button class="btn">Export…</button></div></div>
+      <div class="row"><div class="t">Delete all memory<span>Removes every remembered event on every device.</span></div><div class="ctl"><button class="btn danger">Delete all…</button></div></div>
+    </section>
+  </main>
+</div>
+<script>
+document.querySelectorAll('.entry').forEach(e => e.addEventListener('click', () => {
+  document.querySelectorAll('.entry').forEach(x => x.toggleAttribute('aria-current', x === e) || x.removeAttribute('aria-current'));
+  e.setAttribute('aria-current', 'page');
+  document.getElementById('voice').hidden = e.dataset.page !== 'voice';
+  document.getElementById('memory').hidden = e.dataset.page !== 'memory';
+}));
+</script>
+</body>
+</html>
