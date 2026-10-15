@@ -127,8 +127,13 @@ func (s *SpacesService) CodingLease() http.HandlerFunc {
 			writeSpaceError(w, err)
 			return
 		}
+		// A new lease means the device finished its last turn: settle the old ones.
+		if err := s.settleCodingLeases(r.Context(), run, lease.ID); err != nil {
+			writeBillingError(w, err)
+			return
+		}
 		if s.usageMeter != nil {
-			if _, err := serveragent.ReserveMeasuredUsage(s.usageMeter, user, codingUsageKey(run.record.ID, lease.ID), body.Engine,
+			if _, err := serveragent.ReserveMeasuredUsage(s.usageMeter, user, codingUsageKey(run.record.ID, lease.ID), codingBillingProvider(body.Engine),
 				firstAIText(body.Model, body.Engine), map[string]int64{"external_tokens": budget}, "coding:"+run.record.ID); err != nil {
 				writeBillingError(w, err)
 				return

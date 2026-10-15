@@ -284,6 +284,7 @@ variables and deliberate compatibility aliases are called out separately below.
 | `MISTY_BILLING_ADAPTER` | `integrations/billing.env` | `server/internal/app/health.go` · `server/internal/platform/config/billing.go` |
 | `MISTY_BILLING_URL` | `integrations/billing.env` | `server/internal/app/health.go` · `server/internal/platform/config/billing.go` |
 | `MISTY_BILLING_SECRET` | `integrations/billing.env` | `server/internal/app/health.go` · `server/internal/platform/config/billing.go` |
+| `MISTY_CODING_EXTERNAL_FACTOR` | `integrations/billing.env` | `server/internal/platform/httpapi/coding_pricing.go` |
 | `MISTY_DROPBOX_CLIENT_ID` | `integrations/dropbox.env` | `server/internal/platform/httpapi/connected_accounts_oauth.go` · `server/internal/platform/httpapi/cloud_connections_cloud_o_auth_definition.go` |
 | `MISTY_DROPBOX_CLIENT_SECRET` | `integrations/dropbox.env` | `server/internal/platform/httpapi/connected_accounts_oauth.go` · `server/internal/platform/httpapi/cloud_connections_cloud_o_auth_definition.go` |
 | `MAILJET_API_KEY` | `integrations/email.env` | `server/internal/app/health.go` · `server/internal/platform/email/sender_config.go` |
