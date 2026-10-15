@@ -26,6 +26,7 @@ export const projectCapabilities = [
   "code.processes",
   "code.stop",
   "code.preview",
+  "code.delegate",
   "git.status",
   "git.diff",
   "git.log",

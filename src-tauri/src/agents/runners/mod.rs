@@ -10,7 +10,9 @@ pub mod events;
 pub mod lease;
 pub mod mirror;
 pub mod registry;
+pub mod route;
 pub mod session;
+pub mod tauri_host;
 
 use std::{fmt, path::PathBuf};
 
@@ -207,6 +209,8 @@ pub const BYPASS_MARKERS: [&str; 7] = [
 
 #[cfg(test)]
 mod adapter_tests;
+#[cfg(test)]
+mod route_tests;
 #[cfg(test)]
 mod session_tests;
 #[cfg(test)]

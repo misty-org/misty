@@ -92,7 +92,8 @@ func planModeTools(toolbox *agenttools.Registry, names []string) []string {
 	}
 	allowed := make([]string, 0, len(names))
 	for _, name := range names {
-		if risk[name] == serveragent.RiskRead && planModeToolPermitted(name) {
+		// Delegated coding inherits Plan: the tool gets a read-only launch.
+		if (risk[name] == serveragent.RiskRead || name == codeDelegateTool) && planModeToolPermitted(name) {
 			allowed = append(allowed, name)
 		}
 	}

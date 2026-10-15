@@ -42,3 +42,11 @@ export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
 export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
 export type { AgentGrant } from "./grants/api";
+export {
+  codingAllowance,
+  codingToolName,
+  codingToolStatusText,
+  codingTools,
+  detectCodingTools,
+} from "./coding/codingTools";
+export type { CodingAllowance, CodingTool, CodingToolStatus } from "./coding/codingTools";

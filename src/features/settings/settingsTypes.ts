@@ -28,6 +28,7 @@ export type SettingsSection =
   | "agents-memory"
   | "agents-connections"
   | "agents-permissions"
+  | "agents-coding"
   | "agents-companion"
   | "agents-usage"
   | "account"

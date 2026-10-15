@@ -42,7 +42,10 @@ use app::device_job_commands::{
     device_read_shared_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
 #[cfg(desktop)]
-use app::runner_commands::{coding_engines_detect, coding_runner_stop};
+use app::runner_commands::{
+    coding_engines_detect, coding_project_remote, coding_route, coding_run_turn, coding_runner_answer,
+    coding_runner_stop,
+};
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
 #[cfg(desktop)]
@@ -456,6 +459,14 @@ pub fn run() {
                     coding_engines_detect,
                     #[cfg(desktop)]
                     coding_runner_stop,
+                    #[cfg(desktop)]
+                    coding_route,
+                    #[cfg(desktop)]
+                    coding_project_remote,
+                    #[cfg(desktop)]
+                    coding_run_turn,
+                    #[cfg(desktop)]
+                    coding_runner_answer,
                     #[cfg(desktop)]
                     device_read_shared_file,
                     #[cfg(desktop)]

@@ -37,7 +37,7 @@ var deviceAgentCapabilities = map[string]bool{
 	"browser.session": true,
 	// Code projects on the chat's own computer (docs/plans/agent-code-projects.md).
 	"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.write": true, "code.edit": true,
-	"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true,
+	"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true, "code.delegate": true,
 	// Git for projects (docs/plans/agent-git-projects.md).
 	"git.status": true, "git.diff": true, "git.log": true, "git.branch": true, "git.pull": true, "git.pull_request": true,
 }
@@ -51,7 +51,7 @@ var deviceContextCapabilities = map[string]map[string]bool{
 	"project_folder": {
 		"files.list": true, "files.read": true, "files.send": true,
 		"code.read": true, "code.list": true, "code.find": true, "code.search": true, "code.write": true, "code.edit": true,
-		"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true,
+		"code.run": true, "code.start": true, "code.logs": true, "code.processes": true, "code.stop": true, "code.preview": true, "code.delegate": true,
 		"git.status": true, "git.diff": true, "git.log": true, "git.commit": true, "git.branch": true,
 		"git.push": true, "git.pull": true, "git.pull_request": true,
 	},
