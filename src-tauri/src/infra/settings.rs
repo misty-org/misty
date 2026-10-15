@@ -281,6 +281,24 @@ fn normalize_settings_document(document: &mut Value) -> bool {
     if let Some(shortcuts) = root.get_mut("shortcuts").and_then(Value::as_object_mut) {
         changed |= shortcuts.remove("custom_shortcuts_enabled").is_some();
     }
+    // Voice (docs/design/voice-memory/BRIEF.md). Dictation's shortcut is empty
+    // for the platform default: Fn/Globe on macOS, Right Alt on Windows.
+    changed |= ensure_section_defaults(
+        root,
+        "voice",
+        &[
+            ("dictation_enabled", json!(true)),
+            ("dictation_shortcut", json!("")),
+            ("dictation_hands_free", json!(true)),
+            ("dictation_cleanup", json!(true)),
+            ("dictation_style", json!("plain")),
+            ("language", json!("auto")),
+            ("dictionary", json!("")),
+            ("agent_handoff", json!(true)),
+            ("capture_sources", json!("mic-tab")),
+            ("keep_recordings", json!(false)),
+        ],
+    );
     changed |= ensure_section_defaults(
         root,
         "advanced",

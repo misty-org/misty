@@ -61,7 +61,7 @@ func TestLiveChannelsAreMicAndSystemOnce(t *testing.T) {
 }
 
 func TestLiveRolesHaveDefaultModels(t *testing.T) {
-	for _, role := range []string{"live-transcription", "diarized-transcription"} {
+	for _, role := range []string{"live-transcription", "diarized-transcription", "dictation-cleanup"} {
 		if model := defaultRoleModel(role); !strings.Contains(model, "/") {
 			t.Fatalf("%s default = %q", role, model)
 		}

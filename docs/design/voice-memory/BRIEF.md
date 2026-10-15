@@ -81,9 +81,22 @@ monochrome and shows:
 - Mute
 - once the key is released, a quiet "Cleaning up…" spinner before the text lands
 
-There is no "Loading…" text. The pill appears on key-down from the pre-rolled audio,
-before the network is ready. Saying "Hey <agent name>, …" at the start sends the rest to
+There is no "Loading…" text. The pill appears on key-down, before the network is
+ready: the microphone's first audio waits in the renderer while the ticket and socket
+open (up to 30 s), then goes first.
+
+No warm ticket is held between dictations. Each ticket reserves its audio allowance
+until it settles, so an unused warm ticket would hold billing for its whole window.
+The pre-roll covers the ticket's round trip instead. Saying "Hey <agent name>, …" at the start sends the rest to
 that agent instead of typing it, and the pill says where it went.
+
+Insertion:
+- Fields in Misty's own window get the text directly, with no clipboard.
+- A web page in a Misty tab, like any other app, gets a clipboard paste. The saved
+  clipboard is restored unless it changed, and paste waits for the dictation keys to
+  be released. Windows terminals get Ctrl+Shift+V; macOS terminals take Cmd+V.
+- If Accessibility isn't allowed yet, macOS asks once and the text stays on the
+  clipboard.
 
 ### Capture Note
 A Note in your personal Space, opened when a capture starts. It has three parts:

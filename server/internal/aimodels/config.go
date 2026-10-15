@@ -39,6 +39,8 @@ var Roles = []Role{
 	// catalog model fits them, so they keep Misty's defaults.
 	{"live-transcription", false},
 	{"diarized-transcription", false},
+	// Tidying dictation before it is typed: the fast model.
+	{"dictation-cleanup", false},
 }
 
 // Sense is a user-facing model choice. Kind says which Gateway models fit it.

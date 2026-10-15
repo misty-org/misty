@@ -14,6 +14,7 @@ mod infra;
 mod platform;
 mod shell_plugins;
 mod telemetry;
+mod voice;
 
 #[cfg(desktop)]
 use app::commands::{};
@@ -253,6 +254,8 @@ pub fn run() {
             app.manage(std::sync::Arc::new(
                 infra::cursor_companion::CursorCompanionState::default(),
             ));
+            #[cfg(any(target_os = "macos", windows))]
+            app.manage(voice::DictationState::default());
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -500,6 +503,14 @@ pub fn run() {
                     infra::extension_popup::extension_popup_close,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_configure,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_configure,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_stop,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_insert,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_pill_hide,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_interrupt,
                     #[cfg(any(target_os = "macos", windows))]

@@ -1,4 +1,5 @@
 import { CursorCompanionController } from "@/features/agents";
+import { DictationController } from "@/features/voice";
 import { type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
@@ -295,7 +296,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               />
             )}
             {!isAuthRoute && user?.id ? (
-              <CursorCompanionController key={user.id} accountId={user.id} />
+              <>
+                <CursorCompanionController key={user.id} accountId={user.id} />
+                <DictationController key={`dictation-${user.id}`} />
+              </>
             ) : null}
           </>
         </section>
