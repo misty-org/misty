@@ -104,6 +104,8 @@ func grantLabel(grant db.AgentGrant) string {
 		return "Install packages in " + scope
 	case serveragent.GrantGitPush:
 		return "Push to " + scope
+	case serveragent.GrantRecallRead:
+		return "Search your Memory"
 	}
 	return grant.Action
 }
@@ -145,6 +147,10 @@ func (s *SpacesService) validateGrantScope(ctx context.Context, user string, req
 		}
 	case serveragent.ScopeProject, serveragent.ScopeRepo:
 		return s.validateCodingScope(ctx, user, kind, request.GrantScopeID)
+	case serveragent.ScopeRecall:
+		if request.GrantScopeID != serveragent.RecallScopeID {
+			return db.ErrSpaceInvalid
+		}
 	}
 	return nil
 }

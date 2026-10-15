@@ -32,6 +32,7 @@ export type SettingsSection =
   | "agents-companion"
   | "agents-usage"
   | "voice"
+  | "recall"
   | "account"
   | "general"
   | "sync"

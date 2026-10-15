@@ -54,3 +54,26 @@ func TestGrantScopes(t *testing.T) {
 		t.Fatal("unknown actions always pause")
 	}
 }
+
+func TestRecallGrantsAreScopedToMemoryAndForgettingAlwaysAsks(t *testing.T) {
+	if !Rememberable(GrantRecallRead) || ClassOf(GrantRecallRead) != ClassPermission {
+		t.Fatal("searching Memory should be a rememberable permission")
+	}
+	if !ValidGrantScope(GrantRecallRead, ScopeRecall, RecallScopeID) || ValidGrantScope(GrantRecallRead, ScopeSpace, "space-1") || ValidGrantScope(GrantRecallRead, ScopeRecall, "*") {
+		t.Fatal("a Memory grant names Memory and nothing else")
+	}
+	if Rememberable(ActionRecallForget) || ClassOf(ActionRecallForget) != ClassNeverRemember {
+		t.Fatal("forgetting must never be remembered")
+	}
+	for _, mode := range []string{PermissionAsk, PermissionAuto} {
+		if Decide(mode, ClassOf(ActionRecallForget), true) != DecisionPause {
+			t.Fatalf("forgetting continued without asking in %s", mode)
+		}
+		if Decide(mode, ClassOf(GrantRecallRead), false) != DecisionPause {
+			t.Fatalf("searching Memory continued without permission in %s", mode)
+		}
+	}
+	if Decide(PermissionAuto, ClassOf(GrantRecallRead), true) != DecisionAllow || Decide(PermissionAsk, ClassOf(GrantRecallRead), true) != DecisionPause {
+		t.Fatal("a remembered Memory grant applies in Auto only")
+	}
+}

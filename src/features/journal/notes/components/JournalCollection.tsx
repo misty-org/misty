@@ -1,6 +1,7 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
+import { JournalDay } from "../../day/JournalDay";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import {
@@ -42,12 +43,13 @@ export function JournalCollection(props: {
   const navigate = useNavigate();
   const creatorName = useSpaceItemCreator(props.spaceId);
   const [params, setParams] = useSearchParams();
+  const section = params.get("section");
   const filter =
-    params.get("section") === "notes"
-      ? "notes"
-      : params.get("section") === "pinned"
-        ? "pinned"
-        : "all";
+    section === "notes" ||
+    section === "pinned" ||
+    (section === "day" && journalSections.some((s) => s.value === "day"))
+      ? section
+      : "all";
   const selectSection = (value: string) => {
     if (value === "drawings") navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`);
     else {
@@ -78,6 +80,19 @@ export function JournalCollection(props: {
     },
   );
   const notes = refinement.items;
+  if (filter === "day")
+    return (
+      <JournalDay
+        filters={
+          <CollectionFilters
+            collectionId="journal"
+            options={journalSections}
+            value="day"
+            onChange={selectSection}
+          />
+        }
+      />
+    );
   if (filter === "all" || filter === "pinned")
     return <JournalAllCollection {...props} section={filter} onSection={selectSection} />;
   return (

@@ -6,6 +6,7 @@ import {
   Info,
   Keyboard,
   Layers,
+  History,
   Mic,
   MonitorSmartphone,
   Palette,
@@ -43,6 +44,7 @@ import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { UsageSection } from "./sections/UsageSection";
 import { VoiceSection } from "./sections/VoiceSection";
+import { MemorySection } from "./sections/MemorySection";
 import { CodingToolsSection } from "./sections/CodingToolsSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -59,6 +61,7 @@ export type SettingsArea =
   | "spaces"
   | "agents"
   | "voice"
+  | "memory"
   | "sync"
   | "devices"
   | "privacy"
@@ -72,6 +75,7 @@ export const settingsAreas: Record<SettingsArea, { label: string; icon: LucideIc
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
   voice: { label: "Voice", icon: Mic },
+  memory: { label: "Memory", icon: History },
   sync: { label: "Sync", icon: RefreshCw },
   devices: { label: "Devices", icon: MonitorSmartphone },
   privacy: { label: "Privacy", icon: Shield },
@@ -140,6 +144,7 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   page("agents", "agents-coding", "Coding tools", CodingToolsSection, "resource", true),
   page("agents", "agents-companion", "Companion", CompanionSection, "account"),
   page("voice", "voice", "Voice", VoiceSection, "account", true),
+  page("memory", "recall", "Memory", MemorySection, "account", true),
   page("sync", "sync", "Sync", BrowserSyncSettings),
   page("devices", "devices", "Devices", DevicesSection, "account"),
   page("privacy", "privacy", "Privacy", PrivacySection, "account"),

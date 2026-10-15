@@ -66,7 +66,7 @@ therefore uses its own namespace in code:
 
 People still see "Memory" in Settings, the Journal and the island. The database keeps the
 plan's names: `memory_events` and `memory_backlog`, with retrieval kinds `memory_page`,
-`memory_voice`, `memory_recording` and `memory_agent_turn`.
+`memory_voice`, `memory_recording` and `memory_note`.
 
 ## Surfaces
 
@@ -157,6 +157,15 @@ row with the kind's icon tone. Above the timeline sit an AI summary from `day-su
 and search. Every row has "Forget this", and the header has Export (a zip of Markdown
 plus media).
 
+As built in Phase 4 (revision 2):
+- The Journal shows the day as a "Day" section beside All, Notes and Pinned, behind the
+  `recall` flag. It has a day-by-day timeline and a Summarize button.
+- Search, "Forget this" on a row, and media in the export are not built yet. Forget
+  (last hour, today, everything) and Export (`memory.jsonl` plus a Markdown page per
+  day) live in Settings › Memory.
+- The summary is shown, not saved. Notes get their content through the collaborative
+  editor, so a server-written day Note is a follow-up.
+
 ## Architecture
 
 ```
@@ -170,6 +179,22 @@ voice/dictation → insert (page | paste)
 recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memory_events
                                                                   ─▶ ai_retrieval (memory_*)
 ```
+
+Memory indexing, as built:
+- A trigger on `memory_events` writes each event that has text as a **private**
+  retrieval document (owner only, no Space).
+- The existing embedding worker embeds private documents and bills their owner. Its
+  billing operation is `library.embedding`; a separate `memory` operation needs a
+  `misty-billing` change and is a follow-up.
+- A second trigger takes the event off `memory_backlog` once its embedding lands.
+- General retrieval search (global search, `search.all` and the context broker) excludes
+  `memory_*` documents. Only the gated `recall.*` tools search them.
+- The page recorder reads the reader article (the same extraction as reader mode). That
+  extraction skips forms and fields, so typed values are never read.
+- A revisit within 6 simhash bits of the last kept visit stores a pointer, not the text
+  again.
+- Device settings live in the `recall` section of the settings document. Agent
+  preferences already use the name "memory".
 
 - **`audeeo-core`** lives in the owner's Audeeo repo (branch `audeeo-core`):
   - the Rust crate `crates/audeeo-core`
@@ -234,7 +259,7 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
      Voice also counts toward the weekly AI limit; whichever runs out first stops it.
    - **Per ticket:** `MISTY_VOICE_LIVE_TICKET_MINUTES` (15) per channel. The relay
      stops at the limit and keeps what was heard.
-   - **Memory backlog cap:** `MISTY_MEMORY_BACKLOG_CAP=2000` events waiting to embed.
+   - **Memory backlog cap:** `MISTY_RECALL_BACKLOG_CAP=2000` events waiting to embed.
      Past it the recorder stops and says so.
 
 ## Privacy rules

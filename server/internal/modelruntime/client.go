@@ -291,6 +291,36 @@ func (c *Client) VoiceNotes(ctx context.Context, request VoiceNotesRequest) (Voi
 	return result, err
 }
 
+// DaySummaryRequest summarizes one day of the person's Memory.
+type DaySummaryRequest struct {
+	Route           Route     `json:"route"`
+	Model           string    `json:"model"`
+	Date            string    `json:"date"`
+	Items           []DayItem `json:"items"`
+	Language        string    `json:"language,omitempty"`
+	MaxOutputTokens int64     `json:"maxOutputTokens,omitempty"`
+}
+
+type DayItem struct {
+	At      string `json:"at"`
+	Kind    string `json:"kind"`
+	Title   string `json:"title"`
+	Site    string `json:"site,omitempty"`
+	Excerpt string `json:"excerpt,omitempty"`
+}
+
+type DaySummaryResult struct {
+	Markdown string   `json:"markdown"`
+	Topics   []string `json:"topics"`
+	Usage    Usage    `json:"usage"`
+}
+
+func (c *Client) DaySummary(ctx context.Context, request DaySummaryRequest) (DaySummaryResult, error) {
+	var result DaySummaryResult
+	err := c.post(ctx, "/v1/models/day-summary", request, &result)
+	return result, err
+}
+
 // SearchRequest runs one web search through the AI Gateway's search tools.
 // Model is the small model that issues the search call; Engine is parallel,
 // perplexity or exa.

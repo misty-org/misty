@@ -48,10 +48,14 @@ func voiceTestDB(t *testing.T) *Database {
 	if _, err = conn.Exec(`CREATE TABLE account_cloud_mutations(transaction_id bigint,user_id text,added_bytes bigint,removed_bytes bigint);
  CREATE TABLE users(id text PRIMARY KEY); INSERT INTO users VALUES('owner'),('other');
  CREATE FUNCTION misty_rls_user_id() RETURNS text LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('app.current_user_id',true),'') $$;
+ CREATE TABLE ai_retrieval_documents(id text PRIMARY KEY, source_kind text NOT NULL, source_id text NOT NULL, owner_user_id text, privacy_class text NOT NULL,
+   lifecycle_state text NOT NULL DEFAULT 'active', source_revision text NOT NULL, title text NOT NULL, href text NOT NULL, metadata jsonb NOT NULL DEFAULT '{}', updated_at timestamptz DEFAULT now(), UNIQUE(source_kind, source_id));
+ CREATE TABLE ai_retrieval_chunks(document_id text REFERENCES ai_retrieval_documents(id) ON DELETE CASCADE, ordinal int, content text NOT NULL, content_hash text NOT NULL,
+   embedding real[], updated_at timestamptz DEFAULT now(), PRIMARY KEY(document_id, ordinal));
  CREATE FUNCTION misty_rls_is_service() RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT current_setting('app.rls_mode',true)='service' $$;`); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"20271020000000_voice_live_sessions.sql", "20271020010000_voice_transcripts.sql"} {
+	for _, name := range []string{"20271020000000_voice_live_sessions.sql", "20271020010000_voice_transcripts.sql", "20271021000000_memory_events.sql"} {
 		migration, err := migrationFiles.ReadFile("migrations/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -59,6 +63,12 @@ func voiceTestDB(t *testing.T) *Database {
 		up, _, _ := strings.Cut(string(migration), "-- +goose Down")
 		if _, err = conn.Exec(up); err != nil {
 			t.Fatal(name, err)
+		}
+	}
+	// The memory triggers pin search_path to public; tests use their own schema.
+	for _, function := range []string{"misty_memory_index_event", "misty_memory_embedded"} {
+		if _, err = conn.Exec(`ALTER FUNCTION ` + function + `() SET search_path = ` + pq.QuoteIdentifier(schema) + `, pg_temp`); err != nil {
+			t.Fatal(err)
 		}
 	}
 	return &Database{Conn: conn}

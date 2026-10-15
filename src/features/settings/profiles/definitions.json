@@ -915,5 +915,56 @@
     "type": "boolean",
     "platforms": ["desktop"],
     "keywords": ["audio", "storage"]
+  },
+  {
+    "id": "recall.enabled",
+    "label": "Remember pages I read",
+    "page": "recall",
+    "section": "recall",
+    "key": "enabled",
+    "default": false,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "history", "recall"]
+  },
+  {
+    "id": "recall.paused_until",
+    "label": "Pause Memory",
+    "page": "recall",
+    "section": "recall",
+    "key": "paused_until",
+    "default": 0,
+    "owner": "account",
+    "type": "number",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "pause"],
+    "min": 0,
+    "max": 9007199254740991
+  },
+  {
+    "id": "recall.excluded_sites",
+    "label": "Sites Memory skips",
+    "page": "recall",
+    "section": "recall",
+    "key": "excluded_sites",
+    "default": "",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "exclude", "privacy"],
+    "maxLength": 8000
+  },
+  {
+    "id": "recall.remember_dictation",
+    "label": "Remember dictation",
+    "page": "recall",
+    "section": "recall",
+    "key": "remember_dictation",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "voice"]
   }
 ]

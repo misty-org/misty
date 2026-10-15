@@ -218,6 +218,9 @@ GET /api/me/avatar
 GET /api/me/coding/allowance
 GET /api/me/conversations/{conversationID}/collaboration
 GET /api/me/library-lock
+GET /api/me/memory/events
+GET /api/me/memory/export
+GET /api/me/memory/status
 GET /api/me/referral
 GET /api/me/settings
 GET /api/me/space-people
@@ -323,6 +326,9 @@ GET /me/avatar
 GET /me/coding/allowance
 GET /me/conversations/{conversationID}/collaboration
 GET /me/library-lock
+GET /me/memory/events
+GET /me/memory/export
+GET /me/memory/status
 GET /me/referral
 GET /me/settings
 GET /me/space-people
@@ -452,6 +458,9 @@ GET /v1/me/avatar
 GET /v1/me/coding/allowance
 GET /v1/me/conversations/{conversationID}/collaboration
 GET /v1/me/library-lock
+GET /v1/me/memory/events
+GET /v1/me/memory/export
+GET /v1/me/memory/status
 GET /v1/me/referral
 GET /v1/me/settings
 GET /v1/me/space-people
@@ -710,6 +719,9 @@ POST /api/me/deletion
 POST /api/me/email/verify
 POST /api/me/export
 POST /api/me/library-lock
+POST /api/me/memory/day-summary
+POST /api/me/memory/events
+POST /api/me/memory/forget
 POST /api/me/referral/claim
 POST /api/me/screen-model/{jobID}
 POST /api/me/space-templates
@@ -841,6 +853,9 @@ POST /me/deletion
 POST /me/email/verify
 POST /me/export
 POST /me/library-lock
+POST /me/memory/day-summary
+POST /me/memory/events
+POST /me/memory/forget
 POST /me/referral/claim
 POST /me/screen-model/{jobID}
 POST /me/space-templates
@@ -991,6 +1006,9 @@ POST /v1/me/deletion
 POST /v1/me/email/verify
 POST /v1/me/export
 POST /v1/me/library-lock
+POST /v1/me/memory/day-summary
+POST /v1/me/memory/events
+POST /v1/me/memory/forget
 POST /v1/me/referral/claim
 POST /v1/me/screen-model/{jobID}
 POST /v1/me/space-templates
