@@ -1,6 +1,6 @@
 use std::{
-    fs,
     path::PathBuf,
+    fs,
     sync::atomic::{AtomicU64, Ordering},
 };
 

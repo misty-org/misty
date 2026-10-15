@@ -266,10 +266,9 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
         .displays
         .clone();
     if old == frames
-        && frames.iter().all(|d| {
-            app.get_webview_window(&format!("{PREFIX}{}", d.id))
-                .is_some()
-        })
+        && frames
+            .iter()
+            .all(|d| app.get_webview_window(&format!("{PREFIX}{}", d.id)).is_some())
     {
         return Ok(());
     }

@@ -125,22 +125,14 @@ impl ExplorerService {
         let output_path = thumbnail_path.clone();
         #[cfg(target_os = "macos")]
         let service = self.image_service()?;
-        let rendered =
-            tokio::task::spawn_blocking(move || -> ApiResult<GeneratedImageThumbnail> {
-                #[cfg(target_os = "macos")]
-                match service {}
-                #[cfg(not(target_os = "macos"))]
-                render_image_thumbnail_file_blocking(
-                    &source_path,
-                    &output_path,
-                    format,
-                    max_dimension,
-                )
-            })
-            .await
-            .map_err(|error| {
-                ApiError::Message(format!("Image thumbnail worker failed: {error}"))
-            })??;
+        let rendered = tokio::task::spawn_blocking(move || -> ApiResult<GeneratedImageThumbnail> {
+            #[cfg(target_os = "macos")]
+            match service {}
+            #[cfg(not(target_os = "macos"))]
+            render_image_thumbnail_file_blocking(&source_path, &output_path, format, max_dimension)
+        })
+        .await
+        .map_err(|error| ApiError::Message(format!("Image thumbnail worker failed: {error}")))??;
         Ok(rendered)
     }
 

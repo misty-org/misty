@@ -32,15 +32,16 @@ const OBJC_ASSOCIATION_RETAIN_NONATOMIC: usize = 1;
 
 /// Where the first button rests, as f64 bits, so sliding never depends on the current constant.
 #[cfg(target_os = "macos")]
-static TRAFFIC_LIGHTS_REST_X: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static TRAFFIC_LIGHTS_REST_X: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 /// How far the buttons slide away, as f64 bits.
 #[cfg(target_os = "macos")]
-static TRAFFIC_LIGHTS_AWAY_BY: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static TRAFFIC_LIGHTS_AWAY_BY: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 #[cfg(target_os = "macos")]
-static TRAFFIC_LIGHTS_SHOWN: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(true);
+static TRAFFIC_LIGHTS_SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 /// Brings the native window buttons in with the sidebar they sit beside, or sends them out with
 /// it: they slide `distance` points sideways while they fade, over `duration_ms`.
@@ -66,7 +67,8 @@ pub fn set_traffic_lights_visible<R: Runtime>(
         window
             .with_webview(move |webview| unsafe {
                 let ns_window = webview.ns_window() as id;
-                let key = &TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY as *const u8 as *const c_void;
+                let key =
+                    &TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY as *const u8 as *const c_void;
                 let constraints = objc_getAssociatedObject(ns_window, key);
                 let _: () = msg_send![class!(NSAnimationContext), beginGrouping];
                 let context: id = msg_send![class!(NSAnimationContext), currentContext];
@@ -77,11 +79,7 @@ pub fn set_traffic_lights_visible<R: Runtime>(
                     if button.is_null() {
                         continue;
                     }
-                    let enabled = if visible {
-                        cocoa::base::YES
-                    } else {
-                        cocoa::base::NO
-                    };
+                    let enabled = if visible { cocoa::base::YES } else { cocoa::base::NO };
                     // Gone buttons must not take clicks, and keep their place in the layout.
                     let _: () = msg_send![button, setEnabled: enabled];
                     let _: () = msg_send![button, setHidden: cocoa::base::NO];
@@ -90,8 +88,7 @@ pub fn set_traffic_lights_visible<R: Runtime>(
                     let _: () = msg_send![animator, setAlphaValue: alpha];
                     // Each button's constraints are four long; the first is its leading edge.
                     if !constraints.is_null() {
-                        let leading: id =
-                            msg_send![constraints, objectAtIndex: (kind as usize) * 4];
+                        let leading: id = msg_send![constraints, objectAtIndex: (kind as usize) * 4];
                         let rest = f64::from_bits(TRAFFIC_LIGHTS_REST_X.load(Ordering::Acquire))
                             + 23.0 * kind as f64;
                         let target = if visible { rest } else { rest - distance };

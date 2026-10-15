@@ -40,9 +40,7 @@ pub(super) fn read_all_from(store: &Store) -> PermissionStore {
 
 pub(super) fn write_all_to(store: &Store, all: &PermissionStore) -> Result<(), String> {
     let mut connection = store.connect().map_err(|error| error.to_string())?;
-    let transaction = connection
-        .transaction()
-        .map_err(|error| error.to_string())?;
+    let transaction = connection.transaction().map_err(|error| error.to_string())?;
     transaction
         .execute("DELETE FROM site_permissions", [])
         .map_err(|error| error.to_string())?;
@@ -61,9 +59,7 @@ pub(super) fn write_all_to(store: &Store, all: &PermissionStore) -> Result<(), S
 }
 
 pub(super) fn read_all() -> PermissionStore {
-    store()
-        .map(|store| read_all_from(&store))
-        .unwrap_or_default()
+    store().map(|store| read_all_from(&store)).unwrap_or_default()
 }
 
 pub(super) fn write_all(all: &PermissionStore) -> Result<(), String> {

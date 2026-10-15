@@ -120,9 +120,7 @@ mod tests {
         let store = Store::at(directory.path().join("misty.db"));
         let connection = open(&store, &legacy).unwrap();
         let state: String = connection
-            .query_row("SELECT state FROM downloads WHERE id='d1'", [], |r| {
-                r.get(0)
-            })
+            .query_row("SELECT state FROM downloads WHERE id='d1'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(state, "interrupted");
         let (typed, origin, changed): (i64, String, i64) = connection

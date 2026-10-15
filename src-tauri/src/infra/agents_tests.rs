@@ -60,17 +60,13 @@ fn shared_folders_and_the_device_id_import_once_from_an_earlier_database() {
         .unwrap();
     assert_eq!((access.as_str(), installs), ("read", 0));
     // A folder removed afterwards does not come back.
-    connection
-        .execute("DELETE FROM local_agent_scopes", [])
-        .unwrap();
+    connection.execute("DELETE FROM local_agent_scopes", []).unwrap();
     drop(connection);
     import_legacy(&store, &legacy).unwrap();
     let remaining: i64 = store
         .connect()
         .unwrap()
-        .query_row("SELECT COUNT(*) FROM local_agent_scopes", [], |row| {
-            row.get(0)
-        })
+        .query_row("SELECT COUNT(*) FROM local_agent_scopes", [], |row| row.get(0))
         .unwrap();
     assert_eq!(remaining, 0);
 }

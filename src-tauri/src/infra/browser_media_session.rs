@@ -21,8 +21,7 @@ pub(crate) const MEDIA_SESSION_PAGE_SCRIPT: &str = r#"(() => {
 })();"#;
 
 /// Reads the page's now-playing state. Only https artwork leaves the page.
-const MEDIA_INFO_SCRIPT: &str =
-    r#"(() => window.__mistyMediaSnapshot ? window.__mistyMediaSnapshot() : null)()"#;
+const MEDIA_INFO_SCRIPT: &str = r#"(() => window.__mistyMediaSnapshot ? window.__mistyMediaSnapshot() : null)()"#;
 
 /// Runs one of the page's own controls; play and pause fall back to the
 /// playing element when the page registered none.

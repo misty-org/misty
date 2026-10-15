@@ -1,10 +1,10 @@
 //! The encrypted local outbox of an installation's extension storage values.
 use super::*;
+use rusqlite::OptionalExtension;
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce,
 };
-use rusqlite::OptionalExtension;
 
 const KEY_SERVICE: &str = "com.misty.extensions.journal";
 #[derive(Default, Serialize, Deserialize)]
@@ -23,8 +23,7 @@ pub(super) fn ciphers() -> &'static std::sync::Mutex<BTreeMap<String, Aes256Gcm>
     CIPHERS.get_or_init(Default::default)
 }
 fn db() -> Result<rusqlite::Connection, String> {
-    let home =
-        crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
         .connect()
         .map_err(|e| e.to_string())

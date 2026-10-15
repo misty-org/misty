@@ -154,17 +154,12 @@ mod tests {
     #[test]
     fn macos_links_the_profile_to_webkits_own_store_and_removes_only_its_own_link() {
         let directory = tempfile::tempdir().unwrap();
-        let (home, library) = (
-            directory.path().join(".misty"),
-            directory.path().join("Library"),
-        );
+        let (home, library) = (directory.path().join(".misty"), directory.path().join("Library"));
         let profile = "01".repeat(32);
         link_webview_data(&home, &library, "com.misty.desktop", Some(&profile)).unwrap();
         let link = webview_home(&home, Some(&profile)).unwrap();
         let target = std::fs::read_link(&link).unwrap();
-        assert!(target.ends_with(
-            "WebKit/com.misty.desktop/WebsiteDataStore/01010101-0101-0101-0101-010101010101"
-        ));
+        assert!(target.ends_with("WebKit/com.misty.desktop/WebsiteDataStore/01010101-0101-0101-0101-010101010101"));
         // A second call keeps it; the store appearing later makes it resolve.
         link_webview_data(&home, &library, "com.misty.desktop", Some(&profile)).unwrap();
         std::fs::create_dir_all(&target).unwrap();

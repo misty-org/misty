@@ -149,29 +149,24 @@ fn load_snapshot(store: &Store, legacy: &std::path::Path) -> ApiResult<ExplorerL
     // An earlier layout's `explorer_state.json` (already in this document shape) comes
     // along once.
     store
-        .import_once(
-            "explorer_state.json",
-            |connection| -> Result<(), rusqlite::Error> {
-                if let Ok(raw) = fs::read_to_string(legacy) {
-                    if serde_json::from_str::<ExplorerLibrarySnapshot>(&raw).is_ok() {
-                        connection.execute(
-                            "INSERT OR IGNORE INTO explorer_library (id, document) VALUES (1, ?1)",
-                            [raw],
-                        )?;
-                    }
+        .import_once("explorer_state.json", |connection| -> Result<(), rusqlite::Error> {
+            if let Ok(raw) = fs::read_to_string(legacy) {
+                if serde_json::from_str::<ExplorerLibrarySnapshot>(&raw).is_ok() {
+                    connection.execute(
+                        "INSERT OR IGNORE INTO explorer_library (id, document) VALUES (1, ?1)",
+                        [raw],
+                    )?;
                 }
-                Ok(())
-            },
-        )
+            }
+            Ok(())
+        })
         .map_err(db_error)?;
     let raw: Option<String> = store
         .connect()
         .map_err(db_error)?
-        .query_row(
-            "SELECT document FROM explorer_library WHERE id = 1",
-            [],
-            |row| row.get(0),
-        )
+        .query_row("SELECT document FROM explorer_library WHERE id = 1", [], |row| {
+            row.get(0)
+        })
         .optional()
         .map_err(db_error)?;
     let mut snapshot = raw
@@ -336,10 +331,7 @@ mod tests {
         edited.last_opened_path = "/home".into();
         save_snapshot(&store, &edited).expect("save");
         // The old file never overwrites later changes.
-        assert_eq!(
-            load_snapshot(&store, &legacy).unwrap().last_opened_path,
-            "/home"
-        );
+        assert_eq!(load_snapshot(&store, &legacy).unwrap().last_opened_path, "/home");
         fs::remove_dir_all(directory).expect("cleanup");
     }
 

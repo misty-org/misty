@@ -46,8 +46,7 @@ pub fn queue_removal(
     account: &str,
     installation: &Installation,
 ) -> Result<(), String> {
-    let home =
-        crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
         .connect()
         .and_then(|connection| {
