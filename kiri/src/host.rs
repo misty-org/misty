@@ -26,4 +26,10 @@ pub trait Host: Send + Sync + 'static {
 pub enum Signal {
     /// The page is (or stopped) audibly playing media.
     MediaAudible(bool),
+    /// A chunk of the page's own audio (16 kHz mono PCM16, base64) for a
+    /// tap the host started. Hosts must drop chunks for sessions they did
+    /// not start: a page can call this on its own.
+    MediaAudio { session: u64, pcm: String },
+    /// The tap could not hear part of the page, in plain words.
+    MediaTapNotice { session: u64, notice: String },
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, PencilRuler, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth";
+import { CaptureMenu } from "@/features/voice";
 import { useSpacesStore } from "@/features/spaces/core";
 import { useSpaceOverview } from "@/features/spaces/useSpaceOverview";
 import { useSpaceOverviewActions } from "@/features/spaces/useSpaceOverviewActions";
@@ -82,6 +83,7 @@ export function JournalAllCollection(props: {
               value={props.query}
               onChange={(event) => props.onQueryChange(event.target.value)}
             />
+            {!props.readOnly && <CaptureMenu />}
             {!props.readOnly && (
               <Button variant="primary" className="px-4" onClick={props.onCreate}>
                 <Plus />

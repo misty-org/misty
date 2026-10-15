@@ -208,7 +208,17 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
    - WebKit may share one WebContent process between tabs. Where the spike shows sharing,
      "Transcribe this tab" uses the Kiri media capability on the page's media stream
      instead.
-   - Results are recorded under Phase 3 of the roadmap entry.
+   - Result (Phase 3, from reading the engines, not yet run on a device): tab
+     audio is not expected to come from the tab's own process. WebKit plays media
+     through its shared GPU process, and WebView2 through the shared Edge audio
+     service. So `Processes([pid])` on a WebContent or renderer PID would hear
+     nothing, and tapping the shared process would hear every tab.
+     "Transcribe this tab" therefore always uses the Kiri media tap: the page's
+     `<audio>`, `<video>` and call streams go through a WebAudio graph to a
+     16 kHz PCM signal. Only a tab that Misty started tapping can send audio.
+     Sound keeps playing for the person, and media from another site is skipped
+     with a notice, because routing it would mute it. The native PID path still
+     needs a check on a Mac with two tabs playing. It stays for "An app".
 2. **Echo reduction.** Reference subtraction: an NLMS filter in `audeeo-core` that uses
    the system channel as the reference. It needs no third-party AEC and no new license.
    It only runs when both channels are open; mic-only dictation doesn't need it.

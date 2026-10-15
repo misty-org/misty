@@ -13,6 +13,7 @@ import {
 } from "@/shared/ui";
 import {
   ArchiveRestore,
+  AudioLines,
   ClipboardCopy,
   Copy,
   FolderPlus,
@@ -43,6 +44,8 @@ export function LibraryItemContextMenu(props: {
   onToggleFavorite: () => void;
   onTrash: () => void;
   onRestore: () => void;
+  /** Offered for audio and video when voice notes are on. */
+  onTranscribe?: () => void;
 }) {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const onCloseRef = useRef(props.onClose);
@@ -104,6 +107,13 @@ export function LibraryItemContextMenu(props: {
           <>
             {props.canCopy ? (
               <ContextMenuAction icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
+            ) : null}
+            {props.onTranscribe ? (
+              <ContextMenuAction
+                icon={<AudioLines />}
+                label="Transcribe"
+                onSelect={props.onTranscribe}
+              />
             ) : null}
             {props.canCopy && props.canEdit ? (
               <ContextMenuAction icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />

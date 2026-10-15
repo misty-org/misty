@@ -24,7 +24,7 @@ export const voiceApi = {
     body: { text: string; style: string; dictionary: string[]; language: string },
     signal?: AbortSignal,
   ) =>
-    apiRequest<{ text: string }>("/me/voice/cleanup", {
+    apiRequest<{ text: string }>("/ai/me/voice/cleanup", {
       method: "POST",
       body: JSON.stringify(body),
       signal,

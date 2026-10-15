@@ -251,6 +251,46 @@ func (c *Client) TranscribeDiarized(ctx context.Context, model, mediaType string
 	return result, err
 }
 
+// VoiceNotesRequest turns a transcript, and the person's own notes, into
+// notes, a summary, action items or chapters.
+type VoiceNotesRequest struct {
+	Route           Route  `json:"route"`
+	Model           string `json:"model"`
+	Mode            string `json:"mode"`
+	Title           string `json:"title,omitempty"`
+	Turns           []Turn `json:"turns"`
+	UserNotes       string `json:"userNotes,omitempty"`
+	Template        string `json:"template,omitempty"`
+	Language        string `json:"language,omitempty"`
+	MaxOutputTokens int64  `json:"maxOutputTokens,omitempty"`
+}
+
+type ActionItem struct {
+	Text  string `json:"text"`
+	Owner string `json:"owner,omitempty"`
+	Due   string `json:"due,omitempty"`
+}
+
+type Chapter struct {
+	Start   float64 `json:"start"`
+	Title   string  `json:"title"`
+	Summary string  `json:"summary"`
+}
+
+type VoiceNotesResult struct {
+	Title       string       `json:"title"`
+	Markdown    string       `json:"markdown"`
+	ActionItems []ActionItem `json:"actionItems"`
+	Chapters    []Chapter    `json:"chapters"`
+	Usage       Usage        `json:"usage"`
+}
+
+func (c *Client) VoiceNotes(ctx context.Context, request VoiceNotesRequest) (VoiceNotesResult, error) {
+	var result VoiceNotesResult
+	err := c.post(ctx, "/v1/models/voice-notes", request, &result)
+	return result, err
+}
+
 // SearchRequest runs one web search through the AI Gateway's search tools.
 // Model is the small model that issues the search call; Engine is parallel,
 // perplexity or exa.

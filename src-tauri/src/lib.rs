@@ -256,6 +256,8 @@ pub fn run() {
             ));
             #[cfg(any(target_os = "macos", windows))]
             app.manage(voice::DictationState::default());
+            #[cfg(any(target_os = "macos", windows))]
+            app.manage(voice::CaptureState::default());
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -511,6 +513,16 @@ pub fn run() {
                     voice::voice_dictation_insert,
                     #[cfg(any(target_os = "macos", windows))]
                     voice::voice_dictation_pill_hide,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_sources,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_start,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_mute,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_stop,
+                    voice::tab_tap::voice_tab_capture_start,
+                    voice::tab_tap::voice_tab_capture_stop,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_interrupt,
                     #[cfg(any(target_os = "macos", windows))]
