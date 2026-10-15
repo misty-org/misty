@@ -100,7 +100,10 @@ func (s *SpacesService) delegateCoding(ctx context.Context, parent *db.AIInvocat
 	if err := s.database.InsertDelegationChild(ctx, parent.UserID, parent.ID, db.DelegationChild{CallID: request.ID, Goal: input.Task, ChildInvocationID: childID}); err != nil {
 		return nil, err
 	}
-	job, _ := json.Marshal(map[string]any{"childInvocationId": childID, "task": input.Task, "mode": mode, "permissionMode": body.PermissionMode, "project": project.name})
+	// The agent and conversation let the device save a snapshot of the
+	// project to the agent's Space once the run finishes.
+	job, _ := json.Marshal(map[string]any{"childInvocationId": childID, "task": input.Task, "mode": mode, "permissionMode": body.PermissionMode,
+		"project": project.name, "agentId": body.AgentID, "conversationId": parent.ConversationID})
 	config, _ := json.Marshal(map[string]any{"agentId": firstAIText(body.AgentID, "misty-unified")})
 	schema := json.RawMessage(`{"type":"object"}`)
 	if _, err := s.database.QueueAIInvocationDeviceNodeJob(ctx, parent.UserID, parent.ID, "coding_"+request.ID, 0, project.scopeID, codeDelegateTool, codeDelegateTool, job, config, schema, schema); err != nil {

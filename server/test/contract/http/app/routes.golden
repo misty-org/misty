@@ -205,6 +205,7 @@ GET /api/health
 GET /api/instance
 GET /api/integrations/apps
 GET /api/integrations/apps/catalog
+GET /api/integrations/github/repos
 GET /api/me
 GET /api/me/agent-grants
 GET /api/me/agent-interventions
@@ -308,6 +309,7 @@ GET /health
 GET /instance
 GET /integrations/apps
 GET /integrations/apps/catalog
+GET /integrations/github/repos
 GET /me
 GET /me/agent-grants
 GET /me/agent-interventions
@@ -435,6 +437,7 @@ GET /v1/health
 GET /v1/instance
 GET /v1/integrations/apps
 GET /v1/integrations/apps/catalog
+GET /v1/integrations/github/repos
 GET /v1/me
 GET /v1/me/agent-grants
 GET /v1/me/agent-interventions
@@ -676,6 +679,7 @@ POST /api/devices/{deviceID}/channel-ticket
 POST /api/devices/{deviceID}/heartbeat
 POST /api/devices/{deviceID}/remove-device
 POST /api/integrations/apps/connect
+POST /api/integrations/github/repos
 POST /api/internal/journal/note-projections
 POST /api/login
 POST /api/logout
@@ -790,6 +794,7 @@ POST /devices/{deviceID}/channel-ticket
 POST /devices/{deviceID}/heartbeat
 POST /devices/{deviceID}/remove-device
 POST /integrations/apps/connect
+POST /integrations/github/repos
 POST /internal/agent-runtime/runs/{runID}/activate
 POST /internal/agent-runtime/runs/{runID}/budget
 POST /internal/agent-runtime/runs/{runID}/complete
@@ -945,6 +950,7 @@ POST /v1/devices/{deviceID}/channel-ticket
 POST /v1/devices/{deviceID}/heartbeat
 POST /v1/devices/{deviceID}/remove-device
 POST /v1/integrations/apps/connect
+POST /v1/integrations/github/repos
 POST /v1/internal/journal/note-projections
 POST /v1/login
 POST /v1/logout
