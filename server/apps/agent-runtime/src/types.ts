@@ -14,7 +14,7 @@ export interface SpaceTaskContext {
   model_id: string;
   vision_model_id?: string;
   reasoning_effort?: "none" | "low" | "medium" | "high" | "xhigh" | "max" | "";
-  run_mode: "ask" | "auto" | "full";
+  run_mode: "ask" | "auto";
   system: string;
   prompt: string;
   task?: {

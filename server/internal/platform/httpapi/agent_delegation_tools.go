@@ -238,7 +238,7 @@ func (s *SpacesService) startDelegatedInvocation(ctx context.Context, parent *db
 	child := aiInvocationInput{
 		Mode: "drawer", SurfaceID: "global", Trigger: "delegated", Prompt: delegatedPrompt(task), Timezone: body.Timezone,
 		AgentID: body.AgentID, ExecutionMode: body.ExecutionMode, TaskID: body.TaskID, WindowLabel: body.WindowLabel,
-		CollaborationMode: body.CollaborationMode, ModelID: model, ReasoningEffort: body.ReasoningEffort,
+		CollaborationMode: body.CollaborationMode, PermissionMode: body.PermissionMode, ModelID: model, ReasoningEffort: body.ReasoningEffort,
 		IdempotencyKey: "delegate:" + parent.ID + ":" + callID + ":" + strconv.Itoa(index),
 		NotebookKey:    notebookKey(parent, body), DelegatedFrom: parent.ID,
 	}

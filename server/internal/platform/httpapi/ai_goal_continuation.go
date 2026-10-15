@@ -105,8 +105,10 @@ func (s *SpacesService) startGoalContinuation(ctx context.Context, finished *db.
 		ConversationID: finished.ConversationID, AgentID: previous.AgentID, Timezone: previous.Timezone,
 		ModelID: previous.ModelID, ReasoningEffort: previous.ReasoningEffort, ThinkingMode: previous.ThinkingMode,
 		CollaborationMode: db.ConversationModeAct,
-		Prompt:            fmt.Sprintf("Continue working toward the goal (continuation %d of %d).", number, goal.MaxContinuations),
-		IdempotencyKey:    "goal:" + goal.ID + ":" + strconv.Itoa(number),
+		// A continuation never runs in a looser mode than the turn before it.
+		PermissionMode: s.continuationPermissionMode(ctx, finished.UserID, finished.ConversationID, previous.AgentID, previous.PermissionMode),
+		Prompt:         fmt.Sprintf("Continue working toward the goal (continuation %d of %d).", number, goal.MaxContinuations),
+		IdempotencyKey: "goal:" + goal.ID + ":" + strconv.Itoa(number),
 	}
 	if err := validateAIInvocationInput(&body); err != nil {
 		return err

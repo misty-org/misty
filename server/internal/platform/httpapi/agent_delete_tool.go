@@ -75,7 +75,8 @@ func (s *SpacesService) executeItemDelete(ctx context.Context, invocation agentt
 	if strings.TrimSpace(title) == "" {
 		title = "Untitled " + input.Kind
 	}
-	approval, waiting, err := s.confirmAgentAction(ctx, invocation, "misty.items.delete", []string{input.Kind, id}, "Delete "+input.Kind+" “"+title+"”", "This cannot be undone from the agent.")
+	need := grantNeed{action: serveragent.GrantItemDelete, scopeKind: serveragent.ScopeSpace, scopeID: spaceID, label: "delete items in " + s.spaceLabel(ctx, invocation.UserID, spaceID)}
+	approval, waiting, err := s.confirmAgentAction(ctx, invocation, need, "misty.items.delete", []string{input.Kind, id}, "Delete "+input.Kind+" “"+title+"”", "This cannot be undone from the agent.")
 	if err != nil || waiting != nil {
 		return waiting, err
 	}

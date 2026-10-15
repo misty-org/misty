@@ -131,8 +131,9 @@ func withDescription(schema map[string]any, description string) map[string]any {
 	return copy
 }
 
-// browserPageStepsApproval applies "Ask before acting" to page actions the
-// model marked consequential, before the device job is queued.
+// browserPageStepsApproval pauses page actions in Ask before the device job is
+// queued. In Auto they continue; the device still pauses on sends, deletes,
+// publishes and payments unless a remembered grant for that site covers them.
 func (s *SpacesService) browserPageStepsApproval(ctx context.Context, invocation agenttools.Invocation, tool serveragent.ToolRequest, scopeID string) (*db.AgentAppRequest, json.RawMessage, error) {
 	var input struct {
 		AllowConsequential bool   `json:"allowConsequential"`
@@ -145,7 +146,7 @@ func (s *SpacesService) browserPageStepsApproval(ctx context.Context, invocation
 			Key    string `json:"key"`
 		} `json:"steps"`
 	}
-	if json.Unmarshal(tool.Arguments, &input) != nil || !input.AllowConsequential {
+	if json.Unmarshal(tool.Arguments, &input) != nil {
 		return nil, nil, nil
 	}
 	parts := make([]string, 0, len(input.Steps))
@@ -166,7 +167,7 @@ func (s *SpacesService) browserPageStepsApproval(ctx context.Context, invocation
 	if tool.Name == "browser.skill" {
 		summary = "On this page: " + truncateAgentRuntimeText(input.Skill+"."+input.Action, 80)
 	}
-	return s.confirmAgentAction(ctx, invocation, "browser.steps:"+scopeID, json.RawMessage(tool.Arguments), "Act on a web page", summary)
+	return s.confirmAgentAction(ctx, invocation, grantNeed{action: serveragent.ActionBrowserStep}, "browser.steps:"+scopeID, json.RawMessage(tool.Arguments), "Act on a web page", summary)
 }
 
 func validBrowserExtractRequest(raw json.RawMessage) (string, json.RawMessage, error) {

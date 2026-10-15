@@ -127,7 +127,8 @@ func (s *SpacesService) executeSpaceAccessChange(ctx context.Context, invocation
 	if input.Action == "remove_member" && strings.TrimSpace(input.MemberID) == "" {
 		return nil, serveragent.ErrInvalidRequest("remove_member needs member_id from members_list")
 	}
-	approval, waiting, err := s.confirmAgentAction(ctx, invocation, "misty.spaces."+input.Action, []string{space.ID, input.Email, input.MemberID}, title, "Space: "+space.Name)
+	need := grantNeed{action: serveragent.GrantSpaceAdmin, scopeKind: serveragent.ScopeSpace, scopeID: space.ID, label: "manage members of " + space.Name}
+	approval, waiting, err := s.confirmAgentAction(ctx, invocation, need, "misty.spaces."+input.Action, []string{space.ID, input.Email, input.MemberID}, title, "Space: "+space.Name)
 	if err != nil || waiting != nil {
 		return waiting, err
 	}

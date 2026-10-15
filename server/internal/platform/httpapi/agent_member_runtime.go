@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	"github.com/kannachi323/misty/server/internal/agenttools"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
@@ -18,7 +19,7 @@ func (s *SpacesService) memberRequestRuntimeToolbox(ctx context.Context, run *db
 	invocation := agenttools.Invocation{
 		UserID: run.OwnerUserID, SpaceID: request.SpaceID, AgentID: run.AgentID, RunID: run.ID,
 		Source: "space_conversation", Trigger: "message", OriginalInput: request.Message,
-		ConversationScopeKind: db.ConversationScopeEveryone,
+		ConversationScopeKind: db.ConversationScopeEveryone, PermissionMode: serveragent.NormalizePermissionMode(run.EffectiveRunMode),
 	}
 	spaceAuthorize := authorizeSpaceAgentTool(s.database)
 	authorize := func(ctx context.Context, invocation agenttools.Invocation, descriptor agenttools.Descriptor) (bool, error) {

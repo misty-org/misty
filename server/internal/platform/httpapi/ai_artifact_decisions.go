@@ -262,6 +262,10 @@ func validateAIInvocationInput(body *aiInvocationInput) error {
 	if body.CollaborationMode != "" && body.CollaborationMode != "act" && body.CollaborationMode != "plan" {
 		return errors.New("collaboration mode must be act or plan")
 	}
+	body.PermissionMode = strings.TrimSpace(body.PermissionMode)
+	if body.PermissionMode != "" && body.PermissionMode != "ask" && body.PermissionMode != "auto" {
+		return errors.New("permission mode must be ask or auto")
+	}
 	if body.Timezone == "" {
 		body.Timezone = "UTC"
 	}

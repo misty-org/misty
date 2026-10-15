@@ -22,7 +22,9 @@ func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIIn
 	// The run notebook, and sub-agents for runs that are not sub-agents themselves.
 	connected = append(connected, s.notebookToolRegistrations(record, body)...)
 	connected = append(connected, s.delegationToolRegistrations(record, body)...)
-	return resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
+	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
+	invocation.PermissionMode = body.PermissionMode
+	return toolbox, invocation, manifest, err
 }
 
 // aiInvocationConnectedTools are web search, the user's connected apps, the

@@ -162,8 +162,9 @@ func collaborationInstructions(state collaborationState) string {
 	return out.String()
 }
 
-// admitCollaboration settles a new turn's mode at admission: the conversation's
-// saved mode unless the turn chose one, which is then saved. A typed message
+// admitCollaboration settles a new turn's modes at admission: Plan or Act, and
+// Ask or Auto. Each is the conversation's saved mode unless the turn chose one,
+// which is then saved. A typed message
 // also answers the conversation's open questions by superseding them.
 func admitCollaboration(ctx context.Context, database *db.Database, user string, body *aiInvocationInput) error {
 	if body.ConversationID != "" {
@@ -183,7 +184,7 @@ func admitCollaboration(ctx context.Context, database *db.Database, user string,
 	if body.CollaborationMode == "" {
 		body.CollaborationMode = db.ConversationModeAct
 	}
-	return nil
+	return admitPermissionMode(ctx, database, user, body)
 }
 
 // aiCollaborationEventFields are an invocation event's collaboration updates:

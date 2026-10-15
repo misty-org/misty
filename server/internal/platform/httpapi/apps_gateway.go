@@ -36,10 +36,21 @@ type appRequest struct {
 	Summary   string    `json:"summary"`
 	State     string    `json:"state"`
 	ExpiresAt time.Time `json:"expiresAt"`
+	// Rememberable cards offer "Accept and remember"; the label names the exact
+	// scope, written by the server. PermissionMode is the run's Ask or Auto.
+	Rememberable   bool         `json:"rememberable"`
+	RememberLabel  string       `json:"rememberLabel,omitempty"`
+	PermissionMode string       `json:"permissionMode,omitempty"`
+	PaymentCap     *grantAmount `json:"paymentCap,omitempty"`
 }
 
 func appRequestView(request *db.AgentAppRequest) *appRequest {
-	return &appRequest{ID: request.ID, Kind: request.Kind, Subject: request.Subject, Title: request.Title, Summary: request.Summary, State: request.State, ExpiresAt: request.ExpiresAt}
+	view := &appRequest{ID: request.ID, Kind: request.Kind, Subject: request.Subject, Title: request.Title, Summary: request.Summary, State: request.State, ExpiresAt: request.ExpiresAt,
+		Rememberable: request.Rememberable, RememberLabel: request.RememberLabel, PermissionMode: request.PermissionMode}
+	if request.GrantAction == string(serveragent.GrantPayment) {
+		view.PaymentCap = grantAmountFrom(request.GrantConstraints)
+	}
+	return view
 }
 
 func appsAvailable() bool { return composio.ConfigFromEnv().Validate() == nil }
