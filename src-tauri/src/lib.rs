@@ -523,6 +523,9 @@ pub fn run() {
                     voice::voice_capture_stop,
                     voice::tab_tap::voice_tab_capture_start,
                     voice::tab_tap::voice_tab_capture_stop,
+                    voice::recording::voice_recording_start,
+                    voice::recording::voice_recording_stop,
+                    voice::recording::voice_recording_discard,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_interrupt,
                     #[cfg(any(target_os = "macos", windows))]

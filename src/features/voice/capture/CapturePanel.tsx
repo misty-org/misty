@@ -5,6 +5,7 @@ import { Button, IconButton, Input, Skeleton, Textarea } from "@/shared/ui";
 import type { VoiceNoteMode } from "./captureApi";
 import { openCapturedNote, askAboutCapturedNote } from "./openNote";
 import { speakersOf } from "./transcriptTurns";
+import { useRecordingStore } from "../recording/useRecordingStore";
 import { useCaptureStore } from "./useCaptureStore";
 
 const sourceLabel = {
@@ -12,6 +13,7 @@ const sourceLabel = {
   tab: "This tab",
   system: "System audio",
   app: "An app",
+  recording: "Screen recording",
 } as const;
 
 /**
@@ -21,18 +23,24 @@ const sourceLabel = {
  */
 export function CapturePanel() {
   const store = useCaptureStore();
+  const recording = useRecordingStore();
+  const notice = store.notice || recording.notice;
+  const close = () => {
+    useRecordingStore.setState({ notice: undefined });
+    store.close();
+  };
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [store.turns.length]);
   if (!publicBetaFeatureEnabled("voiceNotes")) return null;
-  if (store.phase === "idle" && !store.notice) return null;
+  if (store.phase === "idle" && !notice) return null;
   if (store.phase === "idle")
     return (
       <aside
         role="status"
         className="fixed right-4 bottom-4 z-50 flex max-w-80 items-start gap-2 rounded-lg border border-cream-border bg-background p-3 text-sm shadow-lg"
       >
-        <span className="flex-1">{store.notice}</span>
-        <IconButton size="xs" label="Dismiss" onClick={store.close}>
+        <span className="flex-1">{notice}</span>
+        <IconButton size="xs" label="Dismiss" onClick={close}>
           <X />
         </IconButton>
       </aside>
@@ -66,20 +74,22 @@ export function CapturePanel() {
               size="sm"
               variant="ghost"
               disabled={store.phase !== "live"}
-              onClick={() => void store.stop()}
+              onClick={() =>
+                void (store.source?.kind === "recording" ? recording.stop() : store.stop())
+              }
             >
               <Square /> Stop
             </Button>
           </>
         ) : (
-          <IconButton label="Close" onClick={store.close} disabled={busy}>
+          <IconButton label="Close" onClick={close} disabled={busy}>
             <X />
           </IconButton>
         )}
       </header>
-      {store.notice && (
+      {notice && (
         <p role="status" className="text-xs text-cream-muted">
-          {store.notice}
+          {notice}
         </p>
       )}
       <Lanes />

@@ -10,7 +10,7 @@ export interface VoiceTurn {
   text: string;
 }
 
-export type VoiceSourceKind = "mic" | "tab" | "system" | "app" | "library_item";
+export type VoiceSourceKind = "mic" | "tab" | "system" | "app" | "recording" | "library_item";
 
 export interface VoiceTranscript {
   id: string;
@@ -43,6 +43,12 @@ export const captureApi = {
     apiRequest<void>(
       `/me/voice/transcripts/${encodeURIComponent(id)}`,
       json("PATCH", { speakers }),
+    ),
+  /** Links the Library item that holds the recording. */
+  recordingItem: (id: string, itemId: string) =>
+    apiRequest<void>(
+      `/me/voice/transcripts/${encodeURIComponent(id)}`,
+      json("PATCH", { recording_item_id: itemId }),
     ),
   remove: (id: string) =>
     apiRequest<void>(`/me/voice/transcripts/${encodeURIComponent(id)}`, { method: "DELETE" }),

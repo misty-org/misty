@@ -59,15 +59,17 @@ func (s *SpacesService) VoiceTranscript() http.HandlerFunc {
 			}
 			writeJSON(w, http.StatusOK, transcript)
 		case http.MethodPatch:
+			// Speaker names, and the Library item holding the recording.
 			var body struct {
-				Speakers map[string]string `json:"speakers"`
+				Speakers        map[string]string `json:"speakers"`
+				RecordingItemID string            `json:"recording_item_id"`
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-			if decodeAIJSON(w, r, &body) != nil || body.Speakers == nil {
+			if decodeAIJSON(w, r, &body) != nil || (body.Speakers == nil && body.RecordingItemID == "") {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"code": "invalid_speakers"})
 				return
 			}
-			if err := s.database.UpdateVoiceTranscript(r.Context(), user, id, body.Speakers, "", ""); err != nil {
+			if err := s.database.UpdateVoiceTranscript(r.Context(), user, id, body.Speakers, "", body.RecordingItemID); err != nil {
 				writeVoiceError(w, err)
 				return
 			}

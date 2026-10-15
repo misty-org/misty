@@ -125,6 +125,32 @@ The mist and the island show a steady recording ring while it runs. Stop uploads
 video to the Library. The Library item then gets the diarized transcript and a chapter
 summary, and becomes a memory event.
 
+As built in Phase 5 (revision 2):
+- Recording starts from Capture › Screen recording, behind the `captureSessions` flag.
+  It records the main display, its sound without Misty, and the microphone per
+  Settings › Voice.
+  - On macOS, `MistyScreenRecorder.m` uses ScreenCaptureKit and AVAssetWriter. The
+    microphone is a second track on macOS 15 and later.
+  - On Windows, `voice/recording_windows.rs` uses Windows.Graphics.Capture and a
+    Media Foundation sink writer. System audio and the microphone are two AAC tracks
+    from audeeo-core.
+  - The file is H.264 at about 2.5 Mbit/s or less.
+- The transcript comes from a live capture that runs alongside the recording, with mic
+  and system channels and speakers told apart. It is not made from the file afterwards:
+  server-side file transcription reads at most 25 MB, which a recording passes quickly.
+- On Stop:
+  - the video is uploaded to the personal Space's Library, up to the desktop uploader's
+    100 MB
+  - the transcript links to it (`recording_item_id`) and gets a summary Note
+  - Memory keeps a `recording` event
+  - the local file is deleted
+  - A larger file stays in Misty's cache, and the notice says where.
+- Not built yet:
+  - choosing a window or a Misty tab, and choosing the display
+  - the recording ring on the mist and the island (the capture panel shows it instead)
+  - a streaming uploader for large files
+  - a chapter summary (it uses the summary mode)
+
 ### Settings › Voice (Lucide `Mic`)
 Plain-list rows:
 - Dictation shortcut
