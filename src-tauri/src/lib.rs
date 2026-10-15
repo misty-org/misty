@@ -460,6 +460,10 @@ pub fn run() {
                     #[cfg(desktop)]
                     app::project_commands::project_remove,
                     #[cfg(desktop)]
+                    app::project_commands::project_publish,
+                    #[cfg(desktop)]
+                    app::project_commands::project_clone,
+                    #[cfg(desktop)]
                     app::project_commands::project_git_diff,
                     #[cfg(desktop)]
                     app::checkpoint_commands::project_checkpoints,

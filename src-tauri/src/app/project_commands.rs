@@ -1,5 +1,6 @@
-//! Projects for coding: choosing or creating a project folder, forgetting
-//! one, what changed in it, and carrying old project switches over. The
+//! Projects for coding: choosing, creating or cloning a project folder,
+//! publishing one to GitHub, forgetting one, what changed in it, and carrying
+//! old project switches over. The
 //! coding itself runs in the person's own coding tool (runner_commands).
 //! Every command answers only Misty's main window.
 #![cfg(desktop)]
@@ -10,7 +11,10 @@ use serde_json::Value;
 use tauri::State;
 
 use crate::{
-    agents::project_diff::{project_diff, DiffSet},
+    agents::{
+        project_diff::{project_diff, DiffSet},
+        project_git,
+    },
     app::runtime::MistyRuntime,
     error::{ApiError, ApiResult},
     infra::agent_projects::LegacyProjectFlags,
@@ -91,6 +95,60 @@ pub async fn project_new(
         .args(["init", "-q"])
         .current_dir(&folder)
         .output();
+    Ok(Some(project))
+}
+
+/// Pushes a project to the empty GitHub repository just made for it, and
+/// makes that repository its `origin`.
+#[tauri::command]
+pub async fn project_publish(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    scope_id: String,
+    clone_url: String,
+) -> ApiResult<()> {
+    require_main(&webview)?;
+    let remote = project_git::github_https(&clone_url)
+        .ok_or_else(|| ApiError::Message("That isn't a GitHub repository address.".into()))?;
+    let project = state.agents.project(scope_id).await?;
+    tokio::task::spawn_blocking(move || project_git::publish(&project.root, &remote))
+        .await
+        .map_err(|_| ApiError::Message("Publishing stopped unexpectedly.".into()))?
+        .map_err(ApiError::Message)
+}
+
+/// Clones a GitHub repository into a new project folder where the person
+/// picks. Nothing is left behind when the clone fails.
+#[tauri::command]
+pub async fn project_clone(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    clone_url: String,
+    name: String,
+) -> ApiResult<Option<Value>> {
+    require_main(&webview)?;
+    let remote = project_git::github_https(&clone_url)
+        .ok_or_else(|| ApiError::Message("That isn't a GitHub repository address.".into()))?;
+    let Some(parent) = pick_folder(&app, format!("Choose where to clone {}", name.trim())).await?
+    else {
+        return Ok(None);
+    };
+    let (project, folder) = state
+        .agents
+        .create_project_folder(parent, &name, &protected(&state))
+        .await?;
+    let target = folder.clone();
+    let cloned = tokio::task::spawn_blocking(move || project_git::clone_into(&remote, &target))
+        .await
+        .unwrap_or_else(|_| Err("The clone stopped unexpectedly.".into()));
+    if let Err(message) = cloned {
+        if let Some(id) = project.get("id").and_then(Value::as_str) {
+            let _ = state.agents.revoke_folder_scope(id.to_owned()).await;
+        }
+        let _ = std::fs::remove_dir_all(&folder);
+        return Err(ApiError::Message(message));
+    }
     Ok(Some(project))
 }
 

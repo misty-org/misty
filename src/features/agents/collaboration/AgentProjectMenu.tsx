@@ -1,4 +1,4 @@
-import { FolderOpen, FolderPlus } from "lucide-react";
+import { Download, FolderOpen, FolderPlus, Upload } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -12,7 +12,9 @@ import {
 } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot, chooseProject } from "../store/useAgentsStore";
+import { projectRemote } from "../store/projectGitHub";
 import { useConversationProject } from "../store/useConversationProject";
+import { FromGitHubDialog, PublishDialog } from "./GitHubDialogs";
 import { NewProjectDialog } from "./ProjectDialogs";
 
 const none = "none";
@@ -33,7 +35,9 @@ export function AgentProjectMenu({
 }) {
   const [projects, setProjects] = useState<AgentScope[]>([]);
   const [failed, setFailed] = useState("");
-  const [dialog, setDialog] = useState<"new" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "github" | "publish" | null>(null);
+  /** The chosen project's GitHub remote, or "" when it has none yet. */
+  const [remote, setRemote] = useState<string | null>(null);
   const chosen = useConversationProject((s) =>
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
@@ -48,8 +52,14 @@ export function AgentProjectMenu({
   useEffect(() => {
     if (hasTauriInternals()) void load();
   }, [load]);
+  useEffect(() => {
+    setRemote(null);
+    if (chosen && hasTauriInternals())
+      void projectRemote(chosen).then((found) => setRemote(found ?? ""));
+  }, [chosen]);
   if (!hasTauriInternals()) return null;
   const current = projects.find((project) => project.id === chosen);
+  const canPublish = current?.kind === "project_folder" && current.available && remote === "";
   const add = async () => {
     setFailed("");
     try {
@@ -116,6 +126,24 @@ export function AgentProjectMenu({
             </span>
           </span>
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setDialog("github")}>
+          <Download aria-hidden="true" />
+          <span className="grid min-w-0 gap-0.5">
+            <span>From GitHub…</span>
+            <span className="text-xs text-cream-muted">Clone one of your repositories</span>
+          </span>
+        </DropdownMenuItem>
+        {canPublish ? (
+          <DropdownMenuItem onSelect={() => setDialog("publish")}>
+            <Upload aria-hidden="true" />
+            <span className="grid min-w-0 gap-0.5">
+              <span>Publish to GitHub…</span>
+              <span className="text-xs text-cream-muted">
+                Push {current.displayName} to a new repository
+              </span>
+            </span>
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onSelect={() => void add()}>
           <FolderOpen aria-hidden="true" />
           <span className="grid min-w-0 gap-0.5">
@@ -136,6 +164,20 @@ export function AgentProjectMenu({
         onOpenChange={(open) => setDialog(open ? "new" : null)}
         onCreated={picked}
       />
+      <FromGitHubDialog
+        open={dialog === "github"}
+        onOpenChange={(open) => setDialog(open ? "github" : null)}
+        onCreated={picked}
+      />
+      {current ? (
+        <PublishDialog
+          open={dialog === "publish"}
+          scopeId={current.id}
+          suggestedName={current.displayName}
+          onOpenChange={(open) => setDialog(open ? "publish" : null)}
+          onPublished={setRemote}
+        />
+      ) : null}
     </>
   );
 }

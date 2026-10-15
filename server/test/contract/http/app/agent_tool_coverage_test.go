@@ -39,6 +39,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /(ai/settings|settings/|me/settings$|ai/preferences/|ai/recaps/)`, why: "account settings change in Settings, never by an agent"},
 	{pattern: `^POST /integrations/apps/connect$`, tool: "apps.connect"},
 	{pattern: `^\S+ /(connections|integrations/apps/connections|provider-callbacks|oauth)/`, why: "connecting an account needs the person to sign in"},
+	{pattern: `^POST /integrations/github/repos$`, why: "publishing a project is the person's choice; agents push through their coding tool, which asks first"},
 	{pattern: `^\S+ /(me/app-requests|me/agent-interventions)/`, why: "a person's answer to an agent's card"},
 	{pattern: `^\S+ /me/coding/`, why: "the person's device reports its coding tools and mirrors a delegated run through these; agents start that run with code.delegate"},
 	{pattern: `^(DELETE /me/agent-grants(/\{grantID\})?|POST /me/agent-grants/(site|project))$`,

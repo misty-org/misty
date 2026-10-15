@@ -4,5 +4,6 @@
 //! questions through Misty's rules and reports their work back to the server.
 pub mod checkpoints;
 pub mod project_diff;
+pub mod project_git;
 pub mod project_root;
 pub mod runners;

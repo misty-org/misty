@@ -66,7 +66,7 @@ export async function projectCheckpoints(
 
 /** This device's signed policy lists its shared folders (names only, never
  * paths) so the person's other devices can offer them to agents. */
-async function republishDeviceFolders(): Promise<void> {
+export async function republishDeviceFolders(): Promise<void> {
   const { deviceAccount } = await import("./useAgentDeviceStore");
   const { devicesNative } = await import("@/native/devices");
   await devicesNative.publishFolders(await deviceAccount()).catch(() => {});

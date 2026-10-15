@@ -14,19 +14,22 @@ pub(super) struct Approvals {
 impl Approvals {
     pub(super) fn load(store: Store, legacy: PathBuf) -> Self {
         // An earlier layout kept the hashes in `kura-bridge.json`; import them once.
-        let _ = store.import_once("kura-bridge.json", |connection| -> Result<(), rusqlite::Error> {
-            let hashes = std::fs::read_to_string(&legacy)
-                .ok()
-                .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
-                .unwrap_or_default();
-            for hash in hashes {
-                connection.execute(
-                    "INSERT OR IGNORE INTO kura_approvals (hash) VALUES (?1)",
-                    [hash],
-                )?;
-            }
-            Ok(())
-        });
+        let _ = store.import_once(
+            "kura-bridge.json",
+            |connection| -> Result<(), rusqlite::Error> {
+                let hashes = std::fs::read_to_string(&legacy)
+                    .ok()
+                    .and_then(|text| serde_json::from_str::<Vec<String>>(&text).ok())
+                    .unwrap_or_default();
+                for hash in hashes {
+                    connection.execute(
+                        "INSERT OR IGNORE INTO kura_approvals (hash) VALUES (?1)",
+                        [hash],
+                    )?;
+                }
+                Ok(())
+            },
+        );
         Self {
             store,
             asking: tokio::sync::Mutex::new(()),

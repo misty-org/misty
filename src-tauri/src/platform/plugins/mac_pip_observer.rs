@@ -65,7 +65,9 @@ unsafe fn floating_window_visible(window: id) -> Option<bool> {
     if bytes.is_null() {
         return None;
     }
-    let name = std::ffi::CStr::from_ptr(bytes).to_string_lossy().to_string();
+    let name = std::ffi::CStr::from_ptr(bytes)
+        .to_string_lossy()
+        .to_string();
     if !is_picture_in_picture(&name) {
         return None;
     }

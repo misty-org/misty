@@ -140,7 +140,12 @@ pub(crate) fn process(path: &Path, stop: &AtomicBool) -> Result<Value, String> {
     std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o500))
         .map_err(|_| "Could not prepare processor permissions.")?;
     let started = Instant::now();
-    stage_input(&input, &work.path().join(format!("input.{extension}")), stop, started)?;
+    stage_input(
+        &input,
+        &work.path().join(format!("input.{extension}")),
+        stop,
+        started,
+    )?;
 
     let mut output = tempfile::tempfile().map_err(|_| "Could not receive document output.")?;
     let mut command = sandboxed_command(&executable, work.path())
