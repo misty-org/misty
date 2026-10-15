@@ -220,7 +220,7 @@ export function BrowserOmniboxView(props: {
           aria-activedescendant={focused && matches.length ? selected?.id : undefined}
           autoComplete="off"
           spellCheck={false}
-          variant="toolbar"
+          variant="address"
           style={
             props.trailing && !focused && trailingWidth
               ? { paddingRight: trailingWidth + 8 }

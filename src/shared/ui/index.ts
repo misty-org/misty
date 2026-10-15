@@ -32,6 +32,7 @@ export * from "./overlays/Dialog";
 export * from "./overlays/DropdownMenu";
 export * from "./overlays/MenuItem";
 export * from "./overlays/MenuTrigger";
+export * from "./overlays/SplitMenuPill";
 export * from "./display/AvatarShuffleStack";
 export * from "./overlays/Popover";
 export * from "./overlays/Portal";
