@@ -9,6 +9,7 @@ pub mod claude;
 pub mod codex;
 pub mod detect;
 pub mod events;
+pub mod http_host;
 pub mod launch_only;
 pub mod lease;
 pub mod mirror;
@@ -106,6 +107,8 @@ pub enum Transport {
     Acp,
     /// A child per turn with no way to ask mid-turn.
     LaunchOnly,
+    /// A local HTTP server per turn (see [`http_host`]).
+    HttpHost,
 }
 
 /// What an engine can do, which decides the work it may be given.
@@ -205,10 +208,15 @@ pub fn runner_for(engine: EngineId) -> Option<Box<dyn Runner>> {
         | EngineId::Grok => Some(Box::new(acp_engines::AcpRunner { engine })),
         EngineId::Agy => Some(Box::new(launch_only::AgyRunner)),
         EngineId::Pi => Some(Box::new(launch_only::PiRunner)),
-        // OpenCode and DeepSeek Shell run as local HTTP servers; their host
-        // sessions are not built yet.
+        // OpenCode and DeepSeek Shell run as local HTTP servers: see
+        // [`http_host::hosted_for`].
         EngineId::Opencode | EngineId::Dsh => None,
     }
+}
+
+/// Whether this build can run an engine, on stdio or as a local server.
+pub fn supported(engine: EngineId) -> bool {
+    runner_for(engine).is_some() || http_host::hosted_for(engine).is_some()
 }
 
 /// Flags and settings that remove the tool's own permission checks. Routed

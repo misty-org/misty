@@ -13,11 +13,13 @@ use crate::agents::runners::{
     bridge::BridgeContext,
     detect,
     events::RateLimit,
+    http_host::{driver::run_hosted_turn, hosted_for},
     lease::{Lease, LeaseMeter},
     registry, route, runner_for,
     session::{run_turn, Outcome},
+    supported,
     tauri_host::{self, TauriHost},
-    EngineId, Launch, LaunchMode,
+    EngineId, Launch, LaunchMode, RunnerError,
 };
 use crate::app::device_commands::require_device_window;
 use crate::app::runtime::MistyRuntime;
@@ -139,7 +141,9 @@ pub async fn coding_run_turn(
 ) -> Result<TurnResult, String> {
     require_device_window(&webview)?;
     let engine = EngineId::parse(&request.engine).ok_or("Unknown coding tool.")?;
-    let runner = runner_for(engine).ok_or("This coding tool isn't supported yet.")?;
+    if !supported(engine) {
+        return Err("This coding tool isn't supported yet.".into());
+    }
     let project = state
         .agents
         .project(request.scope_id.clone())
@@ -172,7 +176,15 @@ pub async fn coding_run_turn(
         run_id: request.run_id.clone(),
     };
     let mut meter = LeaseMeter::new(request.lease);
-    let outcome = run_turn(runner.as_ref(), &launch, context, &mut meter, &host, stop).await;
+    let outcome = match (runner_for(engine), hosted_for(engine)) {
+        (Some(runner), _) => {
+            run_turn(runner.as_ref(), &launch, context, &mut meter, &host, stop).await
+        }
+        (None, Some(hosted)) => {
+            run_hosted_turn(hosted.as_ref(), &launch, context, &mut meter, &host, stop).await
+        }
+        (None, None) => Err(RunnerError::Unsupported("this coding tool isn't supported")),
+    };
     registry::finish(&request.run_id);
     Ok(match outcome {
         Ok(Outcome::Finished) => TurnResult {

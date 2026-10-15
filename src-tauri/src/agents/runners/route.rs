@@ -20,9 +20,8 @@ pub fn tier(engine: EngineId) -> Tier {
         | EngineId::Minimax
         | EngineId::Kimi
         | EngineId::Omp
-        | EngineId::Opencode
-        | EngineId::Dsh => Tier::Interactive,
-        EngineId::Grok => Tier::FullAccessOnly,
+        | EngineId::Opencode => Tier::Interactive,
+        EngineId::Grok | EngineId::Dsh => Tier::FullAccessOnly,
         EngineId::Pi | EngineId::Agy | EngineId::Qoder | EngineId::QoderCn => Tier::LaunchOnly,
     }
 }
@@ -72,7 +71,7 @@ pub fn refusal(
     need: &RouteNeed,
 ) -> Option<String> {
     let name = display_name(engine);
-    if super::runner_for(engine).is_none() {
+    if !super::supported(engine) {
         return Some(format!("{name} isn't supported in Misty yet."));
     }
     let Some(status) = status.filter(|status| status.installed) else {

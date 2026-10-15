@@ -50,7 +50,6 @@ export function AgentWorkspaceFrame({
   onConversation,
   onUseTemplate,
   onStartWork,
-  onCompanion,
 }: {
   agent: AgentProfile;
   page: AgentWorkspacePage;
@@ -67,7 +66,6 @@ export function AgentWorkspaceFrame({
   onConversation(id: string): void;
   onUseTemplate(prompt: string): void;
   onStartWork(action: () => void): void;
-  onCompanion(): void;
 }) {
   const allFolders = useAgentFoldersStore((state) => state.folders);
   const sorted = [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -236,7 +234,6 @@ export function AgentWorkspaceFrame({
             onUse={onUseTemplate}
             onConversation={onConversation}
             onStartWork={onStartWork}
-            onCompanion={onCompanion}
           />
         </div>
       </div>

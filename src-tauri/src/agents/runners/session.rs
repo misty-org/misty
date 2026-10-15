@@ -66,6 +66,64 @@ pub async fn answer_permission(
     }
 }
 
+/// What a turn has seen so far, shared by every transport's driver.
+#[derive(Default)]
+pub struct TurnTracker {
+    pub finished: bool,
+    pub exhausted: bool,
+    pub failure: Option<String>,
+}
+
+impl TurnTracker {
+    /// Answers the permission questions among a step's events, records usage
+    /// against the lease and the turn's end, then mirrors the events. Returns
+    /// each question with the answer to send back in the tool's protocol.
+    pub async fn absorb(
+        &mut self,
+        events: Vec<RunnerEvent>,
+        context: &mut BridgeContext,
+        meter: &mut LeaseMeter,
+        host: &dyn SessionHost,
+    ) -> Vec<(PermissionRequest, bool, String)> {
+        let mut answers = Vec::new();
+        for event in &events {
+            match event {
+                RunnerEvent::PermissionRequest(request) => {
+                    context.lease_valid = meter.valid(host.now());
+                    let (allow, reason) = answer_permission(host, context, request).await;
+                    answers.push((request.clone(), allow, reason));
+                }
+                RunnerEvent::Usage(usage) => {
+                    if !meter.record(usage, host.now()) {
+                        self.exhausted = true;
+                    }
+                }
+                RunnerEvent::Done { .. } => self.finished = true,
+                RunnerEvent::Error { message } => self.failure = Some(message.clone()),
+                _ => {}
+            }
+        }
+        if !events.is_empty() {
+            host.emit(events).await;
+        }
+        answers
+    }
+
+    pub fn outcome(self, canceled: bool) -> Outcome {
+        if canceled {
+            Outcome::Canceled
+        } else if let Some(message) = self.failure {
+            Outcome::Failed(message)
+        } else if self.exhausted {
+            Outcome::BudgetExhausted
+        } else if self.finished {
+            Outcome::Finished
+        } else {
+            Outcome::Failed("The coding tool stopped without finishing.".into())
+        }
+    }
+}
+
 pub async fn run_turn(
     runner: &dyn Runner,
     launch: &Launch,
@@ -100,9 +158,7 @@ pub async fn run_turn(
         let _ = stdin.write_all(format!("{line}\n").as_bytes()).await;
     }
     let mut canceled = false;
-    let mut finished = false;
-    let mut exhausted = false;
-    let mut failure: Option<String> = None;
+    let mut tracker = TurnTracker::default();
     loop {
         let line = tokio::select! {
             _ = &mut stop => { canceled = true; break; }
@@ -113,48 +169,18 @@ pub async fn run_turn(
         for write in step.writes {
             let _ = stdin.write_all(format!("{write}\n").as_bytes()).await;
         }
-        let mut forward = Vec::new();
-        let mut done = false;
-        for event in step.events {
-            match &event {
-                RunnerEvent::PermissionRequest(request) => {
-                    context.lease_valid = meter.valid(host.now());
-                    let (allow, reason) = answer_permission(host, &context, request).await;
-                    if let Some(reply) = protocol.answer(request, allow, &reason) {
-                        let _ = stdin.write_all(format!("{reply}\n").as_bytes()).await;
-                    }
-                }
-                RunnerEvent::Usage(usage) => {
-                    if !meter.record(usage, host.now()) {
-                        exhausted = true;
-                    }
-                }
-                RunnerEvent::Done { .. } => done = true,
-                RunnerEvent::Error { message } => failure = Some(message.clone()),
-                _ => {}
+        let answers = tracker.absorb(step.events, &mut context, meter, host).await;
+        for (request, allow, reason) in answers {
+            if let Some(reply) = protocol.answer(&request, allow, &reason) {
+                let _ = stdin.write_all(format!("{reply}\n").as_bytes()).await;
             }
-            forward.push(event);
         }
-        if !forward.is_empty() {
-            host.emit(forward).await;
-        }
-        if done {
-            finished = true;
+        if tracker.finished {
             break;
         }
     }
     drop(stdin);
     let _ = child.start_kill();
     let _ = child.wait().await;
-    Ok(if canceled {
-        Outcome::Canceled
-    } else if let Some(message) = failure {
-        Outcome::Failed(message)
-    } else if exhausted {
-        Outcome::BudgetExhausted
-    } else if finished {
-        Outcome::Finished
-    } else {
-        Outcome::Failed("The coding tool stopped without finishing.".into())
-    })
+    Ok(tracker.outcome(canceled))
 }

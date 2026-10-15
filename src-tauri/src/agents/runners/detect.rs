@@ -38,8 +38,10 @@ pub fn executables(engine: EngineId) -> &'static [&'static str] {
     }
 }
 
-/// Where tools keep credentials, relative to home. Present means signed in;
-/// tools that keep them only in the system keychain report a status command.
+/// Where tools keep credentials, relative to home. Present means signed in.
+/// Tools with no known file (MiniMax, Pi, Oh My Pi, DeepSeek Shell,
+/// Antigravity) count as signed in once installed; a run then fails with the
+/// tool's own message if it isn't.
 fn credential_files(engine: EngineId) -> &'static [&'static str] {
     match engine {
         EngineId::Claude => &[".claude/.credentials.json", ".claude.json"],
@@ -123,12 +125,10 @@ fn version_of(path: &Path) -> String {
 
 pub fn detect(engine: EngineId, home: Option<&Path>) -> EngineStatus {
     let path = locate(executables(engine), home);
+    let files = credential_files(engine);
     let signed_in = path.is_some()
-        && home.is_some_and(|home| {
-            credential_files(engine)
-                .iter()
-                .any(|file| home.join(file).is_file())
-        });
+        && (files.is_empty()
+            || home.is_some_and(|home| files.iter().any(|file| home.join(file).is_file())));
     EngineStatus {
         engine: engine.as_str(),
         installed: path.is_some(),

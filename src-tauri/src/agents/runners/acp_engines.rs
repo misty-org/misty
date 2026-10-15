@@ -64,6 +64,23 @@ fn refusing_hooks() -> Option<PathBuf> {
     Some(dir)
 }
 
+/// Git settings that point hooks at the refusing pre-push hook, unless the
+/// person remembered pushing for this project.
+pub(crate) fn push_guard_env(grants: &[String]) -> Result<Vec<(String, String)>, RunnerError> {
+    if grants.iter().any(|grant| grant == "git.push") {
+        return Ok(Vec::new());
+    }
+    let hooks = refusing_hooks().ok_or(RunnerError::Invalid("couldn't prepare the push guard"))?;
+    Ok(vec![
+        ("GIT_CONFIG_COUNT".to_owned(), "1".to_owned()),
+        ("GIT_CONFIG_KEY_0".to_owned(), "core.hooksPath".to_owned()),
+        (
+            "GIT_CONFIG_VALUE_0".to_owned(),
+            hooks.to_string_lossy().into_owned(),
+        ),
+    ])
+}
+
 impl Runner for AcpRunner {
     fn engine(&self) -> EngineId {
         self.engine
@@ -101,18 +118,7 @@ impl Runner for AcpRunner {
         let mut env = Vec::new();
         if self.engine == EngineId::Grok {
             env.push(("GROK_DISABLE_AUTOUPDATER".to_owned(), "1".to_owned()));
-            if !launch.grants.iter().any(|grant| grant == "git.push") {
-                let hooks = refusing_hooks()
-                    .ok_or(RunnerError::Invalid("couldn't prepare the push guard"))?;
-                env.extend([
-                    ("GIT_CONFIG_COUNT".to_owned(), "1".to_owned()),
-                    ("GIT_CONFIG_KEY_0".to_owned(), "core.hooksPath".to_owned()),
-                    (
-                        "GIT_CONFIG_VALUE_0".to_owned(),
-                        hooks.to_string_lossy().into_owned(),
-                    ),
-                ]);
-            }
+            env.extend(push_guard_env(&launch.grants)?);
         }
         Ok(CommandSpec {
             program: program.into(),

@@ -181,6 +181,9 @@ func TestCodingEngineRules(t *testing.T) {
 	if codingEngineRefusal("grok", run("ask", "act"), all) == "" || codingEngineRefusal("grok", run("auto", "plan"), all) == "" {
 		t.Fatal("Grok never runs in Ask or Plan")
 	}
+	if !strings.Contains(codingEngineRefusal("dsh", run("auto", "act"), all[:1]), "DeepSeek Shell can't ask") || codingEngineRefusal("dsh", run("auto", "act"), all) != "" {
+		t.Fatal("DeepSeek Shell runs like Grok: Auto, with every project grant")
+	}
 	if codingEngineRefusal("agy", run("ask", "act"), nil) == "" || codingEngineRefusal("agy", run("ask", "plan"), nil) != "" {
 		t.Fatal("launch-time tools only plan in Ask")
 	}

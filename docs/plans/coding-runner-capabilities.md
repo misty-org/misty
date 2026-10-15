@@ -34,8 +34,8 @@ adapter.
 | minimax | `mcode acp` | ACP | yes: `session/request_permission` | `session/set_mode plan`; `permissionMode default` | ACP `plan` update | not reported | interactive |
 | kimi | `kimi acp` | ACP | `session/request_permission` exposed | `session/set_mode plan` | ACP `plan` update | not reported | interactive if the request reaches the client in its default mode; confirm |
 | omp | `omp --mode acp` (plan) / `rpc-ui` | ACP / NDJSON | `extension_ui_request` confirm dialogs | `session/set_mode plan` | `op`/`list` todos | not reported | interactive if confirm dialogs cover every change; confirm |
-| opencode | `opencode serve` | HTTP + SSE | `permission.asked` → `/permission/:id/reply` | `agent: plan` | not reported | not reported | interactive once a host session exists; **not built**: reported as not supported yet |
-| dsh | `dsh web` | HTTP + WebSocket | `approval/request` waterfall | `/plan` command | not reported | not reported | interactive once a host session exists; **not built**: reported as not supported yet |
+| opencode | `opencode serve` (per turn, loopback, free port) | HTTP + SSE | `permission.asked` → `/permission/:id/reply` (`once` / `reject`, never `always`); started with `OPENCODE_CONFIG_CONTENT` setting edit, bash and webfetch to `ask`, since OpenCode allows them by default | `agent: plan` | not reported | not reported | interactive (built) |
+| dsh | `dsh web --no-open` (per turn, loopback, free port, one-time token → cookie) | HTTP RPC + WebSocket (`/api/remote.mux`) | host sessions run tools without asking; any `approval/request` waterfall still reaches the bridge | none: `/plan` only steers the model | not reported | not reported | full access only (built), like Grok |
 | pi | `pi --mode rpc` | NDJSON | no | `--tools read,grep,find,ls` | none | not reported | launch-time only |
 | agy | `agy --print` | stream-json child | no | `--mode plan`; `--mode accept-edits` | none | not reported | launch-time only |
 | qoder / qoder-cn | `qodercli --acp` / `qoderclicn` | ACP | requests exist; Misty never sets its bypass mode, so unanswered asks may stall it | none | none | not reported | launch-time only: Auto only (no read-only mode); confirm it asks in its default mode |
@@ -47,13 +47,16 @@ Settings › Agents › Coding tools; only Codex reports one today.
 ## Sign-in detection
 
 None of the tools offers a status command; Misty checks for the credential files
-they write (`detect.rs`). A tool that keeps credentials only in the system
-keychain reads as signed out until a live check proves otherwise, which routes
-work to the fallback rather than failing mid-run.
+they write (`detect.rs`). Tools with no known credential file (MiniMax, Pi, Oh My
+Pi, DeepSeek Shell, Antigravity) count as signed in once installed; a run then
+fails with the tool's own message if it isn't.
 
 ## Built
 
 Claude Code and Codex (phase 4); the shared ACP adapter for MiniMax, Kimi, Oh My
-Pi, Qoder and Grok, and the launch-only adapters for Antigravity and Pi (phase 6).
-OpenCode and DeepSeek Shell need a local HTTP host session, which is not built:
-routing skips them with "isn't supported in Misty yet" and Settings says so.
+Pi, Qoder and Grok, and the launch-only adapters for Antigravity and Pi (phase 6);
+OpenCode and DeepSeek Shell as local servers Misty starts for each turn and stops
+afterwards (`runners/http_host/`). The hosted adapters are tested against mock
+servers built from the ccgui wire shapes; OpenCode's `permission.asked` payload
+and DeepSeek Shell's `approval/request` payload were never parsed there, so
+their classification needs the same live check as every other row.

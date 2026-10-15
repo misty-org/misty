@@ -79,7 +79,8 @@ func (s *SpacesService) codingGrants(ctx context.Context, run *codingRun, repo s
 
 // CodingLease issues a budget for the next turn: POST /me/coding/{invocationID}/lease
 // {device_id, engine, model, repo}. It refuses Basic plans, a spent allowance,
-// and Grok unless the chat is in Auto with edits, installs and pushes remembered.
+// and Grok or DeepSeek Shell unless the chat is in Auto with edits, installs
+// and pushes remembered.
 func (s *SpacesService) CodingLease() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.appsUser(w, r)
@@ -191,9 +192,10 @@ func codingEngineRefusal(engine string, run *codingRun, grants []string) string 
 	plan := run.body.CollaborationMode == db.ConversationModePlan
 	auto := serveragent.NormalizePermissionMode(run.body.PermissionMode) == serveragent.PermissionAuto
 	switch engine {
-	case "grok":
+	case "grok", "dsh":
 		if !auto || plan || !has("project.edit") || !has("project.install") || !has("git.push") {
-			return "Grok can't ask before acting. It runs only in Auto, on a project where you remembered edits, installs and pushes."
+			name := map[string]string{"grok": "Grok", "dsh": "DeepSeek Shell"}[engine]
+			return name + " can't ask before acting. It runs only in Auto, on a project where you remembered edits, installs and pushes."
 		}
 	case "pi", "agy", "qoder", "qoder-cn":
 		if !auto && !plan {
