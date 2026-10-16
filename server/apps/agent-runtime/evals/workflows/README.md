@@ -41,17 +41,59 @@ successful run writes one, a warm run repeats the task with fresh inputs (differ
 candidates or products, so the stored steps can't just replay an answer). The report shows each
 workflow's learning curve: success, tool calls, model turns and cost, cold against warm.
 
+## Run
+
+The runner (`workflow.eval.ts`) sends each task through the local stack's real API, as the
+composer or the cursor would, and reads the run's events: tool calls, screen hand-offs and the
+answer. It refuses any API that isn't local. From `server/apps/agent-runtime`:
+
+```bash
+set -a; . ../../.env/dev/integrations/ai.env; set +a
+MISTY_WORKFLOW_EVAL=1 npm run eval:workflows
+```
+
+| Variable | Meaning |
+|---|---|
+| `MISTY_WORKFLOW_EVAL` | `1` to run; the suite never runs with the unit tests. |
+| `MISTY_WORKFLOW_EVAL_MODELS` | Models to compare. Defaults to `anthropic/claude-haiku-5.5`, `openai/gpt-6-luna`, `google/gemini-3.5-flash-lite`. |
+| `MISTY_WORKFLOW_EVAL_JUDGE` | The rubric judge. Defaults to `anthropic/claude-haiku-5.5`. |
+| `MISTY_WORKFLOW_EVAL_TASKS` | Task ids, categories or sources (`polar`, `misty`) to run. |
+| `MISTY_WORKFLOW_EVAL_BUDGET` | Dollars of AI Gateway spend before the pass stops. Defaults to 7.50. |
+| `MISTY_WORKFLOW_EVAL_ACCOUNTS` | Connected test accounts, such as `gmail,google-calendar,github,slack,linkedin-signed-in`. Tasks needing others are skipped. |
+| `MISTY_WORKFLOW_EVAL_DEVICE` | `1` when a desktop app signed in to the eval account is running, so screen hand-offs can be carried out. |
+| `MISTY_ACCEPTANCE_API` | The local API. Defaults to `http://127.0.0.1:8081`. |
+
+- **Budget.** The cap is read from the AI Gateway's own credit balance before every task, so
+  model, search and judge calls all count. Per-task costs come from balance differences and
+  can lag a little; the pass total is exact.
+- **Your account.** Runs go to your own account on the local stack, so they use your memory,
+  spaces and connected apps and show up in your conversations, as real runs would. Save your
+  local sign-in once, without it reaching your shell history; the file is git-ignored:
+
+  ```bash
+  python3 -c 'import getpass,json,os; e=input("Email: "); p=getpass.getpass(); os.makedirs(".misty/acceptance",exist_ok=True); f=os.open(".misty/acceptance/workflow-eval-signin.json",os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600); os.write(f,json.dumps({"email":e,"password":p}).encode())'
+  ```
+
+  Run it from the repository root, or set `MISTY_WORKFLOW_EVAL_SIGNIN` to another file. A pass
+  stops after three runs in a row are refused before the model runs (an allowance limit or a
+  broken stack).
+- **Seed data.** `npx jiti evals/workflows/seed.ts` fills your connected test apps through
+  Misty's own Composio session: mail inserted into Gmail (nothing is sent; all labeled
+  `Misty eval`), interview and busy events in Calendar (no invites go out), a private
+  `misty-eval-sandbox` repo, a `#marketing-drafts` Slack channel and a "Weekly sync" note.
+  Mail is skipped when already there. Gmail only marks really sent mail as Sent, so the seeded
+  thank-you to Priya is found by sender and recipient, not in the Sent folder.
+- **Screen hand-offs.** Without a device, a run that asks for a screen ends there: its route
+  is scored, its answer isn't.
+- **Schedules** run as composer requests until the runner can claim a scheduled run.
+- **Fixture screens** are HTML pages in `fixtures/screens/`, rendered with
+  `fixtures/screens/render.swift` and scaled to 1280 x 800.
+
 ## Not built yet
 
-- The runner. It runs against the isolated live stack, never production. It starts runs
-  through the control plane as each `agent.entry` does (for `surface: "cursor"`, with the
-  `start.screen` fixture attached as the cursor display's capture), reads the tool trace from the
-  journal, and reuses `../browser/judge.ts` and `../browser/score.ts`.
-- A fixture search index so fixture tasks don't depend on live engines: `web_search` and
-  `web_fetch` answer from `../browser/sites` when the runner sets it.
-- Fixtures: the screen captures named under `start.screen` (`a2o-lite-neon-video.png`,
-  `terminal-module-not-found.png`, `misty-settings-closed.png`, `board-on-screen.png`), the resumes under
-  `fixtures/resumes/`, a `prospects` preset for `grid.html`, stock counts on `products.html`,
-  bug tags and assignees on `board.html`, and shipped-order mail in `mail.html`.
-- `web_fetch` itself (plan phase 1). Until it exists, tasks that require it fail; that is part
-  of the baseline.
+- A fixture search index, so fixture research tasks don't depend on live engines;
+  `research-cited-fixture` is skipped until it exists.
+- Resume fixtures and attachment upload for `candidate-screen-rubric`.
+- `web_fetch` (plan phase 1) and `agent.tool.use` (phase 2). Required tools that don't exist yet
+  are reported as unavailable, not failed; tasks that need them to answer will fail, which is
+  part of the baseline.
