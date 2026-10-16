@@ -166,7 +166,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       stopWhen: isStepCount(1),
       maxRetries: 2,
       // Match the Go admission ceiling (agents.MaxAgentTurnOutputTokens).
-      maxOutputTokens: 8_192,
+      maxOutputTokens: 32_000,
       reasoning: context.reasoning_effort === "max" ? undefined : context.reasoning_effort || undefined,
       telemetry: { isEnabled: true, recordInputs: false, recordOutputs: false, functionId: "misty.space-task-agent" },
       experimental_onStepStart: async ({ stepNumber }) => {

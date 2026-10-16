@@ -40,6 +40,8 @@ function readable(result: string): string {
 
 export class EvalClient {
   private cookies = new Map<string, string>();
+  /** The run in progress, so a stopped pass can cancel it rather than leave it spending. */
+  current = "";
 
   /** Signs in with the email and password saved in the sign-in file (see README.md). */
   static async open(): Promise<EvalClient> {
@@ -89,6 +91,7 @@ export class EvalClient {
       headers: { "Idempotency-Key": key },
       body: JSON.stringify({ trigger: "message", context: [], execution_mode: "user", idempotency_key: key, timezone: "America/Los_Angeles", ...body }),
     });
+    this.current = created.eventsUrl.split("/").at(-2) ?? "";
     const approved = new Set<string>();
     const run: EvalRun = { terminal: "", answer: "", tools: [], screenRequests: [], events: [], pagesRead: [], toolResults: [], invocationId: created.eventsUrl.split("/").at(-2) ?? "" };
     const controller = new AbortController();

@@ -125,6 +125,13 @@ function summary(all: OdysseysRun[]) {
 it.skipIf(env("MISTY_ODYSSEYS") !== "1")("runs Odysseys tasks through the product path", async () => {
   if (!device || !bridge) throw new Error("Odysseys needs this computer as the device: MISTY_WORKFLOW_EVAL_DEVICE and the eval bridge (README.md).");
   const client = await EvalClient.open();
+  // Stopping the pass (Ctrl-C, pkill) cancels the run in progress instead of leaving it spending.
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      const id = client.current;
+      void (id ? client.raw(`/ai/invocations/${id}/cancel`, { method: "POST" }) : Promise.resolve()).finally(() => process.exit(130));
+    });
+  }
   const agentId = (await client.json<{ agents: Array<{ id: string }> }>("/misty/agents")).agents[0]?.id ?? "";
   const me = await client.json<{ id: string }>("/me");
   const tasks = selectTasks(loadTasks(), split, list(env("MISTY_ODYSSEYS_TASKS"))).slice(offset, offset + limit);

@@ -142,7 +142,22 @@ func (m BillingMeter) runtimeBilling(ctx context.Context, account, run string, f
 }
 
 // serverSideRunModelCall reports a settlement for a model call the server made for a
-// run (browser.extract, node model:browse:<job>:extract), rather than a runtime turn.
+// run (browser.extract's model:browse:<job>:extract, browser.act's screen model
+// model:screen:<job>:<n>), rather than one of the runtime's own turns, model:<n>.
 func serverSideRunModelCall(settleKey string) bool {
-	return strings.Contains(settleKey, ":model:model:browse:")
+	key := strings.TrimSuffix(settleKey, ":settle")
+	index := strings.Index(key, ":model:model:")
+	if index < 0 {
+		return false
+	}
+	node := key[index+len(":model:model:"):]
+	if node == "" {
+		return false
+	}
+	for _, char := range node {
+		if char < '0' || char > '9' {
+			return true
+		}
+	}
+	return false
 }

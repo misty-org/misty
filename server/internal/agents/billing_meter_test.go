@@ -138,6 +138,9 @@ func TestRuntimeCompletionLeavesServerSideExtractionOutOfTheAggregate(t *testing
 	if err := meter.CompleteRuntimeTurn(t.Context(), "account", "run", "model:browse:job:extract", ModelUsage{InputTokens: 500, OutputTokens: 40}); err != nil {
 		t.Fatal(err)
 	}
+	if !serverSideRunModelCall("agent-runtime:run:model:model:screen:job:1:settle") || serverSideRunModelCall("agent-runtime:run:model:model:12:settle") {
+		t.Fatal("screen-model calls must count as server-side and runtime turns must not")
+	}
 	// The runtime's aggregate counts only its own turns.
 	if err := meter.CompleteRuntime(t.Context(), "account", "run", ModelUsage{InputTokens: 100, OutputTokens: 20}); err != nil || len(store.entries) != 2 {
 		t.Fatal("server-side extraction contradicted the runtime's aggregate", err, len(store.entries))
