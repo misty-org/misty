@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -303,6 +304,10 @@ func mcpToolError(err error) *mcp.CallToolResult {
 		message = "The drawing changed since it was read. Call drawing_read again, then retry with its latest base_hash."
 	} else if strings.Contains(err.Error(), "document_too_large") {
 		message = "The drawing would exceed the collaboration document size limit. Apply a smaller scene or delete unused elements first."
+	}
+	if message == "Misty could not complete this tool call." {
+		// The model sees a generic failure; the reason belongs in the server log.
+		log.Printf("agent tool call failed: %v", err)
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: message}}, IsError: true}
 }
