@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 /** A remembered approval: this agent may take this action on this one resource in Auto. */
@@ -16,7 +17,7 @@ export interface AgentGrant {
 }
 
 export const grantsApi = {
-  list: () => apiRequest<{ grants: AgentGrant[] }>("/me/agent-grants", { cache: "no-store" }),
+  list: () => cachedRequest<{ grants: AgentGrant[] }>("/me/agent-grants"),
   revoke: (id: string) =>
     apiRequest<void>(`/me/agent-grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
   revokeAll: (agentId: string) =>

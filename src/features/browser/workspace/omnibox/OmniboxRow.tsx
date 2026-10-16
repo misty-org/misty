@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Button, cn, IconButton, SuggestionItem } from "@/shared/ui";
-import { AppWindow, FileText, Globe2, History, Search, Settings2, Star, X } from "lucide-react";
+import { AppWindow, FileText, Globe2, History, Search, Settings, Star, X } from "lucide-react";
 import type { OmniboxMatch } from "./types";
 
 export function omniboxMatchIcon(match: OmniboxMatch) {
   if (match.kind === "search" || match.kind === "suggestion") return Search;
   if (match.kind === "tab") return AppWindow;
-  if (match.kind === "action") return Settings2;
+  if (match.kind === "action") return Settings;
   if (match.kind === "content") return FileText;
   if (match.kind === "bookmark" || match.bookmarked) return Star;
   if (match.kind === "history") return History;

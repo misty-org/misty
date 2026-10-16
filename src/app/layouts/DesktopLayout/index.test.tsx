@@ -34,9 +34,9 @@ vi.mock("./GlobalNavigator", () => ({
 
 vi.mock("./AccountIsland", () => ({ AccountIsland: () => null }));
 vi.mock("./WorkspaceStripDock", () => ({
-  BrowserMenuAccountItems: () => null,
   BrowserProfileButton: () => null,
   AppLauncherButton: () => null,
+  AgentsMenuButton: () => null,
   StripDownloads: () => null,
 }));
 vi.mock("./WorkspaceCanvas", () => ({
@@ -130,6 +130,7 @@ vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({
 vi.mock("@/features/webviews/browserRuntime", () => ({
   setBrowserWebviewsSuspended: vi.fn(),
   setBrowserPointerTrackingEnabled: vi.fn(),
+  isBrowserRuntimeCreated: vi.fn(() => false),
   onBrowserRuntimeClose: vi.fn(() => () => {}),
 }));
 vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({

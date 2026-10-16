@@ -1,0 +1,98 @@
+/*
+ * The Agents composer, one row: attach, the text, voice and send share one rounded box, and
+ * the controls sit in a quiet strip beneath it (ComposerStrip). These rules follow the
+ * two-row rules in workspace/agentWorkspaceFrame.css and win on specificity, so only
+ * composers with data-composer-layout="inline" change.
+ */
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-composer-layout="inline"]
+  > div:has(textarea) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+/* With attachments above, the strip is the box's top and the row its bottom. */
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-composer-layout="inline"]:has(> div:first-child:not(:has(textarea)))
+  > div:has(textarea) {
+  border-top: 0;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-composer-layout="inline"]
+  > div
+  > div:has(> textarea) {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-composer-layout="inline"]
+  > div:has(textarea)
+  > div:is(:first-child, :last-child) {
+  margin: 0;
+  padding: 0;
+}
+.agent-studio
+  .agent-conversation[data-empty="true"]
+  [data-slot="message-composer"][data-composer-layout="inline"]
+  textarea,
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-composer-layout="inline"]
+  textarea {
+  min-height: 38px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.agent-composer-strip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin: 6px 4px 0;
+}
+.agent-composer-strip-end {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-left: auto;
+}
+.agent-composer-strip .agent-strip-chip {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.agent-composer-strip .agent-strip-chip:is(:hover, [data-state="open"]) {
+  color: var(--color-cream);
+  background: var(--color-charcoal-hover);
+}
+.agent-composer-strip-end .agent-strip-chip:first-child {
+  color: var(--color-cream);
+}
+/* In a narrow composer (the Misty panel) every chip shows only its icon; each keeps its name
+   for assistive technology, its tooltip and its menu. */
+@container agent-studio (max-width: 560px) {
+  .agent-composer-strip .agent-strip-chip {
+    padding-inline: 6px;
+  }
+  .agent-composer-strip .agent-strip-chip > span.truncate {
+    display: none;
+  }
+}

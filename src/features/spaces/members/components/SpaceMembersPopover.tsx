@@ -15,7 +15,7 @@ import {
   PopoverTrigger,
   Skeleton,
 } from "@/shared/ui";
-import { Settings2, UserPlus, UsersRound } from "lucide-react";
+import { Settings, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -145,7 +145,7 @@ export function SpaceMembersPopover({
               onClick={() => setOpen(false)}
             >
               <Link to={managePath} state={settingsState}>
-                <Settings2 size={14} />
+                <Settings size={14} />
                 Manage
               </Link>
             </Button>

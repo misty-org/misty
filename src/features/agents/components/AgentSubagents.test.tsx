@@ -15,9 +15,10 @@ it("shows each sub-agent's progress in words and stops a running one", async () 
       ]}
     />,
   );
-  expect(screen.getByText("3 sub-agents")).toBeTruthy();
+  expect(screen.getByText("Running 1 of 3 helpers")).toBeTruthy();
   expect(screen.getByText("Working")).toBeTruthy();
-  expect(screen.getByText("Done · $12 a month")).toBeTruthy();
+  expect(screen.getByText("Done")).toBeTruthy();
+  expect(screen.getByText("$12 a month")).toBeTruthy();
   expect(screen.getByText("Didn’t finish")).toBeTruthy();
   // Only the running one can be stopped.
   const stops = screen.getAllByRole("button", { name: /Stop sub-agent/ });
@@ -44,7 +45,7 @@ it("shows the notebook's findings open, without the agent's checklist", async ()
   const toggle = screen.getByRole("button", { name: /Notebook/ });
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   await act(async () => fireEvent.click(toggle));
-  expect(screen.queryByText(/Acme costs \$12/)).toBeNull();
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("renders nothing for an empty notebook", () => {

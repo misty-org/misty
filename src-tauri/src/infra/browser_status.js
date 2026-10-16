@@ -15,15 +15,22 @@
     if (postToHost) postToHost('{"token":"' + statusToken + '","status":"stopped"}');
   };
   // Single-page sites (YouTube and most apps) change the URL with the History API or the hash,
-  // which loads nothing, so the host would never hear of it. Report each change; the host reads
-  // the real URL from the view itself rather than trusting one from the page.
+  // which loads nothing, so the host would never hear of it. Report each change; the host only
+  // accepts an address within the view's own origin.
   let reportedHref = String(location);
+  // Captured now, before site scripts can replace it.
+  const encode = encodeURIComponent;
   const reportLocation = () => {
     const href = String(location);
     if (href === reportedHref) return;
     reportedHref = href;
     postToHost = postToHost || bindHost();
-    if (postToHost) postToHost('{"token":"' + statusToken + '","status":"location"}');
+    if (!postToHost) return;
+    // The new address rides along, so the host need not wait for the view to catch up. A very
+    // long one is left out and the host reads the view's own address instead.
+    const encoded = encode(href);
+    postToHost('{"token":"' + statusToken + '","status":"location"'
+      + (encoded.length <= 800 ? ',"url":"' + encoded + '"' : "") + '}');
   };
   const historyProto = window.History && History.prototype;
   for (const name of ["pushState", "replaceState"]) {
@@ -211,6 +218,16 @@
     loading = false;
     render();
     reportLoaded();
+  });
+  // A page whose last image, frame or request never finishes never fires load either. Once its
+  // document is ready it is usable, so stop the spinner a few seconds later regardless.
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+      if (!loading) return;
+      loading = false;
+      render();
+      reportLoaded();
+    }, 4000);
   });
   // A page restored from the back/forward cache fires no load.
   window.addEventListener("pageshow", (event) => {

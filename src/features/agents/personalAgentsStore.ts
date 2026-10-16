@@ -27,7 +27,11 @@ export const usePersonalAgentsStore = create<PersonalAgentsState>((set, get) => 
     }
     set({ loading: true });
     try {
-      const { agents } = await personalAgentsApi.list();
+      // The saved copy paints first on a first visit; the fresh list replaces it.
+      const { agents } = await personalAgentsApi.list((saved) => {
+        if (revision === request && get().accountId === accountId && !get().agents.length)
+          set({ agents: saved.agents });
+      });
       if (revision === request && get().accountId === accountId)
         set({ agents, loading: false, error: "" });
     } catch (error) {

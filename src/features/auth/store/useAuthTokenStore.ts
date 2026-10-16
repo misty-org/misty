@@ -1,4 +1,5 @@
 import { forgetAccountCookies, restoreAccountCookies } from "@/api/client/cookie-session";
+import { clearApiCache } from "@/api/cache/apiCache";
 import { configureApiSession } from "@/api/client/session";
 import {
   deploymentStorageKey,
@@ -207,6 +208,7 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
   try {
     const vault = await loadSecureVault();
     const activeId = readActiveAccountId();
+    if (activeId) await clearApiCache(activeId);
     if (activeId) await forgetAccountCookies(await resolveApiBase(), activeId);
     vault.sessions = vault.sessions.filter(
       (item) => !isCurrentDeploymentSession(item) || item.account.id !== activeId,
@@ -262,6 +264,7 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     ) {
       throw new Error("The active Misty session cannot be removed as a background account.");
     }
+    await clearApiCache(accountId);
     await forgetAccountCookies(await resolveApiBase(), accountId);
     const sessions = vault.sessions.filter(
       (item) => !isCurrentDeploymentSession(item) || item.account.id !== accountId,
@@ -537,6 +540,7 @@ configureApiSession({
   // Desktop only: the browser's own cookies decide there. Unknown until the
   // keystore has been read, so startup requests still go out and restore it.
   isSignedOut: () => hasTauriInternals() && cachedToken === null,
+  readAccountId: readActiveAccountId,
   readGeneration: readAccountSessionGeneration,
   readToken: async () => {
     await readAccountAuthToken();

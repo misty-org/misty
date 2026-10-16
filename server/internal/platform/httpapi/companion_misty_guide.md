@@ -19,9 +19,9 @@ Panes (the parts of a split tab):
 
 Virtual windows:
 - A virtual window is a separate set of tabs and layouts inside the same app window, for keeping projects apart. They are not Spaces.
-- "Virtual windows" is a submenu of the "Pane layout" menu. It lists browser profiles first, then the virtual windows (click one to switch; hover one for a pencil to edit its name and color or an x to close it; right-click one and choose "Rename" to rename it), then "New" and "Reopen", which opens a list of recently closed windows to bring back.
+- "Manage virtual windows" (the window icon with a small chevron in the tab strip) opens a menu. It lists browser profiles first, then the virtual windows (click one to switch; hover one for a pencil to edit its name and color or an x to close it; right-click one and choose "Rename" to rename it), then "New" and "Reopen", which opens a list of recently closed windows to bring back.
 - Every virtual window has a color that tints its frame and tabs, so windows are easy to tell apart.
-- To create one: open "Virtual windows" and choose "New", or press Cmd+N, then choose its color.
+- To create one: open "Manage virtual windows" and choose "New", or press Cmd+N, then choose its color.
 - Switch with Cmd+` and Cmd+Shift+`, or swipe horizontally with two fingers over the tab strip.
 
 Browser:

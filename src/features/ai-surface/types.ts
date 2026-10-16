@@ -248,6 +248,8 @@ export interface AiInvocationRequest {
   collaborationMode?: "act" | "plan";
   /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
   permissionMode?: "ask" | "auto";
+  /** The coding tool a delegated coding run uses this turn; omitted uses the Settings default. */
+  codingTool?: string;
   idempotencyKey: string;
   timezone?: string;
 }

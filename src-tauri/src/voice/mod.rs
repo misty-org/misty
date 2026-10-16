@@ -11,9 +11,9 @@ mod pill;
 #[cfg(any(target_os = "macos", windows))]
 mod session;
 
+// Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates
+// beside each function; naming the functions alone leaves generate_handler! blind.
 #[cfg(any(target_os = "macos", windows))]
-pub use capture::{voice_capture_mute, voice_capture_sources, voice_capture_start, voice_capture_stop, CaptureState};
+pub use capture::*;
 #[cfg(any(target_os = "macos", windows))]
-pub use session::{
-    voice_dictation_configure, voice_dictation_insert, voice_dictation_pill_hide, voice_dictation_stop, DictationState,
-};
+pub use session::*;

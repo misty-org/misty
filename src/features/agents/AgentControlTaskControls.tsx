@@ -1,6 +1,6 @@
 import { Check, Hand, Play, Square } from "lucide-react";
 import { formatShortcutLabel, detectShortcutPlatform } from "@/features/shortcuts";
-import { IconButton } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 import { AgentDockControls } from "./dock/AgentDockControls";
 import { finishLocalExecution, type Execution } from "./localExecution";
 import { autopilotStopShortcut } from "./workspaceAutopilot";
@@ -31,23 +31,24 @@ export function AgentControlTaskControls({
   return (
     <div className="flex items-center gap-1" role="group" aria-label="Task controls">
       {running ? (
-        <IconButton size="md" label="Take over" disabled={pending} onClick={takeOver}>
-          <Hand className="size-4" />
-        </IconButton>
+        <Button size="sm" variant="outline" disabled={pending} onClick={takeOver}>
+          <Hand className="size-3.5" aria-hidden="true" /> Take over
+        </Button>
       ) : (
         !finished && (
-          <IconButton
-            size="md"
-            label={execution.state === "waiting" ? "Done" : "Resume"}
+          <Button
+            size="sm"
+            variant="primary"
             disabled={pending || Boolean(execution.method && execution.state !== "waiting")}
             onClick={resume}
           >
             {execution.state === "waiting" ? (
-              <Check className="size-4" />
+              <Check className="size-3.5" aria-hidden="true" />
             ) : (
-              <Play className="size-4" />
-            )}
-          </IconButton>
+              <Play className="size-3.5" aria-hidden="true" />
+            )}{" "}
+            {execution.state === "waiting" ? "Done" : "Resume"}
+          </Button>
         )
       )}
       <AgentDockControls execution={execution} agentName={name} disabled={pending} act={act} />
@@ -58,18 +59,18 @@ export function AgentControlTaskControls({
         </kbd>
       )}
       {finished || stopped ? (
-        <IconButton
-          size="md"
-          label="Done"
+        <Button
+          size="sm"
+          variant="primary"
           disabled={pending}
           onClick={() => act(finishLocalExecution)}
         >
-          <Check className="size-4" />
-        </IconButton>
+          <Check className="size-3.5" aria-hidden="true" /> Done
+        </Button>
       ) : (
-        <IconButton size="md" label="Stop task" disabled={pending} onClick={stop}>
-          <Square className="size-4" />
-        </IconButton>
+        <Button size="sm" variant="outline" disabled={pending} onClick={stop}>
+          <Square className="size-3.5" aria-hidden="true" /> Stop
+        </Button>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { AgentMessageChecklist } from "./AgentChecklist";
 import { useCollaborationStore } from "./store";
@@ -41,10 +41,14 @@ it("summarizes, then lists steps with their status in words", async () => {
   useCollaborationStore.setState({ byConversation: { c1: state([checklist]) } });
   render(<AgentMessageChecklist conversationId="c1" invocationId="inv_1" running />);
   const summary = screen.getByRole("button", { name: /1 of 3 · Edit tests/ });
+  expect(summary.getAttribute("aria-expanded")).toBe("true");
+  const table = screen.getByRole("region", { name: "Checklist" });
+  expect(within(table).getByText("In progress")).toBeTruthy();
+  expect(within(table).getByText("Edit tests")).toBeTruthy();
+  expect(within(table).getByText("Done")).toBeTruthy();
+  expect(within(table).getByText("Read the code")).toBeTruthy();
   await act(async () => fireEvent.click(summary));
-  expect(screen.getByRole("list")).toBeTruthy();
-  expect(screen.getByRole("listitem", { name: "Edit tests: In progress" })).toBeTruthy();
-  expect(screen.getByRole("listitem", { name: "Read the code: Done" })).toBeTruthy();
+  expect(summary.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("says Stopped for the active step of a run that ended, and Waiting for you on a card", () => {
@@ -52,7 +56,8 @@ it("says Stopped for the active step of a run that ended, and Waiting for you on
   const { rerender } = render(
     <AgentMessageChecklist conversationId="c1" invocationId="inv_1" running={false} />,
   );
-  expect(screen.getByRole("button", { name: /Stopped: Edit tests/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /1 of 3 · Edit tests/ })).toBeTruthy();
+  expect(screen.getByText("Stopped")).toBeTruthy();
   rerender(
     <AgentMessageChecklist
       conversationId="c1"
@@ -61,7 +66,7 @@ it("says Stopped for the active step of a run that ended, and Waiting for you on
       hold="waiting_for_you"
     />,
   );
-  expect(screen.getByRole("button", { name: /Waiting for you: Edit tests/ })).toBeTruthy();
+  expect(screen.getByText("Waiting for you")).toBeTruthy();
 });
 
 it("applies checklist events and ignores stale replays", () => {

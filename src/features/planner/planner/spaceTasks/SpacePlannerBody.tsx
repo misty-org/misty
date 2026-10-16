@@ -1,6 +1,6 @@
 import type { SpaceMember, SpaceTask } from "@/api/spaces/dto/entities";
 import type { DueFilter, TaskViewMode } from "@/api/spaces/dto/SpacePlanner";
-import { Button, Spinner } from "@/shared/ui";
+import { Button, SkeletonList, Spinner } from "@/shared/ui";
 import { SpaceTaskBoard, SpaceTaskList } from "../SpacePlannerViews";
 import type { ReactNode } from "react";
 import { matchesDueFilter } from "./taskFiltering";
@@ -16,6 +16,8 @@ export interface SpacePlannerBodyProps {
   assignee: string;
   due: DueFilter;
   data: SpaceTasksData;
+  /** Refresh was pressed: skeletons stand in for the tasks until they are back. */
+  refreshing?: boolean;
   actions: SpaceTaskActions;
   onDeleteRequest: (task: SpaceTask) => void;
 }
@@ -28,7 +30,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
       !(props.assignee === "unassigned" && task.assignee_user_id) &&
       matchesDueFilter(task, props.due),
   );
-  const isEmptyLoad = data.loading && !data.tasks.length;
+  const isEmptyLoad = (data.loading && !data.tasks.length) || Boolean(props.refreshing);
 
   return (
     // The board owns its own scrolling (horizontal columns, vertical cards); the list does not.
@@ -37,9 +39,7 @@ export function SpacePlannerBody(props: SpacePlannerBodyProps) {
     >
       {data.error ? props.renderError(data.error) : null}
       {isEmptyLoad ? (
-        <div className="grid h-full min-h-56 place-items-center text-cream-muted">
-          <Spinner size="lg" label="Loading tasks" />
-        </div>
+        <SkeletonList label="Tasks" rows={8} leading="icon" className="p-3" />
       ) : view === "board" ? (
         <SpaceTaskBoard
           tasks={visibleTasks.filter((task) => task.status !== "canceled")}

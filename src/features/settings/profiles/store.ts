@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useSettingsStore } from "../store/useSettingsStore";
-import { registerProfileWriter } from "./bridge";
+import { registerProfileWriter, type ProfileWriteOptions } from "./bridge";
 import {
   effectiveValues,
   editPreference,
@@ -18,6 +18,10 @@ interface Context {
   projected?: string;
   /** Edits already on screen that are not yet committed to this device's store. */
   pending: PendingEdit[];
+  /** Edits shown but held for Save changes; also listed in `pending` so refreshes keep them. */
+  staged: PendingEdit[];
+  /** The saved state the staged edits are measured against. */
+  baseline?: DeviceProfileState;
   writes: Promise<unknown>;
   channel?: BroadcastChannel;
   refresh?: Promise<void>;
@@ -35,10 +39,24 @@ interface ProfileStore {
   disconnect(): void;
   /** Reads the saved settings again (another window may have changed them). */
   refresh(): Promise<void>;
-  edit(id: string, value: PreferenceValue | undefined): Promise<void>;
+  /** Unsaved edits are waiting on the settings page. */
+  dirty: boolean;
+  /** Bumps each time someone tries to leave with unsaved edits, so the save bar can react. */
+  attention: number;
+  edit(
+    id: string,
+    value: PreferenceValue | undefined,
+    options?: ProfileWriteOptions,
+  ): Promise<void>;
+  /** Commits every staged edit to this device. */
+  saveStaged(): Promise<void>;
+  /** Drops every staged edit and returns to what is saved. */
+  discardStaged(): Promise<void>;
 }
 let context: Context | null = null,
   epoch = 0;
+/** True while the settings page is open; its edits are staged rather than committed. */
+let stagingOn = false;
 let projectionQueue: Promise<unknown> = Promise.resolve();
 const fresh = (ctx: Context) => context === ctx;
 function requiredContext() {
@@ -122,10 +140,25 @@ async function persist(ctx: Context, edit: PendingEdit) {
     throw error;
   }
 }
+/** The settings page opens and closes staging; closing drops anything unsaved. */
+export function setSettingsStaging(on: boolean) {
+  stagingOn = on;
+  if (!on && useSettingsProfiles.getState().dirty)
+    void useSettingsProfiles.getState().discardStaged().catch(() => {});
+}
+/** True, and the save bar draws attention, when leaving settings would lose unsaved edits. */
+export function blockIfUnsaved(): boolean {
+  const { dirty, attention } = useSettingsProfiles.getState();
+  if (!dirty) return false;
+  useSettingsProfiles.setState({ attention: attention + 1 });
+  return true;
+}
 export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
   state: null,
   ready: false,
   error: null,
+  dirty: false,
+  attention: 0,
   configure: async (scope, document) => {
     if (context?.scope === scope && get().ready) return;
     const ctx: Context = {
@@ -133,6 +166,7 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       seed: structuredClone(document),
       epoch: ++epoch,
       pending: [],
+      staged: [],
       writes: Promise.resolve(),
     };
     context?.channel?.close();
@@ -148,7 +182,7 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       };
     }
     registerProfileWriter(null);
-    set({ state: null, ready: false, error: null });
+    set({ state: null, ready: false, error: null, dirty: false });
     try {
       const state = await mutateState(
         scope,
@@ -159,7 +193,7 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       await publish(ctx, state);
       if (!fresh(ctx)) return;
       set({ ready: true });
-      registerProfileWriter((id, value) => get().edit(id, value));
+      registerProfileWriter((id, value, options) => get().edit(id, value, options));
     } catch (error) {
       report(error, ctx);
     }
@@ -169,7 +203,7 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
     context = null;
     epoch++;
     registerProfileWriter(null);
-    set({ state: null, ready: false, error: null });
+    set({ state: null, ready: false, error: null, dirty: false });
   },
   refresh: async () => {
     const ctx = requiredContext();
@@ -194,7 +228,7 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
     return ctx.refresh;
   },
   // The screen and the app's behavior change first; saving to this device follows.
-  edit: async (id, value) => {
+  edit: async (id, value, options) => {
     const ctx = requiredContext();
     let write: Promise<void>;
     try {
@@ -207,6 +241,21 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       ctx.projected = undefined;
       set({ state: next, error: null });
       useSettingsStore.getState().previewProfileValues(effectiveValues(next));
+      if (options?.stage && stagingOn) {
+        // Shown and previewed now; written to this device when the person saves.
+        ctx.baseline ??= current;
+        ctx.staged.push(edit);
+        const changed =
+          signatureOf(effectiveValues(next)) !== signatureOf(effectiveValues(ctx.baseline));
+        if (!changed) {
+          // Back to what is saved: nothing is left to save.
+          ctx.pending = ctx.pending.filter((pending) => !ctx.staged.includes(pending));
+          ctx.staged = [];
+          ctx.baseline = undefined;
+        }
+        set({ dirty: changed });
+        return;
+      }
       // Edits commit in the order they were made, so the last one always wins on disk.
       write = ctx.writes.catch(() => {}).then(() => persist(ctx, edit));
       ctx.writes = write;
@@ -215,5 +264,32 @@ export const useSettingsProfiles = create<ProfileStore>((set, get) => ({
       throw error;
     }
     await write;
+  },
+  saveStaged: async () => {
+    const ctx = requiredContext();
+    const edits = ctx.staged;
+    ctx.staged = [];
+    ctx.baseline = undefined;
+    set({ dirty: false });
+    let last: Promise<void> = ctx.writes.then(
+      () => {},
+      () => {},
+    );
+    for (const edit of edits) last = last.then(() => persist(ctx, edit));
+    ctx.writes = last;
+    await last;
+  },
+  discardStaged: async () => {
+    const ctx = requiredContext();
+    ctx.pending = ctx.pending.filter((pending) => !ctx.staged.includes(pending));
+    ctx.staged = [];
+    ctx.baseline = undefined;
+    ctx.projected = undefined;
+    set({ dirty: false });
+    const saved = await readState<DeviceProfileState>(ctx.scope).catch(() => null);
+    await publish(
+      ctx,
+      saved?.state ? migrateProfileState(saved.state, ctx.seed) : initialProfileState(ctx.seed),
+    );
   },
 }));

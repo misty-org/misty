@@ -16,15 +16,12 @@ import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ConversationModelPicker } from "../models/ConversationModelPicker";
-import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
-import { ComposerOptions } from "./ComposerOptions";
-import {
-  AgentGoalButton,
-  AgentModeToggle,
-  AgentPermissionMenu,
-} from "../collaboration/AgentModeToggle";
+import { ComposerStrip } from "./ComposerStrip";
+import { AgentModeMenu } from "../collaboration/AgentModeToggle";
+import { AgentDeviceMenu } from "../page/AgentDeviceMenu";
 import { usePermissionMode } from "../collaboration/permissionMode";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
+import { AgentCodingToolMenu } from "../collaboration/AgentCodingToolMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
 import {
@@ -38,7 +35,6 @@ export function AgentWorkspaceConversation({
   agent,
   conversationId,
   emptyContent,
-  belowComposer,
   initialDraft = "",
   showControlBar = false,
   spaceId: _legacySpaceId,
@@ -51,8 +47,6 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
-  /** Shown under the composer while the conversation is empty. */
-  belowComposer?: ReactNode;
   initialDraft?: string;
   showControlBar?: boolean;
   spaceId: string;
@@ -307,7 +301,7 @@ export function AgentWorkspaceConversation({
             <p>{state.error}</p>
             {state.working && state.invocationId && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => void useMistyStore.getState().loadConversations(true)}
               >
@@ -366,29 +360,7 @@ export function AgentWorkspaceConversation({
         <MistyComposer
           hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
-          // One toolbar under the text: Attach and the options (mode, project, model, thinking) on
-          // the left; usage, voice and send on the right.
-          leadingControl={
-            <ComposerOptions
-              plan={<AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />}
-              permissions={
-                <AgentPermissionMenu conversationId={conversation?.id} permission={permission} />
-              }
-              goal={<AgentGoalButton conversationId={conversation?.id} />}
-              project={<AgentProjectMenu conversationId={conversation?.id} />}
-              model={
-                <ConversationModelPicker
-                  conversation={conversation}
-                  disabled={state.working}
-                  onError={reportError}
-                />
-              }
-              reasoning={
-                <ConversationReasoningPicker conversation={conversation} disabled={state.working} />
-              }
-            />
-          }
-          layout="conversation"
+          layout="inline"
           value={draft}
           onChange={setDraft}
           mode="ask"
@@ -418,13 +390,6 @@ export function AgentWorkspaceConversation({
           busy={state.working && !draft.trim()}
           voiceControl={
             <>
-              {showControlBar && agent && (
-                <AgentUsageControl
-                  draft={draft}
-                  model={conversation?.modelId}
-                  working={state.working}
-                />
-              )}
               <IconButton
                 label={voice.recording ? "Stop recording" : "Start voice input"}
                 disabled={
@@ -463,13 +428,36 @@ export function AgentWorkspaceConversation({
             ) : undefined
           }
         />
+        <ComposerStrip
+          device={<AgentDeviceMenu disabled={state.working} />}
+          project={<AgentProjectMenu conversationId={conversation?.id} />}
+          mode={
+            <AgentModeMenu
+              conversationId={conversation?.id}
+              mode={collaboration.mode}
+              permission={permission}
+            />
+          }
+          code={<AgentCodingToolMenu conversationId={conversation?.id} disabled={state.working} />}
+          model={
+            <ConversationModelPicker
+              conversation={conversation}
+              disabled={state.working}
+              onError={reportError}
+            />
+          }
+          usage={
+            showControlBar && agent ? (
+              <AgentUsageControl working={state.working} />
+            ) : undefined
+          }
+        />
         {/* Working status belongs to the transcript, under the message that started it. */}
         {(voice.recording || voice.transcribing) && (
           <p className="agent-compose-status" role="status">
             {voice.recording ? "Listening…" : "Transcribing…"}
           </p>
         )}
-        {!conversation?.messages.length && belowComposer}
       </div>
     </section>
   );

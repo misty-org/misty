@@ -179,7 +179,8 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 			return
 		}
 		allowedTools := manifestToolNames(manifest)
-		system += "\n\n" + agentExecutionGuidance + "\n\nCurrent time: " + now.Format(time.RFC3339) + "; timezone: " + timezone + "." + agentCapabilityGuidance(allowedTools, false)
+		// The time changes every run, so it goes last: a provider caches a prompt only up to its first difference.
+		system += "\n\n" + agentExecutionGuidance + agentCapabilityGuidance(allowedTools, false) + "\n\nCurrent time: " + now.Format(time.RFC3339) + "; timezone: " + timezone + "."
 
 		_ = s.database.TouchPersonalAgentTaskRuntime(r.Context(), run.ID, body.RuntimeRunID, "reading_context", 5)
 		planned, forced := planRoutes(r.Context(), s.database, run.OwnerUserID, defaultAIRoutes(membership.ModelID, membership.ReasoningEffort))

@@ -1,13 +1,10 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { useEffect, useState } from "react";
-import { apiRequest, readApiSessionGeneration } from "@/api/client";
+import { readApiSessionGeneration } from "@/api/client";
 import type { AiLimit } from "@/api/spaces/dto/agentUsageTypes";
+import { formatUsagePercent } from "@/features/global-search/CommandUsageEstimate";
+import { Settings } from "lucide-react";
 import {
-  CommandEstimateDetails,
-  formatUsagePercent,
-  useCommandUsageEstimate,
-} from "@/features/global-search/CommandUsageEstimate";
-import {
-  Button,
   IconButton,
   Popover,
   PopoverContent,
@@ -26,18 +23,22 @@ type AiMeter = {
 };
 
 const limitLabels = [
-  ["window", "This session"],
-  ["weekly", "This week"],
-  ["monthly", "This month"],
+  ["window", "Session limit"],
+  ["weekly", "Weekly"],
 ] as const;
 
+/** How long until a limit refills, in the units that matter at that distance. */
 function resetLabel(limit: AiLimit): string {
   if (!limit.resets_at) return "Starts with your next request";
-  const reset = new Date(limit.resets_at);
-  const time = reset.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  return reset.toDateString() === new Date().toDateString()
-    ? `Refills at ${time}`
-    : `Refills ${reset.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}`;
+  const minutes = Math.max(
+    0,
+    Math.round((new Date(limit.resets_at).getTime() - Date.now()) / 60_000),
+  );
+  if (minutes < 1) return "Resets in under a minute";
+  if (minutes < 60) return `Resets in ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Resets in ${hours} hr ${minutes % 60} min`;
+  return `Resets in ${Math.floor(hours / 24)} d ${hours % 24} hr`;
 }
 
 function openUsageSettings() {
@@ -47,34 +48,27 @@ function openUsageSettings() {
 }
 
 /**
- * The composer's usage ring: the account's weekly AI meter, plus billing's estimate for
- * the current draft. Numbers live in the popover so the composer stays quiet.
+ * The composer's usage ring: the account's session and weekly AI limits, with how long until
+ * each refills. Numbers live in the popover so the composer stays quiet.
  */
-export function AgentUsageControl({
-  draft,
-  model,
-  working,
-}: {
-  draft: string;
-  model?: string;
-  working: boolean;
-}) {
+export function AgentUsageControl({ working }: { working: boolean }) {
   const generation = readApiSessionGeneration();
   const [open, setOpen] = useState(false);
   const [usage, setUsage] = useState<{ generation: number; meter?: AiMeter; failed?: boolean }>();
-  const estimate = useCommandUsageEstimate(working ? "" : draft, model);
   // Refresh when work settles and whenever the details open.
   useEffect(() => {
     if (working) return;
     const controller = new AbortController();
-    void apiRequest<{ account?: { ai?: AiMeter } }>("/billing/usage", {
-      signal: controller.signal,
-      cache: "no-store",
+    const show = (value: { account?: { ai?: AiMeter } }) => {
+      if (!controller.signal.aborted && generation === readApiSessionGeneration())
+        setUsage({ generation, meter: value.account?.ai });
+    };
+    // The last reading paints at once; the fresh one follows.
+    void cachedRequest<{ account?: { ai?: AiMeter } }>("/billing/usage", {
+      onCached: show,
+      init: { signal: controller.signal },
     })
-      .then((value) => {
-        if (!controller.signal.aborted && generation === readApiSessionGeneration())
-          setUsage({ generation, meter: value.account?.ai });
-      })
+      .then(show)
       .catch(() => {
         if (!controller.signal.aborted) setUsage({ generation, failed: true });
       });
@@ -83,19 +77,17 @@ export function AgentUsageControl({
   const current = usage?.generation === generation ? usage : undefined;
   const meter = current?.meter && current.meter.limit > 0 ? current.meter : undefined;
   const limits = meter?.limits;
-  // The ring shows the tightest limit: the one closest to stopping work.
+  // The ring shows the tightest limit it lists: the one closest to stopping work.
   const used = meter
     ? Math.min(
         100,
         Math.max(
           0,
-          meter.percentage_used,
+          limits?.weekly?.percentage_used ?? meter.percentage_used,
           limits?.window?.percentage_used ?? 0,
-          limits?.monthly?.percentage_used ?? 0,
         ),
       )
     : 0;
-  const command = estimate.command;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -113,10 +105,22 @@ export function AgentUsageControl({
         align="end"
         sideOffset={8}
         collisionPadding={16}
-        className="agent-usage-popover w-80 max-w-[calc(100vw-2rem)] p-4"
+        className="agent-usage-popover w-[360px] max-w-[calc(100vw-2rem)] p-3"
       >
-        <section aria-label="AI usage">
-          <p className="mb-2 text-sm font-medium">AI usage</p>
+        <section aria-label="Usage">
+          <div className="mb-1.5 flex items-center justify-between">
+            <p className="text-base font-medium">Usage</p>
+            <IconButton
+              label="Usage settings"
+              size="xs"
+              onClick={() => {
+                setOpen(false);
+                openUsageSettings();
+              }}
+            >
+              <Settings className="size-3.5" />
+            </IconButton>
+          </div>
           {meter && limits ? (
             <div className="grid gap-3">
               {limitLabels.map(([key, label]) => {
@@ -125,49 +129,38 @@ export function AgentUsageControl({
                 const value = Math.min(100, Math.max(0, limit.percentage_used));
                 return (
                   <div key={key}>
-                    <p className="mb-1 flex justify-between text-xs">
-                      <span>{label}</span>
+                    <p className="mb-1.5 flex items-baseline justify-between text-[15px]">
+                      <span className="font-medium">{label}</span>
                       <span className="tabular-nums text-cream-muted">
-                        {formatUsagePercent(value)}%
+                        {formatUsagePercent(value)}% used
                       </span>
                     </p>
                     <Progress
-                      aria-label={`${label} AI usage`}
+                      aria-label={`${label} usage`}
                       value={value}
-                      className="h-1.5 bg-cream/10 [&_[data-slot=progress-indicator]]:bg-cream/70"
+                      className="h-2 bg-cream/10 [&_[data-slot=progress-indicator]]:bg-cream/80"
                     />
-                    <p className="mt-1 text-xs text-cream-muted">{resetLabel(limit)}</p>
+                    <p className="mt-1.5 text-[13px] text-cream-muted">{resetLabel(limit)}</p>
                   </div>
                 );
               })}
-              {used >= 80 && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="justify-self-start px-0"
-                  onClick={() => {
-                    setOpen(false);
-                    openUsageSettings();
-                  }}
-                >
-                  Invite friends to raise your limits
-                </Button>
-              )}
             </div>
           ) : meter ? (
             <>
-              <p className="mb-2 text-xs tabular-nums text-cream-muted">
-                {meter.used.toLocaleString()} of {meter.limit.toLocaleString()} weighted tokens this
-                week
+              <p className="mb-1.5 flex items-baseline justify-between text-[15px]">
+                <span className="font-medium">Weekly</span>
+                <span className="tabular-nums text-cream-muted">
+                  {formatUsagePercent(used)}% used
+                </span>
               </p>
               <Progress
-                aria-label="Weekly AI usage"
+                aria-label="Weekly usage"
                 value={used}
-                className="h-1.5 bg-cream/10 [&_[data-slot=progress-indicator]]:bg-cream/70"
+                className="h-2 bg-cream/10 [&_[data-slot=progress-indicator]]:bg-cream/80"
               />
               {meter.reset_at && (
-                <p className="mt-1 text-xs text-cream-muted">
-                  Resets {new Date(meter.reset_at).toLocaleDateString()}
+                <p className="mt-1.5 text-[13px] text-cream-muted">
+                  {resetLabel({ resets_at: meter.reset_at } as AiLimit)}
                 </p>
               )}
             </>
@@ -178,34 +171,10 @@ export function AgentUsageControl({
           ) : (
             <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-2">
               <Skeleton className="h-3 w-2/5" />
-              <Skeleton className="h-1.5 w-full rounded-full" />
+              <Skeleton className="h-2 w-full rounded-full" />
               <Skeleton className="h-2.5 w-1/3" />
             </div>
           )}
-        </section>
-        <section aria-label="This message" className="mt-4 border-t border-charcoal-border pt-4">
-          <p className="mb-1 text-sm font-medium">This message</p>
-          <div className="text-xs text-cream-muted">
-            {working ? (
-              <p>Estimates return when the current task finishes.</p>
-            ) : !estimate.drafting ? (
-              <p>Type a message to estimate its usage.</p>
-            ) : command ? (
-              <>
-                <p className="mb-2 tabular-nums text-cream">
-                  ≈{formatUsagePercent(command.estimated_percentage)}% of weekly AI · ceiling{" "}
-                  {formatUsagePercent(command.maximum_percentage)}%
-                </p>
-                <CommandEstimateDetails command={command} allowed={estimate.allowed} />
-              </>
-            ) : (
-              <p role="status">
-                {estimate.settled
-                  ? "Estimate unavailable. Billing checks your budget before running."
-                  : "Estimating…"}
-              </p>
-            )}
-          </div>
         </section>
       </PopoverContent>
     </Popover>

@@ -42,11 +42,8 @@ import {
   moveAnchor,
   type AgendaView,
 } from "./spaceAgenda/agendaDates";
-import {
-  AgendaMonthView,
-  AgendaTimelineView,
-  type AgendaZoomMinutes,
-} from "./spaceAgenda/AgendaViews";
+import { AgendaBody } from "./spaceAgenda/AgendaBody";
+import type { AgendaZoomMinutes } from "./spaceAgenda/AgendaViews";
 import type { PlannerCalendarRuntime } from "./spaceAgenda/calendarRuntime";
 import { NewCalendarEventDialog } from "./spaceAgenda/NewCalendarEventDialog";
 import { CalendarSourceDrawer, SpaceTaskDrawer, SpaceTaskEventDrawer } from "./SpacePlannerViews";
@@ -471,18 +468,15 @@ export function SpaceAgendaView({
       }
       <main className="relative min-h-0 overflow-hidden" aria-label={`${view} agenda`}>
         {error ? runtime.renderError(error) : null}
-        {view === "month" ? (
-          <AgendaMonthView anchor={anchor} entries={visible} onOpen={openEntry} />
-        ) : (
-          <AgendaTimelineView
-            anchor={anchor}
-            entries={visible}
-            view={view}
-            zoomMinutes={zoomMinutes}
-            onOpen={openEntry}
-            onZoom={updateZoom}
-          />
-        )}
+        <AgendaBody
+          refreshing={busy === "sync"}
+          view={view}
+          anchor={anchor}
+          entries={visible}
+          zoomMinutes={zoomMinutes}
+          onOpen={openEntry}
+          onZoom={updateZoom}
+        />
       </main>
       {drawerOpen ? (
         <CalendarSourceDrawer

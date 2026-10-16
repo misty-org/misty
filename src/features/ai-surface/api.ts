@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { readInvocationStream } from "./invocationStream";
 import { withDeviceRunGrants } from "./deviceRunGrants";
 import {
@@ -121,7 +122,7 @@ export type AiBillingUsage = BillingUsage;
 
 export const aiSurfaceApi = {
   status: () => apiRequest<AiProviderStatus>("/ai/status"),
-  usage: () => apiRequest<AiBillingUsage>("/billing/usage", { cache: "no-store" }),
+  usage: () => cachedRequest<AiBillingUsage>("/billing/usage"),
   settings: () =>
     apiRequest<{ settings: AiUserSettings; preferences: AiSurfacePreferenceRecord[] }>(
       "/ai/settings",
@@ -289,6 +290,7 @@ function toServerInvocation(input: AiInvocationRequest) {
     model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
     permission_mode: input.permissionMode,
+    coding_tool: input.codingTool,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,

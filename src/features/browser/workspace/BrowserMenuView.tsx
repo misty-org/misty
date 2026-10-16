@@ -25,12 +25,9 @@ import {
   PictureInPicture2,
   Plus,
   Printer,
-  Puzzle,
   QrCode,
-  RotateCcw,
   Search,
-  Settings2,
-  Share2,
+  Settings,
   VenetianMask,
   Wrench,
 } from "lucide-react";
@@ -138,12 +135,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.new_private_tab"
               onSelect={commands.newPrivateView}
             />
-            <Item
-              icon={<RotateCcw />}
-              label="Reopen closed tab"
-              shortcut="workspace.reopen_tab"
-              onSelect={commands.reopenView}
-            />
             <DropdownMenuSeparator />
             <BrowserHistoryMenu
               openHistory={() => commands.openPage("history")}
@@ -162,7 +153,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
           </>
         ) : null}
         <BrowserZoomControls zoom={zoom} menu />
-        <DropdownMenuSeparator />
         {commands ? (
           <>
             <Item
@@ -171,31 +161,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               shortcut="browser.find"
               onSelect={commands.find}
             />
-            <Item
-              icon={<Printer />}
-              label="Print…"
-              shortcut="browser.print"
-              onSelect={commands.print}
-            />
-            <Item icon={<Languages />} label="Translate page" onSelect={commands.translate} />
-            <Item
-              icon={<BookOpenText />}
-              label="Reader view"
-              shortcut="browser.reader_mode"
-              onSelect={commands.readerMode}
-            />
-            {pictureInPictureSupported() && (
-              <Item
-                icon={<PictureInPicture2 />}
-                label="Picture in picture"
-                shortcut="browser.picture_in_picture"
-                onSelect={commands.pictureInPicture}
-              />
-            )}
-            <MenuSubmenu icon={<Share2 />} label="Share" width="md">
-              <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
-              <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
-            </MenuSubmenu>
             <MenuSubmenu icon={<Wrench />} label="More tools" width="lg">
               {props.tools ? (
                 <>
@@ -203,49 +168,62 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
                   <DropdownMenuSeparator />
                 </>
               ) : null}
+              <Item icon={<Languages />} label="Translate page" onSelect={commands.translate} />
+              <Item
+                icon={<BookOpenText />}
+                label="Reader view"
+                shortcut="browser.reader_mode"
+                onSelect={commands.readerMode}
+              />
+              {pictureInPictureSupported() && (
+                <Item
+                  icon={<PictureInPicture2 />}
+                  label="Picture in picture"
+                  shortcut="browser.picture_in_picture"
+                  onSelect={commands.pictureInPicture}
+                />
+              )}
+              <Item
+                icon={<Printer />}
+                label="Print…"
+                shortcut="browser.print"
+                onSelect={commands.print}
+              />
               <Item icon={<FileDown />} label="Save page as…" onSelect={commands.savePage} />
+              <DropdownMenuSeparator />
+              <Item icon={<Copy />} label="Copy link" onSelect={commands.copyLink} />
+              <Item icon={<QrCode />} label="QR code…" onSelect={commands.qrCode} />
+              <Item
+                icon={<ExternalLink />}
+                label="Open in default browser"
+                onSelect={
+                  canOpenExternal
+                    ? () => void props.openExternal(props.url).catch(props.reportError)
+                    : undefined
+                }
+              />
+              <DropdownMenuSeparator />
               <Item
                 icon={<Eraser />}
                 label="Clear browsing data…"
                 shortcut="browser.clear_data"
                 onSelect={commands.clearBrowsingData}
               />
-              <DropdownMenuSeparator />
               <Item
                 icon={<Code2 />}
                 label="Developer tools"
                 shortcut="browser.developer_tools"
                 onSelect={commands.developerTools}
               />
+              <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
             </MenuSubmenu>
             <DropdownMenuSeparator />
           </>
         ) : null}
-        <Item
-          icon={<ExternalLink />}
-          label="Open in default browser"
-          onSelect={
-            canOpenExternal
-              ? () => void props.openExternal(props.url).catch(props.reportError)
-              : undefined
-          }
-        />
         {commands ? (
           <>
             <Item
-              icon={<Puzzle />}
-              label="Extensions"
-              onSelect={() =>
-                window.dispatchEvent(
-                  new CustomEvent("misty:open-settings", {
-                    detail: { section: "browser-extensions" },
-                  }),
-                )
-              }
-            />
-            <Item icon={<CircleHelp />} label="Help" onSelect={commands.help} />
-            <Item
-              icon={<Settings2 />}
+              icon={<Settings />}
               label="Settings"
               onSelect={() =>
                 // Settings is a modal over the page, not a tab of its own.

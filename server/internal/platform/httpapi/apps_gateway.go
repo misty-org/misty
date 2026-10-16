@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -131,26 +132,42 @@ func appsWaitFor(ctx context.Context, wait, every time.Duration, check func() (b
 // showAppRequest puts a request's card in the run's chat, when it has one.
 func (s *SpacesService) showAppRequest(ctx context.Context, user, runID string, request *db.AgentAppRequest) {
 	if s.aiInvocations == nil || request == nil {
+		log.Printf("app request %s not shown: invocation hub unavailable", requestID(request))
 		return
 	}
 	invocationID := ""
 	if isAIInvocationRuntimeID(runID) {
 		record, err := s.database.AIInvocationByID(ctx, user, runID)
 		if err != nil {
+			log.Printf("app request %s not shown: invocation %s not found: %v", request.ID, runID, err)
 			return
 		}
 		if _, err := s.aiInvocations.restoreDurable(ctx, *record); err != nil {
+			log.Printf("app request %s not shown: invocation %s could not be restored: %v", request.ID, runID, err)
 			return
 		}
 		invocationID = record.ID
 	} else if strings.HasPrefix(runID, "run_") {
 		run, err := s.database.SpaceRun(ctx, user, runID)
 		if err != nil {
+			log.Printf("app request %s not shown: run %s not found: %v", request.ID, runID, err)
 			return
 		}
 		_, invocationID = s.restoreLinkedAIInvocation(ctx, run)
 	}
-	if invocationID != "" {
-		_ = s.aiInvocations.append(invocationID, aiInvocationEvent{Type: "app.request", AppRequest: appRequestView(request)})
+	if invocationID == "" {
+		log.Printf("app request %s not shown: run %q has no conversation to show it in", request.ID, runID)
+		return
 	}
+	// The card is how the person learns the run is waiting, so a failure to show it is logged.
+	if err := s.aiInvocations.append(invocationID, aiInvocationEvent{Type: "app.request", AppRequest: appRequestView(request)}); err != nil {
+		log.Printf("app request %s not shown: %v", request.ID, err)
+	}
+}
+
+func requestID(request *db.AgentAppRequest) string {
+	if request == nil {
+		return ""
+	}
+	return request.ID
 }

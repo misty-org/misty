@@ -39,7 +39,7 @@ async function open() {
 it("starts with no project and picks one for this conversation", async () => {
   render(<AgentProjectMenu conversationId="conversation-a" />);
   const trigger = await open();
-  expect(trigger.textContent).toContain("No project");
+  expect(trigger.textContent).toContain("Project");
   fireEvent.click(await screen.findByRole("menuitemradio", { name: /site/ }));
   expect(useConversationProject.getState().project("conversation-a")).toBe("scope_site");
   expect(useConversationProject.getState().project("conversation-b")).toBeNull();
@@ -58,9 +58,7 @@ it("offers From GitHub, and Publish to GitHub for a chosen project without a rem
   await waitFor(() => expect(github.projectRemote).toHaveBeenCalledWith("scope_site"));
   await open();
   expect(await screen.findByRole("menuitem", { name: /From GitHub/ })).toBeTruthy();
-  expect(
-    await screen.findByRole("menuitem", { name: /Publish to GitHub.*Push site/ }),
-  ).toBeTruthy();
+  expect(await screen.findByRole("menuitem", { name: /Publish to GitHub/ })).toBeTruthy();
 });
 
 it("hides Publish for a project that already has a GitHub remote", async () => {

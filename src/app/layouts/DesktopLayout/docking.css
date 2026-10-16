@@ -1145,10 +1145,10 @@
   .misty-workspace-tab
   .misty-workspace-tab-close {
   position: absolute;
-  top: 50%;
+  /* Centered with inset and auto margins: a translate would land it on a half pixel. */
+  inset-block: 0;
   right: 6px;
-  margin: 0;
-  transform: translateY(-50%);
+  margin: auto 0;
   border-radius: 6px;
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])

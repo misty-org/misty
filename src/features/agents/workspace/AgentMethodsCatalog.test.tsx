@@ -93,7 +93,7 @@ it("runs the selected immutable version with typed values through the shared inv
 it("instantiates a template into a draft without invoking an agent", async () => {
   mocks.list.mockResolvedValue({ methods: [{ ...method, kind: "template" }] });
   const { onUse } = catalog("template");
-  fireEvent.click(await screen.findByRole("button", { name: "Use template" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Open draft" }));
   fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "A subject" } });
   fireEvent.click(screen.getByRole("button", { name: "Open draft" }));
   await waitFor(() => expect(onUse).toHaveBeenCalledWith("Rendered instructions"));

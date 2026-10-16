@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import {
   isSideDock,
-  type DockPosition,
   type DockingLayout,
 } from "@/features/app-shell/dockingLayout";
 

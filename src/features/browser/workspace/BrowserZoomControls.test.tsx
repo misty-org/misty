@@ -73,7 +73,7 @@ it("keeps the Browser dropdown open across zoom adjustments and reopening", asyn
   const open = () =>
     fireEvent.pointerDown(ui.getByRole("button", { name: "Browser menu" }), { button: 0 });
   open();
-  const plus = await ui.findByRole("menuitem", { name: "Zoom in" });
+  const plus = await ui.findByRole("button", { name: "Zoom in" });
   await act(async () => fireEvent.click(plus));
   expect(setZoom).toHaveBeenLastCalledWith(1.1);
   expect(ui.getByRole("menu")).toBeTruthy();

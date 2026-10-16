@@ -38,10 +38,10 @@ vi.mock("@/features/library/library/SpaceLibrary", async () => {
     },
   };
 });
-vi.mock("./chat/SpaceChat", async () => {
+vi.mock("./chat/SpaceChatEntry", async () => {
   const { useSocialAuth } = await import("./chat/SocialRuntime");
   return {
-    SpaceSocial: ({ spaceId }: { spaceId: string }) => {
+    SpaceChatEntry: ({ spaceId }: { spaceId: string }) => {
       const { user } = useSocialAuth();
       expect(user?.id).toBe("one");
       return <div>Chat in {spaceId}</div>;

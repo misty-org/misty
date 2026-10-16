@@ -37,6 +37,14 @@ mod page_frame;
 pub(crate) mod pane_dim;
 use download_names::{reserve_download_path, sanitize_download_name};
 
+#[cfg(target_os = "macos")]
+#[path = "browser_url_observer.rs"]
+mod url_observer;
+#[path = "browser_load_watch.rs"]
+mod load_watch;
+#[cfg(target_os = "macos")]
+use load_watch::emit_navigated;
+use load_watch::{next_load_generation, watch_load};
 #[path = "browser_host_messages.rs"]
 pub(crate) mod host_messages;
 pub(super) use host_messages::init as init_host_messages;
@@ -1309,6 +1317,10 @@ pub async fn browser_webview_create(
                 tauri::webview::PageLoadEvent::Finished => "finished",
             };
             let _ = webview.eval(browser_status_update_script(&json!({ "loading": phase == "started" })));
+            let generation = next_load_generation(&page_id);
+            if phase == "started" {
+                watch_load(&page_app, &page_id, generation);
+            }
             let _ = page_app.emit(
                 "misty://browser-page",
                 BrowserPageEvent {
@@ -1369,6 +1381,10 @@ pub async fn browser_webview_create(
         super::extensions::native::register(&webview, &request.id, request.private, &request.url);
     }
     host_messages::install(&webview)?;
+    #[cfg(target_os = "macos")]
+    if !preview_only {
+        url_observer::install(&app, &webview, &request.id)?;
+    }
     #[cfg(windows)]
     super::browser_process_ended::watch_page_process(&webview);
     #[cfg(windows)]
@@ -2533,6 +2549,8 @@ pub fn close_browser_webview(
     #[cfg(any(target_os = "macos", windows))]
     super::browser_session_storage::clear(&webview);
     unregister_browser_cursor_ownership(&webview)?;
+    #[cfg(target_os = "macos")]
+    url_observer::remove(&webview, &request.id);
     webview.close().map_err(|error| error.to_string())?;
     Ok(())
 }

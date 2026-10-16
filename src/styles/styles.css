@@ -86,6 +86,24 @@
    wiggle while they open. These keyframes use literal values and never scale; a
    translate moves every glyph by the same amount, so nothing shifts relative to
    its neighbors. */
+@keyframes misty-shake {
+  20%,
+  60% {
+    translate: -6px 0;
+  }
+  40%,
+  80% {
+    translate: 6px 0;
+  }
+}
+.misty-shake {
+  animation: misty-shake 0.4s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-shake {
+    animation: none;
+  }
+}
 @keyframes misty-overlay-fade-in {
   from {
     opacity: 0;
@@ -451,6 +469,38 @@
       transparent 100%
     );
     animation: misty-skeleton-sweep 1.6s ease-in-out infinite;
+  }
+
+  /* Live work reads as a gray highlight sweeping left to right across its text. */
+  .misty-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--color-cream-muted) 40%,
+      var(--color-cream-bright) 50%,
+      var(--color-cream-muted) 60%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: misty-shimmer-sweep 2s linear infinite;
+  }
+
+  @keyframes misty-shimmer-sweep {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -150% 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .misty-shimmer {
+      animation: none;
+      background: none;
+      color: var(--color-cream);
+    }
   }
 
   /* Working text ends in three dots that fill in turn, in place of a spinner. */

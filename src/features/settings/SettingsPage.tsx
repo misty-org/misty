@@ -12,7 +12,8 @@ import {
   type SettingsSearchResult,
 } from "./components/SettingsSearchResults";
 import { SettingsPageScope } from "./profiles/SettingScope";
-import { useSettingsProfiles } from "./profiles/store";
+import { blockIfUnsaved, setSettingsStaging, useSettingsProfiles } from "./profiles/store";
+import { SettingsSaveBar } from "./components/SettingsSaveBar";
 import { NativeAvailability } from "./sections/FeatureSections";
 import { settingsErrorMessage } from "./settingsErrors";
 import { canonicalSettingsSection, settingsAreas, settingsRegistry } from "./settingsRegistry";
@@ -95,6 +96,11 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
   useEffect(() => {
     if (!settings) void load();
   }, [settings, load]);
+  // While this page is open, edits wait for Save changes; closing it drops anything unsaved.
+  useEffect(() => {
+    setSettingsStaging(true);
+    return () => setSettingsStaging(false);
+  }, []);
   const select = (id: SettingsSection, label = `page:${id}`) => {
     store.setActiveSection(id);
     setFocus((current) => ({ label, request: current.request + 1 }));
@@ -110,6 +116,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     onSettingChange: store.updateSetting,
     onLoad: store.load,
     onOpenResource: (path) => {
+      if (blockIfUnsaved()) return;
       props.onClose?.();
       navigate(path);
     },
@@ -125,7 +132,10 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       ariaLabel="Settings"
       items={navItems}
       navigationLabel="Settings sections"
-      onClose={props.onClose}
+      onClose={() => {
+        if (!blockIfUnsaved()) props.onClose?.();
+      }}
+      saveBar={<SettingsSaveBar />}
       onSelect={(id) => select(id)}
       presentation={props.presentation}
       title={settingsAreas[entry.area].label}

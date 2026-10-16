@@ -170,7 +170,8 @@ your window never hides, moves or resizes it (`browser.rs` checks the caller's w
 
 - Small (288 points wide, the content's own aspect) in a corner of Misty's window, which it moves
   with; it never floats over other apps (owner's choice, October 11, like Codex). The mist shows inside it while the agent acts; a
-  label at the bottom says what it's doing, or what it needs, with an icon, never a color.
+  small pill floating 8 points in from the bottom and side edges says what it's doing, or what it needs, with an icon, never a
+  color. Hover puts Open and Stop inside the pill, before the count.
 - Drag it anywhere; it snaps to the nearest corner. Drop it by a side edge and it floats there,
   whole and on screen, a few points in. It is never tucked off-screen.
 - Click it to open the agent's window at full size in front; **Dock** on the island (or the bar

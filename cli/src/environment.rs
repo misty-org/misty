@@ -14,6 +14,7 @@ use crate::{artifacts::write_private, workspace::Workspace};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Target {
     Dev,
+    Staging,
     Prod,
 }
 
@@ -21,6 +22,7 @@ impl Target {
     pub fn label(self) -> &'static str {
         match self {
             Self::Dev => "dev",
+            Self::Staging => "staging",
             Self::Prod => "prod",
         }
     }
@@ -28,6 +30,7 @@ impl Target {
     fn legacy_name(self) -> &'static str {
         match self {
             Self::Dev => ".env.dev",
+            Self::Staging => ".env.staging",
             Self::Prod => ".env.prod",
         }
     }
@@ -316,6 +319,28 @@ const DEV_REQUIRED: &[&str] = &[
     "MISTY_CLOUDFLARE_WORKER_HOST",
 ];
 
+const STAGING_REQUIRED: &[&str] = &[
+    "AGENT_RUNTIME_DB_PASSWORD",
+    "DB_HOST",
+    "DB_MIGRATION_PASSWORD",
+    "DB_MIGRATION_USER",
+    "DB_NAME",
+    "DB_PASSWORD",
+    "DB_USER",
+    "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
+    "MISTY_AGENT_RUNTIME_IMAGE",
+    "MISTY_API_IMAGE",
+    "MISTY_AUTH_SIGNING_KEY",
+    "MISTY_DEVICE_PAIRING_PEPPER",
+    "MISTY_DEVICE_TICKET_PRIVATE_KEY",
+    "MISTY_ENVIRONMENT",
+    "MISTY_HOST_PORT",
+    "MISTY_LIBRARY_BACKEND",
+    "MISTY_LIBRARY_FILESYSTEM_DIR",
+    "MISTY_PUBLIC_API_URL",
+    "SPACE_LINK_ENCRYPTION_KEY",
+];
+
 pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
     workspace.server.join(".env").join(target.label())
 }
@@ -356,6 +381,11 @@ fn initial_file_contents(spec: FileSpec, target: Target) -> String {
             _ => {}
         }
     }
+    if target == Target::Staging {
+        if spec.path == "storage.env" {
+            return "# Private, staging-only Library files on this host.\nMISTY_LIBRARY_BACKEND=filesystem\nMISTY_LIBRARY_FILESYSTEM_DIR=/var/lib/misty/library\n".into();
+        }
+    }
     String::new()
 }
 
@@ -366,7 +396,7 @@ fn random_hex(byte_count: usize) -> String {
 }
 
 pub fn migrate(workspace: &Workspace) -> Result<()> {
-    for target in [Target::Dev, Target::Prod] {
+    for target in [Target::Dev, Target::Staging, Target::Prod] {
         migrate_server_file(workspace, target)?;
     }
     migrate_cli_file(workspace)?;
@@ -468,6 +498,27 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         if !placeholders.is_empty() {
             bail!(
                 "prod environment contains placeholder values: {}",
+                placeholders.join(", ")
+            );
+        }
+    }
+    if target == Target::Staging {
+        if values.get("MISTY_ENVIRONMENT").map(String::as_str) != Some("staging") {
+            bail!("staging environment must set MISTY_ENVIRONMENT=staging");
+        }
+        if let Some(port) = values.get("MISTY_HOST_PORT") {
+            if port.parse::<u16>().ok().is_none_or(|p| p == 0) {
+                bail!("MISTY_HOST_PORT must be a port between 1 and 65535");
+            }
+        }
+        let placeholders = values
+            .iter()
+            .filter(|(_, value)| is_placeholder(value))
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>();
+        if !placeholders.is_empty() {
+            bail!(
+                "staging environment contains placeholder values: {}",
                 placeholders.join(", ")
             );
         }
@@ -608,6 +659,14 @@ pub fn owner(name: &str) -> Result<&'static str> {
         .get(name)
         .copied()
         .with_context(|| format!("unknown environment variable {name}"))
+}
+
+/// Every variable accepted by a scoped server environment file.
+pub fn registered_names() -> Vec<&'static str> {
+    FILES
+        .iter()
+        .flat_map(|spec| spec.names.iter().copied())
+        .collect()
 }
 
 fn migrate_server_file(workspace: &Workspace, target: Target) -> Result<()> {
@@ -848,6 +907,7 @@ fn ownership() -> Result<BTreeMap<&'static str, &'static str>> {
 fn required(target: Target) -> &'static [&'static str] {
     match target {
         Target::Dev => DEV_REQUIRED,
+        Target::Staging => STAGING_REQUIRED,
         Target::Prod => PROD_REQUIRED,
     }
 }
@@ -956,7 +1016,9 @@ pub fn schema_json() -> serde_json::Value {
                 serde_json::json!({
                     "file": spec.path,
                     "name": name,
-                    "required": DEV_REQUIRED.contains(name),
+                    "required": DEV_REQUIRED.contains(name)
+                        || STAGING_REQUIRED.contains(name)
+                        || PROD_REQUIRED.contains(name),
                 })
             })
         })

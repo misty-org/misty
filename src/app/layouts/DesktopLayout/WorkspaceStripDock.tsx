@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, LayoutGrid, Plus, RefreshCw } from "lucide-react";
+import { Check, LayoutGrid, Plus } from "lucide-react";
 import { useBrowserOverlayControl } from "@/features/browser";
 import { BrowserDownloadsButton } from "@/features/browser/workspace";
 import { SpacesLauncherList } from "@/features/spaces";
@@ -10,7 +10,12 @@ import {
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/workspace";
-import { AgentAvatar, MistyPanelSprite, useMistyPanelStore, usePersonalAgentsStore } from "@/features/agents";
+import {
+  AgentAvatar,
+  MistyPanelSprite,
+  useMistyPanelStore,
+  usePersonalAgentsStore,
+} from "@/features/agents";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   Command,
@@ -19,13 +24,11 @@ import {
   CommandList,
   CommandSeparator,
   AvatarShuffleStack,
-  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
-  MenuItem,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -150,11 +153,6 @@ export function StripDownloads() {
   );
 }
 
-/** The browser menu's closing row in horizontal tabs: Sync. The profile has its own button. */
-export function BrowserMenuAccountItems(props: { onSyncClick: () => void }) {
-  return <MenuItem icon={<RefreshCw />} label="Sync" onSelect={props.onSyncClick} />;
-}
-
 /**
  * The agents pill: the personal agents as a stack of avatars, the selected one in front and
  * named beside it. Choosing an agent rotates it to the front and opens the Misty panel on it.
@@ -163,11 +161,30 @@ export function AgentsMenuButton() {
   const navigate = useNavigate();
   const agents = usePersonalAgentsStore((state) => state.agents);
   const selectedAgentId = useMistyStore((state) => state.selectedAgentId);
-  const paneId = useWorkspaceStore((state) => state.layout.focusedPaneId);
   const selected =
     agents.find((agent) => agent.id === selectedAgentId) ??
     agents.find((agent) => agent.system_managed) ??
     agents[0];
+  /** On a browser page the agent opens in the side panel; anywhere else, on its Agents page. */
+  const openAgent = (agentId?: string) => {
+    const { layout } = useWorkspaceStore.getState();
+    const pane = dockLeaves(layout.root).find((leaf) => leaf.id === layout.focusedPaneId);
+    const surfaceId = pane?.views.find((view) => view.id === pane.activeViewId)?.surfaceId;
+    if (surfaceId === "browser") {
+      useMistyPanelStore.getState().setOpen(true, pane?.id ?? null);
+      return;
+    }
+    const surface = workspaceSurfaceFromRoute("/agents");
+    if (!surface) return;
+    const route = useWorkspaceStore.getState().openDestination(surface).route;
+    const id = agentId ?? selected?.id;
+    navigate(
+      id ? `${route}${route.includes("?") ? "&" : "?"}agent=${encodeURIComponent(id)}` : route,
+      {
+        replace: true,
+      },
+    );
+  };
   return (
     <div className="flex min-w-0 items-center" data-misty-window-drag-block="true">
       <DropdownMenu>
@@ -175,7 +192,7 @@ export function AgentsMenuButton() {
           label={selected?.name ?? "Agents"}
           actionLabel={selected ? `Open ${selected.name}` : "Open Agents"}
           menuLabel="Choose Agent"
-          onAction={() => useMistyPanelStore.getState().setOpen(true, paneId ?? null)}
+          onAction={() => openAgent()}
           icon={
             selected ? (
               <AvatarShuffleStack
@@ -200,7 +217,7 @@ export function AgentsMenuButton() {
               key={agent.id}
               onSelect={() => {
                 useMistyStore.setState({ selectedAgentId: agent.id, activeConversationId: "" });
-                useMistyPanelStore.getState().setOpen(true, paneId ?? null);
+                openAgent(agent.id);
               }}
             >
               <span className="size-5 shrink-0 [&_.agent-avatar]:!size-5">

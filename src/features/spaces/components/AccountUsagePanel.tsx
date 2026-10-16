@@ -1,4 +1,5 @@
-import { apiRequest, readApiSessionGeneration } from "@/api/client";
+import { cachedRequest } from "@/api/cache/cachedRequest";
+import { readApiSessionGeneration } from "@/api/client";
 import { Progress, Skeleton } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { formatStorageBytes } from "./spacePanel/storageFormat";
@@ -44,7 +45,7 @@ function loadUsage(force = false): void {
     cache?.generation === generation && !cache.failed && Date.now() - cache.at < usageTtlMs;
   if (!force && fresh) return;
   if (inflight?.generation === generation) return;
-  const promise = apiRequest<AccountUsage>("/billing/usage", { cache: "no-store" })
+  const promise = cachedRequest<AccountUsage>("/billing/usage")
     .then((value) => {
       if (generation === readApiSessionGeneration()) cache = { generation, value, at: Date.now() };
     })

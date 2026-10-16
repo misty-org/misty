@@ -1,128 +1,83 @@
+import { ExtensionsToolbar } from "@/features/extensions/ExtensionsToolbar";
 import {
-  AppWindow,
-  ArrowLeft,
-  ArrowRight,
-  Download,
-  History,
-  MoreVertical,
-  Plus,
-  RotateCw,
-  Settings2,
-  Star,
-} from "lucide-react";
-import { useBrowserChromeSlot } from "@/features/browser/workspace";
-import { browserToolbarStyles } from "@/features/browser/workspace/browserToolbarStyles";
-import { useBrowserSearchStore } from "@/features/browser-workspace/search";
-import { invokeShortcutCommand } from "@/features/shortcuts";
-import {
-  browserInternalUrl,
-  useWorkspaceStore,
-  type BrowserInternalPage,
-} from "@/features/workspace";
-import {
-  cn,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  IconButton,
-  MenuItem,
-  MenuTrigger,
-  toolbarIconProps,
-} from "@/shared/ui";
+  BrowserDownloadsButton,
+  BrowserLibraryMenus,
+  BrowserMenuView,
+  BrowserNavigationButtons,
+  BrowserOmnibox,
+  BrowserPaneLayoutMenu,
+  BrowserToolbar,
+  normalizeBrowserAddress,
+  useBrowserChromeSlot,
+} from "@/features/browser/workspace";
+import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButtons";
+import { browserInternalUrl, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
+import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 
-function openInternalPage(page: BrowserInternalPage) {
-  useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl(page) });
-}
-
-/** The browser menu's rows that need no page: tabs, windows, library pages, settings and sync. */
-function MoreMenu() {
-  const chrome = useBrowserChromeSlot();
-  return (
-    <DropdownMenu>
-      <MenuTrigger
-        iconOnly
-        label="Browser menu"
-        title="More"
-        icon={<MoreVertical {...toolbarIconProps} />}
-      />
-      <DropdownMenuContent align="end" width="lg">
-        <MenuItem
-          icon={<Plus />}
-          label="New tab"
-          onSelect={() => useBrowserSearchStore.getState().show()}
-        />
-        <MenuItem
-          icon={<AppWindow />}
-          label="New window"
-          onSelect={() => void invokeShortcutCommand("workspace.new_virtual_window")}
-        />
-        <DropdownMenuSeparator />
-        <MenuItem icon={<History />} label="History" onSelect={() => openInternalPage("history")} />
-        <MenuItem
-          icon={<Download />}
-          label="Downloads"
-          onSelect={() => openInternalPage("downloads")}
-        />
-        <MenuItem
-          icon={<Star />}
-          label="Bookmarks"
-          onSelect={() => openInternalPage("bookmarks")}
-        />
-        <DropdownMenuSeparator />
-        <MenuItem
-          icon={<Settings2 />}
-          label="Settings"
-          onSelect={() =>
-            window.dispatchEvent(
-              new CustomEvent("misty:open-settings", { detail: { section: "browser" } }),
-            )
-          }
-        />
-        {chrome?.accountItems}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+const noHistory: string[] = [];
+const keepOverlay = async () => {};
 
 /**
- * The browser toolbar on a page that isn't a browser page: resting back, forward and reload,
- * an empty address field that opens search, and the same four buttons on the right as a
- * browser page has: Misty, the profile and the menu. With horizontal tabs the toolbar
- * is always there, so the rest of the app stays one click away.
+ * The browser toolbar on a page that isn't a browser page. It is the same toolbar, built from
+ * the same live parts: the pane layout menu, the real address field, extensions, downloads,
+ * sync, the profile and the browser menu. There is just no page, so back, forward and reload
+ * rest, the address field starts empty and opens what you type in a new browser tab, and the
+ * menu's page rows are disabled. The pane hosts it, so a browser page and any other page
+ * share one toolbar.
  */
-export function PaneToolbarFallback() {
+export function PaneToolbarFallback({ tab }: { tab: WorkspaceView }) {
   const chrome = useBrowserChromeSlot();
+  const hiddenButtons = useHiddenToolbarButtons();
   return (
-    <div
-      className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
-      style={{ backgroundColor: "var(--workspace-tab-surface)" }}
-      data-window-toolbar
-      data-browser-toolbar
+    <BrowserToolbar
       data-misty-window-drag-block="true"
-    >
-      <div className={browserToolbarStyles.group}>
-        <IconButton label="Back" tooltip={false} disabled>
-          <ArrowLeft {...toolbarIconProps} />
-        </IconButton>
-        <IconButton label="Forward" tooltip={false} disabled>
-          <ArrowRight {...toolbarIconProps} />
-        </IconButton>
-        <IconButton label="Reload" tooltip={false} disabled>
-          <RotateCw {...browserToolbarStyles.roundIcon} />
-        </IconButton>
-      </div>
-      <button
-        type="button"
-        className="h-9 min-w-0 flex-1 truncate rounded-lg border border-cream/[0.07] px-3 text-left text-[13px] text-cream-muted transition-colors hover:bg-cream/[0.025]"
-        onClick={() => useBrowserSearchStore.getState().show()}
-      >
-        Search or enter address
-      </button>
-      <div className={browserToolbarStyles.group}>
-        {chrome?.sync}
-        {chrome?.profile}
-        <MoreMenu />
-      </div>
-    </div>
+      nav={
+        <BrowserNavigationButtons
+          canGoBack={false}
+          canGoForward={false}
+          showStop={false}
+          reloadDisabled
+          onTravel={() => {}}
+          onReload={() => {}}
+        />
+      }
+      address={
+        <BrowserOmnibox
+          focusRequest={0}
+          currentUrl=""
+          historyEntries={noHistory}
+          tab={tab}
+          onNavigate={(value) =>
+            useWorkspaceStore.getState().openBrowserView({ url: normalizeBrowserAddress(value) })
+          }
+        />
+      }
+      tools={
+        <>
+          <BrowserPaneLayoutMenu tabId={tab.id} />
+          {hiddenButtons.has("extensions") ? null : <ExtensionsToolbar tabId={tab.id} />}
+          {hiddenButtons.has("downloads") ? null : (
+            <BrowserDownloadsButton
+              suspensionReason={`browser-downloads:${tab.id}`}
+              onShowAll={() =>
+                useWorkspaceStore
+                  .getState()
+                  .openBrowserView({ url: browserInternalUrl("downloads") })
+              }
+            />
+          )}
+          {chrome?.sync}
+          {chrome?.profile}
+          <BrowserMenuView
+            url=""
+            library={<BrowserLibraryMenus />}
+            account={chrome?.accountItems}
+            setOverlay={keepOverlay}
+            openExternal={openSystemExternalLink}
+            reportError={() => {}}
+          />
+        </>
+      }
+    />
   );
 }

@@ -33,27 +33,36 @@
   padding: 0 12px;
   flex-shrink: 0;
 }
+/* The buttons keep their size; a narrow header squeezes the title, never them. */
 .agent-heading-end {
   display: flex;
-  flex: 1;
-  min-width: 30px;
-}
-.agent-heading-end {
+  flex: 0 0 auto;
+  align-items: center;
   justify-content: flex-end;
+  margin-left: auto;
+}
+.agent-heading-end > * {
+  flex-shrink: 0;
 }
 .agent-heading-identity {
   gap: 6px;
+  flex: 0 0 auto;
   max-width: 60%;
+  /* Sized to its content (avatar, name, chevron); only a long name truncates. */
   min-width: 0;
   font-size: 14px;
 }
+.agent-heading-avatar {
+  display: inline-flex;
+  flex: none;
+}
+.agent-heading-avatar .agent-avatar,
 .agent-heading-identity .agent-avatar {
   width: 32px;
   height: 32px;
   font-size: 14px;
 }
-.agent-conversation,
-.agent-new-chat {
+.agent-conversation {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -245,8 +254,8 @@
 }
 /* Interim replies fold into one quiet disclosure above the turn's answer. */
 /* Progress: what Misty said while working, and each run of tools as one quiet
-   line that opens to a table of its steps (docs/design/agent-activity). Text and
-   chevrons only; state is shown with motion and words, never color. */
+   line that opens to a table of its steps (docs/design/agent-activity, agent-chat).
+   State is shown with motion, a word and an icon; color only for waiting and failed. */
 .agent-progress {
   display: grid;
   gap: 10px;
@@ -451,45 +460,6 @@ button.agent-progress-row:hover {
   max-width: 100%;
   overflow-x: auto;
 }
-.agent-recipient-input {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.agent-recipient-input input {
-  font-size: 14px;
-}
-.agent-recipient-results {
-  position: absolute;
-  top: 4px;
-  left: 20px;
-  width: min(320px, calc(100% - 40px));
-  max-height: calc(100% - 96px);
-  overflow-y: auto;
-  padding: 4px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-charcoal-border);
-  background: var(--color-charcoal-card);
-}
-.agent-recipient-row {
-  width: 100%;
-  height: 40px;
-  gap: 10px;
-  font-size: 14px;
-}
-.agent-recipient-row .agent-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-}
-.agent-recipient-row > svg {
-  margin-inline: 4px;
-}
-.agent-new-chat .agent-compose-area {
-  margin-top: auto;
-}
 .agents-workspace .agent-settings-panel {
   position: absolute;
   inset-block: 0;
@@ -590,7 +560,7 @@ button.agent-progress-row:hover {
   flex-shrink: 0;
 }
 /* The conversation fills a short column and grows past a long one. */
-.agents-chat > :is(.agent-conversation, .agent-new-chat) {
+.agents-chat > .agent-conversation {
   flex: 1 0 auto;
   min-height: auto;
 }

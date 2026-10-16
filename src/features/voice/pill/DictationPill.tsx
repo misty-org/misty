@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconButton } from "@/shared/ui";
-import type { PillState } from "../dictationController";
+import type { PillState } from "../dictationEngine";
 import "./dictationPill.css";
 
 const initial: PillState = {

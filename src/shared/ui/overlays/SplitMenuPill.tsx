@@ -16,12 +16,12 @@ export function SplitMenuPill(props: {
   onAction: () => void;
 }) {
   return (
-    <div className="group/pill inline-flex min-w-0 items-center rounded-full bg-cream/[0.07]">
+    <div className="group/pill inline-flex min-w-0 items-center rounded-lg bg-cream/[0.07]">
       <Button
         type="button"
         variant="ghost"
         size="none"
-        className="!h-[var(--shell-tab-height,36px)] min-w-0 max-w-full gap-2 rounded-l-full rounded-r-none bg-transparent pl-2 pr-1.5 hover:bg-cream/[0.08]"
+        className="!h-[var(--shell-tab-height,36px)] min-w-0 max-w-full gap-2 rounded-l-lg rounded-r-none bg-transparent pl-2.5 pr-1.5 hover:bg-cream/[0.08]"
         aria-label={props.actionLabel}
         title={props.actionLabel}
         onClick={props.onAction}
@@ -35,7 +35,7 @@ export function SplitMenuPill(props: {
         size="xs"
         label={props.menuLabel}
         tooltip={false}
-        className="!h-[var(--shell-tab-height,36px)] !w-auto rounded-l-none rounded-r-full bg-transparent pl-1 pr-2 hover:bg-cream/[0.08]"
+        className="!h-[var(--shell-tab-height,36px)] !w-auto rounded-l-none rounded-r-lg bg-transparent pl-1 pr-2 hover:bg-cream/[0.08]"
       />
     </div>
   );

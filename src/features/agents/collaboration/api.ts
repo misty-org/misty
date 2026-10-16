@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 import type {
   AgentGoal,
@@ -14,11 +15,8 @@ const segment = encodeURIComponent;
 
 export const collaborationApi = {
   get: (conversationId: string) =>
-    apiRequest<ConversationCollaboration>(
+    cachedRequest<ConversationCollaboration>(
       `/me/conversations/${segment(conversationId)}/collaboration`,
-      {
-        cache: "no-store",
-      },
     ),
   setMode: (conversationId: string, mode: ConversationMode) =>
     apiRequest<{ mode: ConversationMode }>(`/me/conversations/${segment(conversationId)}/mode`, {

@@ -44,11 +44,13 @@ beforeEach(() => {
   });
 });
 describe("server preference runtime projection", () => {
-  it("routes formerly device-only settings to the account writer", () => {
+  it("stages formerly device-only settings for the page's Save changes", () => {
     store.getState().updateSetting("appearance", "app_zoom", 1.5);
     store.getState().updateSetting("general", "browser_download_directory", "/downloads");
-    expect(native.writer).toHaveBeenCalledWith("app.zoom", 1.5);
-    expect(native.writer).toHaveBeenCalledWith("browser.downloads.directory", "/downloads");
+    expect(native.writer).toHaveBeenCalledWith("app.zoom", 1.5, { stage: true });
+    expect(native.writer).toHaveBeenCalledWith("browser.downloads.directory", "/downloads", {
+      stage: true,
+    });
     expect(native.save).not.toHaveBeenCalled();
   });
   it("applies received launch, shortcut, preset and Open With preferences", async () => {
@@ -98,6 +100,7 @@ describe("server preference runtime projection", () => {
     expect(native.writer).toHaveBeenCalledWith(
       "app.shortcuts.bindings",
       JSON.stringify([{ commandId: "b", alternate: null }]),
+      { stage: true },
     );
   });
   it("ignores a projection for a superseded account", async () => {

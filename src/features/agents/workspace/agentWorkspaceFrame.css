@@ -35,8 +35,10 @@
 /* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
 /* The switcher hugs its name instead of spanning the sidebar. */
 .agent-studio-identity {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  /* Only the name gives way in a narrow sidebar; the avatar and chevron stay whole. */
   min-width: 0;
+  max-width: 100%;
   height: auto;
   min-height: 36px;
   justify-content: flex-start;

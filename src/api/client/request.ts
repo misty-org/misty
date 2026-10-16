@@ -3,10 +3,12 @@ import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { ApiRequestError, decodeApiError } from "./errors";
 import { httpRequest } from "./http";
+import { deleteApiCachePrefix, mutationScope } from "@/api/cache/apiCache";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,
   notifyApiSessionInvalid,
+  readApiAccountId,
   readApiAuthToken,
   readApiSessionGeneration,
 } from "./session";
@@ -44,6 +46,11 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
   }
 
   const { response, accountGeneration } = await authenticatedResponse(path, init);
+  // A change makes the saved copies around it out of date; they are revalidated on next read.
+  if (method !== "GET" && method !== "HEAD") {
+    const account = readApiAccountId();
+    if (account) void deleteApiCachePrefix(account, mutationScope(path));
+  }
   if (response.status === 204) return undefined as T;
 
   const result = (await response.json()) as T;

@@ -1,4 +1,4 @@
-import { CircleAlert, Plug } from "lucide-react";
+import { CircleAlert, Plug, Plus } from "lucide-react";
 import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
 import type { ConnectedApp } from "./api";
 
@@ -53,27 +53,22 @@ interface Actions {
   onDisconnect(item: ConnectedApp, label: string): void;
 }
 
-/** The app heads the group and each of its accounts sits beneath it, even when there is one. */
-export function ConnectedAppGroup({ group, ...actions }: { group: AppGroup } & Actions) {
+/** One line for an app's tile: what needs doing, else its account, else how many. */
+export function accountSummary(group: AppGroup) {
   const labels = accountLabels(group.accounts);
-  const count = group.accounts.length;
+  if (group.accounts.some((item) => item.status === "needs_attention")) return "Needs attention";
+  return group.accounts.length === 1 ? labels[0] : `${labels[0]} +${group.accounts.length - 1}`;
+}
+
+/** The popup card for one app: each of its accounts, then Add account. */
+export function AppAccountsCard({
+  group,
+  onDone,
+  ...actions
+}: { group: AppGroup; onDone(): void } & Actions) {
+  const labels = accountLabels(group.accounts);
   return (
-    <div className="agent-integrations-group">
-      <div className="agent-integrations-row">
-        <AppLogo app={group.app} size={26} />
-        <div className="agent-integrations-row-text">
-          <strong>{group.name}</strong>
-          <span>{count === 1 ? "1 account" : `${count} accounts`}</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={actions.busy}
-          onClick={() => actions.onAdd(group)}
-        >
-          Add account
-        </Button>
-      </div>
+    <div className="agent-integrations-accounts" role="group" aria-label={`${group.name} accounts`}>
       {group.accounts.map((item, index) => (
         <div key={item.id} className="agent-integrations-row agent-integrations-account">
           <div className="agent-integrations-row-text">
@@ -84,9 +79,23 @@ export function ConnectedAppGroup({ group, ...actions }: { group: AppGroup } & A
             item={item}
             label={`${group.name} (${labels[index]})`}
             actions={actions}
+            onDone={onDone}
           />
         </div>
       ))}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="agent-integrations-add"
+        disabled={actions.busy}
+        onClick={() => {
+          onDone();
+          actions.onAdd(group);
+        }}
+      >
+        <Plus size={14} aria-hidden="true" />
+        Add account
+      </Button>
     </div>
   );
 }
@@ -106,10 +115,12 @@ function AccountActions({
   item,
   label,
   actions,
+  onDone,
 }: {
   item: ConnectedApp;
   label: string;
   actions: Actions;
+  onDone(): void;
 }) {
   return (
     <>
@@ -118,7 +129,10 @@ function AccountActions({
           variant="outline"
           size="sm"
           disabled={actions.busy}
-          onClick={() => actions.onReconnect(item)}
+          onClick={() => {
+            onDone();
+            actions.onReconnect(item);
+          }}
         >
           Reconnect
         </Button>

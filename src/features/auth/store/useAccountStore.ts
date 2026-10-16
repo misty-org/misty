@@ -1,3 +1,4 @@
+import { clearApiCache } from "@/api/cache/apiCache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
@@ -100,7 +101,10 @@ export async function accountLogout(accountId: string): Promise<void> {
   try {
     await accountApi.logout();
   } finally {
-    if (accountId) await forgetAccountCookies(await accountApi.resolveBase(), accountId);
+    if (accountId) {
+      await clearApiCache(accountId);
+      await forgetAccountCookies(await accountApi.resolveBase(), accountId);
+    }
   }
 }
 

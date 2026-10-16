@@ -1,8 +1,9 @@
-import { Check, Circle, Loader2, Square, X } from "lucide-react";
 import { useState } from "react";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
 import type { AgentSubagent } from "@/features/ai-surface/types";
 import { Button } from "@/shared/ui";
+import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
+import { WorkGroup } from "../progress/WorkGroup";
 
 const running = new Set([
   "queued",
@@ -13,17 +14,17 @@ const running = new Set([
   "awaiting_timer",
 ]);
 
-/** Status as text and an icon, never color alone. */
-function status(state: string) {
-  if (state === "completed") return { label: "Done", Icon: Check, spin: false };
-  if (state === "failed") return { label: "Didn’t finish", Icon: X, spin: false };
-  if (state === "canceled") return { label: "Stopped", Icon: Square, spin: false };
-  if (state === "queued") return { label: "Starting", Icon: Circle, spin: false };
-  if (state.startsWith("awaiting")) return { label: "Waiting", Icon: Circle, spin: false };
-  return { label: "Working", Icon: Loader2, spin: true };
+/** Status as an icon, a word and, for waiting or failed, color; never color alone. */
+function status(state: string): { label: string; row: StatusState } {
+  if (state === "completed") return { label: "Done", row: "done" };
+  if (state === "failed") return { label: "Didn’t finish", row: "failed" };
+  if (state === "canceled") return { label: "Stopped", row: "stopped" };
+  if (state === "queued") return { label: "Starting", row: "next" };
+  if (state.startsWith("awaiting")) return { label: "Waiting", row: "waiting" };
+  return { label: "Working", row: "running" };
 }
 
-/** The sub-agents a run started, each with its progress and a Stop. */
+/** The sub-agents a run started, as one group line over a table, each with its own Stop. */
 export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
   const [stopping, setStopping] = useState<Record<string, boolean>>({});
   if (!subagents.length) return null;
@@ -31,52 +32,42 @@ export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
     setStopping((current) => ({ ...current, [id]: true }));
     await aiSurfaceApi.cancelInvocation(id).catch(() => undefined);
   };
+  const live = subagents.filter((subagent) => running.has(subagent.state)).length;
+  const total = subagents.length;
+  const noun = total === 1 ? "helper" : "helpers";
   return (
-    <section
-      aria-label="Sub-agents"
-      className="mt-3 rounded-lg border border-charcoal-border bg-charcoal-card p-3"
+    <WorkGroup
+      summary={live ? `Running ${live} of ${total} ${noun}` : `Ran ${total} ${noun}`}
+      running={live > 0}
     >
-      <strong className="text-xs text-cream-bright">
-        {subagents.length === 1 ? "1 sub-agent" : `${subagents.length} sub-agents`}
-      </strong>
-      <ul className="mt-2 grid gap-2">
+      <StatusTable label="Sub-agents">
         {subagents.map((subagent) => {
-          const { label, Icon, spin } = status(subagent.state);
-          const active = running.has(subagent.state) && !stopping[subagent.invocationId];
+          const { label, row } = status(subagent.state);
+          const stoppingNow = stopping[subagent.invocationId] && running.has(subagent.state);
           return (
-            <li key={subagent.invocationId} className="flex items-start gap-2">
-              <Icon
-                className={
-                  spin
-                    ? "mt-0.5 size-3.5 shrink-0 animate-spin text-cream-muted"
-                    : "mt-0.5 size-3.5 shrink-0 text-cream-muted"
-                }
-                aria-hidden="true"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="break-words text-[12px] leading-5 text-cream">{subagent.goal}</p>
-                <p className="text-[11px] leading-4 text-cream-muted">
-                  {stopping[subagent.invocationId] && running.has(subagent.state)
-                    ? "Stopping"
-                    : label}
-                  {subagent.summary ? ` · ${subagent.summary}` : ""}
-                </p>
-              </div>
-              {active ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-[11px]"
-                  aria-label={`Stop sub-agent: ${subagent.goal}`}
-                  onClick={() => void stop(subagent.invocationId)}
-                >
-                  Stop
-                </Button>
-              ) : null}
-            </li>
+            <StatusRow
+              key={subagent.invocationId}
+              state={row}
+              verb={stoppingNow ? "Stopping" : label}
+              sub={subagent.summary || undefined}
+              actions={
+                running.has(subagent.state) && !stoppingNow ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Stop sub-agent: ${subagent.goal}`}
+                    onClick={() => void stop(subagent.invocationId)}
+                  >
+                    Stop
+                  </Button>
+                ) : undefined
+              }
+            >
+              {subagent.goal}
+            </StatusRow>
           );
         })}
-      </ul>
-    </section>
+      </StatusTable>
+    </WorkGroup>
   );
 }

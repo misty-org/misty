@@ -70,7 +70,17 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       snapshotLastRequestedAt = Date.now();
       set({ loading: true, error: null });
       try {
-        const snapshot = await spacesApi.snapshot();
+        // The saved list paints first on a first visit; the fresh one replaces it.
+        const snapshot = await spacesApi.snapshot((saved) => {
+          if (generation !== spacesAccountGeneration || get().snapshotReady) return;
+          set({
+            spaces: saved.spaces,
+            invitations: saved.invitations,
+            limits: saved.entitlements,
+            ownerStorage: saved.owner_storage,
+            snapshotReady: true,
+          });
+        });
         if (generation !== spacesAccountGeneration) return;
         snapshotCooldownUntil = 0;
         set(referenceMode.liveSpaceSnapshotState(snapshot));
@@ -203,7 +213,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadNodes: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { nodes } = await spacesApi.nodes(spaceId);
+      const { nodes } = await spacesApi.nodes(spaceId, (saved) => {
+        if (generation !== spacesAccountGeneration || get().nodesBySpace[spaceId]) return;
+        set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: saved.nodes } }));
+      });
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: nodes } }));
     } catch (error) {
@@ -216,7 +229,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadMembers: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { members } = await spacesApi.members(spaceId);
+      const { members } = await spacesApi.members(spaceId, (saved) => {
+        if (generation !== spacesAccountGeneration || get().membersBySpace[spaceId]) return;
+        set((state) => ({ membersBySpace: { ...state.membersBySpace, [spaceId]: saved.members } }));
+      });
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({
         membersBySpace: { ...state.membersBySpace, [spaceId]: members },

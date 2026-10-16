@@ -59,7 +59,6 @@ export function AgentMethodsCatalog({
   const [methods, setMethods] = useState<AgentMethod[]>();
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const [scheduledOnly, setScheduledOnly] = useState(false);
   const [editor, setEditor] = useState<{
     method?: AgentMethod;
     initial?: AgentMethodDefinition;
@@ -87,7 +86,10 @@ export function AgentMethodsCatalog({
     const own = ++generation.current;
     setError("");
     try {
-      const saved = await agentMethodsApi.list(agentId);
+      // The saved list paints first on a first visit; the fresh one replaces it.
+      const saved = await agentMethodsApi.list(agentId, (copy) => {
+        if (own === generation.current) setMethods((current) => current ?? copy.methods);
+      });
       if (own === generation.current) setMethods(saved.methods);
     } catch (cause) {
       if (own === generation.current) setError(methodError(cause));
@@ -115,7 +117,9 @@ export function AgentMethodsCatalog({
     const { method } = await agentMethodsApi.save(input);
     const prior = methods?.find((m) => m.id === method.id);
     replace({ ...method, schedule: method.schedule ?? prior?.schedule });
-    setNotice(`Saved ${method.kind} version ${method.version}.`);
+    setNotice(
+      `Saved ${method.kind === "template" ? "workflow" : method.kind} version ${method.version}.`,
+    );
   };
   const toggle = async (method: AgentMethod) => {
     if (busy) return;
@@ -129,10 +133,11 @@ export function AgentMethodsCatalog({
       setBusy("");
     }
   };
+  // Saved templates are workflows now: listed with them, and still opening a draft to review.
+  const kinds: AgentMethodKind[] = kind === "workflow" ? ["workflow", "template"] : [kind];
   const visible = (methods ?? []).filter(
     (m) =>
-      m.kind === kind &&
-      (!scheduledOnly || m.schedule) &&
+      kinds.includes(m.kind) &&
       `${m.definition.title} ${m.definition.description}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -169,25 +174,6 @@ export function AgentMethodsCatalog({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {kind === "workflow" && (
-          <div role="navigation" aria-label="Workflow sections" className="flex gap-1.5">
-            {[
-              { label: "All", scheduled: false },
-              { label: "Scheduled", scheduled: true },
-            ].map((option) => (
-              <Button
-                key={option.label}
-                variant="chip"
-                size="chip"
-                className="font-normal"
-                aria-pressed={scheduledOnly === option.scheduled}
-                onClick={() => setScheduledOnly(option.scheduled)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        )}
       </div>
       {error && (
         <div role="alert" className="agent-method-error">
@@ -244,7 +230,7 @@ export function AgentMethodsCatalog({
                 >
                   {method.enabled ? "Turn off" : "Turn on"}
                 </Button>
-                {kind === "workflow" && (
+                {method.kind === "workflow" && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -261,7 +247,7 @@ export function AgentMethodsCatalog({
                     disabled={!method.enabled || working || !!busy}
                     onClick={() => setRunning(method)}
                   >
-                    {kind === "template" ? "Use template" : "Run now"}
+                    {method.kind === "template" ? "Open draft" : "Run now"}
                   </Button>
                 )}
               </div>
@@ -271,19 +257,11 @@ export function AgentMethodsCatalog({
       ) : (
         <section className="agent-studio-workflow-empty">
           <Workflow size={28} />
-          <h2>
-            {query
-              ? `No matching ${kind}s`
-              : scheduledOnly
-                ? "No scheduled workflows"
-                : `No ${kind}s yet`}
-          </h2>
+          <h2>{query ? `No matching ${kind}s` : `No ${kind}s yet`}</h2>
           <p>
             {query
               ? "Try another search."
-              : scheduledOnly
-                ? "Open a workflow’s Schedule to have it run on its own."
-                : "Start with your own instructions or save a method from a successful task."}
+              : "Start with your own instructions or save a method from a successful task."}
           </p>
         </section>
       )}
@@ -291,7 +269,7 @@ export function AgentMethodsCatalog({
       {editor && (
         <AgentMethodEditor
           agentId={agentId}
-          kind={kind}
+          kind={editor.method?.kind ?? kind}
           method={editor.method}
           initial={editor.initial ?? blankDefinition()}
           sources={sources}

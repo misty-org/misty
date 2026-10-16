@@ -172,12 +172,14 @@ fn background_message(raw: &str) -> Option<BackgroundMessage> {
 }
 
 /// Escape stopped a loading page, its document finished loading, or the page changed its URL
-/// without loading (History API or hash). The last carries no URL: the host reads it from the view.
+/// without loading (History API or hash), naming its new address.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct StatusMessage {
     token: String,
     status: StatusChange,
+    #[serde(default)]
+    url: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -398,11 +400,7 @@ impl HostChannel for Channel {
                     let _ = app.emit_to(owner, "misty://browser-stopped", BrowserFocusEvent { id: id.to_owned() });
                 }
                 StatusChange::Location if message.main_frame => {
-                    let url = app.get_webview(message.webview).and_then(|view| view.url().ok());
-                    if let Some(url) = url {
-                        let event = BrowserPageEvent { id: id.to_owned(), url: url.to_string(), phase: "navigated" };
-                        let _ = app.emit_to(owner, "misty://browser-page", event);
-                    }
+                    super::load_watch::emit_location(app, &owner, id, message.webview, status.url.as_deref());
                 }
                 _ => {}
             }

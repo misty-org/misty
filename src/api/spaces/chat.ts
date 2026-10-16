@@ -5,9 +5,14 @@ import type { SpaceRequest } from "./types";
 
 export function createSpaceChatApi(request: SpaceRequest) {
   return {
-    messages: (spaceId: string, before = 0) =>
+    messages: (
+      spaceId: string,
+      before = 0,
+      onCached?: (value: { messages: SpaceMessage[] }) => void,
+    ) =>
       request<{ messages: SpaceMessage[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/messages?before=${before}&limit=50`,
+        { onCached },
       ),
     sendMessage: (
       spaceId: string,

@@ -53,6 +53,8 @@ export function SpaceTasksView({
     data,
   });
   const [deleteTarget, setDeleteTarget] = useState<SpaceTask | null>(null);
+  /** Refresh was pressed: the tasks show skeletons until they are back. */
+  const [refreshing, setRefreshing] = useState(false);
   const reloadTasks = data.load;
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const metadata: Record<string, string> = {
@@ -197,7 +199,10 @@ export function SpaceTasksView({
         loading={data.loading}
         canManage={canManage}
         onQuery={(value: string) => filters.updateParam("q", value)}
-        onSync={() => void data.load(false)}
+        onSync={() => {
+          setRefreshing(true);
+          void data.load(false).finally(() => setRefreshing(false));
+        }}
         onCreate={openCreate}
         filters={
           <TaskFilters
@@ -222,6 +227,7 @@ export function SpaceTasksView({
         assignee={filters.assignee}
         due={filters.due}
         data={data}
+        refreshing={refreshing}
         actions={actions}
         onDeleteRequest={setDeleteTarget}
       />

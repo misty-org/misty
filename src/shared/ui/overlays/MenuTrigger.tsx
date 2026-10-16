@@ -16,6 +16,8 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
   iconOnly?: boolean;
   /** Show dropdown affordance beside a toolbar icon. */
   showChevron?: boolean;
+  /** Labeled triggers only: false drops the trailing chevron where space is tight, such as a strip of chips. */
+  chevron?: boolean;
   tooltip?: string | false;
   /** Opens a DropdownMenu by default; "popover" for a Popover with rich content. */
   kind?: "menu" | "popover";
@@ -25,7 +27,7 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
 
 /**
  * The button that opens a DropdownMenu, or a Popover with kind="popover". Labeled triggers
- * always end in a chevron; toolbar triggers opt in with showChevron.
+ * end in a chevron unless `chevron={false}`; toolbar triggers opt in with showChevron.
  * Features never draw their own.
  */
 const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
@@ -36,6 +38,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
       value,
       iconOnly = false,
       showChevron = false,
+      chevron = true,
       tooltip,
       variant,
       className,
@@ -82,10 +85,12 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
         >
           {icon}
           <span className="min-w-0 truncate">{value ?? label}</span>
-          <ChevronDown
-            aria-hidden
-            className="size-3.5 shrink-0 text-cream-muted transition-transform duration-150 group-data-[state=open]/button:rotate-180"
-          />
+          {chevron && (
+            <ChevronDown
+              aria-hidden
+              className="size-3.5 shrink-0 text-cream-muted transition-transform duration-150 group-data-[state=open]/button:rotate-180"
+            />
+          )}
         </Button>
       </Trigger>
     );

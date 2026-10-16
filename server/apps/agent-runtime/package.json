@@ -22,7 +22,6 @@
     "@ai-sdk/openai": "4.0.46",
     "@ai-sdk/provider": "4.0.7",
     "@ai-sdk/workflow": "1.0.67",
-    "@audeeo/core": "file:vendor/audeeo-core",
     "@misty/mcp-client-runtime": "file:./vendor/mcp-client-runtime",
     "@modelcontextprotocol/client": "^2.0.0",
     "@opentelemetry/api": "1.9.1",

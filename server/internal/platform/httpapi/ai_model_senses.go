@@ -62,6 +62,8 @@ func (s *SpacesService) AIModelSenses() http.HandlerFunc {
 			if catalogErr != nil {
 				options = []agent.SenseModel{}
 			}
+			// Pickers list a trimmed set; the account's own choice always stays listed.
+			options = agent.PickerModels(sense.Kind, options, modelRoute(routes, primary).Model)
 			if sense.Kind == "thinking" || sense.Kind == "seeing" {
 				for i := range options {
 					options[i].PaidOnly = !planAllowsModel(r.Context(), s.database, user, options[i].ID)

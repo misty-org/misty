@@ -24,18 +24,17 @@ export function ApprovalActions({
   const scope = request.rememberLabel?.trim();
   const remember = Boolean(request.rememberable && scope);
   return (
-    <div className="mt-3 grid gap-2">
+    <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          variant="ghost"
-          className="h-7"
+          variant="outline"
           disabled={busy}
           onClick={() => onDecide("deny")}
         >
           Deny
         </Button>
-        <Button size="sm" className="h-7" disabled={busy} onClick={() => onDecide("continue")}>
+        <Button size="sm" variant="primary" disabled={busy} onClick={() => onDecide("continue")}>
           <Check className="size-3.5" aria-hidden="true" /> Accept and continue
         </Button>
         {remember ? (

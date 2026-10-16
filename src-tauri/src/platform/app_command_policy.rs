@@ -5,6 +5,8 @@ pub fn allows(label: &str, command: &str) -> bool {
         || command.starts_with("extensions_")
         || command.starts_with("browser_sync_")
         || command.starts_with("browser_recovery_")
+        // Copies of account data; only the main workspace reads or clears them.
+        || command.starts_with("api_cache_")
         // Reads other browsers' profiles, sign-ins included.
         || command.starts_with("browser_import_")
     {

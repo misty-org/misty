@@ -84,7 +84,10 @@ export function AgentControlIsland() {
     <aside aria-label="Agent control" className={islandClass}>
       <AgentActionQuestions />
       <div className="flex min-w-0 items-center gap-2 px-2 pt-1">
-        <p className="min-w-0 flex-1 truncate text-sm" role="status">
+        <p
+          className={`min-w-0 flex-1 truncate text-sm ${running && !questions ? "misty-shimmer" : ""}`}
+          role="status"
+        >
           {status}
         </p>
         {meta && <span className="shrink-0 text-xs text-cream-muted">{meta}</span>}

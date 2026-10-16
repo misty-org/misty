@@ -108,11 +108,15 @@ describe("BrowserWorkspace", () => {
     await act(async () => root.render(view(browserTab)));
     invoke.mockClear();
     await act(async () => root.render(view(nextTab)));
-    expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
-      request: {
-        id: "tab-browser-one",
-      },
-    });
+    // The old page stays up for a beat so the next one can take its place without a flash;
+    // the handoff's fallback releases it if no page arrives.
+    await vi.waitFor(
+      () =>
+        expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
+          request: { id: "tab-browser-one", keepLive: false },
+        }),
+      { timeout: 3000 },
+    );
   });
   it("keeps Browser chrome on the tab surface and its page host on the page's color", async () => {
     await act(async () => root.render(view(browserTab)));
@@ -148,13 +152,10 @@ describe("BrowserWorkspace", () => {
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
-    expect(container.querySelector('[aria-label="Misty"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Extensions"]')).not.toBeNull();
-    // Site information (left) and the pane layout (right) sit inside the address field; no star.
+    // Site information sits inside the address field, the pane layout in the toolbar beside it; no star.
     expect(container.querySelector('[aria-label="Bookmark this page"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Pane layout"]')?.closest("form")).toBe(
-      omnibox?.closest("form"),
-    );
+    expect(container.querySelector('[aria-label="Pane layout"]')).not.toBeNull();
     expect(container.querySelector('[aria-label="Annotate page"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Viewport"]')).toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
@@ -267,10 +268,7 @@ describe("BrowserWorkspace", () => {
       "History",
       "Downloads",
       "Find…",
-      "Print…",
       "More tools",
-      "Open in default browser",
-      "Extensions",
       "Settings",
     ]) {
       expect(

@@ -54,7 +54,10 @@ test("a failed check fails its suite even when the checks beside it pass", () =>
     // Steps run in parallel, so lint still runs; the suite must fail anyway,
     // with the failing step's own exit code and output.
     assert.equal(result.status, 37);
-    assert.match(result.stdout, /✗ frontend-typecheck\n {2}run typecheck/);
+    // Output streams live, prefixed with the step's name, so the failing step is
+    // named by its own "✗" line and its output carries its prefix.
+    assert.match(result.stdout, /\[frontend-typecheck\] run typecheck/);
+    assert.match(result.stdout, /✗ frontend-typecheck/);
     assert.match(result.stdout, /✓ frontend-lint/);
     assert.doesNotMatch(result.stdout, /✓ frontend \(/);
   } finally { rmSync(directory, { recursive: true, force: true }); }

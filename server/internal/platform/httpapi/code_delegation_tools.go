@@ -23,6 +23,21 @@ const (
 	codingExecutionMode = "coding"
 )
 
+// codingToolIDs are the coding tools a chat can choose, as the device names them.
+var codingToolIDs = map[string]bool{
+	"claude": true, "codex": true, "minimax": true, "kimi": true, "omp": true, "opencode": true,
+	"pi": true, "agy": true, "qoder": true, "qoder-cn": true, "grok": true, "dsh": true,
+}
+
+// codingToolChoice keeps a known tool the person picked; anything else falls
+// back to the Settings default on the device.
+func codingToolChoice(id string) string {
+	if codingToolIDs[id] {
+		return id
+	}
+	return ""
+}
+
 func codeDelegationDescriptors() []agenttools.Descriptor {
 	return []agenttools.Descriptor{
 		{Name: codeDelegateTool, Version: 1, Risk: serveragent.RiskWrite, Locality: agenttools.LocalityServer, Approval: agenttools.ApprovalNone, AuditEvent: "coding.delegated",
@@ -102,7 +117,7 @@ func (s *SpacesService) delegateCoding(ctx context.Context, parent *db.AIInvocat
 	}
 	// The agent and conversation let the device save a snapshot of the
 	// project to the agent's Space once the run finishes.
-	job, _ := json.Marshal(map[string]any{"childInvocationId": childID, "task": input.Task, "mode": mode, "permissionMode": body.PermissionMode,
+	job, _ := json.Marshal(map[string]any{"childInvocationId": childID, "task": input.Task, "mode": mode, "permissionMode": body.PermissionMode, "tool": codingToolChoice(body.CodingTool),
 		"project": project.name, "agentId": body.AgentID, "conversationId": parent.ConversationID})
 	config, _ := json.Marshal(map[string]any{"agentId": firstAIText(body.AgentID, "misty-unified")})
 	schema := json.RawMessage(`{"type":"object"}`)

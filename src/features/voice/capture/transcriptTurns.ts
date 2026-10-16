@@ -1,4 +1,4 @@
-import type { Turn } from "@audeeo/core";
+import type { Turn } from "../transcript/transcript";
 import type { VoiceTurn } from "./captureApi";
 
 /**

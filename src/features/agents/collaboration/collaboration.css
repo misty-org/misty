@@ -144,10 +144,6 @@
 .agent-plan-card {
   display: grid;
   gap: 10px;
-  padding: 14px 16px;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
 }
 .agent-plan-card-head {
   display: flex;

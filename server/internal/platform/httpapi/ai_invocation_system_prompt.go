@@ -46,9 +46,12 @@ func aiInvocationSystem(input aiSystemPromptInput) string {
 		system.WriteString("\nReport complete, partial, blocked or uncertain results accurately.")
 	}
 	system.WriteString("\n\n" + agentExecutionGuidance)
+	system.WriteString(agentCapabilityGuidance(input.tools, invocationHasDesktopControl(input.body)))
+	// Everything that changes from run to run goes last. Providers cache a prompt only up to its
+	// first difference, so a timestamp in the middle made every new run pay full price for the
+	// whole prompt and the tool list (about 12,000 tokens) that follow it.
 	system.WriteString("\n\nAuthoritative run context:\n- Current time: " + input.now.Format(time.RFC3339) + "\n- Current date: " + input.now.Format("2006-01-02") + "\n- Timezone: " + input.body.Timezone)
 	system.WriteString("\nInterpret relative dates only from this current time and timezone. A task before the current date is overdue, not due today.")
-	system.WriteString(agentCapabilityGuidance(input.tools, invocationHasDesktopControl(input.body)))
 	system.WriteString(currentTabGuidance(input.body.CurrentTab, input.tools))
 	system.WriteString(pickedDeviceGuidance(input.body))
 	return system.String()
