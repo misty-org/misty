@@ -132,6 +132,8 @@ services:
         required: false
       - path: .env/dev/integrations/composio.env
         required: false
+      - path: .env/dev/integrations/web-fetch.env
+        required: false
       - path: .env/dev/integrations/dropbox.env
         required: false
       - path: .env/dev/integrations/email.env

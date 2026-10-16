@@ -79,7 +79,7 @@
           "browser_*",
           "agent_tool_use"
         ],
-        "maxCalls": 4,
+        "maxCalls": 6,
         "maxRuns": 1
       },
       "rubric": [
@@ -762,7 +762,7 @@
       "source": "polar",
       "app": "live",
       "surface": "schedule",
-      "prompt": "Every weekday at 8am: top 5 Hacker News stories about AI agents, one line each, with links.",
+      "prompt": "Top 5 Hacker News stories about AI agents right now, one line each, with links.",
       "tools": {
         "forbidden": [
           "screen_*",

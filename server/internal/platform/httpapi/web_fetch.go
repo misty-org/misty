@@ -102,7 +102,7 @@ func (s *SpacesService) webFetchDeviceRegistration(workspaces []deviceGrant) []a
 func webFetchWorkerRegistrations() []agenttools.Registration {
 	base := strings.TrimRight(strings.TrimSpace(envconfig.Getenv("MISTY_WEB_FETCH_URL")), "/")
 	secret := strings.TrimSpace(envconfig.Getenv("MISTY_WEB_FETCH_SECRET"))
-	if !strings.HasPrefix(base, "https://") || len(secret) < 32 {
+	if !(strings.HasPrefix(base, "https://") || localWorker(base)) || len(secret) < 32 {
 		return nil
 	}
 	client := &http.Client{Timeout: webFetchWorkerTimeout}
@@ -146,4 +146,15 @@ func withWebFetch(registrations []agenttools.Registration) []agenttools.Registra
 		}
 	}
 	return append(registrations, webFetchWorkerRegistrations()...)
+}
+
+// localWorker allows plain http only for a Worker running on this computer
+// under wrangler dev, as the development stack reaches it from Docker.
+func localWorker(base string) bool {
+	for _, host := range []string{"http://localhost:", "http://127.0.0.1:", "http://host.docker.internal:"} {
+		if strings.HasPrefix(base, host) {
+			return true
+		}
+	}
+	return false
 }

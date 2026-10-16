@@ -25,3 +25,18 @@ MISTY_WEB_FETCH_SECRET=...
 ```
 
 Without both, the API offers `web.fetch` only through an attached device.
+
+## Local development
+
+The development stack can use the Worker running on this computer, so eval runs and runs
+without a device can read pages before anything is deployed:
+
+```bash
+npm install
+printf 'MISTY_WEB_FETCH_SECRET=%s\n' "$(openssl rand -hex 32)" > .dev.vars
+npx wrangler dev --port 8790 --ip 127.0.0.1
+```
+
+Put the same secret in `server/.env/dev/integrations/web-fetch.env` with
+`MISTY_WEB_FETCH_URL=http://host.docker.internal:8790`, then `misty server up`. Plain http is
+accepted only for localhost, 127.0.0.1 and host.docker.internal.
