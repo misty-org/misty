@@ -69,10 +69,17 @@ function request(task: WorkflowTask, model: string, agentId: string, siteBase: s
   return { ...base, mode: "drawer", surface_id: "global", ...tab };
 }
 
-async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string, contexts: unknown[]): Promise<WorkflowRun> {
+async function runTask(client: EvalClient, budget: Budget, task: WorkflowTask, model: string, agentId: string, siteBase: string, sign: () => Promise<unknown[]>): Promise<WorkflowRun> {
   const before = budget.balance;
   const started = performance.now();
-  const result = await client.run(request(task, model, agentId, siteBase, contexts));
+  // A fresh device grant per run, and one more try with a new one if the server refuses it.
+  let result;
+  try {
+    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+  } catch (error) {
+    if (!String(error).includes("device_grant_required")) throw error;
+    result = await client.run(request(task, model, agentId, siteBase, await sign()));
+  }
   const run: WorkflowRun = {
     taskId: task.id, category: task.category, source: task.source, surface: task.surface, model,
     terminal: result.terminal, tools: result.tools, screenRequests: result.screenRequests,
@@ -112,8 +119,7 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
   const agents = await client.json<{ agents: Array<{ id: string }> }>("/misty/agents");
   const agentId = agents.agents[0]?.id ?? "";
   const me = await client.json<{ id: string }>("/me");
-  // Signed once per pass; a run grant lasts six hours.
-  const contexts = await deviceContexts(me.id, agentId);
+  const sign = () => deviceContexts(me.id, agentId);
   const tasks = loadTasks().filter(selected);
   const sites = await serveSites();
   const runs: WorkflowRun[] = [];
@@ -133,7 +139,17 @@ it.skipIf(!enabled)("runs workflow tasks within budget", async () => {
           stopped = `budget: $${budget.spent.toFixed(2)} of $${budget.cap.toFixed(2)} spent`;
           break outer;
         }
-        const run = await runTask(client, budget, task, model, agentId, sites.base, contexts);
+        let run: WorkflowRun;
+        try {
+          run = await runTask(client, budget, task, model, agentId, sites.base, sign);
+        } catch (error) {
+          // One broken run never ends the pass; it is recorded as that task's error.
+          run = {
+            taskId: task.id, category: task.category, source: task.source, surface: task.surface, model, terminal: "error",
+            tools: [], screenRequests: [], answer: "", ms: 0, costUsd: 0, error: String(error).slice(0, 300),
+            routing: { passed: false, broken: ["the run could not start"], unavailable: [], runs: 0 },
+          };
+        }
         runs.push(run);
         refusedInARow = run.error && run.tools.length === 0 && run.ms < 3_000 ? refusedInARow + 1 : 0;
         if (refusedInARow >= 3) {
