@@ -104,6 +104,14 @@ export class EvalClient {
             const request = event.screenRequest as { kind?: string } | undefined;
             run.screenRequests.push(request?.kind ?? "screen");
           }
+          // Nobody answers cards in an eval: record the card and stop the run
+          // rather than waiting out the timeout.
+          if (event.type === "approval.required" || event.type === "app.request" || event.type === "agent.request") {
+            run.terminal = `needs_person:${event.type}`;
+            await reader.cancel();
+            await this.raw(created.eventsUrl.replace(/\/events$/, "/cancel"), { method: "POST" }).catch(() => undefined);
+            return run;
+          }
           if (/^invocation\.(completed|failed|canceled)$/.test(event.type)) {
             run.terminal = event.type;
             await reader.cancel();
