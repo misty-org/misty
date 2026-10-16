@@ -47,6 +47,8 @@ func aiInvocationSystem(input aiSystemPromptInput) string {
 	}
 	system.WriteString("\n\n" + agentExecutionGuidance)
 	system.WriteString(agentCapabilityGuidance(input.tools, invocationHasDesktopControl(input.body)))
+	system.WriteString(glossaryGuidance(input.tools))
+	system.WriteString(entryGuidance(agentEntry(input.body)))
 	// Everything that changes from run to run goes last. Providers cache a prompt only up to its
 	// first difference, so a timestamp in the middle made every new run pay full price for the
 	// whole prompt and the tool list (about 12,000 tokens) that follow it.
