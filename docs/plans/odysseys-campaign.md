@@ -134,6 +134,10 @@ results in the message.
 | 0 | Oct 17 | Setup and the fixes below; one smoke task | 0/1 | 0.00 | — | 13 calls / 130 s | $0.11 |
 | 1 | Oct 18 | First dev batch, `medium` | 0/6, stopped early | 0.00 | — | 14 calls / 60 s | $0.14 |
 | 2 | Oct 18 | Budget scaling, persistence check, turn-limit fix, Ultra+ eval plan | 0/3, stopped by hand | 0.18 | — | 40 calls / 231 s | $0.25 |
+| 3 | Oct 18 | Several own tabs, extraction fixed (still 20 turns) | 0/2, stopped by hand | 0.00 | — | 24 calls / 128 s | $0.12 |
+| 4 | Oct 18 | 90 turns (eval_turn_limit), long-lived background leases | 0/3, stopped by hand | 0.38 | — | 43 calls / 149 s | $0.34 |
+| 5 | Oct 18 | Allowance per checklist step, 16 tabs, 60-image judge | 0/2, stopped by hand | 0.42 | — | 56 calls / 294 s | $0.34 |
+| 6 | Oct 18 | Websites count as tools, background grading | 0/2, stopped by hand | 0.75 on the shopping task | — | 62 calls / 388 s | $0.21 |
 
 ### Fixes before the first batch (October 17)
 
@@ -173,6 +177,21 @@ Every failure was the harness, not the model. In order found:
 | Pro runs get 20 turns; a run hit the limit mid-browse and ended with no answer at all | H/E | The eval account runs on Ultra+ (90 turns) during passes; two turns before any limit the run must write its answer (`bfb50002`) |
 | Tasks ask for pages "kept open in tabs"; the agent had one tab and said so, failing those rubric items | H | `screen_open` opens more tabs of the agent's own (up to 8) (`0d1b4b32`) |
 | Docker's disk filled with build cache; the database refused writes | E | Prune build cache after rebuilds |
+
+### Batches 3 to 6 (October 18)
+
+| Cause | Label | Fix |
+|---|---|---|
+| The agent's own tabs died mid-task (`native_lease_expired`): their 30 s lease is renewed by a timer in the app window, which WebKit throttles in the background | H | Background leases last 10 minutes (`3cc1426b`) |
+| Edited billing tiers were reverted by reconciliation, so runs kept 20 turns | E | `eval_turn_limit`, honored only in development with model override (`3cc1426b`) |
+| The research budget said "answer now" at turn 11 of 90; eight tabs filled up | H | One base allowance per checklist step; 16 tabs, navigate a tab for pages only read (`0727262a`) |
+| The judge saw only the last 24 screenshots, missing pages read early | E | 60 screenshots (`0727262a`) |
+| The agent said no tool could create a CryptPad document | R/H | Guidance: websites are tools (`d3d2c3d3`) |
+| One refusal of an early give-up was not enough (4 of 10 pediatricians at turn 13) | R/H | A second refusal after more work (`d8fc661c`) |
+| `screen_open` with `new_tab` took the old hand-off and ended the run | H | `new_tab` and `window` open the agent's own tabs in the run (`2344b0bb`) |
+
+Run-to-run variance is large: the shopping task scored 0.75, 0.50 and 0.75 on three runs of nearly the
+same code. Milestone numbers need several trials per task.
 
 The local eval plan was raised to Ultra+ by editing the local billing database (the active
 subscription row and the license record, both `pro` before); restore both after the campaign.
