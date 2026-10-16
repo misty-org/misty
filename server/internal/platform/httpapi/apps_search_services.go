@@ -31,7 +31,7 @@ type searchAppPolicy struct {
 func (s *SpacesService) searchAppPolicy(_ context.Context, invocation agenttools.Invocation) searchAppPolicy {
 	return searchAppPolicy{
 		offer:     offerSearchAppsByDefault,
-		webSearch: s.models.Enabled() && webSearchOnByDefault,
+		webSearch: webSearchKey() != "" && webSearchOnByDefault,
 		request:   invocation.OriginalInput,
 	}
 }

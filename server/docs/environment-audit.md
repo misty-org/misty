@@ -248,6 +248,7 @@ variables and deliberate compatibility aliases are called out separately below.
 | `MISTY_SERVER_VERSION` | `observability.env` | `server/internal/app/health.go` · `server/internal/platform/telemetry/client.go` |
 | `AI_GATEWAY_API_KEY` | `integrations/ai.env` | `server/internal/app/health.go` · `server/internal/app/server_core.go` |
 | `AI_GATEWAY_BASE_URL` | `integrations/ai.env` | `server/internal/app/server_core.go` · `server/internal/agents/model_catalog_version.go` |
+| `MISTY_SERPER_API_KEY` | `integrations/ai.env` | `server/internal/platform/httpapi/web_search.go` |
 | `AGENT_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |
 | `MEDIA_SEARCH_EMERGENCY_DISABLE` | `integrations/ai.env` | `server/internal/platform/httpapi/media_search_index_chunk.go` |
 | `MEDIA_SEARCH_TRANSCRIPTION_MODEL` | `integrations/ai.env` | `server/internal/agents/media_search.go` |

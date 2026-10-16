@@ -83,6 +83,18 @@ MISTY_WORKFLOW_EVAL=1 npm run eval:workflows
   `misty-eval-sandbox` repo, a `#marketing-drafts` Slack channel and a "Weekly sync" note.
   Mail is skipped when already there. Gmail only marks really sent mail as Sent, so the seeded
   thank-you to Priya is found by sender and recipient, not in the Sent folder.
+- **End state.** Account tasks list `state` checks: after the run, `state.ts` reads back what
+  the task should have changed (issues, Gmail drafts and Sent, calendar events, a Slack
+  channel, Misty items) through the same Composio session, keeps the fields a judge can check,
+  and gives them to the judge as the evidence. Placeholders such as `{{github_owner}}`,
+  `{{tomorrow_start}}` and `{{slack_channel:marketing-drafts}}` are filled in at run time.
+- **Scoped and undone.** A check with `since` shows only items created or changed during the
+  run. A check with `undo` removes what the run created once it is graded: drafts, events
+  and Slack messages are deleted, Misty tasks archived and sandbox issues closed. Older items
+  are never touched, and `skip` leaves another app's items (Reclaim events, join messages).
+- **What the agent read.** With `MISTY_AI_TOOL_RESULT_EVENTS=1` in `server/.env/dev/runtime.env`,
+  the local server adds each tool's raw result to its `tool.detail` event (never in
+  production), and the judge reads those instead of the result titles alone.
 - **Screen hand-offs.** Without a device, a run that asks for a screen ends there: its route
   is scored, its answer isn't.
 - **Schedules** run as composer requests until the runner can claim a scheduled run.

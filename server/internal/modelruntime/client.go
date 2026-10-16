@@ -321,37 +321,6 @@ func (c *Client) DaySummary(ctx context.Context, request DaySummaryRequest) (Day
 	return result, err
 }
 
-// SearchRequest runs one web search through the AI Gateway's search tools.
-// Model is the small model that issues the search call; Engine is parallel,
-// perplexity or exa.
-type SearchRequest struct {
-	Model      string   `json:"model"`
-	Engine     string   `json:"engine"`
-	Query      string   `json:"query"`
-	MaxResults int      `json:"maxResults"`
-	Domains    []string `json:"domains,omitempty"`
-	Recency    string   `json:"recency,omitempty"`
-}
-
-type SearchHit struct {
-	Title     string `json:"title"`
-	URL       string `json:"url"`
-	Snippet   string `json:"snippet"`
-	Published string `json:"published,omitempty"`
-}
-
-type SearchResult struct {
-	Engine  string      `json:"engine"`
-	Results []SearchHit `json:"results"`
-	Usage   Usage       `json:"usage"`
-}
-
-func (c *Client) Search(ctx context.Context, request SearchRequest) (SearchResult, error) {
-	var result SearchResult
-	err := c.post(ctx, "/v1/models/search", request, &result)
-	return result, err
-}
-
 // SpeechRequest speaks text for the voice pipeline. The runtime returns raw
 // 24 kHz 16-bit mono PCM; billing charges speech by input characters.
 type SpeechRequest struct {

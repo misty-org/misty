@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import type { StateCheck } from "./state.js";
 
 export interface WorkflowTask {
   id: string;
@@ -18,6 +19,8 @@ export interface WorkflowTask {
   expect?: string[];
   rubric?: string[];
   tools?: { required?: string[]; forbidden?: string[]; maxCalls?: number; maxRuns?: number };
+  /** What to read back after the run, for the judge (state.ts). */
+  state?: StateCheck[];
 }
 
 const here = resolve(import.meta.dirname);
