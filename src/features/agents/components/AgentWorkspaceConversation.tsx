@@ -414,7 +414,8 @@ export function AgentWorkspaceConversation({
           trailingControl={
             state.working ? (
               <IconButton
-                variant="primary"
+                variant="outline"
+                className="text-cream-bright"
                 label="Stop response"
                 onClick={() => {
                   void useMistyStore
