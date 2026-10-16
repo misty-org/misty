@@ -2,7 +2,7 @@
   "src-tauri/src/app/commands.rs": 2397,
   "src-tauri/src/domain/explorer.rs": 621,
   "src-tauri/src/infra/agent_workspace.rs": 549,
-  "src-tauri/src/infra/browser.rs": 3568,
+  "src-tauri/src/infra/browser.rs": 797,
   "src-tauri/src/infra/browser_cookie_store.rs": 521,
   "src-tauri/src/infra/browser_macos.rs": 601,
   "src-tauri/src/infra/browser_sync/device_signin.rs": 724,

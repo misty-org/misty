@@ -1,0 +1,400 @@
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-list[data-reorder-list] {
+  height: 100%;
+  align-items: flex-end;
+  /* Tabs sit close; the active tab's flare runs a little under a neighbor's edge, but stays clear
+     of its favicon, which starts a shoulder's width inside. */
+  gap: 6px;
+  padding: var(--tab-inset) var(--tab-shoulder) 0;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-list[data-reorder-list] {
+  align-items: flex-start;
+  padding-block: 0 var(--tab-inset);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  min-width: 96px;
+  max-width: 232px;
+  flex: 1 1 232px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--workspace-tab-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab
+  [role="tab"] {
+  justify-content: flex-start;
+  gap: 8px;
+  /* The favicon starts 12px inside the tab body, mirroring the close glyph on the other side. */
+  padding: 0 6px 0 12px;
+  color: inherit;
+  text-align: left;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab[data-active="true"] {
+  z-index: 2;
+  background: transparent;
+  color: var(--workspace-tab-text);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"]):hover {
+  color: var(--workspace-tab-text);
+  background: transparent;
+}
+/* Inactive hover: the tab body's own footprint, with the active tab's top corners, stopping
+   short of the pane seam so the seam stays visible. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"])::before {
+  content: "";
+  position: absolute;
+  /* A 28px pill, set to the tab content's measured center. */
+  inset: 3px 0 5px;
+  z-index: -1;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--workspace-tab-text) 10%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab:not([data-active="true"], [data-reorder-dragging="true"]):hover::before {
+  opacity: 1;
+}
+.misty-workspace-tab-shape {
+  position: absolute;
+  top: 0;
+  left: calc(-1 * var(--tab-shoulder));
+  z-index: -1;
+  width: calc(100% + 2 * var(--tab-shoulder));
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.misty-workspace-tab:not([data-active="true"]) .misty-workspace-tab-shape {
+  visibility: hidden;
+}
+.misty-workspace-tab-shape-outline {
+  fill: none;
+  stroke: var(--color-charcoal-border);
+  stroke-width: 1px;
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-shape {
+  scale: 1 -1;
+}
+.misty-workspace-tabs[data-tab-position="bottom"]
+  .misty-workspace-tab:not([data-active="true"])::before {
+  inset: 4px 0 0;
+  border-radius: 8px 8px var(--tab-shoulder) var(--tab-shoulder);
+}
+/* The tab fills the strip minus the --tab-inset gap, and its content is centered on the tab. */
+.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab,
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab {
+  padding: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-list
+  > :is(button, .misty-tab-group-header),
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-actions {
+  align-self: center;
+  margin-block: 0;
+}
+/* New tab and group headers sit in the tab list, so they center on the tabs. The pane controls
+   sit outside it and center on the whole strip, so the inset margin brings them level. */
+.misty-workspace-tabs[data-tab-position="top"] .misty-workspace-tab-actions {
+  margin-top: var(--tab-inset);
+}
+.misty-workspace-tabs[data-tab-position="bottom"] .misty-workspace-tab-actions {
+  margin-bottom: var(--tab-inset);
+}
+/* A clear gap after New tab, so it reads as part of the tabs and not the pane controls. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-actions {
+  margin-left: 4px;
+  color: var(--workspace-tab-muted);
+}
+/* Close and New tab share a 1.33px stroke and sit 12px either side of the
+   tab's trailing edge. Close is the quieter control: a 20px target with a 7px
+   glyph, against New tab's 24px target and 8px glyph. Lucide's x spans 12/24
+   of its box and its plus 14/24. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  :is(.misty-workspace-new-tab, .misty-workspace-tab-close) {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-new-tab {
+  /* The list's shoulder-wide gap already separates it from the last tab. */
+  margin-left: 0;
+  color: var(--workspace-tab-muted);
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-new-tab
+  svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-close {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  /* The 14px glyph sits 3px inside its 20px target, so it ends 12px inside the tab body. */
+  margin: 0 9px 0 0;
+  color: inherit;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab-close
+  svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+/* The tab's media button (speaker, muted speaker or play) is the close button's twin: the same
+   20px target, 14px glyph and stroke, so the two read as one pair. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-tab-media-button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+}
+.misty-workspace-tabs .misty-tab-media-button svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.29;
+}
+/* Pinned tabs in a horizontal strip are icon-only and fixed width, like Chrome. */
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab.misty-workspace-tab-pinned {
+  min-width: 44px;
+  max-width: 44px;
+  flex: 0 0 44px;
+}
+.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
+  .misty-workspace-tab.misty-workspace-tab-pinned
+  [role="tab"] {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* Favorites lead the strip in every virtual window: icon tiles, monochrome states. */
+.misty-workspace-favorites {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+.misty-workspace-favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  margin: 0 0 8px;
+  padding: 0 0 8px;
+  border-right: 0;
+  border-bottom: 1px solid var(--color-charcoal-border, rgba(255, 255, 255, 0.08));
+}
+.misty-workspace-favorite {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--workspace-tab-muted, inherit);
+}
+.misty-workspace-favorites-grid .misty-workspace-favorite {
+  width: 100%;
+  height: 32px;
+}
+.misty-workspace-favorite:hover,
+.misty-workspace-favorite[data-menu-open] {
+  background: rgba(255, 255, 255, 0.05);
+}
+.misty-workspace-favorite[data-active] {
+  background: rgba(255, 255, 255, 0.09);
+}
+.misty-workspace-favorite:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 36px
+   rounded rows with hover-only close buttons, and the window actions sit in a footer. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
+  --shell-tab-height: 36px;
+  gap: 0;
+  padding-bottom: 8px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 2px 0 10px;
+  padding: 0 0 10px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite {
+  height: 34px;
+  border-radius: 8px;
+  background: transparent;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite:is(:hover, [data-menu-open]) {
+  background: rgba(255, 255, 255, 0.05);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid
+  .misty-workspace-favorite[data-active] {
+  background: rgba(255, 255, 255, 0.09);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  gap: 4px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  border-radius: 8px;
+  font-size: 13px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-close {
+  opacity: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:is(:hover, :focus-within)
+  .misty-workspace-tab-close {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+    .misty-workspace-tab-close {
+    opacity: 1;
+  }
+}
+.misty-workspace-new-tab-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: var(--shell-tab-height, 34px);
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--workspace-tab-muted, var(--color-cream-muted));
+  text-align: left;
+}
+/* New Tab reads as a tab row: the same hover wash and text, without a close button. */
+.misty-workspace-new-tab-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+.misty-workspace-new-tab-row:focus-visible {
+  outline: 1px solid var(--color-cream-muted, currentColor);
+  outline-offset: -1px;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-actions {
+  margin: 0 0 6px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+}
+
+/* The vertical tab list sits directly on the sidebar, fading at the edges that still have
+   tabs beyond them so it reads as scrollable. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  margin-top: 2px;
+}
+
+/* Favorites and the window actions (below the address field) sit directly on the sidebar. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid {
+  margin: 0 0 6px;
+  padding: 6px;
+  align-content: start;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+}
+/* Until a favorite exists the container takes no room and draws nothing. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-favorites-grid[data-empty] {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-actions {
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+}
+
+/* New Tab is the first row of the tab list: sticky, on the sidebar's own color. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 0 2px;
+  padding: 0 8px;
+  width: 100%;
+  background: var(--misty-tab-well);
+}
+/* Its hover is a wash over the sidebar color, like a tab's, kept opaque so tabs scrolling
+   beneath the sticky row never show through. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row:is(:hover, :focus-visible) {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)), var(--misty-tab-well);
+  color: var(--workspace-tab-text, var(--color-cream));
+}
+
+/* Tabs fade out at the list's edges while more sit beyond them. The bottom is a mask; the
+   top is a gradient hanging off the sticky New Tab row, so tabs dissolve into that row. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab-list {
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-fade-end, 0px)), transparent);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-new-tab-row::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: var(--tab-fade-start, 0px);
+  background: linear-gradient(var(--misty-tab-well), transparent);
+  pointer-events: none;
+}
+
+/* Vertical tabs: selected and hovered rows are a soft highlight, not a bordered card. */
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-workspace-tab[data-active="true"] {
+  background: rgba(255, 255, 255, 0.09);
+}
