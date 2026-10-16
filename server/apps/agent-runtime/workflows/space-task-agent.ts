@@ -24,6 +24,7 @@ import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolMonitor } from "../src/tool-monitor.js";
 import { agentTools, toolLoadTool, toolState, toolUseTool } from "../src/toolsets.js";
+import { modelFamilyNote } from "../src/model-family.js";
 import { executionInstructions, finalText, incompleteToolResultText, unfinishedModelResult } from "../src/tool-outcomes.js";
 import type { SpaceTaskContext } from "../src/types.js";
 
@@ -111,7 +112,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     }),
   };
   const toolNames = Object.keys(tools);
-  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions].filter(Boolean));
+  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions, modelFamilyNote(context.model_id)].filter(Boolean));
   // Recomputed from the transcript before every model call.
   let visibleTools = toolNames;
   let modelTurn = 0;
