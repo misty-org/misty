@@ -556,7 +556,6 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           mode: companion ? "companion" : "drawer",
           companionMode: companion?.interactionMode,
           companionModel: companion?.model,
-          companionIntent: companion?.intent,
           modelOverride: companion ? undefined : requestState.pendingModelOverride,
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,

@@ -261,7 +261,6 @@ func checkInvocationModelAvailable(w http.ResponseWriter, r *http.Request, body 
 		writeJSON(w, http.StatusBadRequest, map[string]any{"code": "model_unavailable", "message": "Misty’s model is temporarily unavailable. Please try again."})
 		return false
 	}
-	st.reasoning = companionAdmissionReasoning(*body, st.reasoning)
 	return true
 }
 

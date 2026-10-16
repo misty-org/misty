@@ -87,7 +87,6 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   });
   if (context.routine_execution !== undefined) throw new FatalError("Retired automation execution cannot be resumed.");
 
-  const explaining = context.companion_explanation === true;
   const order = serialToolLifecycle();
   const monitor = toolMonitor({ catalog, order, checkpoint: execution.checkpoint, rejected });
   const guard = (callId: string) => {
@@ -96,7 +95,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   };
   // agent.tool: answer by default; browse, desktop, code and loaded families on request.
   const toolsets = agentTools(catalog);
-  const tools: ToolSet = explaining ? {} : {
+  const tools: ToolSet = {
     ...catalogTools(catalog, async (callId, name, value) => {
       guard(callId);
       return await execution.executeCapability(callId, name, value);
@@ -112,9 +111,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     }),
   };
   const toolNames = Object.keys(tools);
-  const instructions = explaining
-    ? context.system
-    : withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions].filter(Boolean));
+  const instructions = withRuntimeInstructions(context.system, [executionInstructions, taskCompletionInstructions, toolsets.instructions].filter(Boolean));
   // Recomputed from the transcript before every model call.
   let visibleTools = toolNames;
   let modelTurn = 0;
@@ -127,7 +124,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     model: new InstanceModel(context.model_id, identity),
     instructions,
     tools,
-    prepareStep: () => ({ activeTools: explaining ? [] : monitor.activeTools(visibleTools) }),
+    prepareStep: () => ({ activeTools: monitor.activeTools(visibleTools) }),
     // One model call per stream lets the coordinator refresh the active-time
     // deadline after durable tool waits. The aggregate loop below owns the cap.
     stopWhen: isStepCount(1),
@@ -179,7 +176,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       runtimeContext: { mistyRunId: input.mistyRunId },
     };
     let messages: ModelMessage[] = initialMessages(context);
-    if (!explaining && validReplay(context.browser_replay)) {
+    if (validReplay(context.browser_replay)) {
       // A workflow that ran before replays its saved browser steps without a
       // model; the agent takes over at the first step the page no longer matches.
       const replay = await runBrowserReplay(context.browser_replay, {
@@ -239,7 +236,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       const admission = await admitModelTurn(identity, {
         node_id: `model:${modelTurn + 1}`, state: "running", phase: "thinking", progress: Math.min(85, 10 + modelTurn * 6),
         // Native payload size only, with images counted apart from text. Billing estimates tokens/rates.
-        output: admissionInput({ system: instructions, messages, tools: explaining ? [] : catalog.tools }),
+        output: admissionInput({ system: instructions, messages, tools: catalog.tools }),
       });
       // Past a usage limit the run may finish on a small grace; ask the model,
       // once, to wrap up rather than start new work.
@@ -279,7 +276,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     throw new FatalError(failure.message);
   }
 
-  const taskReport = explaining ? undefined : finalTaskCompletion(result.steps, result.toolResults);
+  const taskReport = finalTaskCompletion(result.steps, result.toolResults);
   const unfinished = unfinishedModelResult(streamAborted, result.steps.length, taskReport ? "stop" : result.finishReason, limit);
   if (unfinished && streamAborted) return await finish({ status: "incomplete", text: unfinished.message, error_code: unfinished.code, error_message: unfinished.message });
   if (order.stoppedReason) return await finish(stopped());
@@ -289,16 +286,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   // answered directly) is a reply, with nothing to confirm. Any run that acted
   // must still confirm its outcome with agent_finish.
   const acted = result.steps.some((step) => step.content.some((part) => part.type.startsWith("tool-")));
-  if (!explaining && !taskReport && !acted && text) return await finish({ status: "success", text });
-  if (!explaining) {
-    const outcome = taskCompletionOutcome(taskReport);
-    return await finish({ ...outcome, text: taskReport ? taskCompletionText(taskReport) : text || outcome.error_message! });
-  }
-  if (!text) {
-    return await finish({
-      status: "incomplete", text: "I couldn't fully complete that request because no final answer was produced.",
-      error_code: "empty_agent_response", error_message: "The agent produced no final answer.",
-    });
-  }
-  return await finish({ status: "success", text });
+  if (!taskReport && !acted && text) return await finish({ status: "success", text });
+  const outcome = taskCompletionOutcome(taskReport);
+  return await finish({ ...outcome, text: taskReport ? taskCompletionText(taskReport) : text || outcome.error_message! });
 }

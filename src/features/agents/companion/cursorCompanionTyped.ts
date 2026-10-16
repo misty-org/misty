@@ -63,8 +63,15 @@ export class CursorCompanionTypedTurns {
     const controller = new AbortController();
     s.abort = controller;
     try {
-      // Displays are captured only when the task asked to look (screen_look).
-      const screens = request.look ? await s.capture(generation, controller.signal) : [];
+      // Every request at the cursor carries every display, the cursor's first
+      // (docs/plans/agent-harness.md, phase 4); the model judges what matters.
+      // Without screen access the request still goes, with no screenshots.
+      const screens = s.nativeReady
+        ? await s.capture(generation, controller.signal).catch((error: unknown) => {
+            if (request.look || controller.signal.aborted) throw error;
+            return [];
+          })
+        : [];
       if (!s.originIsCurrent(origin))
         throw new Error(
           "The conversation changed. Send your request again in the intended conversation.",
@@ -102,7 +109,6 @@ export class CursorCompanionTypedTurns {
           interactionMode: s.state.mode,
           model: s.state.model,
           ...(screens.length ? { displayCaptures: screens } : {}),
-          ...(request.intent && screens.length ? { intent: request.intent } : {}),
           continuation: request.continuation,
         },
       ),
@@ -134,7 +140,6 @@ export class CursorCompanionTypedTurns {
       conversationId: step.conversationId,
       look: true,
       continuation: true,
-      intent: "teach",
       voice: step.voice,
     });
 }

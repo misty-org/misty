@@ -219,8 +219,6 @@ export interface AiInvocationRequest {
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
-  /** "teach" explains and points at the attached displays, with no tools. */
-  companionIntent?: "teach";
   /** Pins a new conversation's Thinking model with its first message. */
   modelOverride?: string;
   displayCaptures?: DisplayCapture[];

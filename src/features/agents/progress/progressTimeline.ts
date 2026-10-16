@@ -1,4 +1,5 @@
 import type { AiInvocationEvent, AiProgressItem } from "@/features/ai-surface/types";
+import { companionReply } from "../companion/companionReply";
 
 export type ProgressTool = Extract<AiProgressItem, { type: "tool" }>;
 export type ProgressGroup =
@@ -48,7 +49,11 @@ export function groupProgress(items: AiProgressItem[]): ProgressGroup[] {
   const groups: ProgressGroup[] = [];
   items.forEach((item, index) => {
     const last = groups[groups.length - 1];
-    if (item.type === "note") groups.push({ type: "note", key: `note:${index}`, text: item.text });
+    // Pointing tags are for the cursor, never for reading.
+    if (item.type === "note") {
+      const text = companionReply(item.text).text;
+      if (text) groups.push({ type: "note", key: `note:${index}`, text });
+    }
     else if (last?.type === "tools") last.tools.push(item);
     else groups.push({ type: "tools", key: `tools:${item.id || index}`, tools: [item] });
   });
