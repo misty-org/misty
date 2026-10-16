@@ -203,7 +203,8 @@ func (s *SpacesService) remoteScopeDevice(ctx context.Context, userID string, bo
 }
 
 // remoteScreenOpen handles screen_open with a browser session: on a device the
-// person picked, or on this computer when the agent did not name a place. The
+// person picked, or on this computer unless the agent asked for the person's own page
+// or other apps. The
 // device opens the agent's own tab, and the tab joins this run, so the agent
 // keeps working in the same run with browser tools from its next step instead
 // of handing off to a new run. It returns nil, nil when no session applies.
@@ -217,7 +218,9 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 	if err != nil {
 		return nil, err
 	}
-	target := sessionTarget(contexts, place == "" && !desktop)
+	// Only acting in the person's own page (current_tab) or other apps (desktop) hands off;
+	// a new tab or window becomes a tab of the agent's own, in this run.
+	target := sessionTarget(contexts, place != "current_tab" && !desktop)
 	if target == nil {
 		return nil, nil
 	}

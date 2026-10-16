@@ -91,7 +91,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   };
   let finishRefused = false;
   let citationRefused = false;
-  let persistenceRefused = false;
+  // Early give-ups refused so far, and the turn of the last refusal (src/persistence-check.ts).
+  let persistenceRefusals = 0;
+  let refusedAtTurn = -1;
   // Recomputed from the transcript before every model call.
   let visibleTools: string[] = [];
   let modelTurn = 0;
@@ -131,15 +133,17 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
             }
           }
-          // Refused once when it gives up early with room left (src/persistence-check.ts).
-        if (!persistenceRefused) {
-          const unfinished = earlyGiveUp(report, modelTurn, limit);
-          if (unfinished) {
-            persistenceRefused = true;
-            return { status: "failure", tool_error: { message: unfinished } };
+          // An early give-up with room left is sent back to work up to twice, the second
+          // time only after more work since the first (src/persistence-check.ts).
+          if (persistenceRefusals < 2 && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 2)) {
+            const unfinished = earlyGiveUp(report, modelTurn, limit);
+            if (unfinished) {
+              persistenceRefusals++;
+              refusedAtTurn = modelTurn;
+              return { status: "failure", tool_error: { message: unfinished } };
+            }
           }
-        }
-        if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
+          if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
           const refusal = unbackedCompletion(report, messages, catalog.readOnly);
           if (refusal) {
             finishRefused = true;

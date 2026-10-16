@@ -53,7 +53,8 @@ func (s *SpacesService) screenToolRegistrations(record *db.AIInvocationRecord) [
 				"If such a screen is already attached, use browser_act with its scopeId instead. With no target, and a url when you know "+
 				"the page, this opens your own browser tab in the background and keeps this run going: browser tools act on it from "+
 				"your next step. Call it again with another url to keep that page open in another tab of your own (up to 16), as when "+
-				"the person wants pages left open; for pages you only read, navigate a tab you have. A named target ends the current response; Misty opens that screen and continues this conversation "+
+				"the person wants pages left open; for pages you only read, navigate a tab you have. new_tab and window open such tabs too. "+
+				"current_tab and desktop end the current response; Misty opens that screen and continues this conversation "+
 				"with it attached. Do not ask the user where to work.",
 			map[string]any{"reason": reason,
 				"target": map[string]any{"type": "string", "enum": []string{"current_tab", "new_tab", "window", "desktop"}, "description": "Where to work. Omit for the user's preferred place for new screens."},

@@ -76,7 +76,7 @@ func TestTheAgentsOwnTabOpensOnThisComputerOnlyWhenNoPlaceWasNamed(t *testing.T)
 		t.Fatalf("own tab target = %#v", target)
 	}
 	if sessionTarget([]db.AIInvocationContext{own}, false) != nil {
-		t.Fatal("a named place still opened the agent's own tab")
+		t.Fatal("the person's own page still opened the agent's own tab")
 	}
 	if target := sessionTarget([]db.AIInvocationContext{own, picked}, true); target == nil || target.DeviceID != "mac-mini" {
 		t.Fatalf("a picked device lost to this computer: %#v", target)
