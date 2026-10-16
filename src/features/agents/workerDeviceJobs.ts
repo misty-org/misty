@@ -61,6 +61,9 @@ export function deviceWorkflowErrorCode(error: unknown): string {
   if (message.includes("invalid_device_scope") || message.includes("outside its device scope"))
     return "invalid_scope";
   if (message.includes("invalid_url")) return "invalid_url";
+  // web.fetch (web_fetch.rs)
+  for (const code of ["private_address", "fetch_timeout", "fetch_failed", "too_many_redirects"])
+    if (message.includes(code)) return code;
   if (message.includes("unsupported_device_operation")) return "unsupported_operation";
   if (message.includes("invalid_browser_grant") || message.includes("not active"))
     return "browser_grant_invalid";

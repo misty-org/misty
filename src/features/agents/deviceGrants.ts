@@ -14,7 +14,13 @@ const folderCapabilities = ["files.list", "files.read", "files.send"];
  * only, plus reading documents and sending files to the Space Library the way
  * read-only folders do. */
 export const projectCapabilities = [...folderCapabilities, "code.delegate"];
-const workspaceCapabilities = ["tabs.list", "tabs.open", "bookmarks.list", "bookmarks.add"];
+const workspaceCapabilities = [
+  "tabs.list",
+  "tabs.open",
+  "bookmarks.list",
+  "bookmarks.add",
+  "web.fetch",
+];
 /** On another device the agent may also open its own browser session there. */
 const remoteWorkspaceCapabilities = [...workspaceCapabilities, "browser.session"];
 

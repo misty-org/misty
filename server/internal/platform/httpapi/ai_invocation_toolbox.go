@@ -23,6 +23,8 @@ func (s *SpacesService) aiInvocationToolbox(ctx context.Context, record *db.AIIn
 	connected = append(connected, s.notebookToolRegistrations(record, body)...)
 	connected = append(connected, s.delegationToolRegistrations(record, body)...)
 	connected = append(connected, s.codeDelegationToolRegistrations(record, body, s.attachedProjects(ctx, record), collaboration)...)
+	// web.fetch from the attached device, or the isolated Worker without one.
+	connected = withWebFetch(connected)
 	toolbox, invocation, manifest, err := resolveAIInvocationSpaceToolbox(ctx, s.database, actor, prompt, connected...)
 	invocation.PermissionMode = body.PermissionMode
 	return toolbox, invocation, manifest, err

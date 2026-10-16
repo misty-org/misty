@@ -2,6 +2,7 @@ pub mod agent_dock;
 pub mod agent_projects;
 pub mod agent_workspace;
 pub mod agents;
+pub mod web_fetch;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;

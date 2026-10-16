@@ -9,6 +9,7 @@ import {
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
+import { readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
 /**
@@ -25,6 +26,7 @@ export const deviceAgentOperations = new Set([
   "tabs.open",
   "bookmarks.list",
   "bookmarks.add",
+  "web.fetch",
 ]);
 
 const readLimit = 20_000;
@@ -115,6 +117,25 @@ export async function runDeviceAgentOperation(
         .slice(0, 100)
         .map((item) => ({ id: item.id, title: item.title, url: item.url }));
       return { bookmarks: items };
+    }
+    case "web.fetch": {
+      // Fetched natively without cookies; the network checks live in web_fetch.rs.
+      const page = await invoke<{
+        finalUrl: string;
+        status: number;
+        contentType: string;
+        body: string;
+        truncated: boolean;
+      }>("agents_web_fetch", { url: webAddress(input.url) });
+      const question = typeof input.question === "string" ? input.question : "";
+      const readable = readablePage(page.body, page.contentType, question);
+      return {
+        url: page.finalUrl,
+        status: page.status,
+        title: readable.title,
+        text: readable.text,
+        truncated: readable.truncated || page.truncated,
+      };
     }
     case "bookmarks.add": {
       const url = webAddress(input.url);

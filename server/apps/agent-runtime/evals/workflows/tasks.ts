@@ -41,7 +41,6 @@ export function loadTasks(): WorkflowTask[] {
  */
 const today: Record<string, string | null> = {
   agent_tool_use: null, // phase 2
-  web_fetch: null, // phase 1
   memory_pref_update: "memory_update",
   memory_pref_list: "memory_list",
   attached_file_read: "attached_files_read",
