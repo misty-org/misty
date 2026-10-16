@@ -38,19 +38,20 @@ const familyWords: Record<Family, string> = {
 };
 
 /** The run's agent.tool and loaded families, read back from its own tool calls so a replayed run agrees. */
-export function toolState(messages: ModelMessage[], initial: Toolset = "answer"): { toolset: Toolset; loaded: Set<Family> } {
+export function toolState(messages: ModelMessage[], initial: Toolset = "answer"): { toolset: Toolset; loaded: Set<Family>; seen: boolean } {
   let toolset = initial;
+  let seen = false;
   const loaded = new Set<Family>();
   for (const message of messages) {
     if (message.role !== "assistant" || typeof message.content === "string") continue;
     for (const part of message.content) {
       if (part.type !== "tool-call") continue;
       const input = (part.input ?? {}) as { tool?: string; family?: string };
-      if (part.toolName === toolUseTool && input.tool && input.tool in toolsetWords) toolset = input.tool as Toolset;
-      if (part.toolName === toolLoadTool && input.family && input.family in familyWords) loaded.add(input.family as Family);
+      if (part.toolName === toolUseTool && input.tool && input.tool in toolsetWords) (toolset = input.tool as Toolset), (seen = true);
+      if (part.toolName === toolLoadTool && input.family && input.family in familyWords) loaded.add(input.family as Family), (seen = true);
     }
   }
-  return { toolset, loaded };
+  return { toolset, loaded, seen };
 }
 
 export function agentTools(catalog: ModelCatalog) {

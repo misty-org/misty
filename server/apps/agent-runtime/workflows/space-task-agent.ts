@@ -5,7 +5,8 @@ import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
 import { FatalError, getWorkflowMetadata } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
 import { summarizeOlderSteps } from "../src/compaction-step.js";
-import { applyCompaction, CLEAR_AT, clearOldToolResults, COMPACT_AT, contextWindow, estimateInputTokens, messageBytes, planCompaction } from "../src/context-compaction.js";
+import { contextWindow, messageBytes } from "../src/context-compaction.js";
+import { condense, oldToolResults, staleCodeResults, staleSnapshots, summarizedSteps } from "../src/condenser.js";
 import type { RuntimeIdentity } from "../src/control-plane.js";
 import { activateRuntime, admitModelTurn, checkpoint, complete, fetchContext, fetchExecutionBudget, takeSteering } from "../src/control-plane-steps.js";
 import { MISTY_HARNESS_VERSION, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
@@ -13,8 +14,7 @@ import { InstanceModel } from "../src/instance-model.js";
 import { discoverRemoteMCPTools } from "../src/mcp-runtime.js";
 import { accumulateModelUsage, modelTimeout, modelTurnLimit } from "../src/model-budget.js";
 import { initialMessages } from "../src/model-input.js";
-import { pruneStalePageSnapshots, withCacheBreakpoint } from "../src/prompt-cache.js";
-import { pruneStaleCodeResults } from "../src/code-context.js";
+import { withCacheBreakpoint } from "../src/prompt-cache.js";
 import { runBrowserReplay, validReplay } from "../src/browser-replay.js";
 import { catalogTools, modelCatalog } from "../src/model-tools.js";
 import { classifyRuntimeError } from "../src/runtime-errors.js";
@@ -197,38 +197,18 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     let compactions = 0;
     // Keeps the next call inside the model's window: clear old tool results
     // first, then summarize older steps (see src/context-compaction.ts).
-    const manageContext = async () => {
-      // Stale page snapshots go first, in batches that keep most turns cached.
-      const pruned = pruneStalePageSnapshots(messages);
-      if (pruned.dropped) messages = pruned.messages;
-      // So do superseded file reads and old command output in code projects.
-      const code = pruneStaleCodeResults(messages);
-      if (code.dropped) messages = code.messages;
-      let estimate = lastInputTokens > 0 ? estimateInputTokens(lastInputTokens, lastSentBytes, messages) : messageBytes(messages) / 4;
-      if (estimate > window * CLEAR_AT) {
-        const before = messageBytes(messages);
-        const cleared = clearOldToolResults(messages);
-        if (cleared.cleared) {
-          messages = cleared.messages;
-          estimate *= messageBytes(messages) / before;
-        }
-      }
-      if (estimate <= window * COMPACT_AT) return;
-      const plan = planCompaction(messages);
-      if (!plan) return;
-      try {
-        const summary = await summarizeOlderSteps(identity, context.model_id, plan.older, window, ++compactions);
-        messages = applyCompaction(plan, summary);
-      } catch (error) {
-        // A failed summary leaves the transcript as it was; the step may still fit.
-        console.error("[misty-agent-runtime] context compaction failed", error);
-      }
-    };
+    // Keeps the next call inside the model's window (src/condenser.ts).
+    const condensers = [staleSnapshots, staleCodeResults, oldToolResults,
+      summarizedSteps((older) => summarizeOlderSteps(identity, context.model_id, older, window, ++compactions))];
+    // agent.tool survives a summary that drops the calls that chose it.
+    let toolsetState = toolState(messages, toolsets.initial);
     for (; modelTurn < limit; modelTurn++) {
       const steering = await takeSteering(identity, `${modelTurn}:before`, false);
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
-      await manageContext();
-      visibleTools = toolsets.visible(toolNames, toolState(messages, toolsets.initial));
+      messages = await condense(messages, { inputTokens: lastInputTokens, sentBytes: lastSentBytes, window }, condensers);
+      const observed = toolState(messages, toolsets.initial);
+      if (observed.seen || !toolsetState.seen) toolsetState = observed;
+      visibleTools = toolsets.visible(toolNames, toolsetState);
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
       // Admission (billing's hold for this turn) happens before the model call and
