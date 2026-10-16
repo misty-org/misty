@@ -65,7 +65,7 @@ fn device_record_fixture() {
         requester_device_id: device.into(),
         target_device_id: target.into(),
         agent_id: String::new(),
-        capabilities: vec!["files.list".into(), "files.read".into()],
+        capabilities: vec!["folder.list".into(), "folder.read".into()],
         scopes: vec!["scope-1".into()],
         issued_at: ISSUED_AT,
         expires_at: ISSUED_AT + 3600,

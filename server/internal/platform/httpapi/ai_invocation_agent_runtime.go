@@ -145,7 +145,7 @@ func (s *SpacesService) agentRuntimeToolAIInvocation(w http.ResponseWriter, r *h
 }
 
 func runtimeToolStatus(name string) string {
-	if name == "misty_finish_task" || name == "misty.finish.task" {
+	if name == "agent_finish" || name == "agent.finish" {
 		return "Finishing task…"
 	}
 	label := strings.ReplaceAll(strings.TrimSpace(name), "_", " ")

@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	toolboxMemoryRemember = "memory.remember"
-	toolboxMemoryForget   = "memory.forget"
+	toolboxMemoryRemember = "memory.pref.remember"
+	toolboxMemoryForget   = "memory.pref.forget"
 )
 
 func memoryAgentToolDescriptors() []agenttools.Descriptor {
 	return []agenttools.Descriptor{
-		{Name: "memory.list", Version: 1, Description: "Review this agent's account-wide remembered preferences.", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources},
-		{Name: "memory.update", Version: 1, Description: "Correct a durable preference only when the user explicitly asks to change what is remembered. Preserve the existing scope. Use the memory ID from memory_list.", Risk: serveragent.RiskWrite, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "required": []string{"memoryId", "content"}, "properties": map[string]any{"memoryId": map[string]any{"type": "string", "maxLength": 200}, "content": map[string]any{"type": "string", "minLength": 1, "maxLength": 1000}}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalExplicitIntent, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources, AuditEvent: "misty.memory.updated"},
+		{Name: "memory.pref.list", Version: 1, Description: "Review this agent's account-wide remembered preferences.", Risk: serveragent.RiskRead, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources},
+		{Name: "memory.pref.update", Version: 1, Description: "Correct a durable preference only when the user explicitly asks to change what is remembered. Preserve the existing scope. Use the memory ID from memory_pref_list.", Risk: serveragent.RiskWrite, InputSchema: TestingMustAPIRawJSON(map[string]any{"type": "object", "required": []string{"memoryId", "content"}, "properties": map[string]any{"memoryId": map[string]any{"type": "string", "maxLength": 200}, "content": map[string]any{"type": "string", "minLength": 1, "maxLength": 1000}}, "additionalProperties": false}), OutputSchema: agentToolObjectOutputSchema(), Approval: agenttools.ApprovalExplicitIntent, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources, AuditEvent: "misty.memory.updated"},
 		{
 			Name: toolboxMemoryRemember, Version: 1,
 			Description: "Remember a concise fact, preference, or standing instruction only when the user explicitly asks Misty to remember it. Never store credentials, secrets, financial identifiers, health records, or inferred sensitive traits.",
@@ -54,13 +54,13 @@ func memoryAgentToolDescriptors() []agenttools.Descriptor {
 }
 
 func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor spaceConversationToolActor, tool serveragent.ToolRequest) (json.RawMessage, bool, error) {
-	if tool.Name != toolboxMemoryRemember && tool.Name != toolboxMemoryForget && tool.Name != "memory.list" && tool.Name != "memory.update" {
+	if tool.Name != toolboxMemoryRemember && tool.Name != toolboxMemoryForget && tool.Name != "memory.pref.list" && tool.Name != "memory.pref.update" {
 		return nil, false, nil
 	}
 	if database == nil {
 		return nil, true, workflowv2.ErrCapabilityDenied
 	}
-	if tool.Name == "memory.list" {
+	if tool.Name == "memory.pref.list" {
 		items, err := database.MistyMemories(ctx, actor.userID, actor.spaceID, 100, actor.agentID)
 		if err != nil {
 			return nil, true, err
@@ -68,7 +68,7 @@ func executeAgentMemoryTool(ctx context.Context, database *db.Database, actor sp
 		result, err := json.Marshal(map[string]any{"memories": items})
 		return result, true, err
 	}
-	if tool.Name == "memory.update" {
+	if tool.Name == "memory.pref.update" {
 		var input struct {
 			MemoryID string `json:"memoryId"`
 			Content  string `json:"content"`

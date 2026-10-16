@@ -31,7 +31,7 @@ func agentToolboxExecutionJournal(database *db.Database) agenttools.ExecutionMid
 			defer cancel()
 			return next(executionCtx, invocation, request)
 		}
-		// MCP and apps.execute own their journals with encrypted replay results,
+		// MCP and integration.execute own their journals with encrypted replay results,
 		// and routed tools journal inside their Space. An outer journal would
 		// duplicate the effect.
 		if descriptor.Name == appsExecuteTool || descriptor.Locality == agenttools.LocalityRouted {

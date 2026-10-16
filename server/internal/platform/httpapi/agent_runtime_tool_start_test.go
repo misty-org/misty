@@ -14,7 +14,7 @@ func TestOnlyReadsAreAnnouncedOnArrival(t *testing.T) {
 		t.Fatal("a read must be announced when it arrives")
 	}
 	for _, risk := range []string{serveragent.RiskWrite, serveragent.RiskDangerous} {
-		if announcesToolStart(agenttools.Descriptor{Name: "notes.update", Risk: risk}) {
+		if announcesToolStart(agenttools.Descriptor{Name: "note.update", Risk: risk}) {
 			t.Fatalf("a %s tool keeps its runtime start checkpoint", risk)
 		}
 	}

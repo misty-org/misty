@@ -19,13 +19,13 @@ import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
  * tabs are never listed.
  */
 export const deviceAgentOperations = new Set([
-  "files.list",
-  "files.read",
-  "files.send",
-  "tabs.list",
-  "tabs.open",
-  "bookmarks.list",
-  "bookmarks.add",
+  "folder.list",
+  "folder.read",
+  "folder.send",
+  "browser.tab.list",
+  "browser.tab.open",
+  "bookmark.list",
+  "bookmark.add",
   "web.fetch",
 ]);
 
@@ -63,7 +63,7 @@ export async function runDeviceAgentOperation(
 ): Promise<Record<string, unknown>> {
   const input = record(job.input);
   switch (job.operation) {
-    case "files.send": {
+    case "folder.send": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
       if (!job.spaceId) throw new Error("no_space");
@@ -74,11 +74,11 @@ export async function runDeviceAgentOperation(
       const uploaded = await uploadLibraryBlob(job.spaceId, new Blob([bytes]), name);
       return { name, size: bytes.byteLength, libraryItemId: uploaded.item?.id ?? null };
     }
-    case "files.list":
+    case "folder.list":
       return invoke<Record<string, unknown>>("agents_list_scoped_files", {
         request: scopedPath(job),
       });
-    case "files.read": {
+    case "folder.read": {
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
       const document = await agentsPrepareScopedDocument(target, signal);
@@ -87,7 +87,7 @@ export async function runDeviceAgentOperation(
       text = text.slice(0, readLimit);
       return { name: document.displayName, mimeType: document.mimeType, text, truncated };
     }
-    case "tabs.list": {
+    case "browser.tab.list": {
       const tabs: Array<{ id: string; title: string; url: string }> = [];
       const seen = new Set<string>();
       mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (view) => {
@@ -100,12 +100,12 @@ export async function runDeviceAgentOperation(
       });
       return { tabs: tabs.slice(0, 200) };
     }
-    case "tabs.open": {
+    case "browser.tab.open": {
       const url = webAddress(input.url);
       const view = useWorkspaceStore.getState().openBrowserView({ url });
       return { opened: url, tabId: view.id };
     }
-    case "bookmarks.list": {
+    case "bookmark.list": {
       const query = typeof input.query === "string" ? input.query.trim().toLowerCase() : "";
       const items = bookmarks(useWorkspaceStore.getState().bookmarks)
         .filter(
@@ -137,7 +137,7 @@ export async function runDeviceAgentOperation(
         truncated: readable.truncated || page.truncated,
       };
     }
-    case "bookmarks.add": {
+    case "bookmark.add": {
       const url = webAddress(input.url);
       const title = typeof input.title === "string" ? input.title : "";
       return { bookmarkId: saveBookmark({ url, title }), url };

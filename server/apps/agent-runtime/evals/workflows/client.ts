@@ -92,7 +92,7 @@ export class EvalClient {
           run.events.push(event.type);
           if (event.type === "response.delta") run.answer += String(event.delta ?? "");
           if (event.type === "assistant.message") run.answer = String(event.text ?? run.answer);
-          // Started events carry catalog names (notes.search); the model sees underscores.
+          // Started events carry catalog names (note.search); the model sees underscores.
           if (event.type === "tool.started") run.tools.push(String(event.toolName).replace(/\./g, "_"));
           if (event.type === "screen.request") {
             const request = event.screenRequest as { kind?: string } | undefined;

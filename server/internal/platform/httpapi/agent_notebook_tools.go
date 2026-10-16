@@ -18,8 +18,8 @@ import (
 // shows in the conversation and is mirrored to a note in the personal Space.
 
 const (
-	toolboxNotebookRead  = "notebook.read"
-	toolboxNotebookWrite = "notebook.write"
+	toolboxNotebookRead  = "log.work.read"
+	toolboxNotebookWrite = "log.work.write"
 )
 
 type aiNotebookEvent struct {

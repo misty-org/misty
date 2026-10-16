@@ -88,7 +88,7 @@ func messagesSendToolDescriptor() agenttools.Descriptor {
 			"type": "object", "properties": map[string]any{
 				"message":         map[string]any{"type": "string", "maxLength": db.MaxMessageChars},
 				"audience":        map[string]any{"type": "string", "enum": []string{"auto", "private", "space"}, "default": "auto"},
-				"recipientUserId": map[string]any{"type": "string", "description": "Stable user ID from members_resolve for the intended individual recipient."},
+				"recipientUserId": map[string]any{"type": "string", "description": "Stable user ID from space_member_resolve for the intended individual recipient."},
 			}, "required": []string{"message"},
 		}),
 		OutputSchema: agentToolObjectOutputSchema(), RequiredPermission: db.PermissionMessagesWrite,
@@ -142,7 +142,7 @@ func tasksUpdateToolDescriptor() agenttools.Descriptor {
 
 func calendarQueryToolDescriptor() agenttools.Descriptor {
 	return agenttools.Descriptor{
-		Name: "calendar.query", Version: 1, Description: "Query the current Space calendar.",
+		Name: "event.query", Version: 1, Description: "Query the current Space calendar.",
 		Risk: serveragent.RiskRead, InputSchema: taskAgentToolSchema(false), OutputSchema: agentToolObjectOutputSchema(), RequiredPermission: db.PermissionTasksView,
 		AgentPermission: db.PermissionTasksView, AllowCustomAgent: true, Approval: agenttools.ApprovalNone, Locality: agenttools.LocalityServer, Idempotent: true, Sources: agentToolboxSpaceSources,
 	}

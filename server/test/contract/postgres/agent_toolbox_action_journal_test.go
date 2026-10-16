@@ -18,7 +18,7 @@ func TestAgentEffectClaimIsExclusiveAcrossWorkers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	action := AgentToolboxAction{IdempotencyKey: "same-logical-send", UserID: user.ID, ToolName: "messages.send", Risk: "write", AuditEvent: "message.sent", Source: "test", Request: json.RawMessage(`{"text":"hello"}`)}
+	action := AgentToolboxAction{IdempotencyKey: "same-logical-send", UserID: user.ID, ToolName: "message.send", Risk: "write", AuditEvent: "message.sent", Source: "test", Request: json.RawMessage(`{"text":"hello"}`)}
 	entered, release, finished := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 	go func() {
 		_, err := database.JournalAgentToolboxAction(ctx, action, func() (json.RawMessage, error) {
@@ -61,7 +61,7 @@ func TestAgentToolboxActionJournalReplaysSuccessAndRetriesOnlyReads(t *testing.T
 
 	action := AgentToolboxAction{
 		IdempotencyKey: "contract-toolbox-success", UserID: user.ID, SessionID: "session-1",
-		ToolName: "tasks.update", AuditEvent: "task.updated", Risk: "write", Source: "contract",
+		ToolName: "task.update", AuditEvent: "task.updated", Risk: "write", Source: "contract",
 		Request: json.RawMessage(`{"task_id":"task-1"}`),
 	}
 	executions := 0
@@ -111,7 +111,7 @@ func TestAgentToolboxActionJournalNeverRetriesUncertainWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	action := AgentToolboxAction{IdempotencyKey: "uncertain-send", UserID: user.ID, ToolName: "messages.send", AuditEvent: "message.sent", Risk: "write", Source: "contract", Request: json.RawMessage(`{"body":"hello"}`)}
+	action := AgentToolboxAction{IdempotencyKey: "uncertain-send", UserID: user.ID, ToolName: "message.send", AuditEvent: "message.sent", Risk: "write", Source: "contract", Request: json.RawMessage(`{"body":"hello"}`)}
 	calls := 0
 	execute := func() (json.RawMessage, error) { calls++; return nil, errors.New("response lost after send") }
 	for range 2 {

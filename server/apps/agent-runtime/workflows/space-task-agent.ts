@@ -35,9 +35,9 @@ export interface SpaceTaskWorkflowInput {
 /**
  * One durable agent run. The model sees every tool in the run's catalog under
  * its real name; Misty's gateway authorizes, journals and executes each call.
- * The model reports the outcome with misty_finish_task.
+ * The model reports the outcome with agent_finish.
  */
-const usageWrapUpInstruction = "Usage note from Misty: this account just reached an AI usage limit, so this task has only a little room left. Finish now in as few steps as possible. If the task cannot be completed, call misty_finish_task and report exactly what is done and what remains.";
+const usageWrapUpInstruction = "Usage note from Misty: this account just reached an AI usage limit, so this task has only a little room left. Finish now in as few steps as possible. If the task cannot be completed, call agent_finish and report exactly what is done and what remains.";
 
 export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   "use workflow";
@@ -280,7 +280,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   const text = finalText(result.steps);
   // A run that took no actions and answered in text (a greeting, or a question
   // answered directly) is a reply, with nothing to confirm. Any run that acted
-  // must still confirm its outcome with misty_finish_task.
+  // must still confirm its outcome with agent_finish.
   const acted = result.steps.some((step) => step.content.some((part) => part.type.startsWith("tool-")));
   if (!explaining && !taskReport && !acted && text) return await finish({ status: "success", text });
   if (!explaining) {

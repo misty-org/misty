@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	toolboxRoadmapsQuery  = "roadmaps.query"
-	toolboxRoadmapsRead   = "roadmaps.read"
-	toolboxRoadmapsCreate = "roadmaps.create"
-	toolboxRoadmapsUpdate = "roadmaps.update"
+	toolboxRoadmapsQuery  = "roadmap.query"
+	toolboxRoadmapsRead   = "roadmap.read"
+	toolboxRoadmapsCreate = "roadmap.create"
+	toolboxRoadmapsUpdate = "roadmap.update"
 )
 
 func roadmapAgentToolDescriptors() []agenttools.Descriptor {

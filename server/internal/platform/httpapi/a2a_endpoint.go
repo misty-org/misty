@@ -16,7 +16,7 @@ import (
 // The A2A endpoint lets a member's own agent talk to another member's agent
 // in a Space they share. Callers authenticate as one of their agents
 // (see a2a_auth.go). It speaks A2A's JSON-RPC methods and sends every message
-// through the same request service as agents_request, so consent, approval,
+// through the same request service as agent_request, so consent, approval,
 // billing and limits are identical.
 const a2aProtocolVersion = "0.3.0"
 

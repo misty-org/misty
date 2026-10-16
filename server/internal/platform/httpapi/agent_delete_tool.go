@@ -11,10 +11,10 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// items.delete is the one delete tool for Misty items. Deleting asks first
+// item.delete is the one delete tool for Misty items. Deleting asks first
 // when the account asks first, and every delete re-checks the item's own
 // permissions in the database.
-const itemsDeleteTool = "items.delete"
+const itemsDeleteTool = "item.delete"
 
 func (s *SpacesService) deleteToolRegistration() agenttools.Registration {
 	return agenttools.Registration{

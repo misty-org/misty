@@ -82,26 +82,26 @@ const signal = new AbortController().signal;
 beforeEach(() => vi.clearAllMocks());
 
 it("lists only shared, non-private browser tabs once each", async () => {
-  expect(await runDeviceAgentOperation(job("tabs.list", {}), signal)).toEqual({
+  expect(await runDeviceAgentOperation(job("browser.tab.list", {}), signal)).toEqual({
     tabs: [{ id: "a", title: "Docs", url: "https://docs.example.com" }],
   });
 });
 
 it("opens and bookmarks only web addresses", async () => {
-  await runDeviceAgentOperation(job("tabs.open", { url: "https://misty.app" }), signal);
+  await runDeviceAgentOperation(job("browser.tab.open", { url: "https://misty.app" }), signal);
   expect(openBrowserView).toHaveBeenCalledWith({ url: "https://misty.app" });
   await expect(
-    runDeviceAgentOperation(job("tabs.open", { url: "file:///etc/passwd" }), signal),
+    runDeviceAgentOperation(job("browser.tab.open", { url: "file:///etc/passwd" }), signal),
   ).rejects.toThrow("invalid_url");
   await runDeviceAgentOperation(
-    job("bookmarks.add", { url: "https://misty.app", title: "Misty" }),
+    job("bookmark.add", { url: "https://misty.app", title: "Misty" }),
     signal,
   );
   expect(saveBookmark).toHaveBeenCalledWith({ url: "https://misty.app", title: "Misty" });
 });
 
 it("searches bookmarks by title or address", async () => {
-  expect(await runDeviceAgentOperation(job("bookmarks.list", { query: "docs" }), signal)).toEqual({
+  expect(await runDeviceAgentOperation(job("bookmark.list", { query: "docs" }), signal)).toEqual({
     bookmarks: [{ id: "b1", title: "Misty docs", url: "https://misty.app/docs" }],
   });
 });
@@ -109,7 +109,7 @@ it("searches bookmarks by title or address", async () => {
 it("keeps folder jobs inside the granted folder", async () => {
   invoke.mockResolvedValue({ entries: [] });
   await runDeviceAgentOperation(
-    job("files.list", { scopeId: "scope_reports", relativePath: "Q3" }),
+    job("folder.list", { scopeId: "scope_reports", relativePath: "Q3" }),
     signal,
   );
   expect(invoke).toHaveBeenCalledWith("agents_list_scoped_files", {
@@ -117,19 +117,19 @@ it("keeps folder jobs inside the granted folder", async () => {
   });
   await expect(
     runDeviceAgentOperation(
-      job("files.list", { scopeId: "scope_other", relativePath: "" }),
+      job("folder.list", { scopeId: "scope_other", relativePath: "" }),
       signal,
     ),
   ).rejects.toThrow("invalid_device_scope");
   await expect(
     runDeviceAgentOperation(
-      job("files.read", { scopeId: "scope_reports", relativePath: "../x" }),
+      job("folder.read", { scopeId: "scope_reports", relativePath: "../x" }),
       signal,
     ),
   ).rejects.toThrow("invalid_device_scope");
   expect(
     await runDeviceAgentOperation(
-      job("files.read", { scopeId: "scope_reports", relativePath: "q3.txt" }),
+      job("folder.read", { scopeId: "scope_reports", relativePath: "q3.txt" }),
       signal,
     ),
   ).toMatchObject({ name: "q3.txt", text: "Revenue grew" });
@@ -140,7 +140,7 @@ it("sends a shared file to the conversation's Space Library", async () => {
   readSharedFile.mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
   uploadLibraryBlob.mockResolvedValue({ item: { id: "item_1" } });
   expect(
-    await runDeviceAgentOperation(job("files.send", input, "scope_reports", "space_1"), signal),
+    await runDeviceAgentOperation(job("folder.send", input, "scope_reports", "space_1"), signal),
   ).toEqual({ name: "report.pdf", size: 3, libraryItemId: "item_1" });
   expect(readSharedFile).toHaveBeenCalledWith("scope_reports", input, {});
   expect(uploadLibraryBlob).toHaveBeenCalledWith("space_1", expect.any(Blob), "report.pdf");
@@ -149,7 +149,7 @@ it("sends a shared file to the conversation's Space Library", async () => {
 it("needs a Space to send a file to", async () => {
   await expect(
     runDeviceAgentOperation(
-      job("files.send", { scopeId: "scope_reports", relativePath: "report.pdf" }),
+      job("folder.send", { scopeId: "scope_reports", relativePath: "report.pdf" }),
       signal,
     ),
   ).rejects.toThrow("no_space");

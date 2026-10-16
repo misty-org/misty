@@ -12,11 +12,11 @@ import (
 
 // Composio's guidance names its own meta tools; the model knows Misty's.
 var appsGuidanceNames = strings.NewReplacer(
-	"COMPOSIO_MULTI_EXECUTE_TOOL", "apps_execute",
-	"COMPOSIO_GET_TOOL_SCHEMAS", "apps_schemas",
-	"COMPOSIO_MANAGE_CONNECTIONS", "apps_connect",
-	"COMPOSIO_WAIT_FOR_CONNECTIONS", "apps_connect",
-	"COMPOSIO_SEARCH_TOOLS", "apps_search",
+	"COMPOSIO_MULTI_EXECUTE_TOOL", "integration_execute",
+	"COMPOSIO_GET_TOOL_SCHEMAS", "integration_schemas",
+	"COMPOSIO_MANAGE_CONNECTIONS", "integration_connect",
+	"COMPOSIO_WAIT_FOR_CONNECTIONS", "integration_connect",
+	"COMPOSIO_SEARCH_TOOLS", "integration_search",
 	"COMPOSIO_REMOTE_WORKBENCH", "the code sandbox (unavailable in Misty)",
 	"COMPOSIO_REMOTE_BASH_TOOL", "the code sandbox (unavailable in Misty)",
 )
@@ -84,7 +84,7 @@ func appsSearchView(result composio.SearchResult, searchApps searchAppPolicy) ma
 			tool["input_schema"] = schema.InputSchema
 			budget -= len(schema.InputSchema)
 		} else {
-			tool["input_schema"] = "Call apps_schemas for this tool's input schema."
+			tool["input_schema"] = "Call integration_schemas for this tool's input schema."
 		}
 		tools[slug] = tool
 	}

@@ -81,7 +81,7 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
   it("phase 1: finds the two latest notes across spaces", async () => {
     const run = await ask("phase1-latest-notes", "find my two latest notes across spaces");
     expect(run.terminal).toBe("invocation.completed");
-    expect(ran(run, "notes_search")).toBe(true);
+    expect(ran(run, "note_search")).toBe(true);
     for (const title of seeded.latest) expect(run.text).toContain(title);
     expect(run.text).not.toMatch(refusal);
   });
@@ -91,28 +91,28 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
       "phase1-read-note",
       "Open my note Launch checklist and tell me what it says.",
     );
-    expect(ran(read, "notes_read", "notes_search")).toBe(true);
+    expect(ran(read, "note_read", "note_search")).toBe(true);
     const run = await ask(
       "phase1-update-note",
       "update the note I just read: add a line saying Book the venue.",
       { conversation_id: read.conversationId },
     );
     expect(run.terminal).toBe("invocation.completed");
-    expect(ran(run, "notes_update")).toBe(true);
+    expect(ran(run, "note_update")).toBe(true);
     expect(run.text).not.toMatch(refusal);
   });
 
   it("phase 1: tells the team without word-overlap checks", async () => {
     const run = await ask("phase1-tell-team", "tell the team the launch moved to Friday");
     expect(run.terminal).toBe("invocation.completed");
-    expect(ran(run, "messages_send") || has(run, "approval.required")).toBe(true);
+    expect(ran(run, "message_send") || has(run, "approval.required")).toBe(true);
     expect(run.text).not.toMatch(refusal);
   });
 
   it("phase 2: reaches Gmail through Composio, with a connect card when needed", async () => {
     const run = await ask("phase2-gmail", "just tell me what emails I missed");
     expect(run.terminal).toBe("invocation.completed");
-    expect(has(run, "app.request") || ran(run, "apps_execute")).toBe(true);
+    expect(has(run, "app.request") || ran(run, "integration_execute")).toBe(true);
   });
 
   it("phase 2: the Google Drive request uses notes and Composio Drive", async () => {
@@ -121,8 +121,8 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
       'check spaces, gather my two latest notes and upload them to my google drive and move them to a folder called "misty space notes"',
     );
     expect(run.terminal).toBe("invocation.completed");
-    expect(ran(run, "notes_search", "notes_read")).toBe(true);
-    expect(has(run, "app.request") || ran(run, "apps_execute")).toBe(true);
+    expect(ran(run, "note_search", "note_read")).toBe(true);
+    expect(has(run, "app.request") || ran(run, "integration_execute")).toBe(true);
   });
 
   it("phase 2–3: researches with Composio or a screen, never a refusal", async () => {
@@ -133,7 +133,7 @@ describe.skipIf(!liveAcceptanceEnabled)("acceptance prompts on the local server"
     expect(
       has(run, "screen.request") ||
         has(run, "app.request") ||
-        ran(run, "apps_execute", "apps_search"),
+        ran(run, "integration_execute", "integration_search"),
     ).toBe(true);
     expect(run.text).not.toMatch(refusal);
   });

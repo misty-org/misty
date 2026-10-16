@@ -12,7 +12,7 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// roadmaps.plan edits a roadmap's milestones and goals in one tool. Each
+// roadmap.plan edits a roadmap's milestones and goals in one tool. Each
 // change reads the roadmap's current graph version first, so it never
 // overwrites a newer edit.
 func roadmapPlanToolRegistration(database *db.Database) agenttools.Registration {
@@ -21,11 +21,11 @@ func roadmapPlanToolRegistration(database *db.Database) agenttools.Registration 
 	}
 	return agenttools.Registration{
 		Descriptor: agenttools.Descriptor{
-			Name: "roadmaps.plan", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
+			Name: "roadmap.plan", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
 			Description: "Edit a roadmap's milestones and goals in the current Space. Actions: add_milestone (roadmap_id, title), " +
 				"update_milestone (roadmap_id, milestone_id), archive_milestone, add_goal (roadmap_id, milestone_id, title), " +
 				"update_goal (roadmap_id, goal_id; done marks it complete), archive_goal, set_goal_tasks (roadmap_id, goal_id, task_ids). " +
-				"Read the roadmap first with roadmaps_read for ids.",
+				"Read the roadmap first with roadmap_read for ids.",
 			InputSchema: agentToolSchema(map[string]any{
 				"action":       map[string]any{"type": "string", "enum": []string{"add_milestone", "update_milestone", "archive_milestone", "add_goal", "update_goal", "archive_goal", "set_goal_tasks"}},
 				"roadmap_id":   text(200),

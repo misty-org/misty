@@ -211,7 +211,7 @@ export class MistyClient {
             event.type === "tool.failed"
           )
             run.tools.push({
-              // Started events carry catalog names (notes.search), others model names.
+              // Started events carry catalog names (note.search), others model names.
               name: String(event.toolName).replace(/\./g, "_"),
               outcome: event.type.slice(5) as "completed" | "failed" | "started",
             });

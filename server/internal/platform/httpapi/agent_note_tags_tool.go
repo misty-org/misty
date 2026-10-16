@@ -10,11 +10,11 @@ import (
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// notes.tags sets a note's shared tags, the ones everyone in the Space sees.
+// note.tag sets a note's shared tags, the ones everyone in the Space sees.
 func noteTagsToolRegistration(database *db.Database) agenttools.Registration {
 	return agenttools.Registration{
 		Descriptor: agenttools.Descriptor{
-			Name: "notes.tags", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
+			Name: "note.tag", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
 			Description: "Replace a note's shared tags in the current Space. Pass the full list; an empty list clears them.",
 			InputSchema: agentToolSchema(map[string]any{
 				"id":   map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
@@ -33,7 +33,7 @@ func noteTagsToolRegistration(database *db.Database) agenttools.Registration {
 			}
 			note, err := database.SpaceNoteByID(ctx, invocation.UserID, strings.TrimSpace(input.ID))
 			if err != nil || note.SpaceID != invocation.SpaceID {
-				return nil, serveragent.ErrInvalidRequest("no note " + input.ID + " in this Space; call notes_search")
+				return nil, serveragent.ErrInvalidRequest("no note " + input.ID + " in this Space; call note_search")
 			}
 			if err := database.UpdateNoteSharedTags(ctx, invocation.UserID, note.ID, input.Tags); err != nil {
 				return nil, serveragent.ErrInvalidRequest("those tags could not be saved; you may not be able to edit this note")

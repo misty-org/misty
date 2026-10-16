@@ -49,7 +49,7 @@ func resolveAIInvocationSpaceToolbox(ctx context.Context, database *db.Database,
 	for _, registration := range connected {
 		subagents = subagents || registration.Descriptor.Name == toolboxAgentsDelegateTasks
 	}
-	// agents_delegate replaces the older background worker where it is offered.
+	// agent_delegate replaces the older background worker where it is offered.
 	if actor.agentID == "" && !subagents {
 		options.delegation = func(ctx context.Context, invocation agenttools.Invocation, request serveragent.ToolRequest) (json.RawMessage, error) {
 			var input struct {

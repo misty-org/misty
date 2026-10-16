@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	toolboxCalendarCreate = "calendar.create"
-	toolboxCalendarUpdate = "calendar.update"
+	toolboxCalendarCreate = "event.create"
+	toolboxCalendarUpdate = "event.update"
 )
 
 func calendarWriteToolDescriptors() []agenttools.Descriptor {

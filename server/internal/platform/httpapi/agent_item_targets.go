@@ -86,12 +86,12 @@ func spaceThread(ctx context.Context, database *db.Database, userID, spaceID, id
 	return nil, db.ErrSpaceNotFound
 }
 
-// items.rename renames a drawing or a thread; other kinds rename through
+// item.rename renames a drawing or a thread; other kinds rename through
 // their own update tools.
 func (s *SpacesService) renameToolRegistration() agenttools.Registration {
 	return agenttools.Registration{
 		Descriptor: agenttools.Descriptor{
-			Name: "items.rename", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
+			Name: "item.rename", Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
 			Description: "Rename a drawing or a thread. Threads also need their Space. Notes, tasks, roadmaps and albums rename through their own update tools.",
 			InputSchema: agentToolSchema(map[string]any{
 				"kind":  map[string]any{"type": "string", "enum": []string{"drawing", "thread"}},

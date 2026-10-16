@@ -42,7 +42,7 @@ func TestScreenToolsAreOfferedOnlyToDesktopAgentRuns(t *testing.T) {
 }
 
 func TestScreenGuidanceOffersOnDemandScreensInsteadOfAModeChoice(t *testing.T) {
-	desktop := agentCapabilityGuidance([]string{"spaces.list", "screen.open", "screen.look"}, false)
+	desktop := agentCapabilityGuidance([]string{"space.list", "screen.open", "screen.look"}, false)
 	if !strings.Contains(desktop, "call screen_open") || !strings.Contains(desktop, "call screen_look") {
 		t.Fatal(desktop)
 	}
@@ -50,7 +50,7 @@ func TestScreenGuidanceOffersOnDemandScreensInsteadOfAModeChoice(t *testing.T) {
 	if strings.Contains(attached, "screen_open") || !strings.Contains(attached, "screen_look") {
 		t.Fatal(attached)
 	}
-	for _, guidance := range []string{desktop, attached, agentCapabilityGuidance([]string{"spaces.list"}, false)} {
+	for _, guidance := range []string{desktop, attached, agentCapabilityGuidance([]string{"space.list"}, false)} {
 		if strings.Contains(guidance, "above the composer") || strings.Contains(guidance, "Separate Misty window") {
 			t.Fatal("guidance still asks the user to pick a mode")
 		}

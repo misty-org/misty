@@ -12,7 +12,7 @@ import (
 
 // collaborationChecklist publishes the run's live checklist. plan.update is an
 // alias that also records progress on the approved plan.
-const collaborationChecklist = "checklist.update"
+const collaborationChecklist = "log.work.checklist"
 
 // checklistToolRegistrations offers the checklist to every turn outside Plan,
 // including delegated runs, whose checklist nests under their parent's.

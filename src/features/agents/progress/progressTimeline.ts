@@ -140,10 +140,43 @@ const gitPhrases: Record<string, [running: string, done: string, subject: string
   pull_request: ["Opening", "Opened", "a pull request"],
 };
 
+/**
+ * The app's words for what a tool acts on. Tools carry the agent's own names
+ * (docs/plans/agent-harness.md, Agent vocabulary); people see the UI's labels.
+ */
+const uiSubjects: Record<string, string> = {
+  "memory.history": "history",
+  "memory.pref": "memory",
+  "memory.workflow": "workflows",
+  "log.work": "notebook",
+  file: "Library",
+  "file.album": "albums",
+  integration: "apps",
+  folder: "shared folder",
+  "space.member": "members",
+  event: "calendar",
+  "browser.tab": "tabs",
+  bookmark: "bookmarks",
+  note: "notes",
+  task: "tasks",
+  drawing: "drawings",
+  roadmap: "roadmaps",
+  message: "messages",
+  thread: "threads",
+  space: "Spaces",
+  agent: "agents",
+  device: "devices",
+  method: "methods",
+};
+
 /** A tool name split into its verb and what it acts on, such as "Searched" and "web". */
 export function toolParts(name: string, running: boolean): { verb: string; subject: string } {
-  if (/finish[._]task$/.test(name))
+  if (/finish[._]task$|^agent[._]finish$/.test(name))
     return { verb: running ? "Wrapping up" : "Wrapped up", subject: "" };
+  if (/^agent[._]tool[._](use|load)$/.test(name))
+    return { verb: running ? "Getting" : "Got", subject: "more tools" };
+  if (/^log[._]work[._]checklist$/.test(name))
+    return { verb: running ? "Updating" : "Updated", subject: "checklist" };
   const code = /^code[._](\w+)$/.exec(name)?.[1];
   if (code && codePhrases[code]) {
     const [ing, ed, subject] = codePhrases[code];
@@ -161,14 +194,18 @@ export function toolParts(name: string, running: boolean): { verb: string; subje
   const verbIndex = parts.findIndex((part) => verbs[part]);
   if (verbIndex >= 0) {
     const [ing, ed] = verbs[parts[verbIndex]];
-    const subject = parts.filter((_, index) => index !== verbIndex).join(" ");
+    const rest = parts.filter((_, index) => index !== verbIndex);
+    const subject = uiSubjects[rest.join(".")] ?? rest.join(" ");
     return { verb: running ? ing : ed, subject };
   }
-  return { verb: running ? "Using" : "Used", subject: parts.join(" ") || "a tool" };
+  return {
+    verb: running ? "Using" : "Used",
+    subject: uiSubjects[parts.join(".")] ?? (parts.join(" ") || "a tool"),
+  };
 }
 
 /**
- * Plain words for a tool name such as "tabs.list" or "misty_notes_search":
+ * Plain words for a tool name such as "browser.tab.list" or "misty_notes_search":
  * "Listing tabs" while it runs, "Listed tabs" after. Unknown verbs fall back
  * to "Using …" and "Used …".
  */

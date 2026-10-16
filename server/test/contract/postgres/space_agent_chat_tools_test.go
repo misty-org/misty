@@ -34,7 +34,7 @@ func TestPrivateSpaceConversationCreatesTaskThroughServerOwnedTool(t *testing.T)
 		space.ID,
 		"",
 		"Create a task called Review beta readiness",
-		"tasks.create",
+		"task.create",
 		json.RawMessage(`{"title":"Review beta readiness","priority":"high"}`),
 	)
 	if err != nil {
@@ -86,7 +86,7 @@ func TestPrivateSpaceConversationTaskWriteRechecksMemberPermission(t *testing.T)
 		space.ID,
 		"",
 		"Create a task called Forbidden task",
-		"tasks.create",
+		"task.create",
 		json.RawMessage(`{"title":"Forbidden task"}`),
 	)
 	if !errors.Is(err, workflowv2.ErrCapabilityDenied) {
@@ -111,7 +111,7 @@ func TestPrivateSpaceAgentSendsExactMessageThroughServerOwnedToolbox(t *testing.
 	}
 	result, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, personal.ID,
-		"Tell everyone Stone is off for today", "messages.send",
+		"Tell everyone Stone is off for today", "message.send",
 		json.RawMessage(`{"message":"Stone is off for today","audience":"space"}`),
 	)
 	if err != nil {
@@ -159,7 +159,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 
 	result, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
-		"Tell Melissa Chen to please finish the laundry by tonight", "messages.send",
+		"Tell Melissa Chen to please finish the laundry by tonight", "message.send",
 		json.RawMessage(`{"message":"@Melissa Chen, please finish the laundry by tonight.","audience":"auto","recipientUserId":"`+member.ID+`"}`),
 	)
 	if err != nil {
@@ -193,7 +193,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 
 	groupResult, err := api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
-		"Post in the group chat that Melissa Chen will finish the laundry tonight", "messages.send",
+		"Post in the group chat that Melissa Chen will finish the laundry tonight", "message.send",
 		json.RawMessage(`{"message":"@Melissa Chen will finish the laundry tonight.","audience":"space","recipientUserId":"`+member.ID+`"}`),
 	)
 	if err != nil {
@@ -212,7 +212,7 @@ func TestMistyRoutesOnePersonPrivatelyAndPreservesStructuredMention(t *testing.T
 
 	_, err = api.TestingExecuteSpaceConversationTool(
 		ctx, database, owner.ID, space.ID, "",
-		"Send the laundry update", "messages.send",
+		"Send the laundry update", "message.send",
 		json.RawMessage(`{"message":"Laundry update","audience":"auto"}`),
 	)
 	if err == nil || !strings.Contains(err.Error(), "choose audience") {
@@ -247,11 +247,11 @@ func TestSpaceAgentResolvesMemberAndCreatesAssignedTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resolved, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Assign Melissa a chore", "members.resolve", json.RawMessage(`{"query":"Melissa"}`))
+	resolved, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Assign Melissa a chore", "space.member.resolve", json.RawMessage(`{"query":"Melissa"}`))
 	if err != nil || !strings.Contains(string(resolved), member.ID) || !strings.Contains(string(resolved), `"resolved":true`) {
 		t.Fatalf("resolved member = %s, %v", resolved, err)
 	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTaskTool(ctx, database, owner.ID, space.ID, "", "Add a chore to the planner", "tasks.create", json.RawMessage(`{"title":"Wash the dishes","assigneeUserId":"`+member.ID+`","dueAt":"2026-08-19T19:00:00-07:00","dueTimezone":"America/Los_Angeles"}`))
+	createdRaw, err := api.TestingExecuteSpaceConversationTaskTool(ctx, database, owner.ID, space.ID, "", "Add a chore to the planner", "task.create", json.RawMessage(`{"title":"Wash the dishes","assigneeUserId":"`+member.ID+`","dueAt":"2026-08-19T19:00:00-07:00","dueTimezone":"America/Los_Angeles"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestSpaceAgentInterpretsTaskTimestampInTheSuppliedTimezone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTaskTool(ctx, database, owner.ID, space.ID, "", "Add a task", "tasks.create", json.RawMessage(`{"title":"Local date","dueAt":"2024-11-21T19:00:00","dueTimezone":"America/Los_Angeles"}`))
+	createdRaw, err := api.TestingExecuteSpaceConversationTaskTool(ctx, database, owner.ID, space.ID, "", "Add a task", "task.create", json.RawMessage(`{"title":"Local date","dueAt":"2024-11-21T19:00:00","dueTimezone":"America/Los_Angeles"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestSpaceAgentInterpretsTaskTimestampInTheSuppliedTimezone(t *testing.T) {
 	defaultedRaw, err := api.TestingExecuteSpaceConversationTaskTool(
 		ctx, database, owner.ID, space.ID, "",
 		`{"instruction":"Add an evening task","timezone":"America/Los_Angeles"}`,
-		"tasks.create",
+		"task.create",
 		json.RawMessage(`{"title":"Evening task","dueAt":"2024-11-21T19:00:00-08:00"}`),
 	)
 	if err != nil {
@@ -313,7 +313,7 @@ func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	prompt := "Research summer camps in Pasadena, save the research, and post a cited summary to Family Space"
 	sourceURL := "https://example.org/pasadena-camps"
 	createdRaw, err := api.TestingExecuteSpaceConversationTool(
-		ctx, database, owner.ID, space.ID, "", prompt, "notes.create",
+		ctx, database, owner.ID, space.ID, "", prompt, "note.create",
 		json.RawMessage(`{"title":"Pasadena summer camp research","markdown":"# Summer camps\n\nArt and science programs are available.\n\nSource: `+sourceURL+`"}`),
 	)
 	if err != nil || !strings.Contains(string(createdRaw), "Pasadena summer camp research") {
@@ -321,7 +321,7 @@ func TestFamilySpaceResearchCanBeSavedAndPostedWithCitations(t *testing.T) {
 	}
 	summary := "Pasadena summer camps include art and science programs. Source: " + sourceURL
 	if _, err := api.TestingExecuteSpaceConversationTool(
-		ctx, database, owner.ID, space.ID, "", prompt, "messages.send",
+		ctx, database, owner.ID, space.ID, "", prompt, "message.send",
 		json.RawMessage(`{"message":"`+summary+`","audience":"space"}`),
 	); err != nil {
 		t.Fatalf("post cited summary: %v", err)
@@ -343,7 +343,7 @@ func TestSpaceAgentCreatesQueriesAndUpdatesNativeCalendarEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Schedule a calendar event", "calendar.create", json.RawMessage(`{"title":"Investor demo","startsAt":"2026-08-20T10:00:00-07:00","endsAt":"2026-08-20T10:30:00-07:00","timezone":"America/Los_Angeles"}`))
+	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Schedule a calendar event", "event.create", json.RawMessage(`{"title":"Investor demo","startsAt":"2026-08-20T10:00:00-07:00","endsAt":"2026-08-20T10:30:00-07:00","timezone":"America/Los_Angeles"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestSpaceAgentCreatesQueriesAndUpdatesNativeCalendarEvent(t *testing.T) {
 	if err != nil || len(events) != 1 || events[0].ID != created.ID {
 		t.Fatalf("queried calendar events = %#v, %v", events, err)
 	}
-	updatedRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Reschedule the meeting", "calendar.update", json.RawMessage(`{"id":"`+created.ID+`","startsAt":"2026-08-20T11:00:00-07:00","endsAt":"2026-08-20T11:30:00-07:00"}`))
+	updatedRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Reschedule the meeting", "event.update", json.RawMessage(`{"id":"`+created.ID+`","startsAt":"2026-08-20T11:00:00-07:00","endsAt":"2026-08-20T11:30:00-07:00"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestSpaceAgentInterpretsCalendarTimestampInTheSuppliedTimezone(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Schedule a calendar event", "calendar.create", json.RawMessage(`{"title":"Local date","startsAt":"2026-08-20T10:00:00","endsAt":"2026-08-20T10:30:00","timezone":"America/Los_Angeles"}`))
+	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Schedule a calendar event", "event.create", json.RawMessage(`{"title":"Local date","startsAt":"2026-08-20T10:00:00","endsAt":"2026-08-20T10:30:00","timezone":"America/Los_Angeles"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +399,7 @@ func TestSpaceAgentCreatesReadsAndUpdatesRoadmap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Create a product roadmap", "roadmaps.create", json.RawMessage(`{"name":"Beta launch","description":"Prepare the public beta"}`))
+	createdRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Create a product roadmap", "roadmap.create", json.RawMessage(`{"name":"Beta launch","description":"Prepare the public beta"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,11 +407,11 @@ func TestSpaceAgentCreatesReadsAndUpdatesRoadmap(t *testing.T) {
 	if json.Unmarshal(createdRaw, &created) != nil || created.Roadmap.ID == "" || len(created.Milestones) != 1 {
 		t.Fatalf("created roadmap = %s", createdRaw)
 	}
-	queryRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Find the beta roadmap", "roadmaps.query", json.RawMessage(`{"query":"Beta"}`))
+	queryRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Find the beta roadmap", "roadmap.query", json.RawMessage(`{"query":"Beta"}`))
 	if err != nil || !strings.Contains(string(queryRaw), created.Roadmap.ID) {
 		t.Fatalf("queried roadmaps = %s, %v", queryRaw, err)
 	}
-	updatedRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Rename the roadmap", "roadmaps.update", json.RawMessage(`{"id":"`+created.Roadmap.ID+`","name":"Public beta launch"}`))
+	updatedRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Rename the roadmap", "roadmap.update", json.RawMessage(`{"id":"`+created.Roadmap.ID+`","name":"Public beta launch"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +419,7 @@ func TestSpaceAgentCreatesReadsAndUpdatesRoadmap(t *testing.T) {
 	if json.Unmarshal(updatedRaw, &updated) != nil || updated.Name != "Public beta launch" || updated.GraphVersion <= created.Roadmap.GraphVersion {
 		t.Fatalf("updated roadmap = %s", updatedRaw)
 	}
-	readRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Read the roadmap", "roadmaps.read", json.RawMessage(`{"id":"`+created.Roadmap.ID+`"}`))
+	readRaw, err := api.TestingExecuteSpaceConversationTool(ctx, database, owner.ID, space.ID, "", "Read the roadmap", "roadmap.read", json.RawMessage(`{"id":"`+created.Roadmap.ID+`"}`))
 	if err != nil || !strings.Contains(string(readRaw), "Public beta launch") {
 		t.Fatalf("read roadmap = %s, %v", readRaw, err)
 	}

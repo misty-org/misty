@@ -24,7 +24,7 @@ func (s *SpacesService) appsConnect(ctx context.Context, invocation agenttools.I
 	}
 	app := strings.ToLower(strings.TrimSpace(input.App))
 	if !composio.ValidToolkit(app) {
-		return nil, serveragent.ErrInvalidRequest("app must be an app slug from apps_search, such as googledrive")
+		return nil, serveragent.ErrInvalidRequest("app must be an app slug from integration_search, such as googledrive")
 	}
 	client, err := composioClient()
 	if err != nil {

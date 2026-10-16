@@ -245,24 +245,24 @@ func TestRunGrantsLimitWhatAgentsMayDoOnADevice(t *testing.T) {
 		return TestingVerifyDeviceContextGrants(t.Context(), f.database, f.userID, "", raw)
 	}
 	folder := func(device testDevice, grant map[string]string) map[string]any {
-		return map[string]any{"device_id": device.id, "kind": "local_folder", "opaque_ref": "scope-1", "capabilities": []string{"files.list", "files.read"}, "run_grant": grant}
+		return map[string]any{"device_id": device.id, "kind": "local_folder", "opaque_ref": "scope-1", "capabilities": []string{"folder.list", "folder.read"}, "run_grant": grant}
 	}
 	if err := check([]map[string]any{folder(first, nil)}); err == nil {
 		t.Fatal("a device context without a grant was accepted")
 	}
-	if err := check([]map[string]any{folder(first, runGrant(first.key, f.userID, first.id, first.id, []string{"files.list", "files.read"}, []string{"scope-1"}))}); err != nil {
+	if err := check([]map[string]any{folder(first, runGrant(first.key, f.userID, first.id, first.id, []string{"folder.list", "folder.read"}, []string{"scope-1"}))}); err != nil {
 		t.Fatalf("own grant: %v", err)
 	}
 	// The grant cannot be widened: it named only listing.
-	if err := check([]map[string]any{folder(first, runGrant(first.key, f.userID, first.id, first.id, []string{"files.list"}, []string{"scope-1"}))}); err == nil {
+	if err := check([]map[string]any{folder(first, runGrant(first.key, f.userID, first.id, first.id, []string{"folder.list"}, []string{"scope-1"}))}); err == nil {
 		t.Fatal("a context wider than its grant was accepted")
 	}
 	// Signed by a key other than the named requester.
-	if err := check([]map[string]any{folder(second, runGrant(second.key, f.userID, first.id, second.id, []string{"files.list", "files.read"}, []string{"scope-1"}))}); err == nil {
+	if err := check([]map[string]any{folder(second, runGrant(second.key, f.userID, first.id, second.id, []string{"folder.list", "folder.read"}, []string{"scope-1"}))}); err == nil {
 		t.Fatal("a grant with a forged requester was accepted")
 	}
 	// Another device only with its own policy allowing it.
-	cross := folder(second, runGrant(first.key, f.userID, first.id, second.id, []string{"files.list", "files.read"}, []string{"scope-1"}))
+	cross := folder(second, runGrant(first.key, f.userID, first.id, second.id, []string{"folder.list", "folder.read"}, []string{"scope-1"}))
 	if err := check([]map[string]any{cross}); err == nil {
 		t.Fatal("cross-device work without the target's policy was accepted")
 	}
@@ -274,10 +274,10 @@ func TestRunGrantsLimitWhatAgentsMayDoOnADevice(t *testing.T) {
 	}
 	// A device not added yet may let agents work on itself, and nowhere else.
 	third := f.register("Third")
-	if err := check([]map[string]any{folder(third, runGrant(third.key, f.userID, third.id, third.id, []string{"files.list", "files.read"}, []string{"scope-1"}))}); err != nil {
+	if err := check([]map[string]any{folder(third, runGrant(third.key, f.userID, third.id, third.id, []string{"folder.list", "folder.read"}, []string{"scope-1"}))}); err != nil {
 		t.Fatalf("a pending device working on itself: %v", err)
 	}
-	if err := check([]map[string]any{folder(second, runGrant(third.key, f.userID, third.id, second.id, []string{"files.list", "files.read"}, []string{"scope-1"}))}); err == nil {
+	if err := check([]map[string]any{folder(second, runGrant(third.key, f.userID, third.id, second.id, []string{"folder.list", "folder.read"}, []string{"scope-1"}))}); err == nil {
 		t.Fatal("a pending device reached another device")
 	}
 	// Device inboxes are gone: files go to the Space Library, never to another device.

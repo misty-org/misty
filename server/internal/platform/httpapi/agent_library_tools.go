@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	toolboxLibraryRead              = "library.read"
-	toolboxLibraryUpdate            = "library.update"
-	toolboxLibraryPromoteAttachment = "library.promote_attachment"
+	toolboxLibraryRead              = "file.read"
+	toolboxLibraryUpdate            = "file.update"
+	toolboxLibraryPromoteAttachment = "file.promote_attachment"
 )
 
 func libraryMutationToolDescriptors() []agenttools.Descriptor {

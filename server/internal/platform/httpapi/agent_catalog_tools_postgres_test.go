@@ -84,13 +84,13 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		Schedule db.WorkflowSchedule `json:"schedule"`
 	}
 	if json.Unmarshal(raw, &created) != nil || created.Schedule.ID == "" || created.Schedule.NextRunAt == nil {
-		t.Fatalf("workflows.schedule = %s", raw)
+		t.Fatalf("memory.workflow.schedule = %s", raw)
 	}
 	if _, err := call(service.executeWorkflowSchedule, `{"workflow_id":"`+workflow.ID+`","timezone":"UTC","rules":[{"frequency":"weekly","times":["25:99"]}]}`); !errors.As(err, &invalid) {
 		t.Fatalf("invalid schedule = %v", err)
 	}
 	if raw, err := call(service.executeWorkflowSchedule, `{"workflow_id":"`+workflow.ID+`","timezone":"UTC","rules":[{"frequency":"daily","times":["09:00"]}],"enabled":false}`); err != nil || !strings.Contains(string(raw), `"enabled":false`) {
-		t.Fatalf("workflows.schedule pause = %s, %v", raw, err)
+		t.Fatalf("memory.workflow.schedule pause = %s, %v", raw, err)
 	}
 	done := make(chan error, 1)
 	go func() {
@@ -145,19 +145,19 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	inSpace := func(name, arguments string) (json.RawMessage, error) {
 		return threads[name](ctx, spaceInvocation, agent.ToolRequest{ID: "thread-" + name, Arguments: json.RawMessage(arguments)})
 	}
-	if raw, err := inSpace("threads.create", `{"title":"Retro","member_ids":["`+teammate.ID+`"]}`); err != nil || !strings.Contains(string(raw), "Retro") {
-		t.Fatalf("threads.create = %s, %v", raw, err)
+	if raw, err := inSpace("thread.create", `{"title":"Retro","member_ids":["`+teammate.ID+`"]}`); err != nil || !strings.Contains(string(raw), "Retro") {
+		t.Fatalf("thread.create = %s, %v", raw, err)
 	}
-	if raw, err := inSpace("threads.list", `{}`); err != nil || !strings.Contains(string(raw), thread.ID) {
-		t.Fatalf("threads.list = %s, %v", raw, err)
+	if raw, err := inSpace("thread.list", `{}`); err != nil || !strings.Contains(string(raw), thread.ID) {
+		t.Fatalf("thread.list = %s, %v", raw, err)
 	}
-	if _, err := inSpace("threads.post", `{"thread_id":"`+thread.ID+`","message":"Kickoff is Monday"}`); err != nil {
-		t.Fatalf("threads.post = %v", err)
+	if _, err := inSpace("thread.post", `{"thread_id":"`+thread.ID+`","message":"Kickoff is Monday"}`); err != nil {
+		t.Fatalf("thread.post = %v", err)
 	}
-	if raw, err := inSpace("threads.read", `{"thread_id":"`+thread.ID+`"}`); err != nil || !strings.Contains(string(raw), "Kickoff is Monday") || !strings.Contains(string(raw), `"author_kind":"agent"`) {
-		t.Fatalf("threads.read = %s, %v", raw, err)
+	if raw, err := inSpace("thread.read", `{"thread_id":"`+thread.ID+`"}`); err != nil || !strings.Contains(string(raw), "Kickoff is Monday") || !strings.Contains(string(raw), `"author_kind":"agent"`) {
+		t.Fatalf("thread.read = %s, %v", raw, err)
 	}
-	if _, err := inSpace("threads.read", `{"thread_id":"missing"}`); !errors.As(err, &invalid) {
+	if _, err := inSpace("thread.read", `{"thread_id":"missing"}`); !errors.As(err, &invalid) {
 		t.Fatalf("unknown thread = %v", err)
 	}
 
@@ -169,20 +169,20 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	album := func(name, arguments string) (json.RawMessage, error) {
 		return albums[name](ctx, spaceInvocation, agent.ToolRequest{ID: "album-" + arguments, Arguments: json.RawMessage(arguments)})
 	}
-	raw, err = album("library.organize", `{"action":"create","name":"Launch photos"}`)
+	raw, err = album("file.organize", `{"action":"create","name":"Launch photos"}`)
 	var createdAlbum struct {
 		Album struct{ ID string } `json:"album"`
 	}
 	if err != nil || json.Unmarshal(raw, &createdAlbum) != nil || createdAlbum.Album.ID == "" {
-		t.Fatalf("library.organize create = %s, %v", raw, err)
+		t.Fatalf("file.organize create = %s, %v", raw, err)
 	}
-	if raw, err := album("library.organize", `{"action":"rename","album_id":"`+createdAlbum.Album.ID+`","name":"Launch day"}`); err != nil || !strings.Contains(string(raw), "Launch day") {
-		t.Fatalf("library.organize rename = %s, %v", raw, err)
+	if raw, err := album("file.organize", `{"action":"rename","album_id":"`+createdAlbum.Album.ID+`","name":"Launch day"}`); err != nil || !strings.Contains(string(raw), "Launch day") {
+		t.Fatalf("file.organize rename = %s, %v", raw, err)
 	}
-	if raw, err := album("library.albums", `{}`); err != nil || !strings.Contains(string(raw), "Launch day") {
-		t.Fatalf("library.albums = %s, %v", raw, err)
+	if raw, err := album("file.album.list", `{}`); err != nil || !strings.Contains(string(raw), "Launch day") {
+		t.Fatalf("file.album.list = %s, %v", raw, err)
 	}
-	if _, err := album("library.albums", `{"album_id":"missing"}`); !errors.As(err, &invalid) {
+	if _, err := album("file.album.list", `{"album_id":"missing"}`); !errors.As(err, &invalid) {
 		t.Fatalf("unknown album = %v", err)
 	}
 
@@ -196,7 +196,7 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Helper()
 		raw, err := plan(ctx, spaceInvocation, agent.ToolRequest{ID: "plan-" + arguments, Arguments: json.RawMessage(arguments)})
 		if err != nil {
-			t.Fatalf("roadmaps.plan %s = %v", arguments, err)
+			t.Fatalf("roadmap.plan %s = %v", arguments, err)
 		}
 		return raw
 	}
@@ -236,17 +236,17 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 	for _, registration := range methodToolRegistrations(database) {
 		methods[registration.Descriptor.Name] = registration.Handler
 	}
-	if raw, err := call(methods["methods.list"], `{}`); err != nil || !strings.Contains(string(raw), "Weekly brief") {
-		t.Fatalf("methods.list = %s, %v", raw, err)
+	if raw, err := call(methods["method.list"], `{}`); err != nil || !strings.Contains(string(raw), "Weekly brief") {
+		t.Fatalf("method.list = %s, %v", raw, err)
 	}
-	if raw, err := call(methods["methods.use"], `{"method":"Weekly brief","inputs":{"team":"Launch"}}`); err != nil || !strings.Contains(string(raw), "Summarize the week") || !strings.Contains(string(raw), "Launch") {
-		t.Fatalf("methods.use = %s, %v", raw, err)
+	if raw, err := call(methods["method.use"], `{"method":"Weekly brief","inputs":{"team":"Launch"}}`); err != nil || !strings.Contains(string(raw), "Summarize the week") || !strings.Contains(string(raw), "Launch") {
+		t.Fatalf("method.use = %s, %v", raw, err)
 	}
-	if _, err := call(methods["methods.use"], `{"method":"Weekly brief","inputs":{}}`); !errors.As(err, &invalid) {
+	if _, err := call(methods["method.use"], `{"method":"Weekly brief","inputs":{}}`); !errors.As(err, &invalid) {
 		t.Fatalf("missing required input = %v", err)
 	}
 
-	// items.delete removes a calendar event after approval.
+	// item.delete removes a calendar event after approval.
 	event, err := database.CreateNativeCalendarEvent(ctx, owner.ID, db.SpaceCalendarEvent{SpaceID: work.ID, Title: "Standup",
 		StartsAt: time.Now().Add(time.Hour), EndsAt: time.Now().Add(2 * time.Hour)})
 	if err != nil {
@@ -264,7 +264,7 @@ func TestAgentCatalogToolsPostgres(t *testing.T) {
 		t.Fatal("calendar event still active after delete")
 	}
 
-	// items.delete archives a task only after the user approves.
+	// item.delete archives a task only after the user approves.
 	task, err := database.CreateSpaceTask(ctx, owner.ID, db.SpaceTask{SpaceID: work.ID, Title: "Old chore", Status: "todo"})
 	if err != nil {
 		t.Fatal(err)

@@ -277,7 +277,7 @@ export interface AgentNotebook {
   noteId?: string;
 }
 
-/** One sub-agent a run started with agents_delegate. */
+/** One sub-agent a run started with agent_delegate. */
 export interface AgentSubagent {
   invocationId: string;
   goal: string;

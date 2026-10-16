@@ -62,9 +62,9 @@ func agentRequestView(request *db.AgentMemberRequest) json.RawMessage {
 		}
 		view["error"] = truncateAgentRuntimeText(reason, 2_000)
 	case "awaiting_approval":
-		view["note"] = "Waiting for " + request.TargetOwnerName + " to approve. Nothing runs until they do; the request expires after 24 hours. Call agents_request_status later, or carry on without it."
+		view["note"] = "Waiting for " + request.TargetOwnerName + " to approve. Nothing runs until they do; the request expires after 24 hours. Call agent_request_status later, or carry on without it."
 	default:
-		view["note"] = "Still working. Call agents_request_status with this request_id to keep waiting."
+		view["note"] = "Still working. Call agent_request_status with this request_id to keep waiting."
 	}
 	return TestingMustAPIRawJSON(view)
 }

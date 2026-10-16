@@ -113,7 +113,7 @@ func TestNativeAgentsPrivacyMemoryAndLeases(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = database.JournalAgentToolboxAction(ctx, AgentToolboxAction{IdempotencyKey: "native-planner-write", UserID: owner.ID, SpaceID: space.ID, AgentID: agent.ID, RunID: persisted.ID, ToolName: "tasks.update", AuditEvent: "task.updated", Risk: "write", Source: "ai_invocation", Request: json.RawMessage(`{"title":"Launch Friday"}`)}, func() (json.RawMessage, error) {
+	_, err = database.JournalAgentToolboxAction(ctx, AgentToolboxAction{IdempotencyKey: "native-planner-write", UserID: owner.ID, SpaceID: space.ID, AgentID: agent.ID, RunID: persisted.ID, ToolName: "task.update", AuditEvent: "task.updated", Risk: "write", Source: "ai_invocation", Request: json.RawMessage(`{"title":"Launch Friday"}`)}, func() (json.RawMessage, error) {
 		return json.RawMessage(`{"id":"planner-result","title":"Launch Friday"}`), nil
 	})
 	if err != nil {

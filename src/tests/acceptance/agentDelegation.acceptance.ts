@@ -71,7 +71,7 @@ describe.skipIf(!liveAcceptanceEnabled)("agents ask other members' agents", () =
     const ask = await alice.invoke(prompt, { agent_id: aliceAgent });
     record("delegation-ask", prompt, ask);
     expect(ask.terminal).toBe("invocation.completed");
-    expect(ran(ask, "agents_request")).toBe(true);
+    expect(ran(ask, "agent_request")).toBe(true);
 
     const pending = await bob.json<{ requests: Array<{ id: string; requester_name: string }> }>(
       "/me/agent-requests",

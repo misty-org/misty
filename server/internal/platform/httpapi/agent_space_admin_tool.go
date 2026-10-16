@@ -12,10 +12,10 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/security"
 )
 
-// spaces.manage covers rarely used Space administration in one tool, so the
+// space.manage covers rarely used Space administration in one tool, so the
 // catalog stays small. Inviting, removing a member and leaving change who has
 // access, so they ask first when the account asks first.
-const spacesManageTool = "spaces.manage"
+const spacesManageTool = "space.manage"
 
 func (s *SpacesService) spaceAdminToolRegistration() agenttools.Registration {
 	text := func(max int) map[string]any {
@@ -25,7 +25,7 @@ func (s *SpacesService) spaceAdminToolRegistration() agenttools.Registration {
 		Descriptor: agenttools.Descriptor{
 			Name: spacesManageTool, Version: 1, Risk: serveragent.RiskWrite, Approval: agenttools.ApprovalNone,
 			Description: "Administer Spaces. Actions: create (name), rename (space, name), invite (space, email), list_invitations (space), " +
-				"cancel_invitation (space, invitation_id), resend_invitation (space, invitation_id), remove_member (space, member_id from members_list), leave (space). " +
+				"cancel_invitation (space, invitation_id), resend_invitation (space, invitation_id), remove_member (space, member_id from space_member_list), leave (space). " +
 				"Only the Space owner can rename, invite, see or cancel invitations and remove members. " +
 				"invite, remove_member and leave change access and may show the user an approval card first. Act only when the user asked.",
 			InputSchema: agentToolSchema(map[string]any{
@@ -127,7 +127,7 @@ func (s *SpacesService) executeSpaceAccessChange(ctx context.Context, invocation
 		return nil, serveragent.ErrInvalidRequest("invite needs the person's email address")
 	}
 	if input.Action == "remove_member" && strings.TrimSpace(input.MemberID) == "" {
-		return nil, serveragent.ErrInvalidRequest("remove_member needs member_id from members_list")
+		return nil, serveragent.ErrInvalidRequest("remove_member needs member_id from space_member_list")
 	}
 	need := grantNeed{action: serveragent.GrantSpaceAdmin, scopeKind: serveragent.ScopeSpace, scopeID: space.ID, label: "manage members of " + space.Name}
 	approval, waiting, err := s.confirmAgentAction(ctx, invocation, need, "misty.spaces."+input.Action, []string{space.ID, input.Email, input.MemberID}, title, "Space: "+space.Name)
@@ -169,7 +169,7 @@ func (s *SpacesService) spaceAdminTarget(ctx context.Context, invocation agentto
 		reference = invocation.SpaceID
 	}
 	if reference == "" {
-		return db.Space{}, serveragent.ErrInvalidRequest("pass space; call spaces_list for names and ids")
+		return db.Space{}, serveragent.ErrInvalidRequest("pass space; call space_list for names and ids")
 	}
 	spaces, err := s.database.ListSpaces(ctx, invocation.UserID)
 	if err != nil {

@@ -114,12 +114,12 @@ func TestAgentMemberRequestToolsAndBillingPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{agentsRequestTool, "memory.list", "agents.configure", appsExecuteTool, "spaces.list", toolboxAgentsDelegate} {
+	for _, forbidden := range []string{agentsRequestTool, "memory.pref.list", "agent.configure", appsExecuteTool, "space.list", toolboxAgentsDelegate} {
 		if hasToolboxTool(childToolbox, forbidden) {
 			t.Fatalf("delegated run offers %s", forbidden)
 		}
 	}
-	if !hasToolboxTool(childToolbox, "notes.search") || childInvocation.UserID != bob.ID || childInvocation.SpaceID != space.ID || childInvocation.DelegatedApproval {
+	if !hasToolboxTool(childToolbox, "note.search") || childInvocation.UserID != bob.ID || childInvocation.SpaceID != space.ID || childInvocation.DelegatedApproval {
 		t.Fatalf("delegated invocation = %#v", childInvocation)
 	}
 	if _, err := service.meterPersonalAgentRuntimeModel(ctx, child, "model:1", workflowv2.StepRunning, json.RawMessage(`{"input_bytes":64}`)); err != nil {
@@ -136,7 +136,7 @@ func TestAgentMemberRequestToolsAndBillingPostgres(t *testing.T) {
 	if err := database.DeleteSpaceAgentListing(ctx, bob.ID, space.ID, bobAgent.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := childToolbox.Execute(ctx, childInvocation, agent.ToolRequest{ID: "c1", Name: "notes.search", Arguments: json.RawMessage(`{"query":"launch"}`)}, authorize); err == nil {
+	if _, err := childToolbox.Execute(ctx, childInvocation, agent.ToolRequest{ID: "c1", Name: "note.search", Arguments: json.RawMessage(`{"query":"launch"}`)}, authorize); err == nil {
 		t.Fatal("agent kept working after requests were turned off")
 	}
 

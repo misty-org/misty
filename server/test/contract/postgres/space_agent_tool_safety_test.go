@@ -39,7 +39,7 @@ func TestSpaceAgentWriteCallbacksAreIdempotent(t *testing.T) {
 		space.ID,
 		"",
 		"Create an investor demo note",
-		"notes.create",
+		"note.create",
 		arguments,
 	)
 	if err != nil {
@@ -52,7 +52,7 @@ func TestSpaceAgentWriteCallbacksAreIdempotent(t *testing.T) {
 		space.ID,
 		"",
 		"Create an investor demo note",
-		"notes.create",
+		"note.create",
 		arguments,
 	)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestSpaceAgentCannotReadContentFromAnotherSpace(t *testing.T) {
 		target.ID,
 		"",
 		"Read the note",
-		"notes.read",
+		"note.read",
 		json.RawMessage(`{"id":"`+note.ID+`"}`),
 	)
 	if !errors.Is(err, ErrSpaceNotFound) {

@@ -9,16 +9,16 @@ import { useConversationProject } from "./store/useConversationProject";
 /** Each device's Misty browser has its own grant reference. */
 const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
 
-const folderCapabilities = ["files.list", "files.read", "files.send"];
+const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
 /** Projects: coding through the person's own coding tool, on this computer
  * only, plus reading documents and sending files to the Space Library the way
  * read-only folders do. */
 export const projectCapabilities = [...folderCapabilities, "code.delegate"];
 const workspaceCapabilities = [
-  "tabs.list",
-  "tabs.open",
-  "bookmarks.list",
-  "bookmarks.add",
+  "browser.tab.list",
+  "browser.tab.open",
+  "bookmark.list",
+  "bookmark.add",
   "web.fetch",
 ];
 /** On another device the agent may also open its own browser session there. */

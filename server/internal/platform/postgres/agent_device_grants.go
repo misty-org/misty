@@ -27,12 +27,12 @@ type AgentDeviceGrant struct {
 
 var deviceAgentCapabilities = map[string]bool{
 	"browser.workspace.visual": true, "browser.workspace.interact": true,
-	"files.read": true, "files.write": true, "files.list": true, "files.search": true, "files.copy": true, "files.move": true, "files.delete": true, "files.send": true,
+	"folder.read": true, "folder.write": true, "folder.list": true, "folder.search": true, "folder.copy": true, "folder.move": true, "folder.delete": true, "folder.send": true,
 	"project.patch": true, "project.diff": true, "project.status": true, "project.checks": true, "git.commit": true, "git.push": true, "terminal.execute": true,
 	"browser.interact": true, "browser.inspect": true, "browser.visual": true, "browser.navigate": true, "browser.click": true, "browser.type": true, "browser.select": true, "browser.scroll": true,
 	"browser.downloads.list": true, "browser.upload": true, "browser.act": true, "browser.confirm_high_risk": true,
 	"browser.snapshot": true, "browser.find": true, "browser.extract": true, "browser.wait_for": true, "browser.steps": true, "browser.fill_form": true, "browser.skill": true, "browser.spawn_tabs": true,
-	"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true,
+	"browser.tab.list": true, "browser.tab.open": true, "bookmark.list": true, "bookmark.add": true,
 	// Reads one public page without cookies (docs/plans/agent-harness.md, phase 1).
 	"web.fetch": true,
 	// Opens an agent session in another device's browser (docs/design/agents-on-devices/BRIEF.md).
@@ -44,11 +44,11 @@ var deviceAgentCapabilities = map[string]bool{
 
 // deviceContextCapabilities are what each kind of desktop grant may allow.
 var deviceContextCapabilities = map[string]map[string]bool{
-	"local_folder": {"files.list": true, "files.read": true, "files.send": true},
-	"workspace":    {"tabs.list": true, "tabs.open": true, "bookmarks.list": true, "bookmarks.add": true, "browser.session": true, "web.fetch": true},
+	"local_folder": {"folder.list": true, "folder.read": true, "folder.send": true},
+	"workspace":    {"browser.tab.list": true, "browser.tab.open": true, "bookmark.list": true, "bookmark.add": true, "browser.session": true, "web.fetch": true},
 	// A project: delegated coding, plus reading documents and saving files to
 	// the Space Library the way read-only folders do.
-	"project_folder": {"files.list": true, "files.read": true, "files.send": true, "code.delegate": true},
+	"project_folder": {"folder.list": true, "folder.read": true, "folder.send": true, "code.delegate": true},
 }
 
 // DeviceContextCapabilitiesAllowed reports whether a desktop grant asks only

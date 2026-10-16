@@ -133,9 +133,9 @@ func collaborationInstructions(state collaborationState) string {
 	if state.canAsk {
 		out.WriteString("\n\nWhen a missing decision would materially change the result, ask with conversation_ask_user instead of guessing; explore with read tools first and never ask whether to proceed.")
 	}
-	out.WriteString("\n\nBefore multi-step work, publish a live checklist with checklist_update: 3-8 concrete steps the user can follow. Keep exactly one step in_progress, mark each done as you finish it, and mark steps you hand to another agent or a coding tool as delegated. Each turn publishes its own checklist; skip it for a single quick answer.")
+	out.WriteString("\n\nBefore multi-step work, publish a live checklist with log_work_checklist: 3-8 concrete steps the user can follow. Keep exactly one step in_progress, mark each done as you finish it, and mark steps you hand to another agent or a coding tool as delegated. Each turn publishes its own checklist; skip it for a single quick answer.")
 	if plan := state.approvedPlan(); plan != nil {
-		out.WriteString("\n\nThe user approved this plan: \"" + plan.Payload.Title + "\" (version " + fmt.Sprint(plan.Version) + "). Follow it and report each step with checklist_update using the plan's step ids (it starts as the plan's steps): in_progress before you start it, done after it, skipped or blocked with a note. " +
+		out.WriteString("\n\nThe user approved this plan: \"" + plan.Payload.Title + "\" (version " + fmt.Sprint(plan.Version) + "). Follow it and report each step with log_work_checklist using the plan's step ids (it starts as the plan's steps): in_progress before you start it, done after it, skipped or blocked with a note. " +
 			"If a step proves wrong or the work needs steps that are not in the plan, do not widen it silently: ask, or finish explaining the change.\nSteps:")
 		for _, step := range plan.Payload.Steps {
 			status := plan.Progress[step.ID].Status

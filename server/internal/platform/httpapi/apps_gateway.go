@@ -16,11 +16,11 @@ import (
 // reach every toolkit. Misty decides when an action needs the user, shows the
 // card in chat, and journals every write.
 const (
-	appsSearchTool    = "apps.search"
-	appsSchemasTool   = "apps.schemas"
-	appsConnectedTool = "apps.connected"
-	appsConnectTool   = "apps.connect"
-	appsExecuteTool   = "apps.execute"
+	appsSearchTool    = "integration.search"
+	appsSchemasTool   = "integration.schemas"
+	appsConnectedTool = "integration.connected"
+	appsConnectTool   = "integration.connect"
+	appsExecuteTool   = "integration.execute"
 	// One call waits this long for the user; the runtime's MCP request limit is 60s.
 	appsWait       = 40 * time.Second
 	appsRequestTTL = 15 * time.Minute
