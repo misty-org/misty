@@ -107,6 +107,9 @@ func agentCapabilityGuidance(tools []string, desktopControl bool) string {
 	if has("agent.delegate") {
 		guidance.WriteString("\n\nSub-agents: when a large task has independent parts (several companies, products, sources or separate forms), give them to agent_delegate as self-contained goals; they run at the same time, each in its own tab, and report into the notebook. Merge their answers and the notebook's findings into your final answer, and check anything that looks wrong. Do small or sequential work yourself.")
 	}
+	if has("memory.workflow.find") {
+		guidance.WriteString("\n\nWorkflows: when a request looks like something done before, check memory_workflow_find; if one matches, follow it with memory_workflow_use, including its learned steps. After a saved workflow runs well, record what worked with memory_workflow_learn: reusable steps, never the person's data.")
+	}
 	if has("memory.pref.list") {
 		guidance.WriteString("\n\nMemory: use memory_pref_list to review preferences. Change durable memory only when the user asks; task corrections are temporary unless the user makes them lasting. Never store secrets or sensitive personal data. Say something was remembered or forgotten only after the memory tool confirms it.")
 	}
