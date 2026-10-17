@@ -140,6 +140,7 @@ results in the message.
 | 6 | Oct 18 | Websites count as tools, background grading | 0/2, stopped by hand | 0.75 on the shopping task | — | 62 calls / 388 s | $0.21 |
 | 7 | Oct 18 | Stopping a pass cancels its run; 32k output; screen-model calls out of the billing aggregate | 0/2, stopped by hand | 0.07 | — | 45 calls / 523 s | $0.31 |
 | 8 | Oct 18 | Dev tasks 6–10, `medium` | 0/5 | 0.43 | — | 49 calls / 354 s | $0.56 |
+| 9 | Oct 18 | K1 read (frames), parked agent tabs, evidence guidance, recorder fix | 0/3, stopped by hand | 0.30 | — | 54 calls / 341 s | $0.63 |
 
 ### Fixes before the first batch (October 17)
 
@@ -205,6 +206,18 @@ Every failure was the harness, not the model. In order found:
 | Tabs left open by earlier tasks were pictured in later ones: up to 140 screenshots a task, the judge seeing only the last 60 | E | The recorder pictures only pages opened during the run (`c33f0c1f`) |
 | Evidence the task asks to keep open was only fetched, so no tab showed it (R1 of `4614aa0831`, R6 of `42e2344431`) | H | Guidance: those pages are part of the answer, open in tabs and scrolled to the evidence; `scroll into_view` takes text (`7baaa051`) |
 | A studio's class schedule is a cross-origin widget: snapshots, find and extract saw an empty iframe, and in a hidden tab it never drew at all (R2 of `5e09c06aa9`) | K | K1: frames announce themselves from a private content world and the page layer reads inside them; agent tabs are parked instead of hidden so they keep rendering (`7baaa051`) |
+
+### Batch 9 (October 18)
+
+Three hard and medium dev tasks scored 0.50, 0.11 and 0.29, and each finished with most of its turns
+unused. The causes were already clear, so the batch stopped there:
+
+| Cause | Label | Fix |
+|---|---|---|
+| Answers that read well skipped requested fields, items and pages (in-stock size, per-extension review links, the ALS product page) | H | A long request's draft answer is checked against it once by the run's own model; a run with turns left goes back to fill the gaps (`9e93eda8`) |
+| A task asked for about 26 pages kept open; agents could hold 16 | H | 32 tabs (`8da813cc`) |
+| Runs still reported partial with half their turns left after two refusals | H | Up to three refusals, each after more work (`8da813cc`) |
+| CryptPad's editor lives in a cross-origin sandbox frame, so the document stayed empty (R7 of `d03a08650b`, R4 of `48a6cb73b8`) | K | K1 actions: frame refs come from per-frame ranges and steps, forms and skills run in their frame; editor frames get the editor skill. Checked by hand: a formatted CryptPad pad written and saved (`40205697`) |
 
 "invocation.failed" in these reports is often the agent's own "not finished" ending with a full
 answer, which the judge grades like any other.
