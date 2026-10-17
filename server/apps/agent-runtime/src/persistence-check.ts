@@ -3,7 +3,8 @@ import type { TaskCompletion } from "./task-completion.js";
 // Long requests need persistence (docs/plans/odysseys-campaign.md): the first Odysseys
 // batch finished "partial" after a minute or two with most of each run's turns unused,
 // usually right after one page or tool failed. A partial or blocked finish is refused
-// once while the run has room, unless every unfinished part needs the person.
+// (up to three times, with work between) while the run has room, unless every unfinished
+// part needs the person.
 
 /** Unfinished parts only the person can unblock: an account, a payment, a human check. */
 const needsPerson = /\b(sign[ -]?in|log[ -]?in|password|account|captcha|verification|verify|2fa|one-time code|payment|pay|purchase|checkout|paywall|subscri)/i;

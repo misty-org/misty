@@ -136,9 +136,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
             }
           }
-          // An early give-up with room left is sent back to work up to twice, the second
-          // time only after more work since the first (src/persistence-check.ts).
-          if (persistenceRefusals < 2 && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 2)) {
+          // An early give-up with room left is sent back to work up to three times, each
+          // later time only after more work since the last (src/persistence-check.ts).
+          if (persistenceRefusals < 3 && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 3)) {
             const unfinished = earlyGiveUp(report, modelTurn, limit);
             if (unfinished) {
               persistenceRefusals++;

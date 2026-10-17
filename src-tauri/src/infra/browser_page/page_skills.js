@@ -7,6 +7,27 @@
 ((P) => {
   const S = P.state;
   const visible = (el) => !!el && !P.hidden(el);
+  const EDITABLE = '.ProseMirror,[data-lexical-editor],.ql-editor,[contenteditable=""],[contenteditable=true]';
+  /** Editable areas in this document and its same-origin frames, where editors such as
+   * CKEditor and TinyMCE keep theirs (the frame's body is the editable area). */
+  const editables = () => {
+    const found = [];
+    const look = (doc, depth) => {
+      found.push(...doc.querySelectorAll(EDITABLE));
+      if (doc !== document && doc.body && (doc.body.isContentEditable || doc.designMode === "on")) found.push(doc.body);
+      if (depth >= 2) return;
+      for (const frame of doc.querySelectorAll("iframe")) {
+        let inner = null;
+        try { inner = frame.contentDocument; } catch { inner = null; }
+        if (inner) look(inner, depth + 1);
+      }
+    };
+    look(document, 0);
+    return found;
+  };
+  /** How tall an editable area shows: an editor frame's body is as tall as its frame. */
+  const shownHeight = (el) => el === el.ownerDocument.body
+    ? Math.max(el.clientHeight, el.ownerDocument.defaultView?.frameElement?.clientHeight ?? 0) : el.clientHeight;
   const host = location.hostname;
   const path = location.pathname;
 
@@ -140,8 +161,7 @@
     id: "editor",
     // Google Docs has its own skill: its canvas ignores pasted content.
     detect: () => !(host === "docs.google.com" && path.startsWith("/document")) &&
-      Array.from(document.querySelectorAll('[contenteditable=""],[contenteditable=true],.ProseMirror,[data-lexical-editor],.ql-editor'))
-        .some((el) => visible(el) && el.clientHeight > 60),
+      editables().some((el) => visible(el) && shownHeight(el) > 60),
     instructions: "Rich-text editor: write formatted text in one call with browser_skill editor.insert {ref, markdown} (headings with #, lists with - or 1., **bold**, links). It keeps the formatting, unlike typing. Use at: \"end\" (default), \"start\" or \"replace\". Read the editor with editor.read {ref}.",
     actions: {
       insert: (args) => {
@@ -421,8 +441,7 @@
     editorTarget: () => {
       const docsFrame = document.querySelector('.docs-texteventtarget-iframe');
       try { if (docsFrame?.contentDocument?.body) return docsFrame.contentDocument.body; } catch { /* cross-origin */ }
-      return Array.from(document.querySelectorAll('.ProseMirror,[data-lexical-editor],.ql-editor,[contenteditable=""],[contenteditable=true]'))
-        .filter(visible).sort((a, b) => b.clientHeight - a.clientHeight)[0] || null;
+      return editables().filter(visible).sort((a, b) => shownHeight(b) - shownHeight(a))[0] || null;
     },
   };
   P.skills = skills;

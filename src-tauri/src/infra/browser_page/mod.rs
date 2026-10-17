@@ -67,6 +67,31 @@ async fn call(
     args: Value,
     semantic: bool,
 ) -> Result<Value, String> {
+    call_at(webview, None, operation, args, semantic).await
+}
+
+/// The cross-origin frame a ref belongs to and its document id (frames.rs); None for the
+/// top document's refs.
+fn frame_of(view: &Webview, reference: Option<&str>) -> Option<(u64, String)> {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        reference.and_then(|reference| frames::frame_of(view.label(), reference))
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (view, reference);
+        None
+    }
+}
+
+/// `call` in the top document, or in one cross-origin frame of it.
+async fn call_at(
+    webview: &Webview,
+    frame: Option<u64>,
+    operation: &str,
+    args: Value,
+    semantic: bool,
+) -> Result<Value, String> {
     let semantic = if semantic {
         format!(
             "args.readSemantic = ({});",
@@ -85,17 +110,31 @@ async fn call(
         let body = format!(
             "{RUNTIME}\n{invocation}\nreturn JSON.stringify(await page.call({operation}, args));"
         );
-        let raw = crate::infra::browser_content_world::evaluate_in_content_world(
-            webview.clone(),
-            WORLD,
-            body,
-        )
-        .await?;
+        let raw = match frame {
+            Some(frame) => {
+                crate::infra::browser_content_world::evaluate_in_frame(
+                    webview.clone(),
+                    WORLD,
+                    body,
+                    frame,
+                )
+                .await?
+            }
+            None => {
+                crate::infra::browser_content_world::evaluate_in_content_world(
+                    webview.clone(),
+                    WORLD,
+                    body,
+                )
+                .await?
+            }
+        };
         serde_json::from_str(&raw)
             .map_err(|error| format!("The page returned invalid data: {error}"))
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
+        let _ = frame;
         // The page world has no awaiting evaluation; settle is a host sleep there.
         if operation == "\"settle\"" {
             tokio::time::sleep(Duration::from_millis(300)).await;
@@ -157,6 +196,7 @@ async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
         let reads = frames::trees(view).await;
         if let (false, Some(tree)) = (reads.is_empty(), snapshot["tree"].as_str()) {
             snapshot["tree"] = json!(frames::splice_trees(tree, &reads));
+            snapshot["skills"] = frames::merge_skills(&snapshot["skills"], &reads);
         }
     }
     #[cfg(not(any(target_os = "macos", windows)))]

@@ -32,7 +32,9 @@ async fn after_snapshot(
         true,
     )
     .await?;
+    let mut snapshot = snapshot;
     if snapshot["ok"] == true {
+        super::with_frame_trees(view, &mut snapshot).await;
         output["snapshot"] = json!({"documentId": snapshot["documentId"], "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]});
     }
     Ok(())
@@ -215,6 +217,12 @@ pub(super) async fn run_skill(
     let allow_consequential = input["allowConsequential"] == true;
     let task = input["__mistyTaskId"].as_str().unwrap_or("");
     let mut next = json!({"skill": skill, "action": action, "args": input.get("args").cloned().unwrap_or(json!({}))});
+    // A skill on a control inside a cross-origin frame (a document editor) runs there.
+    let frame = super::frame_of(view, next["args"]["ref"].as_str());
+    let skill_document = frame
+        .as_ref()
+        .map_or(document.to_string(), |(_, document)| document.clone());
+    let frame = frame.map(|(frame, _)| frame);
     let mut phases = Vec::new();
     let mut dispatched = false;
     let mut ok = true;
@@ -226,8 +234,8 @@ pub(super) async fn run_skill(
             task,
         )?;
         resolve_agent_webview(app, state, request)?;
-        next["documentId"] = json!(document);
-        let result = call(view, "skill", next.clone(), false).await?;
+        next["documentId"] = json!(skill_document);
+        let result = super::call_at(view, frame, "skill", next.clone(), false).await?;
         if result["ok"] != true {
             if !dispatched && result["errorCode"] == "browser_snapshot_stale" {
                 return Err(page_error(

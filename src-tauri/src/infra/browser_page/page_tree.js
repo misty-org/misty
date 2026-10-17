@@ -101,7 +101,9 @@
         const node = { role: "iframe", name: P.name(el, role), children: [], props: [] };
         let doc = null;
         try { doc = el.contentDocument; } catch { doc = null; }
-        if (doc?.body) visitChildren(doc.body, node, false);
+        // An editor frame's body is itself the editable area (CKEditor, TinyMCE): list the body.
+        if (doc?.body && (doc.body.isContentEditable || doc.designMode === "on")) visit(doc.body, node);
+        else if (doc?.body) visitChildren(doc.body, node, false);
         else {
           let origin = "";
           // A frame a script navigated (src empty or about:blank) is not the page's own origin.
@@ -230,6 +232,9 @@
 
   P.snapshot = (args) => {
     if (!S.documentId) S.documentId = args.candidateId;
+    // A cross-origin frame numbers its refs from its own range, so one snapshot never
+    // names two controls alike (frames.rs routes a ref to its frame by that range).
+    if (args.refBase && S.next < args.refBase) S.next = args.refBase;
     if (args.readSemantic) {
       S.readSemantic = args.readSemantic;
       try { S.semantic = JSON.stringify(args.readSemantic()); } catch { S.semantic = null; }

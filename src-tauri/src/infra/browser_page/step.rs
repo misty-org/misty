@@ -1,8 +1,8 @@
 //! One page action: find its control, check it, then click or type natively
 //! when the tab is visible, or through the page script otherwise.
 use super::{
-    call, native_input, poll, resolve_agent_webview, BrowserAgentExecuteRequest,
-    BrowserSessionState, Step,
+    call, call_at, frame_of, native_input, poll, resolve_agent_webview,
+    BrowserAgentExecuteRequest, BrowserSessionState, Step,
 };
 use crate::infra::browser::action_confirm as confirm;
 use serde_json::{json, Value};
@@ -60,17 +60,18 @@ fn step_args(document: &str, step: &Step) -> Value {
 
 async fn prepare(
     view: &Webview,
+    frame: Option<u64>,
     document: &str,
     step: &Step,
     action: &str,
     key: Option<&str>,
 ) -> Result<Value, String> {
     let args = json!({"documentId": document, "ref": step.reference, "action": action, "key": key});
-    let mut prepared = call(view, "prepare", args.clone(), false).await?;
+    let mut prepared = call_at(view, frame, "prepare", args.clone(), false).await?;
     if prepared["ok"] == true && prepared["scrolled"] == true {
         // Let a smooth-scrolling page come to rest, then measure again.
         tokio::time::sleep(Duration::from_millis(120)).await;
-        prepared = call(view, "prepare", args, false).await?;
+        prepared = call_at(view, frame, "prepare", args, false).await?;
     }
     Ok(prepared)
 }
@@ -112,9 +113,14 @@ pub(super) async fn run_step(
         resolved.reference = found["ref"].as_str().map(str::to_owned);
         resolved.locator = None;
     }
+    // A ref inside a cross-origin frame runs there, against that frame's document.
+    let frame = frame_of(view, resolved.reference.as_deref());
+    let document = frame.as_ref().map_or(document, |(_, document)| document.as_str());
+    let frame = frame.as_ref().map(|(frame, _)| *frame);
     let locator = match &resolved.reference {
-        Some(reference) => call(
+        Some(reference) => call_at(
             view,
+            frame,
             "locatorFor",
             json!({"documentId": document, "ref": reference}),
             false,
@@ -130,6 +136,7 @@ pub(super) async fn run_step(
         state,
         view,
         request,
+        frame,
         document,
         &resolved,
         allow_consequential,
@@ -142,15 +149,24 @@ pub(super) async fn run_step(
 }
 
 /// Runs one step after its checks. Err only for faults where an effect is unknown.
+#[allow(clippy::too_many_arguments)]
 async fn run_step_checked(
     app: &AppHandle,
     state: &BrowserSessionState,
     view: &Webview,
     request: &BrowserAgentExecuteRequest,
+    frame: Option<u64>,
     document: &str,
     step: &Step,
     allow_consequential: bool,
 ) -> Result<Value, String> {
+    // Native input lands at a point in the top document; a frame's controls take script input.
+    let native = |input: Value, prepared: Value| async move {
+        if frame.is_some() {
+            return Ok(None);
+        }
+        native(app, state, view, request, input, &prepared).await
+    };
     if step.action == "wait_for" {
         let condition = json!({"text": step.text, "textGone": step.text_gone});
         let waited = poll(view, &condition, step.timeout_ms.unwrap_or(8_000)).await?;
@@ -166,7 +182,7 @@ async fn run_step_checked(
     } else {
         step.key.as_deref()
     };
-    let prepared = prepare(view, document, step, gate, key).await?;
+    let prepared = prepare(view, frame, document, step, gate, key).await?;
     if prepared["ok"] != true {
         return Ok(prepared);
     }
@@ -214,8 +230,9 @@ async fn run_step_checked(
         }
     }
     let script = |action: &str| {
-        call(
+        call_at(
             view,
+            frame,
             "perform",
             json!({"documentId": document, "step": {"action": action, "ref": step.reference}}),
             false,
@@ -231,15 +248,15 @@ async fn run_step_checked(
             }
             let input = json!({"kind": "click", "x": prepared["point"]["x"], "y": prepared["point"]["y"],
                 "button": step.button.as_deref().unwrap_or("left"), "clickCount": step.click_count.unwrap_or(1)});
-            if let Some(result) = native(app, state, view, request, input, &prepared).await? {
+            if let Some(result) = native(input, prepared.clone()).await? {
                 return Ok(
                     json!({"ok": true, "attempted": true, "input": "native", "cursor": result["cursor"]}),
                 );
             }
-            if let Some(cursor) = cursor_script(&prepared) {
+            if let Some(cursor) = cursor_script(&prepared).filter(|_| frame.is_none()) {
                 let _ = view.eval(cursor);
             }
-            call(view, "perform", step_args(document, step), false).await
+            call_at(view, frame, "perform", step_args(document, step), false).await
         }
         "key" => {
             if step.reference.is_some() {
@@ -248,15 +265,14 @@ async fn run_step_checked(
                     return Ok(focused);
                 }
             }
-            if let Some(_result) =
-                native(app, state, view, request, step.native_key(), &prepared).await?
-            {
+            if let Some(_result) = native(step.native_key(), prepared.clone()).await? {
                 return Ok(json!({"ok": true, "attempted": true, "input": "native"}));
             }
-            call(view, "perform", step_args(document, step), false).await
+            call_at(view, frame, "perform", step_args(document, step), false).await
         }
         _ => {
-            let mut result = call(view, "perform", step_args(document, step), false).await?;
+            let mut result =
+                call_at(view, frame, "perform", step_args(document, step), false).await?;
             if step.action == "fill" && step.submit == Some(true) && result["ok"] == true {
                 let enter = Step {
                     action: "key".into(),
@@ -264,11 +280,12 @@ async fn run_step_checked(
                     reference: None,
                     ..step.clone()
                 };
-                let submitted =
-                    match native(app, state, view, request, enter.native_key(), &prepared).await? {
-                        Some(_) => json!({"ok": true, "input": "native"}),
-                        None => call(view, "perform", step_args(document, &enter), false).await?,
-                    };
+                let submitted = match native(enter.native_key(), prepared.clone()).await? {
+                    Some(_) => json!({"ok": true, "input": "native"}),
+                    None => {
+                        call_at(view, frame, "perform", step_args(document, &enter), false).await?
+                    }
+                };
                 result["submitted"] = json!(submitted["ok"] == true);
             }
             Ok(result)
