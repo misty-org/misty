@@ -363,6 +363,9 @@ pub async fn browser_webview_create(
         super::super::extensions::native::register(&webview, &space, &request.id, request.private, &request.url);
     }
     host_messages::install(&webview)?;
+    if !preview_only {
+        super::super::browser_frames::install(&webview)?;
+    }
     #[cfg(target_os = "macos")]
     if !preview_only {
         url_observer::install(&app, &webview, &request.id)?;

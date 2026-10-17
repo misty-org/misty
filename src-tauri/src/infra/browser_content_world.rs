@@ -12,6 +12,44 @@ pub(crate) async fn evaluate_in_content_world(
     world_name: &'static str,
     function_body: String,
 ) -> Result<String, String> {
+    evaluate_in(webview, world_name, function_body, None).await
+}
+
+/// Runs `function_body` in the named world of one cross-origin frame the tab announced
+/// (browser_frames.rs). A frame that no longer answers is forgotten.
+#[cfg(target_os = "macos")]
+pub(crate) async fn evaluate_in_frame(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: u64,
+) -> Result<String, String> {
+    let result = evaluate_in(webview.clone(), world_name, function_body, Some(frame)).await;
+    if result.is_err() {
+        let _ = webview.with_webview(move |platform| unsafe {
+            super::browser_frames::forget(&*platform.inner().cast(), frame);
+        });
+    }
+    result
+}
+
+#[cfg(windows)]
+pub(crate) async fn evaluate_in_frame(
+    _webview: Webview,
+    _world_name: &'static str,
+    _function_body: String,
+    _frame: u64,
+) -> Result<String, String> {
+    Err("Frames are read on macOS.".to_owned())
+}
+
+#[cfg(target_os = "macos")]
+async fn evaluate_in(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: Option<u64>,
+) -> Result<String, String> {
     use block2::RcBlock;
     use objc2::{rc::Retained, runtime::AnyObject, MainThreadMarker};
     use objc2_foundation::{NSError, NSString};
@@ -46,6 +84,16 @@ pub(crate) async fn evaluate_in_content_world(
                     })
                     .clone()
             });
+            let frame = match frame {
+                Some(id) => match super::browser_frames::info(view, id) {
+                    Some(info) => Some(info),
+                    None => {
+                        fail(Err("The frame is gone.".to_owned()));
+                        return;
+                    }
+                },
+                None => None,
+            };
             let done = finish.clone();
             let handler = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
                 let result = if !error.is_null() {
@@ -62,7 +110,7 @@ pub(crate) async fn evaluate_in_content_world(
             view.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
                 &NSString::from_str(&function_body),
                 None,
-                None,
+                frame.as_deref(),
                 &world,
                 Some(&*handler),
             );

@@ -122,7 +122,7 @@ async function openSessionTab(session: HostedSession, url: string, signal: Abort
       },
     });
     await invoke("agent_workspace_bind_scope", { taskId: session.taskId, scopeId });
-    await invoke("browser_webview_hide", { request: { id } });
+    await invoke("browser_webview_hide", { request: { id, keepLive: true } });
   } catch (error) {
     await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
     throw new DeviceOperationNotAttempted(error);
@@ -192,7 +192,9 @@ export async function startHostedSession(
         },
       });
       await invoke("agent_workspace_bind_scope", { taskId, scopeId });
-      await invoke("browser_webview_hide", { request: { id: viewId } });
+      // Parked out of sight rather than hidden: a hidden page stops rendering, and
+      // embedded widgets (schedules, booking calendars) never draw for the agent to read.
+      await invoke("browser_webview_hide", { request: { id: viewId, keepLive: true } });
     } catch (error) {
       await Promise.allSettled([
         invoke("browser_webview_close", { request: { id: viewId } }),

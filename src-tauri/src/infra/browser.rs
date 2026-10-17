@@ -420,8 +420,9 @@ pub struct BrowserWebviewIdRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewHideRequest {
     pub id: String,
-    /// The page floats a video in picture in picture: park it instead of hiding it, so the
-    /// floating window's back-to-tab button still has a page to return to.
+    /// Park the page out of sight instead of hiding it, so it keeps rendering: a video
+    /// floating in picture in picture keeps a page to return to, and an agent's own tab
+    /// keeps drawing the widgets it reads.
     #[serde(default)]
     pub keep_live: bool,
 }

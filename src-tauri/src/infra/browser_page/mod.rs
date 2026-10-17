@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, Webview};
 
 mod batch;
+#[cfg(any(target_os = "macos", windows))]
+mod frames;
 mod site_blocks;
 mod step;
 mod steps;
@@ -140,11 +142,25 @@ pub(super) async fn landed(
     )
     .await;
     let args = json!({"candidateId": uuid::Uuid::new_v4().to_string(), "maxChars": SNAPSHOT_CHARS, "maxRefs": 800});
-    let snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    let mut snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    with_frame_trees(&view, &mut snapshot).await;
     (snapshot["ok"] == true).then(|| {
         json!({"documentId": snapshot["documentId"], "url": snapshot["url"], "title": snapshot["title"],
             "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]})
     })
+}
+
+/// Adds what the page's cross-origin frames show under their iframes (frames.rs).
+async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let reads = frames::trees(view).await;
+        if let (false, Some(tree)) = (reads.is_empty(), snapshot["tree"].as_str()) {
+            snapshot["tree"] = json!(frames::splice_trees(tree, &reads));
+        }
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = (view, snapshot);
 }
 
 fn page_error(result: &Value, fallback: &str) -> String {
@@ -206,9 +222,13 @@ pub(super) async fn execute(
             if let Some(scope) = input["scopeRef"].as_str() {
                 args["scopeRef"] = json!(scope);
             }
-            let result = call(&view, "snapshot", args, true).await?;
+            let scoped = !input["scopeRef"].is_null();
+            let mut result = call(&view, "snapshot", args, true).await?;
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
+            }
+            if !scoped {
+                with_frame_trees(&view, &mut result).await;
             }
             result
         }
@@ -231,9 +251,16 @@ pub(super) async fn execute(
             result
         }
         "browser.extract" => {
-            let result = call(&view, "markdown", json!({"maxChars": 120_000}), false).await?;
+            let mut result = call(&view, "markdown", json!({"maxChars": 120_000}), false).await?;
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
+            }
+            #[cfg(any(target_os = "macos", windows))]
+            {
+                let reads = frames::markdown(&view).await;
+                if let (false, Some(markdown)) = (reads.is_empty(), result["markdown"].as_str()) {
+                    result["markdown"] = json!(frames::append_markdown(markdown, &reads));
+                }
             }
             result
         }
@@ -293,10 +320,15 @@ async fn poll(view: &Webview, condition: &Value, timeout_ms: u64) -> Result<Valu
     let started = Instant::now();
     loop {
         let check = call(view, "waitCheck", condition.clone(), false).await?;
+        // Text can appear inside an embedded widget's frame rather than the page itself.
+        #[cfg(any(target_os = "macos", windows))]
+        let met = check["met"] == true || (condition["text"].is_string() && frames::shows(view, condition).await);
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let met = check["met"] == true;
         let waited = started.elapsed().as_millis() as u64;
-        if check["met"] == true || waited >= timeout_ms {
+        if met || waited >= timeout_ms {
             let page = call(view, "observe", json!({}), false).await?;
-            return Ok(json!({"met": check["met"] == true, "waitedMs": waited, "page": page}));
+            return Ok(json!({"met": met, "waitedMs": waited, "page": page}));
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }

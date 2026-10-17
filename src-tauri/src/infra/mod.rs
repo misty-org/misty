@@ -21,6 +21,7 @@ pub mod power_keep_awake;
 
 #[cfg(all(desktop, any(target_os = "macos", windows)))]
 pub(crate) mod browser_content_world;
+pub(crate) mod browser_frames;
 #[cfg(desktop)]
 pub mod browser_history;
 #[cfg(desktop)]

@@ -198,10 +198,52 @@
 
   const checkedState = (el) => el.tagName === "INPUT" ? el.checked : el.getAttribute("aria-checked") === "true";
 
+  /** The innermost visible element whose text contains `text`, ignoring case and spacing. */
+  const textElement = (text) => {
+    const norm = (value) => String(value || "").replace(/\s+/g, " ").toLowerCase();
+    const want = norm(text).trim();
+    if (!want) return null;
+    const root = document.body || document.documentElement;
+    const visible = (node) => {
+      const box = node.getBoundingClientRect();
+      return box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden";
+    };
+    // Most text sits in one text node; text split across inline tags falls back to elements.
+    const texts = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+      const parent = node.parentElement;
+      if (parent && !/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(parent.tagName) && norm(node.data).includes(want) && visible(parent)) return parent;
+    }
+    let best = null;
+    // Subtrees without the text are skipped whole, so this stays linear on long pages.
+    const elements = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) => /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(node.tagName) || !norm(node.textContent).includes(want)
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    // Walking down the tree, each match inside the last is more specific.
+    for (let node = elements.nextNode(); node; node = elements.nextNode()) if (visible(node)) best = node;
+    if (best) return best;
+    // Text in an embedded widget lives in a frame this document cannot search: show the
+    // largest visible frame from another origin, where it most likely is.
+    let frame = null;
+    let area = 0;
+    for (const candidate of document.querySelectorAll("iframe")) {
+      let inside = null;
+      try { inside = candidate.contentDocument; } catch { inside = null; }
+      if (inside) continue;
+      const box = candidate.getBoundingClientRect();
+      if (box.width * box.height > area && box.width >= 80 && box.height >= 40) { frame = candidate; area = box.width * box.height; }
+    }
+    return frame;
+  };
+
   const scroll = (el, step) => {
     if (step.direction === "into_view") {
-      if (!el) return fail("Give the ref to scroll into view.");
-      el.scrollIntoView({ block: "center", behavior: "instant" });
+      // A piece of text works too, for showing evidence that has no ref (a price, a schedule row).
+      const target = el || (step.text ? textElement(String(step.text)) : null);
+      if (!target) return fail(step.text ? `No visible text on the page matches “${String(step.text).slice(0, 80)}”.` : "Give the ref or the text to scroll into view.");
+      target.scrollIntoView({ block: "center", behavior: "instant" });
+      if (!el && target.tagName === "IFRAME") return { ok: true, attempted: true, scrolled: true, note: "The text is not in the page itself; scrolled to the embedded frame that most likely shows it." };
       return { ok: true, attempted: true, scrolled: true };
     }
     const pages = Math.max(0.1, Math.min(10, Number(step.amount) || 1));

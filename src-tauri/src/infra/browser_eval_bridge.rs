@@ -253,12 +253,13 @@ async fn open(bridge: &Bridge, body: OpenTab) -> Result<Value, String> {
             let _ = window.show();
             let _ = window.set_focus();
         }
-        // Agents' own tabs are hidden, as sub-agents' tabs are in production.
+        // Agents' own tabs are parked out of sight, still rendering, as in production.
         if !body.visible {
             browser_webview_hide(
                 main_view(app)?,
                 app.clone(),
-                serde_json::from_value(json!({ "id": id })).map_err(|e| e.to_string())?,
+                serde_json::from_value(json!({ "id": id, "keepLive": true }))
+                    .map_err(|e| e.to_string())?,
             )?;
         }
         Ok::<(), String>(())

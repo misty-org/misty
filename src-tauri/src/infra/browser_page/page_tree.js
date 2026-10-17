@@ -104,7 +104,9 @@
         if (doc?.body) visitChildren(doc.body, node, false);
         else {
           let origin = "";
-          try { origin = new URL(el.src, el.baseURI).origin; } catch { origin = ""; }
+          // A frame a script navigated (src empty or about:blank) is not the page's own origin.
+          const src = el.getAttribute("src") || "";
+          try { origin = src && !src.startsWith("about:") ? new URL(src, el.baseURI).origin : ""; } catch { origin = ""; }
           node.props.push(origin ? `cross-origin ${origin}` : "cross-origin");
         }
         parent.children.push(node);

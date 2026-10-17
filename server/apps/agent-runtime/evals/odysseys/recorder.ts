@@ -80,8 +80,10 @@ export class Recorder {
     if (!this.bridge) return [];
     const pages = await this.call<{ pages: Array<{ label: string; url: string }> }>("/pages", {}).catch(() => ({ pages: [] }));
     const files: string[] = [];
-    // The agent's own tabs, and tabs it opened for the person during the run.
-    const ours = (label: string) => agentPage(label) || (this.before !== undefined && !this.before.has(label));
+    // Pages opened during the run: its own tabs and tabs it opened for the person. Every run
+    // gets new tabs, so an agent tab open before it started is an earlier task's, kept for
+    // the person until it idles out, and would crowd this run's evidence out of the judge's view.
+    const ours = (label: string) => this.before ? !this.before.has(label) : agentPage(label);
     for (const page of pages.pages.filter((item) => ours(item.label) && item.url.startsWith("http"))) {
       // 640 points is about 1280 pixels on a Retina display: legible text at a judge's price.
       const image = await this.call<{ dataUrl?: string }>("/capture", { label: page.label, maxDimension: 640 }).catch(() => undefined);
