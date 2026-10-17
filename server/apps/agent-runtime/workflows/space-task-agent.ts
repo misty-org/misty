@@ -22,6 +22,7 @@ import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { earlyGiveUp } from "../src/persistence-check.js";
+import { openPages, reviewAnswer, reviewRefusal, worthReviewing } from "../src/requirements-review.js";
 import { deadlineNote } from "../src/turn-deadline.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
@@ -94,6 +95,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   // Early give-ups refused so far, and the turn of the last refusal (src/persistence-check.ts).
   let persistenceRefusals = 0;
   let refusedAtTurn = -1;
+  // The draft answer is checked against the request once (src/requirements-review.ts).
+  let reviewed = false;
   // Recomputed from the transcript before every model call.
   let visibleTools: string[] = [];
   let modelTurn = 0;
@@ -142,6 +145,12 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               refusedAtTurn = modelTurn;
               return { status: "failure", tool_error: { message: unfinished } };
             }
+          }
+          if (!reviewed && worthReviewing(context.prompt, report, modelTurn, limit)) {
+            reviewed = true;
+            const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
+            const gaps = await reviewAnswer(identity, context.model_id, context.prompt, report, pages);
+            if (gaps.length) return { status: "failure", tool_error: { message: reviewRefusal(gaps) } };
           }
           if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
           const refusal = unbackedCompletion(report, messages, catalog.readOnly);

@@ -138,6 +138,8 @@ results in the message.
 | 4 | Oct 18 | 90 turns (eval_turn_limit), long-lived background leases | 0/3, stopped by hand | 0.38 | — | 43 calls / 149 s | $0.34 |
 | 5 | Oct 18 | Allowance per checklist step, 16 tabs, 60-image judge | 0/2, stopped by hand | 0.42 | — | 56 calls / 294 s | $0.34 |
 | 6 | Oct 18 | Websites count as tools, background grading | 0/2, stopped by hand | 0.75 on the shopping task | — | 62 calls / 388 s | $0.21 |
+| 7 | Oct 18 | Stopping a pass cancels its run; 32k output; screen-model calls out of the billing aggregate | 0/2, stopped by hand | 0.07 | — | 45 calls / 523 s | $0.31 |
+| 8 | Oct 18 | Dev tasks 6–10, `medium` | 0/5 | 0.43 | — | 49 calls / 354 s | $0.56 |
 
 ### Fixes before the first batch (October 17)
 
@@ -189,6 +191,23 @@ Every failure was the harness, not the model. In order found:
 | The agent said no tool could create a CryptPad document | R/H | Guidance: websites are tools (`d3d2c3d3`) |
 | One refusal of an early give-up was not enough (4 of 10 pediatricians at turn 13) | R/H | A second refusal after more work (`d8fc661c`) |
 | `screen_open` with `new_tab` took the old hand-off and ended the run | H | `new_tab` and `window` open the agent's own tabs in the run (`2344b0bb`) |
+
+### Batches 7 and 8 (October 18)
+
+| Cause | Label | Fix |
+|---|---|---|
+| Stopping a pass left its run going, spending | E | The runner cancels the run in progress (`1933f8ae`); in the vitest worker the signal does not arrive, so a helper script cancels |
+| A long final memo hit the model's output limit and the run ended with no answer | H | 32k output tokens a turn (`3150e248`) |
+| Runs whose agent used the screen model failed at completion with a billing conflict | H | Screen-model calls stay out of the runtime's aggregate, like extraction (`3150e248`) |
+| Tool calls failed with a generic message and nothing in the logs | E | The API logs the cause (`587923bb`) |
+| The agent asked a clarifying question and stopped (task `adc644f33f`, 0 of 7) | R/H | Assume sensible defaults and say which (`adeef2d6`) |
+| After one uncertain click every later call failed: "the run has an unconfirmed effect" | H | Page actions that can't pay, send or delete are looked at again instead of gating the run (`2b3a00e1`) |
+| Tabs left open by earlier tasks were pictured in later ones: up to 140 screenshots a task, the judge seeing only the last 60 | E | The recorder pictures only pages opened during the run (`c33f0c1f`) |
+| Evidence the task asks to keep open was only fetched, so no tab showed it (R1 of `4614aa0831`, R6 of `42e2344431`) | H | Guidance: those pages are part of the answer, open in tabs and scrolled to the evidence; `scroll into_view` takes text (`7baaa051`) |
+| A studio's class schedule is a cross-origin widget: snapshots, find and extract saw an empty iframe, and in a hidden tab it never drew at all (R2 of `5e09c06aa9`) | K | K1: frames announce themselves from a private content world and the page layer reads inside them; agent tabs are parked instead of hidden so they keep rendering (`7baaa051`) |
+
+"invocation.failed" in these reports is often the agent's own "not finished" ending with a full
+answer, which the judge grades like any other.
 
 Run-to-run variance is large: the shopping task scored 0.75, 0.50 and 0.75 on three runs of nearly the
 same code. Milestone numbers need several trials per task.
