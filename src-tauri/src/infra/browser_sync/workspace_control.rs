@@ -16,7 +16,7 @@ pub async fn browser_sync_claim(
 ) -> Result<(), String> {
     require_main(&webview)?;
     let handle = {
-        let current = session().lock().await;
+        let current = session_by_id(&session_id).await;
         let active = current.as_ref().ok_or("Connect device sync first.")?;
         require_session(active, &session_id)?;
         if !full_sync_enabled(active) {
@@ -41,7 +41,7 @@ pub async fn browser_sync_claim(
 pub async fn browser_sync_flush(webview: tauri::Webview, session_id: String) -> Result<(), String> {
     require_main(&webview)?;
     let handle = {
-        let current = session().lock().await;
+        let current = session_by_id(&session_id).await;
         let active = current.as_ref().ok_or("Connect device sync first.")?;
         require_session(active, &session_id)?;
         active.handle.clone()
@@ -49,17 +49,26 @@ pub async fn browser_sync_flush(webview: tauri::Webview, session_id: String) -> 
     handle.flush().await.map_err(issue)
 }
 
-/// Called once as the app exits, after windows close.
+/// Called once as the app exits, after windows close. Every vault sends
+/// its batched changes within the same bounded wait.
 pub fn flush_before_exit() {
     tauri::async_runtime::block_on(async {
-        let handle = session()
-            .lock()
-            .await
-            .as_ref()
-            .map(|active| active.handle.clone());
-        if let Some(handle) = handle {
-            let _ = tokio::time::timeout(EXIT_FLUSH, handle.flush()).await;
+        let slots: Vec<Slot> = sessions()
+            .vaults
+            .values()
+            .map(|entry| entry.slot.clone())
+            .collect();
+        let mut handles = Vec::new();
+        for slot in slots {
+            if let Some(active) = slot.lock().await.as_ref() {
+                handles.push(active.handle.clone());
+            }
         }
+        let _ = tokio::time::timeout(
+            EXIT_FLUSH,
+            futures_util::future::join_all(handles.iter().map(|handle| handle.flush())),
+        )
+        .await;
     });
 }
 
@@ -69,7 +78,7 @@ pub async fn browser_sync_activate(
     session_id: String,
 ) -> Result<String, String> {
     require_main(&webview)?;
-    let current = session().lock().await;
+    let current = session_by_id(&session_id).await;
     let session = current.as_ref().ok_or("Connect device sync first.")?;
     require_session(session, &session_id)?;
     if !full_sync_enabled(session) {
@@ -119,7 +128,7 @@ pub async fn browser_sync_rename_device(
         return Err("Use a name of 1 to 60 characters.".into());
     }
     let api = {
-        let current = session().lock().await;
+        let current = session_by_id(&session_id).await;
         let active = current.as_ref().ok_or("Connect device sync first.")?;
         require_session(active, &session_id)?;
         if !active
@@ -144,7 +153,7 @@ pub(crate) async fn page_state_worker() -> Result<WorkerHandle, String> {
 
 /// Worker handle and the workspace this machine is on, for page-state reads.
 pub(crate) async fn page_state_reader() -> Result<(WorkerHandle, String), String> {
-    let current = session().lock().await;
+    let current = personal_session().await;
     let active = current.as_ref().ok_or("Device sync is locked.")?;
     if !full_sync_enabled(active) {
         return Err("Full sync is off for this device.".into());
@@ -172,7 +181,7 @@ pub async fn browser_sync_control_device(
     if activate == full_sync.is_some() || (workspace_id.is_some() && !activate) {
         return Err("Choose one device action.".into());
     }
-    let current = session().lock().await;
+    let current = session_by_id(&session_id).await;
     let active = current.as_ref().ok_or("Connect device sync first.")?;
     require_session(active, &session_id)?;
     if !active

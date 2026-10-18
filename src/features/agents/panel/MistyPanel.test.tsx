@@ -30,7 +30,7 @@ vi.mock("@/features/ai-surface/useAiVoiceRecorder", () => ({
 }));
 
 vi.mock("@/features/misty/handoff", () => ({
-  showMistyConversation: vi.fn(),
+  openMistyConversationInNewTab: vi.fn(),
 }));
 
 const mockAgent = {
@@ -96,8 +96,8 @@ describe("MistyPanel", () => {
     const chat = container.querySelector(".agents-chat");
     expect(chat).toBeTruthy();
 
-    expect(screen.getByRole("button", { name: /Close Misty/i })).toBeDefined();
-    expect(screen.getByRole("button", { name: /Open in Agents/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Close chat/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Open full chat/i })).toBeDefined();
     expect(screen.getByPlaceholderText(/Message Misty Assistant/i)).toBeDefined();
   });
 
@@ -130,7 +130,7 @@ describe("MistyPanel", () => {
       </MemoryRouter>,
     );
 
-    const closeBtn = screen.getByRole("button", { name: /Close Misty/i });
+    const closeBtn = screen.getByRole("button", { name: /Close chat/i });
     fireEvent.click(closeBtn);
     expect(useMistyPanelStore.getState().open).toBe(false);
   });

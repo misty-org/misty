@@ -6,6 +6,7 @@ import {
 } from "@/features/workspace";
 import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
 import { browserLibrary } from "./native";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /** Finds a tab in any virtual window or Space, active or not. */
 function findWorkspaceView(tabId: string): WorkspaceView | null {
@@ -25,20 +26,20 @@ function historyTarget(tabId: string): { profileId?: string } | null {
   const tab = findWorkspaceView(tabId);
   if (!tab) return null;
   const state = parseBrowserViewState(tab.state);
-  if (state.agentOwned || state.private || isBrowserInternalUrl(state.url)) return null;
+  if (state.agentOwned || isIncognitoWindow() || isBrowserInternalUrl(state.url)) return null;
   return { profileId: state.profileId };
 }
-const typedNavigations = new Map<string, number>();
-
-/** Marks the tab's next visit as typed by the person, which ranks it higher in the address bar. */
-export function markBrowserNavigationTyped(tabId: string): void {
-  typedNavigations.set(tabId, Date.now());
-}
-
-/** Removes a page from the tab's profile history. Private and agent tabs have none. */
-export function forgetBrowserPage(tabId: string, url: string): Promise<void> {
+/**
+ * Records a finished page load as a visit, so the address bar's recent pages and history
+ * have something to show. The title usually arrives later and updates this visit.
+ */
+export function recordBrowserVisit(tabId: string, url: string): void {
+  if (!/^https?:\/\//i.test(url)) return;
   const target = historyTarget(tabId);
-  return target ? browserLibrary.forgetPage({ ...target, url }) : Promise.resolve();
+  if (!target) return;
+  const tab = findWorkspaceView(tabId);
+  const title = tab?.title ?? "";
+  void browserLibrary.recordVisit({ ...target, url, title }).catch(() => undefined);
 }
 
 export function recordBrowserVisitTitle(tabId: string, url: string, title: string): void {

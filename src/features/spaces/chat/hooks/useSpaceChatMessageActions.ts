@@ -90,6 +90,33 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     draft.reset();
     await deliver(optimisticMessage, value);
   };
+  /** Posts a reply to one message without touching the main composer; the thread panel uses it. */
+  const sendReply = async (replyToMessageId: string, text: string) => {
+    const value = text.trim();
+    if (!value) return;
+    const clientNonce = createClientNonce();
+    await deliver(
+      {
+        seq: Date.now(),
+        id: `optimistic_${clientNonce}`,
+        client_nonce: clientNonce,
+        local_delivery_state: "sending",
+        space_id: spaceId,
+        conversation_id: conversationId || undefined,
+        sender_user_id: options.currentUser?.id ?? "",
+        sender_name: options.currentUser?.name || "You",
+        sender_kind: "person",
+        content: buildMessageSpans(value, members, options.agents),
+        file_node_ids: [],
+        library_item_ids: [],
+        attachments: [],
+        reactions: [],
+        reply_to_message_id: replyToMessageId,
+        created_at: new Date().toISOString(),
+      },
+      value,
+    );
+  };
   const deliver = async (message: SpaceMessage, value: string) => {
     const nonce = message.client_nonce;
     if (!nonce || sending.current.has(nonce)) return;
@@ -223,6 +250,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
   };
   return {
     submit,
+    sendReply,
     retry,
     saveEdited,
     remove,

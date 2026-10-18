@@ -96,7 +96,7 @@ describe("AppearanceSection app zoom", () => {
       </SettingsPageScope.Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Reset App zoom to default" }));
-    expect(edit).toHaveBeenCalledWith("app.zoom", undefined);
+    expect(edit).toHaveBeenCalledWith("app.zoom", undefined, { stage: true });
     // Theme is still at its default, so it offers no Reset.
     expect(screen.queryByRole("button", { name: "Reset Theme to default" })).toBeNull();
     view.unmount();

@@ -96,7 +96,6 @@
   height: 6px;
 }
 .misty-now-playing-bar[data-scrubbing] > span {
-  transition: none;
   background: var(--misty-theme-text-bright);
 }
 .misty-now-playing-bar[data-seekable]::after {
@@ -109,17 +108,26 @@
   position: absolute;
   inset: 0 auto 0 0;
   background: var(--misty-theme-text-muted);
-  transition: width 100ms linear;
+  /* The fill follows the clock's own animated position, so it moves with no script ticking. */
+  width: calc(var(--playback-position) / var(--playback-length) * 100%);
 }
+/* Source on the left, mute on the right, and the transport exactly in the middle of the card, so
+   the breadcrumbs beneath it can line up with it. */
 .misty-now-playing-controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+.misty-now-playing-controls > :first-child {
+  justify-self: start;
+}
+.misty-now-playing-controls > :last-child {
+  justify-self: end;
+}
+.misty-now-playing-transport {
   display: flex;
   align-items: center;
-  gap: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .misty-now-playing-bar > span {
-    transition: none;
-  }
+  gap: 10px;
 }
 
 /* In the vertical sidebar the player is part of the panel: a lifted card above the foot, one per
@@ -137,4 +145,37 @@
 }
 .misty-sidebar-now-playing .misty-now-playing-card + .misty-now-playing-card {
   border-top: 1px solid var(--color-charcoal-border);
+}
+
+/* Breadcrumbs, at the card's foot, centered under the transport: the dots between two arrows,
+   with clear room on either side so the arrows never crowd them. */
+.misty-now-playing-crumbs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: fit-content;
+  margin: 2px auto 0;
+  color: var(--misty-theme-text-muted, rgba(255, 255, 255, 0.5));
+}
+.misty-now-playing-crumbs > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.misty-now-playing-crumb {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  transition:
+    width 160ms ease-out,
+    background-color 160ms ease-out;
+}
+.misty-now-playing-crumb:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+.misty-now-playing-crumb.is-selected {
+  width: 16px;
+  background: var(--misty-theme-text-bright, rgba(255, 255, 255, 0.95));
 }

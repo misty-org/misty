@@ -1,10 +1,8 @@
-import type { MessageSpan, SpaceRole, SpaceTaskPriority, SpaceTaskStatus } from "./common";
-import type { SpaceTaskSourceRef } from "./agentTaskTypes";
+import type { MessageSpan, SpaceRole } from "./common";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
 import type { SpaceMessageSender } from "./conversationTypes";
-export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
-export type * from "./agentTaskTypes";
+export type * from "./memberTypes";
 export type * from "./conversationTypes";
 
 export interface Space {
@@ -17,7 +15,6 @@ export interface Space {
   member_count: number;
   pending_count: number;
   is_shared: boolean;
-  permissions?: Record<string, boolean>;
   created_at: string;
   updated_at: string;
 }
@@ -36,42 +33,8 @@ export interface SpaceInvitation {
   created_at: string;
 }
 
-type SpaceIntegrationProvider = "google";
-
-interface SpaceTemplateSeedSummary {
-  task_count: number;
-  note_count: number;
-  collection_count: number;
-}
-
-/** Exactly what a template creates, shown before anything exists. */
-interface SpaceTemplateSeedPreview {
-  tasks: string[];
-  notes: string[];
-  collections: string[];
-}
-
-export interface SpaceTemplate {
-  /** Saved by the person from one of their Spaces. */
-  personal?: boolean;
-  id: string;
-  name: string;
-  description: string;
-  version: number;
-  /** A key the client maps to a monochrome glyph. */
-  icon: string;
-  /** Fills the name field until the person types their own; empty for Blank. */
-  suggested_name: string;
-  seed_summary: SpaceTemplateSeedSummary;
-  seed_preview: SpaceTemplateSeedPreview;
-}
-
 export interface CreateSpaceRequest {
   name: string;
-  template_id: string;
-  /** Copies this Space's structure instead of using a template. */
-  source_space_id?: string;
-  integration_providers: SpaceIntegrationProvider[];
 }
 
 /** Someone the person already shares a Space with. */
@@ -81,17 +44,8 @@ export interface SpacePerson {
   email: string;
 }
 
-export interface SpaceSetup {
-  selected_providers: SpaceIntegrationProvider[];
-  completed_providers: SpaceIntegrationProvider[];
-  pending_providers: SpaceIntegrationProvider[];
-}
-
 export interface CreateSpaceResult {
   space: Space;
-  setup: SpaceSetup;
-  /** The Space exists, but some starter notes could not be added. */
-  seed_incomplete?: boolean;
 }
 
 export interface SpaceInvitationPreview {
@@ -99,95 +53,6 @@ export interface SpaceInvitationPreview {
   inviter_name: string;
   invited_email: string;
   expires_at: string;
-}
-
-export interface SpaceTask {
-  id: string;
-  space_id: string;
-  task_number: number;
-  task_key: string;
-  title: string;
-  notes: string;
-  status: SpaceTaskStatus;
-  priority: SpaceTaskPriority;
-  rank: number;
-  assignee_user_id?: string;
-  assignee_agent_id?: string;
-  due_at?: string;
-  due_timezone: string;
-  source_refs: SpaceTaskSourceRef[];
-  created_by_user_id?: string;
-  created_by_agent_id?: string;
-  source_run_id?: string;
-  version: number;
-  completed_at?: string;
-  archived_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SpaceTaskPage {
-  tasks: SpaceTask[];
-  next_cursor?: string;
-  status_totals: Record<SpaceTaskStatus, number>;
-}
-
-export interface SpaceTaskMoveResult {
-  task: SpaceTask;
-  reordered: SpaceTask[];
-}
-
-export interface SpaceCalendarSource {
-  id: string;
-  space_id: string;
-  integration_id: string;
-  connected_by_user_id: string;
-  provider: string;
-  external_calendar_id: string;
-  display_name: string;
-  timezone: string;
-  watch_expires_at?: string;
-  status: "pending" | "syncing" | "active" | "needs_attention" | "disabled";
-  last_error_code?: string;
-  last_reconciled_at?: string;
-  disabled_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface GoogleCalendarChoice {
-  id: string;
-  summary: string;
-  timeZone: string;
-  primary?: boolean;
-  accessRole: string;
-}
-
-export interface SpaceCalendarEvent {
-  id: string;
-  space_id: string;
-  source_id: string;
-  provider: string;
-  external_event_id: string;
-  fingerprint: string;
-  title: string;
-  description: string;
-  location: string;
-  meeting_url: string;
-  organizer: Record<string, unknown>;
-  starts_at: string;
-  ends_at: string;
-  all_day: boolean;
-  timezone: string;
-  status: "confirmed" | "tentative" | "canceled";
-  provider_created_at?: string;
-  provider_updated_at?: string;
-  removed_at?: string;
-  created_at: string;
-  updated_at: string;
-  version?: number;
-  audience_kind?: "space" | "conversation";
-  audience_conversation_id?: string;
 }
 
 export interface SpaceMessage {

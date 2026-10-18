@@ -91,7 +91,7 @@ pub fn snapshot() -> ChannelSnapshot {
 
 fn emit<S: Serialize + Clone>(app: &Option<AppHandle>, event: &str, payload: S) {
     if let Some(app) = app {
-        let _ = app.emit_to("main", event, payload);
+        let _ = crate::infra::space_windows::emit(&app, event, payload);
     }
 }
 

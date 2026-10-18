@@ -2,91 +2,35 @@ import { useCallback, useEffect } from "react";
 import type { LibraryCollectionKind, SpaceLibraryData } from "../types/useSpaceLibraryData";
 import { libraryCollectionKinds } from "../useSpaceLibraryData";
 
-export type SelectCollection = (next: LibraryCollectionKind, id?: string) => void;
+export type SelectCollection = (next: LibraryCollectionKind) => void;
 
 /**
- * Keeps the selected collection and the `?collection=` URL in step.
- *
- * Beta-only collections are not browsable, so their legacy URLs redirect to
- * Recently Added rather than rendering an empty or hidden surface.
- * Opening a specific album also switches the sort to the album's own order.
+ * Keeps the selected collection and the `?collection=` URL in step. Unknown
+ * collections in old URLs fall back to Recent.
  */
 export function useLibraryCollectionRoute(data: SpaceLibraryData): SelectCollection {
-  const {
-    librarySearchParams,
-    setLibrarySearchParams,
-    requestedCollection,
-    requestedCollectionId,
-    setCollection,
-    setSelectedCollectionId,
-    sort,
-    setSort,
-    setDirection,
-  } = data;
+  const { librarySearchParams, setLibrarySearchParams, requestedCollection, setCollection } = data;
 
   const selectCollection: SelectCollection = useCallback(
-    (next, id = "") => {
-      if (next === "people" || next === "groups") {
-        next = "recent";
-        id = "";
-      }
+    (next) => {
       setCollection(next);
-      setSelectedCollectionId(id);
-
       const nextSearchParams = new URLSearchParams(librarySearchParams);
       nextSearchParams.set("collection", next);
-      if (id) nextSearchParams.set("collectionId", id);
-      else nextSearchParams.delete("collectionId");
+      nextSearchParams.delete("collectionId");
       if (nextSearchParams.toString() !== librarySearchParams.toString())
         setLibrarySearchParams(nextSearchParams, { replace: true });
-
-      if (next === "albums" && id) {
-        setSort("album-order");
-        setDirection("asc");
-      } else if (sort === "album-order") {
-        setSort("recently-added");
-        setDirection("desc");
-      }
     },
-    [
-      librarySearchParams,
-      setCollection,
-      setDirection,
-      setLibrarySearchParams,
-      setSelectedCollectionId,
-      setSort,
-      sort,
-    ],
+    [librarySearchParams, setCollection, setLibrarySearchParams],
   );
 
   useEffect(() => {
-    if (requestedCollection === "people" || requestedCollection === "groups") {
-      selectCollection("recent");
-      return;
-    }
-    if (
-      !requestedCollection ||
-      !libraryCollectionKinds.has(requestedCollection as LibraryCollectionKind)
-    )
-      return;
-    const nextCollection = requestedCollection as LibraryCollectionKind;
-    setCollection(nextCollection);
-    setSelectedCollectionId(requestedCollectionId);
-    if (nextCollection === "albums" && requestedCollectionId) {
-      setSort("album-order");
-      setDirection("asc");
-    } else {
-      setSort((current) => (current === "album-order" ? "recently-added" : current));
-    }
-  }, [
-    requestedCollection,
-    requestedCollectionId,
-    selectCollection,
-    setCollection,
-    setDirection,
-    setSelectedCollectionId,
-    setSort,
-  ]);
+    if (!requestedCollection) return;
+    setCollection(
+      libraryCollectionKinds.has(requestedCollection as LibraryCollectionKind)
+        ? (requestedCollection as LibraryCollectionKind)
+        : "recent",
+    );
+  }, [requestedCollection, setCollection]);
 
   return selectCollection;
 }

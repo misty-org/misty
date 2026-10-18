@@ -1,4 +1,4 @@
-import { MessageCircleQuestion } from "lucide-react";
+import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { useCollaborationStore } from "./store";
 import type { AgentQuestionSet } from "./types";
 import "./collaboration.css";
@@ -25,22 +25,25 @@ export function AgentAnsweredQuestions({
   );
   if (!answered.length) return null;
   return (
-    <div className="agent-answered-questions">
+    <>
       {answered.map((set) => (
-        <p key={set.id}>
-          <MessageCircleQuestion size={13} aria-hidden="true" />
-          <span className="agent-answered-label">You answered</span>
+        <StatusTable key={set.id} label="You answered">
           {set.questions.map((question, index) => {
             const answer = set.answers?.[index];
             const parts = [...(answer?.selected ?? []), ...(answer?.other ? [answer.other] : [])];
             return (
-              <span key={question.header + index} className="agent-answered-item">
-                {question.header}: {parts.join("; ")}
-              </span>
+              <StatusRow
+                key={question.header + index}
+                state="done"
+                verb="You answered"
+                meta={parts.join("; ")}
+              >
+                {question.header}
+              </StatusRow>
             );
           })}
-        </p>
+        </StatusTable>
       ))}
-    </div>
+    </>
   );
 }

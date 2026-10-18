@@ -6,9 +6,10 @@ import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-se
 import { MistyActivityStatus } from "@/features/global-search/MistyActivityStatus";
 import { MistyMessageAttachments } from "@/features/global-search/MistyMessageAttachments";
 import mistyCompanion from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
-import { AnimatedEllipsis, Button, cn } from "@/shared/ui";
+import { Button, cn } from "@/shared/ui";
 import { CalendarClock, Flag, Inbox } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
+import { AgentMessageChecklist } from "../collaboration/AgentChecklist";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
 import { AnswerChanges } from "./changes/AnswerChanges";
@@ -16,7 +17,10 @@ import { splitReplyQuote } from "./replyQuote";
 import { AgentProgress } from "../progress/AgentProgress";
 import { useMessageProgress } from "../progress/useMessageProgress";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
+import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
 import { AgentNotebookCard } from "./AgentNotebookCard";
+import { AgentRunOutcome } from "./AgentRunOutcome";
+import { splitUnfinished } from "../progress/unfinished";
 import { AgentSubagents } from "./AgentSubagents";
 import { continuationEvent } from "../progress/continuationEvent";
 import { Link } from "react-router-dom";
@@ -83,17 +87,9 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
             message.role === "assistant" &&
             (message.state === "pending" || message.state === "streaming"),
         ) ? (
-          <div className="agent-message-assistant flex items-start gap-3.5" role="status">
+          <div className="agent-message-assistant flex items-start gap-3.5">
             <MistyAvatar />
-            <div className="min-w-0">
-              <div className="agent-message-status text-[13px] font-medium text-cream">
-                Misty is working
-                <AnimatedEllipsis />
-              </div>
-              <p className="mb-0 text-xs text-cream-muted">
-                You can leave this conversation while the task continues.
-              </p>
-            </div>
+            <MistyActivityStatus />
           </div>
         ) : null}
       </div>
@@ -172,9 +168,15 @@ const AgentMessage = memo(AgentMessageView, (previous, next) => {
 function AgentMessageView(props: AgentMessageProps) {
   const message = props.message;
   const progress = useMessageProgress(message);
-  const content = visibleConversationContent(message.content, message.role);
+  const visible = visibleConversationContent(message.content, message.role);
+  const ended = message.role === "assistant" && (message.state === "failed" || message.state === "canceled");
+  const { answer, remaining } = ended ? splitUnfinished(visible) : { answer: visible, remaining: [] };
+  // A failure's own words go in its table row, never in the answer's place.
+  const content = ended && !remaining.length ? "" : answer;
+  const failure = ended && !remaining.length && message.state === "failed" ? visible : "";
   if (
     !content &&
+    !ended &&
     !message.appRequest &&
     !message.notebook &&
     !message.subagents?.length &&
@@ -191,8 +193,9 @@ function AgentMessageView(props: AgentMessageProps) {
           Continued toward the goal
         </p>
       );
-    const event = continuationEvent(content, message.source);
-    if (event) return <p className="agent-progress-event">{event}</p>;
+    // A turn Misty sent itself after a card was answered has no line of its own: the checklist
+    // above it already shows what it is doing next.
+    if (continuationEvent(content, message.source)) return null;
     const reply = splitReplyQuote(content);
     return (
       <div className="agent-message-user group/message flex flex-col items-end gap-1.5">
@@ -240,12 +243,22 @@ function AgentMessageView(props: AgentMessageProps) {
         {props.steps?.map((step) => (
           <EarlierReply key={step.id} message={step} />
         ))}
+        <AgentMessageChecklist
+          conversationId={props.conversationId}
+          invocationId={message.invocationId}
+          running={message.state === "pending" || message.state === "streaming"}
+          hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
+        />
         {progress?.length ? <AgentProgress items={progress} /> : null}
         {message.subagents?.length ? <AgentSubagents subagents={message.subagents} /> : null}
         {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}
         {content ? (
           <div className="misty-markdown-message text-[14px] leading-6 text-cream">
             <MistyMarkdown>{content}</MistyMarkdown>
+            <LinkPreviews
+              text={content}
+              enabled={message.state !== "pending" && message.state !== "streaming"}
+            />
           </div>
         ) : (message.state === "pending" || message.state === "streaming") &&
           // A running tool's row already says what Misty is doing.
@@ -253,6 +266,16 @@ function AgentMessageView(props: AgentMessageProps) {
           <div className="agent-message-status">
             <MistyActivityStatus activity={message.activity} />
           </div>
+        ) : null}
+        {ended ? (
+          <AgentRunOutcome
+            message={message}
+            remaining={remaining}
+            failure={failure}
+            retryPrompt={props.retryPrompt}
+            working={props.working}
+            onRetry={props.onRetry}
+          />
         ) : null}
         <AnswerChanges message={message} conversationId={props.conversationId} />
         {message.citations?.length ? (

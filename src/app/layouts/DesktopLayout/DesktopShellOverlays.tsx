@@ -1,7 +1,7 @@
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { WorkflowSchedulesBridge } from "@/features/agents";
 import { BrowserSearchDialog } from "@/features/browser-workspace/BrowserSearchDialog";
-import { GlobalMisty } from "@/features/global-search";
+import { MistyContextBridgeHost } from "@/features/misty/MistyContextBridgeHost";
 import { BrowserContextMenuBridge } from "@/features/global-search/BrowserContextMenuBridge";
 import { FirstRunSetup } from "@/features/setup";
 import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
@@ -12,21 +12,11 @@ export function DesktopShellOverlays(props: {
   settingsOpen: boolean;
   onCloseSettings: () => void;
   userId: string | undefined;
-  currentPath: string;
-  activePaneId: string;
-  activeWorkspacePaneId: string | undefined;
 }) {
   return (
     <>
       <SettingsOverlay open={props.settingsOpen} onClose={props.onCloseSettings} />
-      {props.userId ? (
-        <GlobalMisty
-          accountId={props.userId}
-          currentPath={props.currentPath}
-          activePaneId={props.activePaneId}
-          activeWorkspacePaneId={props.activeWorkspacePaneId}
-        />
-      ) : null}
+      {props.userId ? <MistyContextBridgeHost /> : null}
       <BrowserSearchDialog />
       <BrowserRuntimeBridge />
       <BrowserContextMenuBridge />

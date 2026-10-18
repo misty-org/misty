@@ -1,0 +1,104 @@
+/* The dictation pill: monochrome, as the approved palette asks. Status is
+   carried by text and the meter, never by color. */
+.dictation-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  height: 40px;
+  margin: 6px;
+  padding: 0 8px 0 12px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  background: rgb(22 22 24 / 96%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
+  color: #ececee;
+  font:
+    500 13px/1.2 system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+.dictation-pill-meter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+
+.dictation-pill-meter i {
+  display: block;
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: height 80ms linear;
+}
+
+.dictation-pill-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dictation-pill-provisional,
+.dictation-pill-note {
+  color: rgb(255 255 255 / 55%);
+}
+
+.dictation-pill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 70%);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dictation-pill-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 6%);
+  color: inherit;
+  cursor: pointer;
+}
+
+.dictation-pill-button:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.dictation-pill-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.dictation-pill-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgb(255 255 255 / 25%);
+  border-top-color: #fff;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dictation-pill-spinner {
+    animation: dictation-pill-spin 0.9s linear infinite;
+  }
+}
+
+@keyframes dictation-pill-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

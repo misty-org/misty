@@ -13,6 +13,7 @@ import {
 } from "@/features/workspace/browserSearchEngine";
 import { compatObject, type CompatCaller, type CompatHandler } from "./events";
 import { systemHandlers } from "./system";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 function activeBrowserRuntime(): string {
   const view = activeLayoutView(useWorkspaceStore.getState().layout);
@@ -27,7 +28,7 @@ function closedBrowserTabs(caller: CompatCaller) {
     .closedItems.map((item, index) => ({ item, index }))
     .filter(({ item }) => {
       if (item.view.surfaceId !== "browser") return false;
-      return caller.privateAccess || !parseBrowserViewState(item.view.state).private;
+      return caller.privateAccess || !isIncognitoWindow();
     });
 }
 
@@ -39,7 +40,7 @@ function session(view: WorkspaceView) {
       sessionId: view.id,
       url: state.url ?? "about:blank",
       title: view.title ?? "",
-      incognito: state.private ?? false,
+      incognito: isIncognitoWindow(),
       active: false,
       highlighted: false,
       pinned: false,
@@ -74,8 +75,8 @@ export const workspaceHandlers: Record<string, CompatHandler> = {
       workspace.updateBrowserView(current.id, { url });
       return;
     }
-    if (disposition === "NEW_WINDOW") workspace.createWindow();
-    useWorkspaceStore.getState().openBrowserView({ url, private: false });
+    // This Space has one window; a new window's search opens as a new tab in it.
+    useWorkspaceStore.getState().openBrowserView({ url });
   },
   "sessions.getRecentlyClosed": ([filter], caller) => {
     const max = Number(compatObject(filter).maxResults);

@@ -1,18 +1,18 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
 import { useLibraryShortcut as useShortcutHandler } from "../LibraryRuntime";
 import { useLibraryFocused as useWorkspaceViewFocused } from "../LibraryRuntime";
-import type { LibrarySharedReference, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useCallback } from "react";
-import { copyBlobFilesToClipboard, copyLibraryItemsToClipboard } from "../libraryClipboard";
+import { copyLibraryItemsToClipboard } from "../libraryClipboard";
 import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import type { SpaceLibraryData } from "../types/useSpaceLibraryData";
 
 /** Copying, duplicating and pasting edits across the current selection. */
 export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promise<void>) {
   const workspaceFocused = useWorkspaceViewFocused();
-  const { spaceId, canEditLibrary, canCopyLibrary, selectedItems, selectedItemId } = data;
+  const { spaceId, canEditLibrary, selectedItems, selectedItemId } = data;
   const { setSelectedItemIds, bulkSaving, setBulkSaving, setLocalError } = data;
-  const { copiedEditDefinition, sensitiveCollectionToken } = data;
+  const { copiedEditDefinition } = data;
 
   const run = useCallback(
     async (action: () => Promise<void>, fallback: string) => {
@@ -31,27 +31,19 @@ export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promis
 
   const copyItemsToClipboard = useCallback(
     async (itemsToCopy: SpaceLibraryItem[]) => {
-      if (!canCopyLibrary || itemsToCopy.length === 0 || bulkSaving) return;
+      if (itemsToCopy.length === 0 || bulkSaving) return;
       await run(async () => {
-        await copyLibraryItemsToClipboard(spaceId, itemsToCopy, sensitiveCollectionToken);
+        await copyLibraryItemsToClipboard(spaceId, itemsToCopy);
         setSelectedItemIds([]);
       }, "The selected Library items could not be copied.");
     },
-    [bulkSaving, canCopyLibrary, run, sensitiveCollectionToken, setSelectedItemIds, spaceId],
+    [bulkSaving, run, setSelectedItemIds, spaceId],
   );
 
-  const copySharedReferenceToClipboard = async (reference: LibrarySharedReference) => {
-    if (!canCopyLibrary || bulkSaving) return;
-    await run(async () => {
-      const blob = await spacesApi.sharedReferenceContent(spaceId, reference.id);
-      await copyBlobFilesToClipboard([{ name: reference.display_name, blob }]);
-    }, "The shared Library item could not be copied.");
-  };
-
   const duplicateItems = async (itemIDs: string[]) => {
-    if (!canEditLibrary || !canCopyLibrary || itemIDs.length === 0 || bulkSaving) return;
+    if (!canEditLibrary || itemIDs.length === 0 || bulkSaving) return;
     await run(async () => {
-      await spacesApi.duplicateLibraryItems(spaceId, itemIDs, sensitiveCollectionToken);
+      await spacesApi.duplicateLibraryItems(spaceId, itemIDs);
       setSelectedItemIds([]);
       await reload();
     }, "The selected Library items could not be duplicated.");
@@ -69,20 +61,8 @@ export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promis
     }
     await run(async () => {
       for (const item of editableItems) {
-        const result = await spacesApi.createEditVersion(
-          spaceId,
-          item,
-          copiedEditDefinition,
-          sensitiveCollectionToken,
-        );
-        if (result.edit)
-          await spacesApi.renderEditVersion(
-            spaceId,
-            item.id,
-            result.edit.id,
-            0,
-            sensitiveCollectionToken,
-          );
+        const result = await spacesApi.createEditVersion(spaceId, item, copiedEditDefinition);
+        if (result.edit) await spacesApi.renderEditVersion(spaceId, item.id, result.edit.id, 0);
       }
       setSelectedItemIds([]);
       await reload();
@@ -95,8 +75,8 @@ export function useLibraryClipboard(data: SpaceLibraryData, reload: () => Promis
       () => void copyItemsToClipboard(selectedItems),
       [copyItemsToClipboard, selectedItems],
     ),
-    workspaceFocused && canCopyLibrary && selectedItems.length > 0 && !selectedItemId,
+    workspaceFocused && selectedItems.length > 0 && !selectedItemId,
   );
 
-  return { copyItemsToClipboard, copySharedReferenceToClipboard, duplicateItems, pasteEdits };
+  return { copyItemsToClipboard, duplicateItems, pasteEdits };
 }

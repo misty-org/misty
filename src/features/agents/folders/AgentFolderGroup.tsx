@@ -145,7 +145,7 @@ export function AgentFolderGroup({
         <AlertDialogContent>
           <AlertDialogTitle>Delete “{folder.name}”?</AlertDialogTitle>
           <AlertDialogDescription>
-            The project is removed. Its conversations move back to Recents and are not deleted.
+            The project is removed. Its conversations move back to Conversations and are not deleted.
           </AlertDialogDescription>
           {error && (
             <p role="alert" className="text-sm text-cream-muted">

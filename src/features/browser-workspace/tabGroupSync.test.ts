@@ -25,7 +25,7 @@ const group = (id: string, extra: Partial<MistyTabGroup> = {}): MistyTabGroup =>
   id,
   name: id,
   color: "blue",
-  scopeKey: "global",
+  scopeKey: "space:personal",
   collapsed: false,
   ...extra,
 });

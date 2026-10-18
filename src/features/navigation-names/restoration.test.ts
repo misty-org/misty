@@ -9,7 +9,6 @@ import {
   tabNameKey,
   groupNameKey,
   useNavigationNames,
-  windowNameKey,
 } from "./store";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command, args) => {
@@ -47,7 +46,7 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
   store.renameView(tab.id, "Latest page");
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   store.setScope("space:family");
-  store.setScope("global");
+  store.setScope("space:personal");
   expect(navigationName(tabNameKey(tab.id), "Latest page")).toBe("School");
   const migrated = normalizeWorkspaceLayout(
     JSON.parse(JSON.stringify(useWorkspaceStore.getState().layout)),
@@ -102,23 +101,4 @@ it("only prunes discarded restore aliases and keeps open group and sidebar alias
     "section:browser": "Web",
   });
   expect(useWorkspaceStore.getState().closedItems).toEqual([]);
-});
-
-it("keeps window names on reopen and clears only discarded window history", async () => {
-  const store = useWorkspaceStore.getState();
-  const openId = store.activeWindowId;
-  const closed = store.createWindow("Window 2");
-  useNavigationNames.setState({
-    names: {
-      [windowNameKey(openId)]: "Writing",
-      [windowNameKey(closed.id)]: "Research",
-      "window:expired": "Old window",
-    },
-  });
-  expect(store.closeWindow(closed.id)).toBe(true);
-  expect(store.reopenClosedWindow()?.id).toBe(closed.id);
-  expect(navigationName(windowNameKey(closed.id), closed.title)).toBe("Research");
-  expect(store.closeWindow(closed.id)).toBe(true);
-  await clearNavigationRestoreHistory();
-  expect(useNavigationNames.getState().names).toEqual({ [windowNameKey(openId)]: "Writing" });
 });

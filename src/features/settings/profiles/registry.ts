@@ -55,14 +55,6 @@ export const settingSearchEntries: SettingSearchEntry[] = [
     platforms: ["desktop"],
     keywords: ["memory", "remember", "personal"],
   },
-  {
-    id: "agents.models.catalog",
-    label: "Filter models",
-    page: "models",
-    owner: "account",
-    platforms: ["desktop"],
-    keywords: ["available", "capabilities", "provider"],
-  },
 ];
 export const definitionById = new Map(settingDefinitions.map((d) => [d.id, d]));
 export function definitionForLegacy(section: string, key: string) {

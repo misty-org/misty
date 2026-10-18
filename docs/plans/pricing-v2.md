@@ -3,6 +3,34 @@
 Agreed 2026-10-09. Phases 1–5 implemented 2026-10-09 (uncommitted); Stripe test
 mode configured; phase 6 (production) and live Stripe remain.
 
+## Decided 2026-10-16: free plan and one house model
+
+These override the tables and rules below where they disagree.
+
+- **AI spend only ever comes from paying users' money.** Misty never pays for free
+  users' AI out of pocket. The prepaid AI Gateway balance (no auto top-up) is the hard
+  ceiling.
+- **One house model.** Agents run on `anthropic/claude-haiku-5.5` on every plan; users
+  never pick a model or effort. The Models row, Fast / Mid / Flagship and the
+  per-plan default model no longer apply. Plans differ in how much AI, storage and
+  concurrency they include.
+- **Free (Basic) has no recurring AI allowance.** It includes:
+  - the browser, with sync, sign-ins and extensions;
+  - **a one-time agent taste**: about 10 agent tasks (200k weighted tokens, $0.20)
+    once per account, drawn from a **free pool funded by 5% of paid revenue** over
+    the last 31 days. With no paying users the pool is $0 and nobody gets the taste.
+    When a month's pool is used up, free users see that free tries are full and
+    when they refill;
+  - **referral bonuses**: agent tasks earned when a referred friend subscribes,
+    funded by that subscription.
+- **Coding is Pro and above** (decided later on 2026-10-16), enforced on the server
+  with `plan_upgrade_required`, including the hand-off to the person's own Claude
+  Code or Codex; outside agents driving Misty are detected and blocked.
+- The free taste is one-time, with no card and no countdown, so it replaces "the
+  free tier is the trial".
+- Background AI jobs (conversation titles, dictation cleanup, day summaries) need AI
+  allowance, so they don't run for free accounts without the taste or a bonus.
+
 ## As built
 
 - Models: Fast `openai/gpt-6-luna` ($0.10/$0.50 per M), paid default Mid
@@ -22,17 +50,18 @@ mode configured; phase 6 (production) and live Stripe remain.
   a Go socket like Realtime's), the fast model, then ElevenLabs Flash v2.5
   speech ($0.04 per 1,000 characters, through the runtime's AI SDK,
   `@ai-sdk/elevenlabs` 3.0.30), about 15k per reply (admission bound ~25k;
-  replies capped at 300 tokens and 600 characters). Paid plans keep Realtime.
+  replies capped at 300 tokens and 600 characters). Every plan uses the pipeline;
+  `MISTY_VOICE_PIPELINE=realtime` opts a server back into Realtime.
   Both use the same voice style prompt (a warm, patient teacher; brief; replies
   in the user's language). The pipeline emits Realtime's event protocol, so the
   session, tools and billing flow are shared. Env (in `integrations/ai.env`):
   `ELEVENLABS_API_KEY` (Misty's own; read by the API and the agent runtime),
   `MISTY_VOICE_ID` (ElevenLabs voice ID; empty uses ElevenLabs' default),
   `MISTY_VOICE_TTS_MODEL` (default `elevenlabs/eleven_flash_v2_5`),
-  `MISTY_VOICE_PIPELINE=all` to use it for every plan; billing
+  billing
   `MISTY_VOICE_STT_HOUR_MICROUSD` (390,000), `MISTY_VOICE_TTS_CHAR_MICROUSD` (40),
   `MISTY_VOICE_PIPELINE_TEXT_MODEL` (must match `MISTY_AI_FAST_MODEL`). Without an
-  ElevenLabs key Basic falls back to Realtime. Billing v0.1.0 predates pipeline
+  ElevenLabs key every plan falls back to Realtime. Billing v0.1.0 predates pipeline
   pricing: release billing again before deploying a server with it.
 - Capacity (2026-10-10): the agent runtime's own rate limits count only failed
   requests (`skipSuccessfulRequests`), because every legitimate call comes from

@@ -14,10 +14,6 @@ export function spaceItemKeyFromRoute(route: string, spaceId: string): string | 
     kind = "drawing";
     id = detail;
   }
-  if (section === "planner") {
-    kind = "task";
-    id = url.searchParams.get("task");
-  }
   if (
     section === "library" &&
     url.searchParams.get("collection") !== "deleted" &&

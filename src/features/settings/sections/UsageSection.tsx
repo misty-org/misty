@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest, readApiSessionGeneration } from "@/api/client";
 import { ApiRequestError } from "@/api/client/errors";
@@ -85,7 +86,7 @@ export function UsageSection(_props: SettingsContentProps) {
   const load = useCallback(() => {
     const controller = new AbortController();
     const request = <T,>(path: string) =>
-      apiRequest<T>(path, { signal: controller.signal, cache: "no-store" });
+      cachedRequest<T>(path, { init: { signal: controller.signal } });
     void Promise.all([
       request<BillingUsage>("/billing/usage"),
       request<AccountMeResponse>("/me"),
@@ -132,7 +133,7 @@ export function UsageSection(_props: SettingsContentProps) {
       <SettingsSectionBlock title="Plan">
         <SettingsRow
           label="Current plan"
-          description="Every plan has every feature. Higher plans add more AI, smarter models and more storage."
+          description="Coding needs Pro or above. Higher plans add more AI, smarter models and more storage."
         >
           <span className="flex items-center gap-3">
             {plan ? (

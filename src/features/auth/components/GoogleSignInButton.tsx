@@ -1,6 +1,6 @@
 import { accountApi } from "@/api/account/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input, Label } from "@/shared/ui";
+import { BrandIcon, Button, Input, Label } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";
@@ -96,9 +96,11 @@ export default function GoogleSignInButton({
       <Button
         type="button"
         variant="outline"
+        className="h-10 gap-2.5"
         disabled={disabled || pending}
         onClick={() => void signIn()}
       >
+        <BrandIcon brand="google-logo" size={18} aria-hidden />
         {pending ? "Waiting for Google…" : "Continue with Google"}
       </Button>
       {pending ? (
@@ -124,7 +126,7 @@ export default function GoogleSignInButton({
                   event.preventDefault();
                   submitCode();
                 }}
-                className="h-11 px-3.5 text-cream placeholder:text-cream-faint"
+                className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-faint"
               />
               {codeError ? <p className="text-sm text-cream-muted">{codeError}</p> : null}
               <Button type="button" variant="outline" onClick={submitCode}>

@@ -1,6 +1,6 @@
 import type { SpaceInvitation, SpaceMember } from "@/api/spaces/dto/entities";
+import type { SpaceRequest } from "./types";
 
-type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
 
 export function createSpaceMembersApi(
@@ -11,8 +11,10 @@ export function createSpaceMembersApi(
     `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`;
 
   return {
-    members: (spaceId: string) =>
-      request<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`),
+    members: (spaceId: string, onCached?: (value: { members: SpaceMember[] }) => void) =>
+      request<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`, {
+        onCached,
+      }),
     memberAvatar: (spaceId: string, userId: string) =>
       fetchProtectedBlob(`${memberPath(spaceId, userId)}/avatar`),
     invite: (spaceId: string, email: string) =>

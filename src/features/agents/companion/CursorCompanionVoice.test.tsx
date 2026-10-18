@@ -151,7 +151,7 @@ it("delegates only on a tool request with its stable admission key", async () =>
   view.unmount();
   expect(mocks.cancel).not.toHaveBeenCalled();
 });
-it("delegates screen questions without capturing the screen up front", async () => {
+it("sends spoken screen questions with the screens", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
   await act(async () => {
@@ -166,8 +166,8 @@ it("delegates screen questions without capturing the screen up front", async () 
       "conversation",
     );
   });
-  // The task calls screen_look when it needs the screen.
-  expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+  // Every spoken request carries the screens; the run decides what matters.
+  expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
   expect(mocks.submit).toHaveBeenCalledWith(
     "Describe the screen without changing anything.",
     [],
@@ -283,7 +283,7 @@ it("speaks the saved result of delegated work without replaying the task", async
 });
 
 it.each(["user", "agent", "team"] as const)(
-  "delegates voice work in user mode after a %s task, leaving screens to the task",
+  "delegates voice work in user mode after a %s task, with the screens",
   async (previous) => {
     const view = await mounted();
     mocks.state.executionMode = previous;
@@ -301,7 +301,7 @@ it.each(["user", "agent", "team"] as const)(
         "conversation",
       );
     });
-    expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+    expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     expect(mocks.submit).toHaveBeenCalledExactlyOnceWith(
       instruction,
       [],

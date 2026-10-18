@@ -79,10 +79,7 @@ pub(super) async fn adopt(
     logical: &str,
 ) -> Result<misty_browser_sync::store::DeviceSignin, String> {
     let physical_id = if workspace == active.device_id {
-        let selected = super::selected_profile()
-            .lock()
-            .map_err(|_| "Browser profile state is unavailable")?
-            .clone()
+        let selected = super::selected_profile(&active.scope.vault_id)?
             .filter(|selected| selected.logical == logical)
             .map(|selected| selected.physical);
         match selected {

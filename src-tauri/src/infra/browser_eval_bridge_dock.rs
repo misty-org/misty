@@ -33,7 +33,7 @@ pub(super) async fn dock(
                 Some(tab) => tab.id.clone(),
                 None => return reply(Err("The benchmark tab is not open.".into())),
             };
-            match app.get_window("main") {
+            match crate::infra::space_windows::primary(app) {
                 Some(window) => {
                     crate::infra::agent_dock::detach(app, &window, &id, &body.name, "Dock check")
                         .map(|host| json!({ "host": host }))

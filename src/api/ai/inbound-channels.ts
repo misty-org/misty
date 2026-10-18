@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 /** Email or Slack, watched for tasks the person writes to Misty (roadmap C8). */
@@ -14,8 +15,7 @@ export interface InboundChannel {
 }
 
 export const inboundChannelsApi = {
-  list: () =>
-    apiRequest<{ channels: InboundChannel[] }>("/ai/inbound-channels", { cache: "no-store" }),
+  list: () => cachedRequest<{ channels: InboundChannel[] }>("/ai/inbound-channels"),
   enable: (channel: InboundChannelKind) =>
     apiRequest<{ channel: InboundChannel }>(`/ai/inbound-channels/${channel}`, { method: "PUT" }),
   disable: (channel: InboundChannelKind) =>

@@ -3,7 +3,8 @@
 //! and Safari, and bookmarks from or to the HTML file every browser reads.
 //! Source files are only read, from private copies. The renderer names a
 //! source by browser and profile ID; paths and cookie values never cross.
-//! Commands are limited to the main window (`app_command_policy`).
+//! Commands are limited to Space windows (`app_command_policy`), and what they
+//! write lands in the calling window's Space.
 mod chromium;
 mod chromium_key;
 mod cookie_writer;
@@ -33,21 +34,22 @@ pub struct ImportSourceRequest {
     pub profile: String,
 }
 
-/// The Misty browser profile that receives history, permissions and sign-ins:
-/// a profile identity, or none for the default store.
+/// A source whose history, permissions and sign-ins land in the calling window's Space.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportTargetRequest {
     pub source: ImportSourceRequest,
-    pub misty_profile: Option<String>,
 }
 
-impl ImportTargetRequest {
-    fn misty_profile(&self) -> Result<Option<&str>, String> {
-        let profile = self.misty_profile.as_deref();
-        super::browser_profile::data_store_identifier(profile)?;
-        Ok(profile)
+/// The website data store of the calling window's Space: its own store, or `None`
+/// for the personal Space's. Never named by the renderer.
+fn space_store(webview: &tauri::Webview) -> Result<Option<String>, String> {
+    let label = webview.label();
+    if !super::space_windows::is_space_window(label) {
+        return Err("Import from a Space window.".into());
     }
+    let key = super::space_windows::space_for_window(label).ok_or("Import from a Space window.")?;
+    Ok(super::space_windows::space_store_identity(&key))
 }
 
 #[derive(Serialize)]
@@ -173,10 +175,11 @@ pub struct Added {
 
 #[tauri::command]
 pub async fn browser_import_history(
+    webview: tauri::Webview,
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
-    let target = super::browser_history::profile_key(request.misty_profile()?.map(str::to_owned));
+    let target = super::browser_history::profile_key(space_store(&webview)?);
     blocking(move || {
         let source = profile(&request.source)?;
         let visits = history::read(request.source.browser.family(), &source.path)?;
@@ -201,9 +204,10 @@ pub struct ImportedSettingsResult {
 /// the rest to the account's settings.
 #[tauri::command]
 pub async fn browser_import_settings(
+    webview: tauri::Webview,
     request: ImportTargetRequest,
 ) -> Result<ImportedSettingsResult, String> {
-    let misty_profile = request.misty_profile()?.map(str::to_owned);
+    let misty_profile = space_store(&webview)?;
     blocking(move || {
         let source = profile(&request.source)?;
         let settings = settings::read(request.source.browser.family(), &source.path);
@@ -227,10 +231,11 @@ pub async fn browser_import_settings(
 /// system's Keychain prompt for that browser first.
 #[tauri::command]
 pub async fn browser_import_signins(
+    webview: tauri::Webview,
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
-    let misty_profile = request.misty_profile()?.map(str::to_owned);
+    let misty_profile = space_store(&webview)?;
     let source = request.source.clone();
     let read = blocking(move || {
         let path = profile(&source)?.path;

@@ -57,7 +57,7 @@ pub(crate) fn builtin() -> Vec<Box<dyn Capability>> {
 /// Page-side shims for this platform, in the order they are installed.
 pub(crate) fn shims() -> Vec<&'static str> {
     #[allow(unused_mut)]
-    let mut shims = vec![media::SHIM];
+    let mut shims = vec![media::SHIM, media::TAP_SHIM];
     #[cfg(windows)]
     shims.push(media::CAPTURE_SHIM);
     #[cfg(all(target_os = "macos", feature = "tauri"))]

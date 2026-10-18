@@ -169,7 +169,7 @@ it("restores Space routes from another device without changing their pane", () =
     surface: "space",
     url: null,
     profile_id: null,
-    tool_route: "/spaces/project/planner/tasks/list",
+    tool_route: "/spaces/project/library",
   };
   const result = projectWorkspace(
     view([windowRecord("window:a"), layoutRecord("layout:a", "window:a", "pane:a"), record]),
@@ -179,8 +179,8 @@ it("restores Space routes from another device without changing their pane", () =
   expect(pane.id).toBe("pane:a");
   expect(pane.views[0]).toMatchObject({
     surfaceId: "space",
-    route: "/spaces/project/planner/tasks/list",
-    groupKey: "space:project:planner",
+    route: "/spaces/project/library",
+    groupKey: "space:project:library",
   });
 });
 

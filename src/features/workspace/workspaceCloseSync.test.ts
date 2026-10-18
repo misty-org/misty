@@ -20,13 +20,11 @@ afterEach(() => {
   useBrowserSyncStore.setState({ session: null });
 });
 
-it("rejects tab, pane, group, and window closes while following a legacy workspace", () => {
-  state().createWindow();
+it("rejects tab, pane and group closes while following a legacy workspace", () => {
   const id = state().layout.activeTabId!;
   const paneId = state().splitPane(state().layout.focusedPaneId, "right")!;
   const tab = dockTreeViews(state().layout.root)[0];
   const groupId = state().createTabGroup([id], "Work")!;
-  const windowId = state().activeWindowId;
   useBrowserSyncStore.setState({ session: follower() });
   const before = state();
   const notice = vi.fn();
@@ -36,10 +34,8 @@ it("rejects tab, pane, group, and window closes while following a legacy workspa
     expect(state().closeTab(id)).toBe(false);
     state().closePane(paneId);
     expect(state().closeTabGroup(groupId)).toBe(false);
-    expect(state().closeWindow(windowId)).toBe(false);
     expect(state().layout).toBe(before.layout);
     expect(state().closedItems).toBe(before.closedItems);
-    expect(state().closedWindowsByScope).toBe(before.closedWindowsByScope);
     expect(notice).toHaveBeenCalled();
   } finally {
     window.removeEventListener("misty:workspace-notice", notice);

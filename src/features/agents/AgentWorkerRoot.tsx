@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter } from "react-router-dom";
-import { emitTo } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AuthProvider, useAuth } from "@/features/auth";
@@ -186,7 +186,7 @@ function Worker() {
         state.selectedAgentId === agentId &&
         state.invocationConversationId === state.activeConversationId
       ) {
-        void emitTo("main", "misty://agent-task-admitted", {
+        void emit("misty://agent-task-admitted", {
           accountId: expectedAccount,
           agentId,
           conversationId: state.activeConversationId,

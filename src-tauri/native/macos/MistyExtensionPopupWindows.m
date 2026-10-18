@@ -26,8 +26,6 @@ API_AVAILABLE(macos(15.4))
 }
 - (void)webViewDidClose:(WKWebView *)view { [view.window close]; }
 @end
-static MistyPopupWindowDelegate *popupDelegate;
-
 @implementation MistyExtensionHost (PopupWindows)
 - (BOOL)openPopupWindow:(WKWebExtensionWindowConfiguration *)configuration context:(WKWebExtensionContext *)context done:(void (^)(id<WKWebExtensionWindow>, NSError *))done {
     if (configuration.windowType != WKWebExtensionWindowTypePopup || configuration.tabURLs.count != 1 || configuration.tabs.count) return NO;
@@ -55,10 +53,11 @@ static MistyPopupWindowDelegate *popupDelegate;
 
     WKWebView *view = [[WKWebView alloc] initWithFrame:native.contentView.bounds configuration:pageConfiguration];
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    if (!popupDelegate) popupDelegate = [MistyPopupWindowDelegate new];
-    popupDelegate.host = self;
-    view.navigationDelegate = popupDelegate;
-    view.UIDelegate = popupDelegate;
+    // Each Space's host has its own delegate, so links open in that Space.
+    MistyPopupWindowDelegate *delegate = self.popupWindowDelegate;
+    if (!delegate) { delegate = [MistyPopupWindowDelegate new]; delegate.host = self; self.popupWindowDelegate = delegate; }
+    view.navigationDelegate = delegate;
+    view.UIDelegate = delegate;
     native.contentView = view;
 
     MistyExtensionWindow *window = [MistyExtensionWindow new];

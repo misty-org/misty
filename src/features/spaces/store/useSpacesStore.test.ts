@@ -157,7 +157,7 @@ describe("Space loading access boundary", () => {
 
   it("opens a Space without requesting content owned by optional apps", async () => {
     apiMocks.snapshot.mockResolvedValue({
-      spaces: [spaceFixture({ id: "space", permissions: { "messages.read": true } })],
+      spaces: [spaceFixture({ id: "space" })],
       invitations: [],
       limits: null,
     });
@@ -167,7 +167,7 @@ describe("Space loading access boundary", () => {
 
     await useSpacesStore.getState().loadSpace("space");
 
-    expect(apiMocks.members).toHaveBeenCalledWith("space");
+    expect(apiMocks.members).toHaveBeenCalledWith("space", expect.any(Function));
     expect(apiMocks.messages).not.toHaveBeenCalled();
     expect(apiMocks.nodes).not.toHaveBeenCalled();
     expect(useSpacesStore.getState()).toMatchObject({

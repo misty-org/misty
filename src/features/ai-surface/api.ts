@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { readInvocationStream } from "./invocationStream";
 import { withDeviceRunGrants } from "./deviceRunGrants";
 import {
@@ -121,7 +122,7 @@ export type AiBillingUsage = BillingUsage;
 
 export const aiSurfaceApi = {
   status: () => apiRequest<AiProviderStatus>("/ai/status"),
-  usage: () => apiRequest<AiBillingUsage>("/billing/usage", { cache: "no-store" }),
+  usage: () => cachedRequest<AiBillingUsage>("/billing/usage"),
   settings: () =>
     apiRequest<{ settings: AiUserSettings; preferences: AiSurfacePreferenceRecord[] }>(
       "/ai/settings",
@@ -139,11 +140,6 @@ export const aiSurfaceApi = {
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/screen-location", {
       method: "PUT",
       body: JSON.stringify({ location }),
-    }),
-  updateAppActionsAsk: (change: { ask?: boolean; payments?: boolean }) =>
-    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
-      method: "PUT",
-      body: JSON.stringify(change),
     }),
   updateAgentSites: (change: { block_sensitive?: boolean; blocked_sites?: string[] }) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/agent-sites", {
@@ -290,9 +286,10 @@ function toServerInvocation(input: AiInvocationRequest) {
     schedule_claim: input.scheduleClaim,
     skill_version_ids: input.skillVersionIds,
     companion_model: input.companionModel,
-    companion_intent: input.companionIntent,
     model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
+    permission_mode: input.permissionMode,
+    coding_tool: input.codingTool,
     display_captures: input.displayCaptures?.map((c) => ({
       id: c.id,
       name: c.name,

@@ -8,7 +8,7 @@ export type IntegrationCapability =
   | "shell"
   | "files"
   | "drawings"
-  | "drawings_read"
+  | "drawing_read"
   | "drawings_projects"
   | "drawings_comments"
   | "drawings_webhooks"

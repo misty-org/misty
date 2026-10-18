@@ -11,6 +11,8 @@ import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./createSpacesRealtimeActions";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { invoke } from "@tauri-apps/api/core";
 export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const snapshotAutoMinIntervalMs = 1_500;
@@ -70,7 +72,17 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       snapshotLastRequestedAt = Date.now();
       set({ loading: true, error: null });
       try {
-        const snapshot = await spacesApi.snapshot();
+        // The saved list paints first on a first visit; the fresh one replaces it.
+        const snapshot = await spacesApi.snapshot((saved) => {
+          if (generation !== spacesAccountGeneration || get().snapshotReady) return;
+          set({
+            spaces: saved.spaces,
+            invitations: saved.invitations,
+            limits: saved.entitlements,
+            ownerStorage: saved.owner_storage,
+            snapshotReady: true,
+          });
+        });
         if (generation !== spacesAccountGeneration) return;
         snapshotCooldownUntil = 0;
         set(referenceMode.liveSpaceSnapshotState(snapshot));
@@ -136,20 +148,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
       return;
     }
     if (get().referenceOnly) return void set({ loading: false });
-    const canReadMessages = space.permissions?.["messages.read"] !== false;
-    if (!canReadMessages) {
-      set((state) => {
-        const messagesBySpace = { ...state.messagesBySpace };
-        const messageLoadingBySpace = { ...state.messageLoadingBySpace };
-        const messageErrorsBySpace = { ...state.messageErrorsBySpace };
-        const nodesBySpace = { ...state.nodesBySpace };
-        delete messagesBySpace[spaceId];
-        delete messageLoadingBySpace[spaceId];
-        delete messageErrorsBySpace[spaceId];
-        delete nodesBySpace[spaceId];
-        return { messagesBySpace, messageLoadingBySpace, messageErrorsBySpace, nodesBySpace };
-      });
-    }
     const tasks = [get().loadMembers(spaceId)];
     // Space home/settings only need membership. App runtimes load their own
     // content after checking installation and session permissions; prefetching
@@ -203,7 +201,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadNodes: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { nodes } = await spacesApi.nodes(spaceId);
+      const { nodes } = await spacesApi.nodes(spaceId, (saved) => {
+        if (generation !== spacesAccountGeneration || get().nodesBySpace[spaceId]) return;
+        set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: saved.nodes } }));
+      });
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({ nodesBySpace: { ...state.nodesBySpace, [spaceId]: nodes } }));
     } catch (error) {
@@ -216,7 +217,10 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadMembers: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { members } = await spacesApi.members(spaceId);
+      const { members } = await spacesApi.members(spaceId, (saved) => {
+        if (generation !== spacesAccountGeneration || get().membersBySpace[spaceId]) return;
+        set((state) => ({ membersBySpace: { ...state.membersBySpace, [spaceId]: saved.members } }));
+      });
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({
         membersBySpace: { ...state.membersBySpace, [spaceId]: members },
@@ -291,6 +295,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.leave(spaceId);
+      removeSpaceFromDevice(spaceId);
       set((state) => ({
         spaces: state.spaces.filter((space) => space.id !== spaceId),
       }));
@@ -316,6 +321,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     set({ error: null });
     try {
       await spacesApi.delete(spaceId, confirmation);
+      removeSpaceFromDevice(spaceId);
       set((state) => {
         const spaces = state.spaces.filter((space) => space.id !== spaceId);
         const messagesBySpace = { ...state.messagesBySpace };
@@ -337,6 +343,12 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   ...createSpacesRealtimeActions(set, get, () => spacesAccountGeneration),
   clearError: () => set({ error: null }),
 }));
+
+/** A Space this person left or deleted: its windows close and its website data goes. */
+function removeSpaceFromDevice(spaceId: string) {
+  if (!hasTauriInternals()) return;
+  void invoke("space_window_remove", { spaceId }).catch(() => undefined);
+}
 
 referenceMode.bindSpaceReferenceMode((state) => useSpacesStore.setState(state));
 

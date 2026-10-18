@@ -8,7 +8,12 @@ static NSString *JSON(id value) {
     return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"null";
 }
 
-API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
+/// One host per Space, keyed by the Space's key. A single shared controller would
+/// let an extension's own requests carry one Space's cookies into another.
+API_AVAILABLE(macos(15.4)) static NSMutableDictionary<NSString *, MistyExtensionHost *> *hosts;
+MistyExtensionHost *MistyExtensionHostForSpace(NSString *space) {
+    return [space isKindOfClass:NSString.class] ? hosts[space] : nil;
+}
 
 @implementation MistyExtensionHost
 - (instancetype)init {
@@ -33,7 +38,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 - (void)event:(NSString *)kind data:(NSDictionary *)data {
     if (!emitEvent || !self.account) return;
-    NSMutableDictionary *event = [data mutableCopy]; event[@"kind"] = kind; event[@"account"] = self.account;
+    NSMutableDictionary *event = [data mutableCopy]; event[@"kind"] = kind; event[@"account"] = self.account; event[@"space"] = self.space;
     emitEvent(JSON(event).UTF8String);
 }
 - (void)registerOpenTab:(MistyExtensionTab *)tab {
@@ -47,18 +52,29 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     [self.controller didOpenWindow:tab.window];
     [self.controller didOpenTab:tab];
 }
-- (void)configureStore:(WKWebsiteDataStore *)store {
-    if (!self.account) return;
-    if (self.controller && (self.store == store || (self.store.identifier && [self.store.identifier isEqual:store.identifier]))) return;
-    NSArray *descriptors = self.descriptors.allValues;
-    for (NSString *key in self.contexts.allKeys) [self unload:key];
+- (void)startWithStore:(WKWebsiteDataStore *)store {
+    if (!self.account || self.controller) return;
     self.store = store;
     NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:self.controllerIdentifier];
     WKWebExtensionControllerConfiguration *config = [WKWebExtensionControllerConfiguration configurationWithIdentifier:uuid];
+    // Background pages and extension tabs use this store: the Space's own.
     config.defaultWebsiteDataStore = store;
     self.controller = [[WKWebExtensionController alloc] initWithConfiguration:config];
     self.controller.delegate = self;
-    for (NSDictionary *descriptor in descriptors) [self load:descriptor reply:^(NSDictionary *result) { (void)result; }];
+}
+- (void)shutdown {
+    for (void (^pending)(BOOL) in self.pending.allValues) pending(NO);
+    for (void (^pending)(MistyExtensionTab *,NSError *) in self.openRequests.allValues) pending(nil,ExtensionError(@"The account changed."));
+    for (void (^pending)(id,NSString *) in self.compatReplies.allValues) pending(nil,@"The account changed.");
+    [self.compatReplies removeAllObjects];
+    [self.openRequests removeAllObjects]; [self.openingTabs removeAllObjects];
+    for (NSString *key in self.contexts.allKeys) [self unload:key];
+    for (NSWindow *window in self.optionsWindows) [window close];
+    for (NSWindow *window in [self.popupWindows copy]) [window close];
+    [self.optionsWindows removeAllObjects]; [self.popupWindows removeAllObjects]; [self.descriptors removeAllObjects];
+    [self.loadTokens removeAllObjects]; [self.restored removeAllObjects]; [self.tabs removeAllObjects]; [self.windows removeAllObjects]; [self.pending removeAllObjects];
+    self.activeTab = nil; self.popupTab = nil;
+    self.controller = nil; self.store = nil; self.account = nil;
 }
 - (void)unload:(NSString *)identifier {
     [self.loadTokens removeObjectForKey:identifier];
@@ -79,7 +95,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 - (void)load:(NSDictionary *)descriptor reply:(Reply)reply {
     NSString *identifier = descriptor[@"id"], *account = self.account;
-    if (!self.controller) [self configureStore:self.store ?: [WKWebsiteDataStore nonPersistentDataStore]];
+    if (!self.controller) { reply(@{@"error":@"This Space's extension host isn't ready."}); return; }
     WKWebExtensionContext *existing=self.contexts[identifier];
     NSDictionary *previous=self.descriptors[identifier];
     if (existing && ([previous[@"permissions"] containsObject:@"storage"] == [descriptor[@"permissions"] containsObject:@"storage"]) && [previous[@"runtimePath"] isEqual:descriptor[@"runtimePath"]] && [previous[@"guid"] isEqual:descriptor[@"guid"]]) {
@@ -157,18 +173,16 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     if ([operation isEqual:@"configure"]) {
         NSString *account = request[@"account"];
         if (![account isEqual:self.account]) {
-            if (!account.length && self.account) [self event:@"runtime-reset" data:@{}];
-            for (void (^pending)(BOOL) in self.pending.allValues) pending(NO);
-            for (void (^pending)(MistyExtensionTab *,NSError *) in self.openRequests.allValues) pending(nil,ExtensionError(@"The account changed."));
-            for (void (^pending)(id,NSString *) in self.compatReplies.allValues) pending(nil,@"The account changed.");
-            [self.compatReplies removeAllObjects];
-            [self.openRequests removeAllObjects]; [self.openingTabs removeAllObjects];
-            for (NSString *key in self.contexts.allKeys) [self unload:key];
-            for (NSWindow *window in self.optionsWindows) [window close];
-            [self.optionsWindows removeAllObjects]; [self.descriptors removeAllObjects];
-            [self.loadTokens removeAllObjects]; [self.tabs removeAllObjects]; [self.windows removeAllObjects]; [self.pending removeAllObjects]; self.controller = nil; self.store = nil;
-            self.account = account.length ? account : nil;
+            [self shutdown];
+            self.account = account;
             self.controllerIdentifier = request[@"controllerId"];
+        }
+        // The controller is made once, over the store the Space has now. A later
+        // store change (a new sign-in generation) applies when the Space reopens.
+        if (!self.controller) {
+            NSUUID *store = [request[@"store"] isKindOfClass:NSString.class] ? [[NSUUID alloc] initWithUUIDString:request[@"store"]] : nil;
+            if (!store) { reply(@{@"error":@"This Space has no website data store."}); return; }
+            [self startWithStore:[WKWebsiteDataStore dataStoreForIdentifier:store]];
         }
         reply(@{@"supported":@YES}); return;
     }
@@ -176,18 +190,6 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     if ([self compatRequest:request reply:reply]) return;
     if ([operation isEqual:@"diagnostics"]) {
         reply(@{@"runtimeCount":@(self.contexts.count),@"bridgeViewCount":@(self.bridges.count),@"platform":NSProcessInfo.processInfo.operatingSystemVersionString,@"minimumOS":@"15.4",@"manifestVersions":@[@2,@3],@"compatibility":@"Version-specific testing required",@"acquisition":@[@"firefox-addons",@"chrome-web-store"],@"knownUnavailable":@[@"debugger",@"proxy"],@"limited":@[@"webRequestBlocking",@"identity",@"management",@"tabHide",@"contextualIdentities",@"privacy",@"sidePanel",@"offscreen",@"tabGroups",@"declarativeContent",@"contentSettings",@"fontSettings",@"power",@"userScripts",@"tabCapture",@"desktopCapture"],@"compatibilityLayer":@[@"notifications",@"downloads",@"history",@"topSites",@"search",@"sessions",@"browsingData",@"find",@"idle",@"tts",@"theme",@"sidePanel",@"offscreen",@"bookmarks",@"tabGroups",@"declarativeContent",@"contentSettings",@"fontSettings",@"power",@"userScripts",@"tabCapture",@"desktopCapture"],@"hostLimitations":@[@"moving existing tabs into new windows",@"pinned and reader-mode tabs"]}); return;
-    }
-    if ([operation isEqual:@"validate"]) {
-        NSURL *root=[NSURL fileURLWithPath:request[@"runtimePath"] isDirectory:YES];
-        [WKWebExtension extensionWithResourceBaseURL:root completionHandler:^(WKWebExtension *extension,NSError *error) {
-            if (!extension || error) { reply(@{@"error":error.localizedDescription ?: @"Invalid extension manifest."}); return; }
-            NSMutableArray *errors=[NSMutableArray array]; BOOL blocked=NO;
-            for (NSError *issue in extension.errors) {
-                [errors addObject:issue.localizedDescription];
-                if (issue.code==WKWebExtensionErrorInvalidManifest || issue.code==WKWebExtensionErrorUnsupportedManifestVersion || issue.code==WKWebExtensionErrorResourceNotFound || issue.code==WKWebExtensionErrorInvalidArchive) blocked=YES;
-            }
-            reply(@{@"findings":errors,@"blocked":@(blocked),@"platform":NSProcessInfo.processInfo.operatingSystemVersionString,@"hosts":[extension.allRequestedMatchPatterns.allObjects valueForKey:@"string"] ?: @[]});
-        }]; return;
     }
     if ([operation isEqual:@"layout"]) {
         NSMutableSet *seen=[NSMutableSet set];
@@ -248,8 +250,7 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
     if ([operation isEqual:@"unload"] || [operation isEqual:@"remove"]) {
         WKWebExtensionContext *context = self.contexts[identifier];
         [self unload:identifier]; [self.descriptors removeObjectForKey:identifier];
-        if ([operation isEqual:@"remove"]) {
-            if (!self.controller) [self configureStore:self.store ?: [WKWebsiteDataStore nonPersistentDataStore]];
+        if ([operation isEqual:@"remove"] && self.controller) {
             WKWebExtensionController *controller = self.controller;
             NSString *guid = request[@"guid"] ?: context.uniqueIdentifier;
             [controller fetchDataRecordsOfTypes:WKWebExtensionController.allExtensionDataTypes completionHandler:^(NSArray<WKWebExtensionDataRecord *> *records) {
@@ -374,6 +375,8 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 - (void)popupClosed:(NSNotification *)notification {
     (void)notification;
+    // Every Space's host hears every popover close; only the one that showed a popup acts.
+    if (!self.popupTab) return;
     MistyExtensionTab *tab=self.tabs[self.popupTab];
     if (tab.view.window.isKeyWindow) [tab.view.window makeFirstResponder:tab.view];
     self.popupTab=nil;
@@ -494,11 +497,80 @@ API_AVAILABLE(macos(15.4)) static MistyExtensionHost *host;
 }
 @end
 
+/// Checks a downloaded package before any Space installs it; needs no host.
+API_AVAILABLE(macos(15.4))
+static void ValidatePackage(NSDictionary *request, Reply reply) {
+    NSURL *root=[NSURL fileURLWithPath:request[@"runtimePath"] isDirectory:YES];
+    [WKWebExtension extensionWithResourceBaseURL:root completionHandler:^(WKWebExtension *extension,NSError *error) {
+        if (!extension || error) { reply(@{@"error":error.localizedDescription ?: @"Invalid extension manifest."}); return; }
+        NSMutableArray *errors=[NSMutableArray array]; BOOL blocked=NO;
+        for (NSError *issue in extension.errors) {
+            [errors addObject:issue.localizedDescription];
+            if (issue.code==WKWebExtensionErrorInvalidManifest || issue.code==WKWebExtensionErrorUnsupportedManifestVersion || issue.code==WKWebExtensionErrorResourceNotFound || issue.code==WKWebExtensionErrorInvalidArchive) blocked=YES;
+        }
+        reply(@{@"findings":errors,@"blocked":@(blocked),@"platform":NSProcessInfo.processInfo.operatingSystemVersionString,@"hosts":[extension.allRequestedMatchPatterns.allObjects valueForKey:@"string"] ?: @[]});
+    }];
+}
+/// Erases what a removed Space's controller kept: every extension's storage.
+API_AVAILABLE(macos(15.4))
+static void RemoveControllerData(NSString *identifier, Reply reply) {
+    NSUUID *uuid = [identifier isKindOfClass:NSString.class] ? [[NSUUID alloc] initWithUUIDString:identifier] : nil;
+    if (!uuid) { reply(@{@"error":@"Invalid extension controller."}); return; }
+    WKWebExtensionController *controller = [[WKWebExtensionController alloc] initWithConfiguration:[WKWebExtensionControllerConfiguration configurationWithIdentifier:uuid]];
+    [controller fetchDataRecordsOfTypes:WKWebExtensionController.allExtensionDataTypes completionHandler:^(NSArray<WKWebExtensionDataRecord *> *records) {
+        // The controller stays alive until WebKit has removed its records.
+        [controller removeDataOfTypes:WKWebExtensionController.allExtensionDataTypes fromDataRecords:records completionHandler:^{ (void)controller; reply(@{}); }];
+    }];
+}
+API_AVAILABLE(macos(15.4))
+static void HandleRequest(NSDictionary *request, Reply reply) {
+    NSString *operation = request[@"operation"];
+    NSString *space = [request[@"space"] isKindOfClass:NSString.class] ? request[@"space"] : nil;
+    if (!hosts) hosts = [NSMutableDictionary dictionary];
+    if ([operation isEqual:@"validate"]) { ValidatePackage(request, reply); return; }
+    if ([operation isEqual:@"configure"] && ![request[@"account"] length]) {
+        // Signing out stops every Space's host.
+        for (MistyExtensionHost *host in hosts.allValues) {
+            if (host.account) [host event:@"runtime-reset" data:@{}];
+            [host shutdown];
+        }
+        [hosts removeAllObjects];
+        reply(@{@"supported":@YES}); return;
+    }
+    if (!space.length) { reply(@{@"error":@"Extensions run in a Space."}); return; }
+    if ([operation isEqual:@"release-space"] || [operation isEqual:@"remove-space"]) {
+        // The Space's last window closed, or the Space is gone: free its host.
+        [hosts[space] shutdown];
+        [hosts removeObjectForKey:space];
+        if ([operation isEqual:@"remove-space"]) RemoveControllerData(request[@"controllerId"], reply);
+        else reply(@{});
+        return;
+    }
+    MistyExtensionHost *host = hosts[space];
+    if (!host && [operation isEqual:@"configure"]) {
+        host = [MistyExtensionHost new]; host.space = space; hosts[space] = host;
+    }
+    if (!host) { reply(@{@"error":@"The extension account changed."}); return; }
+    [host request:request reply:reply];
+}
+/// The host whose tab shows `view`.
+API_AVAILABLE(macos(15.4))
+static MistyExtensionHost *HostForView(WKWebView *view) {
+    for (MistyExtensionHost *host in hosts.allValues)
+        for (MistyExtensionTab *tab in host.tabs.allValues) if (tab.view == view) return host;
+    return nil;
+}
+
 void misty_extensions_set_events(MistyExtensionEvent callback) { emitEvent = callback; }
 void misty_extensions_compat_message(void *message, void *reply) {
     void (^answer)(id, NSString *) = (__bridge void (^)(id, NSString *))reply;
     if (@available(macOS 15.4, *)) {
-        if (host) { [host compatMessage:(__bridge WKScriptMessage *)message reply:answer]; return; }
+        // The compat page that asked belongs to exactly one Space's host.
+        WKScriptMessage *script = (__bridge WKScriptMessage *)message;
+        for (MistyExtensionHost *host in hosts.allValues) {
+            if (![host.compatViews.allValues containsObject:script.webView]) continue;
+            [host compatMessage:script reply:answer]; return;
+        }
     }
     answer(nil, @"The extension host stopped.");
 }
@@ -510,23 +582,22 @@ void misty_extensions_request(const char *json, MistyExtensionReply callback, vo
             if (@available(macOS 15.4, *)) {
                 NSDictionary *request = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
                 if (![request isKindOfClass:NSDictionary.class]) { reply(@{@"error":@"Invalid extension request."}); return; }
-                if (!host) host = [MistyExtensionHost new];
-                [host request:request reply:reply];
+                HandleRequest(request, reply);
             } else reply(@{@"supported":@NO, @"error":@"Extensions require macOS 15.4 or later."});
         }
     });
 }
-void *misty_extensions_configuration(void *pointer, const char *urlString, bool defaultStore) {
+void *misty_extensions_configuration(const char *spaceKey, void *pointer, const char *urlString) {
     if (@available(macOS 15.4, *)) {
-        if (!host.account) return NULL;
+        MistyExtensionHost *host = hosts[[NSString stringWithUTF8String:spaceKey]];
+        if (!host.account || !host.controller) return NULL;
         WKWebViewConfiguration *config = (__bridge WKWebViewConfiguration *)pointer;
-        if (defaultStore || !host.controller) [host configureStore:config.websiteDataStore];
         NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:urlString]];
         WKWebExtensionContext *context = [host.controller extensionContextForURL:url];
         // WebKit ties extension-origin configurations to their background view.
-        // Changing that configuration's store is invalid. Ordinary private
-        // websites keep the supplied nonpersistent store; extension pages use
-        // their extension's shared storage and swap views before website navigation.
+        // Changing that configuration's store is invalid. Website pages keep the
+        // Space's store; extension pages use their extension's shared storage and
+        // swap views before website navigation.
         if (context) {
             config = context.webViewConfiguration;
             config.userContentController = [WKUserContentController new];
@@ -536,8 +607,9 @@ void *misty_extensions_configuration(void *pointer, const char *urlString, bool 
     }
     return NULL;
 }
-void misty_extensions_register_tab(void *pointer, const char *identifier, bool privateTab, const char *urlString) {
+void misty_extensions_register_tab(const char *spaceKey, void *pointer, const char *identifier, bool privateTab, const char *urlString) {
     if (@available(macOS 15.4, *)) {
+        MistyExtensionHost *host = hosts[[NSString stringWithUTF8String:spaceKey]];
         if (!host.controller) return;
         WKWebView *view = (__bridge WKWebView *)pointer;
         NSString *key = [NSString stringWithUTF8String:identifier];
@@ -560,9 +632,12 @@ void misty_extensions_register_tab(void *pointer, const char *identifier, bool p
         if (done) { [host.openRequests removeObjectForKey:requestId]; [host.openingTabs removeObjectForKey:key]; done(tab,nil); }
     }
 }
-void misty_extensions_tab_event(const char *identifier, const char *kind) {
+void misty_extensions_tab_event(const char *spaceKey, const char *identifier, const char *kind) {
     if (@available(macOS 15.4, *)) {
+        NSString *space = [NSString stringWithUTF8String:spaceKey];
         NSString *key = [NSString stringWithUTF8String:identifier], *event = [NSString stringWithUTF8String:kind];
+        MistyExtensionHost *host = space.length ? hosts[space] : nil;
+        if (!space.length) for (MistyExtensionHost *candidate in hosts.allValues) if (candidate.tabs[key]) host = candidate;
         MistyExtensionTab *tab = host.tabs[key]; if (!tab) return;
         if (![event isEqual:@"close"]) [host registerOpenTab:tab];
         if ([event isEqual:@"close"]) { [host.controller didCloseTab:tab windowIsClosing:NO]; [host.tabs removeObjectForKey:key]; }
@@ -581,6 +656,9 @@ bool misty_extensions_navigation(void *viewPointer, void *actionPointer) {
         if (!action.targetFrame.isMainFrame) return false;
         NSURL *url=action.request.URL;
         if (![@[@"http",@"https",@"webkit-extension"] containsObject:url.scheme]) return false;
+        // Only the Space that owns this tab may redirect it into its extensions.
+        MistyExtensionHost *host=HostForView(view);
+        if (!host) return false;
         NSURL *identity=[host identityRedirect:url];
         for (MistyExtensionTab *tab in host.tabs.allValues) {
             if (tab.view!=view) continue;

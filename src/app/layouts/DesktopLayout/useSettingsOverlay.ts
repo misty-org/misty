@@ -1,6 +1,6 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
-import { useSettingsStore, type SettingsSection } from "@/features/settings";
+import { blockIfUnsaved, useSettingsStore, type SettingsSection } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,12 +19,15 @@ export function useSettingsOverlay(options: {
     if (hasTauriInternals() && !useSettingsStore.getState().loaded) void settingsLoad();
   }, [settingsLoad]);
   const closeSettingsOverlay = useCallback(() => {
+    // Unsaved changes keep settings open; the save bar says why.
+    if (blockIfUnsaved()) return;
     setSettingsOpen(false);
     refreshUserAfterSettings();
   }, [refreshUserAfterSettings]);
   // Account management lives on the website. Opening it hands the current
   // session off to the browser rather than rendering anything locally.
   const openAccountSettings = useCallback(() => {
+    if (blockIfUnsaved()) return;
     setSettingsOpen(false);
     void openAccountSettingsInBrowser().catch((error: unknown) => {
       // The hand-off needs the network, so an offline click has to say so

@@ -1,4 +1,3 @@
-import { createLibraryAssetStackApi } from "./library-asset-stacks";
 import { createLibraryItemMutationApi } from "./library-items-mutations";
 import { createLibraryQueryApi } from "./library-items-query";
 import { createLibraryTransferApi } from "./library-items-transfers";
@@ -21,7 +20,6 @@ export function createSpaceLibraryItemsApi(
   return {
     ...createLibraryQueryApi(spaceRequest),
     ...createLibraryItemMutationApi(spaceRequest),
-    ...createLibraryAssetStackApi(spaceRequest),
     ...createLibraryTransferApi(transfers),
   };
 }

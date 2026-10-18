@@ -1,7 +1,7 @@
 import type { AgentScope } from "@/features/agents";
 import {
   agentsDeviceSnapshot,
-  codeRemoveProject,
+  removeProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
 import { useSpacesStore } from "@/features/spaces";
@@ -16,10 +16,11 @@ import {
 } from "../components/DesktopSettingsUI";
 import { definitionById, fromLegacy } from "../profiles/registry";
 import { useSettingsProfiles } from "../profiles/store";
-import { ChoiceControl } from "../SettingsControls";
+import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
 import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
+import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AppActionsSection } from "./AppActionsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { InboundTasksSection } from "./InboundTasksSection";
@@ -32,17 +33,6 @@ export function SpaceDefaultsSection() {
       description="Used when opening a Space without an explicit destination. Restored sessions keep their place."
     >
       <PreferenceRow id="spaces.openingTool" />
-    </Section>
-  );
-}
-export function SpaceAgendaSection() {
-  return (
-    <Section
-      title="Agenda defaults"
-      description="Existing choices in individual Spaces take precedence."
-    >
-      <PreferenceRow id="spaces.agenda.tasks" />
-      <PreferenceRow id="spaces.agenda.roadmap" />
     </Section>
   );
 }
@@ -77,7 +67,6 @@ export function ManageSpacesSection(props: SettingsContentProps) {
     </Section>
   );
 }
-export { ModelSensesSection as ModelsSection } from "./ModelSensesSection";
 
 export function AgentDefaultsSection() {
   return (
@@ -85,14 +74,14 @@ export function AgentDefaultsSection() {
       <Section
         title="Conversations"
         description={
-          "Plan first: agents research and propose a plan you approve before they change " +
-          "anything. Switch any conversation with the Plan chip or Shift+Tab."
+          "In Plan, agents research and propose a plan you approve before they change " +
+          "anything. Turn Plan on or off in any chat with Shift+Tab."
         }
       >
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
-      <Section title="Misty panel">
+      <Section title="Chat panel">
         <PanelSideRow />
       </Section>
     </>
@@ -125,15 +114,11 @@ function CollaborationModeRow() {
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "act");
   return (
-    <Row label={d.label}>
-      <ChoiceControl
+    <Row label={d.label} description="New chats research and propose before changing anything.">
+      <SwitchControl
         disabled={store.working || !ready}
-        value={value}
-        onValueChange={(next) => void store.updateSetting(d.section, d.key, next)}
-        options={[
-          { value: "act", label: "Act" },
-          { value: "plan", label: "Plan first" },
-        ]}
+        checked={value === "plan"}
+        onChange={(plan) => void store.updateSetting(d.section, d.key, plan ? "plan" : "act")}
       />
     </Row>
   );
@@ -168,11 +153,13 @@ export function CompanionSection() {
 export function DevicesSection() {
   return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
 }
+/** Remembered approvals (server-owned), and on a desktop its project folders. */
 export function AgentPermissionsSection() {
-  return hasTauriInternals() ? (
-    <AgentScopeList />
-  ) : (
-    <NativeAvailability feature="Device permissions" />
+  return (
+    <>
+      <AgentGrantsSection />
+      {hasTauriInternals() ? <AgentScopeList /> : null}
+    </>
   );
 }
 function AgentScopeList() {
@@ -188,7 +175,7 @@ function AgentScopeList() {
   return (
     <Section
       title="Projects"
-      description="Folders on this computer agents can work in when a chat picks them. Add projects in Agents › Integrations."
+      description="Folders on this computer your coding tool works in when a chat picks them. Add one from a chat’s Project menu."
     >
       {scopes.map((s) => (
         <Row
@@ -196,7 +183,7 @@ function AgentScopeList() {
           label={s.displayName}
           description={
             s.kind === "project_folder"
-              ? "Agents can edit files and run sandboxed commands here."
+              ? "Your coding tool works here and asks before changes that need you."
               : "Read only: agents can list and read files here."
           }
         >
@@ -206,13 +193,13 @@ function AgentScopeList() {
               void (async () => {
                 if (
                   !(await confirmAction(
-                    `Stop using “${s.displayName}” as a project? Its files stay on this computer; undo history for it is deleted.`,
+                    `Stop using “${s.displayName}” as a project? Its files stay on this computer.`,
                     "Remove project",
                   ))
                 )
                   return;
                 try {
-                  await codeRemoveProject(s.id);
+                  await removeProject(s.id);
                   await refresh();
                 } catch (e) {
                   setError(String(e));
@@ -226,7 +213,7 @@ function AgentScopeList() {
       ))}
       {!scopes.length && (
         <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No projects yet. Add one in Agents › Integrations.
+          No projects yet. Add one from a chat’s Project menu.
         </p>
       )}
       {error && (

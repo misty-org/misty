@@ -5,11 +5,11 @@ import { cursorEvent, presentationEvent, type Presentation } from "./protocol";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
-  emitTo: vi.fn(),
+  emit: vi.fn(),
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("@tauri-apps/api/event", () => ({ emitTo: mocks.emitTo }));
+vi.mock("@tauri-apps/api/event", () => ({ emit: mocks.emit }));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: "misty-cursor-1",
@@ -26,7 +26,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   mocks.listeners.clear();
   mocks.invoke.mockReset();
-  mocks.emitTo.mockReset();
+  mocks.emit.mockReset();
 });
 
 it("renders activity fades while preserving explicit visibility and active feedback", async () => {
@@ -110,7 +110,7 @@ it("reports snapshot failures instead of silently leaving the overlay hidden", a
   mocks.invoke.mockRejectedValue("This view cannot invoke Host commands.");
   render(<CursorCompanionRoot />);
   await act(async () => {});
-  expect(mocks.emitTo).toHaveBeenCalledWith("main", "misty://cursor-renderer-error", {
+  expect(mocks.emit).toHaveBeenCalledWith("misty://cursor-renderer-error", {
     error: expect.stringContaining("could not restore its display state"),
   });
 });
@@ -181,8 +181,7 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   expect(x - 16).toBeGreaterThan(411);
   for (let time = 4_000; time <= 20_000; time += 500) tick(time);
   expect(marker.style.opacity).toBe("1");
-  expect(mocks.emitTo).not.toHaveBeenCalledWith(
-    "main",
+  expect(mocks.emit).not.toHaveBeenCalledWith(
     "misty://cursor-point-finished",
     expect.anything(),
   );

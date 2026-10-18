@@ -33,7 +33,6 @@ pub struct PathProbe {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentUser {
     id: String,
-    name: String,
     #[serde(default)]
     username: String,
     email: String,
@@ -553,7 +552,6 @@ mod tests {
         let stored = StoredSession {
             user: Some(CurrentUser {
                 id: "a".into(),
-                name: "A".into(),
                 username: "a".into(),
                 email: "a@example.test".into(),
             }),

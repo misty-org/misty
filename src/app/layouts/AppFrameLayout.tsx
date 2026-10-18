@@ -16,6 +16,8 @@ import { isAuthPath } from "@/features/app-shell";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
+import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
 
 const DesktopLayout = lazy(() =>
   import("@/app/layouts/DesktopLayout").then(({ DesktopLayout }) => ({ default: DesktopLayout })),
@@ -28,8 +30,12 @@ export function AppFrameLayout() {
   const isAuthRoute = isAuthPath(location.pathname);
   const isInviteRoute = location.pathname.startsWith("/invite/");
   useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
+  // An incognito window keeps nothing and never syncs. Any other window syncs the tabs
+  // of the Space it shows, through that Space's vault; switching restarts the bridge.
+  const { incognito, key: spaceKey } = useSpaceWindowStore((state) => state.identity);
   const syncAllowed =
-    !nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready);
+    !incognito &&
+    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready));
 
   // Keep hook order stable as identity changes, and let account transitions
   // finish before deciding that the user needs to sign in.
@@ -44,6 +50,7 @@ export function AppFrameLayout() {
   if (
     !isAuthRoute &&
     user &&
+    !incognito &&
     nativeWorkspaceRecoveryEnabled() &&
     (recovery.accountId !== user.id || (!recovery.ready && !recovery.usable))
   ) {
@@ -70,10 +77,11 @@ export function AppFrameLayout() {
           </ConnectedDevicesProvider>
         </Suspense>
       </BrowserSyncStartup>
-      <BrowserSyncBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
+      <BrowserSyncBridge key={spaceKey} accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
       <SpacesRealtimeBridge />
-      <AgentExecutionSurface />
+      <SpaceWindowBridge />
+      {incognito ? null : <AgentExecutionSurface />}
       <UpdateNotices accountId={user?.id ?? ""} />
       <UnsavedQuitGuard />
       <BrowserSyncSleepOverlay

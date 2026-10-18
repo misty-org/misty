@@ -75,7 +75,7 @@ describe("desktop dock store", () => {
     ]);
   });
 
-  it("switches to another panel when closing the last tab of a panel in a multi-panel window", () => {
+  it("switches to another pane when closing the last tab of a pane in a multi-pane window", () => {
     const store = useWorkspaceStore.getState();
     const firstPane = dockLeaves(store.layout.root)[0];
     const secondPaneId = store.splitPane(firstPane.id, "right");
@@ -100,17 +100,6 @@ describe("desktop dock store", () => {
     expect(panesAfter).toHaveLength(1);
     expect(panesAfter[0].id).toBe(firstPane.id);
     expect(useWorkspaceStore.getState().layout.focusedPaneId).toBe(firstPane.id);
-  });
-
-  it("switches to another window when closing the last tab of a multi-window workspace", () => {
-    const store = useWorkspaceStore.getState();
-    const firstWindowId = store.activeWindowId;
-    store.createWindow("Second Window");
-    const onlyTabInSecond = dockTreeViews(useWorkspaceStore.getState().layout.root)[0];
-
-    expect(store.closeView(onlyTabInSecond.id)).toBe(true);
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(firstWindowId);
-    expect(useWorkspaceStore.getState().closedItems[0]?.view.id).toBe(onlyTabInSecond.id);
   });
 
   it("starts the global workspace in Browser", () => {
@@ -192,16 +181,6 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState().openSurface(browserRequest).id).toBe(first.id);
   });
 
-  it("keeps app instances isolated between virtual windows", () => {
-    const first = useWorkspaceStore.getState().openSurface(browserRequest);
-    const secondWindow = useWorkspaceStore.getState().createWindow("Window 2");
-
-    const second = useWorkspaceStore.getState().openSurface(browserRequest);
-
-    expect(second.id).not.toBe(first.id);
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(secondWindow.id);
-  });
-
   it("can focus a new pane on its default tab", () => {
     const first = useWorkspaceStore.getState().openSurface(browserRequest);
     const firstPane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
@@ -241,28 +220,6 @@ describe("desktop dock store", () => {
     expect(
       dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
     ).toContain("agents");
-  });
-
-  it("adopts the default Space once, then leaves the user's choice alone", () => {
-    const store = useWorkspaceStore.getState();
-    store.openSurface({
-      surfaceId: "agents",
-      groupKey: "tool:agents",
-      title: "Agents",
-      route: "/agents",
-      instancePolicy: "single",
-    });
-
-    // The bootstrap scope's tabs come along rather than being stranded.
-    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:misty");
-    expect(
-      dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("agents");
-
-    useWorkspaceStore.getState().setScope("space:family");
-    useWorkspaceStore.getState().adoptDefaultScope("space:misty");
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:family");
   });
 
   it("migrates a saved Transfers tab to a browser tab", () => {
@@ -387,7 +344,7 @@ describe("desktop dock store", () => {
     const first = store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!);
     const browser = store.openBrowserView({ url: "https://example.com" });
     const second = store.openSurface(workspaceSurfaceFromRoute("/spaces/two/notes")!);
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toEqual([
       first.id,
       browser.id,
@@ -396,16 +353,16 @@ describe("desktop dock store", () => {
     expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!).id).toBe(first.id);
   });
 
-  it("opens Journal and Planner as separate reusable tabs in one Space", () => {
+  it("opens Journal and Files as separate reusable tabs in one Space", () => {
     const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
-    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/planner/tasks/board");
+    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/library");
     expect(journalRequest).not.toBeNull();
     expect(plannerRequest).not.toBeNull();
 
     const journal = useWorkspaceStore.getState().addSurface(journalRequest!);
     const planner = useWorkspaceStore.getState().addSurface(plannerRequest!);
 
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("global");
+    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -415,8 +372,8 @@ describe("desktop dock store", () => {
         }),
         expect.objectContaining({
           id: planner.id,
-          groupKey: "space:one:planner",
-          title: "Planner",
+          groupKey: "space:one:library",
+          title: "Files",
         }),
       ]),
     );
@@ -487,7 +444,7 @@ describe("desktop dock store", () => {
     expect(leaves[1].views).toMatchObject([{ placeholder: true, title: "google.com" }]);
   });
 
-  it("opens a tool tab into an empty split panel", () => {
+  it("opens a tool tab into an empty split pane", () => {
     const first = useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
     const pane = dockLeaves(useWorkspaceStore.getState().layout.root)[0];
     const newPaneId = useWorkspaceStore.getState().splitPane(pane.id, "right")!;

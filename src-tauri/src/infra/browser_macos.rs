@@ -20,24 +20,6 @@ pub(super) fn configure_browser_frame_rate(webview: &Webview) -> Result<(), Stri
 }
 
 #[cfg(target_os = "macos")]
-pub(super) fn browser_requires_ephemeral_store() -> bool {
-    use objc2_foundation::NSProcessInfo;
-
-    // Named persistent WKWebsiteDataStore instances arrived in macOS 14.
-    // Older releases use a nonpersistent store instead of sharing the Host's
-    // default store. Tabs are therefore session-isolated on those releases.
-    NSProcessInfo::processInfo()
-        .operatingSystemVersion()
-        .majorVersion
-        < 14
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(super) fn browser_requires_ephemeral_store() -> bool {
-    false
-}
-
-#[cfg(target_os = "macos")]
 pub(crate) async fn evaluate_browser_async_javascript(
     webview: Webview,
     function_body: String,
@@ -571,7 +553,7 @@ pub async fn host_webview_capture_region(
     height: f64,
     max_dimension: Option<f64>,
 ) -> Result<serde_json::Value, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the Host can capture its view.".into());
     }
     capture_webview_region_sized(

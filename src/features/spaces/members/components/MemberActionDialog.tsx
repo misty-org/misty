@@ -28,7 +28,9 @@ export function MemberActionDialog({ dialogs }: { dialogs: MemberDialogsState })
           <AlertDialogDescription>
             {isTransfer
               ? `${memberAction.member.name} will become the owner and control membership and Space settings.`
-              : `${memberAction?.member.name ?? "This member"} will immediately lose access to this Space.`}
+              : `${memberAction?.member.name ?? "This member"} will immediately lose access to this Space. ` +
+                "Their memory, private notes, drawings and files, code projects and app picks here " +
+                "are deleted; their public items stay."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -19,7 +19,7 @@ use crate::{
 /// A folder's canonical path as it is stored and compared: on Windows without
 /// the `\\?\` prefix canonicalizing adds, so every path here has one form.
 pub(crate) fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
-    fs::canonicalize(path).map(|path| misty_agent_code::plain_path(&path))
+    fs::canonicalize(path).map(|path| crate::agents::project_root::plain_path(&path))
 }
 
 #[derive(Clone)]

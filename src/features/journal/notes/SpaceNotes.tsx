@@ -1,7 +1,6 @@
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
 import { useWorkspaceViewTitle } from "@/features/workspace";
-import { useLocalPinnedIds } from "@/shared/hooks/useLocalPinnedIds";
 import { useMemo } from "react";
 import { NewNoteDialog } from "./components/NewNoteDialog";
 import { NotePreview } from "./components/NotePreview";
@@ -25,7 +24,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
       referenceOnly,
       members,
       useStore: useNotesStore,
-      usePinnedIds: useLocalPinnedIds,
       ReadingPane: NoteReadingPane,
       Preview: NotePreview,
       NewNoteDialog,

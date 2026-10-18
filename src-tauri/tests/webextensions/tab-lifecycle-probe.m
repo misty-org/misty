@@ -21,12 +21,14 @@ int main(int argc, const char **argv) {
         if (argc!=3 || !misty_extensions_supported()) return 2;
         [NSApplication sharedApplication];
         [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-        host=[MistyExtensionHost new]; host.account=NSUUID.UUID.UUIDString; host.controllerIdentifier=NSUUID.UUID.UUIDString;
+        // One Space's host, registered as the C entry points find it.
+        MistyExtensionHost *host=[MistyExtensionHost new]; host.space=@"probe"; host.account=NSUUID.UUID.UUIDString; host.controllerIdentifier=NSUUID.UUID.UUIDString;
+        hosts=[NSMutableDictionary dictionaryWithObject:host forKey:@"probe"];
         NSString *url=[NSString stringWithUTF8String:argv[2]];
         NSDictionary *layout=@{@"operation":@"layout",@"account":host.account,@"tabs":@[@{@"id":@"restored",@"windowId":@"main",@"url":url,@"title":@"Fixture",@"private":@NO,@"index":@0,@"active":@YES,@"focused":@YES}]};
         // Restored logical tabs exist before a controller, extension, or native view.
         [host request:layout reply:^(NSDictionary *result) {}];
-        [host configureStore:[WKWebsiteDataStore nonPersistentDataStore]];
+        [host startWithStore:[WKWebsiteDataStore nonPersistentDataStore]];
         __block BOOL loaded=NO;
         [host load:@{@"id":@"1",@"guid":@"native-fixture@misty.test",@"origin":NSUUID.UUID.UUIDString.lowercaseString,@"runtimePath":[NSString stringWithUTF8String:argv[1]],@"privateAccess":@YES,@"permissions":@[@"storage",@"activeTab",@"scripting"],@"hosts":@[@"http://127.0.0.1/*"]} reply:^(NSDictionary *result) { require(!result[@"error"],result[@"error"]); loaded=YES; }];
         for (int i=0;i<500&&!loaded;i++) spin(.01);
@@ -35,7 +37,7 @@ int main(int argc, const char **argv) {
         MistyExtensionTab *tab=host.tabs[@"restored"];
         require([context.openTabs containsObject:tab],@"Restored tab was not announced to the new context");
         WKWebViewConfiguration *original=[WKWebViewConfiguration new]; original.websiteDataStore=host.store;
-        WKWebViewConfiguration *config=CFBridgingRelease(misty_extensions_configuration((__bridge void *)original,url.UTF8String,false));
+        WKWebViewConfiguration *config=CFBridgingRelease(misty_extensions_configuration("probe",(__bridge void *)original,url.UTF8String));
         WKWebView *view=[[WKWebView alloc] initWithFrame:NSMakeRect(0,0,500,300) configuration:config];
         NSWindow *window=[[NSWindow alloc] initWithContentRect:NSMakeRect(80,80,500,300) styleMask:NSWindowStyleMaskTitled backing:NSBackingStoreBuffered defer:NO];
         [window.contentView addSubview:view]; [window makeKeyAndOrderFront:nil];
@@ -44,7 +46,7 @@ int main(int argc, const char **argv) {
         [context didCloseTab:tab windowIsClosing:NO];
         [context actionForTab:tab];
         require(![context.openTabs containsObject:tab],@"Regression setup did not produce an unannounced tab");
-        misty_extensions_register_tab((__bridge void *)view,"restored",false,url.UTF8String);
+        misty_extensions_register_tab("probe",(__bridge void *)view,"restored",false,url.UTF8String);
         require([context.openTabs containsObject:tab],@"Binding an existing adapter did not restore its open registration");
         [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]]];
         BOOL connected=NO;
@@ -55,15 +57,15 @@ int main(int argc, const char **argv) {
         NSNumber *tabID=evaluate(bridge,@"return (await browser.tabs.query({active:true}))[0].id");
         for(int i=0;i<5;i++) {
             [host request:layout reply:^(NSDictionary *result) {}];
-            misty_extensions_register_tab((__bridge void *)view,"restored",false,url.UTF8String);
-            misty_extensions_tab_event("restored","updated");
+            misty_extensions_register_tab("probe",(__bridge void *)view,"restored",false,url.UTF8String);
+            misty_extensions_tab_event("probe","restored","updated");
         }
         require([tabID isEqual:evaluate(bridge,@"return (await browser.tabs.query({active:true}))[0].id")],@"Repeated registration changed the extension tab ID");
         [context didCloseTab:tab windowIsClosing:NO]; [context actionForTab:tab];
         [host request:layout reply:^(NSDictionary *result) {}];
         require([context.openTabs containsObject:tab],@"Layout reconciliation did not restore an existing tab");
         [context didCloseTab:tab windowIsClosing:NO]; [context actionForTab:tab];
-        misty_extensions_tab_event("restored","activate");
+        misty_extensions_tab_event("probe","restored","activate");
         require([context.openTabs containsObject:tab],@"Activation did not restore an existing tab");
         [host unload:@"1"];
         puts("PASS: restored adapters, open-tab reconciliation, content/background messaging, stable IDs during repeated layout/registration");

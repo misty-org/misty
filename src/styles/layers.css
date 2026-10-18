@@ -1,0 +1,104 @@
+/* Named stacking layers. Use these instead of z-[number] so the order stays in one place. */
+/* Agent execution surface over workspace content */
+@utility layer-agent-surface {
+  z-index: 2147482400;
+}
+/* Floating app chrome: global Misty panel, layout controls */
+@utility layer-chrome {
+  z-index: 2147482500;
+}
+/* Overlays scoped to the workspace */
+@utility layer-workspace-overlay {
+  z-index: 2147482600;
+}
+/* Toasts and notices */
+@utility layer-notification {
+  z-index: 2147482900;
+}
+/* A notice above another notice */
+@utility layer-notification-raised {
+  z-index: 2147482910;
+}
+/* Dialog and sheet backdrops */
+@utility layer-dialog-backdrop {
+  z-index: 2147483000;
+}
+/* Dialogs, sheets, and pointer drags over them */
+@utility layer-dialog {
+  z-index: 2147483100;
+}
+/* Blocking screens and alert-dialog backdrops */
+@utility layer-blocking-backdrop {
+  z-index: 2147483200;
+}
+/* Blocking screen content */
+@utility layer-blocking {
+  z-index: 2147483201;
+}
+/* Alert dialogs and popups opened over blocking screens */
+@utility layer-blocking-popup {
+  z-index: 2147483300;
+}
+/* Menus and drag previews */
+@utility layer-menu {
+  z-index: 2147483400;
+}
+/* Inline editors raised over menus */
+@utility layer-menu-raised {
+  z-index: 2147483401;
+}
+/* Popovers and select lists */
+@utility layer-popover {
+  z-index: 2147483420;
+}
+/* Tooltips and the drag ghost, always on top */
+@utility layer-tooltip {
+  z-index: 2147483500;
+}
+
+/* Night light (Settings › Appearance): a warm multiply layer over the whole
+   window, above tooltips, that never takes the pointer. Browser pages are
+   native views on top of this one and get the same layer injected. */
+:root[data-night-light]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background-color: var(--misty-night-light);
+  mix-blend-mode: multiply;
+}
+
+/* The edge fades of sliding text (OverflowFadeText marquee) animate, so they are typed lengths. */
+@property --marquee-fade-left {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --marquee-fade-right {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* A playback position that advances by itself (PlaybackClock): the clock text and the bar both read
+   the animated number, so nothing in script has to tick. */
+@property --playback-position {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --playback-length {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+.playback-elapsed::after {
+  counter-reset: ph round(down, calc(var(--playback-position) / 3600), 1) pm
+    round(down, mod(calc(var(--playback-position) / 60), 60), 1) ps
+    round(down, mod(var(--playback-position), 60), 1);
+  content: counter(pm) ":" counter(ps, decimal-leading-zero);
+}
+.playback-elapsed[data-hours]::after {
+  content: counter(ph) ":" counter(pm, decimal-leading-zero) ":" counter(ps, decimal-leading-zero);
+}

@@ -53,3 +53,24 @@ webview or a color with alpha below 255, in the constructor and in
 `set_background_color`. The transparent main app webview is unchanged.
 
 Remove this patch when upstream keeps the canvas for opaque colors.
+
+# Misty patch: one incognito session per key on macOS
+
+Upstream keeps one thread-local private data store, so every incognito webview in
+the process shares one session. Misty gives each Space its own incognito session:
+all of a Space's incognito windows share it, and other Spaces never see it.
+
+`src/wkwebview/mod.rs` now keeps one `nonPersistentDataStore` per session id. An
+incognito webview built with a `data_store_identifier` joins the session with that
+id (the identifier is never used for a persistent store when `incognito` is set);
+one built without an identifier gets a session of its own.
+`end_private_session(id)` drops a session once its last window has closed, so the
+next incognito window of that Space starts signed out. `extension_private_data_store`
+and `reset_private_data_store` are gone: incognito windows have no extension host.
+
+Regression verification: open two incognito windows in one Space and sign in to a
+site in one; the other is signed in, an incognito window of another Space is not,
+and after closing every incognito window of the first Space a new one starts
+signed out.
+
+Remove this patch when upstream supports more than one private session.

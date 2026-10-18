@@ -1,10 +1,8 @@
 import { useAuth } from "@/features/auth";
-import { SpaceOverview } from "./SpaceOverview";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { SpaceSettings } from "./components/SpaceSettings";
 import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
 import { useSpacesStore } from "./store/useSpacesStore";
 
@@ -13,9 +11,6 @@ const Notes = lazy(() =>
 );
 const Drawings = lazy(() =>
   import("@/features/journal/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
-);
-const Planner = lazy(() =>
-  import("@/features/planner/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
 );
 // Configure host services before React renders the built-in tools.
 // Their runtime hooks deliberately fail if an entry point skips this setup.
@@ -34,15 +29,25 @@ async function loadChat() {
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
+const Code = lazy(() => import("./code/SpaceCode").then((m) => ({ default: m.SpaceCode })));
+async function loadHome() {
+  // File previews on the home page use the Library's runtime.
+  const { initializeHostLibraryRuntime } =
+    await import("@/features/library/library/hostLibraryRuntime");
+  initializeHostLibraryRuntime();
+  const { SpaceHome } = await import("./home/SpaceHome");
+  return { default: SpaceHome };
+}
+const Home = lazy(loadHome);
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
+    case "home":
+      await loadHome();
+      break;
     case "social":
     case "chat":
       await loadChat();
-      break;
-    case "planner":
-      await import("@/features/planner/planner/SpacePlanner");
       break;
     case "notes":
       await import("@/features/journal/notes/SpaceNotes");
@@ -52,6 +57,9 @@ export async function preloadSpaceSection(section: string) {
       break;
     case "library":
       await loadLibrary();
+      break;
+    case "code":
+      await import("./code/SpaceCode");
       break;
   }
 }
@@ -71,7 +79,8 @@ export function SpaceSectionView(props: {
   studioKind?: string;
   workspaceTabId?: string;
 }) {
-  const { spaceId, section, studioKind = "" } = props;
+  const { spaceId, studioKind = "" } = props;
+  const section = props.section || "home";
   const { user, accounts, transitioning } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -137,34 +146,16 @@ export function SpaceSectionView(props: {
     );
   }
 
-  const permission =
-    section === "social" || section === "chat"
-      ? "messages.read"
-      : section === "planner"
-        ? "tasks.view"
-        : section === "library"
-          ? "library.view"
-          : null;
-  if (permission && space.permissions?.[permission] === false)
-    return (
-      <PermissionState
-        className="h-full"
-        title="You don’t have access to this Space tool"
-        description="Ask a Space owner to update your permissions."
-      />
-    );
-
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder />}>
-        {section === "home" ? (
-          <SpaceOverview key={`home:${spaceId}`} space={space} />
-        ) : section === "settings" ? (
-          <SpaceSettings
-            key={`settings:${spaceId}:${studioKind}`}
-            spaceId={spaceId}
-            section={studioKind}
-          />
+        {/* The Journal lists are gone: Notes and Drawings without an item show the home. */}
+        {section === "home" ||
+        (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
+        (section === "drawings" && !studioKind) ||
+        // There is no settings page: its links land on the home, and the Space menu has the rest.
+        section === "settings" ? (
+          <Home space={space} />
         ) : section === "notes" ? (
           <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : section === "drawings" ? (
@@ -173,17 +164,10 @@ export function SpaceSectionView(props: {
             drawingId={studioKind}
             workspaceTabId={props.workspaceTabId}
           />
-        ) : section === "planner" ? (
-          <Planner
-            spaceId={spaceId}
-            canManage={space.role === "owner" || space.permissions?.["tasks.manage"] === true}
-            canManageIntegrations={
-              space.role === "owner" || space.permissions?.["integrations.manage"] === true
-            }
-            workspaceTabId={props.workspaceTabId}
-          />
         ) : section === "library" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "code" ? (
+          <Code spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "social" || section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (

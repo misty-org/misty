@@ -4,9 +4,6 @@ import { providerFromRoute } from "@/features/webviews/providers";
 import {
   NotesDestinationIcon,
   DrawingsDestinationIcon,
-  TasksDestinationIcon,
-  AgendaDestinationIcon,
-  RoadmapsDestinationIcon,
   AllItemsDestinationIcon,
   FavoritesDestinationIcon,
   CollectionsDestinationIcon,
@@ -40,9 +37,6 @@ export function DestinationIcon({
     return <BrandIcon brand={item.id} size={18} />;
   const nativeIcon = {
     notes: NotesDestinationIcon,
-    tasks: TasksDestinationIcon,
-    agenda: AgendaDestinationIcon,
-    roadmaps: RoadmapsDestinationIcon,
     drawings: DrawingsDestinationIcon,
   }[item.id];
   if (nativeIcon) {

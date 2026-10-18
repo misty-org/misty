@@ -82,7 +82,7 @@ fn stack(app: &AppHandle) -> Result<WebviewWindow, String> {
     // Owned by Misty's window: above it, minimized and closed with it.
     if let (Some(stack), Some(main)) = (
         hwnd(&window),
-        app.get_webview_window("main").as_ref().and_then(hwnd),
+        crate::infra::space_windows::primary(app).and_then(|main| main.hwnd().ok().map(|handle| handle.0 as isize)),
     ) {
         // SAFETY: both are live windows of this process.
         unsafe { SetWindowLongPtrW(stack as _, GWLP_HWNDPARENT, main) };
@@ -95,7 +95,7 @@ fn follow_main(app: &AppHandle) {
     if with(|dock| std::mem::replace(&mut dock.following, true)) {
         return;
     }
-    let Some(main) = app.get_webview_window("main") else {
+    let Some(main) = crate::infra::space_windows::primary(app) else {
         return;
     };
     let app = app.clone();
@@ -234,7 +234,7 @@ pub fn visibility(app: &AppHandle) -> Value {
 /// Places the stack in Misty's window and every card's thumbnail in it, and
 /// tells the stack's page where the cards are.
 fn layout(app: &AppHandle) {
-    let Some(main) = app.get_webview_window("main") else {
+    let Some(main) = crate::infra::space_windows::primary(app) else {
         return;
     };
     let Ok(stack) = stack(app) else {

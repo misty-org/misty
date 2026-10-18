@@ -12,6 +12,7 @@ import {
   workspaceRecoveryStorage,
 } from "./workspaceRecoveryStorage";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { isIncognitoWindow } from "./spaceWindow";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 
 function workspaceAccountStorageKey(accountId: string): string {
@@ -19,6 +20,8 @@ function workspaceAccountStorageKey(accountId: string): string {
 }
 
 export function saveAccountWorkspace(accountId: string): void | Promise<void> {
+  // An incognito window keeps nothing.
+  if (isIncognitoWindow()) return;
   if (nativeWorkspaceRecoveryEnabled()) return flushNativeWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) return;
@@ -34,6 +37,10 @@ export function saveAccountWorkspace(accountId: string): void | Promise<void> {
 }
 
 export function restoreAccountWorkspace(accountId: string): void | Promise<void> {
+  if (isIncognitoWindow()) {
+    useWorkspaceStore.getState().reset();
+    return;
+  }
   if (nativeWorkspaceRecoveryEnabled()) return restoreNativeWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) {
@@ -63,6 +70,7 @@ export function restoreAccountWorkspace(accountId: string): void | Promise<void>
 }
 
 export function removeAccountWorkspace(accountId: string): void | Promise<void> {
+  if (isIncognitoWindow()) return;
   if (nativeWorkspaceRecoveryEnabled()) return removeNativeAccountWorkspace(accountId);
   const normalized = accountId.trim();
   if (!normalized) return;

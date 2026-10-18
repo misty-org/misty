@@ -9,7 +9,7 @@ import type { SpaceMembersState } from "./useSpaceMembers";
  * Both leave their errors to the shared Spaces store, which is why the failure
  * branches here are empty — the dialogs render `store.error` directly.
  */
-export function useMemberDialogs(spaceId: string, state: SpaceMembersState) {
+export function useMemberDialogs(spaceId: string, state: SpaceMembersState, startInvite = false) {
   const location = useLocation();
   const { owner, invite, removeMember, transferOwner, clearError } = state;
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -18,10 +18,11 @@ export function useMemberDialogs(spaceId: string, state: SpaceMembersState) {
   const [memberAction, setMemberAction] = useState<MemberAction>();
   const [actionBusy, setActionBusy] = useState(false);
 
-  // ?invite=1 opens the dialog straight from a link.
+  // ?invite=1, or People's Invite, opens the dialog straight away.
   useEffect(() => {
-    if (owner && new URLSearchParams(location.search).get("invite") === "1") setInviteOpen(true);
-  }, [location.search, owner]);
+    if (owner && (startInvite || new URLSearchParams(location.search).get("invite") === "1"))
+      setInviteOpen(true);
+  }, [location.search, owner, startInvite]);
 
   const closeInvite = useCallback(() => {
     if (inviting) return;

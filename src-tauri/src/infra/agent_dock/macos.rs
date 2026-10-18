@@ -68,9 +68,14 @@ pub(super) fn add(app: &AppHandle, label: &str, name: &str) -> Result<(), String
         let Ok(pointer) = window.ns_window() else {
             return;
         };
-        // Docked windows live in Misty's window and move with it.
-        let parent = app
-            .get_window("main")
+        // Docked windows live in the Space window they came from and move with it.
+        let owner = super::hosts()
+            .lock()
+            .ok()
+            .and_then(|hosts| hosts.get(&label).map(|host| host.owner.clone()));
+        let parent = owner
+            .and_then(|owner| app.get_window(&owner))
+            .or_else(|| crate::infra::space_windows::primary(app))
             .and_then(|main| main.ns_window().ok())
             .unwrap_or(std::ptr::null_mut());
         let (id, name) = (c_string(&label), c_string(&name));

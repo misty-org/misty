@@ -1,7 +1,7 @@
+import type { ItemVisibility } from "../visibility";
 import type { LibraryEditDefinition } from "./common";
-export type * from "./actionSuggestionTypes";
 export type * from "./agentArchitectureTypes";
-export type * from "./agentTaskTypes";
+export type * from "./memberTypes";
 export type * from "./conversationTypes";
 
 interface LibraryFile {
@@ -37,6 +37,8 @@ export interface SpaceLibraryItem {
   recover_until?: string;
   version: number;
   updated_at: string;
+  /** A private file opens only for whoever added it. */
+  visibility?: ItemVisibility;
   file: LibraryFile;
 }
 
@@ -135,7 +137,6 @@ export interface LibrarySearchFacets {
   tags: LibrarySearchFacet[];
   media_types: LibrarySearchFacet[];
   years: LibrarySearchFacet[];
-  albums: LibrarySearchFacet[];
   utilities: LibrarySearchFacet[];
 }
 

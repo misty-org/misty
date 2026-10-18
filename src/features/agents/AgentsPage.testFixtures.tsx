@@ -88,9 +88,10 @@ export function chooseFromSwitcher(option: string | RegExp, agent = "Communicati
   fireEvent.click(screen.getByRole("option", { name: option }));
 }
 
-/** Agent settings live in the switcher now that the sidebar has no footer. */
+/** Each agent's settings button sits on its row in the switcher. */
 export function openAgentSettings(agent = "Communications") {
-  chooseFromSwitcher(`${agent} settings`, agent);
+  fireEvent.click(screen.getByRole("button", { name: `Switch agent: ${agent}` }));
+  fireEvent.click(screen.getByRole("button", { name: `${agent} settings` }));
 }
 
 /** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */

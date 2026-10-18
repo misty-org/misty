@@ -1,4 +1,4 @@
-import { emitTo } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RefObject } from "react";
 import { CompanionActivity } from "./companionActivity";
@@ -77,7 +77,7 @@ export function startCursorOverlayLoop({
   const removers = listenToCursorInputs(id, activity, latest, inputs);
   const finish = () => {
     navigation = "follow";
-    void emitTo("main", "misty://cursor-point-finished", {
+    void emit("misty://cursor-point-finished", {
       generation: latest.current.generation,
     });
   };

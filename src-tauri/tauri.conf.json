@@ -13,6 +13,8 @@
     "macOSPrivateApi": true,
     "windows": [
       {
+        "label": "space-personal",
+        "create": false,
         "title": "Misty",
         "width": 1280,
         "height": 820,
@@ -61,7 +63,7 @@
       "dmg"
     ],
     "macOS": {
-      "minimumSystemVersion": "12.0",
+      "minimumSystemVersion": "14.0",
       "entitlements": "Entitlements.plist"
     },
     "icon": [

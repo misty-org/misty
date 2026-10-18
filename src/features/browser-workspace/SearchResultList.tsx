@@ -4,6 +4,7 @@ import {
   Bookmark,
   Bot,
   ChevronRight,
+  FileCode2,
   Download,
   File,
   Folder,
@@ -13,23 +14,24 @@ import {
   Library,
   MessageSquare,
   NotebookPen,
+  PenTool,
   Puzzle,
   RotateCcw,
   Search,
-  Settings2,
-  SquareCheck,
+  Settings,
   Star,
   type LucideIcon,
 } from "lucide-react";
 import { BrandIcon, brandIconAsset, cn } from "@/shared/ui";
+import { AgentAvatar } from "@/features/agents/AgentAvatar";
+import type { AgentProfile } from "@/shared/schemas";
 import mistyIcon from "@/assets/branding/misty-icon.png?inline";
 import { omniboxMatchIcon, type OmniboxMatch } from "@/features/browser/omnibox";
-import type { Bang, SearchScope } from "./bangs/types";
 import type { ScopedSearchKind, ScopedSearchResult } from "./scopedSearchSources";
 
 export type SearchListItem =
-  /** `query` carries text typed before a trailing `!name`. */
-  | { type: "bang"; bang: Bang; query?: string }
+  /** Sends the text to an agent: a new chat with it. */
+  | { type: "ask"; agent: AgentProfile; prompt: string }
   | { type: "match"; match: OmniboxMatch }
   | { type: "result"; result: ScopedSearchResult };
 
@@ -39,7 +41,8 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   space: LayoutGrid,
   "space-item": Library,
   note: NotebookPen,
-  task: SquareCheck,
+  drawing: PenTool,
+  code: FileCode2,
   message: MessageSquare,
   agent: Bot,
   conversation: History,
@@ -48,62 +51,18 @@ const resultIcons: Record<ScopedSearchKind, LucideIcon> = {
   "closed-tab": RotateCcw,
   tab: AppWindow,
   download: Download,
-  setting: Settings2,
+  setting: Settings,
   extension: Puzzle,
   action: ChevronRight,
 };
 
-const scopeIcons: Record<Exclude<SearchScope, "default">, LucideIcon> = {
-  files: Folder,
-  spaces: LayoutGrid,
-  notes: NotebookPen,
-  tasks: SquareCheck,
-  chat: MessageSquare,
-  agents: Bot,
-  bookmarks: Bookmark,
-  history: History,
-  tabs: AppWindow,
-  downloads: Download,
-  settings: Settings2,
-  extensions: Puzzle,
-};
-
-/** The site's icon for a website shortcut, the globe when it has none. */
-function WebBangIcon({ home }: { home: string }) {
-  const [failed, setFailed] = useState(false);
-  let src: string | null = null;
-  try {
-    src = `${new URL(home).origin}/favicon.ico`;
-  } catch {
-    // No usable home page.
-  }
-  if (!src || failed)
-    return <Globe2 size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
-  return (
-    <img
-      src={src}
-      alt=""
-      className="size-4 shrink-0 rounded-sm object-contain"
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-const groupLabels: Record<Bang["group"], string> = {
-  misty: "Misty",
-  custom: "Your shortcuts",
-  web: "Web",
-};
-
 function itemKey(item: SearchListItem): string {
-  if (item.type === "bang") return `bang:${item.bang.trigger}`;
+  if (item.type === "ask") return `ask:${item.agent.id}`;
   return item.type === "match" ? item.match.id : item.result.id;
 }
 
 function formatDetail(item: SearchListItem): string {
-  if (item.type === "bang") {
-    return item.bang.kind === "scope" && !item.query ? item.bang.description : "";
-  }
+  if (item.type === "ask") return item.agent.name;
   if (item.type === "result") {
     return item.result.subtitle;
   }
@@ -127,19 +86,12 @@ function formatDetail(item: SearchListItem): string {
 function ItemIcon({ item }: { item: SearchListItem }) {
   const [imgError, setImgError] = useState(false);
 
-  if (item.type === "bang") {
-    const { bang } = item;
-    const Icon = bang.kind === "scope" ? scopeIcons[bang.scope] : Search;
+  if (item.type === "ask")
     return (
-      <div className="relative flex size-4 shrink-0 items-center justify-center">
-        {bang.kind === "web" ? (
-          <WebBangIcon home={bang.home} />
-        ) : (
-          <Icon size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />
-        )}
-      </div>
+      <span className="inline-flex size-4 shrink-0 [&_.agent-avatar]:!size-4 [&_.agent-avatar]:!text-[11px]">
+        <AgentAvatar agent={item.agent} />
+      </span>
     );
-  }
 
   if (item.type === "result") {
     const Icon = resultIcons[item.result.kind] ?? Globe2;
@@ -165,8 +117,7 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
   const isMisty =
     host.includes("mistysys.com") ||
-    host.includes("misty.local") ||
-    match.title.toLowerCase().includes("misty");
+    host.includes("misty.local");
   const isOpenAi = host.includes("chatgpt.com") || host.includes("openai.com");
   const isYouTube = [host, match.faviconUrl ?? ""].some((value) =>
     /youtube\.com|youtu\.be/.test(value.toLowerCase()),
@@ -212,13 +163,12 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   );
 }
 
+/** Rows name only the target: the address, the search, the agent's message or the place. */
 function Row(props: { item: SearchListItem }) {
   const { item } = props;
   const title =
-    item.type === "bang"
-      ? item.query
-        ? `Search ${item.bang.label} for “${item.query}”`
-        : item.bang.label
+    item.type === "ask"
+      ? item.prompt || `Ask ${item.agent.name}`
       : item.type === "match"
         ? item.match.title
         : item.result.title;
@@ -236,9 +186,6 @@ function Row(props: { item: SearchListItem }) {
           </span>
         )}
       </div>
-      {item.type === "bang" && !item.query && (
-        <span className="shrink-0 text-xs text-zinc-500 sm:text-sm">!{item.bang.trigger}</span>
-      )}
     </>
   );
 }
@@ -262,24 +209,8 @@ export function SearchResultList(props: {
       className="max-h-[360px] space-y-0.5 overflow-y-auto p-1.5"
     >
       {props.items.map((item, index) => {
-        const previous = props.items[index - 1];
-        // Shortcut lists are grouped; a single carried-over shortcut is not.
-        const header =
-          item.type === "bang" &&
-          !item.query &&
-          (previous?.type !== "bang" || previous.bang.group !== item.bang.group)
-            ? groupLabels[item.bang.group]
-            : null;
         return (
           <Fragment key={itemKey(item)}>
-            {header && (
-              <li
-                role="presentation"
-                className="px-3 pb-1 pt-2 text-[11px] font-medium text-zinc-400"
-              >
-                {header}
-              </li>
-            )}
             <li
               role="option"
               aria-selected={index === props.activeIndex}

@@ -17,19 +17,21 @@ import {
 import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback, useMemo, type ReactNode } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function BrowserMenu(props: {
   nativeRuntime: boolean;
   tab: WorkspaceView;
   url: string;
   commands?: BrowserPageCommands;
   tools?: ReactNode;
+  layout?: ReactNode;
   lead?: ReactNode;
   toolsIcon?: boolean;
   library?: ReactNode;
   account?: ReactNode;
 }) {
   const runtimeId = browserRuntimeId(props.tab);
-  const privateTab = Boolean(parseBrowserViewState(props.tab.state).private);
+  const privateTab = Boolean(isIncognitoWindow());
   const siteZoomRaw = useSettingsStore((state) =>
     settingsString(state.settings?.document ?? {}, "general", "browser_site_zoom_json", "[]"),
   );

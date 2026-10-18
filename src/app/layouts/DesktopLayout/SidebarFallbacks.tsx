@@ -27,15 +27,20 @@ export function SidebarNavFallback() {
   const claimed = useBrowserToolbarSlot((state) => state.navClaims > 0);
   if (claimed) return null;
   return (
-    <div className="misty-sidebar-nav-fallback flex items-center gap-0.5">
-      <IconButton size="xs" tooltip={false} label="Back" disabled>
-        <ArrowLeft {...toolbarIconProps} size={18} />
+    // Sized like the page's own buttons that replace it: sidebar chrome, 6px apart.
+    <div
+      className="misty-sidebar-nav-fallback flex items-center gap-1.5"
+      data-browser-toolbar
+      data-sidebar
+    >
+      <IconButton tooltip={false} label="Back" disabled>
+        <ArrowLeft {...toolbarIconProps} />
       </IconButton>
-      <IconButton size="xs" tooltip={false} label="Forward" disabled>
-        <ArrowRight {...toolbarIconProps} size={18} />
+      <IconButton tooltip={false} label="Forward" disabled>
+        <ArrowRight {...toolbarIconProps} />
       </IconButton>
-      <IconButton size="xs" tooltip={false} label="Reload" disabled>
-        <RotateCw {...toolbarIconProps} size={16} />
+      <IconButton tooltip={false} label="Reload" disabled>
+        <RotateCw {...toolbarIconProps} className="size-4" />
       </IconButton>
     </div>
   );

@@ -21,34 +21,7 @@ pub(crate) const MEDIA_SESSION_PAGE_SCRIPT: &str = r#"(() => {
 })();"#;
 
 /// Reads the page's now-playing state. Only https artwork leaves the page.
-const MEDIA_INFO_SCRIPT: &str = r#"(() => {
-  const media = [...document.querySelectorAll("video, audio")];
-  const element =
-    media.find((m) => !m.paused && !m.ended) ||
-    media.find((m) => m.dataset.mistyPaused === "1") ||
-    media.filter((m) => m.currentTime > 0).sort((a, b) => (b.duration || 0) - (a.duration || 0))[0];
-  const meta = navigator.mediaSession && navigator.mediaSession.metadata;
-  const size = (art) => Math.max(...String(art.sizes || "0x0").split(/\s+/).map((s) => parseInt(s, 10) || 0));
-  const art = [...((meta && meta.artwork) || [])]
-    .filter((a) => /^https:/.test(a.src || ""))
-    .sort((a, b) => size(b) - size(a));
-  const pick = art.find((a) => size(a) <= 512) || art[art.length - 1];
-  const og = document.querySelector('meta[property="og:image"]');
-  const ogImage = og && /^https:/.test(og.content || "") ? og.content : "";
-  const actions = window.__mistyMediaActions;
-  const finite = (n) => (Number.isFinite(n) ? n : null);
-  const text = (s) => String(s || "").slice(0, 200);
-  return {
-    title: text(meta && meta.title),
-    artist: text(meta && meta.artist),
-    artwork: (pick && pick.src) || ogImage,
-    duration: element ? finite(element.duration) : null,
-    position: element ? finite(element.currentTime) : null,
-    paused: element ? element.paused : navigator.mediaSession?.playbackState === "paused",
-    canPrevious: Boolean(actions && actions.has("previoustrack")),
-    canNext: Boolean(actions && actions.has("nexttrack")),
-  };
-})()"#;
+const MEDIA_INFO_SCRIPT: &str = r#"(() => window.__mistyMediaSnapshot ? window.__mistyMediaSnapshot() : null)()"#;
 
 /// Runs one of the page's own controls; play and pause fall back to the
 /// playing element when the page registered none.

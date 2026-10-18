@@ -14,6 +14,39 @@
     postToHost = postToHost || bindHost();
     if (postToHost) postToHost('{"token":"' + statusToken + '","status":"stopped"}');
   };
+  // Single-page sites (YouTube and most apps) change the URL with the History API or the hash,
+  // which loads nothing, so the host would never hear of it. Report each change; the host only
+  // accepts an address within the view's own origin.
+  let reportedHref = String(location);
+  // Captured now, before site scripts can replace it.
+  const encode = encodeURIComponent;
+  const reportLocation = () => {
+    const href = String(location);
+    if (href === reportedHref) return;
+    reportedHref = href;
+    postToHost = postToHost || bindHost();
+    if (!postToHost) return;
+    // The new address rides along, so the host need not wait for the view to catch up. A very
+    // long one is left out and the host reads the view's own address instead.
+    const encoded = encode(href);
+    postToHost('{"token":"' + statusToken + '","status":"location"'
+      + (encoded.length <= 800 ? ',"url":"' + encoded + '"' : "") + '}');
+  };
+  const historyProto = window.History && History.prototype;
+  for (const name of ["pushState", "replaceState"]) {
+    const original = historyProto && historyProto[name];
+    if (typeof original !== "function") continue;
+    historyProto[name] = function (...args) {
+      const result = original.apply(this, args);
+      setTimeout(reportLocation, 0);
+      return result;
+    };
+  }
+  window.addEventListener("popstate", () => setTimeout(reportLocation, 0), true);
+  window.addEventListener("hashchange", reportLocation, true);
+  window.addEventListener("pageshow", () => {
+    reportedHref = String(location);
+  });
   let loading = /^https?:$/.test(location.protocol) && document.readyState !== "complete";
   let link = "";
   let host = null;
@@ -174,9 +207,31 @@
   }, true);
   document.addEventListener("fullscreenchange", render);
   window.addEventListener("blur", () => setLink(""));
+  // WebKit only reports a finished load when the navigation finishes cleanly; one that fails or
+  // is cancelled after its document committed (common on YouTube) never does, and the tab would
+  // spin forever. The document finishing is the same answer, so report it too.
+  const reportLoaded = () => {
+    postToHost = postToHost || bindHost();
+    if (postToHost) postToHost('{"token":"' + statusToken + '","status":"loaded"}');
+  };
   window.addEventListener("load", () => {
     loading = false;
     render();
+    reportLoaded();
+  });
+  // A page whose last image, frame or request never finishes never fires load either. Once its
+  // document is ready it is usable, so stop the spinner a few seconds later regardless.
+  document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+      if (!loading) return;
+      loading = false;
+      render();
+      reportLoaded();
+    }, 4000);
+  });
+  // A page restored from the back/forward cache fires no load.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) reportLoaded();
   });
   window.addEventListener("pagehide", () => {
     link = "";

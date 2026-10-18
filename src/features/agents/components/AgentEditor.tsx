@@ -1,6 +1,6 @@
 import { personalAgentsApi, type AgentMemory } from "@/api/agents/native";
+import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentSpaceField } from "./AgentSpaceField";
-import { AgentSpaceSharing } from "./AgentSpaceSharing";
 import { openMisty } from "@/features/misty/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, Field, Input, Pressable, Textarea, Toggle } from "@/shared/ui";
@@ -20,6 +20,7 @@ const emptyProfile: AgentProfileInput = {
   model_id: "",
   reasoning_effort: "",
   enabled: true,
+  default_run_mode: "ask",
 };
 
 export function AgentEditor({
@@ -99,7 +100,7 @@ export function AgentEditor({
         model_id,
         reasoning_effort,
         enabled,
-        space_id,
+        default_run_mode,
       } = draft;
       const saved = await personalAgentsApi.save(
         {
@@ -113,7 +114,7 @@ export function AgentEditor({
           model_id,
           reasoning_effort,
           enabled,
-          space_id: space_id || undefined,
+          default_run_mode,
           version: profile?.version,
         },
         profile?.id,
@@ -268,11 +269,9 @@ export function AgentEditor({
           onChange={(e) => update("description", e.target.value)}
         />
       </Field>
-      <AgentSpaceField
-        value={draft.space_id ?? ""}
-        locked={Boolean(profile?.system_managed)}
-        moving={Boolean(profile?.space_id && draft.space_id && draft.space_id !== profile.space_id)}
-        onChange={(spaceId) => update("space_id", spaceId)}
+      <AgentPermissionsField
+        value={draft.default_run_mode ?? "ask"}
+        onChange={(mode) => update("default_run_mode", mode)}
       />
       <details className="agent-advanced-settings">
         <summary>Instructions and memory</summary>
@@ -294,9 +293,7 @@ export function AgentEditor({
               onChange={(e) => update("instructions", e.target.value)}
             />
           </Field>
-          {profile?.space_id ? (
-            <AgentSpaceSharing agentId={profile.id} spaceId={profile.space_id} />
-          ) : null}
+          {profile ? <AgentSpaceField agentId={profile.id} /> : null}
           {!!memories.length && (
             <section className="border-t border-charcoal-border pt-5">
               <h3 className="mb-2 text-sm font-medium">Remembered preferences</h3>

@@ -1,12 +1,15 @@
 import { libraryApi as spacesApi } from "../LibraryRuntime";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { File } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { libraryItemThumbnailEligible } from "../libraryThumbnail";
+import { LibraryTextPreview } from "./LibraryTextPreview";
 import { libraryItemMIME } from "./libraryMediaTypes";
+import { TEXT_PREVIEW_MAX_BYTES, textPreviewKind } from "./textPreviewKind";
 
 /**
  * A grid thumbnail, preferring the server preview and falling back to the file.
+ * Small text files (HTML, Markdown, CSV, code) show a live preview instead.
  *
  * PDFs are rendered through <object> rather than <img>, so the blob's own type
  * decides which element is used rather than the item's declared MIME.
@@ -14,19 +17,29 @@ import { libraryItemMIME } from "./libraryMediaTypes";
 export function LibraryItemThumbnail({
   spaceId,
   item,
-  reauthenticationToken = "",
   api = spacesApi,
 }: {
   spaceId: string;
   item: SpaceLibraryItem;
-  reauthenticationToken?: string;
   api?: Pick<typeof spacesApi, "libraryPreview" | "libraryContent">;
 }) {
   const [preview, setPreview] = useState<{ url: string; kind: "image" | "pdf" } | null>(null);
   const mimeType = libraryItemMIME(item);
+  const size = Number(item.file.intrinsic_metadata.byte_size ?? 0);
+  const textKind =
+    size > 0 && size <= TEXT_PREVIEW_MAX_BYTES
+      ? textPreviewKind(mimeType, item.file.original_filename)
+      : null;
   const visual =
-    libraryItemThumbnailEligible(mimeType, item.file.original_filename) ||
-    Number(item.file.intrinsic_metadata.width ?? 0) > 0;
+    !textKind &&
+    (libraryItemThumbnailEligible(mimeType, item.file.original_filename) ||
+      Number(item.file.intrinsic_metadata.width ?? 0) > 0);
+  const loadText = useCallback(
+    () => api.libraryContent(spaceId, item.id),
+    // A new version of the file reloads its preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api, spaceId, item.id, item.version],
+  );
 
   useEffect(() => {
     if (!visual) {
@@ -36,10 +49,10 @@ export function LibraryItemThumbnail({
     let current = true;
     let objectUrl = "";
     void api
-      .libraryPreview(spaceId, item.id, reauthenticationToken, item.version)
+      .libraryPreview(spaceId, item.id, item.version)
       .catch(() =>
         mimeType.startsWith("image/") || mimeType === "application/pdf"
-          ? api.libraryContent(spaceId, item.id, reauthenticationToken)
+          ? api.libraryContent(spaceId, item.id)
           : Promise.reject(new Error("The file reader could not load this item")),
       )
       .then((blob) => {
@@ -59,8 +72,10 @@ export function LibraryItemThumbnail({
       current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [api, item.id, item.version, mimeType, reauthenticationToken, spaceId, visual]);
+  }, [api, item.id, item.version, mimeType, spaceId, visual]);
 
+  if (textKind)
+    return <LibraryTextPreview kind={textKind} name={item.display_name} load={loadText} />;
   if (preview?.kind === "image")
     return <img className="size-full object-cover" src={preview.url} alt="" />;
   if (preview?.kind === "pdf")

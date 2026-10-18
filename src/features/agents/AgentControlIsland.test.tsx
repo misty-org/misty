@@ -148,10 +148,10 @@ it("resumes a paused task and finishes a waiting one with Done", async () => {
 it("Stop ends a task without tabs, and keeps a task's own tabs open for review", async () => {
   show({});
   render(<AgentControlIsland />);
-  fireEvent.click(screen.getByRole("button", { name: "Stop task" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
   await waitFor(() => expect(mocks.finish).toHaveBeenCalledOnce());
   show({ autopilot: false, views: ["tab"] });
-  fireEvent.click(screen.getByRole("button", { name: "Stop task" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
   await waitFor(() => expect(mocks.pause).toHaveBeenCalledWith("task"));
   show({ autopilot: false, views: ["tab"], state: "paused" });
   expect(screen.getByRole("status").textContent).toBe(

@@ -268,24 +268,24 @@ function focusedShortcutScope(): ShortcutScope {
   switch (tab?.surfaceId) {
     case "browser":
       return "tool:browser";
-    case "space": {
-      const route = tab.route.toLowerCase();
-      if (route.includes("/tasks/roadmaps") || route.includes("/roadmap")) return "tool:roadmap";
-      if (route.includes("/tasks") || route.includes("/planner")) return "tool:planner";
-      if (route.includes("/library")) return "tool:library";
-      return "workspace";
-    }
+    case "space":
+      return tab.route.toLowerCase().includes("/library") ? "tool:library" : "tool:space";
     default:
       return "workspace";
   }
 }
 
+/** Files is a Space page too, so Space shortcuts stay on there. */
+function inScope(scope: ShortcutScope, activeScope: ShortcutScope): boolean {
+  return scope === activeScope || (scope === "tool:space" && activeScope === "tool:library");
+}
+
 function scopeIsActive(scope: ShortcutScope, activeScope: ShortcutScope): boolean {
-  return scope === "global" || scope === "workspace" || scope === activeScope;
+  return scope === "global" || scope === "workspace" || inScope(scope, activeScope);
 }
 
 function scopeRank(scope: ShortcutScope, activeScope: ShortcutScope): number {
-  if (scope === activeScope && scope.startsWith("tool:")) return 3;
+  if (inScope(scope, activeScope) && scope.startsWith("tool:")) return 3;
   if (scope === "workspace") return 2;
   return 1;
 }

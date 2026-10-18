@@ -38,14 +38,13 @@ export function parseDemoAccount(rawAccount: string): DemoAccount {
   const candidate = value as Partial<DemoAccount>;
   const account: DemoAccount = {
     id: String(candidate.id ?? "").trim(),
-    name: String(candidate.name ?? "").trim(),
-    username: String(candidate.username ?? "").trim() || undefined,
+    username: String(candidate.username ?? "").trim(),
     email: String(candidate.email ?? "")
       .trim()
       .toLowerCase(),
   };
-  if (!account.id || !account.name || !account.email.endsWith(demoEmailSuffix)) {
-    throw new Error("Demo account identity must contain an id, name, and reserved demo email.");
+  if (!account.id || !account.username || !account.email.endsWith(demoEmailSuffix)) {
+    throw new Error("Demo account identity must contain an id, username, and reserved demo email.");
   }
   return account;
 }

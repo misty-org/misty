@@ -24,11 +24,10 @@ export interface LibraryEditVersionsState {
 export function useLibraryEditVersions(options: {
   spaceId: string;
   item: SpaceLibraryItem | null;
-  reauthenticationToken: string;
   editable: boolean;
   onRenditionReady: () => void;
 }): LibraryEditVersionsState {
-  const { spaceId, item, reauthenticationToken, editable, onRenditionReady } = options;
+  const { spaceId, item, editable, onRenditionReady } = options;
   const accountId = useAuth().user?.id ?? "";
   const [editVersions, setEditVersions] = useState<LibraryEditVersion[]>([]);
   const [editingAvailable, setEditingAvailable] = useState(false);
@@ -42,7 +41,7 @@ export function useLibraryEditVersions(options: {
     }
     let current = true;
     void spacesApi
-      .editVersions(spaceId, item.id, reauthenticationToken)
+      .editVersions(spaceId, item.id)
       .then((result) => {
         if (!current) return;
         setEditVersions(result.versions);
@@ -61,7 +60,7 @@ export function useLibraryEditVersions(options: {
     return () => {
       current = false;
     };
-  }, [editable, item, reauthenticationToken, spaceId]);
+  }, [editable, item, spaceId]);
 
   const pending = editVersions.some(
     (version) => version.rendition_state === "queued" || version.rendition_state === "processing",
@@ -77,7 +76,7 @@ export function useLibraryEditVersions(options: {
     let current = true;
     const refresh = () =>
       void spacesApi
-        .editVersions(spaceId, item.id, reauthenticationToken)
+        .editVersions(spaceId, item.id)
         .then((result) => {
           if (!current) return;
           const previousVersions = latestVersions.current;
@@ -106,7 +105,7 @@ export function useLibraryEditVersions(options: {
       stopEvents();
       window.removeEventListener("misty:space-library-event", onLibraryEvent);
     };
-  }, [accountId, item, onRenditionReady, pending, reauthenticationToken, spaceId]);
+  }, [accountId, item, onRenditionReady, pending, spaceId]);
 
   return {
     editVersions,

@@ -1,7 +1,6 @@
 import { contiguousTabs } from "@/features/workspace/tabGroups";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { layoutTabs } from "@/features/workspace/layoutTabs";
-import { isPrivateBrowserView } from "@/features/workspace/privateBrowsing";
 import {
   parseBrowserViewState,
   type WorkspaceDockNode,
@@ -34,8 +33,6 @@ export function retainDeviceState(
   const retainTab = (tab: WorkspaceView): WorkspaceView => {
     const old = oldTabs.get(tab.id);
     if (!old || old.surfaceId !== tab.surfaceId) return tab;
-    // Sync only ever sees a private tab's placeholder; the page stays local.
-    if (isPrivateBrowserView(old)) return { ...tab, ...old };
     let state = tab.state;
     if (tab.surfaceId === "browser") {
       const nextBrowser = parseBrowserViewState(tab.state);

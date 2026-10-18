@@ -1,13 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
-import { personalAgentsApi } from "@/api/agents/native";
+import { agentArtifactsApi } from "@/api/spaces/agent-artifacts";
 import { uploadLibraryPath, type AgentArtifactProvenance } from "@/api/spaces/library-upload";
 import { useSpacesStore } from "@/features/spaces";
-import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { spaceAgentsApi } from "@/api/spaces/space-agents";
 
 /**
- * What agents make is saved to the Space they live in, as Library items that
- * remember which agent, chat and run made them. It counts toward the agent
- * owner's storage. Files stay on this computer too.
+ * What agents make is saved to a Space the agent is in (the personal Space
+ * when it's there), as Library items that remember which agent, chat and run
+ * made them. It counts toward the agent owner's storage. Files stay on this
+ * computer too.
  */
 export interface AgentArtifactInput {
   agentId: string;
@@ -17,15 +18,19 @@ export interface AgentArtifactInput {
   runId?: string;
 }
 
-/** The Space an agent lives in, with its name for status lines. */
+/** The Space an agent saves to, with its name for status lines. */
 export async function agentHomeSpace(agentId: string): Promise<{ id: string; name: string }> {
-  let agent = usePersonalAgentsStore.getState().agents.find((item) => item.id === agentId);
-  if (!agent?.space_id)
-    agent = (await personalAgentsApi.list()).agents.find((item) => item.id === agentId);
-  const spaceId = agent?.space_id;
-  if (!spaceId) throw new Error("This agent’s Space couldn’t be found.");
-  const space = useSpacesStore.getState().spaces.find((item) => item.id === spaceId);
-  return { id: spaceId, name: space?.name ?? "its Space" };
+  const { agents } = await spaceAgentsApi.mine();
+  const memberships = agents.filter((item) => item.agent_id === agentId);
+  const spaces = useSpacesStore.getState().spaces;
+  const personal = memberships.find((item) =>
+    spaces.some(
+      (space) => space.id === item.space_id && space.is_default && space.role === "owner",
+    ),
+  );
+  const home = personal ?? memberships[0];
+  if (!home) throw new Error("This agent isn’t in any Space. Add it to one from its settings.");
+  return { id: home.space_id, name: home.space_name };
 }
 
 export async function saveAgentArtifact(input: AgentArtifactInput) {
@@ -41,18 +46,14 @@ export async function saveAgentArtifact(input: AgentArtifactInput) {
   return { space, itemId: result.item?.id };
 }
 
-/**
- * Saves a snapshot of a code project after an agent changed it. The project
- * folder stays local; the Space keeps the snapshot. Build, package and .env
- * files are left out.
- */
+/** Zips a project after a coding run and saves it to the agent's Space. */
 export async function saveProjectSnapshot(input: {
   agentId: string;
   scopeId: string;
   runId: string;
   conversationId?: string;
 }) {
-  const snapshot = await invoke<{ path: string; name: string }>("code_project_snapshot", {
+  const snapshot = await invoke<{ path: string; name: string; files: number }>("project_snapshot", {
     scopeId: input.scopeId,
     runId: input.runId,
   });
@@ -63,4 +64,13 @@ export async function saveProjectSnapshot(input: {
     conversationId: input.conversationId,
     runId: input.runId,
   });
+}
+
+/** The Space holding a run's project snapshot, when one was saved. */
+export async function runSnapshotSpace(agentId: string, runId: string): Promise<string | null> {
+  const space = await agentHomeSpace(agentId);
+  const { artifacts } = await agentArtifactsApi.list(space.id, agentId);
+  return artifacts.some((item) => item.run_id === runId && item.kind === "code")
+    ? space.name
+    : null;
 }

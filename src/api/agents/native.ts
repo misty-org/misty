@@ -1,8 +1,10 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 
 export const personalAgentsApi = {
-  list: () => apiRequest<{ agents: AgentProfile[] }>("/misty/agents"),
+  list: (onCached?: (value: { agents: AgentProfile[] }) => void) =>
+    cachedRequest<{ agents: AgentProfile[] }>("/misty/agents", { onCached }),
   save: (
     input: AgentProfileInput & {
       version?: number;

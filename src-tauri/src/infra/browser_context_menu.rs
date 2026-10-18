@@ -230,7 +230,7 @@ pub(super) fn select(
     key: &str,
     action: &str,
 ) -> Result<(), String> {
-    if webview.label() != "main" && !webview.label().starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(webview.label()) && !webview.label().starts_with("misty-agent-") {
         return Err("Only Misty's trusted shell can select a browser action.".into());
     }
     let state = app.state::<BrowserSessionState>();

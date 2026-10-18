@@ -46,16 +46,13 @@
 .agent-integrations-list > * + * {
   border-top: 1px solid var(--color-charcoal-border);
 }
-/* Accounts of one app sit under it, aligned with its name, without their own dividers. */
-.agent-integrations-group {
-  padding-bottom: 6px;
-}
-.agent-integrations-group > .agent-integrations-row:first-child {
-  padding-bottom: 6px;
+/* The popup card for one app's accounts. */
+.agent-integrations-accounts {
+  display: grid;
+  gap: 2px;
 }
 .agent-integrations-account {
-  padding-block: 6px;
-  padding-left: 52px;
+  padding: 8px 8px;
 }
 .agent-integrations-row > svg {
   flex-shrink: 0;
@@ -144,4 +141,19 @@
   .agent-integrations-search {
     width: 160px;
   }
+}
+
+/* A connected app's tile is a button that opens its accounts. */
+.agent-integrations-grid > .agent-integrations-tile-button {
+  height: auto;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 12px 8px 12px 14px;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+.agent-integrations-grid > .agent-integrations-tile-button:hover {
+  background: var(--color-charcoal-hover);
 }

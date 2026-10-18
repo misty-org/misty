@@ -31,14 +31,14 @@ export const ProfileNavButton = memo(
       useShallow((state) => ({
         id: state.me?.id,
         email: state.me?.email,
-        name: state.me?.name,
+        username: state.me?.username,
         avatarVersion: state.me?.avatar_version ?? 0,
       })),
     );
     const account = user ?? currentUser;
     const accountMe = me.id === account?.id ? me : null;
     const email = accountMe?.email ?? account?.email ?? "";
-    const displayName = accountMe?.name ?? account?.name ?? emailName(email) ?? "Misty";
+    const displayName = accountMe?.username ?? account?.username ?? emailName(email) ?? "Misty";
     const initials = initialsForProfile(displayName, email);
     const avatarVersion = accountMe?.avatarVersion ?? user?.avatarVersion ?? 0;
     const avatarUrl = useAccountAvatarUrl(account?.id, avatarVersion);

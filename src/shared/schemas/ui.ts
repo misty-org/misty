@@ -10,17 +10,6 @@ const mistyTerminalCommands = [
   "terminal.paste",
 ] as const;
 
-const mistyPlannerCommands = [
-  "planner.create",
-  "roadmap.create",
-  "roadmap.copy",
-  "roadmap.paste",
-  "roadmap.duplicate",
-  "roadmap.delete",
-  "roadmap.undo",
-  "roadmap.redo",
-] as const;
-
 const mistyBrowserCommands = [
   "navigation.back",
   "navigation.forward",
@@ -57,7 +46,6 @@ const mistyCodeCommands = [
 
 export const MistyAppCommandSchema = z.enum([
   ...mistyTerminalCommands,
-  ...mistyPlannerCommands,
   ...mistyBrowserCommands,
   ...mistyCodeCommands,
 ]);
@@ -68,8 +56,6 @@ export function commandsForApp(appId: string): readonly MistyAppCommand[] {
       return mistyCodeCommands;
     case "terminal":
       return mistyTerminalCommands;
-    case "planner":
-      return mistyPlannerCommands;
     case "browser":
       return mistyBrowserCommands;
     case "chat":

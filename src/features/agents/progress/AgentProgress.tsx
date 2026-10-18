@@ -2,6 +2,7 @@ import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import type { AiProgressItem } from "@/features/ai-surface/types";
 import { Pressable } from "@/shared/ui";
 import { useId, useState, type ReactNode } from "react";
+import { Chevron, Fold, WorkGroup } from "./WorkGroup";
 import {
   groupProgress,
   stepMeta,
@@ -35,33 +36,18 @@ export function AgentProgress({ items }: { items: AiProgressItem[] }) {
   );
 }
 
-/** Opens while its work runs and folds once it finishes, unless the person chose. */
 function ToolGroup({ tools }: { tools: ProgressTool[] }) {
-  const running = tools.some((tool) => tool.state === "running");
-  const [chosen, setChosen] = useState<boolean>();
-  const open = chosen ?? running;
-  const listId = useId();
   return (
-    <div className="agent-progress-group" data-open={open || undefined}>
-      <Pressable
-        className="agent-progress-toggle"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setChosen(!open)}
-      >
-        <span className={running ? "agent-progress-shimmer" : undefined}>
-          {toolGroupSummary(tools)}
-        </span>
-        <Chevron />
-      </Pressable>
-      <Fold id={listId} open={open}>
-        <ol className="agent-progress-table" aria-label="Steps">
-          {stepsOf(tools).map((step) => (
-            <Step key={step.id} step={step} />
-          ))}
-        </ol>
-      </Fold>
-    </div>
+    <WorkGroup
+      summary={toolGroupSummary(tools)}
+      running={tools.some((tool) => tool.state === "running")}
+    >
+      <ol className="agent-progress-table" aria-label="Steps">
+        {stepsOf(tools).map((step) => (
+          <Step key={step.id} step={step} />
+        ))}
+      </ol>
+    </WorkGroup>
   );
 }
 
@@ -134,17 +120,4 @@ function stepOutput(step: ProgressStep): ReactNode {
       </pre>,
     );
   return parts.length ? parts : null;
-}
-
-/** Height animates open and closed; closed content leaves the tab order. */
-function Fold({ id, open, children }: { id: string; open: boolean; children: ReactNode }) {
-  return (
-    <div id={id} className="agent-progress-fold" data-open={open || undefined} inert={!open}>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function Chevron() {
-  return <span aria-hidden="true" className="agent-progress-chevron" />;
 }

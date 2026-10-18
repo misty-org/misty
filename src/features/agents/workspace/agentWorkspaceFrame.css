@@ -35,8 +35,10 @@
 /* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
 /* The switcher hugs its name instead of spanning the sidebar. */
 .agent-studio-identity {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  /* Only the name gives way in a narrow sidebar; the avatar and chevron stay whole. */
   min-width: 0;
+  max-width: 100%;
   height: auto;
   min-height: 36px;
   justify-content: flex-start;
@@ -392,6 +394,8 @@ html:has(.agent-studio-resizer[data-dragging]) {
 .agent-studio .agent-conversation[data-empty="true"] {
   justify-content: flex-start;
   padding-top: clamp(40px, 18vh, 210px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .agent-studio .agents-body {
   --agents-canvas: var(--color-charcoal-bg);
@@ -743,11 +747,16 @@ html:has(.agent-studio-resizer[data-dragging]) {
   color: var(--color-cream-bright);
 }
 .agent-studio-recents-selection {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 2px;
-  min-height: 24px;
-  padding-left: 8px;
+  gap: 6px;
+  margin-top: auto;
+  padding: 8px 4px 8px 8px;
+  border-top: 1px solid var(--color-charcoal-border);
+  background: var(--color-charcoal-sidebar);
   font-size: 12px;
   color: var(--color-cream-muted);
 }

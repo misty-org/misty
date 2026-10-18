@@ -62,7 +62,7 @@ beforeEach(async () => {
     createdAt: 0,
     lastFocusedAt: 0,
   };
-  useWorkspaceStore.setState({ windowsByScope: { global: [] } });
+  useWorkspaceStore.getState().reset();
   workspaceSource.write(projection());
   await settled();
   invoke.mockClear();

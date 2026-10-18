@@ -27,9 +27,9 @@ export type RecentFolder = { folder: AgentConversationFolder; conversations: Rec
 
 /**
  * The sidebar's conversations: the agent's projects (stored as folders) first, then
- * unfiled Recents.
+ * unfiled Conversations.
  * Cmd/Ctrl-click toggles a row and Shift-click selects a range across both, as in
- * Finder; a plain click just opens it. Dragging rows onto a project or Recents files them.
+ * Finder; a plain click just opens it. Dragging rows onto a project or Conversations files them.
  */
 /** Memoized: the open conversation's streaming updates must not re-render every row. */
 export const AgentRecentConversations = memo(function AgentRecentConversations({
@@ -96,7 +96,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   const places = useMemo(
     () => [
       ...folders.map(({ folder }) => ({ id: folder.id, name: folder.name })),
-      { id: "", name: "Recents" },
+      { id: "", name: "Conversations" },
     ],
     [folders],
   );
@@ -199,24 +199,6 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
         }
       }}
     >
-      {count ? (
-        <div className="agent-studio-recents-selection" role="toolbar" aria-label="Selection">
-          <span>{count} selected</span>
-          <IconButton
-            label={`Delete ${count} conversation${count === 1 ? "" : "s"}`}
-            disabled={disabled}
-            onClick={() => {
-              setError("");
-              setConfirming(true);
-            }}
-          >
-            <Trash2 size={15} />
-          </IconButton>
-          <IconButton label="Clear selection" onClick={() => setSelected([])}>
-            <X size={15} />
-          </IconButton>
-        </div>
-      ) : null}
       <div className="agent-studio-recents-heading">
         <h2>Projects</h2>
         <IconButton label="New project" disabled={disabled} onClick={onNewProject}>
@@ -238,13 +220,35 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
         ref={recentsRef}
         className="agent-studio-recents-group"
         role="group"
-        aria-label="Recents"
+        aria-label="Conversations"
       >
         <div className="agent-studio-recents-heading">
-          <h2>Recents</h2>
+          <h2>Conversations</h2>
         </div>
         {recent.map(row)}
       </div>
+      {count ? (
+        // Pinned to the bottom of the list so it stays in reach however far you scroll.
+        <div className="agent-studio-recents-selection" role="toolbar" aria-label="Selection">
+          <span>{count} selected</span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={disabled}
+            aria-label={`Delete ${count} conversation${count === 1 ? "" : "s"}`}
+            onClick={() => {
+              setError("");
+              setConfirming(true);
+            }}
+          >
+            <Trash2 size={14} />
+            Delete
+          </Button>
+          <IconButton label="Clear selection" onClick={() => setSelected([])}>
+            <X size={15} />
+          </IconButton>
+        </div>
+      ) : null}
       <span className="sr-only" role="status">
         {announcement}
       </span>

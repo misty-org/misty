@@ -295,7 +295,7 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
       );
       if (response.applyMode === "client") {
         if (!adapter.applyArtifact || adapter.canApply?.(artifact) === false) {
-          throw new Error("The source changed. Ask Misty to regenerate this change.");
+          throw new Error("The source changed. Ask your agent to regenerate this change.");
         }
         const clearHighlight = adapter.highlightArtifactTarget?.(artifact);
         await adapter.applyArtifact(artifact);

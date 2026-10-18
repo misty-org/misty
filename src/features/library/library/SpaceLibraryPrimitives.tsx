@@ -1,17 +1,5 @@
-export { AlbumCover } from "./libraryPrimitives/AlbumCover";
-export {
-  buildLibraryAssetStack,
-  detectUploadedAssetStacks,
-} from "./libraryPrimitives/libraryAssetStackInput";
 export { LibraryCanEditContext } from "./libraryPrimitives/LibraryCanEditContext";
-
-export { LibraryDiscoveryCard } from "./libraryPrimitives/LibraryDiscoveryCard";
 export { LibraryFacetGroup } from "./libraryPrimitives/LibraryFacetGroup";
 export { LibraryItemThumbnail } from "./libraryPrimitives/LibraryItemThumbnail";
-export {
-  activeSensitiveGrant,
-  libraryFileTypeLabel,
-  libraryItemMIME,
-} from "./libraryPrimitives/libraryMediaTypes";
+export { libraryFileTypeLabel, libraryItemMIME } from "./libraryPrimitives/libraryMediaTypes";
 export { LibrarySelect } from "./libraryPrimitives/LibrarySelect";
-export { libraryUtilityIcon } from "./libraryPrimitives/libraryUtilityIcon";

@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 const settingsOverlayLayerClass = [
-  "fixed inset-0 layer-workspace-overlay grid place-items-center bg-black/45 px-6 py-6",
+  "fixed inset-0 layer-workspace-overlay grid place-items-center bg-black/45 px-6 pb-6 pt-[max(1.5rem,var(--misty-modal-inset-top,0px))]",
   "animate-in fade-in-0 duration-200",
 ].join(" ");
 const settingsOverlayPanelClass = [
-  "h-[min(900px,calc(100dvh-48px))] w-[min(1200px,calc(100dvw-96px))]",
+  "h-[min(900px,calc(100dvh-24px-max(24px,var(--misty-modal-inset-top,0px))))] w-[min(1200px,calc(100dvw-96px))]",
   "min-w-0 overflow-hidden rounded-2xl border border-charcoal-border bg-charcoal-card shadow-2xl",
   "misty-dialog-motion",
 ].join(" ");

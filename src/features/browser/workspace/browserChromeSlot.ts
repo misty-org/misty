@@ -1,13 +1,13 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 /**
- * What the app around the browser lends its toolbar and menu: the Spaces button beside Misty,
- * the profile button beside it, and the sync row that closes the browser menu.
+ * What the app around the browser lends its toolbar and menu: the sync status
+ * and the account rows of the browser menu. The tab strip is the only bar; Spaces and
+ * agents are pages reached from the ⌘T panel.
  */
 export type BrowserChromeSlot = {
-  spaces: ReactNode;
-  /** The profile button, beside Spaces. */
-  profile: ReactNode;
+  /** The sync status button. */
+  sync: ReactNode;
   accountItems: ReactNode;
 };
 

@@ -47,6 +47,9 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
         println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDefaultBrowser.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDictationInsert.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyScreenRecorder.m");
+        println!("cargo:rerun-if-changed=native/macos/MistySpaceDock.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
@@ -66,6 +69,9 @@ fn main() {
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyFolderBookmarks.m")
             .file("native/macos/MistyDefaultBrowser.m")
+            .file("native/macos/MistyDictationInsert.m")
+            .file("native/macos/MistyScreenRecorder.m")
+            .file("native/macos/MistySpaceDock.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");
@@ -75,6 +81,7 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
         for framework in [
             "AppKit",
+            "AVFoundation",
             "Carbon",
             "CoreGraphics",
             "Security",

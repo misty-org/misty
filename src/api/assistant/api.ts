@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 interface FrontierModel {
@@ -35,9 +36,10 @@ export const assistantApi = {
         body: JSON.stringify({ attachment_id: attachmentId, query, limit, space_id: spaceId }),
       },
     ),
-  conversations: <T>(query = "") =>
-    apiRequest<{ conversations: T[] }>(
+  conversations: <T>(query = "", onCached?: (value: { conversations: T[] }) => void) =>
+    cachedRequest<{ conversations: T[] }>(
       `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
+      { onCached },
     ),
   createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
     apiRequest<T>("/misty/conversations", {

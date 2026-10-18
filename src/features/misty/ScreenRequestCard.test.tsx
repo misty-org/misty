@@ -53,6 +53,6 @@ it("shows progress without choices once the screen opens on its own", () => {
       request={{ kind: "open", reason: "Read example.com", location: "separate", state: "opening" }}
     />,
   );
-  expect(screen.getByText("Opening a screen…")).toBeTruthy();
+  expect(screen.getByText("Opening a screen")).toBeTruthy();
   expect(screen.queryByRole("button")).toBeNull();
 });

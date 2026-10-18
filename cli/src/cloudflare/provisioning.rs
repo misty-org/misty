@@ -27,6 +27,11 @@ pub struct Options {
 }
 
 pub fn setup(workspace: &Workspace, options: Options) -> Result<()> {
+    if options.target == Target::Staging {
+        bail!(
+            "staging is private and uses SSH port forwarding; Cloudflare is not configured for it"
+        );
+    }
     if options.target == Target::Dev {
         environment::init(workspace, Target::Dev)?;
         crate::server::initialize_development_secrets(workspace)?;
@@ -112,6 +117,7 @@ fn provision(
         })
         .unwrap_or_else(|| match target {
             Target::Dev => format!("misty-{}", host.replace('.', "-")),
+            Target::Staging => format!("misty-staging-{}", host.replace('.', "-")),
             Target::Prod => format!("misty-prod-{}", host.replace('.', "-")),
         });
     if name.trim().is_empty() || name.contains(['\n', '\r', '\0', '\'']) {
@@ -276,6 +282,7 @@ fn provision(
     }
     match target {
         Target::Dev => println!("Cloudflare configured. Next: misty server up; misty server deploy; misty doctor cloudflare"),
+        Target::Staging => unreachable!("staging Cloudflare setup was rejected above"),
         Target::Prod => println!("Production tunnel configured. Configuration saved under server/.env/prod/.\nNext: misty server prod up; start cloudflared on the VPS host using the saved CLOUDFLARE_TUNNEL_TOKEN.\nSee cli/README.md#production-cloudflare-tunnel for connector setup."),
     }
     Ok(())
@@ -323,6 +330,7 @@ fn selected_hostname(options: &Options, values: &BTreeMap<String, String>) -> Re
                 url.scheme() == "https" && url.username().is_empty() && url.password().is_none()
             })
             .and_then(|url| url.host_str().map(str::to_owned)),
+        Target::Staging => None,
     };
     host.filter(|host| !host.is_empty())
         .map(|host| host.to_ascii_lowercase())
@@ -338,9 +346,9 @@ fn service(target: Target, values: &BTreeMap<String, String>) -> Result<String> 
         .map(String::as_str)
         .unwrap_or("8081")
         .parse()
-        .context("production MISTY_HOST_PORT must be a port from 1 to 65535")?;
+        .context("MISTY_HOST_PORT must be a port from 1 to 65535")?;
     if port == 0 {
-        bail!("production MISTY_HOST_PORT must be a port from 1 to 65535");
+        bail!("MISTY_HOST_PORT must be a port from 1 to 65535");
     }
     Ok(format!("http://127.0.0.1:{port}"))
 }

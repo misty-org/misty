@@ -30,7 +30,7 @@ export function usePinTabShortcut() {
       // Synced workspaces keep pins only once every device understands them.
       const reason = pinnedTabsBlockedReason(
         useBrowserSyncStore.getState().session,
-        useUserStore.getState().me?.name,
+        useUserStore.getState().me?.username,
       );
       if (reason) {
         setBlocked((current) => ({ id: (current?.id ?? 0) + 1, reason }));

@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui";
 import { useState } from "react";
 import { DesktopSettingsRow } from "../components/DesktopSettingsUI";
 
-/** Opens the same clear-data dialog as a browser tab, for the default browser profile. */
+/** Opens the same clear-data dialog as a browser tab, for this window's Space. */
 export function ClearBrowsingDataRow() {
   const [open, setOpen] = useState(false);
   const [cleared, setCleared] = useState(false);

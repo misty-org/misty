@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn refuses_host_authentication_views_and_invalid_profile_handles() {
         assert_eq!(
-            expected_profile("main", &"a".repeat(64)),
+            expected_profile("space-personal", &"a".repeat(64)),
             Err(CookieStoreError::Profile)
         );
         assert_eq!(

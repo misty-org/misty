@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 
 export type AgentMethodKind = "workflow" | "template" | "skill";
@@ -95,9 +96,9 @@ export interface SaveAgentMethod {
 }
 const base = "/ai/agent-methods";
 export const agentMethodsApi = {
-  list: (agentId: string) =>
-    apiRequest<{ methods: AgentMethod[] }>(`${base}?agent_id=${encodeURIComponent(agentId)}`, {
-      cache: "no-store",
+  list: (agentId: string, onCached?: (value: { methods: AgentMethod[] }) => void) =>
+    cachedRequest<{ methods: AgentMethod[] }>(`${base}?agent_id=${encodeURIComponent(agentId)}`, {
+      onCached,
     }),
   save: (input: SaveAgentMethod) =>
     apiRequest<{ method: AgentMethod }>(
@@ -120,13 +121,11 @@ export const agentMethodsApi = {
     }),
   removeSchedule: (methodId: string) =>
     apiRequest<void>(`${base}/${encodeURIComponent(methodId)}/schedule`, { method: "DELETE" }),
-  upcoming: () =>
-    apiRequest<{ runs: UpcomingWorkflowRun[] }>("/ai/workflow-schedules", { cache: "no-store" }),
+  upcoming: () => cachedRequest<{ runs: UpcomingWorkflowRun[] }>("/ai/workflow-schedules"),
   /** Runs waiting for this computer (roadmap C1). */
   deviceRuns: (deviceId: string) =>
-    apiRequest<{ runs: (WorkflowSchedule & { title: string; agent_id: string })[] }>(
+    cachedRequest<{ runs: (WorkflowSchedule & { title: string; agent_id: string })[] }>(
       `/ai/workflow-schedules/device-runs?device_id=${encodeURIComponent(deviceId)}`,
-      { cache: "no-store" },
     ),
   /** Takes a waiting run for this computer; the run must then start with its grant. */
   claimDeviceRun: (scheduleId: string, deviceId: string) =>

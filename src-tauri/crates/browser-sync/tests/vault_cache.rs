@@ -26,9 +26,11 @@ fn fixture() -> (
         key_epoch: 1,
         head_sequence: 0,
         root_public_key: root.public_key().unwrap(),
-        key_envelope: root
-            .wrap(&scope, "public fixture password", &secret)
-            .unwrap(),
+        key_envelope: Some(
+            root.wrap(&scope, "public fixture password", &secret)
+                .unwrap(),
+        ),
+        space_key_envelope: None,
     };
     (
         scope,
@@ -79,7 +81,7 @@ fn interrupted_setup_recovers_same_root_device_and_outbox_without_network() {
     assert!(saved.bootstrap_pending && saved.enrollment_pending);
     let root = VaultRoot::unlock(
         &scope,
-        &saved.vault.key_envelope,
+        saved.vault.key_envelope.as_ref().unwrap(),
         "public fixture password",
         &secret,
         &saved.vault.root_public_key,

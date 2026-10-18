@@ -1,8 +1,9 @@
 import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
 import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
+import { JournalDay } from "../../day/JournalDay";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileText, MoreHorizontal, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { FileText, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Button,
   CollectionPage,
@@ -31,23 +32,21 @@ export function JournalCollection(props: {
   onRetry: () => void;
   query: string;
   onQueryChange: (query: string) => void;
-  pinnedIds: Set<string>;
   readOnly: boolean;
   onCreate: () => void;
   onOpen: (note: UnifiedNote) => void;
   onRename: (note: UnifiedNote) => void;
-  onTogglePin: (id: string) => void;
   onDelete: (note: UnifiedNote) => void;
 }) {
   const navigate = useNavigate();
   const creatorName = useSpaceItemCreator(props.spaceId);
   const [params, setParams] = useSearchParams();
+  const section = params.get("section");
   const filter =
-    params.get("section") === "notes"
-      ? "notes"
-      : params.get("section") === "pinned"
-        ? "pinned"
-        : "all";
+    section === "notes" ||
+    (section === "day" && journalSections.some((s) => s.value === "day"))
+      ? section
+      : "all";
   const selectSection = (value: string) => {
     if (value === "drawings") navigate(`/spaces/${encodeURIComponent(props.spaceId)}/drawings`);
     else {
@@ -61,7 +60,7 @@ export function JournalCollection(props: {
   };
   const [view, setView] = useState<"list" | "grid">("list");
   const refinement = useCollectionRefinement(
-    props.notes.filter((note) => filter !== "pinned" || props.pinnedIds.has(note.id)),
+    props.notes,
     {
       label: "Filter notes",
       title: (note) => note.title || "Untitled note",
@@ -78,7 +77,20 @@ export function JournalCollection(props: {
     },
   );
   const notes = refinement.items;
-  if (filter === "all" || filter === "pinned")
+  if (filter === "day")
+    return (
+      <JournalDay
+        filters={
+          <CollectionFilters
+            collectionId="journal"
+            options={journalSections}
+            value="day"
+            onChange={selectSection}
+          />
+        }
+      />
+    );
+  if (filter === "all")
     return <JournalAllCollection {...props} section={filter} onSection={selectSection} />;
   return (
     <CollectionPage>
@@ -146,9 +158,6 @@ export function JournalCollection(props: {
               day: "numeric",
             }),
             onOpen: () => props.onOpen(note),
-            marker: props.pinnedIds.has(note.id) ? (
-              <Pin size={13} className="text-cream-muted" aria-label="Pinned" />
-            ) : undefined,
             contextMenu: <NoteActions note={note} props={props} context />,
             actions: (
               <DropdownMenu>
@@ -181,11 +190,6 @@ function NoteActions({
   const Action = context ? ContextMenuAction : MenuItem;
   return (
     <>
-      <Action
-        icon={props.pinnedIds.has(note.id) ? <PinOff /> : <Pin />}
-        label={props.pinnedIds.has(note.id) ? "Unpin" : "Pin"}
-        onSelect={() => props.onTogglePin(note.id)}
-      />
       <Action
         icon={<Pencil />}
         label="Rename"

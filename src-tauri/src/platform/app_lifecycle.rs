@@ -19,14 +19,22 @@ struct UnsavedBeforeQuit {
     closing: bool,
 }
 
-fn ask(app: &AppHandle, closing: bool) {
-    let _ = crate::infra::tray::show_main_window(app);
+/// Asks in the closing window, or when quitting in the last focused one.
+fn ask(app: &AppHandle, closing: Option<&str>) {
     let unsaved = crate::infra::workspace_recovery::unsaved_count();
-    let _ = app.emit_to(
-        "main",
-        UNSAVED_BEFORE_QUIT,
-        UnsavedBeforeQuit { unsaved, closing },
-    );
+    let payload = UnsavedBeforeQuit {
+        unsaved,
+        closing: closing.is_some(),
+    };
+    match closing {
+        Some(label) => {
+            let _ = app.emit_to(label, UNSAVED_BEFORE_QUIT, payload);
+        }
+        None => {
+            let _ = crate::infra::tray::show_main_window(app);
+            crate::infra::space_windows::emit_to_primary(app, UNSAVED_BEFORE_QUIT, payload);
+        }
+    }
 }
 
 pub fn run_event(app: &AppHandle, event: RunEvent) {
@@ -38,18 +46,28 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
             eprintln!("Could not reopen Misty: {error}");
         }
     }
+    // Links other apps open with Misty go to the Space that claims their site; this
+    // also covers the time no window is open to hear them.
+    #[cfg(target_os = "macos")]
+    if let RunEvent::Opened { urls } = &event {
+        crate::infra::space_windows::route_app_links(
+            app,
+            urls.iter().map(|url| url.to_string()).collect(),
+        );
+    }
     if let RunEvent::ExitRequested { api, .. } = &event {
-        if must_ask() && app.get_webview_window("main").is_some() {
+        if must_ask() && crate::infra::space_windows::primary(app).is_some() {
             api.prevent_exit();
-            ask(app, false);
+            ask(app, None);
+        } else {
+            // The Spaces open now reopen at the next launch.
+            crate::infra::space_windows::quitting();
         }
     }
     if matches!(event, RunEvent::Exit) {
         crate::infra::browser_sync::flush_before_exit();
-        // Agent commands and previews never outlive Misty.
-        if let Some(runtime) = app.try_state::<crate::app::runtime::MistyRuntime>() {
-            runtime.code.shutdown();
-        }
+        // Coding tools started for agents never outlive Misty.
+        crate::agents::runners::registry::stop_all();
         crate::telemetry::shutdown();
     }
 }
@@ -57,9 +75,9 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if window.label() == "main" && must_ask() {
+        if crate::infra::space_windows::is_space_window(window.label()) && must_ask() {
             api.prevent_close();
-            ask(window.app_handle(), true);
+            ask(window.app_handle(), Some(window.label()));
         }
     }
 }
@@ -72,7 +90,7 @@ pub fn app_quit_confirmed(
     app: AppHandle,
     closing: bool,
 ) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {

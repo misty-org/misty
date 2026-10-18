@@ -14,7 +14,7 @@ describe("browser workspace deep links", () => {
       expect(workspaceSurfaceFromRoute(route)).toMatchObject({
         surfaceId: "browser",
         groupKey: "tool:browser",
-        scopeKey: "global",
+        scopeKey: "space:personal",
         route: "/browser",
         instancePolicy: "multiple",
         state: { url: "https://www.google.com" },
@@ -38,17 +38,17 @@ describe("browser workspace deep links", () => {
     expect(workspaceSurfaceFromRoute("/agents?run=task-1")).toMatchObject({
       surfaceId: "agents",
       route: "/agents?run=task-1",
-      scopeKey: "global",
+      scopeKey: "space:personal",
     });
   });
 });
 
 it("restores Space tools as split-capable surfaces in the current global workspace", () => {
-  expect(workspaceSurfaceFromRoute("/spaces/family/planner/tasks/board")).toMatchObject({
+  expect(workspaceSurfaceFromRoute("/spaces/family/library")).toMatchObject({
     surfaceId: "space",
-    groupKey: "space:family:planner",
-    scopeKey: "global",
-    route: "/spaces/family/planner/tasks/board",
+    groupKey: "space:family:library",
+    scopeKey: "space:personal",
+    route: "/spaces/family/library",
   });
   expect(workspaceSurfaceFromRoute("/spaces")).toMatchObject({ surfaceId: "space" });
 });
@@ -63,7 +63,7 @@ it("opens schedule links inside Agents and preserves the task", () => {
     expect(surface).toMatchObject({
       surfaceId: "agents",
       groupKey: "tool:agents",
-      scopeKey: "global",
+      scopeKey: "space:personal",
     });
     const url = new URL(surface.route!, "https://misty.local");
     expect(url.pathname).toBe("/agents");

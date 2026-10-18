@@ -16,3 +16,8 @@ export function spaceChatPath(spaceId: string, query?: string | URLSearchParams)
 export function spaceChatConversationPath(spaceId: string, conversationId: string): string {
   return spaceChatPath(spaceId, new URLSearchParams({ conversation: conversationId }));
 }
+
+/** Where a conversation opens: every chat, with people or agents, lives in the Space's chat. */
+export function conversationPath(spaceId: string, conversation: { id: string }): string {
+  return spaceChatConversationPath(spaceId, conversation.id);
+}

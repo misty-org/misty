@@ -95,8 +95,6 @@ export interface GlobalSearchState {
       methodInputs?: Record<string, string | number | boolean>;
       skillVersionIds?: string[];
       displayCaptures?: DisplayCapture[];
-      /** Explain and point at `displayCaptures`, with no tools. */
-      intent?: "teach";
       capture?: AiCaptureAttachment;
       /** Continues the conversation after a screen opened; shows no new user turn. */
       continuation?: boolean;

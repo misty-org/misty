@@ -2,8 +2,13 @@ pub mod agent_dock;
 pub mod agent_projects;
 pub mod agent_workspace;
 pub mod agents;
+pub mod web_fetch;
+pub mod link_preview;
+mod link_preview_meta;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
+#[cfg(desktop)]
+pub mod space_windows;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
@@ -32,6 +37,7 @@ pub mod browser_process_ended;
 pub(crate) mod browser_profile_view;
 #[cfg(desktop)]
 mod browser_scripts;
+pub mod browser_search_space;
 pub mod browser_search_suggest;
 pub mod browser_shortcuts;
 #[cfg(desktop)]
@@ -40,6 +46,7 @@ pub mod clipboard_bridge;
 pub mod cloud_clipboard;
 pub mod command_defaults;
 pub mod commands;
+pub mod api_cache;
 pub mod credential_store;
 pub mod credentials;
 #[cfg(desktop)]
@@ -79,6 +86,7 @@ pub mod extensions;
 pub mod kura;
 pub mod misty;
 pub mod misty_home;
+pub mod global_hotkey;
 pub mod native_clipboard;
 pub mod paths;
 #[cfg(desktop)]

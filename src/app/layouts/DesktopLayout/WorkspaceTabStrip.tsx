@@ -11,7 +11,6 @@ import { useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { FavoritesStrip } from "./FavoritesStrip";
 import { useTabHoverCards } from "./TabHoverCard";
-import { useWindowSwipe } from "./useWindowSwipe";
 import { navigatorMotionClass } from "./styles";
 import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 import { useTabStripReorder } from "./useTabStripReorder";
@@ -20,7 +19,9 @@ import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
+import { SpaceRow } from "@/features/spaces/components/spaceRow/SpaceRow";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
+import { dockingMetrics } from "./dockingGeometry";
 
 const setNavSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setNav(element);
@@ -32,8 +33,6 @@ export function WorkspaceTabStrip(
     position?: DockPosition;
     onNewTab(): void;
     onCloseLayoutTab(id: string): void;
-    /** Spaces and Agents buttons: a sidebar's bottom-left, or a strip's right end. */
-    shortcuts?: ReactNode;
     account?: ReactNode;
     /** The sidebar's bottom-left: downloads. */
     footEnd?: ReactNode;
@@ -60,7 +59,6 @@ export function WorkspaceTabStrip(
   const tabListRef = useRef<HTMLDivElement>(null);
   useTabPresenceMotion(tabListRef, !vertical);
   const hoverCards = useTabHoverCards();
-  useWindowSwipe(ref, tabListRef, props.windows, props.activeWindowId, props.onSelectWindow);
   useTabStripFade(tabListRef, true, tabs.length, vertical ? "y" : "x");
   const { pane, ClosePaneIcon, canRight, canDown } = useFocusedPaneSplit(layout);
   const { reorder, bindTabList } = useTabStripReorder({
@@ -71,18 +69,38 @@ export function WorkspaceTabStrip(
     tabListRef,
   });
   useEffect(() => {
-    ref.current
+    const list = ref.current;
+    list
       ?.querySelector('[aria-selected="true"]')
       ?.closest("[data-reorder-item]")
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [layout.activeTabId, position]);
+    // A vertical list only scrolls down. Branches and indents hang a few pixels past a
+    // tab's box, and any scroll sideways would slide every tab off the strip's edge.
+    if (vertical)
+      for (const box of [list, tabListRef.current]) if (box?.scrollLeft) box.scrollLeft = 0;
+  }, [layout.activeTabId, position, vertical]);
+  useEffect(() => {
+    const boxes = [ref.current, tabListRef.current].filter((box): box is HTMLDivElement =>
+      Boolean(box),
+    );
+    if (!vertical) return;
+    const keepLeft = (event?: Event) => {
+      const box = (event?.currentTarget as HTMLDivElement | undefined) ?? null;
+      for (const item of box ? [box] : boxes) if (item.scrollLeft) item.scrollLeft = 0;
+    };
+    keepLeft();
+    for (const box of boxes) box.addEventListener("scroll", keepLeft, { passive: true });
+    return () => {
+      for (const box of boxes) box.removeEventListener("scroll", keepLeft);
+    };
+  }, [vertical]);
   const newTabButton = vertical ? (
     <Pressable
       type="button"
       className="misty-workspace-new-tab misty-workspace-new-tab-row"
       onClick={props.onNewTab}
     >
-      <Plus className="size-4" aria-hidden="true" />
+      <Plus className="size-5" aria-hidden="true" />
       New Tab
     </Pressable>
   ) : (
@@ -120,7 +138,6 @@ export function WorkspaceTabStrip(
           <SidebarAddressFallback />
         </div>
       )}
-      {vertical ? <div className="misty-sidebar-shortcut-row">{props.shortcuts}</div> : null}
       {vertical ? <FavoritesStrip vertical onOpen={props.onOpen} /> : null}
       <div
         {...reorder}
@@ -136,8 +153,9 @@ export function WorkspaceTabStrip(
         )}
       >
         {vertical && newTabButton}
-        {allTabs.map((tab) => {
+        {allTabs.map((tab, index) => {
           const group = groups.find((g) => g.id === tab.tabGroupId);
+          const lastInGroup = Boolean(group) && allTabs[index + 1]?.tabGroupId !== group?.id;
           const firstInGroup = group && !shownGroups.has(group.id);
           if (group) shownGroups.add(group.id);
           return (
@@ -154,6 +172,8 @@ export function WorkspaceTabStrip(
                 <WorkspaceTabStripTab
                   tab={tab}
                   group={group}
+                  firstInGroup={Boolean(firstInGroup)}
+                  lastInGroup={lastInGroup}
                   active={tab.id === layout.activeTabId}
                   vertical={vertical}
                   tabs={tabs}
@@ -189,9 +209,9 @@ export function WorkspaceTabStrip(
           vertical
             ? undefined
             : {
-                // The first shoulder starts in the strip's inset, next to the traffic
-                // lights, but never closer to the edge than a rounded pane corner.
-                paddingLeft: `max(12px, ${props.titlebarInsets?.left ?? 8}px - var(--tab-shoulder))`,
+                // The first shoulder starts a little past the window buttons, and never closer to the
+                // edge than a rounded pane corner.
+                paddingLeft: `max(12px, ${(props.titlebarInsets?.left ?? 0) + dockingMetrics.tabLead}px)`,
                 paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
               }
         }
@@ -206,6 +226,7 @@ export function WorkspaceTabStrip(
                 <SidebarNavFallback />
               </div>
             </div>
+            <SpaceRow />
             {cardBody}
             <SidebarNowPlaying />
             <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
@@ -213,7 +234,12 @@ export function WorkspaceTabStrip(
             </div>
           </div>
         ) : (
-          cardBody
+          <>
+            {cardBody}
+            {/* With the sidebar collapsed the Space ends the tab strip, sized like a tab. */}
+            <SpaceRow compact />
+            {props.account}
+          </>
         )}
         {vertical ? props.account : null}
         {hoverCards.card}
@@ -232,15 +258,7 @@ export function WorkspaceTabStrip(
           canSplitSideways={canRight}
           canSplitVertically={canDown}
           closePaneControl={closePaneControl}
-          windows={props.windows}
-          activeWindowId={props.activeWindowId}
-          canReopen={props.canReopenWindow}
-          canCloseWindow={() => props.windows.length > 1}
           onSplitPane={props.onSplitPane}
-          onSelectWindow={props.onSelectWindow}
-          onCreateWindow={props.onCreateWindow}
-          onCloseWindow={props.onCloseWindow}
-          onReopenWindow={props.onReopenWindow}
         />
       </header>
     </OverlaySideProvider>

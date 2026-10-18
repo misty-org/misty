@@ -14,11 +14,7 @@ import { mergeSpaceMessages, messageFromSpaceEvent } from "../store/useSpaceMess
 
 const pendingByConversation = new Map<string, SpaceMessage[]>();
 let pendingGeneration = -1;
-export function useSpaceConversationChat(
-  spaceId: string,
-  conversationId: string,
-  canRead: boolean,
-) {
+export function useSpaceConversationChat(spaceId: string, conversationId: string) {
   const [conversations, setConversations] = useState<SpaceConversation[]>([]);
   const session = readApiSessionGeneration();
   if (pendingGeneration !== session) {
@@ -56,7 +52,7 @@ export function useSpaceConversationChat(
   const activeConversationIdRef = useRef("");
   const reloadMessages = useCallback(() => setReloadRevision((current) => current + 1), []);
   useEffect(() => {
-    if (!canRead || !conversationId) {
+    if (!conversationId) {
       setConversations([]);
       setMessages(pendingByConversation.get(key) ?? []);
       setLoadedConversationId("");
@@ -138,7 +134,7 @@ export function useSpaceConversationChat(
       active = false;
       socialEvents.removeEventListener("misty:space-message-event", reload);
     };
-  }, [canRead, conversationId, reloadRevision, spaceId, key, setMessages]);
+  }, [conversationId, reloadRevision, spaceId, key, setMessages]);
   return {
     conversations,
     messages,

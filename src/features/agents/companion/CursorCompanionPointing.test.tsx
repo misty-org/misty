@@ -76,7 +76,7 @@ it("answers a spoken screen question from fresh captures, then points and reads 
   await act(async () => {
     id = await mocks.conversationOptions!.tool(
       {
-        name: "show_on_screen",
+        name: "start_task",
         callId: "show",
         key: "voice-1:show",
         instruction: "where do I commit?",
@@ -89,9 +89,9 @@ it("answers a spoken screen question from fresh captures, then points and reads 
   expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
   expect(mocks.submit.mock.calls[0][6]).toMatchObject({
     displayCaptures: [screen],
-    intent: "teach",
     idempotencyKey: "voice-1:show",
   });
+  expect(mocks.submit.mock.calls[0][6]).not.toHaveProperty("intent");
   act(() =>
     mocks.conversationOptions!.onDone({
       id: "voice-1",
@@ -176,11 +176,9 @@ it("holds a walkthrough step until its target is clicked, then asks for the next
       prompt: "teach me to commit",
       conversationId: "conversation",
       look: true,
-      intent: "teach",
     }),
   );
   expect(mocks.submit.mock.calls[0][6]).toMatchObject({
-    intent: "teach",
     displayCaptures: [screen],
   });
   complete(
@@ -208,7 +206,6 @@ it("holds a walkthrough step until its target is clicked, then asks for the next
   await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
   expect(mocks.submit.mock.calls[1][0]).toContain("I did step 1 of 3 (open Source Control)");
   expect(mocks.submit.mock.calls[1][6]).toMatchObject({
-    intent: "teach",
     continuation: true,
     displayCaptures: [screen],
   });
@@ -234,7 +231,6 @@ it("snaps a point to the control Accessibility finds", async () => {
       prompt: "where's commit?",
       conversationId: "conversation",
       look: true,
-      intent: "teach",
     }),
   );
   complete("snap", "right there. [POINT:112,58:click Commit:screen1]");

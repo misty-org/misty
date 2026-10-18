@@ -129,19 +129,19 @@ it("opens note rename in its collaborative editor", () => {
   expect(screen.getByRole("status").textContent).toContain("rename=1");
 });
 
-it.each([
-  ["task", "Archive"],
-  ["file", "Move to Trash"],
-] as const)("uses the correct removal operation for %s", (kind, label) => {
-  render(
-    <MemoryRouter>
-      <Harness item={{ ...item, kind, remove: vi.fn() }} />
-    </MemoryRouter>,
-  );
-  openMenu();
-  expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
-  expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
-});
+it.each([["file", "Move to Trash"]] as const)(
+  "uses the correct removal operation for %s",
+  (kind, label) => {
+    render(
+      <MemoryRouter>
+        <Harness item={{ ...item, kind, remove: vi.fn() }} />
+      </MemoryRouter>,
+    );
+    openMenu();
+    expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+  },
+);
 
 it("uses the same native note pin IDs as the Notes collection", async () => {
   localStorage.setItem("misty:note-pins:user:space", JSON.stringify(["misty:n"]));

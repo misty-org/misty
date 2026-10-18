@@ -1,3 +1,6 @@
+// Its frame styles travel with it, so any page that hosts the conversation gets them.
+import "../agentsWorkspace.css";
+import "../workspace/agentWorkspaceFrame.css";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
@@ -15,10 +18,12 @@ import { AgentConversationView } from "./AgentConversationView";
 import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
-import { ConversationModelPicker } from "../models/ConversationModelPicker";
-import { ConversationReasoningPicker } from "../models/ConversationReasoningPicker";
-import { AgentModeToggle } from "../collaboration/AgentModeToggle";
+import { ComposerStrip } from "./ComposerStrip";
+import { AgentModeMenu } from "../collaboration/AgentModeToggle";
+import { AgentDeviceMenu } from "../page/AgentDeviceMenu";
+import { usePermissionMode } from "../collaboration/permissionMode";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
+import { AgentCodingToolMenu } from "../collaboration/AgentCodingToolMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
 import {
@@ -32,7 +37,6 @@ export function AgentWorkspaceConversation({
   agent,
   conversationId,
   emptyContent,
-  belowComposer,
   initialDraft = "",
   showControlBar = false,
   spaceId: _legacySpaceId,
@@ -45,8 +49,6 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
-  /** Shown under the composer while the conversation is empty. */
-  belowComposer?: ReactNode;
   initialDraft?: string;
   showControlBar?: boolean;
   spaceId: string;
@@ -88,6 +90,7 @@ export function AgentWorkspaceConversation({
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === (conversationId ?? state.activeConversationId));
+  const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
   const reportError = (error: string) =>
     useMistyStore.setState({
       error: error || null,
@@ -122,8 +125,7 @@ export function AgentWorkspaceConversation({
       void store.loadConversations();
   }, [accountId]);
   useEffect(() => {
-    // On the Agents page the chat column scrolls, so follow that instead of the transcript.
-    const view = scrollRef.current?.closest<HTMLElement>("[data-scroll-root]") ?? scrollRef.current;
+    const view = scrollRef.current;
     if (
       conversation?.messages.length &&
       view &&
@@ -300,7 +302,7 @@ export function AgentWorkspaceConversation({
             <p>{state.error}</p>
             {state.working && state.invocationId && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => void useMistyStore.getState().loadConversations(true)}
               >
@@ -359,15 +361,7 @@ export function AgentWorkspaceConversation({
         <MistyComposer
           hideUsageEstimate={showControlBar && Boolean(agent)}
           modelId={conversation?.modelId}
-          // One toolbar under the text: Attach, the mode and the project on the left; the model,
-          // usage, voice and send on the right.
-          leadingControl={
-            <>
-              <AgentModeToggle conversationId={conversation?.id} mode={collaboration.mode} />
-              <AgentProjectMenu conversationId={conversation?.id} />
-            </>
-          }
-          layout="conversation"
+          layout="inline"
           value={draft}
           onChange={setDraft}
           mode="ask"
@@ -380,7 +374,7 @@ export function AgentWorkspaceConversation({
           onError={reportError}
           onKeyDown={(e) => {
             if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
-              // Shift+Tab switches between Plan and Act, as in other agent tools.
+              // Shift+Tab turns Plan on or off, as in other agent tools.
               e.preventDefault();
               collaboration.toggleMode();
               return;
@@ -397,19 +391,6 @@ export function AgentWorkspaceConversation({
           busy={state.working && !draft.trim()}
           voiceControl={
             <>
-              <ConversationModelPicker
-                conversation={conversation}
-                disabled={state.working}
-                onError={reportError}
-              />
-              <ConversationReasoningPicker conversation={conversation} disabled={state.working} />
-              {showControlBar && agent && (
-                <AgentUsageControl
-                  draft={draft}
-                  model={conversation?.modelId}
-                  working={state.working}
-                />
-              )}
               <IconButton
                 label={voice.recording ? "Stop recording" : "Start voice input"}
                 disabled={
@@ -434,7 +415,8 @@ export function AgentWorkspaceConversation({
           trailingControl={
             state.working ? (
               <IconButton
-                variant="primary"
+                variant="outline"
+                className="text-cream-bright"
                 label="Stop response"
                 onClick={() => {
                   void useMistyStore
@@ -448,13 +430,29 @@ export function AgentWorkspaceConversation({
             ) : undefined
           }
         />
+        <ComposerStrip
+          device={<AgentDeviceMenu disabled={state.working} />}
+          project={<AgentProjectMenu conversationId={conversation?.id} />}
+          mode={
+            <AgentModeMenu
+              conversationId={conversation?.id}
+              mode={collaboration.mode}
+              permission={permission}
+            />
+          }
+          code={<AgentCodingToolMenu conversationId={conversation?.id} disabled={state.working} />}
+          usage={
+            showControlBar && agent ? (
+              <AgentUsageControl working={state.working} />
+            ) : undefined
+          }
+        />
         {/* Working status belongs to the transcript, under the message that started it. */}
         {(voice.recording || voice.transcribing) && (
           <p className="agent-compose-status" role="status">
             {voice.recording ? "Listening…" : "Transcribing…"}
           </p>
         )}
-        {!conversation?.messages.length && belowComposer}
       </div>
     </section>
   );
