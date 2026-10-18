@@ -5,12 +5,12 @@ import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
 import type { MessageEditingState } from "../hooks/useMessageEditing";
 import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChatData";
 import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
-import type { SpaceChatPermissions } from "../hooks/useSpaceChatPermissions";
+import type { SpaceChatAccess } from "../hooks/useSpaceChatAccess";
 import { SpaceChatMessages } from "./ChatMessages";
 
 export interface SpaceChatThreadProps {
   spaceId: string;
-  access: SpaceChatPermissions;
+  access: SpaceChatAccess;
   scope: ReturnType<typeof useSpaceChatScope>;
   store: ReturnType<typeof useSpaceChatStore>;
   editing: MessageEditingState;
@@ -47,8 +47,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       editSaving={editing.editSaving}
       nodes={scope.nodes}
       libraryItems={suggestions.libraryItems}
-      canCopyLibrary={access.canCopyLibrary}
-      canAddToLibrary={access.canAddToLibrary}
       spaceId={spaceId}
       spaceName={scope.activeConversation?.title || access.activeSpace?.name}
       directRecipient={scope.directRecipient}

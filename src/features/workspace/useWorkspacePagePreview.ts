@@ -4,6 +4,7 @@ import { snapshotPage } from "./pageSnapshot";
 import { pagePreviewGeneration, savePagePreview } from "@/features/webviews/browserRuntime";
 import { invoke } from "@tauri-apps/api/core";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
+import { isIncognitoWindow } from "./spaceWindow";
 
 /** All host-rendered tools, including misty:// pages, get a real content preview. */
 export function useWorkspacePagePreview(
@@ -14,7 +15,7 @@ export function useWorkspacePagePreview(
   const latest = useRef(tab);
   latest.current = tab;
   const url = tab?.surfaceId === "browser" ? parseBrowserViewState(tab.state).url : tab?.route;
-  const privateTab = tab?.surfaceId === "browser" && parseBrowserViewState(tab.state).private;
+  const privateTab = tab?.surfaceId === "browser" && isIncognitoWindow();
   const tabId = tab?.id;
   const surfaceId = tab?.surfaceId;
   useEffect(() => {

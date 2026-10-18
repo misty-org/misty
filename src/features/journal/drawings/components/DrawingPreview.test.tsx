@@ -89,7 +89,7 @@ function drawingFixture(): SpaceDrawing {
 function userFixture(): AuthUser {
   return {
     id: "user-1",
-    name: "Matthew Chen",
+    username: "matthew",
     email: "mattdev727@gmail.com",
   };
 }

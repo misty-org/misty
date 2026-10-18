@@ -62,6 +62,8 @@ export function AgentMethodEditor({
   onClose(): void;
   onSave(input: SaveAgentMethod): Promise<void>;
 }) {
+  // Saved templates are workflows to the person; the kind itself is saved as it was.
+  const noun = kind === "template" ? "workflow" : kind;
   const [definition, setDefinition] = useState(method?.definition ?? initial ?? blankDefinition());
   const [tools, setTools] = useState(
     (method?.definition ?? initial)?.required_tools.join(", ") ?? "",
@@ -118,7 +120,7 @@ export function AgentMethodEditor({
     >
       <DialogContent className="agent-studio-dialog agent-method-dialog">
         <DialogTitle>
-          {method ? "Edit" : "New"} {kind}
+          {method ? "Edit" : "New"} {noun}
         </DialogTitle>
         <DialogDescription>
           {kind === "skill"
@@ -318,7 +320,7 @@ export function AgentMethodEditor({
               Cancel
             </Button>
             <Button type="submit" disabled={busy}>
-              {busy ? "Saving…" : `Save ${kind}`}
+              {busy ? "Saving…" : `Save ${noun}`}
             </Button>
           </footer>
         </form>

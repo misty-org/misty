@@ -3,6 +3,7 @@ import {
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
 } from "./model";
+import { windowSpaceScope } from "./spaceWindow";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   const path = pathname.split(/[?#]/)[0];
@@ -26,7 +27,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         "agents",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   }
   if (path === "/spaces" || path.startsWith("/spaces/")) {
@@ -46,16 +47,16 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
           ? "Chat"
           : tool === "journal"
             ? "Journal"
-            : tool === "planner"
-              ? "Planner"
-              : tool === "library"
-                ? "Library"
+            : tool === "library"
+              ? "Files"
+              : spaceId
+                ? "Home"
                 : "Spaces",
         pathname,
         spaceId ? `${spaceId}:${tool}` : "spaces",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   }
   if (path === "/agents" || path === "/apps/agents")
@@ -68,7 +69,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         "agents",
         "single",
       ),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
     };
   if (
     ["/", "/new", "/browser", "/apps/browser"].includes(path) ||
@@ -78,14 +79,14 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     const url = new URL(pathname, "https://misty.local").searchParams.get("url");
     return {
       ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
-      scopeKey: "global",
+      scopeKey: windowSpaceScope(),
       state: createBrowserViewState(url ?? undefined),
     };
   }
   return null;
 }
 
-export type SpaceWorkspaceTool = "journal" | "planner" | "social" | "library" | "space";
+export type SpaceWorkspaceTool = "journal" | "social" | "library" | "space";
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);
@@ -110,9 +111,11 @@ function request(
   };
 }
 
+/** Which of a Space's tabs a section opens in. Home is the bare Space (its gallery); it never
+ * shares Chat's tab, or opening one would swap the other's page under the wrong name. */
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "notes" || section === "drawings") return "journal";
   if (section === "chat" || section === "social") return "social";
-  if (section === "planner" || section === "library") return section;
+  if (section === "library") return section;
   return "space";
 }

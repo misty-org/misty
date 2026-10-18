@@ -7,7 +7,7 @@ import {
   MenuItem,
   MenuTrigger,
 } from "@/shared/ui";
-import { CheckSquare, Notebook, Plus, Upload } from "lucide-react";
+import { Notebook, Plus, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSpacesStore } from "../store/useSpacesStore";
 
@@ -43,22 +43,11 @@ export function SpaceCreateMenu({
           label="Note"
           onSelect={() => navigate(`${base}/notes?create=note`)}
         />
-        {(space.role === "owner" || space.permissions?.["tasks.manage"] === true) &&
-          space.permissions?.["tasks.view"] !== false && (
-            <MenuItem
-              icon={<CheckSquare />}
-              label="Task"
-              onSelect={() => navigate(`${base}/planner/tasks/list?create=task`)}
-            />
-          )}
-        {space.permissions?.["library.view"] !== false &&
-          space.permissions?.["library.upload"] !== false && (
-            <MenuItem
-              icon={<Upload />}
-              label="Upload file"
-              onSelect={() => navigate(`${base}/library?upload=1`)}
-            />
-          )}
+        <MenuItem
+          icon={<Upload />}
+          label="Upload file"
+          onSelect={() => navigate(`${base}/library?upload=1`)}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

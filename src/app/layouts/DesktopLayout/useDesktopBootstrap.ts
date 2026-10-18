@@ -1,9 +1,8 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
 import { useSettingsStore } from "@/features/settings";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { settingsFallbackRoute } from "./helpers";
 
@@ -14,13 +13,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const loadApp = useAppStore((state) => state.loadApp);
   const settings = useSettingsStore((state) => state.settings);
   const settingsLoad = useSettingsStore((state) => state.load);
-  const workspaceLayout = useWorkspaceStore((state) => state.layout);
-  const activeWorkspacePane = useMemo(
-    () =>
-      dockLeaves(workspaceLayout.root).find((pane) => pane.id === workspaceLayout.focusedPaneId) ??
-      dockLeaves(workspaceLayout.root)[0],
-    [workspaceLayout],
-  );
   const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
@@ -67,8 +59,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     navigate,
     app,
     settingsLoad,
-    activePaneId: "",
-    activeWorkspacePaneId: activeWorkspacePane?.id ?? "",
     lastAppRoute,
     lastNonSettingsRouteRef,
     routeId,

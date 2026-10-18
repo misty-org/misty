@@ -5,10 +5,10 @@ const validSections = new Set([
   "home",
   "social",
   "chat",
-  "planner",
   "notes",
   "drawings",
   "library",
+  "code",
   "members",
   "settings",
 ]);
@@ -17,10 +17,6 @@ const validSettingsSections = new Set(["general", "members", "connections", "sug
 export interface SpacePanelRoute {
   activeSpaceId: string;
   section: string;
-  plannerSection: "tasks" | "agenda" | "goals" | "milestones" | "roadmaps";
-  taskView: string;
-  agendaView: "month" | "week" | "day";
-  roadmapId: string;
   settingsSection: string;
   libraryCollection: string;
   conversationId: string | null;
@@ -37,43 +33,15 @@ export function useSpacePanelRoute(): SpacePanelRoute {
   const location = useLocation();
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const routeParts = location.pathname.split("/").filter(Boolean);
-  const defaultJournalSection = "notes";
-  const requestedSection = routeParts[2] ?? "home";
-  const routeSection =
-    requestedSection === "files"
-      ? "library"
-      : requestedSection === "tasks"
-        ? "planner"
-        : requestedSection;
+  const defaultSection = "home";
+  const requestedSection = routeParts[2] ?? defaultSection;
+  const routeSection = requestedSection === "files" ? "library" : requestedSection;
   const requestedSettingsSection =
     routeParts[3] === "integrations" ? "connections" : (routeParts[3] ?? "");
 
-  const plannerPart = routeParts[3] ?? "";
-  const plannerSection =
-    plannerPart === "agenda" || plannerPart === "calendar"
-      ? "agenda"
-      : plannerPart === "goals" || plannerPart === "milestones" || plannerPart === "roadmaps"
-        ? plannerPart
-        : "tasks";
-  const legacyTaskView = plannerPart === "board" || plannerPart === "list" ? plannerPart : "";
-  const canonicalTaskView = plannerPart === "tasks" ? (routeParts[4] ?? "") : "";
-  const agendaCandidate = plannerPart === "agenda" ? (routeParts[4] ?? "month") : "month";
-
   return {
     activeSpaceId: routeParts[0] === "spaces" ? decodeRouteSegment(routeParts[1] ?? "") : "",
-    section: validSections.has(routeSection) ? routeSection : defaultJournalSection,
-    plannerSection,
-    taskView:
-      routeSection === "planner" && ["board", "list"].includes(canonicalTaskView || legacyTaskView)
-        ? canonicalTaskView || legacyTaskView
-        : "board",
-    agendaView: ["month", "week", "day"].includes(agendaCandidate)
-      ? (agendaCandidate as "month" | "week" | "day")
-      : "month",
-    roadmapId:
-      routeSection === "planner" && plannerPart === "roadmaps"
-        ? decodeRouteSegment(routeParts[4] ?? "")
-        : "",
+    section: validSections.has(routeSection) ? routeSection : defaultSection,
     settingsSection: validSettingsSections.has(requestedSettingsSection)
       ? requestedSettingsSection
       : "general",

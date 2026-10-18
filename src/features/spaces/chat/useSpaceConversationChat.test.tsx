@@ -18,7 +18,7 @@ import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 let latest: ReturnType<typeof useSpaceConversationChat>;
 
 function Harness() {
-  latest = useSpaceConversationChat("space-1", "conversation-1", true);
+  latest = useSpaceConversationChat("space-1", "conversation-1");
   return null;
 }
 
@@ -138,7 +138,7 @@ it("routes late message completions to the original conversation after switching
   const { renderHook, waitFor, cleanup } = await import("@testing-library/react");
   apiMocks.conversations.mockResolvedValue({ conversations: [] });
   apiMocks.conversationMessages.mockResolvedValue({ messages: [] });
-  const hook = renderHook(({ id }) => useSpaceConversationChat("switching-space", id, true), {
+  const hook = renderHook(({ id }) => useSpaceConversationChat("switching-space", id), {
     initialProps: { id: "a" },
   });
   await waitFor(() => expect(hook.result.current.loading).toBe(false));

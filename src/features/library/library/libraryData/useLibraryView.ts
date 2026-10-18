@@ -9,10 +9,8 @@ export type LibraryMediaType = "" | NonNullable<LibraryItemQuery["media_type"]>;
 export function useLibraryView() {
   const [librarySearchParams, setLibrarySearchParams] = useSearchParams();
   const [collection, setCollection] = useState<LibraryCollectionKind>("recent");
-  const [selectedCollectionId, setSelectedCollectionId] = useState("");
-  const [selectedAlbumFolderId, setSelectedAlbumFolderId] = useState("");
   const [mediaType, setMediaType] = useState<LibraryMediaType>("");
-  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("list");
+  const [libraryViewMode, setLibraryViewMode] = useState<"grid" | "list">("grid");
   const [libraryItemScale, setLibraryItemScale] = useState(1);
   const [sort, setSort] = useState<NonNullable<LibraryItemQuery["sort"]>>("recently-added");
   const [direction, setDirection] = useState<NonNullable<LibraryItemQuery["direction"]>>("desc");
@@ -21,13 +19,8 @@ export function useLibraryView() {
     librarySearchParams,
     setLibrarySearchParams,
     requestedCollection: librarySearchParams.get("collection"),
-    requestedCollectionId: librarySearchParams.get("collectionId") ?? "",
     collection,
     setCollection,
-    selectedCollectionId,
-    setSelectedCollectionId,
-    selectedAlbumFolderId,
-    setSelectedAlbumFolderId,
     mediaType,
     setMediaType,
     libraryViewMode,

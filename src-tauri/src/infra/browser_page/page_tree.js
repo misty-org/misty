@@ -271,19 +271,27 @@
     const phrase = String(args.query || "").toLowerCase().trim();
     const roleWords = { button: ["button", "clickable"], link: ["link"], field: ["textbox", "searchbox", "combobox", "spinbutton"],
       box: ["textbox", "searchbox", "checkbox", "combobox"], input: ["textbox", "searchbox", "combobox", "spinbutton"],
-      checkbox: ["checkbox", "switch"], tab: ["tab"], menu: ["menuitem", "menu"], dropdown: ["combobox", "listbox"], option: ["option"] };
+      checkbox: ["checkbox", "switch"], tab: ["tab"], menu: ["menuitem", "menu"], dropdown: ["combobox", "listbox"], option: ["option"],
+      toggle: ["switch", "checkbox", "button", "clickable", "radio"], switch: ["switch", "checkbox", "clickable"] };
+    // Words that name the thing, not its kind: a match should contain most of them.
+    const content = words.filter((word) => !roleWords[word]);
     const scored = built.interactive.map((node) => {
       const haystack = `${node.role} ${node.name} ${node.value ?? ""} ${node.url ?? ""}`.toLowerCase();
       let score = 0;
+      let named = 0;
       for (const word of words) {
         if (haystack.includes(word)) score += 2;
+        if (haystack.includes(word) && !roleWords[word]) named++;
         if (roleWords[word]?.includes(node.role)) score += 3;
       }
       if (phrase && node.name.toLowerCase() === phrase) score += 8;
       else if (phrase.length > 3 && haystack.includes(phrase)) score += 4;
-      return { node, score };
+      return { node, score, named };
     }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score).slice(0, Math.min(20, args.limit ?? 8));
-    return { ok: true, documentId: S.documentId, url: location.href, matches: scored.map((item) => P.line(item.node)) };
+    const strong = scored.some((item) => content.length === 0 || item.named * 2 >= content.length);
+    // A weak search says so, so the agent reads the page rather than acting on a poor guess.
+    const hint = strong ? undefined : "No element matched most of these words; these are loose guesses. Read the page with browser_snapshot (use scopeRef for one region) instead of searching again.";
+    return { ok: true, documentId: S.documentId, url: location.href, matches: scored.map((item) => P.line(item.node)), ...(hint ? { weak: true, hint } : {}) };
   };
 
   /** Readable Markdown of the page for a model to extract from. */

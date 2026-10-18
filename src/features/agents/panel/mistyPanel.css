@@ -29,6 +29,21 @@ aside[data-misty-panel] .agents-chat {
   min-width: 0;
 }
 
+/* A narrow column: the welcome line sits close above the composer, sized for the panel. */
+aside[data-misty-panel] .agent-conversation[data-empty="true"] {
+  padding-top: clamp(64px, 24vh, 200px);
+}
+aside[data-misty-panel] .agent-studio-welcome {
+  margin-bottom: clamp(56px, 12vh, 112px);
+}
+aside[data-misty-panel] .agent-studio-welcome h1 {
+  font-size: 26px;
+}
+aside[data-misty-panel] .agent-conversation[data-empty="true"] .agent-compose-area {
+  width: auto;
+  max-width: calc(100% - 32px);
+}
+
 /* The panel's outline is the resize handle: drag it, or focus it and use the arrow keys. Like the
    tab drawer's, it draws nothing of its own, only the resize cursor. */
 .misty-panel-resizer {

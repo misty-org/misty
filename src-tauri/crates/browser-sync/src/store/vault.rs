@@ -28,17 +28,26 @@ impl CachedVault {
         {
             return Err(Error::Identity);
         }
-        let wrapped = &self.vault.key_envelope;
-        if wrapped.version != 1 || wrapped.kdf != "argon2id-m65536-t3-p1" {
-            return Err(Error::Invalid);
+        match (&self.vault.key_envelope, &self.vault.space_key_envelope) {
+            (Some(wrapped), None) => {
+                if wrapped.version != 1 || wrapped.kdf != "argon2id-m65536-t3-p1" {
+                    return Err(Error::Invalid);
+                }
+                decode_fixed::<16>(&wrapped.salt)?;
+                Envelope {
+                    version: wrapped.version,
+                    nonce: wrapped.nonce.clone(),
+                    ciphertext: wrapped.ciphertext.clone(),
+                }
+                .decode(4096)?;
+            }
+            // A Space vault is created online before it is cached, so it never
+            // has a bootstrap pending.
+            (None, Some(sealed)) if !self.bootstrap_pending => {
+                sealed.decode(4096)?;
+            }
+            _ => return Err(Error::Invalid),
         }
-        decode_fixed::<16>(&wrapped.salt)?;
-        Envelope {
-            version: wrapped.version,
-            nonce: wrapped.nonce.clone(),
-            ciphertext: wrapped.ciphertext.clone(),
-        }
-        .decode(4096)?;
         Ok(())
     }
 
@@ -52,6 +61,7 @@ impl CachedVault {
         // the locally pinned identity/wrapper merely because a server sent one.
         if remote.key_epoch != self.vault.key_epoch
             || remote.key_envelope != self.vault.key_envelope
+            || remote.space_key_envelope != self.vault.space_key_envelope
             || remote.head_sequence < self.vault.head_sequence
             || remote.head_sequence > MAX_COUNTER
         {
@@ -67,11 +77,12 @@ impl CachedVault {
         if !self.enrollment_pending {
             return Ok(());
         }
-        match api.vault().await? {
+        match self.remote(api).await? {
             Some(remote) => self.check_remote(&remote)?,
             None if self.bootstrap_pending => {
+                let wrapped = self.vault.key_envelope.as_ref().ok_or(Error::Invalid)?;
                 match api
-                    .bootstrap(&self.vault.root_public_key, &self.vault.key_envelope, grant)
+                    .bootstrap(&self.vault.root_public_key, wrapped, grant)
                     .await
                 {
                     Ok(()) => {}
@@ -85,6 +96,20 @@ impl CachedVault {
             None => return Err(Error::Recovery),
         }
         api.enroll(grant).await
+    }
+
+    /// The server's copy of this vault: the personal vault, or this Space
+    /// vault from the account's list.
+    async fn remote(&self, api: &SyncApi) -> Result<Option<Vault>> {
+        if !self.vault.is_space() {
+            return api.vault().await;
+        }
+        Ok(api
+            .vaults()
+            .await?
+            .into_iter()
+            .find(|vault| vault.vault_id == self.vault.vault_id)
+            .map(Vault::from))
     }
 }
 

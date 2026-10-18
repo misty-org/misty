@@ -12,11 +12,12 @@ extern "C" {
     );
     fn misty_extensions_set_events(callback: extern "C" fn(*const c_char));
     fn misty_extensions_configuration(
+        space: *const c_char,
         configuration: *mut c_void,
         url: *const c_char,
-        default_store: bool,
     ) -> *mut c_void;
     fn misty_extensions_register_tab(
+        space: *const c_char,
         webview: *mut c_void,
         identifier: *const c_char,
         private_tab: bool,
@@ -26,14 +27,17 @@ extern "C" {
     fn misty_extensions_set_compat_channel(install: extern "C" fn(*mut c_void));
     fn misty_extensions_compat_message(message: *mut c_void, reply: *mut c_void);
     fn misty_extensions_supported() -> bool;
-    fn misty_extensions_tab_event(identifier: *const c_char, event: *const c_char);
+    fn misty_extensions_tab_event(
+        space: *const c_char,
+        identifier: *const c_char,
+        event: *const c_char,
+    );
 }
 
 static SYNC_EVENTS: std::sync::OnceLock<tokio::sync::mpsc::UnboundedSender<Value>> =
     std::sync::OnceLock::new();
 static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
-#[cfg(windows)]
 pub(super) fn app() -> Option<&'static tauri::AppHandle> {
     APP.get()
 }
@@ -98,7 +102,17 @@ extern "C" fn event(pointer: *const c_char) {
         if let Some(send) = SYNC_EVENTS.get() {
             let _ = send.send(value);
         }
-    } else if value["kind"] == "replace-view" {
+        return;
+    }
+    // Every event names the Space whose host raised it, and goes to that Space only.
+    let Some(space) = value["space"]
+        .as_str()
+        .filter(|key| crate::infra::space_windows::valid_key(key))
+        .map(str::to_owned)
+    else {
+        return;
+    };
+    if value["kind"] == "replace-view" {
         let app = app.clone();
         let _ = app.clone().run_on_main_thread(move || {
             if let Some(id) = value["tabId"].as_str() {
@@ -106,13 +120,14 @@ extern "C" fn event(pointer: *const c_char) {
                     let _ = view.close();
                 }
             }
-            let _ = app.emit_to("main", "misty://extensions", value);
+            crate::infra::space_windows::emit_to_space(&app, &space, "misty://extensions", value);
         });
     } else {
         if value["kind"] == "runtime-error" {
             let event = value.clone();
+            let space = space.clone();
             tauri::async_runtime::spawn(async move {
-                let mut state = super::service().lock().await;
+                let mut state = super::service(&space).lock().await;
                 if event["account"].as_str() == Some(&state.account) {
                     if let Some(status) =
                         event["id"].as_str().and_then(|id| state.states.get_mut(id))
@@ -131,7 +146,7 @@ extern "C" fn event(pointer: *const c_char) {
                 }
             });
         }
-        let _ = app.emit_to("main", "misty://extensions", value);
+        crate::infra::space_windows::emit_to_space(app, &space, "misty://extensions", value);
     }
 }
 
@@ -180,22 +195,35 @@ pub async fn request(value: Value) -> Result<Value, String> {
     }
 }
 
-pub fn tab_event(app: &tauri::AppHandle, id: &str, event: &str) {
+/// The Space a browser page belongs to, from the window that holds it.
+pub fn page_space(app: &tauri::AppHandle, id: &str) -> Option<String> {
+    let view = app.get_webview(&format!("misty-browser-{id}"))?;
+    crate::infra::space_windows::space_for_owner(view.window().label())
+}
+
+/// `space` is the page's Space; `None` lets the host that knows the tab answer
+/// (a closing page whose window is already gone).
+pub fn tab_event(app: &tauri::AppHandle, space: Option<&str>, id: &str, event: &str) {
     #[cfg(target_os = "macos")]
-    if let (Ok(id), Ok(event)) = (CString::new(id), CString::new(event)) {
+    if let (Ok(space), Ok(id), Ok(event)) = (
+        CString::new(space.unwrap_or_default()),
+        CString::new(id),
+        CString::new(event),
+    ) {
         let _ = app.run_on_main_thread(move || unsafe {
-            misty_extensions_tab_event(id.as_ptr(), event.as_ptr());
+            misty_extensions_tab_event(space.as_ptr(), id.as_ptr(), event.as_ptr());
         });
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = (app, id, event);
+    let _ = (app, space, id, event);
 }
 
-pub fn register(view: &tauri::Webview, id: &str, private: bool, url: &str) {
+pub fn register(view: &tauri::Webview, space: &str, id: &str, private: bool, url: &str) {
     #[cfg(target_os = "macos")]
-    if let (Ok(id), Ok(url)) = (CString::new(id), CString::new(url)) {
+    if let (Ok(space), Ok(id), Ok(url)) = (CString::new(space), CString::new(id), CString::new(url)) {
         let _ = view.with_webview(move |platform| unsafe {
             misty_extensions_register_tab(
+                space.as_ptr(),
                 platform.inner().cast(),
                 id.as_ptr(),
                 private,
@@ -206,17 +234,19 @@ pub fn register(view: &tauri::Webview, id: &str, private: bool, url: &str) {
     #[cfg(windows)]
     super::native_windows::register(view);
     #[cfg(not(target_os = "macos"))]
-    let _ = (view, id, private, url);
+    let _ = (view, space, id, private, url);
 }
 
+/// A page configuration wired to its Space's extension controller.
 #[cfg(target_os = "macos")]
 pub async fn configuration(
     app: &tauri::AppHandle,
+    space: &str,
     profile: [u8; 16],
     private: bool,
     url: String,
-    default_store: bool,
 ) -> Result<Option<usize>, String> {
+    let space = CString::new(space).map_err(|_| "Invalid Space.")?;
     if !unsafe { misty_extensions_supported() } {
         return Ok(None);
     }
@@ -229,12 +259,12 @@ pub async fn configuration(
             let mtm = MainThreadMarker::new()
                 .ok_or("Extension configuration requires the main thread.")?;
             let config = unsafe { WKWebViewConfiguration::new(mtm) };
-            let store = if private {
-                wry::extension_private_data_store(mtm)
-            } else {
-                unsafe {
-                    WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(profile), mtm)
-                }
+            // Incognito windows have no extension host; their pages never get here.
+            if private {
+                return Err("Extensions don't run in incognito windows.".to_owned());
+            }
+            let store = unsafe {
+                WKWebsiteDataStore::dataStoreForIdentifier(&NSUUID::from_bytes(profile), mtm)
             };
             unsafe {
                 config.setWebsiteDataStore(&store);
@@ -242,9 +272,9 @@ pub async fn configuration(
             let url = CString::new(url).map_err(|_| "Invalid browser URL.")?;
             let pointer = unsafe {
                 misty_extensions_configuration(
+                    space.as_ptr(),
                     Retained::as_ptr(&config).cast_mut().cast(),
                     url.as_ptr(),
-                    default_store,
                 )
             };
             Ok::<_, String>((!pointer.is_null()).then_some(pointer as usize))
@@ -257,9 +287,13 @@ pub async fn configuration(
         .map_err(|_| "Extension configuration was cancelled.")?
 }
 
-pub fn trusted(view: &tauri::Webview) -> Result<(), String> {
-    if view.label() == "main" {
-        Ok(())
+/// The Space whose extensions a caller manages: its own Space window's. Only Space
+/// windows manage extensions; incognito windows have none.
+pub fn caller_space(view: &tauri::Webview) -> Result<String, String> {
+    let label = view.window().label().to_owned();
+    if crate::infra::space_windows::is_space_window(&label) {
+        crate::infra::space_windows::space_for_window(&label)
+            .ok_or_else(|| "Only the Misty workspace can manage extensions.".into())
     } else {
         Err("Only the Misty workspace can manage extensions.".into())
     }

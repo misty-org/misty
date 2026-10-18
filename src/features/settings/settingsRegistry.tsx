@@ -1,4 +1,3 @@
-import { PasswordsSettings } from "./sections/PasswordsSettings";
 import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
@@ -6,6 +5,8 @@ import {
   Info,
   Keyboard,
   Layers,
+  History,
+  Mic,
   MonitorSmartphone,
   Palette,
   PanelsTopLeft,
@@ -30,8 +31,6 @@ import {
   CompanionSection,
   DevicesSection,
   ManageSpacesSection,
-  ModelsSection,
-  SpaceAgendaSection,
   SpaceDefaultsSection,
 } from "./sections/FeatureSections";
 import { GeneralSection } from "./sections/GeneralSection";
@@ -41,6 +40,9 @@ import { PrivacySection } from "./sections/PrivacySection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
 import { UsageSection } from "./sections/UsageSection";
+import { VoiceSection } from "./sections/VoiceSection";
+import { MemorySection } from "./sections/MemorySection";
+import { CodingToolsSection } from "./sections/CodingToolsSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
@@ -55,6 +57,8 @@ export type SettingsArea =
   | "browser"
   | "spaces"
   | "agents"
+  | "voice"
+  | "memory"
   | "sync"
   | "devices"
   | "privacy"
@@ -67,6 +71,8 @@ export const settingsAreas: Record<SettingsArea, { label: string; icon: LucideIc
   browser: { label: "Browser", icon: Globe },
   spaces: { label: "Spaces", icon: Layers },
   agents: { label: "Agents", icon: Sparkles },
+  voice: { label: "Voice", icon: Mic },
+  memory: { label: "Memory", icon: History },
   sync: { label: "Sync", icon: RefreshCw },
   devices: { label: "Devices", icon: MonitorSmartphone },
   privacy: { label: "Privacy", icon: Shield },
@@ -106,7 +112,6 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "resource",
     true,
   ),
-  page("browser", "browser-passwords", "Passwords", PasswordsSettings, "resource", true),
   page("browser", "browser-extensions", "Extensions", ExtensionsSettings, "resource", true),
   page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
   page(
@@ -117,10 +122,8 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
     "account",
   ),
   page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
-  page("spaces", "spaces-agenda", "Agenda", SpaceAgendaSection),
   page("spaces", "spaces-manage", "Manage spaces", ManageSpacesSection, "resource"),
   page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
-  page("agents", "models", "Models", ModelsSection, "account"),
   page("agents", "agents-usage", "Usage", UsageSection, "account"),
   page("agents", "misty", "Misty", MistySection, "account"),
   page(
@@ -132,7 +135,10 @@ export const settingsRegistry: readonly SettingsRegistryEntry[] = [
   ),
   page("agents", "agents-connections", "Connections", AgentConnectionsSection, "resource"),
   page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
+  page("agents", "agents-coding", "Coding tools", CodingToolsSection, "resource", true),
   page("agents", "agents-companion", "Companion", CompanionSection, "account"),
+  page("voice", "voice", "Voice", VoiceSection, "account", true),
+  page("memory", "recall", "Memory", MemorySection, "account", true),
   page("sync", "sync", "Sync", BrowserSyncSettings),
   page("devices", "devices", "Devices", DevicesSection, "account"),
   page("privacy", "privacy", "Privacy", PrivacySection, "account"),
@@ -154,7 +160,6 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
         "browser-handoff": "sync",
         social: "spaces-defaults",
         journal: "spaces-defaults",
-        planner: "spaces-agenda",
         library: "spaces-manage",
         terminal: "general",
         code: "general",

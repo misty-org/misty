@@ -5,6 +5,7 @@ import { BrowserSettingsPage } from "./BrowserSettingsPage";
 import { DownloadsPage } from "./DownloadsPage";
 import { ExtensionsPage } from "./ExtensionsPage";
 import { HistoryPage } from "./HistoryPage";
+import { PasswordsPage } from "./PasswordsPage";
 import type { BrowserInternalPageProps } from "./types";
 
 /** Draws a misty:// page in place of the tab's native web page. */
@@ -17,6 +18,8 @@ export function BrowserInternalPage(props: BrowserInternalPageProps & { page: In
       return <HistoryPage {...pageProps} />;
     case "downloads":
       return <DownloadsPage {...pageProps} />;
+    case "passwords":
+      return <PasswordsPage />;
     case "bookmarks":
       return <BookmarksPage {...pageProps} />;
     case "extensions":

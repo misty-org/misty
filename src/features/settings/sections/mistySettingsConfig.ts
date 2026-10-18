@@ -4,8 +4,6 @@ import type { AiSurfaceId } from "@/features/ai-surface/types";
 export const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
   { id: "global", label: "Global Misty" },
   { id: "notes", label: "Notes" },
-  { id: "planner.tasks", label: "Planner" },
-  { id: "planner.agenda", label: "Agenda" },
   { id: "browser", label: "Browser" },
   { id: "space.chat", label: "Space Social" },
   { id: "drawings", label: "Drawings" },

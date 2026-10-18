@@ -108,6 +108,9 @@ export interface NativeSyncView {
   /** Workspaces and this machine's standing in them; absent before this
    * vault switched to workspaces. */
   sync?: SyncState | null;
+  /** Spaces whose own vault has a problem. Sync shows one state for the
+   * account and names a Space only when it is the one in trouble. */
+  space_problems?: { space_id: string; issue: string }[];
 }
 export interface SyncAccount {
   apiBase: string;

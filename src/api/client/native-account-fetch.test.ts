@@ -47,6 +47,25 @@ describe("native account HTTP", () => {
     expect(response.url).toBe("https://misty.test/v1/me");
   });
 
+  it("tells the server when the window is driven by WebDriver", async () => {
+    native.invoke.mockImplementation(async (command: string) =>
+      command === "auth_http_start"
+        ? { status: 204, headers: [], url: "https://misty.test/v1/me" }
+        : null,
+    );
+    Object.defineProperty(navigator, "webdriver", { configurable: true, get: () => true });
+    try {
+      await nativeAccountFetch("https://misty.test/v1/me", { method: "GET" });
+    } finally {
+      Reflect.deleteProperty(navigator, "webdriver");
+    }
+    const [, , options] = native.invoke.mock.calls.find(
+      ([command]) => command === "auth_http_start",
+    )!;
+    const metadata = JSON.parse(decodeURIComponent(options.headers["X-Misty-Request"]));
+    expect(metadata.headers).toContainEqual(["x-misty-automation", "webdriver"]);
+  });
+
   it("aborts promptly before response headers arrive", async () => {
     native.invoke.mockImplementation((command: string) =>
       command === "auth_http_start" ? new Promise(() => {}) : Promise.resolve(),

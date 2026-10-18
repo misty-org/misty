@@ -1,11 +1,9 @@
+//! Erasing a Space's website data store once the Space is deleted or left.
 use super::*;
 
-/// The SDK host derives this identity from the caller; package code cannot select a store.
+/// Closes the store's pages and erases its data. The caller picks the store natively.
 pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), String> {
     let identifier = browser_profile_identifier(Some(&profile_id))?;
-    if browser_requires_ephemeral_store() {
-        return Err("Website accounts require macOS 14 or later.".into());
-    }
     let ids = {
         let state = app.state::<BrowserSessionState>();
         let sessions = state
@@ -69,19 +67,14 @@ fn is_locked(error: &std::io::Error) -> bool {
     cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33 | 145))
 }
 
-/// Erases a deleted device profile's website data. The default account profile
-/// is never a device profile, so it cannot be removed this way.
-#[tauri::command]
-pub async fn browser_device_profile_delete(
-    webview: Webview,
-    app: AppHandle,
-    profile_id: String,
-) -> Result<(), String> {
-    if webview.label() != "main" {
-        return Err("Only Misty's trusted shell can remove browser profiles.".into());
-    }
-    if super::super::browser_sync::is_account_browser_profile(&profile_id).await {
-        return Err("The account's own browser profile can't be removed.".into());
+/// Erases a deleted or left Space's website data. Its windows are already closed;
+/// WebKit holds a store briefly after its last view goes, so this runs a moment later.
+pub(crate) async fn remove_space_data(app: AppHandle, key: String) -> Result<(), String> {
+    let profile_id = crate::infra::space_windows::space_store_identity(&key)
+        .ok_or("The personal Space's data can't be removed.")?;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    if !crate::infra::space_windows::windows_for_space(&app, &key).is_empty() {
+        return Err("The Space was opened again before its data could be removed.".into());
     }
     remove(app, profile_id).await
 }

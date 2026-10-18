@@ -39,9 +39,6 @@ export type AiSurfaceId =
   | "global"
   | "activity"
   | "space.chat"
-  | "planner.tasks"
-  | "planner.agenda"
-  | "planner.roadmap"
   | "notes"
   | "drawings"
   | "library"
@@ -219,8 +216,6 @@ export interface AiInvocationRequest {
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
   companionModel?: string;
-  /** "teach" explains and points at the attached displays, with no tools. */
-  companionIntent?: "teach";
   /** Pins a new conversation's Thinking model with its first message. */
   modelOverride?: string;
   displayCaptures?: DisplayCapture[];
@@ -246,6 +241,10 @@ export interface AiInvocationRequest {
   conversationId?: string;
   /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
   collaborationMode?: "act" | "plan";
+  /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
+  permissionMode?: "ask" | "auto";
+  /** The coding tool a delegated coding run uses this turn; omitted uses the Settings default. */
+  codingTool?: string;
   idempotencyKey: string;
   timezone?: string;
 }
@@ -273,7 +272,7 @@ export interface AgentNotebook {
   noteId?: string;
 }
 
-/** One sub-agent a run started with agents_delegate. */
+/** One sub-agent a run started with agent_delegate. */
 export interface AgentSubagent {
   invocationId: string;
   goal: string;

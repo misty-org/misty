@@ -37,7 +37,7 @@ export const tabFeatureCommands = [
 
 export const browserFeatureCommands = [
   command("browser.translate", "Translate page", {
-    description: "Ask Misty to translate the page into your language beside it.",
+    description: "Ask your agent to translate the page into your language beside it.",
     category: "Browser",
     scope: "tool:browser",
     aliases: ["translate", "language"],

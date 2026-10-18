@@ -42,19 +42,32 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         {overlay ? (
           <IconButton
             label={`Close ${props.ariaLabel.toLowerCase()}`}
-            className="absolute right-3 top-3 z-10"
+            className="absolute right-4 top-3 z-10"
             onClick={props.onClose}
           >
             <X className="size-4" strokeWidth={1.8} />
           </IconButton>
         ) : null}
         {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
-        <div className="misty-scrollbar misty-scrollbar-floating my-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="w-full max-w-[960px] px-10 pb-12 pt-9 text-[15px] leading-6 max-[720px]:px-6">
+        {/* In the overlay the scroller starts below the close button, so the scrollbar and the
+            page never run under it; the page's top padding moves up to match. */}
+        <div
+          className={cn(
+            "misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain",
+            overlay ? "mt-12" : "mt-3",
+          )}
+        >
+          <div
+            className={cn(
+              "w-full max-w-[960px] px-10 pb-12 text-[15px] leading-6 max-[720px]:px-6",
+              overlay ? "pt-0" : "pt-9",
+            )}
+          >
             {props.contentHeader}
             {props.children}
           </div>
         </div>
+        {props.saveBar}
       </main>
     </div>
   );
@@ -176,6 +189,8 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   items: readonly DesktopSettingsNavEntry<Id>[];
   navigationLabel: string;
   onClose?: () => void;
+  /** Pinned to the content's bottom right, over the scrolling page. */
+  saveBar?: ReactNode;
   onSelect: (id: Id) => void;
   presentation?: "page" | "overlay";
   /** Announced to screen readers; the sidebar already shows it. */

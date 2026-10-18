@@ -73,6 +73,7 @@
   --misty-status-idle: color-mix(in srgb, var(--misty-theme-text-muted) 70%, transparent);
   --misty-status-attention: color-mix(in srgb, #e8a33a 82%, var(--misty-theme-text));
   --misty-status-failed: var(--misty-theme-danger);
+  --misty-status-done: color-mix(in srgb, #4ade80 70%, var(--misty-theme-text));
 }
 
 /* The global rail uses square 34px tiles around 18px glyphs and 28px avatars. */

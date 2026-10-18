@@ -7,6 +7,9 @@ import { Fragment, memo, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChatDateDivider, formatChatMessageTime } from "./ChatDisplay";
 import { MessageAttachments } from "./MessageAttachments";
+import { LinkPreviews } from "@/features/link-preview/LinkPreviews";
+import { useChatSidePanel } from "../store/chatSidePanelStore";
+import { AgentTranscriptButton } from "./AgentTranscriptButton";
 import { MessageEditForm } from "./MessageEditForm";
 import { MessageHoverActions } from "./MessageHoverActions";
 import { MessageReactions } from "./MessageReactions";
@@ -20,6 +23,8 @@ export interface ChatMessageRowProps {
   avatarUrl: string;
   repliedToMessage: SpaceMessage | undefined;
   repliedToAvatarUrl: string;
+  /** How many messages reply to this one; above zero it gets a Show replies button. */
+  replyCount?: number;
   props: SpaceChatMessagesProps;
 }
 
@@ -31,8 +36,6 @@ export interface ChatMessageRowProps {
  */
 /** The list fields a row renders; anything else on the list props never reaches a row. */
 const rowFields = [
-  "canAddToLibrary",
-  "canCopyLibrary",
   "canWrite",
   "currentUserId",
   "isOwner",
@@ -65,6 +68,7 @@ export const ChatMessageRow = memo(ChatMessageRowView, (previous, next) => {
     previous.avatarUrl !== next.avatarUrl ||
     previous.repliedToMessage !== next.repliedToMessage ||
     previous.repliedToAvatarUrl !== next.repliedToAvatarUrl ||
+    previous.replyCount !== next.replyCount ||
     rowFields.some((field) => previous.props[field] !== next.props[field])
   )
     return false;
@@ -86,10 +90,19 @@ function ChatMessageRowView({
   avatarUrl,
   repliedToMessage,
   repliedToAvatarUrl,
+  replyCount = 0,
   props,
 }: ChatMessageRowProps) {
   const rowClass = message.reply_to_message_id ? "row-start-2" : "row-start-1";
   const agentAuthored = isAgentAuthoredMessage(message);
+  // The reply to your own mention carries how it was made; nobody else gets the button.
+  const requestId = message.origin?.agent_request_id;
+  const transcriptRequestId =
+    message.origin?.kind === "agent_member_reply" &&
+    typeof requestId === "string" &&
+    repliedToMessage?.sender_user_id === props.currentUserId
+      ? requestId
+      : undefined;
 
   return (
     <Fragment>
@@ -164,6 +177,21 @@ function ChatMessageRowView({
               ) : null}
             </p>
           )}
+          {props.editingMessageId === message.id ? null : (
+            <LinkPreviews text={messageText(message.content)} />
+          )}
+
+          {replyCount > 0 ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 -ml-2"
+              onClick={() => useChatSidePanel.getState().openThread(message.id)}
+            >
+              Show replies ({replyCount})
+            </Button>
+          ) : null}
+          {transcriptRequestId ? <AgentTranscriptButton requestId={transcriptRequestId} /> : null}
 
           {message.local_delivery_state === "failed" ? (
             <div
@@ -184,8 +212,6 @@ function ChatMessageRowView({
             message={message}
             nodes={props.nodes}
             libraryItems={props.libraryItems}
-            canCopyLibrary={props.canCopyLibrary}
-            canAddToLibrary={props.canAddToLibrary}
             spaceId={props.spaceId}
             onOpenNode={props.onOpenNode}
             onError={props.onError}
@@ -233,6 +259,11 @@ function MessageHeader({ message }: { message: SpaceMessage }) {
       </time>
     </div>
   );
+}
+
+/** The message's words and link addresses as one string, for finding links to preview. */
+function messageText(spans: MessageSpan[]): string {
+  return spans.map((span) => (span.type === "text" ? span.text : span.type === "link" ? ` ${span.url} ` : "")).join("");
 }
 
 function MessageContent({

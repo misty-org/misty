@@ -55,6 +55,7 @@ artifacts/
 *.png
 !src/assets/branding/*.png
 !src/assets/bots/cloud-folder/*.png
+!server/apps/agent-runtime/evals/workflows/fixtures/*.png
 *.jpg
 *.jpeg
 *.gif

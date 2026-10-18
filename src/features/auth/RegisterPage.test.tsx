@@ -75,7 +75,7 @@ describe("RegisterPage", () => {
     });
 
     expect(container.textContent).toContain("Create an account");
-    expect(container.querySelector('input[id="register-name"]')).not.toBeNull();
+    expect(container.querySelector('input[id="register-name"]')).toBeNull();
     expect(container.querySelector('input[id="register-username"]')).not.toBeNull();
     expect(container.querySelector('input[id="register-email"]')).not.toBeNull();
     expect(container.querySelector('input[id="register-password"]')).not.toBeNull();
@@ -101,7 +101,6 @@ describe("RegisterPage", () => {
       "Your current account will remain signed in on this device.",
     );
 
-    const nameInput = container.querySelector<HTMLInputElement>('input[id="register-name"]');
     const usernameInput = container.querySelector<HTMLInputElement>(
       'input[id="register-username"]',
     );
@@ -109,7 +108,6 @@ describe("RegisterPage", () => {
     const passwordInput = container.querySelector<HTMLInputElement>(
       'input[id="register-password"]',
     );
-    expect(nameInput).not.toBeNull();
     expect(usernameInput).not.toBeNull();
     expect(emailInput).not.toBeNull();
     expect(passwordInput).not.toBeNull();
@@ -131,7 +129,7 @@ describe("RegisterPage", () => {
     mocks.accountRegister.mockResolvedValue({
       id: "acc-3",
       email: "carol@example.com",
-      name: "Carol",
+      username: "Carol",
     });
     mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
 
@@ -147,7 +145,6 @@ describe("RegisterPage", () => {
       );
     });
 
-    const nameInput = container.querySelector<HTMLInputElement>('input[id="register-name"]')!;
     const usernameInput = container.querySelector<HTMLInputElement>(
       'input[id="register-username"]',
     )!;
@@ -158,7 +155,6 @@ describe("RegisterPage", () => {
     const form = container.querySelector<HTMLFormElement>("form")!;
 
     await act(async () => {
-      setInputValue(nameInput, "Carol");
       setInputValue(usernameInput, "carol_user");
       setInputValue(emailInput, "carol@example.com");
       setInputValue(passwordInput, "secret12345");
@@ -170,7 +166,6 @@ describe("RegisterPage", () => {
 
     expect(mocks.authenticateAccount).toHaveBeenCalled();
     expect(mocks.accountRegister).toHaveBeenCalledWith(
-      "Carol",
       "carol_user",
       "carol@example.com",
       "secret12345",

@@ -9,6 +9,7 @@ import { AgentWorkspaceFrame } from "./workspace/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
 import { useAgentsPageState } from "./useAgentsPageState";
+import { useSpacesStore } from "@/features/spaces";
 
 /*
  * THESIS: Agents opens straight into a conversation with the selected agent.
@@ -22,7 +23,13 @@ import { useAgentsPageState } from "./useAgentsPageState";
  *   the verdict, DESIGN.md, and every shipping raster carrying its provenance
  */
 export default function NativeAgentsPage() {
+  return <AgentsWorkspacePage />;
+}
+
+function AgentsWorkspacePage() {
   const state = useAgentsPageState();
+  // Agents group by their home Space here; the quick panel just lists them.
+  const spaces = useSpacesStore((store) => store.spaces);
   const actions = createAgentsPageActions(state);
   const view = deriveAgentsPageView(state, actions);
   const {
@@ -30,8 +37,6 @@ export default function NativeAgentsPage() {
     spaceId,
     loading,
     profile,
-    conversation,
-    working,
     access,
     guard,
     workspacePage,
@@ -47,18 +52,14 @@ export default function NativeAgentsPage() {
     activeConversationId,
     workspaceRef,
     identityRef,
-    recipientInputRef,
   } = state;
   const { change, setEditorStatus } = guard;
-  const { openSettingsModal, select, closeSettings, saveProfile, removeProfile, openApps } =
-    actions;
+  const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
   const profileSection = (onDone: () => void) =>
     profile && (
       <AgentProfileSection
         key={`${user?.id}:${profile.id}:${spaceId}`}
         profile={profile}
-        conversation={conversation}
-        working={working}
         onStatusChange={setEditorStatus}
         onTalk={onDone}
         spaceId={spaceId}
@@ -81,7 +82,9 @@ export default function NativeAgentsPage() {
           activity={activity.entries}
           conversationId={activeConversationId}
           disabled={view.disabled}
-          identity={<AgentSwitcher {...switcher} className="agent-studio-identity" />}
+          identity={
+            <AgentSwitcher {...switcher} spaces={spaces} className="agent-studio-identity" />
+          }
           onPageChange={(page) =>
             change(() => {
               setWorkspacePage(page);
@@ -98,7 +101,6 @@ export default function NativeAgentsPage() {
               action();
             })
           }
-          onCompanion={() => openSettingsModal("companion")}
         >
           {taskContent}
         </AgentWorkspaceFrame>
@@ -127,8 +129,7 @@ export default function NativeAgentsPage() {
         onCancel={guard.cancel}
         onDiscard={guard.discard}
         restoreFocus={() => {
-          if (recipientInputRef.current?.isConnected) recipientInputRef.current.focus();
-          else if (workspacePage !== "task")
+          if (workspacePage !== "task")
             workspaceRef.current
               ?.querySelector<HTMLButtonElement>('.agent-studio-sidebar [aria-current="page"]')
               ?.focus();

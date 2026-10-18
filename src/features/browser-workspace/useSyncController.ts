@@ -14,6 +14,7 @@ import {
   vaultAvailability,
   type SyncAccount,
 } from "./native";
+import { useSpacesStore } from "@/features/spaces/core";
 import { selectSyncStatus } from "./syncStatus";
 import { retrySync } from "./retrySync";
 import { useBrowserSyncStore } from "./store";
@@ -21,6 +22,7 @@ import type { VaultUnlockRequest } from "./SyncVaultForm";
 
 export function useSyncController(accountId: string) {
   const sync = useBrowserSyncStore();
+  const spaces = useSpacesStore((state) => state.spaces);
   const recovery = useWorkspaceRecoveryState();
   const desktop = hasTauriInternals();
   const [online, setOnline] = useState(navigator.onLine);
@@ -98,6 +100,7 @@ export function useSyncController(accountId: string) {
     online,
     recovery,
     vault,
+    spaceNames: Object.fromEntries(spaces.map((space) => [space.id, space.name])),
   });
   const execute = async (work: (valid: () => boolean) => Promise<void>) => {
     if (pending.current || isApiSessionTransitioning()) return;

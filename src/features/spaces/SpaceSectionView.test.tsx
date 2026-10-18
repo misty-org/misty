@@ -3,9 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { SpaceSectionView } from "./SpaceSectionView";
 const state = vi.hoisted(() => ({
-  spaces: [
-    { id: "family", name: "Family", role: "member", permissions: {} as Record<string, boolean> },
-  ],
+  spaces: [{ id: "family", name: "Family", role: "member" }],
   snapshotReady: true,
   loading: false,
   error: null,
@@ -24,9 +22,6 @@ vi.mock("@/features/journal/notes/SpaceNotes", () => ({
 vi.mock("@/features/journal/drawings/SpaceDrawings", () => ({
   SpaceDrawings: ({ spaceId }: { spaceId: string }) => <div>Drawings in {spaceId}</div>,
 }));
-vi.mock("@/features/planner/planner/SpacePlanner", () => ({
-  SpacePlanner: ({ spaceId }: { spaceId: string }) => <div>Planner in {spaceId}</div>,
-}));
 // Keep the real runtime guards and host initializers: a shallow tool mock used
 // to hide missing service setup in the restored built-in entry point.
 vi.mock("@/features/library/library/SpaceLibrary", async () => {
@@ -38,29 +33,26 @@ vi.mock("@/features/library/library/SpaceLibrary", async () => {
     },
   };
 });
-vi.mock("./chat/SpaceChat", async () => {
+vi.mock("./chat/SpaceChatEntry", async () => {
   const { useSocialAuth } = await import("./chat/SocialRuntime");
   return {
-    SpaceSocial: ({ spaceId }: { spaceId: string }) => {
+    SpaceChatEntry: ({ spaceId }: { spaceId: string }) => {
       const { user } = useSocialAuth();
       expect(user?.id).toBe("one");
       return <div>Chat in {spaceId}</div>;
     },
   };
 });
-vi.mock("./components/SpaceSettings", () => ({ SpaceSettings: () => null }));
-vi.mock("./SpaceOverview", () => ({
-  SpaceOverview: ({ space }: { space: { id: string } }) => <div>All in {space.id}</div>,
+vi.mock("./home/SpaceHome", () => ({
+  SpaceHome: ({ space }: { space: { id: string } }) => <div>Home in {space.id}</div>,
 }));
 afterEach(() => {
   cleanup();
-  state.spaces[0].permissions = {};
 });
 it.each([
-  ["home", "All"],
+  ["home", "Home"],
   ["notes", "Notes"],
   ["drawings", "Drawings"],
-  ["planner", "Planner"],
   ["library", "Library"],
   ["social", "Chat"],
 ])("opens %s directly without an installed app", async (section, label) => {
@@ -74,14 +66,4 @@ it.each([
   expect(
     await screen.findByText(new RegExp(`${label} in family`), {}, { timeout: 5000 }),
   ).toBeTruthy();
-});
-it("retains Space permissions for direct links", () => {
-  state.spaces[0].permissions = { "tasks.view": false };
-  render(
-    <MemoryRouter>
-      <SpaceSectionView spaceId="family" section="planner" />
-    </MemoryRouter>,
-  );
-  expect(screen.getByText("You don’t have access to this Space tool")).toBeTruthy();
-  expect(screen.queryByText("Planner in family")).toBeNull();
 });

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
-  user: null as { id: string; email: string; name: string } | null,
+  user: null as { id: string; email: string; username: string } | null,
   transitioning: false,
   authenticateAccount: vi.fn(),
   resumeAccount: vi.fn(),
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   accountForgotPassword: vi.fn(),
 }));
 
-let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
+let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
 
 vi.mock("@/api/account/api", () => ({
   accountApi: { googleAvailable: async () => ({ enabled: false }) },
@@ -56,6 +56,13 @@ function setInputValue(input: HTMLInputElement, value: string) {
   valueSetter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+async function useAnotherAccount(container: HTMLElement) {
+  const button = Array.from(container.querySelectorAll("button")).find((element) =>
+    element.textContent?.includes("Use another account"),
+  )!;
+  await act(async () => button.click());
 }
 
 describe("SignInPage", () => {
@@ -100,8 +107,8 @@ describe("SignInPage", () => {
 
   it("renders the account chooser when existing accounts are present", async () => {
     mockAccounts = [
-      { id: "acc-1", email: "alice@example.com", name: "Alice" },
-      { id: "acc-2", email: "bob@example.com", name: "Bob" },
+      { id: "acc-1", email: "alice@example.com", username: "Alice" },
+      { id: "acc-2", email: "bob@example.com", username: "Bob" },
     ];
 
     await act(async () => {
@@ -119,8 +126,8 @@ describe("SignInPage", () => {
   });
 
   it("renders the in-app credentials form when addingAccount is true", async () => {
-    mocks.user = { id: "acc-1", email: "alice@example.com", name: "Alice" };
-    mockAccounts = [{ id: "acc-1", email: "alice@example.com", name: "Alice" }];
+    mocks.user = { id: "acc-1", email: "alice@example.com", username: "Alice" };
+    mockAccounts = [{ id: "acc-1", email: "alice@example.com", username: "Alice" }];
 
     await act(async () => {
       root.render(
@@ -133,6 +140,10 @@ describe("SignInPage", () => {
         </MemoryRouter>,
       );
     });
+
+    // Saved accounts come first, even when adding one.
+    expect(container.textContent).toContain("Choose an account");
+    await useAnotherAccount(container);
 
     // Verify title, with no subheading
     expect(container.textContent).toContain("Add another account");
@@ -153,9 +164,13 @@ describe("SignInPage", () => {
     expect(backButton).not.toBeNull();
     expect(container.textContent).not.toContain("Return to app");
 
-    // Clicking Back arrow navigates back to currently signed-in user
+    // Back returns to the saved accounts, and Back again to the signed-in workspace.
     await act(async () => {
       backButton?.click();
+    });
+    expect(container.textContent).toContain("Choose an account");
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Back"]')?.click();
     });
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });
@@ -184,7 +199,7 @@ describe("SignInPage", () => {
       root.render(view());
     });
     expect(container.querySelector("form")).not.toBeNull();
-    mocks.user = { id: "acc-1", email: "alice@example.com", name: "Alice" };
+    mocks.user = { id: "acc-1", email: "alice@example.com", username: "Alice" };
     mocks.transitioning = true;
     await act(async () => {
       root.render(view());
@@ -201,7 +216,7 @@ describe("SignInPage", () => {
   it.each(["offline", "expired"])(
     "shows a useful saved-account error when restoration is %s",
     async (outcome) => {
-      mockAccounts = [{ id: "acc-1", email: "alice@example.com", name: "Alice" }];
+      mockAccounts = [{ id: "acc-1", email: "alice@example.com", username: "Alice" }];
       mocks.resumeAccount.mockRejectedValueOnce(
         outcome === "expired"
           ? new SavedAccountSessionUnavailableError()
@@ -237,11 +252,11 @@ describe("SignInPage", () => {
   );
 
   it("submits in-app credentials and authenticates when adding another account", async () => {
-    mockAccounts = [{ id: "acc-1", email: "alice@example.com", name: "Alice" }];
+    mockAccounts = [{ id: "acc-1", email: "alice@example.com", username: "Alice" }];
     mocks.accountSignIn.mockResolvedValue({
       id: "acc-2",
       email: "new@example.com",
-      name: "New User",
+      username: "New User",
     });
     mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
 
@@ -256,6 +271,7 @@ describe("SignInPage", () => {
         </MemoryRouter>,
       );
     });
+    await useAnotherAccount(container);
 
     const emailInput = container.querySelector<HTMLInputElement>('input[type="email"]')!;
     const passwordInput = container.querySelector<HTMLInputElement>('input[type="password"]')!;
@@ -323,7 +339,7 @@ describe("SignInPage", () => {
   });
 
   it("asks for a fresh sign-in when a saved account's session expired", async () => {
-    mockAccounts = [{ id: "acc-1", email: "alice@example.com", name: "Alice" }];
+    mockAccounts = [{ id: "acc-1", email: "alice@example.com", username: "Alice" }];
 
     await act(async () => {
       root.render(

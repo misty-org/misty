@@ -93,7 +93,7 @@ fn parts(origin: &str, hour: i64, visits: &[Visit]) -> Vec<ViewRecord> {
     out
 }
 
-pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
+pub(super) fn spawn(app: tauri::AppHandle, slot: Slot, expected: String) -> JoinHandle<()> {
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(PASS);
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -101,7 +101,7 @@ pub(super) fn spawn(app: tauri::AppHandle, expected: String) -> JoinHandle<()> {
         loop {
             tick.tick().await;
             let (handle, device, profile) = {
-                let current = session().lock().await;
+                let current = slot.lock().await;
                 let Some(active) = current.as_ref().filter(|active| active.id == expected) else {
                     break;
                 };

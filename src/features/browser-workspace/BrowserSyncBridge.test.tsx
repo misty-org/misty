@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createWorkspaceWindow } from "@/features/workspace/windows";
+import { currentWindow, initialWorkspaceWindow } from "@/features/workspace/windows";
 const mocks = vi.hoisted(() => ({
   baseline: {} as unknown,
   live: {} as unknown,
@@ -82,8 +82,8 @@ beforeEach(() => {
   mocks.values.clear();
   mocks.values.set("before-sync", "{}");
   mocks.flush.mockResolvedValue(undefined);
-  mocks.baseline = { windowsByScope: { global: [] }, bookmarkFolders: [], bookmarks: [] };
-  mocks.live = { windows: [createWorkspaceWindow()], groups: [], websites: [] };
+  mocks.baseline = { bookmarkFolders: [], bookmarks: [] };
+  mocks.live = { windows: [currentWindow(initialWorkspaceWindow())], groups: [], websites: [] };
   mocks.session = {
     account_id: "a",
     deployment: "https://sync.example",

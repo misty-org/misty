@@ -256,7 +256,7 @@ pub async fn agent_tab_detach(
     title: String,
     name: String,
 ) -> Result<String, String> {
-    if window.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(window.label()) {
         return Err("Only tabs in the Misty window can be detached.".into());
     }
     detach(&app, &window, &tab, &title, &name)
@@ -421,13 +421,13 @@ mod tests {
             "misty-agent-01951d32-40ac-7000-8000-000000000001"
         ));
         assert!(!is_agent_window("misty-agent-host"));
-        assert!(!is_agent_window("main"));
+        assert!(!is_agent_window("space-personal"));
     }
 
     #[test]
     fn the_person_s_window_leaves_detached_tabs_alone() {
-        assert!(hosted_elsewhere("main", "misty-dock-1"));
+        assert!(hosted_elsewhere("space-personal", "misty-dock-1"));
         assert!(!hosted_elsewhere("misty-dock-1", "misty-dock-1"));
-        assert!(!hosted_elsewhere("main", "main"));
+        assert!(!hosted_elsewhere("space-personal", "space-personal"));
     }
 }

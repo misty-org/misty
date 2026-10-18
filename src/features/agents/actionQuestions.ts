@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 import { create } from "zustand";
+import { apiRequest } from "@/api/client";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
@@ -14,6 +15,10 @@ export interface ActionQuestion {
   control: string;
   reason: string;
   site: string;
+  /** The page's origin, which "Accept and remember" names. */
+  origin?: string;
+  /** Sends, deletes and publishes on a secure page can be remembered; payments never. */
+  rememberable?: boolean;
   agentId: string;
   taskId: string;
 }
@@ -92,16 +97,39 @@ export function askPerson(input: {
   });
 }
 
-export async function answerActionQuestion(id: string, allow: boolean) {
+/**
+ * Answers a question. "remember" also stores the grant for this agent, kind and
+ * site first, so the next step on the same site continues while the chat is in Auto.
+ */
+export async function answerActionQuestion(id: string, allow: boolean, remember = false) {
   const finish = local.get(id);
   if (finish) return finish(allow);
+  const question = useActionQuestions.getState().items.find((item) => item.id === id);
   try {
+    if (allow && remember && question?.rememberable && question.origin)
+      await apiRequest("/me/agent-grants/site", {
+        method: "POST",
+        body: JSON.stringify({
+          agent_id: question.agentId,
+          kind: question.kind,
+          origin: question.origin,
+        }),
+      });
     await invoke("agent_action_confirm", { id, allow });
   } finally {
     useActionQuestions.setState((state) => ({
       items: state.items.filter((item) => item.id !== id),
     }));
   }
+}
+
+export function actionQuestionVerb(question: Pick<ActionQuestion, "kind">) {
+  return {
+    payment: "pay or buy",
+    send: "send messages",
+    delete: "delete things",
+    publish: "post or publish",
+  }[question.kind];
 }
 
 export function actionQuestionText(question: ActionQuestion, agentName: string) {

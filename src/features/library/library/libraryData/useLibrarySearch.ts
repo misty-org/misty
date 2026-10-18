@@ -14,7 +14,6 @@ const emptyFacets: LibrarySearchFacets = {
   tags: [],
   media_types: [],
   years: [],
-  albums: [],
   utilities: [],
 };
 

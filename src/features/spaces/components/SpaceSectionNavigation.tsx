@@ -1,17 +1,14 @@
-import { appIcons, TooltipProvider } from "@/shared/ui";
-import { useAuth } from "@/features/auth";
-import { Images, Layers, MessagesSquare, Notebook } from "lucide-react";
-import { rememberedJournalRoute } from "../spacesShell/spaceSubpageMemory";
-import { useSpacesStore } from "../store/useSpacesStore";
+import { TooltipProvider } from "@/shared/ui";
+import { FileCode2, FolderOpen, MessagesSquare, Notebook, PenTool } from "lucide-react";
 import { SpaceSidebarLink } from "./spacePanel/SpaceSidebarLink";
 
-// Work surfaces only. Management controls live at the bottom of the Space rail.
-const sections = [
-  { id: "home", label: "All", icon: Layers },
+// A Space's primitives, in ⌘1 to ⌘5 order. Management controls sit beside them.
+export const spaceSections = [
   { id: "social", label: "Chat", icon: MessagesSquare },
-  { id: "planner", label: "Planner", icon: appIcons.planner },
-  { id: "journal", label: "Journal", icon: Notebook },
-  { id: "library", label: "Library", icon: Images },
+  { id: "notes", label: "Notes", icon: Notebook },
+  { id: "drawings", label: "Drawings", icon: PenTool },
+  { id: "library", label: "Files", icon: FolderOpen },
+  { id: "code", label: "Code", icon: FileCode2 },
 ] as const;
 
 export function SpaceSectionNavigation({
@@ -30,15 +27,6 @@ export function SpaceSectionNavigation({
   strip?: boolean;
   onNavigate?: (path: string) => void;
 }) {
-  const { user } = useAuth();
-  const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
-  const permissions = space?.permissions;
-  const visibleSections = sections
-    .filter(({ id }) => id !== "social" || permissions?.["messages.read"] !== false)
-    .filter(({ id }) => id !== "planner" || permissions?.["tasks.view"] !== false)
-    .filter(({ id }) => id !== "library" || permissions?.["library.view"] !== false);
-  const accountId = user?.id ?? "";
-
   return (
     <TooltipProvider delayDuration={350}>
       <nav
@@ -51,22 +39,16 @@ export function SpaceSectionNavigation({
         }
         aria-label="Space sections"
       >
-        {visibleSections.map(({ id, label, icon: Icon }) => (
+        {spaceSections.map(({ id, label, icon: Icon }) => (
           <SpaceSidebarLink
             key={id}
             horizontal={horizontal}
             iconOnly={iconOnly}
             strip={strip}
-            active={
-              id === "journal" ? section === "notes" || section === "drawings" : section === id
-            }
+            active={section === id}
             icon={Icon}
             label={label}
-            to={
-              id === "journal"
-                ? rememberedJournalRoute(accountId, spaceId)
-                : `/spaces/${encodeURIComponent(spaceId)}/${id}`
-            }
+            to={`/spaces/${encodeURIComponent(spaceId)}/${id}`}
             onNavigate={onNavigate}
           />
         ))}

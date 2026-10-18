@@ -7,7 +7,7 @@ import { useBrowserMediaStore } from "../library/mediaStore";
  * A speaker on a workspace tab while one of its browser pages plays sound,
  * like Chrome's tab audio indicator. Clicking it mutes or unmutes that page.
  */
-export function BrowserViewAudioButton(props: { tabs: WorkspaceView[] }) {
+export function BrowserViewAudioButton(props: { tabs: WorkspaceView[]; className?: string }) {
   const target = useBrowserMediaStore((state) => {
     const browserTabs = props.tabs.filter((tab) => tab.surfaceId === "browser");
     return (
@@ -29,6 +29,7 @@ export function BrowserViewAudioButton(props: { tabs: WorkspaceView[] }) {
       label={label}
       tooltip={false}
       size="xs"
+      className={props.className}
       data-reorder-ignore="true"
       onClick={(event) => {
         event.stopPropagation();

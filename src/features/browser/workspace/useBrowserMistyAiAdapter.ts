@@ -156,7 +156,7 @@ export function useBrowserMistyAiAdapter(
         const action = applicableAction(artifact);
         if (!action)
           throw new Error(
-            "The page or browser scope changed. Ask Misty to regenerate this action.",
+            "The page or browser scope changed. Ask your agent to regenerate this action.",
           );
         const grantId = `misty-action-${crypto.randomUUID()}`;
         const agentId = "misty-contextual-copilot";

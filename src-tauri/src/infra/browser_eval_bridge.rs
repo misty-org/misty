@@ -28,6 +28,10 @@ use std::sync::Arc;
 
 #[path = "browser_eval_bridge_dock.rs"]
 mod dock;
+#[path = "browser_eval_bridge_pages.rs"]
+mod pages;
+#[path = "browser_eval_bridge_grants.rs"]
+mod grants;
 
 const AGENT: &str = "browser-eval";
 const ACCOUNT: &str = "browser-eval";
@@ -117,6 +121,9 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/evaluate", post(evaluate))
             .route("/close", post(close))
             .route("/dock", post(dock::dock))
+            .route("/pages", post(pages::pages))
+            .route("/capture", post(pages::capture))
+            .route("/run-grants", post(grants::run_grants))
             .with_state(bridge);
         match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
             Ok(listener) => {
@@ -178,8 +185,8 @@ fn denied() -> Response {
 }
 
 fn main_view(app: &AppHandle) -> Result<Webview, String> {
-    app.get_webview("main")
-        .ok_or_else(|| "Misty's main window is not open.".to_owned())
+    crate::infra::space_windows::primary_webview(app)
+        .ok_or_else(|| "No Space window is open.".to_owned())
 }
 
 fn lease(task: &str, renew: bool) -> Value {

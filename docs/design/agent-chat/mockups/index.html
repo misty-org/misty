@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Chat States</title>
+<style>
+  :root {
+    --bg:#141414; --card:#1a1a1a; --hover:#202020; --border:#2c2c2c;
+    --text:#e8e6e3; --bright:#fafafa; --muted:#8f8d8a; --faint:#5f5d5a;
+    --font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 var(--font)}
+  .page{max-width:1280px;margin:0 auto;padding:32px 16px 96px}
+  h1{font-size:20px;font-weight:500;margin:0 0 4px;color:var(--bright)}
+  .lede{color:var(--muted);margin:0 0 20px;max-width:760px;font-size:14px}
+  h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:500;margin:36px 0 12px}
+  .rules{border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .rules ol{margin:0;padding-left:18px}.rules li{margin:3px 0}.rules b{color:var(--text);font-weight:500}
+  .boards{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:20px}
+  .board{border:1px solid var(--border);border-radius:12px;padding:20px;background:#171717;min-width:0}
+  .board-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .board-title{font-size:15px;font-weight:500;color:var(--bright);margin:2px 0 4px}
+  .src{font:11px var(--mono);color:var(--faint);margin:0 0 16px}
+  .was{font-size:12.5px;color:var(--muted);margin:16px 0 0;padding-top:12px;border-top:1px dashed var(--border)}
+  .was b{color:var(--text);font-weight:500}
+  .user{display:flex;justify-content:flex-end;margin:0 0 14px}
+  .user p{margin:0;background:#262626;border-radius:14px;padding:8px 14px;max-width:85%;font-size:14px}
+  p.say{margin:10px 0;font-size:14px}
+  a{color:var(--bright)}
+  .muted{color:var(--muted)}.faint{color:var(--faint)}
+
+  /* group line */
+  .group{margin:6px 0}
+  .toggle{display:inline-flex;align-items:center;gap:6px;padding:2px 0;border:0;background:none;color:var(--muted);font:inherit;cursor:pointer;text-align:left}
+  .toggle:hover{color:var(--text)}
+  .chev{width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .2s;margin-left:4px;flex:none}
+  [data-open]>.toggle .chev{transform:rotate(45deg) translate(-2px,-2px)}
+  .shimmer,.running .verb,.running .st{background:linear-gradient(90deg,var(--muted) 40%,var(--bright) 50%,var(--muted) 60%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sweep 2s linear infinite}
+  @keyframes sweep{from{background-position:100% 0}to{background-position:-150% 0}}
+  .fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s}
+  [data-open]>.fold{grid-template-rows:1fr}
+  .fold>div{overflow:hidden;min-height:0}
+
+  /* THE table: steps, checklist, sub-agents, plan, questions, requests, not-finished */
+  .table{margin:6px 0 4px;border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:14px}
+  .row{display:flex;align-items:baseline;gap:10px;padding:10px 14px}
+  .row+.row{border-top:1px solid var(--border)}
+  .row .verb{color:var(--muted);white-space:nowrap}
+  .row .tgt{color:var(--text);min-width:0;flex:1}
+  .row .st{margin-left:auto;padding-left:12px;color:var(--faint);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .row.done .tgt{color:var(--muted)}
+  .row.next .tgt{color:var(--muted)}
+  .row.failed .tgt{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+  .row .sub{display:block;color:var(--faint);font-size:13px;margin-top:2px;text-decoration:none}
+  .head{padding:8px 14px;font-size:12px;color:var(--faint);border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+  .acts{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);align-items:center}
+  .btn{font:13px var(--font);color:var(--text);background:none;border:1px solid var(--border);border-radius:8px;padding:4px 12px;cursor:pointer}
+  .btn:hover{background:var(--hover)}
+  .btn.p{background:var(--bright);color:#111;border-color:var(--bright)}
+  .btn.g{border-color:transparent;color:var(--muted)}
+  .opt{display:flex;gap:10px;padding:8px 14px;align-items:baseline;border-top:1px solid var(--border);cursor:pointer}
+  .opt:hover{background:var(--hover)}
+  .opt .n{color:var(--faint);width:14px}.opt small{display:block;color:var(--faint);font-size:13px}
+  .opt.sel .n::before{content:"✓";color:var(--bright)}
+  .opt.sel .n{font-size:0}.opt.sel .n::before{font-size:14px}
+  pre{margin:0;padding:10px 12px;border-radius:8px;background:#111;border:1px solid var(--border);font:12px/1.55 var(--mono);white-space:pre-wrap}
+  .event{color:var(--faint);font-size:13px;margin:14px 0;text-align:center}
+  .event.rule{display:flex;gap:12px;align-items:center}.event.rule:before,.event.rule:after{content:"";flex:1;height:1px;background:var(--border)}
+  .tag{color:var(--faint);font-size:12.5px;margin:0 0 4px;text-align:right}
+  .answer{font-size:14px}.answer p{margin:8px 0}.answer ul{margin:6px 0;padding-left:20px}
+  .actions{display:flex;gap:14px;margin-top:8px;font-size:13px;color:var(--faint)}
+  .actions span{cursor:pointer}.actions span:hover{color:var(--text)}
+  .sources{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:12.5px;border:1px solid var(--border);border-radius:999px;padding:1px 10px;color:var(--muted)}
+  .diff .ln{font:12px/1.55 var(--mono);padding:0 12px;display:block}
+  .ln.a{background:rgba(70,160,90,.14)}.ln.r{background:rgba(200,80,80,.14)}
+  .island{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:10px 12px;margin-top:4px}
+  .island .line{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+  .island .line .m{color:var(--faint);font-size:13px}
+  .island .bar{display:flex;gap:8px;margin-top:8px}
+  .island input{flex:1;background:#111;border:1px solid var(--border);border-radius:10px;padding:6px 10px;color:var(--text);font:13px var(--font)}
+  .map{width:100%;border-collapse:collapse;font-size:13px}
+  .map th,.map td{text-align:left;padding:8px 10px;border-top:1px solid var(--border);vertical-align:top}
+  .map th{color:var(--faint);font-weight:500;border-top:0}
+  .map code{font:12px var(--mono);color:var(--muted)}
+  .map td:nth-child(3){color:var(--muted)}
+  @media (prefers-reduced-motion:reduce){.shimmer,.running .verb,.running .st{animation:none;background:none;color:var(--text)}.fold,.chev{transition:none}}
+
+  :root{--ok:#4ade80;--warn:#f5a524;--err:#f87171;--doc:#7aa2ff;--file:#c4b5fd;}
+  .ic{display:inline-block;width:14px;height:14px;flex:none;align-self:center;vertical-align:-2px}
+  .ic svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .row.done .ic{color:var(--ok)} .row.next .ic{color:var(--faint)} .row.failed .ic{color:var(--err)}
+  .row.running .ic{color:var(--muted)} .row.running .ic svg{animation:spin 1s linear infinite}
+  .row.wait .ic{color:var(--warn)} .row.wait .st{color:var(--warn)}
+  .row.failed .st{color:var(--err)}
+  .row.failed .verb,.row.done .verb{color:var(--muted)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:5px;font:700 10px var(--font);color:#fff;flex:none;align-self:center}
+  .brand.docs{background:#4285f4}.brand.gmail{background:#ea4335}.brand.shop{background:#5a8f3d}
+  .file{color:var(--doc)}
+  .btn.sm{font-size:12px;padding:2px 10px;margin-left:8px;vertical-align:1px}
+  .btn.danger{color:var(--err);border-color:rgba(248,113,113,.35)}
+  .st .btn{margin-left:8px}
+  .evic{display:inline-block;vertical-align:-2px;margin-right:6px}
+  .evic svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .island .line .ic{margin-right:6px}
+  .note{font-size:11px;color:var(--faint);margin-left:4px}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Agent chat: every state</h1>
+  <p class="lede">One structure for everything an agent shows in a conversation, following Claude's desktop app. Click any line with a chevron to open it. Source files are named under each board.</p>
+
+  <div class="rules"><ol>
+    <li><b>Working shimmers.</b> Any live label (the thinking line, a group line, a running step) gets the gray sweep, with a small spinner beside a running step. No "…" dots.</li>
+    <li><b>Steps are a table.</b> Checklist, tool steps, sub-agents, plans, questions, app and screen requests, and unfinished work share one bordered table: a status icon and word, the thing itself, a short result on the right.</li>
+    <li><b>The answer is the message.</b> The final reply is plain formatted text in the transcript, never a banner, toast, card or error. A run that did not finish shows its answer, then a "Not finished" table.</li>
+    <li><b>Icons and color carry meaning.</b> Status icons (done, working, waiting, failed), brand logos for connected apps, item-type glyphs for files and docs, and amber / red for "needs you" and "failed". Every status keeps its word too, so color is never alone.</li>
+    <li><b>Actions are buttons.</b> Stop, Resume, Try again, Connect, Allow and the rest are real buttons (primary for the one that moves things forward), never underlined links.</li>
+    <li><b>No raw text leaks.</b> Tags such as [POINT:none], server markdown like "Still incomplete:" and raw error strings are parsed into the table, or dropped.</li>
+  </ol></div>
+
+  <h2>Where it lives today</h2>
+  <div class="board" style="padding:8px 16px">
+  <table class="map">
+    <tr><th>State</th><th>Source today</th><th>What is wrong</th></tr>
+    <tr><td>Thinking, before any text</td><td><code>AgentConversationView.tsx</code> "Misty is working" + <code>MistyActivityStatus.tsx</code></td><td>Two different looks, "…" dots, a helper sentence, rotating phrases</td></tr>
+    <tr><td>Checklist</td><td><code>collaboration/AgentChecklist.tsx</code>, <code>ChecklistStatus.tsx</code></td><td>Icon list with spinner, "Stopped: …" glued into the summary, not a table</td></tr>
+    <tr><td>Tool steps</td><td><code>progress/AgentProgress.tsx</code></td><td>Already the target. Keep</td></tr>
+    <tr><td>Final answer, partial or blocked</td><td>runtime <code>task-completion.ts</code> → store <code>error</code> → <code>AgentWorkspaceConversation.tsx</code> <code>.agent-compose-error</code></td><td>The answer is shown as a dismissible error popup over the composer, with raw "Still incomplete:" markdown and a leaked [POINT:none]</td></tr>
+    <tr><td>Failed run</td><td>same error banner</td><td>Raw server text in a popup</td></tr>
+    <tr><td>Sub-agents</td><td><code>components/AgentSubagents.tsx</code></td><td>Boxed card, icons, spinner, ghost Stop button</td></tr>
+    <tr><td>Notebook</td><td><code>components/AgentNotebookCard.tsx</code></td><td>Boxed card with book icon and Hide/Show</td></tr>
+    <tr><td>Proposed plan</td><td><code>collaboration/AgentPlanCard.tsx</code>, <code>AgentPlanChecklist.tsx</code></td><td>Card with icon header, numbered circles, headings, four buttons</td></tr>
+    <tr><td>Questions for you</td><td><code>collaboration/AgentQuestionCard.tsx</code>, <code>AgentActionQuestions.tsx</code></td><td>Card, popup-style alertdialog in the island</td></tr>
+    <tr><td>You answered</td><td><code>collaboration/AgentAnsweredQuestions.tsx</code></td><td>Icon plus run-on sentence</td></tr>
+    <tr><td>App / screen requests</td><td><code>agents</code> AppRequestCard, <code>misty/ScreenRequestCard.tsx</code></td><td>Cards, icons, "…" status strings</td></tr>
+    <tr><td>Event lines</td><td><code>AgentConversationView.tsx</code> goal continuation, summarized divider; <code>continuationEvent.ts</code></td><td>Flag icon; user-turn labels with calendar and inbox icons</td></tr>
+    <tr><td>Control island</td><td><code>AgentControlIsland.tsx</code>, <code>agentControlStatus.ts</code></td><td>Sentence-style status, icon-only buttons, "Stopped. Completed changes have not been undone." as prose</td></tr>
+    <tr><td>Cursor bubble, companion panel</td><td><code>CursorOverlayMarkup.tsx</code>, <code>AgentCompanionPanel.tsx</code></td><td>"Working…" / "Listening…" plain text with ellipsis</td></tr>
+    <tr><td>Sources, changes</td><td>citations in <code>AgentConversationView.tsx</code>, <code>changes/AnswerChanges.tsx</code></td><td>Chips are fine; diffs keep their approved tint</td></tr>
+  </table>
+  </div>
+
+  <h2>1 · Working</h2>
+  <div class="boards">
+
+    <section class="board">
+      <div class="board-label">A</div><div class="board-title">Thinking</div>
+      <p class="src">AgentConversationView · MistyActivityStatus</p>
+      <div class="user"><p>Make a simple peach fan website</p></div>
+      <div class="group" data-open><span class="toggle"><span class="shimmer">Thinking</span></span></div>
+      <p class="was"><b>Was:</b> "Misty is working…" with a "you can leave" sentence, or rotating phrases. <b>Now:</b> one shimmering word. The same line becomes the group line as soon as a tool starts, so nothing jumps.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">B</div><div class="board-title">Working with a checklist</div>
+      <p class="src">AgentChecklist · AgentProgress</p>
+      <div class="user"><p>Make a simple peach fan website</p></div>
+      <p class="say">I'll check the product details, build the page, then verify it in a browser.</p>
+      <div class="group" data-open>
+        <button class="toggle"><span class="shimmer">1 of 3 · Building the page</span><span class="chev"></span></button>
+        <div class="fold"><div>
+          <div class="table">
+            <div class="row done"><i class="ic"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i><span class="verb">Done</span><span class="tgt">Check product details</span></div>
+            <div class="row running"><i class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.55"/></svg></i><span class="verb">Working</span><span class="tgt">Build the page</span></div>
+            <div class="row next"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></i><span class="verb">Next</span><span class="tgt">Verify it in a browser</span></div>
+          </div>
+        </div></div>
+      </div>
+      <div class="group" data-open>
+        <button class="toggle"><span class="shimmer">Writing index.html</span><span class="chev"></span></button>
+        <div class="fold"><div><div class="table">
+          <div class="row"><span class="verb">Searched</span><span class="tgt">peach nutrition facts</span><span class="st">6 results</span></div>
+          <div class="row running"><i class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.55"/></svg></i><span class="verb">Writing</span><span class="tgt"><span class="file">&#9638;</span> index.html</span><span class="st">0:04</span></div>
+        </div></div></div>
+      </div>
+      <p class="was"><b>Was:</b> icon list with a spinner and "Not started / In progress". <b>Now:</b> the status is the left word, so the table scans like the step table. Done rows go muted; the running row shimmers. Folds to "3 of 3 · Done" when finished.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">C</div><div class="board-title">Waiting for you (app or screen)</div>
+      <p class="src">AppRequestCard · ScreenRequestCard · AgentChecklist hold</p>
+      <div class="user"><p>Write the plan in a Google Doc</p></div>
+      <div class="group"><button class="toggle">Checked connected apps<span class="chev"></span></button></div>
+      <p class="say">Google Docs isn't connected yet. Connect it and I'll carry on.</p>
+      <div class="table">
+        <div class="row wait"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></i><span class="verb">Connect</span><span class="tgt"><span class="brand docs">D</span> Google Docs<span class="sub">Misty can read and create docs. Nothing is shared.</span></span><span class="st">Waiting for you</span></div>
+        <div class="acts"><button class="btn p"><span class="brand docs" style="width:14px;height:14px;font-size:8px;margin-right:6px;vertical-align:-2px">D</span>Connect Google Docs</button><button class="btn g">Not now</button></div>
+      </div>
+      <div class="event"><span class="brand docs" style="width:14px;height:14px;font-size:8px;vertical-align:-3px;margin-right:6px">D</span>Connected Google Docs · Misty continued</div>
+      <p class="was"><b>Was:</b> a card with "Opening a screen…" status strings. <b>Now:</b> the same table with the app's real logo (shown as a placeholder here; production uses BrandIcon), an amber "Waiting for you", and a primary Connect button. After you answer, the row folds into an event line.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">D</div><div class="board-title">Sub-agents</div>
+      <p class="src">AgentSubagents</p>
+      <p class="say">I'll split this into three searches.</p>
+      <div class="group" data-open>
+        <button class="toggle"><span class="shimmer">Running 2 of 3 helpers</span><span class="chev"></span></button>
+        <div class="fold"><div><div class="table">
+          <div class="row done"><i class="ic"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></i><span class="verb">Done</span><span class="tgt">Compare peach varieties<span class="sub">Found 6 common varieties</span></span><span class="st">0:42</span></div>
+          <div class="row running"><i class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.55"/></svg></i><span class="verb">Working</span><span class="tgt">Find growing regions</span><span class="st">0:31<button class="btn sm">Stop</button></span></div>
+          <div class="row running"><i class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.55"/></svg></i><span class="verb">Working</span><span class="tgt">Collect recipes</span><span class="st">0:31<button class="btn sm">Stop</button></span></div>
+        </div></div></div>
+      </div>
+      <p class="was"><b>Was:</b> boxed card, spinner and check icons, ghost Stop buttons. <b>Now:</b> a group line like any other work; Stop is a small button in the status cell.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">E</div><div class="board-title">Notebook</div>
+      <p class="src">AgentNotebookCard</p>
+      <div class="group" data-open>
+        <button class="toggle">Notebook · 4 findings<span class="chev"></span></button>
+        <div class="fold"><div>
+          <div class="table"><div class="row"><span class="tgt answer" style="font-size:13.5px">Georgia and South Carolina lead US peach output. Freestone varieties suit baking; clingstone suit canning.<span class="sub">Saved as a note in your personal Space</span></span></div></div>
+        </div></div>
+      </div>
+      <p class="was"><b>Was:</b> a card with a book icon and Hide/Show. <b>Now:</b> a group line that opens to its text in a table row.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">F</div><div class="board-title">Needs your OK (control island)</div>
+      <p class="src">AgentControlIsland · AgentActionQuestions</p>
+      <div class="island">
+        <div class="line"><span class="shimmer">Misty is working with its own cursor</span><span class="m">2 helpers</span></div>
+        <div class="table" style="margin:8px 0 0">
+          <div class="row wait"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></i><span class="verb">Pay</span><span class="tgt">$24.00 to Peach Farms<span class="sub">Checkout on peachfarms.com</span></span><span class="st">Waiting for you</span></div>
+          <div class="acts"><button class="btn p">Allow</button><button class="btn">Allow always</button><button class="btn danger">Deny</button></div>
+        </div>
+        <div class="bar"><input placeholder="Message Misty"><button class="btn">Take over</button><button class="btn danger">Stop</button></div>
+      </div>
+      <p class="was"><b>Was:</b> an alertdialog card above icon-only buttons. <b>Now:</b> the same table; island buttons carry words. No answer in three minutes shows "Denied · no answer".</p>
+    </section>
+  </div>
+
+  <h2>2 · Finished</h2>
+  <div class="boards">
+
+    <section class="board">
+      <div class="board-label">G</div><div class="board-title">Completed</div>
+      <p class="src">AgentConversationView answer</p>
+      <div class="user"><p>Make a simple peach fan website</p></div>
+      <div class="group"><button class="toggle">3 of 3 · Done<span class="chev"></span></button></div>
+      <div class="group"><button class="toggle">Wrote index.html, opened it in the browser<span class="chev"></span></button></div>
+      <div class="answer">
+        <p>Your peach fan site is ready: <a href="#" class="file">index.html</a>. It has a hero, a peach-fact grid and a recipes section, and I opened it to check it renders.</p>
+      </div>
+      <div class="actions"><span>Copy</span><span>Retry</span><span>Reply</span></div>
+      <p class="was"><b>Now:</b> checklist and work fold to one line each; the answer is ordinary text. Actions are words, shown on hover.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">H</div><div class="board-title">Partly done or blocked</div>
+      <p class="src">task-completion.ts → AgentWorkspaceConversation (banner)</p>
+      <div class="user"><p>Make a simple peach fan website</p></div>
+      <div class="group"><button class="toggle">1 of 3 · Stopped<span class="chev"></span></button></div>
+      <div class="answer">
+        <p>I wrote the complete peach-themed site and saved it in the note <a href="#" class="file">Peach Vibe fan website — index.html</a> in your personal Space. It's self-contained.</p>
+      </div>
+      <div class="table">
+        <div class="head"><span>Not finished</span><span>Why</span></div>
+        <div class="row failed"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg></i><span class="tgt">Save the site as an HTML file in the project</span><span class="st" style="white-space:normal;text-align:right;max-width:46%">Your Mac was offline</span></div>
+        <div class="row failed"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg></i><span class="tgt">Verify it in a browser</span><span class="st" style="white-space:normal;text-align:right;max-width:46%">Couldn't save the file</span></div>
+        <div class="acts"><button class="btn p">Try again</button></div>
+      </div>
+      <div class="actions"><span>Copy</span><span>Retry</span><span>Reply</span></div>
+      <p class="was"><b>Was:</b> this whole message appeared in a dismissible error popup, with "[POINT:none]" and "Still incomplete:" showing raw. <b>Now:</b> the summary is the answer in the transcript; each unfinished requirement is a row with its reason. The server stops sending this as an error.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">I</div><div class="board-title">Failed</div>
+      <p class="src">same banner · AgentProgress failed row</p>
+      <div class="user"><p>Summarize my inbox</p></div>
+      <div class="group" data-open>
+        <button class="toggle">Tried to read mail<span class="chev"></span></button>
+        <div class="fold"><div><div class="table">
+          <div class="row failed"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg></i><span class="verb">Read</span><span class="tgt"><span class="brand gmail">M</span> Gmail inbox</span><span class="st">Couldn't connect</span></div>
+        </div></div></div>
+      </div>
+      <p class="say muted">I couldn't reach your mail, so there's nothing to summarize yet.</p>
+      <div class="table"><div class="row failed"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg></i><span class="tgt" style="text-decoration:none">Run didn't finish<span class="sub">Misty couldn't connect to Gmail. Nothing was changed.</span></span><span class="st"><button class="btn sm">Try again</button></span></div></div>
+      <p class="was"><b>Was:</b> raw error text in a composer popup that hides the failure's place in the story. <b>Now:</b> the failure sits in the transcript where it happened, in plain words. Network drops show a Reconnect button in the same row.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">J</div><div class="board-title">Stopped by you</div>
+      <p class="src">agentControlStatus statusText</p>
+      <div class="user"><p>Rename all my screenshots</p></div>
+      <div class="group"><button class="toggle">Renamed 12 files<span class="chev"></span></button></div>
+      <div class="table"><div class="row wait"><i class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg></i><span class="verb">Stopped</span><span class="tgt">You stopped this task<span class="sub">The 12 renames already made were not undone.</span></span><span class="st"><button class="btn sm">Resume</button></span></div></div>
+      <p class="was"><b>Was:</b> the island's prose "Stopped. Completed changes have not been undone." <b>Now:</b> a row, with Resume as a button.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">K</div><div class="board-title">Changes and sources</div>
+      <p class="src">changes/AnswerChanges · citations</p>
+      <div class="answer"><p>Updated the hero heading and added the recipes section.</p></div>
+      <div class="table">
+        <div class="row"><span class="verb">Edited</span><span class="tgt"><span class="file">&#9638;</span> index.html</span><span class="st">+24 −3</span></div>
+        <div class="diff" style="border-top:1px solid var(--border);padding:6px 0">
+          <span class="ln r">- &lt;h1&gt;Peaches&lt;/h1&gt;</span><span class="ln a">+ &lt;h1&gt;Peach Vibe&lt;/h1&gt;</span>
+        </div>
+      </div>
+      <div class="sources"><span class="chip">nhs.uk</span><span class="chip">usda.gov</span></div>
+      <p class="was"><b>Unchanged:</b> the approved diff tint and counts. File rows join the same table.</p>
+    </section>
+  </div>
+
+  <h2>3 · Asking and planning</h2>
+  <div class="boards">
+
+    <section class="board">
+      <div class="board-label">L</div><div class="board-title">Proposed plan</div>
+      <p class="src">AgentPlanCard · AgentPlanChecklist · AgentPlanEditor</p>
+      <p class="say">Here's the plan. Run it when you're ready.</p>
+      <div class="table">
+        <div class="head"><span>Plan · Peach fan site · version 2</span><span>Risk</span></div>
+        <div class="row"><span class="verb">1</span><span class="tgt">Gather product facts</span><span class="st">Low</span></div>
+        <div class="row"><span class="verb">2</span><span class="tgt">Build index.html</span><span class="st">Low</span></div>
+        <div class="row"><span class="verb">3</span><span class="tgt">Save to the project and open it</span><span class="st">Changes files</span></div>
+        <div class="acts"><button class="btn p">Run plan</button><button class="btn">Edit</button><button class="btn g">Keep planning</button><span style="flex:1"></span><button class="btn g">Dismiss</button></div>
+      </div>
+      <div class="group"><button class="toggle">Assumptions · Done when · 1 earlier version<span class="chev"></span></button></div>
+      <p class="was"><b>Was:</b> card with icon header, numbered circles and headings. <b>Now:</b> the plan is the checklist table before it runs, so approving it and watching it run look the same.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">M</div><div class="board-title">Questions for you</div>
+      <p class="src">AgentQuestionCard · AgentAnsweredQuestions</p>
+      <p class="say">Two quick questions before I start.</p>
+      <div class="table">
+        <div class="head"><span>1 of 2 · Style</span><span>Choose one</span></div>
+        <div class="opt sel"><span class="n">1</span><span>Playful<small>Bright peach, rounded type</small></span></div>
+        <div class="opt"><span class="n">2</span><span>Minimal<small>White space, one accent</small></span></div>
+        <div class="opt"><span class="n">3</span><span>Other</span></div>
+        <div class="acts"><button class="btn p">Next</button><button class="btn g">Skip</button></div>
+      </div>
+      <div class="event" style="margin-top:18px">Once answered</div>
+      <div class="table">
+        <div class="row"><span class="verb">You answered</span><span class="tgt">Style: Playful · Pages: One page</span></div>
+      </div>
+      <p class="was"><b>Now:</b> the selected option shows a checkmark, never a dot. Answered sets fold into one row.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">N</div><div class="board-title">Event lines</div>
+      <p class="src">AgentConversationView · continuationEvent</p>
+      <div class="user"><p>Keep improving the site until it scores 90</p></div>
+      <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><path d="M4 22V4M4 4h13l-2 4 2 4H4"/></svg></span>Continued toward the goal</div>
+      <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Sent by scheduled task · Mon 9:00</div>
+      <div class="event"><span class="evic"><svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6H2v-6z"/></svg></span>Sent from email</div>
+      <div class="event rule">Earlier messages summarized</div>
+      <p class="was"><b>Now:</b> centered muted lines, keeping their small icons (flag, clock, inbox) and the app logo for connections.</p>
+    </section>
+
+    <section class="board">
+      <div class="board-label">O</div><div class="board-title">Cursor bubble and companion panel</div>
+      <p class="src">CursorOverlayMarkup · AgentCompanionPanel</p>
+      <div class="island">
+        <div class="line"><span class="shimmer">Listening</span><span class="m"><button class="btn sm">Stop audio</button><button class="btn sm">Stop task</button></span></div>
+      </div>
+      <div class="island" style="margin-top:10px">
+        <div class="line"><span class="shimmer">Working</span><span class="m"><button class="btn sm">Stop task</button></span></div>
+      </div>
+      <div class="island" style="margin-top:10px">
+        <div class="line"><span>Companion needs attention</span><span class="m"><button class="btn sm">Retry</button></span></div>
+      </div>
+      <p class="was"><b>Was:</b> "Listening…", "Speaking…", "Working…" with ellipsis and icon-only buttons. <b>Now:</b> one shimmering word; Stop audio and Stop task are labeled buttons. Raw [POINT] tags are removed before any text is shown, including bubbles.</p>
+    </section>
+  </div>
+
+  <h2>4 · Empty</h2>
+  <div class="boards">
+    <section class="board">
+      <div class="board-label">P</div><div class="board-title">New conversation</div>
+      <p class="src">AgentConversationView empty state</p>
+      <div style="text-align:center;margin-top:28px"><span class="brand" style="width:36px;height:36px;border-radius:50%;background:#1d2a3d;font-size:14px">M</span></div><p style="text-align:center;margin:10px 0 6px;color:var(--bright);font-size:17px;font-weight:500">What can I help with?</p>
+      <p class="muted" style="text-align:center;margin:0 0 32px;font-size:14px">Ask a question, make a drawing, update a task, or hand Misty a bigger piece of work.</p>
+      <p class="was"><b>Was:</b> a large blue avatar bubble. <b>Now:</b> the Misty mark stays, smaller, above the text; the avatar stays beside replies. First loads use the existing skeletons.</p>
+    </section>
+  </div>
+</div>
+<script>document.querySelectorAll(".group > .toggle").forEach(t=>t.addEventListener("click",()=>{const g=t.parentElement;g.hasAttribute("data-open")?g.removeAttribute("data-open"):g.setAttribute("data-open","")}));</script>
+</body>
+</html>

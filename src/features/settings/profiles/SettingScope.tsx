@@ -18,5 +18,5 @@ export function useSettingReset(label: string): (() => void) | null {
   );
   if (!definition || !store.ready || !store.state) return null;
   if (resolveSetting(store.state, definition.id).value === definition.default) return null;
-  return () => void store.edit(definition.id, undefined).catch(() => {});
+  return () => void store.edit(definition.id, undefined, { stage: true }).catch(() => {});
 }

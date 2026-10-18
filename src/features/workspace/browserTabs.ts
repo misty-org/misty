@@ -2,6 +2,7 @@ import { activeLayoutView, allLayoutViews } from "./layoutTabs";
 import { parseBrowserViewState } from "./model";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { currentWindows } from "./windows";
+import { isIncognitoWindow } from "./spaceWindow";
 
 export interface OpenBrowserTab {
   tabId: string;
@@ -25,7 +26,7 @@ export function openBrowserTabs(): OpenBrowserTab[] {
         url: state.url,
         title: tab.title,
         profileId: state.profileId,
-        private: Boolean(state.private),
+        private: isIncognitoWindow(),
         agentOwned: Boolean(state.agentOwned),
         faviconUrl: state.faviconUrl,
       };
@@ -37,5 +38,5 @@ export function activeBrowserTabContext(): { tabId: string; profileId?: string; 
   const view = activeLayoutView(useWorkspaceStore.getState().layout);
   if (view?.surfaceId !== "browser") return null;
   const state = parseBrowserViewState(view.state);
-  return { tabId: view.id, profileId: state.profileId, private: Boolean(state.private) };
+  return { tabId: view.id, profileId: state.profileId, private: isIncognitoWindow() };
 }

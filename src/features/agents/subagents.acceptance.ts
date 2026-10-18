@@ -4,7 +4,7 @@ import { MistyClient, type InvocationRun } from "@/tests/acceptance/mistyClient"
 import { writeAcceptanceReport } from "@/tests/acceptance/report";
 
 // Phase 4 of docs/plans/agentic-browser.md, live on the local server: a run
-// splits research across sub-agents with agents_delegate, keeps a notebook,
+// splits research across sub-agents with agent_delegate, keeps a notebook,
 // and merges what they found. No browser is attached, so the sub-agents
 // research with web search. The account's first Space is its personal one,
 // where the notebook is mirrored as a note.
@@ -58,7 +58,7 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
     expect(
       searchDown ? ["invocation.completed", "invocation.failed"] : ["invocation.completed"],
     ).toContain(run.terminal);
-    expect(ran(run, "agents_delegate")).toBe(true);
+    expect(ran(run, "agent_delegate")).toBe(true);
     const children = last(delegations)?.delegation?.children ?? [];
     // One per country; a retry after a failed source may add more.
     expect(children.length).toBeGreaterThanOrEqual(3);

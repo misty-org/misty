@@ -1,8 +1,8 @@
-import { ChevronDown } from "lucide-react";
 import * as React from "react";
 import { Button, type ButtonProps } from "../controls/Button";
 import { IconButton, type IconButtonProps } from "../controls/IconButton";
 import { cn } from "../utils";
+import { MenuChevron } from "./MenuChevron";
 import { DropdownMenuTrigger } from "./DropdownMenu";
 import { PopoverTrigger } from "./Popover";
 
@@ -16,6 +16,8 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
   iconOnly?: boolean;
   /** Show dropdown affordance beside a toolbar icon. */
   showChevron?: boolean;
+  /** Labeled triggers only: false drops the trailing chevron where space is tight, such as a strip of chips. */
+  chevron?: boolean;
   tooltip?: string | false;
   /** Opens a DropdownMenu by default; "popover" for a Popover with rich content. */
   kind?: "menu" | "popover";
@@ -25,7 +27,7 @@ type MenuTriggerProps = Omit<ButtonProps, "asChild" | "size" | "children" | "val
 
 /**
  * The button that opens a DropdownMenu, or a Popover with kind="popover". Labeled triggers
- * always end in a chevron; toolbar triggers opt in with showChevron.
+ * end in a chevron unless `chevron={false}`; toolbar triggers opt in with showChevron.
  * Features never draw their own.
  */
 const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
@@ -36,6 +38,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
       value,
       iconOnly = false,
       showChevron = false,
+      chevron = true,
       tooltip,
       variant,
       className,
@@ -59,12 +62,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
             {...props}
           >
             {icon}
-            {showChevron && (
-              <ChevronDown
-                aria-hidden
-                className="size-4 shrink-0 transition-transform duration-150 group-data-[state=open]/button:rotate-180"
-              />
-            )}
+            {showChevron && <MenuChevron className="size-4" />}
           </IconButton>
         </Trigger>
       );
@@ -82,10 +80,7 @@ const MenuTrigger = React.forwardRef<HTMLButtonElement, MenuTriggerProps>(
         >
           {icon}
           <span className="min-w-0 truncate">{value ?? label}</span>
-          <ChevronDown
-            aria-hidden
-            className="size-3.5 shrink-0 text-cream-muted transition-transform duration-150 group-data-[state=open]/button:rotate-180"
-          />
+          {chevron && <MenuChevron className="text-cream-muted" />}
         </Button>
       </Trigger>
     );

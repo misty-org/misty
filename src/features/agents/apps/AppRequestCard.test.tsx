@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   request: vi.fn(),
@@ -23,7 +23,10 @@ const connect: AppRequest = {
   expiresAt: new Date(Date.now() + 600_000).toISOString(),
 };
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 it("checks for the finished sign-in and reports the connected card", async () => {
   const onResolved = vi.fn();
@@ -48,6 +51,52 @@ it("reports an approval decision", async () => {
   const approval = { ...connect, kind: "approve" as const, title: "Send email" };
   mocks.decide.mockResolvedValueOnce({ request: { ...approval, state: "approved" } });
   render(<AppRequestCard request={approval} onResolved={onResolved} />);
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: /Approve/ })));
+  expect(screen.queryByRole("button", { name: /Accept and remember/ })).toBeNull();
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: /Accept and continue/ })),
+  );
+  expect(mocks.decide).toHaveBeenCalledWith("apprq-1", "continue");
   expect(onResolved).toHaveBeenCalledWith(expect.objectContaining({ state: "approved" }));
+});
+
+it("names the exact scope it would remember, from the server", async () => {
+  const approval: AppRequest = {
+    ...connect,
+    kind: "approve",
+    title: "Gmail · Send email",
+    rememberable: true,
+    rememberLabel: "act in Gmail (me@example.test)",
+    permissionMode: "auto",
+  };
+  mocks.decide.mockResolvedValueOnce({ request: { ...approval, state: "approved" } });
+  render(<AppRequestCard request={approval} />);
+  expect(screen.getByText(/Remember: act in Gmail \(me@example.test\)/)).toBeTruthy();
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: /Accept and remember/ })),
+  );
+  expect(mocks.decide).toHaveBeenCalledWith("apprq-1", "remember");
+});
+
+it("says remembering applies in Auto while the chat is in Ask", () => {
+  const payment: AppRequest = {
+    ...connect,
+    kind: "approve",
+    title: "Stripe · Create payment",
+    rememberable: true,
+    rememberLabel: "pay through Stripe up to 5.00 USD",
+    permissionMode: "ask",
+    paymentCap: { max_amount_minor: 500, currency: "usd" },
+  };
+  render(<AppRequestCard request={payment} />);
+  expect(screen.getByText(/each payment up to 5.00 USD/)).toBeTruthy();
+  expect(screen.getByText(/remembered approvals apply in Auto/)).toBeTruthy();
+});
+
+it("denies", async () => {
+  const approval = { ...connect, kind: "approve" as const, title: "Delete file" };
+  mocks.decide.mockResolvedValueOnce({ request: { ...approval, state: "declined" } });
+  render(<AppRequestCard request={approval} />);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Deny" })));
+  expect(mocks.decide).toHaveBeenCalledWith("apprq-1", "deny");
+  expect(screen.getByText("Denied")).toBeTruthy();
 });

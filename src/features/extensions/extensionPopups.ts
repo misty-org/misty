@@ -5,11 +5,17 @@ import { extensionsNative } from "./native";
 
 /**
  * Popup-type windows an extension opens (a game or panel from its toolbar
- * button) float as small windows, as in Chrome. Each is a tab in a workspace
- * window of its own whose page is moved into the floating host; this tracks
- * the pair so closing either side closes the other.
+ * button) float as small windows, as in Chrome. Each is a tab of this Space
+ * window whose page is moved into the floating host; the extension sees it as
+ * a window of its own. This tracks the pair so closing either side closes the other.
  */
-const popups = new Map<string, { host: string; windowId: string }>();
+const popups = new Map<string, { host: string; windowId: string; viewId: string }>();
+
+/** The window id an extension knows a floating popup's tab by. */
+export function extensionWindowIdFor(viewId: string): string | undefined {
+  for (const popup of popups.values()) if (popup.viewId === viewId) return popup.windowId;
+  return undefined;
+}
 
 const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -19,10 +25,9 @@ const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve
  * Returns false when the page could not be moved; it then stays a window.
  */
 export async function floatExtensionPopup(
-  view: Parameters<typeof browserRuntimeId>[0],
-  windowId: string,
+  view: Parameters<typeof browserRuntimeId>[0] & { id: string },
   popup: { name?: string; width?: number; height?: number },
-  previousWindow: string | null | undefined,
+  previousView: string | null | undefined,
 ): Promise<boolean> {
   const tab = browserRuntimeId(view);
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -33,8 +38,8 @@ export async function floatExtensionPopup(
         popup.width ?? 380,
         popup.height ?? 520,
       );
-      popups.set(tab, { host, windowId });
-      if (previousWindow) useWorkspaceStore.getState().switchWindow(previousWindow);
+      popups.set(tab, { host, windowId: `popup:${view.id}`, viewId: view.id });
+      if (previousView) useWorkspaceStore.getState().focusView(previousView);
       return true;
     } catch {
       await pause(150);
@@ -51,7 +56,7 @@ export function closeExtensionPopup(match: { tabId?: string; windowId?: string }
   }
 }
 
-/** The person closed a popup window: its tab and workspace window go too. */
+/** The person closed a popup window: its tab goes too. */
 export function watchExtensionPopups() {
   const stop = listen<{ action?: string; tab?: string }>(
     "misty://extension-popup",
@@ -59,7 +64,7 @@ export function watchExtensionPopups() {
       const popup = payload.tab ? popups.get(payload.tab) : undefined;
       if (payload.action !== "closed" || !payload.tab || !popup) return;
       popups.delete(payload.tab);
-      useWorkspaceStore.getState().closeWindow(popup.windowId);
+      useWorkspaceStore.getState().closeView(popup.viewId);
     },
   );
   return () => void stop.then((unlisten) => unlisten());

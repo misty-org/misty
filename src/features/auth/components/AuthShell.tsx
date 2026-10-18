@@ -1,32 +1,28 @@
-import { IconButton } from "@/shared/ui";
-import { ChevronLeft } from "lucide-react";
+import { WelcomeNav } from "@/features/welcome";
 import type { ReactNode } from "react";
+import { useFitToHeight } from "./useFitToHeight";
 
 export default function AuthShell({ title, description, children, onBack }: AuthShellProps) {
+  const { panelRef, containerRef, scale } = useFitToHeight<HTMLDivElement, HTMLDivElement>();
   return (
-    <div className="relative flex min-h-full flex-col overflow-y-auto bg-charcoal-bg px-4 pb-24 pt-28 sm:px-6 sm:pt-32">
-      {onBack ? (
-        <IconButton
-          size="md"
-          label="Back"
-          className="absolute left-4 top-4 z-10 sm:left-7 sm:top-7"
-          onClick={onBack}
-        >
-          <ChevronLeft size={20} strokeWidth={1.9} />
-        </IconButton>
-      ) : null}
+    <div
+      ref={containerRef}
+      className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-8 pt-24 sm:px-6"
+    >
+      <WelcomeNav onBack={onBack} />
+      <div ref={panelRef} style={{ zoom: scale }} className="mx-auto my-auto w-full max-w-sm">
+        <div key={title} className="misty-page-in flex flex-col gap-5">
+          <div className="text-center">
+            <h1 className="text-balance text-2xl font-medium tracking-[-0.04em] text-cream sm:text-3xl">
+              {title}
+            </h1>
+            {description ? (
+              <p className="mt-3 text-sm leading-6 text-cream-muted sm:text-base">{description}</p>
+            ) : null}
+          </div>
 
-      <div className="mx-auto flex w-full max-w-md flex-col gap-8">
-        <div className="text-center">
-          <h1 className="text-balance text-3xl font-medium tracking-[-0.04em] text-cream sm:text-4xl">
-            {title}
-          </h1>
-          {description ? (
-            <p className="mt-3 text-sm leading-6 text-cream-muted sm:text-base">{description}</p>
-          ) : null}
+          <div className="flex w-full flex-col">{children}</div>
         </div>
-
-        <div className="flex w-full flex-col">{children}</div>
       </div>
     </div>
   );

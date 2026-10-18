@@ -9,6 +9,7 @@ fn fixture() -> WorkspaceState {
             agent: "one".into(),
             window: "worker-one".into(),
             expires: Instant::now() + Duration::from_secs(20),
+            background: false,
         },
     );
     state.leases.insert(
@@ -18,6 +19,7 @@ fn fixture() -> WorkspaceState {
             agent: "two".into(),
             window: "worker-two".into(),
             expires: Instant::now() + Duration::from_secs(20),
+            background: false,
         },
     );
     state.scopes.insert(
@@ -47,7 +49,24 @@ fn personal_request(task: &str, renew: bool) -> LeaseRequest {
         space_id: String::new(),
         task_id: task.into(),
         renew,
+        background: false,
     }
+}
+
+#[test]
+fn hidden_sessions_run_beside_other_tasks() {
+    let mut state = WorkspaceState::default();
+    let background = |task: &str| LeaseRequest {
+        background: true,
+        ..personal_request(task, false)
+    };
+    assert!(acquire_lease(&mut state, "space-personal", background("hidden-one")).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", background("hidden-two")).is_ok());
+    // A task on screen still gets the window, and two on screen still exclude each other.
+    let visible = personal_request("visible", false);
+    assert!(acquire_lease(&mut state, "space-personal", visible).is_ok());
+    let other = personal_request("other", false);
+    assert!(acquire_lease(&mut state, "space-personal", other).is_err());
 }
 #[test]
 fn revealing_a_worker_requires_the_exact_owner_and_agent() {
@@ -105,19 +124,19 @@ fn worker_receipt_is_bound_to_its_window_and_cannot_be_replaced() {
 #[test]
 fn personal_tasks_acquire_and_renew_without_space() {
     let mut state = WorkspaceState::default();
-    assert!(acquire_lease(&mut state, "main", personal_request("task", false)).is_ok());
-    assert!(acquire_lease(&mut state, "main", personal_request("task", true)).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", personal_request("task", false)).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", personal_request("task", true)).is_ok());
     assert!(acquire_lease(&mut state, "worker", personal_request("other", false)).is_err());
     assert!(acquire_lease(&mut state, "worker", personal_request("task", true)).is_err());
     let mut retarget = personal_request("task", true);
     retarget.space_id = "historical".into();
-    assert!(acquire_lease(&mut state, "main", retarget).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", retarget).is_ok());
     let mut retarget = personal_request("task", true);
     retarget.account_id = "other".into();
-    assert!(acquire_lease(&mut state, "main", retarget).is_err());
+    assert!(acquire_lease(&mut state, "space-personal", retarget).is_err());
     state.leases.get_mut("task").unwrap().expires = Instant::now() - Duration::from_secs(1);
-    assert!(acquire_lease(&mut state, "main", personal_request("task", true)).is_err());
-    assert!(acquire_lease(&mut state, "main", personal_request("new", false)).is_ok());
+    assert!(acquire_lease(&mut state, "space-personal", personal_request("task", true)).is_err());
+    assert!(acquire_lease(&mut state, "space-personal", personal_request("new", false)).is_ok());
 }
 #[test]
 fn personal_task_still_requires_account_agent_and_task_identity() {
@@ -129,7 +148,7 @@ fn personal_task_still_requires_account_agent_and_task_identity() {
             1 => request.agent_id.clear(),
             _ => request.task_id.clear(),
         }
-        assert!(acquire_lease(&mut state, "main", request).is_err());
+        assert!(acquire_lease(&mut state, "space-personal", request).is_err());
     }
     assert!(state.leases.is_empty());
 }

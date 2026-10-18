@@ -1,5 +1,5 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { invoke } from "@tauri-apps/api/core";
-import { apiRequest } from "@/api/client";
 import { subscribeAccountEvents } from "@/api/accountEvents";
 import { resolveApiBase } from "@/api/deployment/api";
 import { useUserStore } from "@/features/auth/core";
@@ -31,11 +31,14 @@ const renewMs = 10_000;
 const timers = new Map<string, ReturnType<typeof setInterval>>();
 let unsubscribe: (() => void) | undefined;
 
+// A hosted session is the agent's own hidden tab, so it runs beside the person's
+// tasks and other sessions instead of waiting for them.
 const lease = (session: Pick<HostedSession, "accountId" | "agentId" | "taskId">) => ({
   accountId: session.accountId,
   agentId: session.agentId,
   spaceId: "",
   taskId: session.taskId,
+  background: true,
 });
 
 export async function endHostedSession(taskId: string): Promise<void> {
@@ -69,9 +72,8 @@ function watchRequests(accountId: string) {
     if (event.topic !== "invocations" && event.topic !== "reset") return;
     for (const session of sessions()) {
       if (event.topic === "invocations" && event.id && event.id !== session.runId) continue;
-      void apiRequest<{ state: string }>(
+      void cachedRequest<{ state: string }>(
         `/ai/invocations/${encodeURIComponent(session.runId)}/state`,
-        { cache: "no-store" },
       )
         .then(({ state }) => {
           if (state === "canceled") void endHostedSession(session.taskId);

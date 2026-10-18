@@ -149,6 +149,9 @@ const MIGRATIONS: &[&str] = &[
          document TEXT NOT NULL,
          saved_at INTEGER NOT NULL
      );",
+    // 15: projects' old access switches become remembered approvals on the server; this
+    // marks a project whose switches were carried over (the switches stay for reference)
+    "ALTER TABLE local_agent_scopes ADD COLUMN grants_migrated INTEGER NOT NULL DEFAULT 0;",
 ];
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,7 @@
-import { Pin, PinOff, RotateCcw, Star, StarOff } from "lucide-react";
+import { AudioLines, Pin, PinOff, RotateCcw, Star, StarOff } from "lucide-react";
+import { publicBetaFeatureEnabled } from "@/features/launch";
+import { captureTab } from "@/features/voice";
+import { browserRuntimeId } from "@/features/browser";
 import {
   addFavorite,
   isFavorite,
@@ -14,6 +17,7 @@ import { parseBrowserViewState, type WorkspaceTab } from "@/features/workspace/m
 import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { ContextMenuAction, ContextMenuLabel } from "@/shared/ui";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 /** Pin and favorite actions for the page in a tab's right-click menu. */
 export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
@@ -21,6 +25,7 @@ export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
     <>
       <PinnedTabMenu tab={tab} />
       <FavoriteTabMenu tab={tab} />
+      <TranscribeTabMenu tab={tab} />
     </>
   );
 }
@@ -29,7 +34,7 @@ export function TabPageMenu({ tab }: { tab: WorkspaceTab }) {
 function PinnedTabMenu({ tab }: { tab: WorkspaceTab }) {
   // Synced workspaces keep pins only once every device understands them.
   const session = useBrowserSyncStore((state) => state.session);
-  const ownerName = useUserStore((state) => state.me?.name);
+  const ownerName = useUserStore((state) => state.me?.username);
   const blockedReason = pinnedTabsBlockedReason(session, ownerName);
   if (tab.pinnedUrl) {
     const view = activeLayoutView(tab);
@@ -85,7 +90,7 @@ function FavoriteTabMenu({ tab }: { tab: WorkspaceTab }) {
         onSelect={() => removeFavorite(state.bookmarkId!)}
       />
     );
-  if (state.private || state.agentOwned || !/^https?:/.test(state.url)) return null;
+  if (isIncognitoWindow() || state.agentOwned || !/^https?:/.test(state.url)) return null;
   return (
     <ContextMenuAction
       label="Add to favorites"
@@ -95,6 +100,23 @@ function FavoriteTabMenu({ tab }: { tab: WorkspaceTab }) {
         // The favorite now switches to this tab instead of opening another.
         useWorkspaceStore.getState().updateBrowserView(view.id, { bookmarkId: id });
       }}
+    />
+  );
+}
+
+/** "Transcribe this tab": hear the page's own audio into a live Note. */
+function TranscribeTabMenu({ tab }: { tab: WorkspaceTab }) {
+  if (!publicBetaFeatureEnabled("voiceNotes")) return null;
+  const views = dockTreeViews(tab.root);
+  const view = views.length === 1 && views[0].surfaceId === "browser" ? views[0] : null;
+  if (!view) return null;
+  const state = parseBrowserViewState(view.state);
+  if (!/^https?:/.test(state.url)) return null;
+  return (
+    <ContextMenuAction
+      label="Transcribe this tab"
+      icon={<AudioLines />}
+      onSelect={() => void captureTab(browserRuntimeId(view), view.title, state.url)}
     />
   );
 }

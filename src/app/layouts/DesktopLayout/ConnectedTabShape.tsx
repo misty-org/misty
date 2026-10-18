@@ -1,8 +1,11 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 
+/** How far the shape may run on past the seam, cut off at the tab's edge. Zero lets the shoulders
+ * end flat on the seam; a few pixels would end them at an angle instead. */
+const SINK = 0;
 /** Corner and shoulder radius, from the strip's `--tab-shoulder`. */
 function connectedTabRadius(element: Element) {
-  return parseFloat(getComputedStyle(element).getPropertyValue("--tab-shoulder")) || 14;
+  return parseFloat(getComputedStyle(element).getPropertyValue("--tab-shoulder")) || 12;
 }
 
 /**
@@ -14,7 +17,9 @@ function connectedTabRadius(element: Element) {
  */
 export function ConnectedTabShape() {
   const ref = useRef<SVGSVGElement>(null);
-  const gradientId = `misty-tab-fill-${useId().replace(/[^\w-]/g, "")}`;
+  const uid = useId().replace(/[^\w-]/g, "");
+  const gradientId = `misty-tab-fill-${uid}`;
+  const clipId = `misty-tab-clip-${uid}`;
   const [size, setSize] = useState<{ width: number; height: number; radius: number } | null>(null);
 
   useLayoutEffect(() => {
@@ -37,7 +42,9 @@ export function ConnectedTabShape() {
     return () => observer.disconnect();
   }, []);
 
-  const outline = size ? outlinePath(size.width + size.radius * 2, size.height, size.radius) : "";
+  const outline = size
+    ? outlinePath(size.width + size.radius * 2, size.height + SINK, size.radius)
+    : "";
   return (
     <svg ref={ref} aria-hidden="true" className="misty-workspace-tab-shape" focusable="false">
       {size && (
@@ -47,13 +54,19 @@ export function ConnectedTabShape() {
               <stop offset="0" style={{ stopColor: "var(--workspace-tab-surface-top)" }} />
               <stop offset="1" style={{ stopColor: "var(--workspace-tab-surface)" }} />
             </linearGradient>
+            {/* Cuts the drawing at the tab's bottom edge, so what runs past the seam is hidden. */}
+            <clipPath id={clipId}>
+              <rect x={-1} y={0} width={size.width + size.radius * 2 + 2} height={size.height} />
+            </clipPath>
           </defs>
-          <path
-            d={`${outline} V ${size.height} H 0 Z`}
-            fill={`url(#${gradientId})`}
-            className="misty-workspace-tab-shape-fill"
-          />
-          <path d={outline} className="misty-workspace-tab-shape-outline" />
+          <g clipPath={`url(#${clipId})`}>
+            <path
+              d={`${outline} V ${size.height + SINK} H 0 Z`}
+              fill={`url(#${gradientId})`}
+              className="misty-workspace-tab-shape-fill"
+            />
+            <path d={outline} className="misty-workspace-tab-shape-outline" />
+          </g>
         </>
       )}
     </svg>
@@ -63,23 +76,27 @@ export function ConnectedTabShape() {
 /**
  * Outline centered on whole device-independent pixels: the shoulders end on
  * the pane seam row (height - 1 to height) and the sides on the first and
- * last pixel columns of the tab body.
+ * last pixel columns of the tab body. The shape is drawn SINK pixels taller than
+ * the tab and cut at the tab's edge, so the shoulders meet the seam where they are
+ * already angled, not in a hair-thin tangent that antialiases into a jagged edge.
  */
 function outlinePath(width: number, height: number, r: number) {
   const seam = height - 0.5;
-  const shoulder = r + 0.5;
+  // Corners and shoulders share one radius, so the outline reads as a single even curve.
+  const rx = r + 0.5;
+  const ry = rx;
   const top = 0.5;
   const corner = r - 0.5;
-  const left = r + 0.5;
-  const right = width - r - 0.5;
+  const left = rx;
+  const right = width - rx;
   return [
     `M 0 ${seam}`,
-    `A ${shoulder} ${shoulder} 0 0 0 ${left} ${seam - shoulder}`,
+    `A ${rx} ${ry} 0 0 0 ${left} ${seam - ry}`,
     `V ${top + corner}`,
     `A ${corner} ${corner} 0 0 1 ${left + corner} ${top}`,
     `H ${right - corner}`,
     `A ${corner} ${corner} 0 0 1 ${right} ${top + corner}`,
-    `V ${seam - shoulder}`,
-    `A ${shoulder} ${shoulder} 0 0 0 ${width} ${seam}`,
+    `V ${seam - ry}`,
+    `A ${rx} ${ry} 0 0 0 ${width} ${seam}`,
   ].join(" ");
 }

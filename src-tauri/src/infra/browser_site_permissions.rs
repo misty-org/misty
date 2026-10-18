@@ -1,6 +1,7 @@
-//! Website camera and microphone permissions. Choices are local to this app and
-//! browser profile. Kiri applies them in every engine; this module stores them
-//! and serves Misty's site settings.
+//! Website camera and microphone permissions. Choices belong to the Space whose
+//! pages use the browser store (private sessions keep theirs to themselves).
+//! Kiri applies them in every engine; this module stores them and serves
+//! Misty's site settings.
 use kiri::engine::{self, MediaRequest, StoreScope};
 use kiri::permissions::{canonical_origin, media_verdict, Verdict};
 pub use kiri::permissions::{Decision, MediaPermissions as Permissions};
@@ -13,6 +14,15 @@ pub struct SavedPermission {
     pub profile: String,
     pub origin: String,
     pub permissions: Permissions,
+}
+
+/// A saved choice with the Space whose store holds it.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListedPermission {
+    #[serde(flatten)]
+    pub saved: SavedPermission,
+    pub space: String,
 }
 
 #[derive(Serialize)]
@@ -75,7 +85,7 @@ pub(super) fn forget_private_session() {
 }
 
 fn require_host(caller: &Webview) -> Result<(), String> {
-    if caller.label() != "main" && !caller.label().starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(caller.label()) && !caller.label().starts_with("misty-agent-") {
         return Err("Only Misty's settings can change website permissions.".into());
     }
     Ok(())
@@ -129,7 +139,7 @@ async fn inspect(
         .or_else(|| session_scope(app, view.label()))
         .ok_or("This browser tab has closed.")?;
     let sites = {
-        let (scope, origin) = (scope.clone(), origin.clone());
+        let (scope, origin, update) = (scope.clone(), origin.clone(), update.clone());
         with_tab(&view, move || unsafe {
             match update {
                 Some(update) => update_scope(&scope, &origin, update),
@@ -138,6 +148,9 @@ async fn inspect(
         })
         .await??
     };
+    if let (Some(update), StoreScope::Persistent(profile)) = (update, &scope) {
+        space::publish(profile.clone(), [(origin.clone(), update)].into());
+    }
     let profile = match &scope {
         StoreScope::Persistent(profile) => Some(profile.clone()),
         StoreScope::Temporary(_) => None,
@@ -228,13 +241,23 @@ pub async fn browser_site_permissions_set(
     Ok(info)
 }
 
-/// Profiles with an open tab. Dormant profiles of another signed-in account stay hidden.
-fn active_profiles(app: &AppHandle) -> std::collections::HashSet<String> {
+/// The stores of Spaces with an open tab, with each Space's name. Dormant stores of
+/// another signed-in account stay hidden.
+fn active_profiles(app: &AppHandle) -> std::collections::HashMap<String, String> {
+    let spaces = crate::infra::space_windows::listed_spaces();
     app.webviews()
-        .into_keys()
-        .filter_map(|label| match session_scope(app, &label)? {
-            StoreScope::Persistent(profile) => Some(profile),
-            StoreScope::Temporary(_) => None,
+        .into_iter()
+        .filter_map(|(label, view)| {
+            let StoreScope::Persistent(profile) = session_scope(app, &label)? else {
+                return None;
+            };
+            let key = crate::infra::space_windows::space_for_owner(view.window().label())?;
+            let name = spaces
+                .iter()
+                .find(|space| space.key == key)
+                .map(|space| space.name.clone())
+                .unwrap_or_else(|| "Space".into());
+            Some((profile, name))
         })
         .collect()
 }
@@ -243,19 +266,22 @@ fn active_profiles(app: &AppHandle) -> std::collections::HashSet<String> {
 pub async fn browser_site_permissions_list(
     caller: Webview,
     app: AppHandle,
-) -> Result<Vec<SavedPermission>, String> {
+) -> Result<Vec<ListedPermission>, String> {
     require_host(&caller)?;
     let active = active_profiles(&app);
     Ok(read_store()
         .into_iter()
-        .filter(|(profile, _)| active.contains(profile))
-        .flat_map(|(profile, sites)| {
+        .filter_map(|(profile, sites)| Some((active.get(&profile)?.clone(), profile, sites)))
+        .flat_map(|(space, profile, sites)| {
             sites
                 .into_iter()
-                .map(move |(origin, permissions)| SavedPermission {
-                    profile: profile.clone(),
-                    origin,
-                    permissions,
+                .map(move |(origin, permissions)| ListedPermission {
+                    saved: SavedPermission {
+                        profile: profile.clone(),
+                        origin,
+                        permissions,
+                    },
+                    space: space.clone(),
                 })
         })
         .collect())
@@ -270,12 +296,13 @@ pub async fn browser_site_permissions_reset(
 ) -> Result<(), String> {
     require_host(&caller)?;
     let origin = canonical_origin(&origin)?;
-    if !active_profiles(&app).contains(&profile) {
-        return Err("Open a tab in this browser profile before resetting its permissions.".into());
+    if !active_profiles(&app).contains_key(&profile) {
+        return Err("Open a tab in this Space before resetting its permissions.".into());
     }
     // Serialize all store read/modify/write operations on the main thread.
     let (tx, rx) = tokio::sync::oneshot::channel();
     let affected_profile = profile.clone();
+    let reset_origin = origin.clone();
     app.run_on_main_thread(move || {
         let mut store = read_store();
         if let Some(sites) = store.get_mut(&profile) {
@@ -286,6 +313,10 @@ pub async fn browser_site_permissions_reset(
     .map_err(|error| error.to_string())?;
     rx.await
         .map_err(|_| "Could not reset website permissions.".to_owned())??;
+    space::publish(
+        affected_profile.clone(),
+        [(reset_origin, Permissions::default())].into(),
+    );
     stop_capture(&app, &StoreScope::Persistent(affected_profile), true, true).await
 }
 
@@ -307,13 +338,14 @@ pub(crate) fn import_decisions(
 ) -> Result<usize, String> {
     let key = profile_key(profile)?;
     let mut store = read_store();
-    let sites = store.entry(key).or_default();
+    let sites = store.entry(key.clone()).or_default();
     let mut added = 0;
+    let mut changed = std::collections::BTreeMap::new();
     for (origin, kind, allow) in decisions {
         let Ok(origin) = canonical_origin(origin) else {
             continue;
         };
-        let entry = sites.entry(origin).or_default();
+        let entry = sites.entry(origin.clone()).or_default();
         let slot = if *kind == "camera" {
             &mut entry.camera
         } else {
@@ -326,15 +358,20 @@ pub(crate) fn import_decisions(
                 Decision::Block
             };
             added += 1;
+            changed.insert(origin, entry.clone());
         }
     }
     sites.retain(|_, permissions| *permissions != Permissions::default());
     write_store(&store)?;
+    space::publish(key, changed);
     Ok(added)
 }
 
 #[path = "browser_site_permissions_db.rs"]
 mod db;
+#[path = "browser_site_permissions_space.rs"]
+mod space;
+pub(crate) use space::{seed_records, space_changed};
 #[cfg(target_os = "macos")]
 #[path = "browser_site_permissions_store.rs"]
 mod store;

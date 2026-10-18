@@ -1,4 +1,4 @@
-import { Flag } from "lucide-react";
+import { ClipboardList, Flag, Shield, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -10,78 +10,72 @@ import {
   MenuTrigger,
 } from "@/shared/ui";
 import { AgentGoalDialog } from "./AgentGoalDialog";
+import { permissionModeLabel, permissionModes, setPermissionMode } from "./permissionMode";
 import { useCollaborationStore } from "./store";
-import type { ConversationMode } from "./types";
+import type { ConversationMode, PermissionMode } from "./types";
 
-const modes: { id: ConversationMode; label: string; description: string }[] = [
-  { id: "act", label: "Act", description: "Works on the task directly" },
-  {
-    id: "plan",
-    label: "Plan",
-    description: "Researches and proposes a plan before changing anything",
-  },
-];
+type Mode = PermissionMode | "plan";
+
+const modeIcons = { ask: Shield, auto: ShieldCheck, plan: ClipboardList } as const;
 
 /**
- * The composer toolbar's mode menu, beside Attach. Plan researches read-only, asks
- * questions and proposes a plan; Act works directly. Shift+Tab in the composer
- * switches too. The next message uses the new mode; a running turn keeps the mode it
- * started in. Goal, under the modes, opens the conversation's goal and live plan.
+ * How the agent works in this chat, in one menu: Manual pauses before every change, Auto
+ * continues where an approval was remembered, and Plan researches read-only and proposes a
+ * plan. Goal sits at the bottom. Shift+Tab in the composer switches Plan too. The next
+ * message uses the new mode; a running turn keeps the mode it started in.
  */
-export function AgentModeToggle({
+export function AgentModeMenu({
   conversationId,
   mode,
+  permission,
   disabled,
 }: {
   conversationId?: string;
   mode: ConversationMode;
+  permission: PermissionMode;
   disabled?: boolean;
 }) {
   const [goalOpen, setGoalOpen] = useState(false);
   const goal = useCollaborationStore((s) =>
     conversationId ? s.byConversation[conversationId]?.goal : undefined,
   );
-  const goalActive = goal?.status === "pursuing" || goal?.status === "paused";
+  const active = goal?.status === "pursuing" || goal?.status === "paused";
+  const current: Mode = mode === "plan" ? "plan" : permission;
+  const label = current === "plan" ? "Plan" : permissionModeLabel(permission);
+  const Icon = modeIcons[current];
+  const choose = (next: Mode) => {
+    const store = useCollaborationStore.getState();
+    if (next === "plan") return void store.setMode(conversationId, "plan");
+    void store.setMode(conversationId, "act");
+    void setPermissionMode(conversationId, next);
+  };
   return (
     <>
       <DropdownMenu>
         <MenuTrigger
           label="Mode"
-          value={modes.find((m) => m.id === mode)?.label ?? "Act"}
-          title="Mode · Shift+Tab to switch"
+          title={`Mode: ${label} · Shift+Tab switches Plan`}
+          icon={<Icon aria-hidden className="size-4 shrink-0" />}
+          value={label}
+          chevron={false}
           disabled={disabled}
-          className="agent-mode-toggle h-7 px-2 text-xs font-normal text-cream-muted"
+          className="agent-strip-chip"
         />
-        <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
-          <DropdownMenuRadioGroup
-            value={mode}
-            onValueChange={(next) =>
-              void useCollaborationStore
-                .getState()
-                .setMode(conversationId, next as ConversationMode)
-            }
-          >
-            {modes.map((option) => (
+        <DropdownMenuContent align="start" className="w-48" data-misty-layer-portal>
+          <DropdownMenuRadioGroup value={current} onValueChange={(next) => choose(next as Mode)}>
+            {permissionModes.map((option) => (
               <DropdownMenuRadioItem key={option.id} value={option.id}>
-                <span className="grid min-w-0 gap-0.5">
-                  <span>{option.label}</span>
-                  <span className="text-xs text-cream-muted">{option.description}</span>
-                </span>
+                {option.label}
               </DropdownMenuRadioItem>
             ))}
+            <DropdownMenuRadioItem value="plan">Plan</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={!conversationId} onSelect={() => setGoalOpen(true)}>
-            <Flag aria-hidden="true" />
-            <span className="grid min-w-0 gap-0.5">
-              <span>Goal</span>
-              <span className="text-xs text-cream-muted">
-                {goal && goalActive
-                  ? goal.objective
-                  : conversationId
-                    ? "Keeps working toward an objective across turns"
-                    : "Start a conversation, then set a goal"}
-              </span>
+            <Flag aria-hidden />
+            <span className="min-w-0 flex-1 truncate">Goal</span>
+            <span className="max-w-24 truncate text-xs text-cream-muted">
+              {active && goal ? goal.objective : "None"}
             </span>
           </DropdownMenuItem>
         </DropdownMenuContent>

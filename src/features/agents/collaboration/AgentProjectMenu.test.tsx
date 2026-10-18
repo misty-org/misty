@@ -8,15 +8,28 @@ const store = vi.hoisted(() => ({
       { id: "scope_docs", displayName: "Docs", kind: "local_folder", available: true },
     ],
   })),
-  codeChooseProject: vi.fn(async () => ({ id: "scope_new", displayName: "new" })),
+  chooseProject: vi.fn(async () => ({ id: "scope_new", displayName: "new" })),
 }));
 vi.mock("../store/useAgentsStore", () => store);
+const github = vi.hoisted(() => ({
+  projectRemote: vi.fn(async () => null as string | null),
+  githubRepos: vi.fn(async () => []),
+  createGitHubRepo: vi.fn(),
+  publishProject: vi.fn(),
+  cloneProject: vi.fn(),
+}));
+vi.mock("../store/projectGitHub", () => github);
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+const access = vi.hoisted(() => ({ included: true as boolean | null }));
+vi.mock("../coding/useCodingIncluded", () => ({ useCodingIncluded: () => access.included }));
 
 import { useConversationProject } from "../store/useConversationProject";
 import { AgentProjectMenu } from "./AgentProjectMenu";
 
-beforeEach(() => useConversationProject.setState({ byConversation: {}, draft: null }));
+beforeEach(() => {
+  access.included = true;
+  useConversationProject.setState({ byConversation: {}, draft: null });
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -31,7 +44,7 @@ async function open() {
 it("starts with no project and picks one for this conversation", async () => {
   render(<AgentProjectMenu conversationId="conversation-a" />);
   const trigger = await open();
-  expect(trigger.textContent).toContain("No project");
+  expect(trigger.textContent).toContain("Project");
   fireEvent.click(await screen.findByRole("menuitemradio", { name: /site/ }));
   expect(useConversationProject.getState().project("conversation-a")).toBe("scope_site");
   expect(useConversationProject.getState().project("conversation-b")).toBeNull();
@@ -42,4 +55,23 @@ it("adds a project from the menu and picks it", async () => {
   await open();
   fireEvent.click(await screen.findByRole("menuitem", { name: /Add an existing folder/ }));
   await waitFor(() => expect(useConversationProject.getState().draft).toBe("scope_new"));
+});
+
+it("offers From GitHub, and Publish to GitHub for a chosen project without a remote", async () => {
+  useConversationProject.setState({ byConversation: { c1: "scope_site" }, draft: null });
+  render(<AgentProjectMenu conversationId="c1" />);
+  await waitFor(() => expect(github.projectRemote).toHaveBeenCalledWith("scope_site"));
+  await open();
+  expect(await screen.findByRole("menuitem", { name: /From GitHub/ })).toBeTruthy();
+  expect(await screen.findByRole("menuitem", { name: /Publish to GitHub/ })).toBeTruthy();
+});
+
+it("hides Publish for a project that already has a GitHub remote", async () => {
+  github.projectRemote.mockResolvedValueOnce("ana/site");
+  useConversationProject.setState({ byConversation: { c1: "scope_site" }, draft: null });
+  render(<AgentProjectMenu conversationId="c1" />);
+  await waitFor(() => expect(github.projectRemote).toHaveBeenCalled());
+  await open();
+  await screen.findByRole("menuitem", { name: /From GitHub/ });
+  expect(screen.queryByRole("menuitem", { name: /Publish to GitHub/ })).toBeNull();
 });

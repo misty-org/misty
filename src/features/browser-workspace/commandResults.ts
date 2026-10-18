@@ -5,7 +5,7 @@ import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import type { ScopedSearchResult } from "./scopedSearchSources";
 
 /** The search box itself and keys that only make sense inside it. */
-const hidden = new Set(["search.toggle", "app.command_palette"]);
+const hidden = new Set(["search.toggle"]);
 const limit = 3;
 
 type WorkspaceState = ReturnType<typeof useWorkspaceStore.getState>;

@@ -30,10 +30,12 @@ export function useDesktopWindowChrome() {
       void (desktopPlatform === "macos" ? togglePseudoMaximize() : toggleTitlebarMaximize()).catch(
         () => undefined,
       );
-    }).then((stop) => {
-      if (disposed) stop();
-      else unlisten = stop;
-    });
+    })
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
+      .catch(() => undefined);
     return () => {
       disposed = true;
       unlisten?.();

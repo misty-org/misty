@@ -11,7 +11,6 @@ import {
 } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
 import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
-import { codeProjectOperations, runCodeProjectOperation } from "./codeProjectTools";
 import { invoke } from "@tauri-apps/api/core";
 import {
   browserUncertainErrorCode,
@@ -216,7 +215,7 @@ export class DesktopAgentJobWorker {
         })();
       }, leaseHeartbeatMs);
       const output = await abortable(
-        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt),
+        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt, deviceId),
         controller.signal,
       );
       report = () =>
@@ -317,6 +316,7 @@ async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
   leaseExpiresAt: string | null | undefined,
+  deviceId: string,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
   // Every job carries the run grant the asking device signed. This device
@@ -390,8 +390,9 @@ async function executeWorkflowNodeOnDevice(
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
   }
-  if (codeProjectOperations.has(job.operation)) {
-    return runCodeProjectOperation(job, signal);
+  if (job.operation === "code.delegate") {
+    // Coding through the person's own tool; the run reports on its own.
+    return (await import("./coding/codingRun")).startCodingRun(job, deviceId);
   }
   if (job.operation !== "read_content") {
     throw new Error(`unsupported_device_operation:${job.operation}`);

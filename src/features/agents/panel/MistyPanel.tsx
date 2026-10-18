@@ -1,6 +1,6 @@
 import { observeAccountChanges } from "@/api/accountEvents";
 import { useAuth } from "@/features/auth";
-import { showMistyConversation } from "@/features/misty/handoff";
+import { openMistyConversationInNewTab } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useSettingsStore } from "@/features/settings";
 import { IconButton } from "@/shared/ui";
@@ -11,17 +11,15 @@ import "../workspace/agentWorkspaceFrame.css";
 import "./mistyPanel.css";
 import { AgentWorkspaceConversation } from "../components/AgentWorkspaceConversation";
 import { AgentConversationHeading } from "../page/AgentConversationHeading";
-import { AgentLanding } from "../page/AgentLanding";
-import { AgentNewChat } from "../page/AgentNewChat";
+import { PanelConversationPicker } from "./PanelConversationPicker";
 import { usePersonalAgentsStore } from "../personalAgentsStore";
 import { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./mistyPanelStore";
 
 export type MistyPanelSide = "left" | "right";
 
 /**
- * The Agents conversation beside the workspace, so Misty is one keystroke away from any
- * tool. It is the Agents page's own title bar, conversation and landing in one column;
- * anything beyond that (Activity, Templates, agent settings) opens the Agents page.
+ * The chat panel beside the workspace, so an agent (and, once chats live in Spaces, a
+ * friend) is one keystroke away from any page. Expanding it opens the full chat page.
  */
 export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const settingsAgent = useSettingsStore((s) => s.settings?.document.agent) as
@@ -31,13 +29,10 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const accountId = user?.id ?? "";
   const { agents, load } = usePersonalAgentsStore();
   const [selected, setSelected] = useState<string>();
-  const [newChat, setNewChat] = useState(false);
-  const [recipientSearch, setRecipientSearch] = useState("");
   const [chatRevision, setChatRevision] = useState(0);
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const root = useRef<HTMLElement>(null);
   const identityRef = useRef<HTMLButtonElement>(null);
-  const recipientInputRef = useRef<HTMLInputElement>(null);
   const working = useMistyStore((s) => s.working);
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
@@ -68,14 +63,11 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
       (c.agentId === profile?.id || (!c.agentId && profile?.system_managed)),
   );
   const close = () => useMistyPanelStore.getState().setOpen(false);
-  const openInAgents = () => {
-    showMistyConversation();
-    close();
-  };
+  // The full page opens in a new tab; this panel stays as it is.
+  const openInAgents = () => openMistyConversationInNewTab();
   const select = (id: string, startNew = false, conversationId?: string, prompt = "") => {
     setChatRevision((n) => n + 1);
     setSelected(id);
-    setNewChat(false);
     setDraftSeed({ agentId: id, text: prompt });
     const nextConversationId = startNew ? "" : (conversationId ?? "");
     useMistyStore.setState({
@@ -95,7 +87,7 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
       // The dock sets the width; it stays fixed while the dock slides, so the panel
       // slides in from the edge instead of squeezing.
       style={{ width: `var(--misty-panel-width, ${MISTY_PANEL_WIDTH}px)` }}
-      aria-label="Misty"
+      aria-label="Chat"
       data-misty-panel={side}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -108,12 +100,9 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
           <div className="agent-studio-task flex h-full min-h-0 flex-1 flex-col">
             <div className="agents-main h-full">
               <div className="agents-body h-full">
-                <div className="agents-chat" data-scroll-root>
+                <div className="agents-chat">
                   <AgentConversationHeading
-                    newChat={newChat}
                     conversation={conversation}
-                    recipientSearch={recipientSearch}
-                    recipientInputRef={recipientInputRef}
                     switcher={{
                       agents,
                       conversations,
@@ -127,56 +116,49 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                       onSettings: openInAgents,
                     }}
                     disabled={working}
-                    onRecipientSearch={setRecipientSearch}
-                    onCloseNewChat={() => setNewChat(false)}
-                    onNewChat={() => {
-                      setNewChat(true);
-                      setRecipientSearch("");
-                    }}
+                    panelPicker={
+                      <PanelConversationPicker
+                        accountId={accountId}
+                        agentId={profile?.id}
+                        includeUnassigned={profile?.system_managed}
+                        title={conversation?.title}
+                        disabled={working}
+                        onSelect={(id) => profile && select(profile.id, false, id)}
+                        onNew={() => profile && select(profile.id, true)}
+                        onViewAll={openInAgents}
+                      />
+                    }
                     actions={
                       <>
-                        <IconButton label="Open in Agents" onClick={openInAgents}>
+                        <IconButton label="Open full chat" onClick={openInAgents}>
                           <ArrowUpRight />
                         </IconButton>
-                        <IconButton label="Close Misty" onClick={close}>
+                        <IconButton label="Close chat" onClick={close}>
                           <X />
                         </IconButton>
                       </>
                     }
                   />
-                  {newChat ? (
-                    <AgentNewChat
-                      agents={agents}
-                      search={recipientSearch}
-                      onCreate={openInAgents}
-                      onSelect={(id) => select(id, true)}
-                    />
-                  ) : (
-                    <AgentWorkspaceConversation
-                      key={`${accountId}:${profile?.id}:${chatRevision}`}
-                      agent={profile}
-                      spaceId=""
-                      accountId={accountId}
-                      showControlBar
-                      initialDraft={
-                        !activeConversationId && draftSeed.agentId === profile?.id
-                          ? draftSeed.text
-                          : ""
-                      }
-                      belowComposer={
-                        profile ? (
-                          <AgentLanding
-                            accountId={accountId}
-                            agentId={profile.id}
-                            onConversation={(id) => select(profile.id, false, id)}
-                            onUseTemplate={(prompt) => select(profile.id, true, undefined, prompt)}
-                            onTemplates={openInAgents}
-                          />
-                        ) : undefined
-                      }
-                      onCreate={openInAgents}
-                    />
-                  )}
+                  <AgentWorkspaceConversation
+                    key={`${accountId}:${profile?.id}:${chatRevision}`}
+                    agent={profile}
+                    spaceId=""
+                    accountId={accountId}
+                    showControlBar
+                    emptyContent={
+                      profile ? (
+                        <div className="agent-studio-welcome">
+                          <h1>What can I do for you?</h1>
+                        </div>
+                      ) : undefined
+                    }
+                    initialDraft={
+                      !activeConversationId && draftSeed.agentId === profile?.id
+                        ? draftSeed.text
+                        : ""
+                    }
+                    onCreate={openInAgents}
+                  />
                 </div>
               </div>
             </div>

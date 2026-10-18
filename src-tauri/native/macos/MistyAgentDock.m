@@ -17,6 +17,8 @@ static MistyDockCallback dockCallback;
 
 static const CGFloat DockWidth = 288, CornerMargin = 24, EdgeMargin = 8, CarouselStep = 170;
 static const CGFloat CaptionWidth = 440, CaptionHeight = 58, AnimationSeconds = 0.42;
+// The status pill: its height and how far it floats in from the window edges.
+static const CGFloat PillHeight = 26, PillInset = 8;
 
 @class MistyDockOverlay;
 
@@ -147,6 +149,12 @@ static NSInteger Offset(NSInteger index) {
   return self;
 }
 - (BOOL)isFlipped { return YES; }
+// Round and centered at any size: 30 points at a corner, 20 inside the status pill.
+- (void)setFrameSize:(NSSize)size {
+  [super setFrameSize:size];
+  self.layer.cornerRadius = MIN(size.width, size.height) / 2;
+  self.icon.frame = NSMakeRect((size.width - 14) / 2, (size.height - 14) / 2, 14, 14);
+}
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
 - (BOOL)shouldDelayWindowOrderingForEvent:(NSEvent *)event { return YES; }
 - (void)mouseDown:(NSEvent *)event { [NSApp preventWindowOrdering]; }
@@ -186,9 +194,12 @@ static NSInteger Offset(NSInteger index) {
     self.dimLayer = [CALayer layer];
     self.dimLayer.backgroundColor = NSColor.blackColor.CGColor;
     self.dimLayer.opacity = 0;
-    self.labelLayer = [CAGradientLayer layer];
-    ((CAGradientLayer *)self.labelLayer).colors = @[(id)[NSColor colorWithSRGBRed:0.03 green:0.04 blue:0.05 alpha:0].CGColor, (id)[NSColor colorWithSRGBRed:0.03 green:0.04 blue:0.05 alpha:0.92].CGColor];
-    ((CAGradientLayer *)self.labelLayer).locations = @[@0, @0.45];
+    // A small pill floating inset from the window's edges, not a strip along its bottom.
+    self.labelLayer = [CALayer layer];
+    self.labelLayer.backgroundColor = [NSColor colorWithSRGBRed:0.05 green:0.06 blue:0.07 alpha:0.9].CGColor;
+    self.labelLayer.borderColor = [NSColor colorWithWhite:1 alpha:0.14].CGColor;
+    self.labelLayer.borderWidth = 1;
+    self.labelLayer.cornerRadius = PillHeight / 2;
     self.gripLayer = [CALayer layer];
     self.gripLayer.backgroundColor = [NSColor colorWithWhite:0.9 alpha:0.55].CGColor;
     self.gripLayer.cornerRadius = 2;
@@ -249,7 +260,8 @@ static NSInteger Offset(NSInteger index) {
   if (entry.mist) MistyAgentMistSetWaiting(entry.mist, entry.waiting);
   self.dimLayer.frame = CGRectMake(0, 0, w, h);
   self.dimLayer.opacity = (float)MAX(dim, self.hovering && dim == 0 ? 0.32 : 0);
-  self.labelLayer.frame = CGRectMake(0, h - 34, w, 34);
+  CGFloat pillX = PillInset, pillW = MAX(0, w - 2 * PillInset), pillY = h - PillInset - PillHeight;
+  self.labelLayer.frame = CGRectMake(pillX, pillY, pillW, PillHeight);
   self.gripLayer.frame = CGRectMake(w / 2 - 18, 7, 36, 4);
   [CATransaction commit];
   BOOL chosen = dim == 0;
@@ -260,21 +272,32 @@ static NSInteger Offset(NSInteger index) {
   BOOL front = !carousel && count > 1 && docked.firstObject == entry;
   self.badge.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)count];
   CGFloat badgeWidth = MAX(20, 12 + 7 * self.badge.stringValue.length);
-  // The count sits at the right end of the label strip.
+  BOOL controls = self.hovering && chosen && (carousel || count == 1 || docked.firstObject == entry);
+  // Left to right inside the pill: icon, the label, Open and Stop on hover, the count.
+  // In the carousel there is no pill, so Open and Stop sit at the window's top corners.
+  CGFloat trailing = pillX + pillW - 6;
   self.badge.hidden = !front || !showLabel;
-  self.badge.frame = NSMakeRect(w - badgeWidth - 8, h - 25, badgeWidth, 18);
-  self.label.frame = NSMakeRect(30, h - 23, MAX(0, w - 40 - (front ? badgeWidth + 6 : 0)), 16);
-  self.spinner.frame = NSMakeRect(10, h - 23, 14, 14);
-  self.waitIcon.frame = NSMakeRect(10, h - 23, 14, 14);
+  self.badge.frame = NSMakeRect(trailing - badgeWidth, pillY + 4, badgeWidth, 18);
+  if (front && showLabel) trailing -= badgeWidth + 6;
+  BOOL inPill = controls && showLabel;
+  if (inPill) {
+    self.stopButton.frame = NSMakeRect(trailing - 20, pillY + 3, 20, 20);
+    trailing -= 24;
+    self.openButton.frame = NSMakeRect(trailing - 20, pillY + 3, 20, 20);
+    trailing -= 24;
+  } else {
+    self.openButton.frame = NSMakeRect(10, 16, 30, 30);
+    self.stopButton.frame = NSMakeRect(w - 40, 16, 30, 30);
+  }
+  self.label.frame = NSMakeRect(pillX + 28, pillY + 5, MAX(0, trailing - (pillX + 28) - 2), 16);
+  self.spinner.frame = NSMakeRect(pillX + 9, pillY + 6, 14, 14);
+  self.waitIcon.frame = NSMakeRect(pillX + 9, pillY + 6, 14, 14);
   self.spinner.hidden = !showLabel || entry.waiting;
   self.waitIcon.hidden = !showLabel || !entry.waiting;
   self.label.stringValue = entry.status.length ? entry.status : (entry.name.length ? [entry.name stringByAppendingString:@" is working"] : @"Working");
-  BOOL controls = self.hovering && chosen && (carousel || count == 1 || docked.firstObject == entry);
   self.gripLayer.hidden = !controls || carousel;
   self.openButton.hidden = !controls;
   self.stopButton.hidden = !controls;
-  self.openButton.frame = NSMakeRect(10, 16, 30, 30);
-  self.stopButton.frame = NSMakeRect(w - 40, 16, 30, 30);
   [self setAccessibilityLabel:[NSString stringWithFormat:@"%@: %@", entry.name.length ? entry.name : @"Agent", self.label.stringValue]];
 }
 - (void)updateTrackingAreas {

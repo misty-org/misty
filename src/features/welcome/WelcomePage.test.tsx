@@ -1,67 +1,37 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { afterEach, expect, it, vi } from "vitest";
 import { WelcomePage } from "./WelcomePage";
 
-const mocks = vi.hoisted(() => ({
-  flight: { begin: vi.fn(), dive: vi.fn(), setTheme: vi.fn(), destroy: vi.fn() },
-  intro: vi.fn(),
-  dive: vi.fn(),
-  hush: vi.fn(),
-}));
-vi.mock("./cloudFlight", () => ({ startCloudFlight: () => mocks.flight }));
-vi.mock("./windSound", () => ({
-  playIntroWind: mocks.intro,
-  playDiveWind: mocks.dive,
-  hushWind: mocks.hush,
-}));
-vi.mock("@/features/settings", () => ({
-  useAppThemeStore: Object.assign(
-    (select: (state: { resolvedTheme: string }) => unknown) => select({ resolvedTheme: "dark" }),
-    { getState: () => ({ resolvedTheme: "dark" }) },
-  ),
-}));
+vi.mock("@/features/workspace", () => ({ MistyBrandIcon: () => <span /> }));
 
-const renderWelcome = () =>
+function SignInProbe() {
+  const location = useLocation();
+  return <p>Sign in from {(location.state as { from?: string } | null)?.from}</p>;
+}
+
+const renderWelcome = (state?: unknown) =>
   render(
-    <MemoryRouter initialEntries={["/welcome"]}>
+    <MemoryRouter initialEntries={[{ pathname: "/welcome", state }]}>
       <Routes>
         <Route path="/welcome" element={<WelcomePage />} />
-        <Route path="/signin" element={<p>Sign in page</p>} />
+        <Route path="/signin" element={<SignInProbe />} />
+        <Route path="/browser" element={<p>Browser page</p>} />
       </Routes>
     </MemoryRouter>,
   );
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  vi.clearAllMocks();
-});
-afterEach(() => {
-  cleanup();
-  vi.useRealTimers();
-});
+afterEach(cleanup);
 
-it("waits for a click, then starts the flight and its wind together", () => {
-  renderWelcome();
-  expect(screen.getByText("Click anywhere to begin")).toBeTruthy();
-  expect(mocks.flight.begin).not.toHaveBeenCalled();
-  expect(mocks.intro).not.toHaveBeenCalled();
-
-  fireEvent.pointerDown(window);
-  expect(mocks.flight.begin).toHaveBeenCalledOnce();
-  expect(mocks.intro).toHaveBeenCalledOnce();
-});
-
-it("dives into the clouds before opening sign in", () => {
-  renderWelcome();
-  fireEvent.pointerDown(window);
-  act(() => vi.advanceTimersByTime(1500));
+it("shows the name and tagline, and Sign in opens sign in", () => {
+  renderWelcome({ from: "/browser" });
+  expect(screen.getByRole("heading").textContent).toContain("The agentic browser workspace");
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(mocks.flight.dive).toHaveBeenCalledOnce();
-  expect(mocks.dive).toHaveBeenCalledOnce();
-  expect(screen.queryByText("Sign in page")).toBeNull();
-  act(() => vi.advanceTimersByTime(1300));
-  expect(screen.getByText("Sign in page")).toBeTruthy();
-  // The dive's wind keeps easing out over the sign-in page.
-  expect(mocks.hush).not.toHaveBeenCalled();
+  expect(screen.getByText("Sign in from /browser")).toBeTruthy();
+});
+
+it("offers Back when adding an account", () => {
+  renderWelcome({ from: "/browser", addingAccount: true });
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByText("Browser page")).toBeTruthy();
 });

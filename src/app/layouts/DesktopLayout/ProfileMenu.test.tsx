@@ -4,12 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui";
 import { ProfileMenu } from "./ProfileMenu";
 
-let mockUser: { id: string; email: string; name: string } | null = {
+let mockUser: { id: string; email: string; username: string } | null = {
   id: "account-1",
   email: "owner@example.com",
-  name: "Owner",
+  username: "Owner",
 };
-let mockAccounts: Array<{ id: string; email: string; name: string }> = [];
+let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
 
 vi.mock("@/features/auth", () => ({
   SavedAccountSessionUnavailableError: class extends Error {},
@@ -42,7 +42,7 @@ function renderMenu() {
 describe("ProfileMenu", () => {
   afterEach(() => {
     cleanup();
-    mockUser = { id: "account-1", email: "owner@example.com", name: "Owner" };
+    mockUser = { id: "account-1", email: "owner@example.com", username: "Owner" };
     mockAccounts = [];
   });
 
@@ -67,8 +67,8 @@ describe("ProfileMenu", () => {
 
   it("switches between saved accounts without extra subtext", () => {
     mockAccounts = [
-      { id: "account-1", email: "owner@example.com", name: "Owner" },
-      { id: "account-2", email: "second@example.com", name: "Matt" },
+      { id: "account-1", email: "owner@example.com", username: "Owner" },
+      { id: "account-2", email: "second@example.com", username: "Matt" },
     ];
     renderMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: /Switch accounts/ }));

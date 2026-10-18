@@ -221,13 +221,13 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
                   "General",
                   "Onboarding",
                   "Spaces",
-                  "Journal",
-                  "Planner",
-                  "Social",
-                  "Library",
+                  "Chat",
+                  "Notes",
+                  "Drawings",
                   "Files",
+                  "Code",
                   "Browser",
-                  "Misty AI",
+                  "Agents",
                   "Settings",
                 ].map((area) => ({ value: area, label: area }))}
               />

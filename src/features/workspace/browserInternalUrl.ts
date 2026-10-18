@@ -6,6 +6,7 @@ export const browserInternalPages = {
   scheduled: { url: "misty://scheduled", title: "Workflows" },
   history: { url: "misty://history", title: "History" },
   downloads: { url: "misty://downloads", title: "Downloads" },
+  passwords: { url: "misty://passwords", title: "Passwords" },
   bookmarks: { url: "misty://bookmarks", title: "Bookmarks" },
   extensions: { url: "misty://extensions", title: "Extensions" },
   settings: { url: "misty://settings", title: "Browser settings" },

@@ -14,9 +14,6 @@ export function configureAccountApi(context: { readAnalyticsEnabled: () => boole
   readAnalyticsEnabled = context.readAnalyticsEnabled;
 }
 export const accountApi = {
-  libraryLock: () => requestJson<{ configured: boolean }>("GET", "/me/library-lock"),
-  setLibraryPassword: (password: string, confirmation: string) =>
-    requestJson<{ configured: boolean }>("POST", "/me/library-lock", { password, confirmation }),
   googleAvailable: () => requestJson<{ enabled: boolean }>("GET", "/auth/google"),
   beginGoogle: (reauthenticate = false, signal?: AbortSignal) =>
     requestJson<{ url: string; flow_token: string; expires_in: number }>(

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { Minus, Plus } from "lucide-react";
-import { Button, cn, MenuItem } from "@/shared/ui";
+import { Minus, Plus, ZoomIn } from "lucide-react";
+import { Button, cn, MenuItem, Pressable } from "@/shared/ui";
 
 const levels = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
 
@@ -68,6 +68,54 @@ export function BrowserZoomControls({
       content: <Plus size={15} />,
     },
   ];
+  if (menu)
+    // A row like the others: icon, label, and the controls where a shortcut would sit.
+    return (
+      <MenuItem
+        icon={<ZoomIn />}
+        label="Zoom"
+        aria-label="Page zoom"
+        onSelect={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          const step =
+            event.key === "ArrowLeft" ? actions[0] : event.key === "ArrowRight" ? actions[2] : null;
+          if (!step || disabled || step.value === undefined) return;
+          event.preventDefault();
+          event.stopPropagation();
+          void change(step.value);
+        }}
+        shortcut={
+          <span
+            className="flex items-center gap-0.5 text-cream"
+            role="group"
+            aria-label="Zoom controls"
+          >
+            {actions.map(({ label, value, content }) => (
+              <Pressable
+                key={label}
+                type="button"
+                aria-label={label}
+                title={label}
+                tabIndex={-1}
+                disabled={disabled || value === undefined}
+                className={cn(
+                  "grid h-6 place-items-center rounded-md px-1 text-sm tracking-normal tabular-nums outline-none",
+                  "hover:bg-charcoal-border disabled:opacity-40 disabled:hover:bg-transparent",
+                  label === "Reset zoom to 100%" ? "min-w-12" : "min-w-6",
+                )}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void change(value!);
+                }}
+              >
+                {content}
+              </Pressable>
+            ))}
+          </span>
+        }
+      />
+    );
   return (
     <div
       className="flex min-h-8 items-center px-2 text-sm"

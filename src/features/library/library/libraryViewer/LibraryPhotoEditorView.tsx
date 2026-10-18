@@ -125,7 +125,7 @@ export function LibraryPhotoEditorView({
       applyArtifact: async (artifact) => {
         const definition = applicableEdit(artifact);
         if (!definition)
-          throw new Error("The image version changed. Ask Misty to regenerate this edit.");
+          throw new Error("The image version changed. Ask your agent to regenerate this edit.");
         const result = await spacesApi.createEditVersion(spaceId, item, definition);
         if (!result.edit || !result.item)
           throw new Error("Misty could not create the image version.");

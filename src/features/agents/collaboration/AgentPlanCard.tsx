@@ -1,7 +1,7 @@
-import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
 import { Button } from "@/shared/ui";
+import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { AgentPlanEditor } from "./AgentPlanEditor";
 import { PlanRiskTag } from "./PlanRiskTag";
 import { useCollaborationStore } from "./store";
@@ -55,43 +55,40 @@ export function AgentPlanCard({
     );
   return (
     <section className="agent-plan-card" aria-label={`Proposed plan: ${payload.title}`}>
-      <header className="agent-plan-card-head">
-        <ListChecks size={15} aria-hidden="true" />
-        <span>Proposed plan</span>
-        <small>
-          Version {plan.version}
-          {plan.author === "user" ? " · edited by you" : ""}
-        </small>
-      </header>
-      <h3>{payload.title}</h3>
       {payload.summary && <p className="agent-plan-summary">{payload.summary}</p>}
-      <ol className="agent-plan-steps">
-        {payload.steps.map((step, index) => (
-          <li key={step.id}>
-            <span className="agent-plan-step-number" aria-hidden="true">
-              {index + 1}
+      <StatusTable
+        label="Plan"
+        head={
+          <>
+            <span>
+              Plan · {payload.title} · version {plan.version}
+              {plan.author === "user" ? " · edited by you" : ""}
             </span>
-            <div className="agent-plan-step-body">
-              {step.detail ? (
+            <span>Risk</span>
+          </>
+        }
+      >
+        {payload.steps.map((step, index) => (
+          <StatusRow
+            key={step.id}
+            state="plain"
+            verb={index + 1}
+            meta={<PlanRiskTag risk={step.risk} />}
+            sub={
+              step.detail ? (
                 <details>
-                  <summary>
-                    <span>{step.title}</span>
-                    <PlanRiskTag risk={step.risk} />
-                  </summary>
+                  <summary>Details</summary>
                   <div className="misty-markdown-message agent-plan-step-detail">
                     <MistyMarkdown>{step.detail}</MistyMarkdown>
                   </div>
                 </details>
-              ) : (
-                <p>
-                  <span>{step.title}</span>
-                  <PlanRiskTag risk={step.risk} />
-                </p>
-              )}
-            </div>
-          </li>
+              ) : undefined
+            }
+          >
+            {step.title}
+          </StatusRow>
         ))}
-      </ol>
+      </StatusTable>
       {Boolean(payload.assumptions?.length) && (
         <div className="agent-plan-list">
           <h4>Assumptions</h4>

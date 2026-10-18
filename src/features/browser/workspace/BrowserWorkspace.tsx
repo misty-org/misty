@@ -14,7 +14,6 @@ import { useEffect, useRef, useState } from "react";
 import { useBrowserToolbarSlot } from "./browserToolbarSlot";
 import { BrowserAgentAccessMenu } from "./BrowserAgentAccessMenu";
 import { BrowserBookmarkDialog } from "./BrowserBookmarkDialog";
-import { BrowserBookmarkStar } from "./BrowserBookmarkStar";
 import { BrowserClearDataDialog } from "./BrowserClearDataDialog";
 import { BrowserClipboardButton } from "./BrowserClipboardButton";
 import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
@@ -22,11 +21,12 @@ import { BrowserFindBar } from "./BrowserFindBar";
 import { BrowserHelpDialog } from "./BrowserHelpDialog";
 import { BrowserMenu } from "./BrowserMenu";
 import { BrowserMenuLeadRows } from "./BrowserMenuLeadRows";
+import { BrowserAgentsButton, BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { useTabAway } from "@/features/agents";
 import { BrowserOmnibox } from "./BrowserOmnibox";
 import { BrowserLibraryMenus } from "./BrowserLibraryMenus";
-import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
+import { BrowserPaneLayoutMenu, BrowserPaneLayoutSubmenu } from "./BrowserPaneLayoutMenu";
 import { useBrowserChromeSlot } from "./browserChromeSlot";
 import { BrowserQrCodeDialog } from "./BrowserQrCodeDialog";
 import {
@@ -41,8 +41,9 @@ import { inspectBrowserPage } from "./browserPageInspection";
 import { setBrowserError } from "./browserErrors";
 import { BrowserNotices } from "./BrowserNotices";
 import { BrowserPageStage } from "./BrowserPageStage";
-import { BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
+import { BrowserToolbar } from "./BrowserToolbar";
+import { usePaneToolbarHost } from "./paneToolbarHost";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { BrowserViewportMenu, useBrowserViewport } from "./BrowserViewportMenu";
 import { useBrowserMistyAiAdapter } from "./useBrowserMistyAiAdapter";
@@ -54,8 +55,8 @@ import { useBrowserPageCommands } from "./useBrowserPageCommands";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
 import { useBrowserReadingTools } from "./useBrowserReadingTools";
 import { useHiddenToolbarButtons } from "@/features/settings/browserToolbarButtons";
-import { profileDataIdForView } from "@/features/workspace/browserProfiles";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
   const fallbackTab = useWorkspaceStore((store) => {
     const panes = dockLeaves(store.layout.root);
@@ -94,10 +95,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   const runtimeError = useBrowserRuntimeStore((runtime) => runtime.errors[tab.id] ?? null);
   const pageLoading = useBrowserRuntimeStore((runtime) => runtime.loading[tab.id] ?? false);
   const internalPage = browserInternalPage(state.url);
-  // Views in a device profile use that profile's website data and history.
-  const profileId = useWorkspaceStore(
-    (store) => state.profileId ?? profileDataIdForView(store, tab.id),
-  );
+  const profileId = state.profileId;
   useBrowserPagePreview(tab, pageHostRef, nativeRuntime && active && !pageLoading && !runtimeError);
   const { isOffline, handleRetry, handleGoHome } = useBrowserOnlineStatus(
     tab,
@@ -195,15 +193,15 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   // With vertical tabs the focused pane's toolbar lives in the sidebar; no pane keeps a row.
   const sidebar = Boolean(topSlot);
+  // A pane with horizontal tabs owns the one toolbar row; this page's toolbar is portaled
+  // into it while the page is the pane's active one.
+  const paneToolbarHost = usePaneToolbarHost();
+  const hoisted = !sidebar && paneToolbarHost !== null;
   const claimsNav = paneFocused && sidebar && Boolean(navSlot);
   useEffect(
     () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
     [claimsNav],
   );
-  const bookmark =
-    page.commands.bookmark && !hiddenButtons.has("bookmark") ? (
-      <BrowserBookmarkStar url={state.url} onBookmark={page.commands.bookmark} />
-    ) : undefined;
   const navButtons = (
     <BrowserNavigationButtons
       canGoBack={history.index > 0}
@@ -217,7 +215,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const badges = (
     <>
-      {state.private ? (
+      {isIncognitoWindow() ? (
         <span
           className={cn(
             "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
@@ -244,7 +242,8 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <BrowserMenu
       toolsIcon={sidebarMenu}
       library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
-      account={sidebarMenu ? undefined : chrome?.accountItems}
+      layout={sidebarMenu ? undefined : <BrowserPaneLayoutSubmenu tabId={tab.id} />}
+      account={chrome?.accountItems}
       lead={
         sidebarMenu ? (
           <BrowserMenuLeadRows
@@ -293,7 +292,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
       )}
       {siteInfo}
-      {paneLayout}
+      {chrome?.sync}
       {browserMenu(true)}
     </>
   );
@@ -301,57 +300,40 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <BrowserOmnibox
       focusRequest={addressFocusRequest}
       currentUrl={state.url}
-      historyEntries={history.entries}
-      tab={tab}
       onNavigate={navigateActiveTab}
       hostOnly={sidebar}
-      panel={sidebar}
-      trailing={sidebar ? sidebarTrailing : bookmark}
+      leading={sidebar ? undefined : siteInfo}
+      trailing={sidebar ? sidebarTrailing : undefined}
     />
   );
+  // Tools for this page: extensions (when any are installed), then Agents beside Chat. Pane
+  // layout lives in the ⋯ menu here; the sidebar keeps its button beside back and forward.
   const toolButtons = (
     <>
-      {hiddenButtons.has("misty") ? null : <BrowserMistyButton tabId={tab.id} />}
-      {chrome ? (
-        <>
-          {chrome.spaces}
-          {chrome.profile}
-        </>
-      ) : hiddenButtons.has("extensions") ? null : (
+      {hiddenButtons.has("extensions") ? null : (
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} />
       )}
+      <BrowserAgentsButton />
+      <BrowserMistyButton />
       {hiddenButtons.has("downloads") ? null : (
         <BrowserDownloadsButton
           suspensionReason={`browser-downloads:${browserRuntimeId(tab)}`}
           onShowAll={() => page.commands.openPage("downloads")}
         />
       )}
+      {chrome?.sync}
       {browserMenu(false)}
     </>
   );
   // Vertical tabs: back/forward/reload go beside the sidebar toggle, and the address field,
-  // pinned extensions and a ⋯ menu (bookmark, Misty, extensions, then the browser menu) fill
+  // pinned extensions and a ⋯ menu (bookmark, extensions, then the browser menu) fill
   // the sidebar's top slot.
   const toolbar = (
-    <div
-      className={cn(browserToolbarStyles.bar, "border-cream/[0.055]")}
-      style={{ backgroundColor: browserChromeBackground }}
-      data-window-toolbar
-      data-browser-toolbar
-    >
-      <div className={browserToolbarStyles.group}>
-        {navButtons}
-        {siteInfo}
-        {paneLayout}
-      </div>
-      {badges}
-      {omnibox}
-      <div className={browserToolbarStyles.group}>{toolButtons}</div>
-    </div>
+    <BrowserToolbar nav={navButtons} badges={badges} address={omnibox} tools={toolButtons} />
   );
   const sidebarTop = (
     <div className={browserToolbarStyles.sidebarTop} data-browser-toolbar data-sidebar>
-      {state.private || state.agentOwned ? (
+      {isIncognitoWindow() || state.agentOwned ? (
         <div className="flex items-center gap-1" data-misty-window-drag-block="true">
           {badges}
         </div>
@@ -369,7 +351,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <section
       className={cn("grid h-full min-h-0 overflow-hidden", "text-cream")}
       style={{
-        gridTemplateRows: `${sidebar ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
+        gridTemplateRows: `${sidebar || hoisted ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
         backgroundColor: browserChromeBackground,
       }}
       data-browser-theme={browserTheme}
@@ -387,10 +369,16 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
                 data-misty-window-drag-block="true"
               >
                 {navButtons}
+                {paneLayout}
               </div>
             </Portal>
           ) : null}
           {paneFocused && topSlot ? <Portal container={topSlot}>{sidebarTop}</Portal> : null}
+        </>
+      ) : hoisted ? (
+        <>
+          <div aria-hidden="true" />
+          {active ? <Portal container={paneToolbarHost}>{toolbar}</Portal> : null}
         </>
       ) : (
         toolbar

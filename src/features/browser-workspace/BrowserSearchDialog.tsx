@@ -10,34 +10,13 @@ import {
   DialogTitle,
   IconButton,
   Input,
-  SkeletonList,
-  Spinner,
 } from "@/shared/ui";
 import { browserSearchEngine } from "@/features/workspace/browserSearchEngine";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
-import { mistyBangs } from "./bangs/catalog";
-import { bangDestination, parseBang, parseLeadingBang } from "./bangs/parse";
-import type { Bang } from "./bangs/types";
 import { browserSearchDestination, useBrowserSearchStore, type SearchAnchor } from "./search";
 import { SearchResultList, type SearchListItem } from "./SearchResultList";
-import { openInNewBrowserTab, openMatch, openResult } from "./searchTargets";
+import { openInNewBrowserTab, openMatch, openTargetBeside } from "./searchTargets";
 import { useSearchItems } from "./useSearchItems";
-
-/**
- * Margins that move the top-anchored panel onto the page area, not the whole window. The
- * input stays put while results grow downward beneath it.
- */
-function centerOnPage(open: boolean) {
-  const rect = open
-    ? document.querySelector("[data-browser-page-host]")?.getBoundingClientRect()
-    : undefined;
-  if (!rect?.width) return { marginLeft: 84, marginTop: 0 };
-  return {
-    marginLeft: Math.round(rect.left + rect.right - window.innerWidth),
-    // The dialog's own 12vh top offset is replaced by 12% of the page height.
-    marginTop: Math.round(rect.top + rect.height * 0.12 - window.innerHeight * 0.12),
-  };
-}
 
 /** Margins that put the panel's top-left corner where the address bar was. */
 function overAddressBar(anchor: SearchAnchor) {
@@ -48,15 +27,13 @@ const close = () => useBrowserSearchStore.getState().close();
 
 export function BrowserSearchDialog() {
   const open = useBrowserSearchStore((state) => state.open);
-  const openScope = useBrowserSearchStore((state) => state.scope);
   const anchor = useBrowserSearchStore((state) => state.anchor);
-  const [bang, setBang] = useState<Bang | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { items, bangs, loading } = useSearchItems(bang, query, open);
+  const { items } = useSearchItems(query, open);
   const engine = browserSearchEngine().name;
 
   useEffect(() => {
@@ -70,7 +47,6 @@ export function BrowserSearchDialog() {
   useEffect(() => {
     setBrowserWebviewsSuspended(open, "browser-search");
     if (!open) {
-      setBang(null);
       setQuery("");
       setError(null);
       setNotice(null);
@@ -78,31 +54,14 @@ export function BrowserSearchDialog() {
     return () => setBrowserWebviewsSuspended(false, "browser-search");
   }, [open]);
 
-  // Opened for one scope (Search open tabs): start inside it, with the full list showing.
-  useEffect(() => {
-    if (!open || !openScope) return;
-    setBang(mistyBangs.find((candidate) => candidate.scope === openScope) ?? null);
-    setQuery("");
-  }, [open, openScope]);
-
-  useEffect(() => setActiveIndex(0), [bang, query]);
+  useEffect(() => setActiveIndex(0), [query]);
   // Slower sources can shorten the list under the highlight.
   const active = Math.min(activeIndex, Math.max(0, items.length - 1));
 
   const changeQuery = (value: string) => {
     setError(null);
     setNotice(null);
-    const parsed = bang ? null : parseLeadingBang(value, bangs);
-    if (parsed) {
-      setBang(parsed.bang);
-      setQuery(parsed.query);
-    } else setQuery(value);
-  };
-
-  const pickBang = (next: Bang, carried = "") => {
-    setBang(next);
-    setQuery(carried);
-    setNotice(null);
+    setQuery(value);
   };
 
   const run = (action: () => string | void) => {
@@ -115,53 +74,45 @@ export function BrowserSearchDialog() {
     }
   };
 
+  /** ⌘⏎: the choice opens beside the current pane. */
+  const chooseBeside = (item: SearchListItem | undefined) => {
+    if (!item) {
+      const url = browserSearchDestination(query);
+      if (url) run(() => openTargetBeside({ url }));
+      return;
+    }
+    if (item.type === "match" && item.match.target.type === "navigate")
+      return run(() => openTargetBeside({ url: item.match.target.url }));
+    choose(item);
+  };
+
   const choose = (item: SearchListItem) => {
-    if (item.type === "bang") pickBang(item.bang, item.query);
-    else if (item.type === "match") {
+    if (item.type === "match") {
       const target = item.match.target;
       if (anchor && target.type !== "switch-tab" && target.type !== "open-in-app")
         run(() => anchor.openUrl(target.url));
       else run(() => openMatch(item.match, navigate));
-    } else if (anchor && item.result.target.kind === "url") {
-      const { url } = item.result.target;
-      run(() => anchor.openUrl(url));
-    } else run(() => openResult(item.result, navigate));
+    }
   };
 
-  /** Enter with nothing highlighted: a website shortcut's search, or the typed address or search. */
+  /** Enter with nothing highlighted: the typed address, or the typed search. */
   const submitText = () => {
-    if (bang?.kind === "scope") return;
-    const parsed = bang ? { bang, query } : parseBang(query, bangs);
-    if (parsed?.bang.kind === "scope") return pickBang(parsed.bang, parsed.query);
-    const url =
-      parsed?.bang.kind === "web"
-        ? bangDestination(parsed.bang, parsed.query)
-        : browserSearchDestination(query);
+    const url = browserSearchDestination(query);
     if (url) run(() => (anchor ? anchor.openUrl(url) : openInNewBrowserTab(url, navigate)));
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Backspace" && !query && bang) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      setBang(null);
-      setNotice(null);
+      chooseBeside(query.trim() || activeIndex > 0 ? items[active] : undefined);
     } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && items.length) {
       event.preventDefault();
       const step = event.key === "ArrowDown" ? 1 : -1;
       setActiveIndex((active + step + items.length) % items.length);
-    } else if (event.key === "Tab" && items[active]?.type === "bang") {
-      event.preventDefault();
-      choose(items[active]);
     }
   };
 
-  const placeholder = !bang
-    ? "Search..."
-    : bang.kind === "scope"
-      ? bang.placeholder
-      : `Search ${bang.label}`;
-  const canSubmit =
-    bang?.kind === "scope" ? items.length > 0 : Boolean(query.trim() || items.length || bang);
+  const canSubmit = Boolean(query.trim() || items.length);
 
   return (
     <Dialog
@@ -171,41 +122,34 @@ export function BrowserSearchDialog() {
       <DialogContent
         placement="top"
         backdrop={!anchor}
-        style={anchor ? overAddressBar(anchor) : centerOnPage(open)}
+        // Unanchored, it opens in the middle of the window, whatever the panes are doing.
+        style={anchor ? overAddressBar(anchor) : undefined}
         className={cn(
           anchor ? "max-w-none" : "max-w-[700px]",
           "gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
           "ring-0 shadow-[0_24px_70px_rgba(0,0,0,0.65)] [&>[data-slot=dialog-close]]:hidden",
         )}
       >
-        <DialogTitle className="sr-only">
-          {bang ? `Search ${bang.label}` : "Search or enter a URL"}
-        </DialogTitle>
+        <DialogTitle className="sr-only">Search or enter a URL</DialogTitle>
         <DialogDescription className="sr-only">
-          Enter opens a website or a {engine} search in a new workspace tab. Type an exclamation
-          mark for shortcuts, such as !files, !bookmarks or !yt, to search there instead. Escape
-          closes search.
+          Enter opens a website or a {engine} search; Command-Enter opens it beside this page.
+          Escape closes.
         </DialogDescription>
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            const item = bang || query.trim() || activeIndex > 0 ? items[active] : undefined;
+            const item = query.trim() || activeIndex > 0 ? items[active] : undefined;
             if (item) choose(item);
             else submitText();
           }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            {loading && !items.length ? (
-              <Spinner size="sm" label={false} className="size-4 shrink-0 text-zinc-400" />
-            ) : (
-              <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
-            )}
-            {bang && <span className="shrink-0 text-base text-zinc-400">!{bang.trigger}</span>}
+            <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
             <Input
               variant="bare"
               autoFocus
               aria-label="Search or enter a URL"
-              placeholder={placeholder}
+              placeholder={`Search ${engine} or enter a URL`}
               value={query}
               onChange={(event) => changeQuery(event.target.value)}
               onKeyDown={onKeyDown}
@@ -234,23 +178,12 @@ export function BrowserSearchDialog() {
             </p>
           )}
         </form>
-        {loading && !items.length ? (
-          <div className="p-3">
-            <SkeletonList label={`Searching ${bang?.label ?? ""}`} rows={3} lines={1} />
-          </div>
-        ) : (
-          <SearchResultList
-            items={items}
-            activeIndex={active}
-            onHover={setActiveIndex}
-            onChoose={choose}
-          />
-        )}
-        {bang?.kind === "scope" && query.trim() && !loading && !items.length && (
-          <p className="px-4 py-3 text-sm text-zinc-400">
-            No matches in {bang.label.toLowerCase()}.
-          </p>
-        )}
+        <SearchResultList
+          items={items}
+          activeIndex={active}
+          onHover={setActiveIndex}
+          onChoose={choose}
+        />
       </DialogContent>
     </Dialog>
   );

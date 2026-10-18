@@ -1,17 +1,19 @@
 import { CursorCompanionController } from "@/features/agents";
+import { CapturePanel, DictationController } from "@/features/voice";
+import { RecallRecorderMount } from "@/features/recall";
 import { type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
-import { BrowserSyncBadge } from "@/features/browser-workspace/BrowserSyncBadge";
+import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
+import { BrowserSyncBadge, SyncMenuItem } from "@/features/browser-workspace/BrowserSyncBadge";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
-import { useSettingsStore } from "@/features/settings";
+import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { useWindowDockingLayout } from "@/features/workspace";
-import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { windowChromeBackground } from "@/features/workspace/windowColors";
-import { useWindowColorRequest } from "./windowColorRequest";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
@@ -21,14 +23,8 @@ import { isTopEdgeDragPress } from "./windowChromeHelpers";
 import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { AccountIsland } from "./AccountIsland";
-import {
-  BrowserMenuAccountItems,
-  BrowserProfileButton,
-  StripDownloads,
-  StripShortcuts,
-} from "./WorkspaceStripDock";
-import { SpacesMenuButton } from "@/features/spaces";
+import { AccountIsland, AccountTab } from "./AccountIsland";
+import { StripChat, StripDownloads } from "./WorkspaceStripDock";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
@@ -41,6 +37,8 @@ import { useDesktopShellStatus } from "./useDesktopShellStatus";
 import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
+import { useOtherWindowsHiddenWhileAddingAccount, useSignedOutWindow } from "./useSignedOutWindow";
+import { useStrayBrowserPages } from "./useStrayBrowserPages";
 import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
@@ -57,17 +55,10 @@ export type {
 
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
+  useStrayBrowserPages();
   const { user, refreshUser, transitioning } = useAuth();
-  const {
-    location,
-    navigate,
-    settingsLoad,
-    activePaneId,
-    activeWorkspacePaneId,
-    lastAppRoute,
-    lastNonSettingsRouteRef,
-    routeId,
-  } = useDesktopBootstrap({ getRouteId: props.getRouteId });
+  const { location, navigate, settingsLoad, lastAppRoute, lastNonSettingsRouteRef, routeId } =
+    useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
@@ -131,23 +122,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     shouldShowWindowsControls,
     appZoom,
   });
-  // The color being tried in the picker shows live, before it is kept.
-  const activeWindowId = useWorkspaceStore((state) => state.activeWindowId);
-  // Editing another window leaves this one's chrome alone.
-  const windowColorPreview = useWindowColorRequest((state) =>
-    state.request?.kind === "edit" && state.request.windowId !== activeWindowId
-      ? null
-      : state.preview,
+  useSignedOutWindow(isAuthRoute);
+  useOtherWindowsHiddenWhileAddingAccount(
+    isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
-  const windowChrome = useWorkspaceStore((state) =>
-    windowChromeBackground(
-      windowColorPreview ??
-        (state.windowsByScope[state.activeScopeKey] ?? []).find(
-          (item) => item.id === state.activeWindowId,
-        )?.color,
-    ),
-  );
-  // The window's color tints everything around the content region.
+  // The window takes its Space's color, which tints everything around the content region.
+  const windowChrome = useSpaceWindowStore((state) => windowChromeBackground(state.space?.color));
   useEffect(() => {
     const shell = shellRef.current;
     if (windowChrome && !isAuthRoute)
@@ -158,43 +138,45 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useSettingsStore.getState().setActiveSection("sync");
     openSettingsOverlay();
   };
-  const stripAccount =
-    !isAuthRoute && isSideDock(docking.tabs) ? (
-      <AccountIsland
-        open={profileOpen}
-        onOpenChange={(open) => {
-          if (open) setSettingsOpen(false);
-          setProfileOpen(open);
-        }}
-        onOpenAccountSettings={openAccountSettings}
-        settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-        onSettingsClick={openSettingsOverlay}
-      />
-    ) : null;
-  const stripShortcuts = <StripShortcuts />;
-  // The sidebar's bottom edge: downloads on the left, sync on the right.
+  const AccountStrip = isSideDock(docking.tabs) ? AccountIsland : AccountTab;
+  const stripAccount = !isAuthRoute ? (
+    <AccountStrip
+      open={profileOpen}
+      onOpenChange={(open) => {
+        if (open) {
+          if (blockIfUnsaved()) return;
+          setSettingsOpen(false);
+        }
+        setProfileOpen(open);
+      }}
+      onOpenAccountSettings={openAccountSettings}
+      settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+      onSettingsClick={openSettingsOverlay}
+    />
+  ) : null;
+  // The sidebar's bottom edge: downloads on the left, chat on the right.
   const stripFootEnd = (
     <>
       <StripDownloads />
-      {/* Sidebar chrome, so it is the same 28px button as downloads and settings. */}
-      <div className="flex shrink-0 items-center" data-browser-toolbar data-sidebar>
-        <BrowserSyncBadge
-          key={user?.id}
-          accountId={user?.id ?? ""}
-          onOpenSettings={openSyncSettings}
-        />
-      </div>
+      <StripChat />
     </>
   );
   const browserChrome = {
-    spaces: <SpacesMenuButton toolbar />,
-    profile: <BrowserProfileButton onOpenAccountSettings={openAccountSettings} />,
-    accountItems: <BrowserMenuAccountItems onSyncClick={openSyncSettings} />,
+    sync: (
+      <BrowserSyncBadge
+        key={user?.id}
+        accountId={user?.id ?? ""}
+        onOpenSettings={openSyncSettings}
+        menuOnly
+      />
+    ),
+    accountItems: <SyncMenuItem accountId={user?.id ?? ""} />,
   };
   return (
     <NavigationNamesBoundary userId={user?.id ?? ""} enabled={!isAuthRoute}>
       <ExtensionPermissionRequest />
       <ExtensionInstallRequest />
+      <SpaceImportRequest />
       <main
         ref={shellRef}
         className={cn(
@@ -239,7 +221,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               aria-hidden="true"
               // Stops where the first tab's curve starts, so the curve is not painted over.
               style={{
-                width: Math.max(0, (topTabInsets?.left ?? 0) - dockingMetrics.tabShoulder),
+                width: Math.max(0, (topTabInsets?.left ?? 0) + dockingMetrics.tabLead),
               }}
             />
           ) : null}
@@ -259,7 +241,10 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         </header>
 
         <section
-          className="route-shell relative z-10 min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
+          className={cn(
+            "route-shell relative z-10 min-h-0 min-w-0 overflow-hidden",
+            isAuthRoute ? "bg-window-chrome" : "bg-charcoal-bg",
+          )}
           style={isAuthRoute ? { gridColumn: 1, gridRow: 2 } : geometry.content}
           data-misty-route-shell
         >
@@ -279,14 +264,18 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
                 tabPosition={docking.tabs}
                 titlebarInsets={topTabInsets}
                 hideTabStrip={focusMode}
-                stripShortcuts={stripShortcuts}
                 stripFootEnd={stripFootEnd}
                 stripAccount={stripAccount}
                 browserChrome={browserChrome}
               />
             )}
             {!isAuthRoute && user?.id ? (
-              <CursorCompanionController key={user.id} accountId={user.id} />
+              <>
+                <CursorCompanionController key={user.id} accountId={user.id} />
+                <DictationController key={`dictation-${user.id}`} />
+                <CapturePanel key={`capture-${user.id}`} />
+                <RecallRecorderMount key={`recall-${user.id}`} />
+              </>
             ) : null}
           </>
         </section>
@@ -297,9 +286,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             settingsOpen={settingsOpen}
             onCloseSettings={closeSettingsOverlay}
             userId={user?.id}
-            currentPath={`${location.pathname}${location.search}`}
-            activePaneId={activePaneId}
-            activeWorkspacePaneId={activeWorkspacePaneId}
           />
         ) : null}
       </main>

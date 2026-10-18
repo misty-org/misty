@@ -6,7 +6,7 @@ import {
 } from "@/features/workspace";
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn, Spinner } from "@/shared/ui";
-import { VenetianMask, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { providerFromRoute } from "@/features/webviews/providers";
 import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
@@ -43,16 +43,6 @@ export function ViewIcon({
   );
   const faviconUrl = browserState?.faviconUrl;
   useEffect(() => setFaviconFailed(false), [faviconUrl]);
-  if (browserState?.private && !isLoading) {
-    return (
-      <VenetianMask
-        className={cn("shrink-0", isActive ? "text-cream-bright" : "text-cream-muted")}
-        size={size}
-        strokeWidth={2}
-        aria-label="Private tab"
-      />
-    );
-  }
   if (isBrowser && isLoading) {
     return (
       <Spinner
@@ -93,7 +83,7 @@ export function ViewIcon({
     : null;
   if (
     website &&
-    ["planner", "journal", "library"].includes(appId) &&
+    ["journal", "library"].includes(appId) &&
     Object.prototype.hasOwnProperty.call(websiteIntegrations, website)
   )
     return (
@@ -106,19 +96,9 @@ export function ViewIcon({
     tab &&
     (!website || website === "misty") &&
     section &&
-    [
-      "notes",
-      "drawings",
-      "tasks",
-      "agenda",
-      "roadmaps",
-      "explorer",
-      "recent",
-      "favorites",
-      "collections",
-      "albums",
-      "deleted",
-    ].includes(section)
+    ["notes", "drawings", "explorer", "recent", "favorites", "collections", "deleted"].includes(
+      section,
+    )
   )
     return (
       <span className="inline-flex shrink-0 [&_svg]:!size-4">

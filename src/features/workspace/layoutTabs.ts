@@ -5,7 +5,6 @@ import type {
   WorkspaceLayout,
   WorkspaceTab,
   WorkspaceView,
-  WorkspaceWindow,
 } from "./model";
 
 export function layoutTabs(layout: WorkspaceLayout): WorkspaceTab[] {
@@ -153,14 +152,15 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
   );
 }
 
+/** Every view this window holds, in its Space's layout and any device profile's. */
 export function workspaceTabsById(state: {
-  windowsByScope: Record<string, WorkspaceWindow[] | undefined>;
+  layout: WorkspaceLayout;
+  layoutsByScope: Partial<Record<string, WorkspaceLayout>>;
 }): Map<string, WorkspaceView> {
   return new Map(
-    Object.values(state.windowsByScope)
-      .filter((windows): windows is NonNullable<typeof windows> => Boolean(windows))
-      .flat()
-      .flatMap((workspaceWindow) => allLayoutViews(workspaceWindow.layout))
+    [state.layout, ...Object.values(state.layoutsByScope)]
+      .filter((layout): layout is WorkspaceLayout => Boolean(layout))
+      .flatMap((layout) => allLayoutViews(layout))
       .map((tab) => [tab.id, tab]),
   );
 }

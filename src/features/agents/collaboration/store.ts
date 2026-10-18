@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { collaborationApi } from "./api";
+import { upsertChecklist } from "./checklists";
 import type {
   AgentGoal,
   AgentPlan,
@@ -9,10 +10,14 @@ import type {
   CollaborationEvent,
   ConversationCollaboration,
   ConversationMode,
+  PermissionMode,
 } from "./types";
 
 const empty = (): ConversationCollaboration => ({
   mode: "act",
+  permissionMode: "",
+  agentPermissionMode: "ask",
+  checklists: [],
   plan: null,
   planHistory: [],
   goal: null,
@@ -29,6 +34,8 @@ interface CollaborationStore {
   defaultMode: ConversationMode;
   /** The composer picked a mode for the next new conversation. */
   draftChosen: boolean;
+  /** Ask or Auto for the next new conversation; empty follows its agent. */
+  draftPermissionMode: PermissionMode | "";
   setDefaultMode(mode: ConversationMode): void;
   error: string;
   /**
@@ -118,6 +125,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     draftMode: "act",
     defaultMode: "act",
     draftChosen: false,
+    draftPermissionMode: "",
     error: "",
     queuedTurn: undefined,
     setDefaultMode(mode) {
@@ -141,6 +149,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
         byConversation: {},
         draftMode: get().defaultMode,
         draftChosen: false,
+        draftPermissionMode: "",
         error: "",
         queuedTurn: undefined,
       });
@@ -158,6 +167,7 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
             ...empty(),
             ...value,
             questionSets: value.questionSets ?? [],
+            checklists: value.checklists ?? [],
             planHistory: value.planHistory ?? [],
           };
           set((state) => ({
@@ -190,8 +200,11 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     },
     adoptDraftMode(conversationId) {
       if (!conversationId || get().byConversation[conversationId]) return;
-      patch(conversationId, () => ({ mode: get().draftMode }));
-      set({ draftMode: get().defaultMode, draftChosen: false });
+      patch(conversationId, () => ({
+        mode: get().draftMode,
+        permissionMode: get().draftPermissionMode,
+      }));
+      set({ draftMode: get().defaultMode, draftChosen: false, draftPermissionMode: "" });
     },
     applyEvent(conversationId, event) {
       if (!conversationId) return;
@@ -206,6 +219,10 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
             : { plan: event.plan, planHistory: withVersion(current.planHistory, event.plan) },
         );
       else if (event.type === "goal.updated") patch(conversationId, () => ({ goal: event.goal }));
+      else if (event.type === "checklist.updated")
+        patch(conversationId, (current) => ({
+          checklists: upsertChecklist(current.checklists, event.checklist),
+        }));
     },
     async answer(questionSet, answers) {
       const accountId = get().accountId;

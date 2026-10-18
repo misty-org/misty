@@ -109,6 +109,44 @@ async fn call(
     }
 }
 
+/// The page a navigation lands on, once its document has loaded and gone quiet, as the
+/// model reads it: the agent sees the new page in the same step instead of guessing its
+/// next look (docs/plans/odysseys-campaign.md). None when the page never answered.
+pub(super) async fn landed(
+    app: &AppHandle,
+    id: &str,
+    previous: &url::Url,
+    target: &url::Url,
+) -> Option<Value> {
+    let started = tokio::time::Instant::now();
+    loop {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let view = webview(app, id).ok()?;
+        let moved = view.url().ok().as_ref() != Some(previous)
+            || (previous == target && started.elapsed() > Duration::from_millis(1200));
+        let ready = call(&view, "waitCheck", json!({}), false)
+            .await
+            .is_ok_and(|check| check["ready"] == true);
+        if (moved && ready) || started.elapsed() > Duration::from_secs(15) {
+            break;
+        }
+    }
+    let view = webview(app, id).ok()?;
+    let _ = call(
+        &view,
+        "settle",
+        json!({"quietMs": 400, "maxMs": 3000}),
+        false,
+    )
+    .await;
+    let args = json!({"candidateId": uuid::Uuid::new_v4().to_string(), "maxChars": SNAPSHOT_CHARS, "maxRefs": 800});
+    let snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    (snapshot["ok"] == true).then(|| {
+        json!({"documentId": snapshot["documentId"], "url": snapshot["url"], "title": snapshot["title"],
+            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]})
+    })
+}
+
 fn page_error(result: &Value, fallback: &str) -> String {
     let message = result["error"].as_str().unwrap_or(fallback);
     match result["errorCode"].as_str() {

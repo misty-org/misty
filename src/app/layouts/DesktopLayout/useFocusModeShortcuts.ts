@@ -20,8 +20,8 @@ export function useFocusModeShortcuts() {
     "workspace.search_tabs",
     useCallback(() => {
       const search = useBrowserSearchStore.getState();
-      if (search.open && search.scope === "tabs") search.close();
-      else search.show("tabs");
+      if (search.open) search.close();
+      else search.show();
     }, []),
   );
   return focusMode;

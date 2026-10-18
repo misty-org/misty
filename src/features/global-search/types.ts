@@ -12,12 +12,10 @@ export type GlobalAiMode = "search" | "ask";
 
 type GlobalSearchKind =
   | "space"
-  | "task"
   | "note"
   | "message"
   | "conversation"
   | "calendar"
-  | "roadmap"
   | "drawing"
   | "library"
   | "folder"

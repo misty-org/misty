@@ -39,7 +39,7 @@ billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
-rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate agent-code-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }
 # The desktop crate compiles for Windows too. A Windows machine already covers
 # it in desktop-crate; elsewhere cargo-xwin cross-checks every target, so
@@ -55,7 +55,6 @@ desktop_windows() {
 }
 browser_sync_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
 # Code projects: file tools, the Seatbelt sandbox and its escape tests (macOS).
-agent_code_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/agent-code/Cargo.toml; }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
 kiri_crate() { cargo test --locked --quiet --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {
@@ -102,35 +101,71 @@ run() {
   echo "✓ $name ($((SECONDS - started))s)"
 }
 
-# Runs steps at the same time, each into its own log, and reports them in
-# order: the time of each that passed and the full log of each that failed.
-# Returns the exit code of the first step (in order) that failed.
+# Runs steps at the same time, each into its own log, and reports completion
+# and the full log of each that failed. Periodic updates keep long-running
+# checks visible even when their tools buffer output.
+# Returns the exit code of the first step (in launch order) that failed.
 # Every step runs as a plain command in its own subshell, so errexit stays on
 # inside it; only the wait is tested.
 parallel() {
-  local logs name i=0 status=0
+  local logs name i=0 status=0 started=$SECONDS last_report=$SECONDS running
   local pids=()
+  local done=()
   logs=$(mktemp -d)
   for name in "$@"; do
+    case "$name" in
+      frontend) echo "▶ frontend checks started (typecheck, lint, unit tests, dev-navigation)" ;;
+      scripts) echo "▶ script tests started" ;;
+      rust-desktop) echo "▶ Rust desktop checks started (crate tests and Windows cross-check)" ;;
+      *) echo "▶ $name started" ;;
+    esac
     (
       started=$SECONDS
-      "${name//-/_}"
+      "${name//-/_}" 2>&1 | tee "$logs/$name.log" | while IFS= read -r line; do
+        printf '[%s] %s\n' "$name" "$line"
+      done
       echo "$((SECONDS - started))" >"$logs/$name.time"
-    ) >"$logs/$name.log" 2>&1 &
+    ) &
     pids+=($!)
+    done+=(0)
   done
   local code
-  for name in "$@"; do
-    code=0
-    wait "${pids[$i]}" || code=$?
-    if [ "$code" -eq 0 ]; then
-      echo "✓ $name ($(cat "$logs/$name.time")s)"
-    else
-      echo "✗ $name"
-      sed 's/^/  /' "$logs/$name.log"
-      [ "$status" -ne 0 ] || status=$code
+  while :; do
+    running=0
+    i=0
+    for name in "$@"; do
+      if [ "${done[$i]}" -eq 0 ]; then
+        if kill -0 "${pids[$i]}" 2>/dev/null; then
+          running=$((running + 1))
+        else
+          code=0
+          wait "${pids[$i]}" || code=$?
+          done[$i]=1
+          if [ "$code" -eq 0 ]; then
+            echo "✓ $name ($(cat "$logs/$name.time")s)"
+          else
+            echo "✗ $name"
+            [ "$status" -ne 0 ] || status=$code
+          fi
+        fi
+      fi
+      i=$((i + 1))
+    done
+    [ "$running" -gt 0 ] || break
+    if [ $((SECONDS - last_report)) -ge 15 ]; then
+      running=
+      i=0
+      for name in "$@"; do
+        if [ "${done[$i]}" -eq 0 ] && kill -0 "${pids[$i]}" 2>/dev/null; then
+          [ -z "$running" ] || running="$running, "
+          running="$running$name"
+        fi
+        i=$((i + 1))
+      done
+      echo "… still running after $((SECONDS - started))s: $running"
+      last_report=$SECONDS
     fi
-    i=$((i + 1))
+    sleep 1
   done
   rm -rf "$logs"
   return "$status"

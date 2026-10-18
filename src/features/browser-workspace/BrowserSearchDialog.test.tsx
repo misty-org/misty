@@ -4,6 +4,9 @@ import { MemoryRouter } from "react-router-dom";
 import { activeLayoutView, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { BrowserSearchDialog } from "./BrowserSearchDialog";
 import { useBrowserSearchStore } from "./search";
+import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
+import { useMistyStore } from "@/features/misty/useMistyStore";
+import type { AgentProfile } from "@/shared/schemas";
 vi.mock("@/features/webviews/browserRuntime", () => ({
   onBrowserRuntimeClose: () => () => undefined,
   setBrowserWebviewsSuspended: vi.fn(),
@@ -50,58 +53,47 @@ describe("browser search submission", () => {
   });
 });
 
-describe("bangs", () => {
-  it("lists shortcuts for a bare exclamation mark, grouped", () => {
-    fireEvent.change(renderDialog(), { target: { value: "!" } });
-    expect(screen.getByText("Misty")).toBeTruthy();
-    expect(screen.getByText("Web")).toBeTruthy();
-    expect(screen.getByRole("option", { name: /!bookmarks/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /!yt/ })).toBeTruthy();
+describe("internal Misty items excluded", () => {
+  const agent = (id: string, name: string, system = false) =>
+    ({
+      id,
+      name,
+      role: "",
+      enabled: true,
+      system_managed: system,
+      avatar: {},
+    }) as unknown as AgentProfile;
+  beforeEach(() => {
+    usePersonalAgentsStore.setState({
+      agents: [agent("misty", "Misty", true), agent("res", "Researcher")],
+    });
+    useMistyStore.setState({ selectedAgentId: "" });
   });
 
-  it("turns a leading shortcut into a chip and searches that site", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!yt " } });
-    expect(screen.getByText("!yt")).toBeTruthy();
-    expect(input.getAttribute("placeholder")).toBe("Search YouTube");
-    fireEvent.change(input, { target: { value: "lo fi" } });
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(openedUrl()).toBe("https://www.youtube.com/results?search_query=lo%20fi");
+  const optionNames = () => screen.getAllByRole("option").map((option) => option.textContent ?? "");
+
+  it("never offers asking an agent for requests or questions", () => {
+    fireEvent.change(renderDialog(), { target: { value: "summarize this page for me" } });
+    expect(optionNames().some((name) => name.includes("Misty"))).toBe(false);
+    expect(optionNames()[0]).toBe("summarize this page for me");
   });
 
-  it("reads a trailing shortcut on submit", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "misty !gh" } });
-    expect(screen.getByRole("option", { name: /Search GitHub/ })).toBeTruthy();
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(openedUrl()).toBe("https://github.com/search?q=misty");
+  it("never offers asking an agent for search queries", () => {
+    fireEvent.change(renderDialog(), { target: { value: "pizza brooklyn" } });
+    const names = optionNames();
+    expect(names.some((name) => name.includes("Misty"))).toBe(false);
+    expect(names[0]).toBe("pizza brooklyn");
   });
 
-  it("leaves a slash command as plain text", async () => {
-    fireEvent.change(renderDialog(), { target: { value: "/files report" } });
-    expect(screen.queryByText("!files")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Search or enter a URL" })).toBeTruthy();
+  it("does not offer asking for an address", () => {
+    fireEvent.change(renderDialog(), { target: { value: "github.com" } });
+    expect(optionNames().some((name) => name.includes("Misty"))).toBe(false);
   });
 
-  it("shows bookmark actions for !b and clears the chip on Backspace", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!b " } });
-    expect(await screen.findByRole("option", { name: /Open bookmark manager/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /Bookmark all tabs/ })).toBeTruthy();
-    fireEvent.keyDown(input, { key: "Backspace" });
-    expect(screen.queryByText("!bookmarks")).toBeNull();
-  });
-
-  it("opens the bookmark manager from !bookmarks", async () => {
-    const input = renderDialog();
-    fireEvent.change(input, { target: { value: "!bookmarks " } });
-    await screen.findByRole("option", { name: /Open bookmark manager/ });
-    fireEvent.submit(input.closest("form")!);
-    await waitFor(() => expect(useBrowserSearchStore.getState().open).toBe(false));
-    expect(
-      parseBrowserViewState(activeLayoutView(useWorkspaceStore.getState().layout)!.state).url,
-    ).toBe("misty://bookmarks");
+  it("does not treat @ as an agent mention", () => {
+    fireEvent.change(renderDialog(), { target: { value: "@res find the launch date" } });
+    const names = optionNames();
+    expect(names.some((name) => name.includes("Researcher"))).toBe(false);
+    expect(names[0]).toBe("@res find the launch date");
   });
 });

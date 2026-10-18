@@ -30,6 +30,7 @@ import {
 import { browserProfileChanged } from "@/features/webviews/browserRuntime";
 import { workspaceSource } from "./source";
 import { useBrowserSyncStore } from "./store";
+import { currentWindows, type WorkspaceWindowsState } from "@/features/workspace/windows";
 
 export function BrowserSyncBridge({ accountId }: { accountId: string }) {
   useEffect(() => {
@@ -131,7 +132,7 @@ export function BrowserSyncBridge({ accountId }: { accountId: string }) {
           ) {
             const live = workspaceSource.read();
             const changes = workspaceChanges(
-              baseline.windowsByScope?.global ?? [],
+              baseline.layout ? currentWindows(baseline as WorkspaceWindowsState) : [],
               live.windows,
               native.profile_id,
             );

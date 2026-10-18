@@ -42,9 +42,14 @@ export function SpaceSettingsDangerDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Leave {spaceName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              You will immediately lose access. Another member must invite you to regain it.
+              You lose access now, and everything of yours in this Space is deleted with you:
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <WhatGoes leaving />
+          <p className="m-0 text-sm text-cream-muted">
+            Your public notes, drawings and files stay with the Space. Another member must invite
+            you to come back.
+          </p>
           {error ? <DangerError message={error} /> : null}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={dangerBusy}>Cancel</AlertDialogCancel>
@@ -74,10 +79,14 @@ export function SpaceSettingsDangerDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-cream-bright">Delete {spaceName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes member access immediately and schedules permanent deletion. Type the
-              Space name exactly to continue.
+              Everyone loses access now. For every member, this deletes at once:
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <WhatGoes />
+          <p className="m-0 text-sm text-cream-muted">
+            The rest of the Space is deleted permanently after 30 days. Type the Space name exactly
+            to continue.
+          </p>
           <label className="grid gap-2 text-xs font-medium text-cream-muted">
             Space name
             <Input
@@ -103,6 +112,18 @@ export function SpaceSettingsDangerDialogs({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/** What leaving or deleting a Space takes with it: each person's private layer there. */
+function WhatGoes({ leaving = false }: { leaving?: boolean }) {
+  return (
+    <ul className="m-0 list-disc space-y-1 pl-5 text-sm text-cream">
+      <li>Memory from this Space</li>
+      <li>Private notes, drawings and files</li>
+      {leaving && <li>Your code projects linked here</li>}
+      <li>The app accounts picked for this Space</li>
+    </ul>
   );
 }
 

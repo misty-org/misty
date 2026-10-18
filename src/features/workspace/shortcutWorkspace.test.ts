@@ -110,7 +110,7 @@ describe("workspace shortcut actions", () => {
     expect(restoredLayout.root).toMatchObject({ direction: "horizontal", ratio: 0.38 });
   });
 
-  it("returns a tab to its existing source panel instead of the focused panel", () => {
+  it("returns a tab to its existing source pane instead of the focused pane", () => {
     const store = useWorkspaceStore.getState();
     const files = store.addSurface({
       surfaceId: "agents",

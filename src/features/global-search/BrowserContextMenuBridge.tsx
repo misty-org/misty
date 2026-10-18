@@ -15,7 +15,6 @@ import {
   Highlighter,
   Image,
   Link,
-  MessageCircle,
   Puzzle,
   QrCode,
   RotateCw,
@@ -48,27 +47,28 @@ export interface BrowserMenuPresentation {
 }
 
 const entries = {
-  ask: { label: "Ask Misty…", icon: MessageCircle },
   copy: { label: "Copy", icon: Copy },
   cut: { label: "Cut", icon: Scissors },
   paste: { label: "Paste", icon: ClipboardPaste },
-  "search-web": { label: "Search the Web for Selection", icon: Search },
-  "open-link": { label: "Open Link in New Tab", icon: ExternalLink },
-  "open-link-split": { label: "Open Link in Split View", icon: Columns2 },
-  "peek-link": { label: "Peek Link", icon: Eye },
-  "copy-link": { label: "Copy Link Address", icon: Link },
-  "open-image": { label: "Open Image in New Tab", icon: Image },
-  "copy-image-link": { label: "Copy Image Address", icon: Link },
+  "search-web": { label: "Search web for selection", icon: Search },
+  "open-link": { label: "Open link in new tab", icon: ExternalLink },
+  "open-link-split": { label: "Open link in split view", icon: Columns2 },
+  "peek-link": { label: "Peek link", icon: Eye },
+  "copy-link": { label: "Copy link address", icon: Link },
+  "open-image": { label: "Open image in new tab", icon: Image },
+  "copy-image-link": { label: "Copy image address", icon: Link },
   back: { label: "Back", icon: ArrowLeft },
   forward: { label: "Forward", icon: ArrowRight },
   reload: { label: "Reload", icon: RotateCw },
-  bookmark: { label: "Bookmark Page…", icon: Star },
-  "copy-page-link": { label: "Copy Page Link", icon: Link },
-  "qr-code": { label: "QR Code for Page…", icon: QrCode },
-  annotate: { label: "Annotate Page", icon: Highlighter },
+  bookmark: { label: "Bookmark", icon: Star },
+  "copy-page-link": { label: "Copy link", icon: Link },
+  "qr-code": { label: "QR code", icon: QrCode },
+  annotate: { label: "Annotate", icon: Highlighter },
   extensions: { label: "Extensions", icon: Puzzle },
-  inspect: { label: "Inspect Page", icon: Code },
+  inspect: { label: "Inspect", icon: Code },
 };
+/** Actions the native menu may still send that this menu no longer shows. */
+const hiddenActions = new Set(["ask"]);
 const suspensionReason = "browser-context-menu";
 
 /**
@@ -151,20 +151,28 @@ export function BrowserContextMenuView({
         onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        {menu.actions.map((action, index) => {
-          if (action === "separator") return <DropdownMenuSeparator key={`separator-${index}`} />;
-          const entry = entries[action as keyof typeof entries];
-          if (!entry) return null;
-          const Icon = entry.icon;
-          return (
-            <MenuItem
-              key={action}
-              icon={<Icon size={17} aria-hidden="true" />}
-              label={entry.label}
-              onSelect={() => onSelect(action)}
-            />
-          );
-        })}
+        {menu.actions
+          .filter((action) => !hiddenActions.has(action))
+          // Hiding a row can leave a separator first, last or doubled.
+          .filter(
+            (action, index, all) =>
+              action !== "separator" ||
+              (index > 0 && index < all.length - 1 && all[index - 1] !== "separator"),
+          )
+          .map((action, index) => {
+            if (action === "separator") return <DropdownMenuSeparator key={`separator-${index}`} />;
+            const entry = entries[action as keyof typeof entries];
+            if (!entry) return null;
+            const Icon = entry.icon;
+            return (
+              <MenuItem
+                key={action}
+                icon={<Icon size={17} aria-hidden="true" />}
+                label={entry.label}
+                onSelect={() => onSelect(action)}
+              />
+            );
+          })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

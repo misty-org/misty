@@ -1,23 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import type { LibraryAlbum, SpaceLibraryItem } from "@/api/spaces/dto/entities";
+import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import {
   ContextMenu,
   ContextMenuAction,
   ContextMenuContent,
   ContextMenuLabel,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/shared/ui";
 import {
   ArchiveRestore,
+  AudioLines,
   ClipboardCopy,
   Copy,
-  FolderPlus,
   Pencil,
-  Star,
   Tags,
   Trash2,
 } from "lucide-react";
@@ -30,7 +26,6 @@ export interface LibraryItemMenuState {
 export function LibraryItemContextMenu(props: {
   state: LibraryItemMenuState;
   item: SpaceLibraryItem;
-  albums: LibraryAlbum[];
   canCopy: boolean;
   canEdit: boolean;
   deleted: boolean;
@@ -39,10 +34,10 @@ export function LibraryItemContextMenu(props: {
   onDuplicate: () => void;
   onRename: () => void;
   onEditTags: () => void;
-  onAddToAlbum: (albumId: string) => void;
-  onToggleFavorite: () => void;
   onTrash: () => void;
   onRestore: () => void;
+  /** Offered for audio and video when voice notes are on. */
+  onTranscribe?: () => void;
 }) {
   const triggerRef = useRef<HTMLSpanElement>(null);
   const onCloseRef = useRef(props.onClose);
@@ -105,6 +100,13 @@ export function LibraryItemContextMenu(props: {
             {props.canCopy ? (
               <ContextMenuAction icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
             ) : null}
+            {props.onTranscribe ? (
+              <ContextMenuAction
+                icon={<AudioLines />}
+                label="Transcribe"
+                onSelect={props.onTranscribe}
+              />
+            ) : null}
             {props.canCopy && props.canEdit ? (
               <ContextMenuAction icon={<Copy />} label="Duplicate" onSelect={props.onDuplicate} />
             ) : null}
@@ -112,32 +114,6 @@ export function LibraryItemContextMenu(props: {
               <>
                 <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={props.onRename} />
                 <ContextMenuAction icon={<Tags />} label="Edit tags" onSelect={props.onEditTags} />
-                {props.albums.length ? (
-                  <ContextMenuSub>
-                    <ContextMenuSubTrigger>
-                      <FolderPlus className="size-4" /> Add to album
-                    </ContextMenuSubTrigger>
-                    <ContextMenuSubContent className="w-52">
-                      <ContextMenuLabel className="text-xs text-cream-muted">
-                        Choose an album
-                      </ContextMenuLabel>
-                      <ContextMenuSeparator />
-                      {props.albums.map((album) => (
-                        <ContextMenuAction
-                          icon={<FolderPlus className="size-4" />}
-                          label={album.name}
-                          key={album.id}
-                          onSelect={() => props.onAddToAlbum(album.id)}
-                        />
-                      ))}
-                    </ContextMenuSubContent>
-                  </ContextMenuSub>
-                ) : null}
-                <ContextMenuAction
-                  icon={<Star fill={props.item.favorite ? "currentColor" : "none"} />}
-                  label={props.item.favorite ? "Remove from favorites" : "Add to favorites"}
-                  onSelect={props.onToggleFavorite}
-                />
                 <ContextMenuSeparator />
                 <ContextMenuAction
                   destructive

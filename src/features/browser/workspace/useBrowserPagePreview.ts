@@ -2,6 +2,7 @@ import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { useEffect, useRef, type RefObject } from "react";
 import { captureBrowserPagePreview } from "./browserRuntime";
+import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 export function useBrowserPagePreview(
   tab: WorkspaceView,
@@ -10,7 +11,8 @@ export function useBrowserPagePreview(
 ) {
   const latest = useRef(tab);
   latest.current = tab;
-  const { url, private: privateTab } = parseBrowserViewState(tab.state);
+  const { url } = parseBrowserViewState(tab.state);
+  const privateTab = isIncognitoWindow();
   useEffect(() => {
     if (!enabled || privateTab || !/^https?:\/\//i.test(url)) return;
     let disposed = false;

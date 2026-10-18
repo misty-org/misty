@@ -190,8 +190,7 @@ pub fn island_press(action: &str, text: &str) {
             .flatten()
     });
     if let Some((app, task)) = target {
-        let _ = app.emit_to(
-            "main",
+        let _ = crate::infra::space_windows::emit(&app,
             "misty://agent-island",
             json!({ "taskId": task, "action": action, "text": text }),
         );
@@ -230,8 +229,7 @@ fn stop_control(reason: Option<&str>) {
     });
     release_control(false);
     if let (Some((app, task)), Some(reason)) = (announce, reason) {
-        let _ = app.emit_to(
-            "main",
+        let _ = crate::infra::space_windows::emit(&app,
             "misty://desktop-control-stopped",
             json!({ "taskId": task, "reason": reason }),
         );

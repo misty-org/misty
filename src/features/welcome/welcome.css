@@ -1,91 +1,54 @@
-/* Welcome hero: emerges from the haze as the clouds clear, then dives back in on Sign in. */
-.misty-welcome-hero {
-  opacity: 0;
-  transform: scale(0.22);
-  transform-origin: 50% 50%;
-  visibility: hidden;
+/* The website's hero highlight: an italic serif word on a hand-drawn pastel marker, tilted a
+   little like a stroke made by hand. Colors match misty-website's midnight.css. */
+.misty-welcome-marker {
+  position: relative;
+  z-index: 0;
+  padding: 0 0.1em 0 0.06em;
+  background: none;
+  color: var(--misty-theme-text-bright);
+  white-space: nowrap;
+  line-height: 1;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.1em;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
-.misty-welcome-hero[data-phase="in"] {
-  visibility: visible;
-  animation: misty-welcome-emerge 2.2s cubic-bezier(0.2, 0.9, 0.25, 1) forwards;
-}
-.misty-welcome-hero[data-phase="out"] {
-  visibility: visible;
-  pointer-events: none;
-  animation: misty-welcome-dive 1.5s cubic-bezier(0.5, 0, 0.85, 0.4) forwards;
-}
-/* A soft pool of background behind the copy so it stays readable over passing mist. */
-.misty-welcome-hero::before {
+.misty-welcome-marker::before {
   content: "";
   position: absolute;
-  inset: -18% -25%;
+  inset: 0.12em 0 0.04em;
   z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--color-charcoal-bg) 78%, transparent) 30%,
-    transparent
-  );
+  border-radius: 0.1em 0.18em 0.12em 0.2em;
+  background: var(--marker);
+  transform: rotate(-1.5deg) skewX(-8deg);
+  opacity: 0.5;
 }
-.misty-welcome-title,
-.misty-welcome-hint {
-  text-shadow: 0 0 40px var(--color-charcoal-bg);
+.misty-welcome-marker[data-tone="yellow"] {
+  --marker: #f0d58c;
 }
-.misty-welcome-hint {
-  opacity: 0;
-  transition: opacity 1.2s ease;
-}
-.misty-welcome-hint[data-visible="true"] {
-  opacity: 1;
-  animation: misty-welcome-breathe 3.2s ease-in-out 1.2s infinite;
+.misty-welcome-marker[data-tone="blue"] {
+  --marker: #a0c4d4;
 }
 
-@keyframes misty-welcome-emerge {
+/* Page transition: a page's content (not the bar) fades and rises into place. Opacity and transform only,
+   so it runs on the compositor; a blur filter made it stutter in WebKit. */
+.misty-page-in {
+  animation: misty-page-in 360ms ease-out both;
+  will-change: opacity, transform;
+}
+@keyframes misty-page-in {
   from {
     opacity: 0;
-    transform: scale(0.22);
-    filter: blur(14px);
-  }
-  45% {
-    opacity: 1;
-  }
-  70% {
-    filter: blur(0);
+    transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
+    transform: translate3d(0, 0, 0);
   }
 }
-@keyframes misty-welcome-dive {
-  from {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-  to {
-    opacity: 0;
-    transform: scale(2.4);
-    filter: blur(18px);
-  }
-}
-@keyframes misty-welcome-breathe {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .misty-welcome-hero,
-  .misty-welcome-hero[data-phase] {
-    opacity: 1;
-    transform: none;
-    visibility: visible;
+  .misty-page-in {
     animation: none;
   }
 }

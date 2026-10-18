@@ -1,3 +1,4 @@
+import { clearApiCache } from "@/api/cache/apiCache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
@@ -21,7 +22,6 @@ function authenticatedUser(data: LoginResponse, operation: string): AccountAuthU
   if (!id) throw new AccountApiError(`${operation} response did not include a user id.`);
   return {
     id,
-    name: data.name,
     username: data.username,
     email: data.email,
     provider: data.provider,
@@ -100,7 +100,10 @@ export async function accountLogout(accountId: string): Promise<void> {
   try {
     await accountApi.logout();
   } finally {
-    if (accountId) await forgetAccountCookies(await accountApi.resolveBase(), accountId);
+    if (accountId) {
+      await clearApiCache(accountId);
+      await forgetAccountCookies(await accountApi.resolveBase(), accountId);
+    }
   }
 }
 
@@ -109,12 +112,11 @@ export async function accountForgotPassword(email: string): Promise<void> {
 }
 
 export async function accountRegister(
-  name: string,
   username: string,
   email: string,
   password: string,
 ): Promise<AccountAuthUser> {
-  const body = { name, username, email, password };
+  const body = { username, email, password };
   return persistLogin(await accountApi.register(body), "Registration");
 }
 

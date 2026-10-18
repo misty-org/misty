@@ -31,10 +31,8 @@ import type {
 } from "@/native/ipc";
 import { configureStartupPreference } from "@/features/app-shell";
 import { configureBrowserHomeUrl } from "@/features/workspace/browserHome";
-import {
-  configureBrowserCustomBangs,
-  configureBrowserSearchSuggestions,
-} from "@/features/workspace/browserSearchEngine";
+import { configureBrowserSearchSuggestions } from "@/features/workspace/browserSearchEngine";
+import { configureDeviceBangs } from "@/features/workspace/spaceSearch";
 import {
   configureWorkspaceDefaultView,
   workspaceDefaultViewIndex,
@@ -49,12 +47,12 @@ import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
 import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
-import { configureAutoPictureInPicture } from "@/features/webviews/pictureInPictureSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { errorText } from "@/shared/lib/format";
 import { invoke } from "@/native/invoke";
 import { create } from "zustand";
 import type { SettingsSection, SettingValue } from "../types/store";
+import { configureLinkPreviews } from "@/features/link-preview/settings";
 import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
 export type { SettingsSection, SettingValue } from "../types/store";
 export * from "./preferences";
@@ -175,7 +173,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         set({ error: `Invalid value for ${definition.label}` });
         return;
       }
-      void writeProfilePreference(definition.id, converted).catch((error) =>
+      void writeProfilePreference(definition.id, converted, { stage: true }).catch((error) =>
         set({ error: errorText(error) }),
       );
       return;
@@ -189,7 +187,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     if (entry) entry[request.slot] = request.value;
     else overrides.push({ commandId: request.commandId, [request.slot]: request.value });
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -205,7 +205,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       else overrides.push({ commandId, [slot]: value });
     }
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -218,7 +220,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         )
       : [];
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides));
+      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+        stage: true,
+      });
     } catch (error) {
       set({ error: errorText(error) });
     }
@@ -277,9 +281,8 @@ function applySettingsSideEffects(
   configureBrowserSearchSuggestions(
     settingsBoolean(document, "general", "browser_search_suggestions", false),
   );
-  configureBrowserCustomBangs(
-    settingsString(document, "general", "browser_custom_bangs_json", "[]"),
-  );
+  // Bangs are Space data; the device's own list applies while no Space vault is open.
+  configureDeviceBangs(settingsString(document, "general", "browser_custom_bangs_json", "[]"));
   configureBrowserSiteZoom(settingsString(document, "general", "browser_site_zoom_json", "[]"));
   configureBrowserSiteStyles(settingsString(document, "general", "browser_site_styles_json", "[]"));
   configureBrowserMouseGestures(
@@ -287,9 +290,7 @@ function applySettingsSideEffects(
   );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
-  configureAutoPictureInPicture(
-    settingsBoolean(document, "general", "browser_auto_picture_in_picture", true),
-  );
+  configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
   configureWorkspaceDefaultView(
     settingsNumber(document, "general", "workspace_default_tab_index", workspaceDefaultViewIndex),
   );

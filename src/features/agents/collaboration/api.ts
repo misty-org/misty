@@ -1,3 +1,4 @@
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import { apiRequest } from "@/api/client";
 import type {
   AgentGoal,
@@ -7,23 +8,26 @@ import type {
   AgentQuestionSet,
   ConversationCollaboration,
   ConversationMode,
+  PermissionMode,
 } from "./types";
 
 const segment = encodeURIComponent;
 
 export const collaborationApi = {
   get: (conversationId: string) =>
-    apiRequest<ConversationCollaboration>(
+    cachedRequest<ConversationCollaboration>(
       `/me/conversations/${segment(conversationId)}/collaboration`,
-      {
-        cache: "no-store",
-      },
     ),
   setMode: (conversationId: string, mode: ConversationMode) =>
     apiRequest<{ mode: ConversationMode }>(`/me/conversations/${segment(conversationId)}/mode`, {
       method: "PUT",
       body: JSON.stringify({ mode }),
     }),
+  setPermissionMode: (conversationId: string, permissionMode: PermissionMode | "") =>
+    apiRequest<{ permissionMode: PermissionMode | "" }>(
+      `/me/conversations/${segment(conversationId)}/mode`,
+      { method: "PUT", body: JSON.stringify({ permission_mode: permissionMode }) },
+    ),
   answer: (questionSetId: string, answers: AgentQuestionAnswer[]) =>
     apiRequest<{ questionSet: AgentQuestionSet; continuation?: { prompt: string } }>(
       `/me/agent-questions/${segment(questionSetId)}/answer`,

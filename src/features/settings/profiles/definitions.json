@@ -255,18 +255,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.autoPictureInPicture",
-    "label": "Picture in picture when switching tabs",
-    "keywords": ["pip", "video", "floating", "mini player"],
-    "page": "browser",
-    "section": "general",
-    "key": "browser_auto_picture_in_picture",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "browser.autoArchiveHours",
     "label": "Archive idle tabs",
     "keywords": ["archive", "auto close", "clean up", "tabs"],
@@ -358,6 +346,18 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "browser.linkPreviews",
+    "label": "Link previews",
+    "keywords": ["thumbnail", "unfurl", "embed", "link card", "images in chat"],
+    "page": "browser",
+    "section": "general",
+    "key": "browser_link_previews",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "browser.statusBubble",
     "label": "Link and loading status",
     "page": "browser",
@@ -438,7 +438,7 @@
   },
   {
     "id": "spaces.openingTool",
-    "label": "Opening tool",
+    "label": "Opens on",
     "page": "spaces-defaults",
     "section": "spaces",
     "key": "opening_tool",
@@ -446,29 +446,7 @@
     "owner": "account",
     "type": "string",
     "platforms": ["desktop"],
-    "enum": ["home", "chat", "journal", "planner", "library"]
-  },
-  {
-    "id": "spaces.agenda.tasks",
-    "label": "Show tasks",
-    "page": "spaces-agenda",
-    "section": "spaces",
-    "key": "agenda_tasks",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "spaces.agenda.roadmap",
-    "label": "Show roadmap",
-    "page": "spaces-agenda",
-    "section": "spaces",
-    "key": "agenda_roadmap",
-    "default": true,
-    "owner": "account",
-    "type": "boolean",
-    "platforms": ["desktop"]
+    "enum": ["home", "chat", "notes", "drawings", "library", "code"]
   },
   {
     "id": "files.startingFolder",
@@ -494,7 +472,7 @@
   },
   {
     "id": "agents.collaboration_mode",
-    "label": "Start new conversations in",
+    "label": "Start new chats in Plan",
     "page": "agents-defaults",
     "section": "agent",
     "key": "default_collaboration_mode",
@@ -503,6 +481,70 @@
     "type": "string",
     "platforms": ["desktop"],
     "enum": ["act", "plan"]
+  },
+  {
+    "id": "agents.coding_default_tool",
+    "label": "Default coding tool",
+    "page": "agents-coding",
+    "section": "agent",
+    "key": "coding_default_tool",
+    "default": "none",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": [
+      "none",
+      "claude",
+      "codex",
+      "kimi",
+      "minimax",
+      "grok",
+      "pi",
+      "omp",
+      "dsh",
+      "agy",
+      "opencode",
+      "qoder",
+      "qoder-cn"
+    ]
+  },
+  {
+    "id": "agents.coding_fallback_tool",
+    "label": "Fallback",
+    "page": "agents-coding",
+    "section": "agent",
+    "key": "coding_fallback_tool",
+    "default": "none",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": [
+      "none",
+      "claude",
+      "codex",
+      "kimi",
+      "minimax",
+      "grok",
+      "pi",
+      "omp",
+      "dsh",
+      "agy",
+      "opencode",
+      "qoder",
+      "qoder-cn"
+    ]
+  },
+  {
+    "id": "agents.coding_usage_cap",
+    "label": "Use up to",
+    "page": "agents-coding",
+    "section": "agent",
+    "key": "coding_usage_cap",
+    "default": "none",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["none", "25", "35", "50", "75"]
   },
   {
     "id": "agents.plan_deep_thinking",
@@ -653,19 +695,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "collections.tabs.planner",
-    "label": "Planner tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "planner_tab_order",
-    "default": "[]",
-    "owner": "account",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "collections.tabs.library",
     "label": "Library tab order",
     "page": "appearance",
@@ -705,6 +734,19 @@
     "maxLength": 524288
   },
   {
+    "id": "extensions.space_installations",
+    "label": "Installed extensions in other Spaces",
+    "page": "browser-extensions",
+    "section": "extensions",
+    "key": "space_installations",
+    "default": "[]",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "format": "json",
+    "maxLength": 4194304
+  },
+  {
     "id": "extensions.agent_access",
     "label": "Allow agents to use extensions",
     "page": "browser-extensions",
@@ -739,5 +781,180 @@
     "format": "json",
     "maxLength": 4096,
     "platforms": ["desktop"]
+  },
+  {
+    "id": "voice.dictation.enabled",
+    "label": "Dictation",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictation_enabled",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["speech", "talk", "type by voice"]
+  },
+  {
+    "id": "voice.dictation.shortcut",
+    "label": "Dictation shortcut",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictation_shortcut",
+    "default": "",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["hotkey", "fn", "globe", "right alt"],
+    "maxLength": 40
+  },
+  {
+    "id": "voice.dictation.hands_free",
+    "label": "Hands-free double-tap",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictation_hands_free",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["lock", "double tap"]
+  },
+  {
+    "id": "voice.dictation.cleanup",
+    "label": "AI cleanup",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictation_cleanup",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["punctuation", "filler"]
+  },
+  {
+    "id": "voice.dictation.style",
+    "label": "Style",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictation_style",
+    "default": "plain",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "enum": ["plain", "casual", "formal"]
+  },
+  {
+    "id": "voice.language",
+    "label": "Language",
+    "page": "voice",
+    "section": "voice",
+    "key": "language",
+    "default": "auto",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["speech language"],
+    "maxLength": 16
+  },
+  {
+    "id": "voice.dictionary",
+    "label": "Personal dictionary",
+    "page": "voice",
+    "section": "voice",
+    "key": "dictionary",
+    "default": "",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["names", "words", "spelling"],
+    "maxLength": 8000
+  },
+  {
+    "id": "voice.agent_handoff",
+    "label": "Hand off to agents by name",
+    "page": "voice",
+    "section": "voice",
+    "key": "agent_handoff",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["hey", "agent"]
+  },
+  {
+    "id": "voice.capture_sources",
+    "label": "Default sources",
+    "page": "voice",
+    "section": "voice",
+    "key": "capture_sources",
+    "default": "mic-tab",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["microphone", "tab audio", "system audio"],
+    "enum": ["mic", "mic-tab", "mic-system", "tab", "system"]
+  },
+  {
+    "id": "voice.keep_recordings",
+    "label": "Keep recordings",
+    "page": "voice",
+    "section": "voice",
+    "key": "keep_recordings",
+    "default": false,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["audio", "storage"]
+  },
+  {
+    "id": "recall.enabled",
+    "label": "Remember pages I read",
+    "page": "recall",
+    "section": "recall",
+    "key": "enabled",
+    "default": false,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "history", "recall"]
+  },
+  {
+    "id": "recall.paused_until",
+    "label": "Pause Memory",
+    "page": "recall",
+    "section": "recall",
+    "key": "paused_until",
+    "default": 0,
+    "owner": "account",
+    "type": "number",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "pause"],
+    "min": 0,
+    "max": 9007199254740991
+  },
+  {
+    "id": "recall.excluded_sites",
+    "label": "Sites Memory skips",
+    "page": "recall",
+    "section": "recall",
+    "key": "excluded_sites",
+    "default": "",
+    "owner": "account",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "exclude", "privacy"],
+    "maxLength": 8000
+  },
+  {
+    "id": "recall.remember_dictation",
+    "label": "Remember dictation",
+    "page": "recall",
+    "section": "recall",
+    "key": "remember_dictation",
+    "default": true,
+    "owner": "account",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "voice"]
   }
 ]

@@ -4,6 +4,7 @@
 // failures.
 #![allow(dead_code, unused_imports, unused_variables)]
 
+mod agents;
 mod app;
 #[cfg(all(desktop, debug_assertions))]
 mod development_profile;
@@ -13,6 +14,7 @@ mod infra;
 mod platform;
 mod shell_plugins;
 mod telemetry;
+mod voice;
 
 #[cfg(desktop)]
 use app::commands::{};
@@ -40,6 +42,11 @@ use app::device_commands::{devices_refresh, devices_start, devices_stop, devices
 use app::device_job_commands::{
     device_read_shared_file, device_sign_request, device_sign_run_grants, device_verify_job,
 };
+#[cfg(desktop)]
+use app::runner_commands::{
+    coding_engines_detect, coding_project_remote, coding_route, coding_run_turn, coding_runner_answer,
+    coding_runner_stop,
+};
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
 #[cfg(desktop)]
@@ -60,7 +67,7 @@ use infra::browser::page_tools::media_tools::{
 };
 use infra::browser::pane_dim::browser_webview_set_pane_dim;
 #[cfg(desktop)]
-use infra::browser::profile_cleanup::browser_device_profile_delete;
+use infra::browser::retired_profiles::browser_retired_profiles_erase;
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
@@ -68,9 +75,10 @@ use infra::browser::{
     browser_webview_create, browser_webview_forward, browser_webview_held, browser_webview_hide,
     browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
     browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
-    browser_webview_set_zoom, browser_webview_show, browser_webviews_hide_all,
-    browser_webviews_park_all, browser_webviews_set_overlay_active,
-    browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble, BrowserSessionState,
+    browser_webview_set_zoom, browser_webview_show, browser_webviews_close_except,
+    browser_webviews_hide_all, browser_webviews_hide_except, browser_webviews_park_all,
+    browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
+    browser_webviews_set_status_bubble, BrowserSessionState,
 };
 #[cfg(desktop)]
 use infra::browser::{
@@ -99,7 +107,6 @@ use infra::browser_library::{
     browser_download_cancel, browser_download_open, browser_download_reveal,
     browser_downloads_list, browser_downloads_progress, browser_downloads_remove,
 };
-use infra::browser_search_suggest::browser_search_suggest;
 #[cfg(desktop)]
 use infra::browser_shortcuts::browser_shortcuts_update;
 #[cfg(desktop)]
@@ -136,18 +143,18 @@ pub fn run() {
         if !mac_rounded_corners::main_window_ready() {
             return;
         }
-        if let Some(window) = app
-            .get_webview_window("main")
-            .or_else(|| app.webview_windows().into_values().next())
-        {
+        if let Some(window) = infra::space_windows::primary(app) {
             let _ = window.show();
             let _ = window.unminimize();
             let _ = window.set_focus();
+        } else {
+            let _ = infra::space_windows::restore(app);
         }
-        // Links opened while Misty runs, as the default browser.
+        // Links opened while Misty runs, as the default browser, go to the Space
+        // that claims their site, else to the last focused Space window.
         let urls = infra::default_browser::web_urls(args.iter().skip(1));
         if !urls.is_empty() {
-            let _ = app.emit("deep-link://new-url", urls);
+            infra::space_windows::route_app_links(app, urls);
         }
     }));
 
@@ -183,6 +190,8 @@ pub fn run() {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(tauri_plugin_os::init())
         .setup(move |app| {
+            #[cfg(target_os = "macos")]
+            platform::plugins::mac_pip_observer::install(app.handle());
             // Debug-only: the browser benchmark runs its tasks in Misty's own
             // tabs when asked to; see browser_eval_bridge.rs.
             #[cfg(all(desktop, debug_assertions))]
@@ -200,15 +209,6 @@ pub fn run() {
                     handle.exit(if passed { 0 } else { 1 });
                 });
             }
-            #[cfg(all(desktop, debug_assertions))]
-            if let Ok(profile) =
-                std::env::var("MISTY_DESKTOP_PROFILE").or_else(|_| std::env::var("MISTY_PROFILE"))
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_title(&profile)?;
-                }
-            }
-
             // Runs only in the primary instance, before any service opens a
             // file under ~/.misty. Services still create what they need, so a
             // failure here is reported rather than blocking launch.
@@ -244,6 +244,10 @@ pub fn run() {
             app.manage(std::sync::Arc::new(
                 infra::cursor_companion::CursorCompanionState::default(),
             ));
+            #[cfg(any(target_os = "macos", windows))]
+            app.manage(voice::DictationState::default());
+            #[cfg(any(target_os = "macos", windows))]
+            app.manage(voice::CaptureState::default());
             #[cfg(desktop)]
             app.manage(BrowserExecutionState::default());
             // The floating Misty window is intentionally not created during
@@ -261,10 +265,8 @@ pub fn run() {
             infra::devices::start_device_change_listener(app.handle().clone());
             #[cfg(windows)]
             infra::misty_context_windows::start_foreground_watch();
-            #[cfg(windows)]
-            if let Some(main) = app.get_webview("main") {
-                infra::browser_process_ended::watch_page_process(&main);
-            }
+            #[cfg(desktop)] // Every window belongs to a Space: reopen those open at quit.
+            infra::space_windows::restore(app.handle())?;
             Ok(())
         });
 
@@ -281,10 +283,12 @@ pub fn run() {
     builder
         .on_window_event(|_window, _event| {
             platform::app_lifecycle::window_event(_window, _event);
+            #[cfg(desktop)]
+            infra::space_windows::window_event(_window, _event);
             #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 let (window, event) = (_window, _event);
-                if window.label() != "main" {
+                if !crate::infra::space_windows::is_app_window(window.label()) {
                     return;
                 }
 
@@ -295,7 +299,7 @@ pub fn run() {
                 let Some(webview) = window
                     .webviews()
                     .into_iter()
-                    .find(|webview| webview.label() == "main")
+                    .find(|webview| webview.label() == window.label())
                 else {
                     return;
                 };
@@ -322,6 +326,10 @@ pub fn run() {
                     crate::infra::extensions::extensions_compat,
                     crate::infra::extensions::runtime::extensions_check_updates,
                     crate::infra::browser_sync::browser_sync_availability,
+                    crate::infra::api_cache::api_cache_get,
+                    crate::infra::api_cache::api_cache_put,
+                    crate::infra::api_cache::api_cache_delete_prefix,
+                    crate::infra::api_cache::api_cache_clear,
                     crate::infra::workspace_recovery::browser_recovery_open,
                     crate::infra::workspace_recovery::browser_recovery_read,
                     crate::infra::workspace_recovery::browser_recovery_write,
@@ -347,7 +355,8 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_set_frequency,
-                    crate::infra::browser_sync::browser_sync_forget_key,
+                    crate::infra::browser_sync::browser_sync_forget_key, crate::infra::browser_sync::browser_sync_space_window,
+                    crate::infra::browser_sync::browser_sync_space_sites, crate::infra::browser_sync::browser_sync_set_space_sites,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
                     crate::infra::auth_cookies::auth_cookie_forget,
@@ -386,21 +395,8 @@ pub fn run() {
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
-                    app::code_commands::code_execute,
-                    app::code_commands::code_choose_project,
-                    app::code_commands::code_set_project_installs,
-                    app::code_commands::code_allow_project_changes,
-                    app::code_commands::code_remove_project,
-                    app::code_commands::code_checkpoints,
-                    app::code_commands::code_undo,
-                    app::code_snapshots::code_project_snapshot,
-                    app::code_commands::code_new_project,
-                    app::code_commands::code_clone_project,
-                    app::code_commands::code_set_project_push,
-                    app::code_commands::code_run_diff,
-                    app::code_commands::code_git,
-                    app::code_commands::code_git_job,
-                    agents_list_scoped_files,
+                    agents_list_scoped_files, infra::web_fetch::agents_web_fetch,
+                    infra::link_preview::link_preview_fetch,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
@@ -447,6 +443,42 @@ pub fn run() {
                     #[cfg(desktop)]
                     device_verify_job,
                     #[cfg(desktop)]
+                    coding_engines_detect,
+                    #[cfg(desktop)]
+                    coding_runner_stop,
+                    #[cfg(desktop)]
+                    coding_route,
+                    #[cfg(desktop)]
+                    coding_project_remote,
+                    #[cfg(desktop)]
+                    coding_run_turn,
+                    #[cfg(desktop)]
+                    coding_runner_answer,
+                    #[cfg(desktop)]
+                    app::project_commands::project_choose,
+                    #[cfg(desktop)]
+                    app::project_commands::project_new,
+                    #[cfg(desktop)]
+                    app::project_commands::project_remove,
+                    #[cfg(desktop)]
+                    app::project_commands::project_publish,
+                    #[cfg(desktop)]
+                    app::project_commands::project_clone,
+                    #[cfg(desktop)]
+                    app::project_commands::project_git_diff,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_checkpoints,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_run_diff,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_undo,
+                    #[cfg(desktop)]
+                    app::checkpoint_commands::project_snapshot,
+                    #[cfg(desktop)]
+                    app::project_commands::project_legacy_flags,
+                    #[cfg(desktop)]
+                    app::project_commands::project_legacy_flags_done,
+                    #[cfg(desktop)]
                     device_read_shared_file,
                     #[cfg(desktop)]
                     #[cfg(desktop)]
@@ -469,6 +501,27 @@ pub fn run() {
                     infra::extension_popup::extension_popup_close,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_configure,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_configure,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_stop,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_insert,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_dictation_pill_hide,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_sources,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_start,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_mute,
+                    #[cfg(any(target_os = "macos", windows))]
+                    voice::voice_capture_stop,
+                    voice::tab_tap::voice_tab_capture_start,
+                    voice::tab_tap::voice_tab_capture_stop,
+                    voice::recording::voice_recording_start,
+                    voice::recording::voice_recording_stop,
+                    voice::recording::voice_recording_discard,
                     #[cfg(any(target_os = "macos", windows))]
                     infra::cursor_companion::cursor_companion_interrupt,
                     #[cfg(any(target_os = "macos", windows))]
@@ -581,7 +634,15 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_webview_reader_article,
                     #[cfg(desktop)]
-                    browser_device_profile_delete,
+                    browser_retired_profiles_erase,
+                    crate::infra::space_windows::space_window_info,
+                    crate::infra::space_windows::space_windows_set_spaces,
+                    crate::infra::space_windows::space_window_open,
+                    crate::infra::space_windows::space_window_switch, crate::infra::space_windows::space_window_is_host,
+                    crate::infra::space_windows::space_incognito_open, crate::infra::space_windows::space_window_set_color,
+                    crate::infra::space_windows::space_window_close,
+                    crate::infra::space_windows::space_windows_menu,
+                    crate::infra::space_windows::space_window_link_target, crate::infra::space_windows::space_window_remove,
                     #[cfg(desktop)]
                     browser_set_mouse_gestures,
                     #[cfg(desktop)]
@@ -624,7 +685,8 @@ pub fn run() {
                     browser_import_settings,
                     #[cfg(desktop)]
                     browser_import_signins,
-                    browser_search_suggest,
+                    infra::browser_search_suggest::browser_search_suggest,
+                    infra::browser_search_space::browser_space_search,
                     #[cfg(desktop)]
                     browser_download_cancel,
                     #[cfg(desktop)]
@@ -641,6 +703,10 @@ pub fn run() {
                     browser_webview_hide,
                     #[cfg(desktop)]
                     browser_webviews_hide_all,
+                    #[cfg(desktop)]
+                    browser_webviews_hide_except,
+                    #[cfg(desktop)]
+                    browser_webviews_close_except,
                     #[cfg(desktop)]
                     browser_webviews_park_all,
                     #[cfg(desktop)]

@@ -4,7 +4,7 @@ import { activeLayoutView, tabLabel } from "@/features/workspace/layoutTabs";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import type { WorkspaceTab, WorkspaceView } from "@/features/workspace/model";
 import type { MistyTabGroup } from "@/features/workspace/tabGroups";
-import { cn, IconButton, OverflowFadeText, Pressable } from "@/shared/ui";
+import { cn, IconButton, OverflowFadeText, Pressable, TreeBranch } from "@/shared/ui";
 import { Blocks, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RefObject } from "react";
 import { BrowserViewAudioButton } from "@/features/browser/workspace";
@@ -18,6 +18,8 @@ import { ViewIcon } from "./WorkspaceViewGroupButton";
 export function WorkspaceTabStripTab({
   tab,
   group,
+  firstInGroup = false,
+  lastInGroup = false,
   active,
   vertical,
   tabs,
@@ -32,6 +34,9 @@ export function WorkspaceTabStripTab({
 }: {
   tab: WorkspaceTab;
   group: MistyTabGroup | undefined;
+  /** The group's first and last tabs, where its vertical branch starts and ends. */
+  firstInGroup?: boolean;
+  lastInGroup?: boolean;
   active: boolean;
   vertical: boolean;
   /** Visible (not collapsed) tabs, in order, for arrow-key navigation. */
@@ -51,8 +56,8 @@ export function WorkspaceTabStripTab({
     panes = dockLeaves(tab.root),
     pinned = Boolean(tab.pinnedUrl),
     iconOnly = pinned && !vertical,
-    // Only the open tab's panes can be stepped through, and a pinned icon has no room for it.
-    rotatable = active && panes.length > 1 && !iconOnly;
+    // Any split tab's panes can be stepped through; a pinned icon has no room for the chip.
+    rotatable = panes.length > 1 && !iconOnly;
   return (
     <Renameable
       menuItems={
@@ -94,6 +99,15 @@ export function WorkspaceTabStripTab({
         )}
       >
         {!vertical && <ConnectedTabShape />}
+        {group && vertical ? (
+          <TreeBranch
+            className="-left-3.5 w-3.5"
+            color="var(--tab-group-color)"
+            last={lastInGroup}
+            reach={firstInGroup ? 3 : undefined}
+            edge={1}
+          />
+        ) : null}
         <Pressable
           role="tab"
           aria-selected={active}
@@ -146,17 +160,13 @@ export function WorkspaceTabStripTab({
               {label}
             </OverflowFadeText>
           )}
-          {panes.length > 1 && !rotatable ? (
-            <span aria-hidden="true" className="shrink-0 text-[10px] text-cream-muted tabular-nums">
-              {panes.length}
-            </span>
-          ) : null}
         </Pressable>
         {rotatable ? (
           <PaneRotateChips
+            tabId={tab.id}
+            active={active}
             panes={panes}
             focusedPaneId={tab.focusedPaneId}
-            hoverOnly={!vertical}
             onOpen={onOpen}
           />
         ) : null}
@@ -192,18 +202,20 @@ export function WorkspaceTabStripTab({
 
 /**
  * Previous and next pane, with where you are among them, as a small chip beside the tab's close
- * button, never over it. Horizontal tabs are short, so there it shows only while the tab is hovered
- * or focused, in place of the pane count.
+ * button, never over it. Every split tab always shows it, never a bare count, and stepping through
+ * a tab you are not on opens it.
  */
 function PaneRotateChips({
+  tabId,
+  active,
   panes,
   focusedPaneId,
-  hoverOnly,
   onOpen,
 }: {
+  tabId: string;
+  active: boolean;
   panes: ReturnType<typeof dockLeaves>;
   focusedPaneId: string;
-  hoverOnly: boolean;
   onOpen(view: WorkspaceView): void;
 }) {
   const index = Math.max(
@@ -213,6 +225,8 @@ function PaneRotateChips({
   const step = (delta: number) => {
     const pane = panes[(index + delta + panes.length) % panes.length];
     if (!pane) return;
+    // Stepping through another tab's panes opens that tab first.
+    if (!active) useWorkspaceStore.getState().selectTab(tabId);
     useWorkspaceStore.getState().focusPane(pane.id);
     const view = pane.views.find((item) => item.id === pane.activeViewId) ?? pane.views[0];
     if (view) onOpen(view);
@@ -222,10 +236,7 @@ function PaneRotateChips({
       role="group"
       aria-label="Panes"
       data-reorder-ignore="true"
-      className={cn(
-        "misty-tab-pane-chips",
-        hoverOnly && "hidden group-focus-within/tab:flex group-hover/tab:flex",
-      )}
+      className="misty-tab-pane-chips"
     >
       <IconButton size="2xs" tooltip={false} label="Previous pane" onClick={() => step(-1)}>
         <ChevronLeft className="size-3" aria-hidden="true" />

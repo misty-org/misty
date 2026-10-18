@@ -7,7 +7,7 @@ import { currentDeviceId, deviceDataStateLabel, orderedDeviceData } from "./webs
 /** Each device keeps its own sign-in data; show every device this session has
  * written, the one it writes now first. */
 export function DeviceWebsiteDataList({ session }: { session: NativeSyncView }) {
-  const ownerName = useUserStore((state) => state.me?.name);
+  const ownerName = useUserStore((state) => state.me?.username);
   const devices = session.website_data ?? [];
   if (!devices.length) return null;
   const current = currentDeviceId(session);

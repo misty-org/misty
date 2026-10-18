@@ -13,6 +13,7 @@ import { ExtensionSettingsItem } from "./ExtensionSettingsItem";
 import { openStorePage } from "./openStorePage";
 import {
   parseInstallations,
+  spaceInstallationsRaw,
   storeHomes,
   storeNames,
   updateInstallation,
@@ -36,9 +37,9 @@ export function ExtensionsSettings() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
   const [removing, setRemoving] = useState<Installation | null>(null);
-  const installed = parseInstallations(
-    profile ? String(resolveSetting(profile, "extensions.installations").value) : "[]",
-  ).filter((item) => item.installed);
+  const installed = parseInstallations(spaceInstallationsRaw(profile)).filter(
+    (item) => item.installed,
+  );
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;

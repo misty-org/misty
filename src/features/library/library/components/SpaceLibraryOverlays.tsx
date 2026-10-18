@@ -1,9 +1,12 @@
-import { LibraryPicker as MistyFilePicker, libraryApi as spacesApi } from "../LibraryRuntime";
+import { LibraryPicker as MistyFilePicker } from "../LibraryRuntime";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
-import { LibraryMemoryPlayback } from "../SpaceLibraryPlayback";
 import { LibraryItemViewer } from "../SpaceLibraryViewer";
+import { publicBetaFeatureEnabled } from "@/features/launch";
+import { transcribeLibraryFile } from "@/features/voice";
+import { libraryMediaKind } from "../libraryViewer/libraryMediaKind";
+import { libraryItemMIME } from "../SpaceLibraryPrimitives";
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
 
 export function SpaceLibraryOverlays() {
@@ -12,12 +15,9 @@ export function SpaceLibraryOverlays() {
     spaceId,
     canUploadLibrary,
     canEditLibrary,
-    canCopyLibrary,
     items,
-    setAlbums,
     visibleItems,
     displayItems,
-    albums,
     collection,
     itemMenu,
     setItemMenu,
@@ -26,30 +26,6 @@ export function SpaceLibraryOverlays() {
     selectedItemId,
     setSelectedItemId,
     libraryViewerTriggerRef,
-    stackByItemID,
-    sensitiveCollectionToken,
-    memoryPlaybackOpen,
-    setMemoryPlaybackOpen,
-    currentDiscoveryGroup,
-    localError,
-    setLocalError,
-    albumDialogMode,
-    setAlbumDialogMode,
-    albumName,
-    setAlbumName,
-    albumDescription,
-    setAlbumDescription,
-    albumCoverItemId,
-    setAlbumCoverItemId,
-    albumSaving,
-    personDialogMode,
-    setPersonDialogMode,
-    personName,
-    setPersonName,
-    personKind,
-    personCoverItemId,
-    setPersonCoverItemId,
-    personSaving,
     metadataDialogAction,
     setMetadataDialogAction,
     selectedItems,
@@ -68,14 +44,6 @@ export function SpaceLibraryOverlays() {
     setTextDialog,
     textDialogSaving,
     textDialogError,
-    unlockScope,
-    unlockPassword,
-    setUnlockPassword,
-    unlockSaving,
-    unlockConfigured,
-    unlockConfirmation,
-    setUnlockConfirmation,
-    closeSensitiveUnlock,
     setCopiedEditDefinition,
     setReloadKey,
     showTextDialog,
@@ -84,28 +52,18 @@ export function SpaceLibraryOverlays() {
     uploadFiles,
     duplicateItems,
     copyItemsToClipboard,
-    setAssetStackCover,
-    setAssetStackEffect,
-    ungroupAssetStack,
     updateItem,
     replaceItem,
     trashItem,
     restoreItem,
     saveBulkMetadata,
-    submitSensitiveUnlock,
   } = itemActions;
-  const { saveAlbum, savePerson, submitTextDialog } = collectionActions;
+  const { submitTextDialog } = collectionActions;
   const menuItem = itemMenu
     ? (items.find((item) => item.id === itemMenu.itemId) ??
       visibleItems.find((item) => item.id === itemMenu.itemId) ??
       null)
     : null;
-
-  const addItemToAlbum = async (itemId: string, albumId: string) => {
-    await spacesApi.addAlbumItems(spaceId, albumId, [itemId]);
-    const result = await spacesApi.albums(spaceId);
-    setAlbums(result.albums);
-  };
 
   return (
     <>
@@ -113,11 +71,15 @@ export function SpaceLibraryOverlays() {
         <LibraryItemContextMenu
           state={itemMenu}
           item={menuItem}
-          albums={albums}
-          canCopy={canCopyLibrary}
+          canCopy
           canEdit={canEditLibrary}
           deleted={collection === "deleted"}
           onClose={() => setItemMenu(null)}
+          onTranscribe={
+            transcribable(menuItem)
+              ? () => void transcribeLibraryFile(spaceId, menuItem.id, menuItem.display_name)
+              : undefined
+          }
           onCopy={() => void copyItemsToClipboard([menuItem])}
           onDuplicate={() => void duplicateItems([menuItem.id])}
           onRename={() =>
@@ -138,16 +100,6 @@ export function SpaceLibraryOverlays() {
               itemId: menuItem.id,
             })
           }
-          onAddToAlbum={(albumId) =>
-            void addItemToAlbum(menuItem.id, albumId).catch((error) =>
-              setLocalError(
-                error instanceof Error
-                  ? error.message
-                  : "The item could not be added to that album.",
-              ),
-            )
-          }
-          onToggleFavorite={() => void updateItem(menuItem, { favorite: !menuItem.favorite })}
           onTrash={() => void trashItem(menuItem)}
           onRestore={() => void restoreItem(menuItem)}
         />
@@ -177,16 +129,10 @@ export function SpaceLibraryOverlays() {
             null
           }
           items={displayItems}
-          allItems={items}
-          assetStack={stackByItemID.get(selectedItemId) ?? null}
-          reauthenticationToken={sensitiveCollectionToken}
           canEdit={canEditLibrary}
-          canCopy={canCopyLibrary}
+          canCopy
           returnFocusRef={libraryViewerTriggerRef}
           onCopyEdit={(definition) => setCopiedEditDefinition(structuredClone(definition))}
-          onSetStackCover={setAssetStackCover}
-          onSetStackEffect={setAssetStackEffect}
-          onUngroupStack={ungroupAssetStack}
           onClose={() => setSelectedItemId("")}
           onSelect={setSelectedItemId}
           onUpdate={updateItem}
@@ -195,40 +141,7 @@ export function SpaceLibraryOverlays() {
           onTrash={trashItem}
         />
       ) : null}
-      {memoryPlaybackOpen && currentDiscoveryGroup?.kind === "memory" ? (
-        <LibraryMemoryPlayback
-          spaceId={spaceId}
-          group={currentDiscoveryGroup}
-          items={visibleItems}
-          onClose={() => setMemoryPlaybackOpen(false)}
-        />
-      ) : null}
       <SpaceLibraryDialogs
-        album={{
-          mode: albumDialogMode,
-          name: albumName,
-          description: albumDescription,
-          coverItemId: albumCoverItemId,
-          saving: albumSaving,
-          items: visibleItems,
-          setName: setAlbumName,
-          setDescription: setAlbumDescription,
-          setCoverItemId: setAlbumCoverItemId,
-          close: () => setAlbumDialogMode(""),
-          submit: (event) => void saveAlbum(event),
-        }}
-        person={{
-          mode: personDialogMode,
-          kind: personKind,
-          name: personName,
-          coverItemId: personCoverItemId,
-          saving: personSaving,
-          items: visibleItems,
-          setName: setPersonName,
-          setCoverItemId: setPersonCoverItemId,
-          close: () => setPersonDialogMode(""),
-          submit: (event) => void savePerson(event),
-        }}
         metadata={{
           action: metadataDialogAction,
           selectedCount: selectedItems.length,
@@ -254,19 +167,14 @@ export function SpaceLibraryOverlays() {
           close: () => setTextDialog(null),
           submit: (event) => void submitTextDialog(event),
         }}
-        unlock={{
-          configured: unlockConfigured,
-          confirmation: unlockConfirmation,
-          setConfirmation: setUnlockConfirmation,
-          scope: unlockScope,
-          password: unlockPassword,
-          saving: unlockSaving,
-          error: localError,
-          setPassword: setUnlockPassword,
-          close: closeSensitiveUnlock,
-          submit: (event) => void submitSensitiveUnlock(event),
-        }}
       />
     </>
   );
+}
+
+/** Audio and video files can be transcribed once voice notes are on. */
+function transcribable(item: Parameters<typeof libraryItemMIME>[0]) {
+  if (!publicBetaFeatureEnabled("voiceNotes")) return false;
+  const kind = libraryMediaKind(libraryItemMIME(item), item.file.intrinsic_metadata);
+  return kind.isAudio || kind.isVideo;
 }

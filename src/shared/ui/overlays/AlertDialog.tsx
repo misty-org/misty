@@ -36,14 +36,14 @@ const AlertDialogContent = React.forwardRef<
     <AlertDialogOverlay />
     <div
       data-slot="alert-dialog-positioner"
-      className="pointer-events-none fixed inset-0 layer-blocking-popup flex items-center justify-center"
+      className="pointer-events-none fixed inset-0 layer-blocking-popup flex items-center justify-center pt-[var(--misty-modal-inset-top,0px)]"
     >
       <AlertDialogPrimitive.Content
         ref={ref}
         data-slot="alert-dialog-content"
         className={cn(
           "pointer-events-auto relative grid",
-          "max-h-[calc(100dvh-4rem)] w-[calc(100%-2rem)] max-w-lg",
+          "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)] max-w-lg",
           "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
           "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
           className,

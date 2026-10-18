@@ -12,13 +12,6 @@ const mocks = vi.hoisted(() => ({
       id: "space-allowed",
       name: "Launch room",
       is_shared: true,
-      permissions: { "library.upload": true },
-    },
-    {
-      id: "space-blocked",
-      name: "Read-only room",
-      is_shared: true,
-      permissions: { "library.upload": false },
     },
   ],
 }));
@@ -116,13 +109,12 @@ describe("AddFilesToSpaceDialog", () => {
     container.remove();
   });
 
-  it("states copy semantics and excludes Spaces without upload permission", async () => {
+  it("states copy semantics and lists the person's Spaces", async () => {
     await renderDialog(root, ["/Users/misty/report.pdf"]);
 
     expect(container.textContent).toContain("Your originals stay in Files");
     expect(container.textContent).toContain("never moved or replaced");
     expect(container.textContent).toContain("Launch room");
-    expect(container.textContent).not.toContain("Read-only room");
     expect(container.textContent).toContain("report.pdf");
     expect(mocks.load).toHaveBeenCalledOnce();
   });

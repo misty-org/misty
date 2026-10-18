@@ -28,7 +28,7 @@ vi.mock("./betaModes", () => ({ visibleAutopilotAvailable: () => mocks.autopilot
 vi.mock("./workspaceAutopilot", () => ({ startWorkspaceAutopilot: mocks.startAutopilot }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({ label: "main", setFocus: mocks.focus }),
+  getCurrentWindow: () => ({ label: "space-personal", setFocus: mocks.focus }),
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/features/auth/core", () => ({

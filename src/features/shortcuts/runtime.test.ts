@@ -186,33 +186,37 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("keeps canonical Space task routes in their focused shortcut scopes", () => {
+  it("switches Space sections with a number while a Space page is focused, tabs elsewhere", () => {
     const store = useWorkspaceStore.getState();
-    const planner = store.openSurface({
+    store.openSurface({
       surfaceId: "space",
-      groupKey: "space:alpha:planner",
-      title: "Planner",
-      route: "/spaces/alpha/tasks/agenda",
+      groupKey: "space:alpha:notes",
+      title: "Notes",
+      route: "/spaces/alpha/notes",
       instancePolicy: "multiple",
     });
-    const plannerHandler = vi.fn();
-    const removePlanner = registerShortcutHandler("planner.create", plannerHandler);
+    const sectionHandler = vi.fn();
+    const tabHandler = vi.fn();
+    const removeSection = registerShortcutHandler("space.section_2", sectionHandler);
+    const removeTab = registerShortcutHandler("workspace.tab_2", tabHandler);
+    const two = () => new KeyboardEvent("keydown", { key: "2", code: "Digit2", ctrlKey: true });
 
-    expect(dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "c", code: "KeyC" }))).toBe(
-      true,
-    );
-    expect(plannerHandler).toHaveBeenCalledOnce();
+    expect(dispatchShortcutEvent(two())).toBe(true);
+    expect(sectionHandler).toHaveBeenCalledOnce();
+    expect(tabHandler).not.toHaveBeenCalled();
 
-    store.updateViewRoute(planner.id, "/spaces/alpha/tasks/roadmaps");
-    const roadmapHandler = vi.fn();
-    const removeRoadmap = registerShortcutHandler("roadmap.create", roadmapHandler);
-    expect(dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "n", code: "KeyN" }))).toBe(
-      true,
-    );
-    expect(roadmapHandler).toHaveBeenCalledOnce();
+    store.openSurface({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: "Browser",
+      route: "/browser",
+      instancePolicy: "multiple",
+    });
+    expect(dispatchShortcutEvent(two())).toBe(true);
+    expect(tabHandler).toHaveBeenCalledOnce();
 
-    removePlanner();
-    removeRoadmap();
+    removeSection();
+    removeTab();
   });
 
   it("does not rerender shortcut consumers when handlers register", () => {
@@ -229,7 +233,7 @@ describe("shortcut dispatcher", () => {
     expect(result.current).toContain("Previous");
   });
 
-  it("matches search.toggle with both primary and alternate shortcut keys", () => {
+  it("opens a new tab with Cmd+T only; Cmd+K is not bound", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("search.toggle", handler);
     // Primary: Cmd+T / Ctrl+T
@@ -241,15 +245,14 @@ describe("shortcut dispatcher", () => {
     });
     expect(dispatchShortcutEvent(primaryEvent)).toBe(true);
 
-    // Alternate: Cmd+K / Ctrl+K
-    const alternateEvent = new KeyboardEvent("keydown", {
+    const retired = new KeyboardEvent("keydown", {
       key: "k",
       code: "KeyK",
       ctrlKey: true,
       metaKey: false,
     });
-    expect(dispatchShortcutEvent(alternateEvent)).toBe(true);
-    expect(handler).toHaveBeenCalledTimes(2);
+    expect(dispatchShortcutEvent(retired)).toBe(false);
+    expect(handler).toHaveBeenCalledTimes(1);
     remove();
   });
 

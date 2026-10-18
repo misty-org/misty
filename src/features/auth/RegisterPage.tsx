@@ -21,7 +21,6 @@ export default function RegisterPage() {
       ? rawFrom
       : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount || user);
-  const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,7 +38,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await authenticateAccount(() => accountRegister(name, normalizedUsername, email, password));
+      await authenticateAccount(() => accountRegister(normalizedUsername, email, password));
       navigate(from, { replace: true });
     } catch (registerError) {
       setError(
@@ -66,23 +65,7 @@ export default function RegisterPage() {
           </NavLink>
         }
       >
-        <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
-          <GoogleSignInButton
-            disabled={loading}
-            onBusy={setLoading}
-            onError={setError}
-            onSuccess={() => navigate(from, { replace: true })}
-          />
-          <AuthField
-            id="register-name"
-            label="Name"
-            value={name}
-            autoComplete="name"
-            placeholder="Your name"
-            required
-            disabled={loading}
-            onChange={setName}
-          />
+        <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
           <AuthField
             id="register-username"
             label="Username"
@@ -123,6 +106,17 @@ export default function RegisterPage() {
             idleLabel="Create account"
             loadingLabel="Creating account..."
             loading={loading}
+          />
+          <div className="flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
+            <span className="h-px flex-1 bg-charcoal-border" />
+            or
+            <span className="h-px flex-1 bg-charcoal-border" />
+          </div>
+          <GoogleSignInButton
+            disabled={loading}
+            onBusy={setLoading}
+            onError={setError}
+            onSuccess={() => navigate(from, { replace: true })}
           />
         </form>
       </AuthCard>

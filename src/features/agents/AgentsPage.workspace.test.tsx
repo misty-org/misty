@@ -30,7 +30,7 @@ it("opens straight into the agent's New task conversation without a directory", 
 it("offers agent settings and new agents from the switcher, not a directory", () => {
   renderAgentsPage();
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
-  expect(screen.getByRole("option", { name: "Communications settings" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Communications settings" })).toBeTruthy();
   expect(screen.getByRole("option", { name: "New agent" })).toBeTruthy();
   expect(screen.queryByRole("option", { name: "Browse all agents" })).toBeNull();
 });
@@ -76,8 +76,8 @@ it("preserves one conversation draft across catalogs", () => {
   renderAgentsPage();
   const draft = composer();
   typeDraft("Keep this while I browse");
-  fireEvent.click(screen.getByRole("button", { name: "Templates" }));
-  expect(screen.getByRole("heading", { name: "Templates", level: 1 })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
+  expect(screen.getByRole("heading", { name: "Workflows", level: 1 })).toBeTruthy();
   expect(screen.queryByRole("alertdialog")).toBeNull();
   expect(composer()).toBe(draft);
   expect(draft.value).toBe("Keep this while I browse");
@@ -90,7 +90,7 @@ it("preserves one conversation draft across catalogs", () => {
 it("requires draft-discard confirmation before filling a template, without submitting it", () => {
   renderAgentsPage();
   typeDraft("Original draft");
-  fireEvent.click(screen.getByRole("button", { name: "Templates" }));
+  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
   const template = () =>
     screen.getByRole("button", { name: /Research a topic and build a useful report/ });
   fireEvent.click(template());
@@ -125,7 +125,7 @@ it("opens the existing profile editor from the workspace and guards catalog navi
   renderAgentsPage();
   openAgentSettings();
   fireEvent.change(nameField(), { target: { value: "Unsaved identity" } });
-  fireEvent.click(screen.getByRole("button", { name: "Templates" }));
+  fireEvent.click(screen.getByRole("button", { name: "Workflows" }));
   expect(screen.getByRole("alertdialog")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
   expect(nameField().value).toBe("Unsaved identity");

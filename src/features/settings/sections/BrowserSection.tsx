@@ -14,12 +14,10 @@ import {
   TextControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { BrowserBangsSettings } from "./BrowserBangsSettings";
 import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
 import { parseSiteZoomLevels } from "@/features/webviews/siteZoom";
 import { parseSiteStyles } from "@/features/webviews/siteStyles";
-import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 
 const archiveOptions = [
   { value: "0", label: "Never" },
@@ -70,6 +68,18 @@ export function BrowserSection(
                 disabled={props.working}
                 onChange={(value) =>
                   props.onSettingChange("general", "browser_search_suggestions", value)
+                }
+              />
+            </SettingsRow>
+            <SettingsRow
+              label="Link previews"
+              description="Show a card with a picture and title under links in replies and chats. Misty fetches each page from this device, without cookies or sign-ins, so the site sees your address."
+            >
+              <SwitchControl
+                checked={booleanSetting(props.document, "general", "browser_link_previews", true)}
+                disabled={props.working}
+                onChange={(value) =>
+                  props.onSettingChange("general", "browser_link_previews", value)
                 }
               />
             </SettingsRow>
@@ -151,25 +161,6 @@ export function BrowserSection(
                 }
               />
             </SettingsRow>
-            {pictureInPictureSupported() && (
-              <SettingsRow
-                label="Picture in picture when switching tabs"
-                description="A video playing with sound keeps going in a floating window when you switch away from its tab."
-              >
-                <SwitchControl
-                  checked={booleanSetting(
-                    props.document,
-                    "general",
-                    "browser_auto_picture_in_picture",
-                    true,
-                  )}
-                  disabled={props.working}
-                  onChange={(value) =>
-                    props.onSettingChange("general", "browser_auto_picture_in_picture", value)
-                  }
-                />
-              </SettingsRow>
-            )}
             <SettingsRow
               label="Mouse gestures"
               description="Hold the right button and drag left to go back, right to go forward or up to reload."
@@ -198,7 +189,6 @@ export function BrowserSection(
         )}
       </SettingsSectionBlock>
       {props.page !== "downloads" && <BrowserToolbarSettings {...props} />}
-      {props.page !== "downloads" && <BrowserBangsSettings {...props} />}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { parseBrowserViewState, type WorkspaceTab } from "./model";
 import { contiguousTabs } from "./tabGroups";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { withActiveWindowLayout } from "./windows";
+import { isIncognitoWindow } from "./spaceWindow";
 
 export interface PinnedTabActions {
   /** Pins a single-page web tab at its current page. False when it can't be pinned. */
@@ -18,7 +19,7 @@ export function pinnableTabUrl(tab: WorkspaceTab): string | null {
   const views = dockTreeViews(tab.root);
   if (views.length !== 1 || views[0].surfaceId !== "browser") return null;
   const state = parseBrowserViewState(views[0].state);
-  if (state.private || state.agentOwned) return null;
+  if (isIncognitoWindow() || state.agentOwned) return null;
   try {
     const url = new URL(state.url);
     return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;

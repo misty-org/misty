@@ -107,9 +107,9 @@ impl AppEnvironmentService {
         self.inner.misty_dir.clone()
     }
 
-    /// Undo copies, command homes and scratch folders for code projects.
-    pub fn agent_code_dir(&self) -> PathBuf {
-        self.inner.misty_dir.join("agent-code")
+    /// Undo copies of coding runs (agents::checkpoints).
+    pub fn checkpoints_dir(&self) -> PathBuf {
+        self.inner.misty_dir.join("checkpoints")
     }
 
     #[cfg(test)]

@@ -43,7 +43,7 @@ const choices: { id: Choice; label: string; detail: string }[] = [
   },
 ];
 
-/** Clear browsing data for this tab's browser profile. */
+/** Clear browsing data for this tab's Space. */
 export function BrowserClearDataDialog(props: {
   request: number;
   tabId: string;
@@ -111,7 +111,7 @@ export function ClearBrowsingDataDialog(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogTitle>Clear browsing data</DialogTitle>
-        <DialogDescription>Applies to this browser profile on this device.</DialogDescription>
+        <DialogDescription>Applies to this Space on this device.</DialogDescription>
         <Field label="Time range">
           <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
             <SelectTrigger className="w-full">

@@ -107,7 +107,7 @@ pub async fn agents_choose_folder_scope(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<Option<serde_json::Value>> {
     use tauri_plugin_dialog::DialogExt;
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err(crate::error::ApiError::Message(
             "Open the main Misty window to share a folder with agents.".into(),
         ));
@@ -137,7 +137,7 @@ pub async fn agents_list_scoped_files(
     request: crate::infra::agents::ListScopedFilesRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err(crate::error::ApiError::Message(
             "Only the Host can process approved device scopes.".into(),
         ));
@@ -154,7 +154,7 @@ pub async fn agents_prepare_scoped_document(
     request: PrepareScopedAgentDocumentRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedAgentDocument> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err(crate::error::ApiError::Message(
             "Only the Host can process approved device scopes.".into(),
         ));
@@ -568,7 +568,7 @@ pub async fn navigation_names_snapshot(
     state: State<'_, MistyRuntime>,
     account: String,
 ) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the trusted Misty shell can read navigation names.".into());
     }
     Ok(state.navigation_names.snapshot(&account).await)
@@ -581,7 +581,7 @@ pub async fn navigation_names_update(
     key: String,
     name: Option<String>,
 ) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Only the trusted Misty shell can rename navigation.".into());
     }
     state.navigation_names.update(account, key, name).await
@@ -593,7 +593,7 @@ pub async fn settings_profile_state(
     scope: String,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err(ApiError::Unavailable(
             "Only the trusted Misty shell can read settings profiles.".into(),
         ));
@@ -609,7 +609,7 @@ pub async fn settings_profile_commit(
     document: serde_json::Value,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings_profile_store::ProfileStateSnapshot> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err(ApiError::Unavailable(
             "Only the trusted Misty shell can save settings profiles.".into(),
         ));

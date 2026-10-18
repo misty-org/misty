@@ -15,12 +15,12 @@ import {
   PopoverTrigger,
   Skeleton,
 } from "@/shared/ui";
-import { Settings2, UserPlus, UsersRound } from "lucide-react";
+import { Settings, UserPlus, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactElement } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { AgentTeamRows } from "../agents/AgentTeamRows";
-import { useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
+import { SpaceAgentRow } from "../agents/SpaceAgentRow";
+import { agentsByOwner, useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
+import type { SpaceAgent } from "@/api/spaces/space-agents";
 
 const emptyMembers: SpaceMember[] = [];
 const emptyViewers: SpacePresenceViewer[] = [];
@@ -32,13 +32,15 @@ export function SpaceMembersPopover({
   space,
   trigger,
   side,
+  onManage,
 }: {
   space: Space;
   trigger?: ReactElement;
   side?: "bottom" | "right";
+  /** Opens the People window: to invite someone, or to manage who is in the Space. */
+  onManage: (invite: boolean) => void;
 }) {
   const { user } = useAuth();
-  const location = useLocation();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { members, viewers, loadMembers } = useSpacesStore(
@@ -76,10 +78,6 @@ export function SpaceMembersPopover({
     ...groupedMembers.idle,
     ...groupedMembers.offline,
   ];
-  const managePath = `/spaces/${encodeURIComponent(space.id)}/settings/members`;
-  const settingsState = {
-    spaceSettingsReturnTo: `${location.pathname}${location.search}${location.hash}`,
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -119,35 +117,34 @@ export function SpaceMembersPopover({
             <MembersSkeleton />
           ) : (
             <>
-              <TeamRows members={orderedMembers} />
-              <AgentTeamRows agents={agents ?? []} currentUserId={user?.id} />
+              <TeamRows members={orderedMembers} agents={agents} />
             </>
           )}
         </div>
 
-        {space.role === "owner" || space.permissions?.["space.invite"] === true ? (
+        {space.role === "owner" ? (
           <div className="grid grid-cols-2 gap-1 border-t border-charcoal-border/60 px-1 py-1.5">
             <Button
-              asChild
               className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onManage(true);
+              }}
             >
-              <Link to={`${managePath}?invite=1`} state={settingsState}>
-                <UserPlus size={14} />
-                Invite
-              </Link>
+              <UserPlus size={14} />
+              Invite
             </Button>
             <Button
-              asChild
               className="h-8 justify-start gap-2 px-1.5 text-xs"
               variant="ghost"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                onManage(false);
+              }}
             >
-              <Link to={managePath} state={settingsState}>
-                <Settings2 size={14} />
-                Manage
-              </Link>
+              <Settings size={14} />
+              Manage
             </Button>
           </div>
         ) : null}
@@ -156,30 +153,34 @@ export function SpaceMembersPopover({
   );
 }
 
-function TeamRows({ members }: { members: PresentMember[] }) {
+/** People, each with the agents they brought under them. Agents have no presence. */
+function TeamRows({ members, agents }: { members: PresentMember[]; agents?: SpaceAgent[] }) {
+  const byOwner = agentsByOwner(agents);
   return (
     <div className="grid gap-0.5">
       {members.map((member) => (
-        <div
-          className="flex min-h-10 items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-charcoal-hover"
-          key={`person:${member.user_id}`}
-        >
-          <span className="relative inline-flex shrink-0">
-            <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
-              <AvatarFallback
-                className={cn(
-                  "text-[9px] font-semibold",
-                  avatarColorClass(member.user_id),
-                  avatarInkClass,
-                )}
-              >
-                {personInitials(member.name)}
-              </AvatarFallback>
-            </Avatar>
-            <PresenceDot status={member.presenceStatus} />
-          </span>
-          <span className="min-w-0 flex-1 truncate text-xs font-medium">{member.name}</span>
-          <span className="shrink-0 text-[10px] capitalize text-cream-muted">{member.role}</span>
+        <div key={`person:${member.user_id}`}>
+          <div className="flex min-h-10 items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-charcoal-hover">
+            <span className="relative inline-flex shrink-0">
+              <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
+                <AvatarFallback
+                  className={cn(
+                    "text-[9px] font-semibold",
+                    avatarColorClass(member.user_id),
+                    avatarInkClass,
+                  )}
+                >
+                  {personInitials(member.name)}
+                </AvatarFallback>
+              </Avatar>
+              <PresenceDot status={member.presenceStatus} />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{member.name}</span>
+            <span className="shrink-0 text-[10px] capitalize text-cream-muted">{member.role}</span>
+          </div>
+          {(byOwner.get(member.user_id) ?? []).map((agent) => (
+            <SpaceAgentRow key={agent.agent_id} agent={agent} compact />
+          ))}
         </div>
       ))}
     </div>

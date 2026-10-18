@@ -65,19 +65,3 @@ it("saves the current layout by name and lists it for reuse", async () => {
     expect.objectContaining({ page: "layout" }),
   );
 });
-it("edits the current virtual window and restores its arrangement when switching", () => {
-  const firstId = useWorkspaceStore.getState().activeWindowId;
-  render(<LayoutSection />);
-  const { result } = renderHook(useWindowDockingLayout);
-  chooseTabs("Vertical");
-  expect(result.current.tabs).toBe("left");
-  act(() => {
-    useWorkspaceStore.getState().createWindow("Research");
-  });
-  expect(screen.getByRole("heading", { name: "Layout for Research" })).toBeTruthy();
-  expect(result.current).toEqual(defaultDockingLayout);
-  act(() => {
-    useWorkspaceStore.getState().switchWindow(firstId);
-  });
-  expect(result.current.tabs).toBe("left");
-});

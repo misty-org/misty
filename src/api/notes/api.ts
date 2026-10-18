@@ -1,4 +1,5 @@
 import { spaceRequest } from "@/api/spaces/api";
+import type { ItemVisibility } from "@/api/spaces/visibility";
 
 const part = encodeURIComponent;
 
@@ -17,6 +18,8 @@ export interface ServerSpaceNote {
   created_at?: string;
   updated_at?: string;
   backlink_count?: number;
+  /** A private note opens only for its creator. */
+  visibility?: ItemVisibility;
 }
 
 type NoteCollaborationRole = "creator" | "editor" | "viewer";

@@ -20,7 +20,7 @@ import {
   IconButton,
   itemTones,
 } from "@/shared/ui";
-import { MoreHorizontal, Pencil, PencilRuler, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, PencilRuler, Plus, Trash2 } from "lucide-react";
 
 export function DrawingCollection(props: {
   spaceId: string;
@@ -28,8 +28,6 @@ export function DrawingCollection(props: {
   drawings: SpaceDrawing[];
   query: string;
   onQuery: (value: string) => void;
-  pinnedIds: Set<string>;
-  onPin: (id: string) => void;
   onOpen: (drawing: SpaceDrawing) => void;
   onCreate: () => void;
   onRename: (drawing: SpaceDrawing) => void;
@@ -91,7 +89,7 @@ export function DrawingCollection(props: {
       {
         <CollectionItems
           columnSetId="drawings"
-          fields={["Access", "Pinned", "Created"]}
+          fields={["Access", "Created"]}
           sortResetKey={refinement.sortKey}
           categoryLabel="Type"
           view={view}
@@ -104,7 +102,6 @@ export function DrawingCollection(props: {
             creator: creatorName(d.creator_user_id),
             metadata: {
               Access: props.readOnly || d.role === "viewer" ? "View only" : "Can edit",
-              Pinned: props.pinnedIds.has(d.id) ? "Yes" : "No",
               Created: new Date(d.created_at).toLocaleDateString(),
             },
             sortValues: { Created: Date.parse(d.created_at) },
@@ -114,7 +111,6 @@ export function DrawingCollection(props: {
               day: "numeric",
             }),
             onOpen: () => props.onOpen(d),
-            marker: props.pinnedIds.has(d.id) ? <Pin size={13} aria-label="Pinned" /> : undefined,
             contextMenu: <DrawingActions drawing={d} props={props} context />,
             actions: (
               <DropdownMenu modal={false}>
@@ -147,11 +143,6 @@ function DrawingActions({
   const Action = context ? ContextMenuAction : MenuItem;
   return (
     <>
-      <Action
-        icon={props.pinnedIds.has(drawing.id) ? <PinOff /> : <Pin />}
-        label={props.pinnedIds.has(drawing.id) ? "Unpin" : "Pin"}
-        onSelect={() => props.onPin(drawing.id)}
-      />
       <Action
         icon={<Pencil />}
         label="Rename"

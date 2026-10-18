@@ -7,6 +7,7 @@ import { useWorkspaceStore, useWindowDockingLayout } from "@/features/workspace"
 import { DesktopSettingsSection, DesktopSettingsRow } from "../components/DesktopSettingsUI";
 import { ChoiceControl } from "../SettingsControls";
 import { SavedLayoutsSettings } from "./SavedLayoutsSettings";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 
 export function LayoutSection() {
   const windowId = useWorkspaceStore((state) => state.activeWindowId);
@@ -21,16 +22,11 @@ export function LayoutSection() {
 function WindowLayoutEditor() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
-  const windowName = useWorkspaceStore(
-    (state) =>
-      state.windowsByScope[state.activeScopeKey]?.find(
-        (window) => window.id === state.activeWindowId,
-      )?.title ?? "this window",
-  );
+  const windowName = useSpaceWindowStore((state) => state.space?.name ?? "this window");
   return (
     <DesktopSettingsSection
       title={`Layout for ${windowName}`}
-      description="Changes apply immediately to this virtual window and keep your open pages in place."
+      description="Changes apply immediately to this Space's window and keep your open pages in place."
     >
       <DesktopSettingsRow
         label="Tabs"

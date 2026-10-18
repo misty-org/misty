@@ -1,7 +1,6 @@
 import { useMistyPanelStore } from "@/features/agents";
 import { useAppStore } from "@/features/app-shell";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
-import { useGlobalSearchStore } from "@/features/global-search";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { useCallback, useEffect } from "react";
@@ -13,26 +12,9 @@ export function useDesktopShortcuts(options: {
   openSettingsOverlay: () => void;
 }) {
   const { navigate, openSettingsOverlay } = options;
-  const openLauncher = useCallback((commandsOnly = false) => {
-    const launcher = useGlobalSearchStore.getState();
-    if (commandsOnly) {
-      launcher.setQuery(">");
-      launcher.activateLauncher();
-    } else {
-      launcher.togglePanel();
-    }
-    window.setTimeout(
-      () => document.querySelector<HTMLInputElement>("[data-global-misty-launcher-input]")?.focus(),
-      0,
-    );
-  }, []);
   useShortcutHandler(
     "search.toggle",
     useCallback(() => useBrowserSearchStore.getState().toggle(), []),
-  );
-  useShortcutHandler(
-    "app.command_palette",
-    useCallback(() => openLauncher(true), [openLauncher]),
   );
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler(

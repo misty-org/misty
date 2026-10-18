@@ -1,7 +1,6 @@
 export interface SavedAccountSession {
   id: string;
-  name: string;
-  username?: string;
+  username: string;
   email: string;
   accountCreatedAt?: string;
   currentPlan?: string;

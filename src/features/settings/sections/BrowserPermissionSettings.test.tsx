@@ -13,6 +13,7 @@ const entry = {
   origin: "https://example.com",
   profile: "profile-a",
   permissions: { camera: "block", microphone: "ask" },
+  space: "Work",
 };
 describe("saved website permissions", () => {
   let container: HTMLDivElement;
@@ -27,7 +28,7 @@ describe("saved website permissions", () => {
     act(() => root.unmount());
     container.remove();
   });
-  it("resets exactly the selected profile and removes the saved choice", async () => {
+  it("resets exactly the selected Space's choice and removes it", async () => {
     invoke
       .mockResolvedValueOnce([entry])
       .mockResolvedValueOnce(undefined)

@@ -308,12 +308,12 @@ describe("Clicky capture ordering and shared entry points", () => {
     await waitFor(() =>
       expect(useCompanionState.getState().presentation.error).toContain("answer is saved"),
     );
-    // Voice delegation captures nothing up front, so there is no point to show.
+    // The request carried the screens; the answer had no point to show.
     expect(useCompanionState.getState().presentation).toMatchObject({
       visible: true,
       phase: "idle",
     });
-    expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+    expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     await act(async () => companionControl({ kind: "retry" }));
     expect(mocks.speech).toHaveBeenCalledTimes(2);
     expect(mocks.speech.mock.calls.every(([id]) => id === "completed-invocation")).toBe(true);
@@ -355,7 +355,7 @@ describe("Clicky capture ordering and shared entry points", () => {
     view.unmount();
   });
 
-  it("captures displays only when the task asks to look", async () => {
+  it("captures every display with each request at the cursor", async () => {
     mocks.submit.mockImplementation(async () => {
       mocks.state.invocationId = "typed";
       mocks.state.working = true;
@@ -368,7 +368,8 @@ describe("Clicky capture ordering and shared entry points", () => {
         conversationId: "conversation",
       }),
     );
-    expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+    // Every request at the cursor carries the screens (agent-harness plan, phase 4).
+    expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     mocks.state.working = false;
     await act(async () =>
       useCompanionState.getState().submit!({
@@ -445,7 +446,7 @@ it("sends and completes plain text while the realtime provider is unavailable", 
   );
   expect(mocks.conversationOpen).not.toHaveBeenCalled();
   expect(mocks.conversationCommit).not.toHaveBeenCalled();
-  expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(false);
+  expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(true);
   await act(async () => {
     mocks.state.working = false;
     mocks.state.conversations = [
@@ -484,7 +485,7 @@ it.each(["user", "agent", "team"] as const)(
         conversationId: "conversation",
       }),
     );
-    // The task opens a screen itself (screen_open) if it needs one.
+    // The screens go with the request; the task opens a browser only if it must act.
     expect(mocks.submit).toHaveBeenCalledWith(
       expect.stringContaining("open instagram"),
       [],
@@ -496,13 +497,13 @@ it.each(["user", "agent", "team"] as const)(
     );
     expect(mocks.conversationOpen).not.toHaveBeenCalled();
     expect(mocks.invoke.mock.calls.some(([name]) => name === "cursor_companion_capture")).toBe(
-      false,
+      true,
     );
     view.unmount();
   },
 );
 
-it("sends a typed screen question without capturing the screen up front", async () => {
+it("sends a typed screen question with the screens", async () => {
   mocks.submit.mockImplementation(async () => {
     mocks.state.invocationId = "screen-task";
     mocks.state.working = true;
@@ -514,7 +515,7 @@ it("sends a typed screen question without capturing the screen up front", async 
       conversationId: "conversation",
     }),
   );
-  expect(mocks.invoke).not.toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
+  expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
   expect(mocks.submit).toHaveBeenCalledOnce();
   expect(mocks.conversationOpen).not.toHaveBeenCalled();
   view.unmount();

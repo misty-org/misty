@@ -53,7 +53,7 @@ pub fn agent_workspace_context(
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     return Err("Misty window control isn't available on this system".into());
-    if webview.label() != "main" || context.to_string().len() > 32000 {
+    if !crate::infra::space_windows::is_space_window(webview.label()) || context.to_string().len() > 32000 {
         return Err("Invalid workspace context".into());
     }
     super::agent_workspace::authorize_window_task(
@@ -111,7 +111,7 @@ pub async fn agent_desktop_recent_audio(
     task_id: String,
     seconds: f64,
 ) -> Result<Value, String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("Invalid desktop audio request".into());
     }
     {
@@ -146,7 +146,7 @@ pub async fn agent_desktop_recent_audio(
 /// window back; the desktop is taken back by the next visual tool call.
 #[tauri::command]
 pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> Result<(), String> {
-    if webview.label() != "main" {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Ok(());
     }
     let desktop = {
@@ -192,7 +192,7 @@ pub fn agent_control_island(
     task_id: String,
     island: Value,
 ) -> Result<(), String> {
-    if webview.label() != "main" || island.to_string().len() > 4000 {
+    if !crate::infra::space_windows::is_space_window(webview.label()) || island.to_string().len() > 4000 {
         return Err("Invalid control island update".into());
     }
     {
@@ -251,7 +251,10 @@ fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Va
         state.context["spaceId"].as_str().unwrap_or(""),
     )?;
     super::agent_workspace::authorize_scope(app, &request.scope_id, &request.agent_id, task)?;
-    let window = app.get_window("main").ok_or("Misty window closed")?;
+    let window = super::agent_workspace::task_window(app, task)
+        .and_then(|label| app.get_window(&label))
+        .or_else(|| crate::infra::space_windows::primary(app))
+        .ok_or("Misty window closed")?;
     if state.context["desktopControl"] != true && !window.is_focused().unwrap_or(false) {
         #[cfg(target_os = "macos")]
         return unsafe { decode(misty_autopilot_focus_reason()) };

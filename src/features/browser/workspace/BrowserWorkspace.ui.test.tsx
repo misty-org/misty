@@ -1,5 +1,5 @@
+import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
-import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
@@ -108,11 +108,15 @@ describe("BrowserWorkspace", () => {
     await act(async () => root.render(view(browserTab)));
     invoke.mockClear();
     await act(async () => root.render(view(nextTab)));
-    expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
-      request: {
-        id: "tab-browser-one",
-      },
-    });
+    // The old page stays up for a beat so the next one can take its place without a flash;
+    // the handoff's fallback releases it if no page arrives.
+    await vi.waitFor(
+      () =>
+        expect(invoke).toHaveBeenCalledWith("browser_webview_hide", {
+          request: { id: "tab-browser-one", keepLive: false },
+        }),
+      { timeout: 3000 },
+    );
   });
   it("keeps Browser chrome on the tab surface and its page host on the page's color", async () => {
     await act(async () => root.render(view(browserTab)));
@@ -148,11 +152,13 @@ describe("BrowserWorkspace", () => {
     const omnibox = container.querySelector('[aria-label="Search or enter address"]');
     expect(omnibox).not.toBeNull();
     expect(omnibox?.closest("form")?.classList.contains("relative")).toBe(true);
-    expect(container.querySelector('[aria-label="Misty"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Extensions"]')).not.toBeNull();
-    expect(container.querySelector('[aria-label="Bookmark this page"]')?.closest("form")).toBe(
-      omnibox?.closest("form"),
-    );
+    // No extensions installed, so no Extensions button; Agents sits beside Chat.
+    expect(container.querySelector('[aria-label="Extensions"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Agents"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Chat"]')).not.toBeNull();
+    // Site information sits inside the address field and pane layout in the ⋯ menu; no star.
+    expect(container.querySelector('[aria-label="Bookmark this page"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Pane layout"]')).toBeNull();
     expect(container.querySelector('[aria-label="Annotate page"]')).toBeNull();
     expect(container.querySelector('[aria-label^="Viewport"]')).toBeNull();
     expect(container.querySelector('[aria-label="New tab"]')).toBeNull();
@@ -204,7 +210,7 @@ describe("BrowserWorkspace", () => {
     });
     expect(container.querySelector('[aria-label="Browser annotation canvas"]')).toBeNull();
   });
-  it("selects the complete address when the omnibox receives focus", async () => {
+  it("opens the search panel over the page when the address bar is focused", async () => {
     const tab = {
       ...browserTab,
       state: createBrowserViewState("https://example.com/path?q=misty"),
@@ -217,38 +223,11 @@ describe("BrowserWorkspace", () => {
       input?.focus();
       await settleBrowserOverlay();
     });
-    expect(input?.value).toBe("https://example.com/path?q=misty");
-    expect(input?.selectionStart).toBe(0);
-    expect(input?.selectionEnd).toBe(input?.value.length);
-  });
-  it("shows the current page on focus, then direct and web-search suggestions while typing", async () => {
-    const tab = {
-      ...browserTab,
-      state: createBrowserViewState("https://youtube.com/watch?v=misty"),
-    };
-    await act(async () => root.render(view(tab)));
-    const input = container.querySelector<HTMLInputElement>(
-      '[aria-label="Search or enter address"]',
-    );
-    await act(async () => {
-      input?.focus();
-      await settleBrowserOverlay();
-    });
-    const focusedOptions = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    // Before typing the list is recent pages and tabs; the current page is not repeated.
-    expect(focusedOptions.length).toBeGreaterThan(0);
-    expect(focusedOptions.some((option) => option.textContent?.includes("youtube.com"))).toBe(
-      false,
-    );
-    await act(async () => {
-      fireEvent.change(input!, { target: { value: "vimeo.com" } });
-      await settleBrowserOverlay();
-    });
-    const options = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')];
-    expect(options.map((option) => option.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("vimeo.com")]),
-    );
-    expect(options.some((option) => option.textContent?.includes("Search with"))).toBe(false);
+    const search = useBrowserSearchStore.getState();
+    expect(search.open).toBe(true);
+    // Anchored over the address bar, so the choice navigates this tab.
+    expect(search.anchor).not.toBeNull();
+    act(() => search.close());
   });
   it("opens a functional browser menu", async () => {
     await act(async () => root.render(view(browserTab)));
@@ -260,17 +239,7 @@ describe("BrowserWorkspace", () => {
     const menuItems = [
       ...document.body.querySelectorAll<HTMLElement>('[data-browser-menu] [role="menuitem"]'),
     ].map((item) => item.textContent?.trim() ?? "");
-    for (const label of [
-      "New tab",
-      "History",
-      "Downloads",
-      "Find…",
-      "Print…",
-      "More tools",
-      "Open in default browser",
-      "Extensions",
-      "Settings",
-    ]) {
+    for (const label of ["New tab", "History", "Downloads", "Find…", "More tools", "Settings"]) {
       expect(
         menuItems.some((item) => item.startsWith(label)),
         label,

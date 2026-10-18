@@ -18,6 +18,8 @@ export type TrafficLightOffset = { x: number; y: number };
  * here too, so the red one lines up with the address bar. */
 export const sidebarContentLeft = 19;
 const trafficLightRestX = 20;
+export const trafficLightRestY = 19;
+export const sideTabTrafficLightNudgeX = 2;
 export const trafficLightOffsetDefault: TrafficLightOffset = {
   x: sidebarContentLeft - trafficLightRestX,
   y: 0,

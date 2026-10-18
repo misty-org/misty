@@ -1,9 +1,7 @@
 import { LibraryPreview as EmbeddedUniversalPreview } from "../LibraryRuntime";
-import type { LibraryAssetStack } from "@/api/spaces/dto/entities";
 import { Button, IconButton } from "@/shared/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
-import { LibraryStackChips, LibraryStackEffectChips } from "./LibraryStackChips";
 
 export interface LibraryViewerStageProps {
   displayName: string;
@@ -12,27 +10,20 @@ export interface LibraryViewerStageProps {
   contentLoading: boolean;
   contentError: string;
   mediaStyle: CSSProperties | undefined;
-  assetStack: LibraryAssetStack | null;
-  stackMediaID: string;
-  primaryItemID: string;
-  canEdit: boolean;
   canCopy: boolean;
   index: number;
   itemCount: number;
   imageRef: RefObject<HTMLImageElement | null>;
   videoRef: RefObject<HTMLVideoElement | null>;
-  onSelectStackMember: (itemId: string) => void;
-  onSetStackEffect: (effect: LibraryAssetStack["effect"]) => void;
-  onVideoEnded: () => void;
   onVideoTime: () => void;
-  onCopyStackMedia: () => void;
+  onCopy: () => void;
   onPrevious: () => void;
   onNext: () => void;
 }
 
-/** The media half of the viewer: the preview, stack chips and paging arrows. */
+/** The media half of the viewer: the preview and paging arrows. */
 export function LibraryViewerStage(props: LibraryViewerStageProps) {
-  const { assetStack, index, itemCount } = props;
+  const { index, itemCount } = props;
 
   return (
     <div className="relative isolate min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace">
@@ -46,14 +37,11 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
           imageRef={props.imageRef}
           videoRef={props.videoRef}
           mediaStyle={props.mediaStyle}
-          autoPlay={assetStack?.kind === "live_photo"}
-          loop={assetStack?.kind === "live_photo" && assetStack.effect === "loop"}
-          onVideoEnded={props.onVideoEnded}
           onVideoMetadata={props.onVideoTime}
           onVideoTime={props.onVideoTime}
           fallbackAction={
             props.canCopy ? (
-              <Button size="sm" variant="outline" type="button" onClick={props.onCopyStackMedia}>
+              <Button size="sm" variant="outline" type="button" onClick={props.onCopy}>
                 <ClipboardCopy size={14} />
                 Copy
               </Button>
@@ -61,18 +49,6 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
           }
         />
       </div>
-
-      {assetStack ? (
-        <LibraryStackChips
-          stack={assetStack}
-          activeItemID={props.stackMediaID}
-          primaryItemID={props.primaryItemID}
-          onSelect={props.onSelectStackMember}
-        />
-      ) : null}
-      {props.canEdit && assetStack?.kind === "live_photo" ? (
-        <LibraryStackEffectChips stack={assetStack} onSelect={props.onSetStackEffect} />
-      ) : null}
 
       {itemCount > 1 ? (
         <>

@@ -17,8 +17,16 @@ import type { WorkspaceStore } from "./useWorkspaceStore";
 import { initialWorkspaceWindow } from "./windows";
 import { collectUnrestoredViews, type UnrestoredView } from "./workspaceMigrations";
 import { SaveRetryBackoff } from "./saveRetryBackoff";
+import { spaceWindow } from "./spaceWindow";
+import type { WorkspaceLayout, WorkspaceScopeKey } from "./model";
 
-const key = "workspace";
+/** A window saves its tabs under the Space it shows. The personal Space keeps the record
+ * from before Spaces had windows, so its tabs come back. */
+function spaceRecoveryKey(space: { personal: boolean; key: string }) {
+  return space.personal ? "workspace" : `workspace:space:${space.key}`;
+}
+/** The record this window opened with. */
+const key = spaceRecoveryKey(spaceWindow());
 const noSaves: RecoverySaveStatus = { pending: [], failed: [] };
 const closedRecoveryState = {
   accountId: null,
@@ -146,7 +154,7 @@ class WorkspaceRecoveryWriter {
    * leave those alone until their value changes. */
   async flush(retry = false) {
     this.cancel();
-    this.storage.setItem(key, this.capture());
+    this.storage.setItem(spaceRecoveryKey(spaceWindow()), this.capture());
     await (retry ? this.storage.retry() : this.storage.flush());
   }
   cancel() {
@@ -193,11 +201,13 @@ async function restore(accountId: string, generation: number) {
     if (!valid()) return;
     const legacyKey = deploymentStorageKey(`misty:workspace-account:${accountId}`);
     const sources: [string, string][] = [];
-    const accountRaw = localStorage.getItem(legacyKey);
-    const accountBackup = localStorage.getItem(workspaceRecoveryKey(legacyKey));
+    // Only the personal Space's window takes over workspaces saved before Spaces.
+    const legacy = spaceWindow().personal;
+    const accountRaw = legacy ? localStorage.getItem(legacyKey) : null;
+    const accountBackup = legacy ? localStorage.getItem(workspaceRecoveryKey(legacyKey)) : null;
     if (accountRaw !== null) sources.push([legacyKey, accountRaw]);
     if (accountBackup !== null) sources.push([workspaceRecoveryKey(legacyKey), accountBackup]);
-    const candidate = legacyWorkspaceCandidate();
+    const candidate = legacy ? legacyWorkspaceCandidate() : undefined;
     const global = candidate?.owner === accountId ? candidate : undefined;
     if (global && localStorage.getItem(workspaceStoreStorageKey) === global.raw) {
       sources.push([workspaceStoreStorageKey, global.raw]);
@@ -325,5 +335,32 @@ async function restore(accountId: string, generation: number) {
     if (valid()) continueWithTemporaryWorkspace(accountId, error);
   } finally {
     recovery?.release();
+  }
+}
+
+/**
+ * The tabs a Space last had on this device, for a window switching to a Space it
+ * hasn't shown yet. `undefined` when nothing was saved or recovery isn't open.
+ */
+export async function recoveredSpaceLayout(
+  space: { personal: boolean; key: string },
+  scope: WorkspaceScopeKey,
+): Promise<WorkspaceLayout | undefined> {
+  const storage = owner?.storage;
+  if (!storage) return undefined;
+  const record = spaceRecoveryKey(space);
+  try {
+    await storage.load(record);
+    const raw = storage.getItem(record);
+    if (raw === null) return undefined;
+    const parsed = JSON.parse(raw);
+    const envelope = typeof parsed?.version === "number" && parsed.state;
+    const state = migrateWorkspaceStore(
+      envelope ? parsed.state : parsed,
+      envelope ? parsed.version : 11,
+    );
+    return state.layoutsByScope?.[scope] ?? undefined;
+  } catch {
+    return undefined;
   }
 }

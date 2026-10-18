@@ -8,7 +8,7 @@ export function useSpaceItemCreator(spaceId: string) {
   return (userId?: string, agentId?: string, agentName?: string) => {
     if (agentId) return agentName || "Agent";
     if (!userId) return "Unknown";
-    if (userId === user?.id) return user.name?.trim() || "You";
+    if (userId === user?.id) return user.username?.trim() || "You";
     return members?.find((member) => member.user_id === userId)?.name?.trim() || "Unknown member";
   };
 }

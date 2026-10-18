@@ -21,12 +21,12 @@ vi.mock("@/shared/platform/tauri", () => ({
 }));
 const ada = {
   id: "user-ada",
-  name: "Ada",
+  username: "ada",
   email: "ada@example.com",
 };
 const grace = {
   id: "user-grace",
-  name: "Grace",
+  username: "grace",
   email: "grace@example.com",
 };
 describe("multi-account auth token storage", () => {

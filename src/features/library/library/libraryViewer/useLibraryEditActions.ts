@@ -8,7 +8,6 @@ import { normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";
 export interface LibraryEditActionsOptions {
   spaceId: string;
   item: SpaceLibraryItem;
-  reauthenticationToken: string;
   canEdit: boolean;
   isImage: boolean;
   editing: boolean;
@@ -23,7 +22,7 @@ export interface LibraryEditActionsOptions {
 
 /** Every server-side mutation of an item's edit versions, with shared busy/error state. */
 export function useLibraryEditActions(options: LibraryEditActionsOptions) {
-  const { spaceId, item, reauthenticationToken, canEdit, isImage, editing } = options;
+  const { spaceId, item, canEdit, isImage, editing } = options;
   const { setEditing, editVersions, setEditVersions, editDraft, setEditDraft } = options;
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -43,12 +42,7 @@ export function useLibraryEditActions(options: LibraryEditActionsOptions) {
 
   const saveEdit = (definition: LibraryEditDefinition = editDraft) =>
     run(async () => {
-      const result = await spacesApi.createEditVersion(
-        spaceId,
-        item,
-        definition,
-        reauthenticationToken,
-      );
+      const result = await spacesApi.createEditVersion(spaceId, item, definition);
       options.onReplaceItem(result.item);
       if (result.edit) await startRendition({ ...result.edit, is_current: true });
       setEditing(false);
@@ -60,13 +54,7 @@ export function useLibraryEditActions(options: LibraryEditActionsOptions) {
       ...current.map((version) => ({ ...version, is_current: false })),
     ]);
     try {
-      const rendition = await spacesApi.renderEditVersion(
-        spaceId,
-        item.id,
-        savedVersion.id,
-        0,
-        reauthenticationToken,
-      );
+      const rendition = await spacesApi.renderEditVersion(spaceId, item.id, savedVersion.id, 0);
       setEditVersions((current) =>
         current.map((version) =>
           version.id === savedVersion.id
@@ -85,40 +73,18 @@ export function useLibraryEditActions(options: LibraryEditActionsOptions) {
 
   const saveAsCopy = (definition: LibraryEditDefinition = editDraft) =>
     run(async () => {
-      const duplicated = await spacesApi.duplicateLibraryItems(
-        spaceId,
-        [item.id],
-        reauthenticationToken,
-      );
+      const duplicated = await spacesApi.duplicateLibraryItems(spaceId, [item.id]);
       const copy = duplicated.items[0];
       if ((isImage || editing) && copy) {
-        const edited = await spacesApi.createEditVersion(
-          spaceId,
-          copy,
-          definition,
-          reauthenticationToken,
-        );
-        if (edited.edit)
-          await spacesApi.renderEditVersion(
-            spaceId,
-            copy.id,
-            edited.edit.id,
-            0,
-            reauthenticationToken,
-          );
+        const edited = await spacesApi.createEditVersion(spaceId, copy, definition);
+        if (edited.edit) await spacesApi.renderEditVersion(spaceId, copy.id, edited.edit.id, 0);
       }
       options.onRenditionReady();
     }, "A copy could not be saved.");
 
   const renderEdit = (editID: string) =>
     run(async () => {
-      const rendition = await spacesApi.renderEditVersion(
-        spaceId,
-        item.id,
-        editID,
-        0,
-        reauthenticationToken,
-      );
+      const rendition = await spacesApi.renderEditVersion(spaceId, item.id, editID, 0);
       setEditVersions((current) =>
         current.map((version) =>
           version.id === editID
@@ -130,12 +96,7 @@ export function useLibraryEditActions(options: LibraryEditActionsOptions) {
 
   const selectEdit = (editID = "") =>
     run(async () => {
-      const result = await spacesApi.selectEditVersion(
-        spaceId,
-        item,
-        editID,
-        reauthenticationToken,
-      );
+      const result = await spacesApi.selectEditVersion(spaceId, item, editID);
       options.onReplaceItem(result.item);
       setEditVersions((current) =>
         current.map((version) => ({ ...version, is_current: version.id === editID })),
@@ -151,7 +112,7 @@ export function useLibraryEditActions(options: LibraryEditActionsOptions) {
   const deleteEdit = async (editID: string) => {
     if (!canEdit || editSaving || !(await confirmAction("Delete this edit version?"))) return;
     await run(async () => {
-      await spacesApi.deleteEditVersion(spaceId, item.id, editID, reauthenticationToken);
+      await spacesApi.deleteEditVersion(spaceId, item.id, editID);
       setEditVersions((current) => current.filter((version) => version.id !== editID));
     }, "Version could not be deleted.");
   };

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, PencilRuler, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth";
+import { publicBetaFeatureEnabled } from "@/features/launch";
+import { CaptureMenu } from "@/features/voice";
 import { useSpacesStore } from "@/features/spaces/core";
 import { useSpaceOverview } from "@/features/spaces/useSpaceOverview";
 import { useSpaceOverviewActions } from "@/features/spaces/useSpaceOverviewActions";
@@ -23,35 +25,30 @@ export const journalSections = [
   { value: "all", label: "All" },
   { value: "notes", label: "Notes" },
   { value: "drawings", label: "Drawings" },
-  { value: "pinned", label: "Pinned" },
+  // A day of Memory: what you read, said and recorded.
+  ...(publicBetaFeatureEnabled("recall") ? [{ value: "day", label: "Day" }] : []),
 ];
 
 export function JournalAllCollection(props: {
   spaceId: string;
-  section: "all" | "pinned";
+  section: "all";
   query: string;
   onQueryChange: (query: string) => void;
   onSection: (section: string) => void;
   readOnly: boolean;
   onCreate: () => void;
-  pinnedIds: Set<string>;
-  onTogglePin: (id: string) => void;
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const space = useSpacesStore((state) => state.spaces.find((space) => space.id === props.spaceId));
   const data = useSpaceOverview(user?.id ?? "", space ?? { id: props.spaceId }, "Journal");
   const journal = data.items.filter((item) => item.area === "Journal");
-  const actions = useSpaceOverviewActions(user?.id ?? "", props.spaceId, journal, data.retry, {
-    pinnedIdSet: props.pinnedIds,
-    togglePinned: props.onTogglePin,
-  });
+  const actions = useSpaceOverviewActions(user?.id ?? "", props.spaceId, journal, data.retry);
   const creator = useSpaceItemCreator(props.spaceId);
   const [view, setView] = useState<"list" | "grid">("list");
   const refinement = useCollectionRefinement(
     journal.filter(
       (item) =>
-        (props.section !== "pinned" || actions.isPinned(item)) &&
         item.title.toLocaleLowerCase().includes(props.query.trim().toLocaleLowerCase()),
     ),
     {
@@ -82,6 +79,7 @@ export function JournalAllCollection(props: {
               value={props.query}
               onChange={(event) => props.onQueryChange(event.target.value)}
             />
+            {!props.readOnly && <CaptureMenu />}
             {!props.readOnly && (
               <Button variant="primary" className="px-4" onClick={props.onCreate}>
                 <Plus />
@@ -118,7 +116,7 @@ export function JournalAllCollection(props: {
       ) : (
         <CollectionItems
           columnSetId="journal-all"
-          fields={["Access", "Pinned", "Created"]}
+          fields={["Access", "Created"]}
           view={view}
           sortResetKey={refinement.sortKey}
           categoryLabel="Type"
@@ -132,7 +130,6 @@ export function JournalAllCollection(props: {
             metadata: {
               Access:
                 props.readOnly || !(item.rename || item.renameRoute) ? "View only" : "Can edit",
-              Pinned: actions.isPinned(item) ? "Yes" : "No",
               Created: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—",
             },
             sortValues: { Created: item.createdAt ? Date.parse(item.createdAt) : undefined },

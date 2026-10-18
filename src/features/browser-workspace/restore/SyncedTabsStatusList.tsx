@@ -18,11 +18,14 @@ function useOpenWindows(): WorkspaceWindow[] {
   useEffect(() => {
     let live = true;
     let stop: (() => void) | undefined;
-    void import("@/features/workspace/useWorkspaceStore")
-      .then(({ useWorkspaceStore }) => {
+    void Promise.all([
+      import("@/features/workspace/useWorkspaceStore"),
+      import("@/features/workspace/windows"),
+    ])
+      .then(([{ useWorkspaceStore }, { currentWindows }]) => {
         if (!live) return;
-        const read = ({ windowsByScope }: ReturnType<typeof useWorkspaceStore.getState>) =>
-          setWindows(Object.values(windowsByScope).flatMap((list) => list ?? []));
+        const read = (state: ReturnType<typeof useWorkspaceStore.getState>) =>
+          setWindows(currentWindows(state));
         read(useWorkspaceStore.getState());
         stop = useWorkspaceStore.subscribe(read);
       })

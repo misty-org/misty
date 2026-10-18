@@ -4,6 +4,9 @@
 #import <AppKit/AppKit.h>
 #import <sys/resource.h>
 static NSString *account,*root;
+// Probes run as one Space with its own named store.
+static NSString *const ProbeStore = @"6D697374-7900-4000-8000-70726F626573";
+
 static NSInteger count,ready;
 static struct rusage baseline;
 static CFAbsoluteTime began;
@@ -15,7 +18,7 @@ static void reply(void *pointer,const char *json) {
     block(value);
 }
 static void request(NSDictionary *input,Reply block) {
-    NSMutableDictionary *value=[input mutableCopy];if (!value[@"account"]) value[@"account"]=account;
+    NSMutableDictionary *value=[input mutableCopy];if (!value[@"account"]) value[@"account"]=account;if (!value[@"space"]) value[@"space"]=@"probe";
     NSData *data=[NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
     misty_extensions_request([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String,reply,(__bridge_retained void *)[block copy]);
 }
@@ -42,7 +45,7 @@ int main(int argc,const char *argv[]) {
         [NSApplication sharedApplication]; count=atoi(argv[2]); root=[NSString stringWithUTF8String:argv[1]];
         account=[@"benchmark-" stringByAppendingString:NSUUID.UUID.UUIDString];began=CFAbsoluteTimeGetCurrent();
         misty_extensions_set_events(events);
-        request(@{@"operation":@"configure",@"controllerId":NSUUID.UUID.UUIDString},^(NSDictionary *value){
+        request(@{@"operation":@"configure",@"controllerId":NSUUID.UUID.UUIDString,@"store":ProbeStore},^(NSDictionary *value){
             if (!count) { measure(); return; }
             for (NSInteger i=0;i<count;i++) request(@{@"operation":@"load",@"id":[NSString stringWithFormat:@"%ld",(long)i],@"guid":[NSString stringWithFormat:@"benchmark-%ld@misty.test",(long)i],@"origin":NSUUID.UUID.UUIDString.lowercaseString,@"runtimePath":root,@"permissions":@[@"storage"],@"hosts":@[],@"privateAccess":@YES},^(NSDictionary *value){});
         });

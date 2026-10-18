@@ -5,18 +5,15 @@ import {
   focusModeCommands,
   tabFeatureCommands,
 } from "./browserFeatureCommands";
-import { roadmapShortcutCommands } from "./roadmapCommands";
 export type * from "./types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("search.toggle", "New tab", {
     description:
-      "Open a new tab: search the web, open an address, or type ! to search your files, spaces and bookmarks.",
+      "Open a new tab: open an address, search the web, ask an agent or jump to any page. Type @ to pick an agent.",
     category: "Navigation",
-    aliases: ["new tab", "search", "url", "website", "google", "bangs", "shortcuts"],
+    aliases: ["new tab", "search", "url", "website", "google", "ask", "agent"],
     mac: "Cmd+T",
-    macAlternate: "Cmd+K",
     windows: "Ctrl+T",
-    windowsAlternate: "Ctrl+K",
     allowInEditable: true,
     nativeMenu: true,
     allowShadowing: true,
@@ -30,24 +27,14 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     allowShadowing: true,
   }),
-  command("misty.contextual_companion", "Toggle Misty panel", {
-    description: "Open or close the Misty panel beside the workspace.",
+  command("misty.contextual_companion", "Toggle chat panel", {
+    description: "Open or close the chat panel beside the page.",
     category: "Misty",
     aliases: ["assistant", "ask misty"],
     mac: "Cmd+Shift+K",
     windows: "Ctrl+Shift+K",
     allowInEditable: true,
     nativeMenu: false,
-    allowShadowing: true,
-  }),
-  command("app.command_palette", "Open command palette", {
-    description: "Open Misty with command-only results.",
-    category: "Misty",
-    aliases: ["actions", "commands", "launcher"],
-    mac: "Cmd+Shift+P",
-    windows: "Ctrl+Shift+P",
-    allowInEditable: true,
-    nativeMenu: true,
     allowShadowing: true,
   }),
   command("app.open_settings", "Open settings", {
@@ -93,74 +80,46 @@ const shellCommands: ShortcutCommandDefinition[] = [
 
 const workspaceCommands: ShortcutCommandDefinition[] = [
   ...tabFeatureCommands,
-  command("workspace.new_virtual_window", "New virtual window", {
-    description: "Create a full workspace window inside the active Space.",
-    category: "Virtual windows",
+  command("workspace.open_space", "Open Space", {
+    description: "List your Spaces; each opens in its own window, with its own sign-ins.",
+    category: "Windows",
     scope: "workspace",
-    aliases: ["new workspace", "new window"],
-    mac: "Cmd+N",
-    windows: "Ctrl+N",
+    aliases: ["switch space", "spaces", "new window", "profile"],
+    mac: "Cmd+Shift+N",
+    windows: "Ctrl+Shift+N",
     allowInEditable: true,
     nativeMenu: true,
   }),
-  command("workspace.close_virtual_window", "Close virtual window", {
-    description: "Close the active virtual window when another window remains.",
-    category: "Virtual windows",
+  command("workspace.new_incognito_window", "New incognito window", {
+    description:
+      "Browse in this Space without saving history, cookies or site data. Its incognito windows share one session until the last one closes.",
+    category: "Windows",
     scope: "workspace",
-    aliases: ["close workspace", "close window"],
+    aliases: ["incognito", "private window", "private browsing"],
+    mac: "Cmd+Option+N",
+    windows: "Ctrl+Alt+N",
+    allowInEditable: true,
+    nativeMenu: true,
+  }),
+  command("workspace.close_window", "Close window", {
+    description: "Close this window. Its Space keeps its tabs for the next time it opens.",
+    category: "Windows",
+    scope: "workspace",
+    aliases: ["close space"],
     mac: "Cmd+Shift+W",
     windows: "Ctrl+Shift+W",
     allowInEditable: true,
     nativeMenu: true,
   }),
-  command("workspace.next_virtual_window", "Next virtual window", {
-    description: "Switch to the next virtual window in this Space.",
-    category: "Virtual windows",
-    scope: "workspace",
-    mac: "Cmd+Grave",
-    windows: "Ctrl+Alt+Grave",
-    windowsAlternate: "Ctrl+Shift+PageDown",
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-  command("workspace.previous_virtual_window", "Previous virtual window", {
-    description: "Switch to the previous virtual window in this Space.",
-    category: "Virtual windows",
-    scope: "workspace",
-    mac: "Cmd+Shift+Grave",
-    windows: "Ctrl+Alt+Shift+Grave",
-    windowsAlternate: "Ctrl+Shift+PageUp",
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-  command("workspace.reopen_virtual_window", "Reopen closed virtual window", {
-    description: "Restore the most recently closed virtual window in this Space.",
-    category: "Virtual windows",
-    scope: "workspace",
-    aliases: ["undo close window", "restore workspace"],
-    mac: "Cmd+Option+Shift+W",
-    windows: "Ctrl+Alt+Shift+W",
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-  ...Array.from({ length: 9 }, (_, index) => {
-    const number = index + 1;
-    return command(`workspace.window_${number}`, `Select virtual window ${number}`, {
-      description: `Switch directly to virtual window ${number} in this Space.`,
-      category: "Virtual windows",
-      scope: "workspace",
-      aliases: [`window ${number}`, `workspace ${number}`],
-      mac: `Option+${number}`,
-      windows: `Ctrl+Alt+${number}`,
-      allowInEditable: true,
-    });
-  }),
-  command("workspace.swap_panel_next", "Swap panel", {
+  command("workspace.swap_panel_next", "Swap pane", {
     description:
-      "Choose a panel with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
-    category: "Virtual windows",
+      "Choose a pane with the arrow keys to trade places with the focused one. Enter swaps, Escape cancels.",
+    category: "Windows",
     scope: "workspace",
-    aliases: ["reorder panels", "move panel"],
+    aliases: ["reorder panes", "move pane", "drag pane"],
+    mac: "Cmd+Option+M",
+    windows: "Ctrl+Alt+M",
+    allowInEditable: true,
   }),
   command("workspace.new_tab", "New tab", {
     description: "Open the keyboard-first New Tab picker.",
@@ -300,14 +259,28 @@ const workspaceCommands: ShortcutCommandDefinition[] = [
 // Each tool keeps its Cmd/Ctrl+Shift number; 1 belonged to the retired Home page.
 const toolSlots = [
   ["journal", "Journal", 2],
-  ["planner", "Planner", 3],
   ["social", "Social", 4],
   ["library", "Library", 5],
   ["browser", "Browser", 6],
   ["code", "Code", 8],
 ] as const;
 
+/** The Space home's tabs, on ⌘1 to ⌘5 while a Space is focused (browser tabs elsewhere). */
+const spaceSections = ["Home", "Notes", "Drawings", "Files", "Code"] as const;
+
 const tabAndToolCommands = [
+  ...spaceSections.map((label, index) =>
+    command(`space.section_${index + 1}`, `Open ${label}`, {
+      description: `Open this Space's ${label}.`,
+      category: "Spaces",
+      scope: "tool:space",
+      aliases: ["space", "section", label.toLowerCase()],
+      mac: `Cmd+${index + 1}`,
+      windows: `Ctrl+${index + 1}`,
+      allowInEditable: true,
+      allowShadowing: true,
+    }),
+  ),
   ...Array.from({ length: 9 }, (_, index) =>
     command(
       `workspace.tab_${index + 1}`,
@@ -339,30 +312,12 @@ const tabAndToolCommands = [
 ];
 
 const toolCommands: ShortcutCommandDefinition[] = [
-  command("planner.create", "Create Planner item", {
-    description: "Create an item in the focused Planner view.",
-    category: "Planner",
-    scope: "tool:planner",
-    mac: "C",
-    windows: "C",
-  }),
-  ...roadmapShortcutCommands,
   command("library.copy", "Copy Library selection", {
     description: "Copy the selected Library content.",
     category: "Library",
     scope: "tool:library",
     mac: "Cmd+C",
     windows: "Ctrl+C",
-  }),
-  command("browser.new_private_tab", "New private tab", {
-    description: "Browse without saving history, cookies or site data.",
-    category: "Browser",
-    scope: "tool:browser",
-    aliases: ["incognito", "private window", "private browsing"],
-    mac: "Cmd+Shift+N",
-    windows: "Ctrl+Shift+N",
-    allowInEditable: true,
-    allowShadowing: true,
   }),
   command("browser.find", "Find on page", {
     description: "Search for text in the focused website.",

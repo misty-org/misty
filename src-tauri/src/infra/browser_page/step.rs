@@ -171,7 +171,8 @@ async fn run_step_checked(
         return Ok(prepared);
     }
     let kind = prepared["consequenceKind"].as_str().unwrap_or("");
-    if confirm::asks(request, kind) {
+    let origin = confirm::page_origin(view);
+    if confirm::asks(request, kind) && !confirm::covered(request, &origin, kind) {
         // The account asks before this kind of step: it waits for the person.
         let control = prepared["describe"]
             .as_str()

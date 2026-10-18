@@ -8,6 +8,9 @@
 #import "compat-channel.h"
 
 static NSString *account, *origin, *pageURL;
+// Probes run as one Space with its own named store.
+static NSString *const ProbeStore = @"6D697374-7900-4000-8000-70726F626573";
+
 static NSWindow *window;
 static NSMutableArray<WKWebView *> *views;
 static WKWebView *page;
@@ -34,6 +37,7 @@ static void replied(void *pointer, const char *json) {
 static void request(NSDictionary *input, Completion completion) {
     NSMutableDictionary *value = [input mutableCopy];
     value[@"account"] = account;
+    if (!value[@"space"]) value[@"space"] = @"probe";
     NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
     misty_extensions_request([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String, replied, (__bridge_retained void *)[completion copy]);
 }
@@ -42,13 +46,13 @@ static WKWebView *viewFor(NSString *url, NSString *identifier) {
     // WebKit treats a nonpersistent store as private browsing, where an
     // extension without private access has no rules. Normal tabs persist.
     original.websiteDataStore = store;
-    WKWebViewConfiguration *configuration = CFBridgingRelease(misty_extensions_configuration((__bridge void *)original, url.UTF8String, false));
+    WKWebViewConfiguration *configuration = CFBridgingRelease(misty_extensions_configuration("probe", (__bridge void *)original, url.UTF8String));
     if (!configuration) fail(@"Native configuration was not returned");
     WKWebView *view = [[WKWebView alloc] initWithFrame:NSMakeRect(0, 0, 500, 300) configuration:configuration];
     view.navigationDelegate = navigation;
     [views addObject:view];
     [window.contentView addSubview:view];
-    misty_extensions_register_tab((__bridge void *)view, identifier.UTF8String, false, url.UTF8String);
+    misty_extensions_register_tab("probe", (__bridge void *)view, identifier.UTF8String, false, url.UTF8String);
     [view loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:url]]];
     return view;
 }
@@ -149,10 +153,10 @@ int main(int argc, const char *argv[]) {
         misty_extensions_set_events(events);
         misty_extensions_set_compat_channel(installCompatChannel);
         NSArray *permissions = @[@"storage", @"webRequest", @"webRequestBlocking", @"declarativeNetRequest", @"history", @"idle", @"notifications", @"browsingData", @"tabs"];
-        request(@{@"operation":@"configure", @"controllerId":NSUUID.UUID.UUIDString}, ^(NSDictionary *result) {
+        request(@{@"operation":@"configure", @"controllerId":NSUUID.UUID.UUIDString, @"store":ProbeStore}, ^(NSDictionary *result) {
             request(@{@"operation":@"load", @"id":@"1", @"guid":@"compat-fixture@misty.test", @"origin":origin, @"runtimePath":root, @"privateAccess":@NO, @"permissions":permissions, @"hosts":@[@"http://127.0.0.1/*"]}, ^(NSDictionary *loaded) {
                 page = viewFor(pageURL, @"normal");
-                misty_extensions_tab_event("normal", "activate");
+                misty_extensions_tab_event("probe", "normal", "activate");
                 after(2, ^{ runChecks(); });
             });
         });

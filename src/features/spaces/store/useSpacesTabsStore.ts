@@ -278,7 +278,13 @@ export function defaultSpaceRoute(spaceId: string): string {
   const preferences = useSettingsStore.getState().settings?.document.spaces as
     Record<string, unknown> | undefined;
   const tool = String(preferences?.opening_tool ?? "home");
-  const route = ["home", "chat", "journal", "planner", "library"].includes(tool) ? tool : "home";
+  // Older choices (Journal, Planner) open on Notes and the Space home.
+  const route =
+    tool === "journal"
+      ? "notes"
+      : ["home", "chat", "notes", "drawings", "library", "code"].includes(tool)
+        ? tool
+        : "home";
   return `/spaces/${encodeURIComponent(spaceId)}/${route}`;
 }
 
@@ -294,13 +300,9 @@ function normalizeSpacesTabRoute(route: string, spaceId?: string): string {
     if (pathParts[1] === "spaces" && pathParts[2] && !pathParts[3]) {
       pathParts[3] = "home";
     }
-    if (pathParts[1] === "spaces" && pathParts[3] === "tasks") pathParts[3] = "planner";
-    if (pathParts[1] === "spaces" && pathParts[3] === "planner") {
-      if (!pathParts[4]) pathParts.push("tasks", "board");
-      else if (pathParts[4] === "board" || pathParts[4] === "list")
-        pathParts.splice(4, 1, "tasks", pathParts[4]);
-      else if (pathParts[4] === "calendar") pathParts.splice(4, 1, "agenda", "month");
-    }
+    // Tasks and the Planner are gone; their saved tabs open the Space home.
+    if (pathParts[1] === "spaces" && (pathParts[3] === "tasks" || pathParts[3] === "planner"))
+      pathParts.splice(3, pathParts.length - 3, "home");
     return `${pathParts.join("/")}${parsed.search}${parsed.hash}`;
   } catch {
     return fallback;

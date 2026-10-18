@@ -128,6 +128,57 @@ MISTY_BILLING_URL, R2_*, MISTY_BACKUP_*, and any integrations. Check with: misty
     Ok(())
 }
 
+/// Initializes isolated, local-image staging configuration without touching dev or prod.
+pub fn initialize_staging_secrets(workspace: &Workspace) -> Result<()> {
+    environment::init(workspace, Target::Staging)?;
+    let existing = environment::read(workspace, Target::Staging)?;
+    let missing = |name: &str| {
+        existing
+            .get(name)
+            .is_none_or(|value| value.trim().is_empty())
+    };
+    let generated = [
+        ("MISTY_ENVIRONMENT", "staging".to_owned()),
+        ("DB_HOST", "postgres".to_owned()),
+        ("DB_NAME", "misty_staging".to_owned()),
+        ("DB_USER", "misty_app".to_owned()),
+        ("DB_MIGRATION_USER", "misty".to_owned()),
+        ("DB_PASSWORD", hex_secret()),
+        ("DB_MIGRATION_PASSWORD", hex_secret()),
+        ("AGENT_RUNTIME_DB_PASSWORD", hex_secret()),
+        ("MISTY_AUTH_SIGNING_KEY", base64_secret()),
+        ("MISTY_AGENT_RUNTIME_CONTROL_SECRET", base64_secret()),
+        ("SPACE_LINK_ENCRYPTION_KEY", base64_secret()),
+        ("MISTY_API_IMAGE", "misty-api:staging".to_owned()),
+        (
+            "MISTY_AGENT_RUNTIME_IMAGE",
+            "misty-agent-runtime:staging".to_owned(),
+        ),
+        ("MISTY_PUBLIC_API_URL", "http://api:8080/v1".to_owned()),
+        ("MISTY_HOST_PORT", "8082".to_owned()),
+        ("MISTY_BILLING_ADAPTER", "none".to_owned()),
+    ];
+    let mut added = Vec::new();
+    for (name, value) in generated {
+        if missing(name) {
+            environment::set(workspace, Target::Staging, name, &value)?;
+            added.push(name);
+        }
+    }
+    let staging = environment::root(workspace, Target::Staging);
+    if server::ensure_connected_devices_development_config(&staging.join("crypto/devices.env"))? {
+        added.push("MISTY_DEVICE_TICKET_PRIVATE_KEY, MISTY_DEVICE_PAIRING_PEPPER");
+    }
+    for name in added {
+        println!("  generated {name}");
+    }
+    println!(
+        "Initialized private staging configuration in {}. Add provider credentials only if the staging tests need them.",
+        staging.display()
+    );
+    Ok(())
+}
+
 /// Writes misty-billing/.env/prod/billing.env beside this checkout, sharing the
 /// adapter secret, and adds only values that are missing.
 fn initialize_billing_environment(workspace: &Workspace, secret: &str) -> Result<()> {

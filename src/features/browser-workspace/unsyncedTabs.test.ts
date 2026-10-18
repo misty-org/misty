@@ -1,12 +1,12 @@
 import { expect, it } from "vitest";
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { createDockLeaf } from "@/features/workspace/dockTree";
-import { initialWorkspaceWindow } from "@/features/workspace/windows";
+import { currentWindow, initialWorkspaceWindow } from "@/features/workspace/windows";
 import type { UnsyncedRecord } from "./native";
 import { unsyncedTabRows } from "./unsyncedTabs";
 
 function windowWith(view: WorkspaceView) {
-  const window = initialWorkspaceWindow().windowsByScope.global![0];
+  const window = currentWindow(initialWorkspaceWindow());
   const tab = window.layout.tabs![0];
   return {
     ...window,

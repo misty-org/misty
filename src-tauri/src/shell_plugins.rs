@@ -27,12 +27,12 @@ impl<R: Runtime, P: Plugin<R>> Plugin<R> for ShellScriptPlugin<P> {
     fn initialization_script(&self) -> Option<String> {
         self.0.initialization_script_2().map(|script| {
             // Tauri sets currentWebview metadata before running plugin scripts.
-            // Child webviews share the "main" window, so check the webview label.
+            // Child webviews share their Space's window, so check the webview label.
             // The explicit frame guard also covers WebView2's subframe injection.
             // This is DOM scoping; command authorization still comes from the ACL.
             format!(
                 r#"(() => {{
-  if (window !== window.top || window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label !== 'main') return;
+  if (window !== window.top || !/^(space|incognito)-/.test(window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? '')) return;
   {}
 }})();"#,
                 script.script

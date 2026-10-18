@@ -1,10 +1,7 @@
 import { BrowserChromeSlotContext, WindowMenuSlotContext } from "@/features/browser/workspace";
-import { useWorkspaceWindowMenu } from "./WorkspaceWindowMenu";
-import { registerWindowColorAnchor } from "./windowColorRequest";
+import { useSpaceWindowMenu } from "./SpaceWindowMenu";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { PaneSwapMode } from "./PaneSwapMode";
-import { WindowColorPopover } from "./WindowColorPopover";
-import { requestNewWindow } from "./windowColorRequest";
 import { routes } from "@/features/app-shell";
 import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
 import { useNavigationNames } from "@/features/navigation-names/store";
@@ -28,7 +25,6 @@ import { closePeek, usePeekStore } from "@/features/workspace/peek";
 import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import type { WorkspaceTab } from "@/features/workspace/model";
-import { useWindowTransition } from "./useWindowTransition";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
@@ -38,12 +34,14 @@ export function WorkspaceCanvas(props: {
   windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
-  stripShortcuts?: ReactNode;
   stripFootEnd?: ReactNode;
   /** The vertical sidebar's closing row: the account, sync and settings, inside its panel. */
   stripAccount?: ReactNode;
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
-  browserChrome?: { spaces: ReactNode; profile: ReactNode; accountItems: ReactNode };
+  browserChrome?: {
+    sync: ReactNode;
+    accountItems: ReactNode;
+  };
 }) {
   const legacyNames = useNavigationNames((state) => state.names);
   const legacyNamesReady = useNavigationNames((state) => state.ready);
@@ -67,14 +65,6 @@ export function WorkspaceCanvas(props: {
   const navigate = useNavigate();
   const layout = useWorkspaceStore((state) => state.layout);
   const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
-  const activeVirtualWindowId = useWorkspaceStore((state) => state.activeWindowId);
-  const windowTransitionRef = useWindowTransition(activeVirtualWindowId);
-  const virtualWindows = useWorkspaceStore(
-    (state) => state.windowsByScope[state.activeScopeKey] ?? [],
-  );
-  const canReopenVirtualWindow = useWorkspaceStore((state) =>
-    Boolean(state.closedWindowsByScope[state.activeScopeKey]?.length),
-  );
   const lastUsedTabByGroup = useWorkspaceStore((state) => state.lastUsedViewByGroup);
   const focusTab = useWorkspaceStore((state) => state.focusView);
   const closeTab = useWorkspaceStore((state) => state.closeView);
@@ -123,39 +113,6 @@ export function WorkspaceCanvas(props: {
       return newPaneId;
     },
     [navigateToActiveLayoutTab, splitPane],
-  );
-
-  const selectVirtualWindow = useCallback(
-    (windowId: string) => {
-      if (useWorkspaceStore.getState().switchWindow(windowId))
-        window.setTimeout(navigateToActiveLayoutTab, 0);
-    },
-    [navigateToActiveLayoutTab],
-  );
-
-  const createWorkspaceVirtualWindow = useCallback(
-    () => requestNewWindow(() => window.setTimeout(navigateToActiveLayoutTab, 0)),
-    [navigateToActiveLayoutTab],
-  );
-
-  const reopenWorkspaceVirtualWindow = useCallback(
-    (windowId?: string) => {
-      if (useWorkspaceStore.getState().reopenClosedWindow(windowId))
-        window.setTimeout(navigateToActiveLayoutTab, 0);
-    },
-    [navigateToActiveLayoutTab],
-  );
-
-  const closeWorkspaceVirtualWindow = useCallback(
-    (windowId: string) => {
-      const state = useWorkspaceStore.getState();
-      const workspaceWindow = state.windowsByScope[state.activeScopeKey]?.find(
-        (candidate) => candidate.id === windowId,
-      );
-      if (!workspaceWindow || !state.closeWindow(windowId)) return;
-      window.setTimeout(navigateToActiveLayoutTab, 0);
-    },
-    [navigateToActiveLayoutTab],
   );
 
   const openTab = useCallback(
@@ -267,15 +224,7 @@ export function WorkspaceCanvas(props: {
     return () => unregister.forEach((remove) => remove());
   }, [openSelectedTab]);
 
-  useWorkspaceCanvasShortcuts({
-    closeWorkspaceVirtualWindow,
-    createWorkspaceVirtualWindow,
-    navigateToActiveLayoutTab,
-    openTab,
-    reopenWorkspaceVirtualWindow,
-    selectVirtualWindow,
-    splitWorkspacePane,
-  });
+  useWorkspaceCanvasShortcuts({ openTab, splitWorkspacePane });
 
   useEffect(() => {
     const focusRequestedTab = (event: Event) => {
@@ -307,13 +256,6 @@ export function WorkspaceCanvas(props: {
         closePane(paneId);
         navigateToActiveLayoutTab();
       }}
-      windows={virtualWindows}
-      activeWindowId={activeVirtualWindowId}
-      canReopenWindow={canReopenVirtualWindow}
-      onSelectWindow={selectVirtualWindow}
-      onCreateWindow={createWorkspaceVirtualWindow}
-      onCloseWindow={closeWorkspaceVirtualWindow}
-      onReopenWindow={reopenWorkspaceVirtualWindow}
       onResizeSplit={updateSplitRatio}
     />
   );
@@ -324,35 +266,19 @@ export function WorkspaceCanvas(props: {
     leaves.length === 1 &&
     allLayoutViews(layout).length === 1 &&
     (leaves[0].views[0]?.surfaceId === "agents" || leaves[0].views[0]?.groupKey === "app:agents") &&
-    virtualWindows.length <= 1 &&
     !props.windowsTitlebarControls &&
     !props.titlebarInsets &&
     (props.tabPosition ?? "top") === "top";
 
-  const windowMenu = useWorkspaceWindowMenu({
-    windows: virtualWindows,
-    activeWindowId: activeVirtualWindowId,
-    canReopen: canReopenVirtualWindow,
-    onSelect: selectVirtualWindow,
-    onCreate: createWorkspaceVirtualWindow,
-    onClose: closeWorkspaceVirtualWindow,
-    onReopen: reopenWorkspaceVirtualWindow,
-  });
-  const windowMenuSlot = {
-    items: windowMenu.items,
-    dialog: windowMenu.dialog,
-    registerAnchor: registerWindowColorAnchor,
-  };
+  const windowMenuSlot = useSpaceWindowMenu();
 
   return (
     <BrowserChromeSlotContext.Provider value={props.browserChrome ?? null}>
       <WindowMenuSlotContext.Provider value={windowMenuSlot}>
         <div
-          ref={windowTransitionRef}
-          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-border ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
+          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
           data-workspace-panes={leaves.length}
           data-workspace-scope={activeScopeKey}
-          data-virtual-window={activeVirtualWindowId}
         >
           {!standaloneAgents &&
             !props.hideTabStrip &&
@@ -375,15 +301,7 @@ export function WorkspaceCanvas(props: {
                     closePane(paneId);
                     navigateToActiveLayoutTab();
                   }}
-                  windows={virtualWindows}
-                  activeWindowId={activeVirtualWindowId}
-                  canReopenWindow={canReopenVirtualWindow}
-                  onSelectWindow={selectVirtualWindow}
-                  onCreateWindow={createWorkspaceVirtualWindow}
-                  onCloseWindow={closeWorkspaceVirtualWindow}
-                  onReopenWindow={reopenWorkspaceVirtualWindow}
                   onResizeSplit={updateSplitRatio}
-                  shortcuts={props.stripShortcuts}
                   account={props.stripAccount}
                   footEnd={props.stripFootEnd}
                 />
@@ -406,15 +324,7 @@ export function WorkspaceCanvas(props: {
                   closePane(paneId);
                   navigateToActiveLayoutTab();
                 }}
-                windows={virtualWindows}
-                activeWindowId={activeVirtualWindowId}
-                canReopenWindow={canReopenVirtualWindow}
-                onSelectWindow={selectVirtualWindow}
-                onCreateWindow={createWorkspaceVirtualWindow}
-                onCloseWindow={closeWorkspaceVirtualWindow}
-                onReopenWindow={reopenWorkspaceVirtualWindow}
                 onResizeSplit={updateSplitRatio}
-                shortcuts={props.stripShortcuts}
                 account={props.stripAccount}
                 footEnd={props.stripFootEnd}
               />
@@ -428,7 +338,6 @@ export function WorkspaceCanvas(props: {
           />
           {pinBlockedNotice}
           <PaneSwapMode />
-          <WindowColorPopover onCreated={() => window.setTimeout(navigateToActiveLayoutTab, 0)} />
         </div>
       </WindowMenuSlotContext.Provider>
     </BrowserChromeSlotContext.Provider>

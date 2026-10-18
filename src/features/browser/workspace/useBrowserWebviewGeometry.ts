@@ -1,3 +1,4 @@
+import { isAuthPath } from "@/features/app-shell/routes";
 import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import type { RefObject } from "react";
 import { useLayoutEffect, useRef } from "react";
@@ -295,8 +296,12 @@ function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
   };
 }
 
-/** Whether some pane still shows a browser tab, as when switching between them. */
+/**
+ * Whether some pane still shows a browser tab, as when switching between them. Signed-out pages
+ * show no pane at all, whatever the layout remembers, so no page is coming to take over.
+ */
 function browserSurfaceStillActive(): boolean {
+  if (isAuthPath(window.location.pathname)) return false;
   return dockLeaves(useWorkspaceStore.getState().layout.root).some(
     (pane) => pane.views.find((view) => view.id === pane.activeViewId)?.surfaceId === "browser",
   );

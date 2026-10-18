@@ -102,31 +102,6 @@ vi.mock("@/api/assistant/api", () => ({
     }),
   },
 }));
-vi.mock("@/api/assistant/senses", () => ({
-  sensesApi: {
-    list: async () => ({
-      senses: [
-        {
-          id: "thinking",
-          name: "Thinking",
-          description: "Conversations, planning and using tools.",
-          model: "",
-          default_model: "openai/default",
-          options: [{ id: "openai/default", name: "Default model", provider: "OpenAI" }],
-        },
-        {
-          id: "browsing",
-          name: "Browsing",
-          description: "Reading and filling in web pages.",
-          model: "",
-          default_model: "openai/default",
-          options: [{ id: "openai/default", name: "Default model", provider: "OpenAI" }],
-        },
-      ],
-    }),
-    set: async () => {},
-  },
-}));
 initializeHostAgentsRuntime();
 describe("SettingsWorkspace", () => {
   let container: HTMLDivElement;
@@ -186,13 +161,6 @@ describe("SettingsWorkspace", () => {
     expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
     // Dropdown controls report aria-expanded; navigation never discloses entries.
     expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
-  });
-  it("shows a model choice per sense", async () => {
-    await render("models");
-    expect(container.querySelector("main")?.textContent).toContain("Thinking");
-    expect(container.querySelector("main")?.textContent).toContain("Misty default");
-    // Browsing follows Seeing until the account picks a model for it.
-    expect(container.querySelector("main")?.textContent).toContain("Same as Seeing");
   });
   it("keeps system pages individually addressable", () => {
     for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])

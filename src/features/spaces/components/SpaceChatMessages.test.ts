@@ -110,8 +110,6 @@ describe("Space chat display rows", () => {
         editSaving: false,
         nodes: [],
         libraryItems: [],
-        canCopyLibrary: false,
-        canAddToLibrary: false,
         spaceId: "space-1",
         endRef: createRef<HTMLDivElement>(),
         scrollRef: createRef<HTMLDivElement>(),

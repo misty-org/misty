@@ -62,6 +62,13 @@ impl AccountClient {
         let jar = Arc::new(Jar::default());
         let http = reqwest::Client::builder()
             .cookie_provider(jar.clone())
+            // The server admits coding only from the Misty app, which names
+            // itself with this user agent (coding_access.go).
+            .user_agent(format!(
+                "MistyDesktop/{} ({})",
+                env!("CARGO_PKG_VERSION"),
+                std::env::consts::OS
+            ))
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(15))
             .read_timeout(Duration::from_secs(90))

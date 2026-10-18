@@ -5,6 +5,7 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
+import { cachedRequest } from "@/api/cache/cachedRequest";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -19,18 +20,14 @@ import type {
   SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
-  SpaceSetup,
+  SpacePerson,
   SpacesSnapshot,
-  SpaceTemplate,
 } from "@/api/spaces/dto/entities";
 import { createSpaceMembersApi } from "@/api/spaces/members";
-import { createSpacePlannerExpansionApi } from "@/api/spaces/planner";
 import { createSpaceChatApi } from "./chat";
-import { createSpaceLibraryCollectionsApi } from "./library-collections";
 import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
 import { fetchProtectedBlob } from "./library-upload";
-import { createSpaceTasksApi } from "./tasks";
 import type { SpaceRequestInit } from "./types";
 
 export class SpaceRequestError extends ApiRequestError {
@@ -56,9 +53,15 @@ export async function spaceRequest<T = void>(path: string, init?: SpaceRequestIn
       "offline_reference_only",
     );
   }
-  const { allowWhileReferenceOnly: _allowWhileReferenceOnly, ...requestInit } = init ?? {};
+  const {
+    allowWhileReferenceOnly: _allowWhileReferenceOnly,
+    onCached,
+    ...requestInit
+  } = init ?? {};
   try {
-    return await apiRequest<T>(path, requestInit);
+    return await (onCached
+      ? cachedRequest<T>(path, { onCached: onCached as (value: T) => void, init: requestInit })
+      : apiRequest<T>(path, requestInit));
   } catch (error) {
     if (error instanceof ApiRequestError) {
       throw new SpaceRequestError(
@@ -138,12 +141,10 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     malware_detected: "This upload was rejected because it matched a malware signature.",
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
-    library_reauthentication_required: "Unlock this protected Library collection again.",
     offline_reference_only: "Spaces are unavailable while Misty reconnects.",
     agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
-    reauthentication_failed: "That password is incorrect.",
     invite_expired: "That invitation has expired.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not load this Space right now. Try again in a moment.",
@@ -161,16 +162,11 @@ function quotaReason(responseText: string): string | undefined {
 }
 
 export const spacesApi = {
-  snapshot: () => spaceRequest<SpacesSnapshot>("/spaces"),
-  ...createSpacePlannerExpansionApi(spaceRequest),
-  templates: () =>
-    spaceRequest<{
-      templates: SpaceTemplate[];
-      providers?: ProviderConnectionAvailability[];
-    }>("/space-templates"),
+  snapshot: (onCached?: (value: SpacesSnapshot) => void) =>
+    spaceRequest<SpacesSnapshot>("/spaces", { onCached }),
   create: createSpaceRequest,
-  setup: (spaceId: string) =>
-    spaceRequest<SpaceSetup>(`/spaces/${encodeURIComponent(spaceId)}/setup`),
+  /** People the person already shares a Space with. */
+  people: () => spaceRequest<{ people: SpacePerson[] }>("/me/space-people"),
   invitationPreview: (token: string) =>
     spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
   redeemInvitation: (token: string) =>
@@ -191,7 +187,6 @@ export const spacesApi = {
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
-  ...createSpaceTasksApi(spaceRequest),
   integrations: (spaceId: string) =>
     spaceRequest<{
       integrations: SpaceIntegration[];
@@ -210,8 +205,10 @@ export const spacesApi = {
         body: JSON.stringify({ connection_id: connectionId, capability }),
       },
     ),
-  nodes: (spaceId: string) =>
-    spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`),
+  nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
+    spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {
+      onCached,
+    }),
   resolve: (spaceId: string, nodeId: string, disposition: "open" | "download") =>
     spaceRequest<{ ticket: string; url: string; expires_in: number }>(
       `/spaces/${encodeURIComponent(spaceId)}/nodes/${encodeURIComponent(nodeId)}/resolve`,
@@ -224,6 +221,5 @@ export const spacesApi = {
       allowWhileReferenceOnly: true,
     }),
   ...createSpaceLibraryItemsApi(spaceRequest),
-  ...createSpaceLibraryCollectionsApi(spaceRequest),
   ...createSpaceLibraryEditsApi(spaceRequest),
 };

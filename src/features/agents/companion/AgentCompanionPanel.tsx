@@ -41,10 +41,10 @@ export function AgentCompanionPanel() {
   const active = working || state.phase !== "idle";
   const status =
     state.phase === "listening"
-      ? "Listening…"
+      ? "Listening"
       : state.phase === "responding"
-        ? "Speaking…"
-        : "Working…";
+        ? "Speaking"
+        : "Working";
   return (
     <div className="agent-companion-panel" aria-label="Companion">
       <div className="agent-companion-preview">
@@ -52,10 +52,12 @@ export function AgentCompanionPanel() {
       </div>
       {active && (
         <div className="agent-companion-status">
-          <span role="status">{status}</span>
+          <span role="status" className="misty-shimmer">
+            {status}
+          </span>
           {state.phase !== "idle" && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               disabled={!control}
               onClick={() => act({ kind: "stop_audio" })}
@@ -65,7 +67,7 @@ export function AgentCompanionPanel() {
             </Button>
           )}
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             disabled={!control}
             onClick={() => act({ kind: "stop" })}
@@ -77,7 +79,7 @@ export function AgentCompanionPanel() {
       )}
       {!control && (
         <p className="agent-companion-availability" role="status">
-          {desktop ? "Starting…" : "Available in Misty for macOS and Windows."}
+          {desktop ? "Starting" : "Available in Misty for macOS and Windows."}
         </p>
       )}
       <DesktopSettingsSection title="Behavior">

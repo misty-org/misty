@@ -68,11 +68,7 @@ export function TextDialog({ model }: { model: TextDialogModel }) {
                 Cancel
               </Button>
               <Button type="submit" disabled={model.saving || missingPrimary || missingSecondary}>
-                {model.saving
-                  ? "Saving…"
-                  : state.kind === "create-folder"
-                    ? "Create"
-                    : "Save changes"}
+                {model.saving ? "Saving…" : "Save changes"}
               </Button>
             </DialogFooter>
           </form>

@@ -1,6 +1,6 @@
 import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "./dockTree";
 import {
-  maxWorkspacePanels,
+  maxWorkspacePanes,
   type DockSplitDirection,
   type WorkspaceDockNode,
   type WorkspaceLayout,
@@ -9,7 +9,7 @@ import {
   type WorkspacePane,
 } from "./model";
 
-interface ClosedPanelPlacement {
+interface ClosedPanePlacement {
   splitId: string;
   anchorNodeId: string;
   direction: DockSplitDirection;
@@ -23,7 +23,7 @@ export interface ClosedWorkspaceItem {
   view: WorkspaceView;
   windowId: string;
   paneId: string;
-  panelPlacement?: ClosedPanelPlacement;
+  panePlacement?: ClosedPanePlacement;
 }
 
 export function rememberClosedWorkspaceView(
@@ -39,8 +39,8 @@ export function rememberClosedWorkspaceView(
     windowId,
     paneId: pane?.id ?? "",
     pane,
-    panelPlacement:
-      pane?.views.length === 1 ? findClosedPanelPlacement(layout.root, pane.id) : undefined,
+    panePlacement:
+      pane?.views.length === 1 ? findClosedPanePlacement(layout.root, pane.id) : undefined,
   };
 }
 
@@ -49,13 +49,13 @@ export function restoreClosedWorkspaceItem(
   closed: ClosedWorkspaceItem,
   tab: WorkspaceView,
 ): WorkspaceLayout {
-  const placement = closed.panelPlacement;
-  if (placement && dockLeaves(layout.root).length < maxWorkspacePanels) {
+  const placement = closed.panePlacement;
+  if (placement && dockLeaves(layout.root).length < maxWorkspacePanes) {
     const pane = closed.pane
       ? { ...closed.pane, tabs: [tab], activeTabId: tab.id }
       : createDockLeaf([tab]);
     if (closed.paneId) pane.id = closed.paneId;
-    const root = restorePanelAtAnchor(layout.root, placement, pane);
+    const root = restorePaneAtAnchor(layout.root, placement, pane);
     if (root !== layout.root) return { root, focusedPaneId: pane.id };
   }
 
@@ -80,10 +80,10 @@ export function migrateClosedWorkspaceItems(value: unknown): ClosedWorkspaceItem
   });
 }
 
-function findClosedPanelPlacement(
+function findClosedPanePlacement(
   node: WorkspaceDockNode,
   paneId: string,
-): ClosedPanelPlacement | undefined {
+): ClosedPanePlacement | undefined {
   if (node.type === "leaf") return undefined;
   if (node.first.type === "leaf" && node.first.id === paneId) {
     return placementFor(node, node.second.id, true);
@@ -92,7 +92,7 @@ function findClosedPanelPlacement(
     return placementFor(node, node.first.id, false);
   }
   return (
-    findClosedPanelPlacement(node.first, paneId) ?? findClosedPanelPlacement(node.second, paneId)
+    findClosedPanePlacement(node.first, paneId) ?? findClosedPanePlacement(node.second, paneId)
   );
 }
 
@@ -100,7 +100,7 @@ function placementFor(
   split: Extract<WorkspaceDockNode, { type: "split" }>,
   anchorNodeId: string,
   closedFirst: boolean,
-): ClosedPanelPlacement {
+): ClosedPanePlacement {
   return {
     splitId: split.id,
     anchorNodeId,
@@ -116,9 +116,9 @@ function placementFor(
   };
 }
 
-function restorePanelAtAnchor(
+function restorePaneAtAnchor(
   node: WorkspaceDockNode,
-  placement: ClosedPanelPlacement,
+  placement: ClosedPanePlacement,
   pane: Extract<WorkspaceDockNode, { type: "leaf" }>,
 ): WorkspaceDockNode {
   if (node.id === placement.anchorNodeId) {
@@ -136,7 +136,7 @@ function restorePanelAtAnchor(
     };
   }
   if (node.type === "leaf") return node;
-  const first = restorePanelAtAnchor(node.first, placement, pane);
-  const second = restorePanelAtAnchor(node.second, placement, pane);
+  const first = restorePaneAtAnchor(node.first, placement, pane);
+  const second = restorePaneAtAnchor(node.second, placement, pane);
   return first === node.first && second === node.second ? node : { ...node, first, second };
 }

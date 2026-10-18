@@ -67,6 +67,33 @@ export function jobConfirmKinds(config: unknown): string[] | undefined {
     : undefined;
 }
 
+/**
+ * The run's Ask or Auto and the person's remembered page grants, as the server
+ * put them in the job. Anything malformed reads as no grants: every kind asks.
+ */
+export function jobGrantSet(config: unknown) {
+  const value =
+    config && typeof config === "object" ? (config as { grantSet?: unknown }).grantSet : undefined;
+  if (!value || typeof value !== "object") return undefined;
+  const { mode, grants, version } = value as {
+    mode?: unknown;
+    grants?: unknown;
+    version?: unknown;
+  };
+  return {
+    mode: mode === "auto" ? "auto" : "ask",
+    version: typeof version === "number" ? version : 0,
+    grants: Array.isArray(grants)
+      ? grants.filter(
+          (grant): grant is { kind: string; origin: string } =>
+            !!grant &&
+            typeof (grant as { kind?: unknown }).kind === "string" &&
+            typeof (grant as { origin?: unknown }).origin === "string",
+        )
+      : [],
+  };
+}
+
 export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"]) {
   const contextId = job.contextId;
   if (!job.operation.startsWith("browser.") || !contextId || !job.scopeId) {
@@ -91,6 +118,7 @@ export function browserAgentExecutionRequest(job: ClaimedWorkflowNodeJob["job"])
     },
     siteBlocks: jobSiteBlocks(job.config),
     confirmKinds: jobConfirmKinds(job.config),
+    grantSet: jobGrantSet(job.config),
   };
 }
 

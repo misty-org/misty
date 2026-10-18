@@ -13,7 +13,7 @@ use crate::infra::{
     device_records::SignedRecord, device_trust,
 };
 
-/// The largest file a `files.send` job hands to the Space's Library, the
+/// The largest file a `folder.send` job hands to the Space's Library, the
 /// same limit as any upload from the app.
 const MAX_SENT_FILE_BYTES: u64 = 128 * 1024 * 1024;
 
@@ -71,10 +71,20 @@ pub async fn device_sign_run_grants(
     grants: Vec<RunGrantRequest>,
 ) -> Result<Vec<SignedRecord>, String> {
     require_device_window(&webview)?;
+    sign_run_grants(&state, &api_base, &account_id, grants).await
+}
+
+/// One signing path for chats and for the debug-only eval bridge.
+pub(crate) async fn sign_run_grants(
+    state: &MistyRuntime,
+    api_base: &str,
+    account_id: &str,
+    grants: Vec<RunGrantRequest>,
+) -> Result<Vec<SignedRecord>, String> {
     if grants.len() > 16 {
         return Err("Too many devices in one request.".into());
     }
-    let context = context(&state, &api_base, &account_id).await?;
+    let context = context(state, api_base, account_id).await?;
     grants
         .into_iter()
         .map(|grant| {
@@ -93,7 +103,7 @@ pub async fn device_sign_run_grants(
 fn surface_for(operation: &str, scope_id: &str) -> &'static str {
     if scope_id.starts_with("inbox:") {
         "inbox"
-    } else if operation.starts_with("files.") || operation == "read_content" {
+    } else if operation.starts_with("folder.") || operation == "read_content" {
         "folders"
     } else if operation.starts_with("terminal.") {
         "terminal"
@@ -127,7 +137,7 @@ pub async fn device_verify_job(
     .map_err(|_| "device_grant_invalid".to_owned())
 }
 
-/// Reads the file a `files.send` job names: checks its grant and resolves the
+/// Reads the file a `folder.send` job names: checks its grant and resolves the
 /// file inside the shared folder. The app then saves it to the conversation's
 /// Space Library, where the person's other devices open it.
 #[tauri::command]
@@ -141,7 +151,7 @@ pub async fn device_read_shared_file(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    device_trust::verify_job_grant(&grant, &scope_id, "files.send", "folders")
+    device_trust::verify_job_grant(&grant, &scope_id, "folder.send", "folders")
         .map_err(|_| "device_grant_invalid".to_owned())?;
     if input["scopeId"].as_str() != Some(scope_id.as_str()) {
         return Err("invalid_scope".into());
