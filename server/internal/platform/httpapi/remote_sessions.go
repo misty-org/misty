@@ -235,11 +235,19 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 	// one beside them (up to maxOwnTabs), so pages the person asked to keep open stay
 	// open; a call without one goes back to the first.
 	own := []string{}
+	already := ""
 	for _, item := range contexts {
 		var metadata map[string]any
 		if item.Kind == "browser_tab" && item.State == "attached" && item.DeviceID == target.DeviceID && json.Unmarshal(item.Metadata, &metadata) == nil && metadata["remote_session"] == true {
 			own = append(own, item.OpaqueRef)
+			// A page opened again goes back to its tab rather than a duplicate of it.
+			if url != "" && metadata["opened_url"] == url && already == "" {
+				already = item.OpaqueRef
+			}
 		}
+	}
+	if already != "" {
+		return sessionOpened(already, name, url, true, own...)
 	}
 	if len(own) > 0 && (url == "" || len(own) >= maxOwnTabs) {
 		return sessionOpened(own[0], name, url, true, own...)
@@ -255,6 +263,9 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 		return nil, deviceOfflineError{name: name, reason: "returned an invalid browser session."}
 	}
 	metadata["window_label"] = body.WindowLabel
+	if url != "" {
+		metadata["opened_url"] = url
+	}
 	tab.Metadata, _ = json.Marshal(metadata)
 	if _, err := s.database.AttachRunningAIInvocationContext(ctx, record.UserID, record.ID, tab.DeviceID, tab.Kind, tab.OpaqueRef, tab.DisplayName, tab.Capabilities, tab.Metadata, runGrantRecord(tab.RunGrant)); err != nil {
 		// Calls made together (one per site) share the device's one session tab: the

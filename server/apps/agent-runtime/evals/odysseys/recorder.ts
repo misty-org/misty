@@ -66,7 +66,9 @@ export class Recorder {
 
   /** The final answer and a last picture of every page the agent left open. */
   async finish(answer: string): Promise<void> {
-    this.steps.push({ step: this.steps.length + 1, action: "final_answer", response: answer.slice(0, 6_000), screenshots: await this.capture() });
+    // Every open page is pictured again, changed or not: the judge sees the last pictures, and
+    // a tab opened early and left as proof would otherwise only appear among the dropped ones.
+    this.steps.push({ step: this.steps.length + 1, action: "final_answer", response: answer.slice(0, 6_000), screenshots: await this.capture(true) });
     const lines = this.steps.map((step) => JSON.stringify({ step: step.step, action: step.action, response: step.response, screenshot: step.screenshots[0] ?? "", screenshots: step.screenshots }));
     writeFileSync(join(this.dir, "steps.jsonl"), lines.join("\n") + "\n");
   }
@@ -76,7 +78,7 @@ export class Recorder {
     return this.steps.flatMap((step) => step.screenshots.map((file) => join(this.dir, file)));
   }
 
-  private async capture(): Promise<string[]> {
+  private async capture(all = false): Promise<string[]> {
     if (!this.bridge) return [];
     const pages = await this.call<{ pages: Array<{ label: string; url: string }> }>("/pages", {}).catch(() => ({ pages: [] }));
     const files: string[] = [];
@@ -90,7 +92,7 @@ export class Recorder {
       const match = /^data:image\/(\w+);base64,(.+)$/.exec(String(image?.dataUrl ?? ""));
       if (!match) continue;
       const digest = createHash("sha1").update(match[2]!).digest("hex");
-      if (this.seen.get(page.label) === digest) continue;
+      if (!all && this.seen.get(page.label) === digest) continue;
       this.seen.set(page.label, digest);
       const file = `shot-${String(++this.shots).padStart(3, "0")}.${match[1] === "png" ? "png" : "jpg"}`;
       writeFileSync(join(this.dir, file), Buffer.from(match[2]!, "base64"));
