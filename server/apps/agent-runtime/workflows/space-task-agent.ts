@@ -22,7 +22,7 @@ import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { earlyGiveUp } from "../src/persistence-check.js";
-import { openPages, reviewAnswer, reviewRefusal, worthReviewing } from "../src/requirements-review.js";
+import { openPages, reviewAnswer, reviewRefusal, skippedRefusal, worthReviewing } from "../src/requirements-review.js";
 import { deadlineNote } from "../src/turn-deadline.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
@@ -97,6 +97,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   let refusedAtTurn = -1;
   // The draft answer is checked against the request once (src/requirements-review.ts).
   let reviewed = false;
+  // The turn a finish was last sent back, and how often a plain answer then skipped it.
+  let finishRefusedTurn = -1;
+  let plainPushbacks = 0;
   // Recomputed from the transcript before every model call.
   let visibleTools: string[] = [];
   let modelTurn = 0;
@@ -143,6 +146,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
             if (unfinished) {
               persistenceRefusals++;
               refusedAtTurn = modelTurn;
+              finishRefusedTurn = modelTurn;
               return { status: "failure", tool_error: { message: unfinished } };
             }
           }
@@ -150,7 +154,10 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
             reviewed = true;
             const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
             const gaps = await reviewAnswer(identity, context.model_id, context.prompt, report, pages);
-            if (gaps.length) return { status: "failure", tool_error: { message: reviewRefusal(gaps) } };
+            if (gaps.length) {
+              finishRefusedTurn = modelTurn;
+              return { status: "failure", tool_error: { message: reviewRefusal(gaps) } };
+            }
           }
           if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
           const refusal = unbackedCompletion(report, messages, catalog.readOnly);
@@ -323,6 +330,27 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
           citationRefused = true;
           const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
           messages.push({ role: "user", content: citationRefusal(unread, canFetch, "give your answer again") });
+          continue;
+        }
+      }
+      // A plain-text answer is held to agent_finish's checks too: a long request's draft is
+      // reviewed once (src/requirements-review.ts), and one written right after a finish was
+      // sent back, leaving out what it listed, goes back to work while turns remain.
+      if (plainAnswer && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults)) {
+        const draft = { outcome: "completed" as const, summary: plainAnswer.slice(0, 12_000), remaining: [] };
+        if (!reviewed && worthReviewing(context.prompt, draft, modelTurn, limit)) {
+          reviewed = true;
+          const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
+          const gaps = await reviewAnswer(identity, context.model_id, context.prompt, draft, pages);
+          if (gaps.length) {
+            finishRefusedTurn = modelTurn;
+            messages.push({ role: "user", content: reviewRefusal(gaps) });
+            continue;
+          }
+        } else if (finishRefusedTurn === modelTurn - 1 && plainPushbacks < 2 && modelTurn < limit - 4) {
+          plainPushbacks++;
+          finishRefusedTurn = modelTurn;
+          messages.push({ role: "user", content: skippedRefusal });
           continue;
         }
       }

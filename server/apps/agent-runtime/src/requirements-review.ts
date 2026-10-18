@@ -54,6 +54,10 @@ export function reviewRefusal(gaps: string[]): string {
     "Do each one now, with the tools that found the rest (open pages the person asked to keep open in your own tabs), then finish again. If one truly cannot be done, say why in the answer.";
 }
 
+/** For a plain answer that leaves out what the last finish was sent back for. */
+export const skippedRefusal = "Your last finish was sent back for the parts it listed, and this answer still leaves them out. " +
+  "Keep working on them with your tools (search, your own tabs, the sites' own search and links), then finish with agent_finish. Report a part as not done only when it needs the person or the sites truly lack it.";
+
 /** One durable review call, metered like any model call; it does not spend a model turn. */
 export async function reviewAnswer(
   identity: RuntimeIdentity,

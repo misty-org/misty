@@ -28,6 +28,7 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
   let handoff = "";
   const failures: Array<{ toolName: string; error: string }> = [];
   const rejectedWrites = new Map<string, number>();
+  let unopenedTabs = 0;
 
   const requireInspection = (name: string) => {
     requiredInspection ||= name;
@@ -53,6 +54,12 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
     if (outcome.kind === "stop" && uncertainPageAction(name, call.input)) {
       const look = catalog.modelName("browser.snapshot") ? "browser.snapshot" : "browser.inspect";
       requireInspection(look);
+      return;
+    }
+    // Opening a tab of the agent's own changes nothing for anyone, so one that couldn't be
+    // confirmed (the device was slow to answer) is planned around instead of ending the run.
+    if (outcome.kind === "stop" && name === "screen.open" && ownTab(call.input) && ++unopenedTabs <= 2) {
+      order.pause(`Opening that tab did not finish (${visible}). Navigate a tab you already have, open it again, or read the page with web_fetch.`);
       return;
     }
     if (outcome.kind === "retry") {
@@ -110,6 +117,12 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
       });
     }),
   };
+}
+
+/** screen_open for a tab of the agent's own, not the person's tab or desktop. */
+function ownTab(input: unknown): boolean {
+  const target = (input && typeof input === "object" ? (input as Record<string, unknown>).target : undefined) ?? "";
+  return target === "" || target === "new_tab" || target === "window";
 }
 
 /** A browser page action, not marked consequential, whose outcome was uncertain. */

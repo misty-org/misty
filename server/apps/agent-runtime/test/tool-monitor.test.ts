@@ -94,6 +94,21 @@ describe("tool monitor", () => {
     }
   });
 
+  it("plans around an own tab that did not open, twice, but not the person's tab", async () => {
+    const { order, monitor, call } = setup();
+    for (const id of ["a", "b"]) {
+      await call(id, "screen_open", { success: true, output: { status: "uncertain" } }, { url: "https://depop.com/x", newTab: true });
+      expect(order.stoppedReason).toBe("");
+      expect(order.resume()).toBe(true);
+    }
+    await call("c", "screen_open", { success: true, output: { status: "uncertain" } }, { url: "https://depop.com/x" });
+    expect(order.stoppedReason).not.toBe("");
+    const person = setup();
+    await person.call("d", "screen_open", { success: true, output: { status: "uncertain" } }, { target: "current_tab" });
+    expect(person.order.stoppedReason).not.toBe("");
+    expect(monitor.failures()).toHaveLength(1);
+  });
+
   it("declines the rest of a response after a failure without running it", async () => {
     const { order, monitor } = setup(new Set(["write"]));
     const write = { toolCallId: "write", toolName: "note_update", input: {} };
