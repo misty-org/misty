@@ -22,7 +22,7 @@ import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { earlyGiveUp } from "../src/persistence-check.js";
-import { openPages, reviewAnswer, reviewRefusal, skippedRefusal, worthReviewing } from "../src/requirements-review.js";
+import { ledgerNote, openPages, requirementsLedger, reviewAnswer, reviewRefusal, skippedRefusal, worthLedger, worthReviewing } from "../src/requirements-review.js";
 import { deadlineNote } from "../src/turn-deadline.js";
 import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
 import { executeTool } from "../src/tool-calls.js";
@@ -266,6 +266,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const condensers = [staleSnapshots, staleCodeResults, oldToolResults,
       summarizedSteps((older) => summarizeOlderSteps(identity, context.model_id, older, window, ++compactions))];
     // agent.tool survives a summary that drops the calls that chose it.
+    // A long request's requirements, listed once before work starts (src/requirements-review.ts).
+    if (worthLedger(context.prompt)) {
+      const ledger = await requirementsLedger(identity, context.model_id, context.prompt);
+      if (ledger) messages.push({ role: "user", content: ledgerNote(ledger) });
+    }
     let toolsetState = toolState(messages, toolsets.initial);
     for (; modelTurn < limit; modelTurn++) {
       const steering = await takeSteering(identity, `${modelTurn}:before`, false);

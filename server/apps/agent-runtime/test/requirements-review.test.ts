@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
-import { openPages, parseGaps, reviewRefusal, worthReviewing } from "../src/requirements-review.js";
+import { ledgerNote, openPages, parseGaps, reviewRefusal, worthLedger, worthReviewing } from "../src/requirements-review.js";
 
 const done = { outcome: "completed" as const, summary: "Here is the memo.", remaining: [] };
 const long = "Compare eight cleats on price, studs, weight and returns, and keep each product page open. ".repeat(4);
@@ -11,6 +11,12 @@ describe("requirements review", () => {
     expect(worthReviewing("What time is it in Lisbon?", done, 2, 90)).toBe(false);
     expect(worthReviewing(long, done, 87, 90)).toBe(false);
     expect(worthReviewing(long, { ...done, outcome: "blocked" }, 20, 90)).toBe(false);
+  });
+
+  it("lists a long request's requirements before work starts", () => {
+    expect(worthLedger(long)).toBe(true);
+    expect(worthLedger("What time is it in Lisbon?")).toBe(false);
+    expect(ledgerNote("1. Eight cleats\n2. Price for each")).toContain("2. Price for each");
   });
 
   it("reads gaps one per line, and NONE as none", () => {

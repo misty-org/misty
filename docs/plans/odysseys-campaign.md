@@ -143,6 +143,8 @@ results in the message.
 | 9 | Oct 18 | K1 read (frames), parked agent tabs, evidence guidance, recorder fix | 0/3, stopped by hand | 0.30 | — | 54 calls / 341 s | $0.63 |
 | 10 | Oct 18 | Requirements review, K1 actions (frame refs, CryptPad), 32 tabs, three refusals | 0/2, stopped by hand | 0.06 | — | 38 calls / 171 s | $0.25 |
 | 11 | Oct 18 | Own-tab failures planned around, plain answers checked, summary is the whole answer, tabs reused | 0/7, stopped early | 0.24 (0.34 without two connect failures) | — | 72 calls / 508 s | $1.17 |
+| 12 | Oct 18 | Consent decline, parallel calls | 0/4, stopped by hand | 0.21 (network failures) | — | 91 calls / 659 s | $0.65 |
+| 13 | Oct 18 | IPv4-first provider calls, commit to picks, whole final answer to the judge | 0/2 before the account ran out of AI usage | 0.43 | — | 76 calls / 479 s | $0.47 |
 
 ### Fixes before the first batch (October 17)
 
@@ -239,6 +241,18 @@ third of them. What still failed:
 | A twelve-hotel run made one call a turn and covered six hotels | H | Independent calls go in one response (`90f6235b`) |
 
 CryptPad works end to end now: in batch 11 the agent created a titled document and wrote into it.
+
+### Batches 12 and 13 (October 18)
+
+The shopping task reached 0.63 (its best) and the pediatrician task 0.44, but both batches were
+spoiled by the environment more than the agent:
+
+| Cause | Label | Fix |
+|---|---|---|
+| Model calls failed in bursts with ETIMEDOUT about 1.3 s apart, whole runs dying before their first step: Node raced IPv4 and IPv6 with 250 ms for IPv4, and the container cannot route IPv6 | E | IPv4 first, no family racing (`26640e9d`) |
+| The judge saw final answers cut at 6,000 characters, so long reports' last sections were graded missing | E | The whole answer (`f6c923d1`) |
+| The eval account spent its weekly AI allowance (14.25M units) mid-batch; the next six tasks failed in a second each | E | The local allowance is raised for the campaign (old row in the scratchpad restore notes; the weekly reset restores the plan's), and a pass stops when the account is out of usage |
+| A run refused to pick ("Dress: unresolved") and left a popup over its evidence | H | Commit to a pick and say what is unconfirmed; close overlays over evidence (`3a096f68`) |
 
 "invocation.failed" in these reports is often the agent's own "not finished" ending with a full
 answer, which the judge grades like any other.
