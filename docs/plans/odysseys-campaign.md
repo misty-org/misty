@@ -141,6 +141,8 @@ results in the message.
 | 7 | Oct 18 | Stopping a pass cancels its run; 32k output; screen-model calls out of the billing aggregate | 0/2, stopped by hand | 0.07 | — | 45 calls / 523 s | $0.31 |
 | 8 | Oct 18 | Dev tasks 6–10, `medium` | 0/5 | 0.43 | — | 49 calls / 354 s | $0.56 |
 | 9 | Oct 18 | K1 read (frames), parked agent tabs, evidence guidance, recorder fix | 0/3, stopped by hand | 0.30 | — | 54 calls / 341 s | $0.63 |
+| 10 | Oct 18 | Requirements review, K1 actions (frame refs, CryptPad), 32 tabs, three refusals | 0/2, stopped by hand | 0.06 | — | 38 calls / 171 s | $0.25 |
+| 11 | Oct 18 | Own-tab failures planned around, plain answers checked, summary is the whole answer, tabs reused | 0/7, stopped early | 0.24 (0.34 without two connect failures) | — | 72 calls / 508 s | $1.17 |
 
 ### Fixes before the first batch (October 17)
 
@@ -218,6 +220,25 @@ unused. The causes were already clear, so the batch stopped there:
 | A task asked for about 26 pages kept open; agents could hold 16 | H | 32 tabs (`8da813cc`) |
 | Runs still reported partial with half their turns left after two refusals | H | Up to three refusals, each after more work (`8da813cc`) |
 | CryptPad's editor lives in a cross-origin sandbox frame, so the document stayed empty (R7 of `d03a08650b`, R4 of `48a6cb73b8`) | K | K1 actions: frame refs come from per-frame ranges and steps, forms and skills run in their frame; editor frames get the editor skill. Checked by hand: a formatted CryptPad pad written and saved (`40205697`) |
+
+### Batches 10 and 11 (October 18)
+
+Runs now use their turns (50 to 68 of 90, ten to twelve minutes each) instead of giving up at a
+third of them. What still failed:
+
+| Cause | Label | Fix |
+|---|---|---|
+| The device was slow to answer one of 32 `screen_open` calls; the job was canceled at its deadline and the run ended at 41 s | H | An own tab that did not open is planned around, twice at most (`347c2f41`) |
+| After a refused finish, the model answered in plain text and the loop took it (six of ten pediatricians, 27 of 90 turns) | H | Plain answers get the review, and one that skips what the last refusal listed goes back to work (`cd76e319`) |
+| Two runs failed at their first model call with "Cannot connect to API", each right after another run ended | E/H | Model calls back off for about 30 s, and direct provider calls log the network error (`13523835`); the runner retries a run that never reached the agent |
+| A stopped batch's vitest worker kept starting tasks beside the next batch | E | The stop script kills the worker too |
+| A final answer pointed to a table "in my answer" above, which nobody sees | H | The finish summary is the whole answer (`eb705e90`) |
+| Duplicate tabs of one listing crowded the requested set | H | A page opened again reuses its tab (`eb705e90`) |
+| A tab opened early as proof fell outside the judge's last 60 pictures | E | Every open tab is pictured again at the end |
+| Cookie banners covered evidence (Depop, UHC, a scholarship page) | K | Agent tabs decline consent banners the private way before reading, open shadow roots included (`a6d2e41c`) |
+| A twelve-hotel run made one call a turn and covered six hotels | H | Independent calls go in one response (`90f6235b`) |
+
+CryptPad works end to end now: in batch 11 the agent created a titled document and wrote into it.
 
 "invocation.failed" in these reports is often the agent's own "not finished" ending with a full
 answer, which the judge grades like any other.
