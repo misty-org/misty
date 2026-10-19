@@ -54,7 +54,7 @@ mod macos {
     };
     use std::{
         cell::{Cell, RefCell},
-        collections::{HashMap, HashSet},
+        collections::HashMap,
     };
 
     struct Entry {
@@ -66,8 +66,6 @@ mod macos {
     thread_local! {
         /// Web view → its cross-origin frames, newest last. Main thread only.
         static FRAMES: RefCell<HashMap<usize, Vec<Entry>>> = RefCell::new(HashMap::new());
-        /// Content controllers that already announce frames; a handler name is added once.
-        static INSTALLED: RefCell<HashSet<usize>> = RefCell::new(HashSet::new());
         static NEXT: Cell<u64> = const { Cell::new(1) };
     }
 
@@ -153,8 +151,13 @@ mod macos {
         let mtm = MainThreadMarker::new().ok_or("Frames are prepared on the main thread.")?;
         unsafe {
             let controller = view.configuration().userContentController();
-            let key = Retained::as_ptr(&controller) as usize;
-            if !INSTALLED.with(|installed| installed.borrow_mut().insert(key)) {
+            // A controller announces frames once; the script's presence says so even when a
+            // closed tab's controller address is reused by a new one.
+            if controller
+                .userScripts()
+                .iter()
+                .any(|script| script.source().to_string() == ANNOUNCE)
+            {
                 return Ok(());
             }
             let world = WKContentWorld::worldWithName(&NSString::from_str(WORLD), mtm);

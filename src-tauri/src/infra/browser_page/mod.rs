@@ -180,13 +180,27 @@ pub(super) async fn landed(
         false,
     )
     .await;
+    let declined = decline_consent(&view).await;
     let args = json!({"candidateId": uuid::Uuid::new_v4().to_string(), "maxChars": SNAPSHOT_CHARS, "maxRefs": 800});
     let mut snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    if let Some(label) = declined {
+        snapshot["consentDeclined"] = json!(label);
+    }
     with_frame_trees(&view, &mut snapshot).await;
     (snapshot["ok"] == true).then(|| {
         json!({"documentId": snapshot["documentId"], "url": snapshot["url"], "title": snapshot["title"],
-            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]})
+            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"],
+            "consentDeclined": snapshot["consentDeclined"]})
     })
+}
+
+/// Answers a cookie or consent banner the most private way before the agent reads the page
+/// (page_read.js), and says which control it pressed.
+async fn decline_consent(view: &Webview) -> Option<String> {
+    let result = call(view, "declineConsent", json!({}), false).await.ok()?;
+    let label = result["declined"].as_str().filter(|label| !label.is_empty())?.to_owned();
+    let _ = call(view, "settle", json!({"quietMs": 300, "maxMs": 1500}), false).await;
+    Some(label)
 }
 
 /// Adds what the page's cross-origin frames show under their iframes (frames.rs).
@@ -263,7 +277,11 @@ pub(super) async fn execute(
                 args["scopeRef"] = json!(scope);
             }
             let scoped = !input["scopeRef"].is_null();
+            let declined = if scoped { None } else { decline_consent(&view).await };
             let mut result = call(&view, "snapshot", args, true).await?;
+            if let Some(label) = declined {
+                result["consentDeclined"] = json!(label);
+            }
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
             }
