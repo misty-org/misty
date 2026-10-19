@@ -39,6 +39,18 @@ function directOpenAI(modelId: string, env: Environment) {
   return modelId.startsWith("openai/") && openAIKey(env) !== "";
 }
 
+/** fetch for direct provider calls that logs why a request never reached the provider: the
+ * SDK reports only "Cannot connect to API", without the network error under it. */
+const loggedFetch: typeof fetch = async (input, init) => {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    const cause = (error as { cause?: { code?: string; message?: string } }).cause;
+    console.error("[model-fetch] request failed", String((error as Error).name), String((error as Error).message), cause?.code ?? "", cause?.message ?? "");
+    throw error;
+  }
+};
+
 function anthropicKey(env: Environment) {
   return env.ANTHROPIC_API_KEY?.trim() || env.CLAUDE_API_KEY?.trim() || "";
 }
@@ -73,7 +85,7 @@ export function resolveInstanceModel(
     // Gateway routing options mean nothing to Anthropic itself.
     const { gateway: _gateway, ...providerOptions } = options.providerOptions ?? {};
     return {
-      model: createAnthropic({ apiKey: anthropicKey(env) })(anthropicModelName(modelId)),
+      model: createAnthropic({ apiKey: anthropicKey(env), fetch: loggedFetch })(anthropicModelName(modelId)),
       options: { ...options, providerOptions },
     };
   }

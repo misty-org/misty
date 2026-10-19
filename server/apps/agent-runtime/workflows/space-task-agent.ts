@@ -180,7 +180,9 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       // One model call per stream lets the coordinator refresh the active-time
       // deadline after durable tool waits. The aggregate loop below owns the cap.
       stopWhen: isStepCount(1),
-      maxRetries: 2,
+      // Backoff of 2, 4, 8 and 16 seconds rides out a short network blip to the provider,
+      // which failed whole runs at their first call when three quick retries did not.
+      maxRetries: 4,
       // Match the Go admission ceiling (agents.MaxAgentTurnOutputTokens).
       maxOutputTokens: 32_000,
       reasoning: context.reasoning_effort === "max" ? undefined : context.reasoning_effort || undefined,
