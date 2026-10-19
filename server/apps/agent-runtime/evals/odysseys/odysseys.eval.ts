@@ -163,6 +163,11 @@ it.skipIf(env("MISTY_ODYSSEYS") !== "1")("runs Odysseys tasks through the produc
     try {
       performed = await perform(client, task, agentId, me.id, dir);
       refusedInARow = 0;
+      // Out of AI usage, every later task would fail in a second: stop instead of grading them.
+      if (/usage limit/i.test(performed.result.answer) && performed.result.tools.length < 3) {
+        stopped = "the account is out of AI usage: raise the eval account's allowance, then run again";
+        break;
+      }
     } catch (error) {
       const run = failedRun(task, dir, error);
       runs.push(run);

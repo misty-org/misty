@@ -68,7 +68,7 @@ export class Recorder {
   async finish(answer: string): Promise<void> {
     // Every open page is pictured again, changed or not: the judge sees the last pictures, and
     // a tab opened early and left as proof would otherwise only appear among the dropped ones.
-    this.steps.push({ step: this.steps.length + 1, action: "final_answer", response: answer.slice(0, 6_000), screenshots: await this.capture(true) });
+    this.steps.push({ step: this.steps.length + 1, action: "final_answer", response: answer.slice(0, 40_000), screenshots: await this.capture(true) });
     const lines = this.steps.map((step) => JSON.stringify({ step: step.step, action: step.action, response: step.response, screenshot: step.screenshots[0] ?? "", screenshots: step.screenshots }));
     writeFileSync(join(this.dir, "steps.jsonl"), lines.join("\n") + "\n");
   }
