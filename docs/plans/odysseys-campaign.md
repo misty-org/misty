@@ -145,6 +145,8 @@ results in the message.
 | 11 | Oct 18 | Own-tab failures planned around, plain answers checked, summary is the whole answer, tabs reused | 0/7, stopped early | 0.24 (0.34 without two connect failures) | — | 72 calls / 508 s | $1.17 |
 | 12 | Oct 18 | Consent decline, parallel calls | 0/4, stopped by hand | 0.21 (network failures) | — | 91 calls / 659 s | $0.65 |
 | 13 | Oct 18 | IPv4-first provider calls, commit to picks, whole final answer to the judge | 0/2 before the account ran out of AI usage | 0.43 | — | 76 calls / 479 s | $0.47 |
+| 14 | Oct 18 | Requirements ledger at the start | 0/2, stopped by hand (tabs idled out) | 0.43 | — | 81 calls / 599 s | $0.52 |
+| 15 | Oct 18 | Sessions kept alive by any tab, research scaled by the ledger, clean app restart | **3/7** (two hard, one medium) | **0.67** | — | 90 calls / 730 s | $1.85 |
 
 ### Fixes before the first batch (October 17)
 
@@ -253,6 +255,22 @@ spoiled by the environment more than the agent:
 | The judge saw final answers cut at 6,000 characters, so long reports' last sections were graded missing | E | The whole answer (`f6c923d1`) |
 | The eval account spent its weekly AI allowance (14.25M units) mid-batch; the next six tasks failed in a second each | E | The local allowance is raised for the campaign (old row in the scratchpad restore notes; the weekly reset restores the plan's), and a pass stops when the account is out of usage |
 | A run refused to pick ("Dress: unresolved") and left a popup over its evidence | H | Commit to a pick and say what is unconfirmed; close overlays over evidence (`3a096f68`) |
+
+### Batches 14 and 15 (October 18): the first perfect tasks
+
+| Cause | Label | Fix |
+|---|---|---|
+| Fields per item, review links and pages to keep open were found missing only at the end, with too few turns left | H | A requirements ledger: one short call lists the request's explicit requirements as the run's first note (`0cfb22db`) |
+| A run working in its other tabs idled its session out after ten minutes and lost every tab ("the browser stopped responding") | H | Jobs on any of a session's tabs keep it in use (`cd39d759`) |
+| A 26-page task ran out of search at a third of its turns | H | The research budget scales with the ledger, up to twenty base allowances (`cd39d759`) |
+| A hot reload during a batch orphaned session timers | E | Restart the desktop app before a batch after frontend edits |
+| Requested tab sets were crowded by sign-in pages and duplicates | H | `screen_close` closes a run's own extra tabs (`11d2b7af`) |
+| CryptPad's drive looked stuck on "Loading..." (a placeholder at a negative z-index under the app frame) and a run gave up on the document | K | Covered layers behind the page are hidden from the tree (`97309ea1`) |
+
+Batch 15 scored 0.63, 0.33, 0.71, 0.00, **1.00, 1.00, 1.00**: the dog-ownership health check, the Maryland
+and DC law school outreach plan and the twelve-hotel Disney comparison passed every rubric item. The four
+fixes that mattered most for them were the long-lived sessions, the ledger, persistence against
+plain-text answers and IPv4-first provider calls.
 
 "invocation.failed" in these reports is often the agent's own "not finished" ending with a full
 answer, which the judge grades like any other.

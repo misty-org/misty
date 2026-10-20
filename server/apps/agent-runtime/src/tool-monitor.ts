@@ -29,6 +29,7 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
   const failures: Array<{ toolName: string; error: string }> = [];
   const rejectedWrites = new Map<string, number>();
   let unopenedTabs = 0;
+  let unanswered = 0;
 
   const requireInspection = (name: string) => {
     requiredInspection ||= name;
@@ -60,6 +61,12 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
     // confirmed (the device was slow to answer) is planned around instead of ending the run.
     if (outcome.kind === "stop" && name === "screen.open" && ownTab(call.input) && ++unopenedTabs <= 2) {
       order.pause(`Opening that tab did not finish (${visible}). Navigate a tab you already have, open it again, or read the page with web_fetch.`);
+      return;
+    }
+    // Asking the person for help (a bot check, a sign-in) changes no page either: when nobody
+    // can answer, the run takes another route instead of ending with nothing.
+    if (outcome.kind === "stop" && name === "browser.request_user_action" && ++unanswered <= 2) {
+      order.pause(`Nobody could take over that page (${visible}). Reach what you need another way: the same page from a search result, another site that has it, or web_fetch; report it as blocked only if nothing else has it.`);
       return;
     }
     if (outcome.kind === "retry") {

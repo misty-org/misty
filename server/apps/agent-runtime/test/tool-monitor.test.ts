@@ -109,6 +109,17 @@ describe("tool monitor", () => {
     expect(monitor.failures()).toHaveLength(1);
   });
 
+  it("plans around a request for the person that nobody answered", async () => {
+    const pages = modelCatalog([{ name: "browser.request_user_action", description: "", inputSchema: schema }], ["agent_finish"]);
+    const order = serialToolLifecycle();
+    const monitor = toolMonitor({ catalog: pages, order, rejected: new Set(), checkpoint: async () => {} });
+    const toolCall = { toolCallId: "ask", toolName: "browser_request_user_action", input: { reason: "Cloudflare check" } };
+    await monitor.onStart({ toolCall });
+    await monitor.onEnd({ toolCall, durationMs: 1, success: false, error: "The tool could not complete this action." });
+    expect(order.stoppedReason).toBe("");
+    expect(monitor.failures()).toHaveLength(0);
+  });
+
   it("declines the rest of a response after a failure without running it", async () => {
     const { order, monitor } = setup(new Set(["write"]));
     const write = { toolCallId: "write", toolName: "note_update", input: {} };
