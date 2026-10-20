@@ -1,4 +1,5 @@
 import type { ModelMessage } from "ai";
+import { ledgerHeading } from "./requirements-review.js";
 
 // Research budget (docs/plans/agent-harness.md). Prompts say "be economical"; this layer makes
 // it true. It reads the run's own transcript before every model call, so a replayed run agrees,
@@ -59,13 +60,20 @@ function stageFor(cost: number, scale = 1): ResearchStage {
 
 /**
  * A long request earns a longer budget: one base allowance for every step of the run's
- * own checklist (log_work_checklist), never less than one. A quick question has no
+ * own checklist (log_work_checklist) or every requirement listed from the request, whichever
+ * is more, never less than one nor more than twenty. A quick question has no
  * checklist and keeps the base budget; a six-part task gets about 36 lookups before the
  * wrap-up note (docs/plans/odysseys-campaign.md).
  */
 export function budgetScale(messages: ModelMessage[]): number {
   const steps = new Set<string>();
+  // The requirements Misty listed from a long request (src/requirements-review.ts) count too:
+  // a run with 26 pages to verify outgrew an eight-step checklist's budget at a third of its turns.
+  let requirements = 0;
   for (const message of messages) {
+    if (message.role === "user" && typeof message.content === "string" && message.content.startsWith(ledgerHeading)) {
+      requirements = Math.max(requirements, message.content.split("\n").filter((line) => /^\s*\d+[.)]\s/.test(line)).length);
+    }
     if (message.role !== "assistant" || typeof message.content === "string") continue;
     for (const part of message.content) {
       if (part.type !== "tool-call" || part.toolName !== "log_work_checklist") continue;
@@ -73,7 +81,7 @@ export function budgetScale(messages: ModelMessage[]): number {
       for (const item of items) if (typeof item?.id === "string") steps.add(item.id);
     }
   }
-  return Math.max(1, steps.size);
+  return Math.min(20, Math.max(1, steps.size, requirements));
 }
 
 /** What the run has spent on research so far, read from its tool calls. */

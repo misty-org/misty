@@ -67,3 +67,14 @@ describe("research budget", () => {
     expect(researchUse([plan, ...searches], tools).stage).toBe("open");
   });
 });
+
+describe("budgetScale with a requirements ledger", () => {
+  it("grows with the requirements Misty listed, up to twenty", async () => {
+    const { budgetScale } = await import("../src/research-budget.js");
+    const { ledgerNote } = await import("../src/requirements-review.js");
+    const lines = Array.from({ length: 26 }, (_, index) => `${index + 1}. Requirement ${index + 1}`).join("\n");
+    expect(budgetScale([{ role: "user", content: ledgerNote(lines.split("\n").slice(0, 7).join("\n")) }])).toBe(7);
+    expect(budgetScale([{ role: "user", content: ledgerNote(lines) }])).toBe(20);
+    expect(budgetScale([{ role: "user", content: "Find a flight" }])).toBe(1);
+  });
+});

@@ -17,6 +17,8 @@ export interface HostedSession {
   viewId: string;
   /** Tabs this session's sub-agents opened; closed with it. */
   childViews: string[];
+  /** The scopes of the session's other tabs, whose jobs keep it in use too. */
+  childScopes?: string[];
   /** The request currently using the session. */
   runId: string;
   lastUsed: number;
@@ -31,9 +33,10 @@ export function hostedSessionForTask(taskId: string): HostedSession | undefined 
   return sessions().find((session) => session.taskId === taskId);
 }
 
-/** Marks a session in use when one of its tabs runs a job. */
+/** Marks a session in use when any of its tabs runs a job: a run working in its other tabs
+ * is still using the session, which would otherwise idle out and close them mid-run. */
 export function touchHostedSession(scopeId: string, runId: string) {
-  const session = sessions().find((item) => item.scopeId === scopeId);
+  const session = sessions().find((item) => item.scopeId === scopeId || item.childScopes?.includes(scopeId));
   if (session)
     update(
       sessions().map((item) =>
@@ -42,10 +45,12 @@ export function touchHostedSession(scopeId: string, runId: string) {
     );
 }
 
-export function addHostedChildViews(taskId: string, views: string[]) {
+export function addHostedChildViews(taskId: string, views: string[], scopes: string[] = []) {
   update(
     sessions().map((item) =>
-      item.taskId === taskId ? { ...item, childViews: [...item.childViews, ...views] } : item,
+      item.taskId === taskId
+        ? { ...item, childViews: [...item.childViews, ...views], childScopes: [...(item.childScopes ?? []), ...scopes] }
+        : item,
     ),
   );
 }

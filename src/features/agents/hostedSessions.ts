@@ -127,7 +127,7 @@ async function openSessionTab(session: HostedSession, url: string, signal: Abort
     await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
     throw new DeviceOperationNotAttempted(error);
   }
-  addHostedChildViews(session.taskId, [id]);
+  addHostedChildViews(session.taskId, [id], [scopeId]);
   return scopeId;
 }
 

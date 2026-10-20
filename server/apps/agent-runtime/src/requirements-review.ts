@@ -65,9 +65,11 @@ export const LEDGER_SYSTEM = [
   "Reply with a numbered list of at most 30 short lines and nothing else.",
 ].join("\n");
 
+export const ledgerHeading = "Requirements of this request";
+
 /** The ledger as the agent sees it, right after the request. */
 export function ledgerNote(ledger: string): string {
-  return `Requirements of this request, to work through and to check before you finish (Misty listed them from the request):\n${ledger}`;
+  return `${ledgerHeading}, to work through and to check before you finish (Misty listed them from the request):\n${ledger}`;
 }
 
 /** One durable call that lists a long request's requirements before work starts, so they
