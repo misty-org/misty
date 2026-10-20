@@ -147,6 +147,7 @@ results in the message.
 | 13 | Oct 18 | IPv4-first provider calls, commit to picks, whole final answer to the judge | 0/2 before the account ran out of AI usage | 0.43 | — | 76 calls / 479 s | $0.47 |
 | 14 | Oct 18 | Requirements ledger at the start | 0/2, stopped by hand (tabs idled out) | 0.43 | — | 81 calls / 599 s | $0.52 |
 | 15 | Oct 18 | Sessions kept alive by any tab, research scaled by the ledger, clean app restart | **3/7** (two hard, one medium) | **0.67** | — | 90 calls / 730 s | $1.85 |
+| 16 | Oct 18 | screen_close, covered layers hidden | 0/3, stopped by hand | 0.38 | — | 82 calls / 623 s | $0.74 |
 
 ### Fixes before the first batch (October 17)
 
@@ -271,6 +272,14 @@ Batch 15 scored 0.63, 0.33, 0.71, 0.00, **1.00, 1.00, 1.00**: the dog-ownership 
 and DC law school outreach plan and the twelve-hotel Disney comparison passed every rubric item. The four
 fixes that mattered most for them were the long-lived sessions, the ledger, persistence against
 plain-text answers and IPv4-first provider calls.
+
+### Batch 16 (October 18)
+
+| Cause | Label | Fix |
+|---|---|---|
+| A shop's bot check led the agent to ask the person to take over its hidden tab; the request failed and ended the run at 28 turns, its narration the only answer | H | A request nobody answers is planned around (`83c910b4`) |
+| A stopped run's answer was only the failure, though it had found most of what was asked | H | A stopped run writes its answer from the transcript before the stop reason (`d98fbb95`) |
+| CryptPad's "New > Rich text" opened the document in a new window, which from a hidden agent tab went to the person's window | K | Pages an agent's own tab opens load in that tab (`8f774c91`) |
 
 "invocation.failed" in these reports is often the agent's own "not finished" ending with a full
 answer, which the judge grades like any other.

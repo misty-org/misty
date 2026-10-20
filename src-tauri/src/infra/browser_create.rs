@@ -249,6 +249,18 @@ pub async fn browser_webview_create(
             if preview_only { return NewWindowResponse::Deny; }
             #[cfg(any(target_os = "macos", windows))]
             if let Some(response) = provider_popup(&popup_app, &popup_id, &url, features) { return response; }
+            // An agent's own hidden tab has no person to show a new tab to (a "New document"
+            // button, a target=_blank link): the page opens in place, where the agent's next
+            // look finds it, instead of in a tab the agent never sees.
+            if popup_id.starts_with("agent-") && matches!(url.scheme(), "https" | "http") {
+                if let Ok(label) = webview_label(&popup_id) {
+                    if let Some(view) = popup_app.get_webview(&label) {
+                        let url = url.clone();
+                        tauri::async_runtime::spawn(async move { let _ = view.navigate(url); });
+                    }
+                }
+                return NewWindowResponse::Deny;
+            }
             if external_url(url.as_str()).is_ok() {
                 let _ = popup_app.emit_to(
                     browser_owner_label(&popup_app, &popup_id).as_str(),
