@@ -5,6 +5,7 @@ import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
 import { FatalError, getWorkflowMetadata } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
 import { summarizeOlderSteps } from "../src/compaction-step.js";
+import { closingAnswer } from "../src/closing-answer.js";
 import { contextWindow, messageBytes } from "../src/context-compaction.js";
 import { condense, oldToolResults, staleCodeResults, staleSnapshots, summarizedSteps } from "../src/condenser.js";
 import type { RuntimeIdentity } from "../src/control-plane.js";
@@ -233,8 +234,20 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       error_code: "tool_sequence_stopped", error_message: order.stoppedReason,
     };
   };
+  // A stopped run writes its answer from what it found before the stop reason
+  // (src/closing-answer.ts); a handoff or a run that barely started keeps the plain message.
+  const finishStopped = async () => {
+    const ending = stopped();
+    if (!monitor.handoff && (result?.steps.length ?? 0) > 2) {
+      const answer = await closingAnswer(identity, context.model_id, context.prompt, transcript, order.stoppedReason);
+      if (answer) return await finish({ ...ending, text: `${answer}\n\n${ending.text}` });
+    }
+    return await finish(ending);
+  };
   const limit = modelTurnLimit(context.model_turn_limit);
   const legacyDeadline = Date.now() + 30 * 60_000;
+  // The transcript so far, also read after the loop when a stopped run writes its answer.
+  let transcript: ModelMessage[] = [];
   try {
     const shared = {
       providerOptions: { gateway: { models: [context.model_id] } },
@@ -314,6 +327,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       // WorkflowAgent returns the complete model transcript, including tool
       // results. Reinject our fixed system instructions once on the next call.
       messages = current.messages.filter((message) => message.role !== "system");
+      transcript = messages;
       if (screenJoined(current.toolResults)) {
         // The agent's own tab joined this run: offer its browser tools from the next turn.
         const next = await discoverRemoteMCPTools(identity);
@@ -369,7 +383,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     }
     if (!result) throw new Error("empty_agent_response");
   } catch (error) {
-    if (order.stoppedReason) return await finish(stopped());
+    if (order.stoppedReason) return await finishStopped();
     const failure = classifyRuntimeError(error);
     if (failure.code === "usage_limit_reached") {
       // Out of usage mid-task is a pause, not a failure: keep what was done.
@@ -383,7 +397,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   const taskReport = finalTaskCompletion(result.steps, result.toolResults);
   const unfinished = unfinishedModelResult(streamAborted, result.steps.length, taskReport ? "stop" : result.finishReason, limit);
   if (unfinished && streamAborted) return await finish({ status: "incomplete", text: unfinished.message, error_code: unfinished.code, error_message: unfinished.message });
-  if (order.stoppedReason) return await finish(stopped());
+  if (order.stoppedReason) return await finishStopped();
   if (unfinished) return await finish({ status: "incomplete", text: unfinished.message, error_code: unfinished.code, error_message: unfinished.message });
   const text = finalText(result.steps);
   // A run that took no actions and answered in text (a greeting, or a question
