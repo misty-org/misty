@@ -13,6 +13,7 @@ import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./work
 import {
   addHostedChildViews,
   hostedSessionForTask,
+  removeHostedChildTab,
   sessions,
   touchHostedSession,
   update,
@@ -150,7 +151,7 @@ export async function startHostedSession(
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const config = (job.config ?? {}) as { agentId?: unknown };
-  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown; newTab?: unknown };
+  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown; newTab?: unknown; closeScope?: unknown };
   const agentId = typeof config.agentId === "string" ? config.agentId : "";
   const conversationId = typeof input.conversationId === "string" ? input.conversationId : "";
   const accountId = useUserStore.getState().me?.id ?? "";
@@ -166,6 +167,13 @@ export async function startHostedSession(
   let session = sessions().find(
     (item) => item.conversationId === conversationId && conversationId && item.agentId === agentId,
   );
+  // screen_close: one of the session's other tabs, which the run no longer keeps open.
+  if (typeof input.closeScope === "string") {
+    const view = session && removeHostedChildTab(session.taskId, input.closeScope);
+    if (!view) throw new DeviceOperationNotAttempted(new Error("unknown_tab"));
+    await invoke("browser_webview_close", { request: { id: view } }).catch(() => undefined);
+    return { closed: true };
+  }
   if (!session) {
     const taskId = crypto.randomUUID();
     const viewId = `agent-${crypto.randomUUID()}`;

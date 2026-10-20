@@ -45,6 +45,26 @@ export function touchHostedSession(scopeId: string, runId: string) {
     );
 }
 
+/** Forgets one of a session's other tabs by its scope, returning the view to close. */
+export function removeHostedChildTab(taskId: string, scopeId: string): string | undefined {
+  const session = sessions().find((item) => item.taskId === taskId);
+  const index = session?.childScopes?.indexOf(scopeId) ?? -1;
+  const view = index >= 0 ? session?.childViews[index] : undefined;
+  if (!session || !view) return undefined;
+  update(
+    sessions().map((item) =>
+      item === session
+        ? {
+            ...item,
+            childViews: item.childViews.filter((_, position) => position !== index),
+            childScopes: (item.childScopes ?? []).filter((_, position) => position !== index),
+          }
+        : item,
+    ),
+  );
+  return view;
+}
+
 export function addHostedChildViews(taskId: string, views: string[], scopes: string[] = []) {
   update(
     sessions().map((item) =>

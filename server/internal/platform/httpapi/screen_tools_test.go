@@ -36,7 +36,7 @@ func TestScreenToolsAreOfferedOnlyToDesktopAgentRuns(t *testing.T) {
 			t.Fatalf("%s must be a read with a handler", registration.Descriptor.Name)
 		}
 	}
-	if strings.Join(names, ",") != "screen.open,screen.look" {
+	if strings.Join(names, ",") != "screen.open,screen.look,screen.close" {
 		t.Fatalf("screen tools = %v", names)
 	}
 }

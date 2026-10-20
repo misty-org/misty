@@ -65,6 +65,7 @@ func (s *SpacesService) screenToolRegistrations(record *db.AIInvocationRecord) [
 				"Ends the current response; Misty captures the screen and continues this conversation with the image attached.",
 			map[string]any{"reason": reason}, "reason"),
 			Handler: s.screenRequestHandler(screenLookTool)},
+		s.screenCloseRegistration(),
 	}
 }
 
