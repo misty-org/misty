@@ -3,7 +3,7 @@ import { useSpaceWindowMenu } from "./SpaceWindowMenu";
 import { useBrowserSearchStore } from "@/features/browser-workspace/search";
 import { PaneSwapMode } from "./PaneSwapMode";
 import { routes } from "@/features/app-shell";
-import { isSideDock, type DockPosition } from "@/features/app-shell/dockingLayout";
+import type { TabSide } from "@/features/app-shell/dockingLayout";
 import { useNavigationNames } from "@/features/navigation-names/store";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import {
@@ -24,13 +24,14 @@ import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 import { closePeek, usePeekStore } from "@/features/workspace/peek";
 import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
+import { SpaceBar } from "./SpaceBar";
 import type { WorkspaceTab } from "@/features/workspace/model";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
 
 export function WorkspaceCanvas(props: {
-  tabPosition?: DockPosition;
-  titlebarInsets?: { left: number; right: number; animate?: boolean };
+  /** The side of the window the tab sidebar sits on. */
+  tabPosition?: TabSide;
   windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
@@ -39,7 +40,6 @@ export function WorkspaceCanvas(props: {
   stripAccount?: ReactNode;
   /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
   browserChrome?: {
-    sync: ReactNode;
     accountItems: ReactNode;
   };
 }) {
@@ -260,33 +260,25 @@ export function WorkspaceCanvas(props: {
     />
   );
 
-  // A lone Agents surface supplies its own compact titlebar. Keep workspace
-  // navigation when other tabs/panes/windows or Windows caption buttons need it.
-  const standaloneAgents =
-    leaves.length === 1 &&
-    allLayoutViews(layout).length === 1 &&
-    (leaves[0].views[0]?.surfaceId === "agents" || leaves[0].views[0]?.groupKey === "app:agents") &&
-    !props.windowsTitlebarControls &&
-    !props.titlebarInsets &&
-    (props.tabPosition ?? "top") === "top";
-
   const windowMenuSlot = useSpaceWindowMenu();
+  const side = props.tabPosition ?? "left";
+  const contentColumn = side === "right" ? 1 : 2;
 
   return (
     <BrowserChromeSlotContext.Provider value={props.browserChrome ?? null}>
       <WindowMenuSlotContext.Provider value={windowMenuSlot}>
         <div
-          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
+          className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace ${
+            side === "right" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)]"
+          }`}
           data-workspace-panes={leaves.length}
           data-workspace-scope={activeScopeKey}
         >
-          {!standaloneAgents &&
-            !props.hideTabStrip &&
-            (isSideDock(props.tabPosition ?? "top") ? (
-              <SidebarDrawer side={props.tabPosition === "right" ? "right" : "left"}>
+          {!props.hideTabStrip ? (
+            <>
+              <SidebarDrawer side={side}>
                 <WorkspaceTabStrip
-                  position={props.tabPosition}
-                  titlebarInsets={props.titlebarInsets}
+                  position={side}
                   windowsTitlebarControls={props.windowsTitlebarControls}
                   focusedPaneId={layout.focusedPaneId}
                   lastUsedViewByGroup={lastUsedTabByGroup}
@@ -306,30 +298,11 @@ export function WorkspaceCanvas(props: {
                   footEnd={props.stripFootEnd}
                 />
               </SidebarDrawer>
-            ) : (
-              <WorkspaceTabStrip
-                position={props.tabPosition}
-                titlebarInsets={props.titlebarInsets}
-                windowsTitlebarControls={props.windowsTitlebarControls}
-                focusedPaneId={layout.focusedPaneId}
-                lastUsedViewByGroup={lastUsedTabByGroup}
-                onOpen={openTab}
-                onClose={closeWorkspaceTab}
-                onNewTab={() => useBrowserSearchStore.getState().show()}
-                onCloseLayoutTab={closeLayoutTab}
-                onMoveView={moveTab}
-                onDockView={dockTab}
-                onSplitPane={splitWorkspacePane}
-                onClosePane={(paneId) => {
-                  closePane(paneId);
-                  navigateToActiveLayoutTab();
-                }}
-                onResizeSplit={updateSplitRatio}
-                account={props.stripAccount}
-                footEnd={props.stripFootEnd}
-              />
-            ))}
+              <SpaceBar gridColumn={contentColumn} />
+            </>
+          ) : null}
           <WorkspaceTabPanels
+            gridColumn={contentColumn}
             layout={layout}
             renderTree={dockTree}
             onClosePeek={() => {

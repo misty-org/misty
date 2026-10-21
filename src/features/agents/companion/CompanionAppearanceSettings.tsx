@@ -2,6 +2,7 @@ import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Slider, Switch } from "@/shared/ui";
 import { useState } from "react";
+import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import {
   companionSizeDefault,
   companionSizeMax,
@@ -20,48 +21,34 @@ export function CompanionAppearanceSettings() {
     void companionControl(value).catch((reason) => setError(String(reason)));
   };
   return (
-    <section
-      aria-label="Cursor companion"
-      className="space-y-4 border-b border-charcoal-border pb-5"
+    <DesktopSettingsSection
+      title="Misty at your cursor"
+      description="Misty stays beside your pointer, including outside the app. Changes apply at once and stay on this device."
     >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h3 className="text-sm font-medium text-cream">Cursor companion</h3>
-          <p className="mt-1 text-xs text-cream-muted">
-            Keep Misty beside your cursor, including outside the app.
-          </p>
-        </div>
+      <DesktopSettingsRow
+        label="Show beside your cursor"
+        description="Turn off to keep Misty out of the way until you call it."
+      >
         <Switch
           aria-label="Show cursor companion"
           checked={presentation.showCompanion ?? true}
           disabled={!control}
-          onCheckedChange={(visible) =>
-            change({
-              kind: "visibility",
-              visible,
-            })
-          }
+          onCheckedChange={(visible) => change({ kind: "visibility", visible })}
         />
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center" aria-hidden="true">
-          <img
-            src={sprite}
-            alt=""
-            style={{
-              width: (32 * size) / 100,
-              height: (32 * size) / 100,
-            }}
-          />
-        </div>
-        <label className="min-w-0 flex-1 text-xs text-cream">
-          <span className="mb-2 flex justify-between gap-3">
-            <span>Companion size</span>
-            <span>{size}%</span>
-          </span>
+      </DesktopSettingsRow>
+      <DesktopSettingsRow label="Size" description="How big Misty appears beside your cursor.">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center" aria-hidden="true">
+            <img
+              src={sprite}
+              alt=""
+              style={{ width: (32 * size) / 100, height: (32 * size) / 100 }}
+            />
+          </div>
           <Slider
             aria-label="Companion size"
             aria-valuetext={`${size}%`}
+            className="w-[160px]"
             min={companionSizeMin}
             max={companionSizeMax}
             step={companionSizeStep}
@@ -69,27 +56,22 @@ export function CompanionAppearanceSettings() {
             disabled={!control}
             onValueChange={([next]) => change({ kind: "size", size: next })}
           />
-        </label>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!control || size === companionSizeDefault}
-          onClick={() =>
-            change({
-              kind: "size",
-              size: companionSizeDefault,
-            })
-          }
-        >
-          Reset size
-        </Button>
-      </div>
-      <p className="text-xs text-cream-muted">Applies immediately. Saved for you on this device.</p>
+          <span className="w-10 text-right text-[14px] tabular-nums text-cream-muted">{size}%</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!control || size === companionSizeDefault}
+            onClick={() => change({ kind: "size", size: companionSizeDefault })}
+          >
+            Reset size
+          </Button>
+        </div>
+      </DesktopSettingsRow>
       {error && (
-        <p role="alert" className="text-xs text-cream">
+        <p role="alert" className="border-t border-charcoal-border py-3 text-[14px] text-cream">
           {error}
         </p>
       )}
-    </section>
+    </DesktopSettingsSection>
   );
 }

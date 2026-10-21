@@ -1,7 +1,9 @@
 import {
+  normalizeDockingLayout,
   useDockingLayoutStore,
   validDockingLayout,
   type SavedDockingLayout,
+  type StoredDockingLayout,
 } from "@/features/app-shell/dockingLayout";
 import {
   definitionForLegacy,
@@ -45,6 +47,7 @@ import {
 import { configureBrowserSiteZoom } from "@/features/webviews/siteZoom";
 import { configureBrowserSiteStyles } from "@/features/webviews/siteStyles";
 import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures";
+import { configureHiddenTabSleep } from "@/features/webviews/hiddenTabSleep";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
 import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
@@ -251,14 +254,16 @@ function applySettingsSideEffects(
     const parsed: unknown = JSON.parse(presets);
     if (applyPortableLayout && Array.isArray(parsed))
       useDockingLayoutStore.setState({
-        savedLayouts: parsed.filter(
-          (item): item is SavedDockingLayout =>
-            validDockingLayout(item) &&
-            "id" in item &&
-            typeof item.id === "string" &&
-            "name" in item &&
-            typeof item.name === "string",
-        ),
+        savedLayouts: parsed
+          .filter(
+            (item): item is StoredDockingLayout & Pick<SavedDockingLayout, "id" | "name"> =>
+              validDockingLayout(item) &&
+              "id" in item &&
+              typeof item.id === "string" &&
+              "name" in item &&
+              typeof item.name === "string",
+          )
+          .map((item): SavedDockingLayout => ({ ...item, ...normalizeDockingLayout(item) })),
       });
   } catch {
     /* Invalid legacy data uses the last applied presets. */
@@ -289,6 +294,9 @@ function applySettingsSideEffects(
     settingsBoolean(document, "general", "browser_mouse_gestures", false),
   );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
+  configureHiddenTabSleep(
+    settingsNumber(document, "general", "browser_hidden_tab_sleep_seconds", 60),
+  );
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
   configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
   configureWorkspaceDefaultView(

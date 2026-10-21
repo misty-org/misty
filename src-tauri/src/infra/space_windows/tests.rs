@@ -70,10 +70,7 @@ fn incognito_sessions_follow_the_space_a_window_shows() {
     // One window switching away leaves the Space's session to the other.
     assert_eq!(leave_incognito(&mut state, PERSONAL, "incognito-1"), None);
     join_incognito(&mut state, ID, "incognito-1");
-    assert_ne!(
-        state.incognito[ID].session,
-        personal
-    );
+    assert_ne!(state.incognito[ID].session, personal);
     // The last window leaving ends the session.
     assert_eq!(
         leave_incognito(&mut state, PERSONAL, "incognito-2"),

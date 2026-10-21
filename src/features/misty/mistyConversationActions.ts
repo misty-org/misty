@@ -1,3 +1,4 @@
+import { ApiRequestError } from "@/api/client";
 import { subscribeAgentsInvocation as subscribeToAiInvocation } from "@/features/agents/AgentsRuntime";
 import { selectedPersonalAgent } from "@/features/agents/personalAgentsStore";
 import { globalMistyError } from "@/features/global-search/globalMistyActions";
@@ -11,8 +12,11 @@ import {
   type GlobalSearchGet,
   type GlobalSearchSet,
 } from "@/features/global-search/globalSearchStoreHelpers";
+import { settleRun } from "./settleRun";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
 import { updateMistyDraftAttachments } from "./draftAttachments";
+import { localChats, markStoredChats } from "./localChats";
+import { syncLocalChats, thisDeviceId } from "./localChatSync";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
 /** Loading, opening, creating, renaming and deleting Misty conversations. */
@@ -37,11 +41,25 @@ export function createMistyConversationActions(
         conversationsLoading: true,
       });
       try {
-        // The saved list paints first when nothing is loaded yet; the fresh one replaces it.
-        const response = await globalMistyApi.conversations("", (saved) => {
-          if (get().accountId !== accountId || get().working || get().conversations.length) return;
-          set({ conversations: saved.conversations.map(normalizeConversation) });
-        });
+        // Chats live on this device (docs/design/agent-chats-local/BRIEF.md). Its copy
+        // paints first when nothing is loaded yet; the server's newer turns merge in after.
+        const response = localChats.available()
+          ? await localChats
+              .conversations(accountId)
+              .catch(() => [])
+              .then(async (saved) => {
+                const local = saved.map(normalizeConversation);
+                markStoredChats(local);
+                if (get().accountId === accountId && !get().working && !get().conversations.length)
+                  set({ conversations: local });
+                return { conversations: await syncLocalChats(accountId, local) };
+              })
+          : // Outside the desktop app there is no device to keep chats: the server lists them.
+            await globalMistyApi.conversations("", (saved) => {
+              if (get().accountId !== accountId || get().working || get().conversations.length)
+                return;
+              set({ conversations: saved.conversations.map(normalizeConversation) });
+            });
         if (get().accountId !== accountId) return;
         if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
           set({
@@ -50,6 +68,8 @@ export function createMistyConversationActions(
           return;
         }
         const conversations = response.conversations.map(normalizeConversation);
+        // What the device sync returned is saved already.
+        if (localChats.available()) markStoredChats(conversations);
         if (
           expected &&
           (expected.accountId !== accountId ||
@@ -58,7 +78,8 @@ export function createMistyConversationActions(
             !conversations.some(
               (conversation) =>
                 conversation.id === expected.conversationId &&
-                conversation.agentId === expected.agentId &&
+                // Misty's own chats may carry no agent.
+                (!conversation.agentId || conversation.agentId === expected.agentId) &&
                 conversation.messages.some(
                   (message) =>
                     message.role === "assistant" && message.invocationId === expected.invocationId,
@@ -152,8 +173,13 @@ export function createMistyConversationActions(
                 }
               },
               onError: (error) => {
-                if (get().accountId === accountId && get().invocationId === invocationId)
-                  set({ error: error.message, working: true });
+                if (get().accountId !== accountId || get().invocationId !== invocationId) return;
+                // A reattach that drops again ends here; the next reload retries.
+                settleRun(set, get, {
+                  state: "failed",
+                  conversationId: conversation.id,
+                  error: error.message,
+                });
               },
             }),
           );
@@ -168,11 +194,13 @@ export function createMistyConversationActions(
     newConversation: async (_legacySpaceId, requestedAgentId) => {
       const accountId = get().accountId;
       const epoch = submissionEpoch();
+      // This device keeps the chat it starts.
       const conversation = normalizeConversation(
         await globalMistyApi.createConversation(
           "New conversation",
           "",
           requestedAgentId || get().selectedAgentId || selectedPersonalAgent("")?.id,
+          (await thisDeviceId()) ?? undefined,
         ),
       );
       // A browser handoff can await the server while the user switches accounts.
@@ -231,7 +259,12 @@ export function createMistyConversationActions(
             get().invocationConversationId === conversationId)
         )
           throw new Error("Stop the response before deleting this conversation.");
-        if (existing.remote) await globalMistyApi.deleteConversation(conversationId);
+        // The server's row only admits and bills the chat's runs; the chat itself is here.
+        if (existing.remote)
+          await globalMistyApi.deleteConversation(conversationId).catch((error: unknown) => {
+            if (!(error instanceof ApiRequestError && error.status === 404)) throw error;
+          });
+        await localChats.deleteConversation(requestAccount, conversationId);
         if (get().accountId !== requestAccount) return;
         updateMistyDraftAttachments(requestAccount, conversationId, (attachments) => {
           attachments.forEach((attachment) => {
@@ -277,9 +310,11 @@ export function createMistyConversationActions(
       const existing = get().conversations.find((item) => item.id === conversationId);
       if (!existing || !normalized || normalized === existing.title) return;
       try {
-        const renamed = existing.remote
-          ? await globalMistyApi.renameConversation(conversationId, normalized)
-          : { title: normalized };
+        // The name lives with the chat on this device; the server's copy only stops it
+        // from naming the chat itself.
+        const renamed = { title: normalized };
+        if (existing.remote)
+          void globalMistyApi.renameConversation(conversationId, normalized).catch(() => undefined);
         if (get().accountId !== requestAccount) return;
         set({
           conversations: get().conversations.map((item) =>

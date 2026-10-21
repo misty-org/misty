@@ -1,7 +1,7 @@
 //! Creating a browser page webview and its favicon and compatibility probes.
 
-use super::*;
 use super::super::space_windows;
+use super::*;
 
 /// Debug builds only: with `MISTY_EVAL_EPHEMERAL_PAGES=1` every page opens in one temporary
 /// session for this run of the app, so benchmarks browse the live web with no saved
@@ -35,8 +35,8 @@ pub async fn browser_webview_create(
     // The page's Space, and with it its website data, comes from the window that asks
     // for it, never from the request.
     let owner = caller.window().label().to_owned();
-    let space = space_windows::space_for_owner(&owner)
-        .ok_or("Only a Space window can open pages.")?;
+    let space =
+        space_windows::space_for_owner(&owner).ok_or("Only a Space window can open pages.")?;
     let incognito = space_windows::incognito_session(&owner)
         .or_else(eval_ephemeral_session)
         .map(|session| space_windows::incognito_store_id(&session));
@@ -108,6 +108,7 @@ pub async fn browser_webview_create(
         session.origin_space_id = request.origin_space_id.clone();
         session.provider_id = request.provider_id.clone();
         session.private = request.private;
+        session.agent_run_id = request.agent_run_id.clone();
         if request.profile_id.is_some() {
             session.profile_id = request.profile_id.clone();
             session.logical_profile_id = profile_lease.logical_profile_id.clone();
@@ -151,7 +152,13 @@ pub async fn browser_webview_create(
         apply_shortcuts(&webview, &state)?;
         apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking)?;
         set_webview_bounds_if_changed(&app, &webview, position, size)?;
-        super::super::extensions::native::register(&webview, &space, &request.id, request.private, &request.url);
+        super::super::extensions::native::register(
+            &webview,
+            &space,
+            &request.id,
+            request.private,
+            &request.url,
+        );
         return present_macos_webview(&webview);
     }
 
@@ -164,7 +171,8 @@ pub async fn browser_webview_create(
     let popup_id = request.id.clone();
     let download_app = app.clone();
     let download_id = request.id.clone();
-    let replacing_extension_view = super::super::extensions::pending_navigation(&space, &request.id).await;
+    let replacing_extension_view =
+        super::super::extensions::pending_navigation(&space, &request.id).await;
     let restoring_tab_session = profile_lease.tab_session.is_some() || replacing_extension_view;
     let preview_only = request.preview_only;
     let initial_url = if restoring_tab_session {
@@ -229,6 +237,15 @@ pub async fn browser_webview_create(
         .accept_first_mouse(true)
         .background_color(browser_background(&request.theme))
         .initialization_script_for_all_frames(browser_scrollbar_script())
+        // Captions for questions about a video, read in every frame; private tabs keep none.
+        .initialization_script_for_all_frames(if request.private || preview_only {
+            String::new()
+        } else {
+            browser_captions_script()
+        })
+        .initialization_script_for_all_frames(if cfg!(windows) && !preview_only {
+            include_str!("browser_background_tab.js")
+        } else { "" })
         .initialization_script(browser_viewport_script(
             &shortcut_token,
             renderer(caller.window().label()).tracking,
@@ -249,6 +266,18 @@ pub async fn browser_webview_create(
             if preview_only { return NewWindowResponse::Deny; }
             #[cfg(any(target_os = "macos", windows))]
             if let Some(response) = provider_popup(&popup_app, &popup_id, &url, features) { return response; }
+            // An agent's own hidden tab has no person to show a new tab to (a "New document"
+            // button, a target=_blank link): the page opens in place, where the agent's next
+            // look finds it, instead of in a tab the agent never sees.
+            if popup_id.starts_with("agent-") && matches!(url.scheme(), "https" | "http") {
+                if let Ok(label) = webview_label(&popup_id) {
+                    if let Some(view) = popup_app.get_webview(&label) {
+                        let url = url.clone();
+                        tauri::async_runtime::spawn(async move { let _ = view.navigate(url); });
+                    }
+                }
+                return NewWindowResponse::Deny;
+            }
             if external_url(url.as_str()).is_ok() {
                 let _ = popup_app.emit_to(
                     browser_owner_label(&popup_app, &popup_id).as_str(),
@@ -270,6 +299,12 @@ pub async fn browser_webview_create(
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { super::super::browser_session_storage::clear(&webview); }
             let locked = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions|sessions.get(&page_id).map(|session|session.agent_input_locked)).unwrap_or(false);
             let _ = apply_agent_input_lock(&webview,locked);
+            // An agent's page answers its cookie banner as it loads (browser_page/mod.rs).
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
+                && page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions| sessions.get(&page_id).map(agent_controls_page)).unwrap_or(false)
+            {
+                super::page_agent::answer_consent_after_load(webview.clone());
+            }
             #[cfg(not(target_os = "macos"))]
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 let controlled = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions| sessions.get(&page_id).map(agent_controls_page)).unwrap_or(false);
@@ -360,9 +395,18 @@ pub async fn browser_webview_create(
         }
     };
     if !preview_only {
-        super::super::extensions::native::register(&webview, &space, &request.id, request.private, &request.url);
+        super::super::extensions::native::register(
+            &webview,
+            &space,
+            &request.id,
+            request.private,
+            &request.url,
+        );
     }
     host_messages::install(&webview)?;
+    if !preview_only {
+        super::super::browser_frames::install(&webview)?;
+    }
     #[cfg(target_os = "macos")]
     if !preview_only {
         url_observer::install(&app, &webview, &request.id)?;
@@ -371,6 +415,10 @@ pub async fn browser_webview_create(
     super::super::browser_process_ended::watch_page_process(&webview);
     #[cfg(windows)]
     watch_page_focus(&webview, &request.id);
+    #[cfg(windows)]
+    super::super::window_focus_windows::watch(&webview);
+    #[cfg(windows)]
+    engine_menu::install(&webview, false);
     #[cfg(target_os = "macos")]
     attachment_download::install(&webview)?;
     #[cfg(any(target_os = "macos", windows))]

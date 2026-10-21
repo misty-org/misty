@@ -4,13 +4,14 @@ import { cn } from "../utils";
 
 const inputVariants = {
   default: [
-    "h-9 w-full min-w-0 rounded-md border border-charcoal-border bg-transparent px-2.5 py-1",
+    "h-9 w-full min-w-0 rounded-md border border-charcoal-border-strong bg-transparent px-2.5 py-1",
     "text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7",
     "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-cream",
     "placeholder:text-cream-muted disabled:pointer-events-none disabled:cursor-not-allowed",
     "disabled:opacity-50 aria-invalid:border-charcoal-active aria-invalid:ring-3",
     "aria-invalid:ring-charcoal-active/20 md:text-sm bg-charcoal-card",
     "aria-invalid:border-charcoal-active/50 aria-invalid:ring-charcoal-active/40",
+    "hover:border-charcoal-active focus-visible:border-cream-muted",
   ],
   // The browser address bar: a filled pill, so it keeps its shape beside a bright page
   // where a hairline alone fades out.

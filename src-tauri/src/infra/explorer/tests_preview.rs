@@ -314,4 +314,3 @@ async fn cancellable_delete_removes_nested_directory() {
 
     let _ = tokio::fs::remove_dir_all(&root).await;
 }
-

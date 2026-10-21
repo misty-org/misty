@@ -2,8 +2,8 @@ import { Button, cn, IconButton } from "@/shared/ui";
 import { CircleAlert, X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
 import { useSettingReset } from "../profiles/SettingScope";
-import { type DesktopSettingsNavEntry, SettingsNavigation } from "./SettingsNavigation";
-export type { DesktopSettingsNavEntry } from "./SettingsNavigation";
+import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
+export type { DesktopSettingsNavEntry, DesktopSettingsNavGroup } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
@@ -11,10 +11,10 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     <div
       aria-label={props.ariaLabel}
       className={cn(
-        "grid min-h-0 min-w-0 grid-cols-[216px_1px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg",
+        "grid min-h-0 min-w-0 grid-cols-[248px_1px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg",
         overlay ? "h-full" : "h-screen",
-        "max-[900px]:grid-cols-[184px_1px_minmax(0,1fr)]",
-        "max-[680px]:grid-cols-[156px_1px_minmax(0,1fr)]",
+        "max-[900px]:grid-cols-[208px_1px_minmax(0,1fr)]",
+        "max-[680px]:grid-cols-[168px_1px_minmax(0,1fr)]",
       )}
     >
       <aside className="flex min-h-0 flex-col overflow-hidden bg-charcoal-sidebar py-3 text-cream-muted">
@@ -23,7 +23,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         ) : null}
         {props.navigationOverride ?? (
           <SettingsNavigation
-            items={props.items}
+            groups={props.groups}
             activeId={props.activeId}
             label={props.navigationLabel}
             onSelect={props.onSelect}
@@ -52,6 +52,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         {/* In the overlay the scroller starts below the close button, so the scrollbar and the
             page never run under it; the page's top padding moves up to match. */}
         <div
+          data-settings-scroller
           className={cn(
             "misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain",
             overlay ? "mt-12" : "mt-3",
@@ -82,9 +83,9 @@ export function DesktopSettingsSection(props: {
   children: ReactNode;
 }) {
   return (
-    <section aria-label={props.title} className="@container/settings mb-12 min-w-0 last:mb-0">
+    <section aria-label={props.title} className="@container/settings mb-14 min-w-0 last:mb-0">
       <div className="mb-2 min-w-0">
-        <h2 className="text-[17px] font-semibold leading-7 text-cream">{props.title}</h2>
+        <h2 className="text-[18px] font-semibold leading-7 text-cream-bright">{props.title}</h2>
         {props.description ? (
           <p className="mt-1 max-w-[680px] text-[15px] leading-6 text-cream-muted">
             {props.description}
@@ -128,12 +129,15 @@ export function DesktopSettingsRow(props: {
     >
       <div className="grid min-w-0 gap-1">
         <span
-          className={cn("text-[15px] leading-6", props.muted ? "text-cream-muted" : "text-cream")}
+          className={cn(
+            "text-[15px] font-medium leading-6",
+            props.muted ? "text-cream-muted" : "text-cream-bright",
+          )}
         >
           {props.label}
         </span>
         {props.description || reset ? (
-          <p className="max-w-[680px] text-[15px] leading-6 text-cream-muted">
+          <p className="max-w-[720px] text-[14px] leading-[22px] text-cream-muted">
             {props.description}
             {reset ? (
               <>
@@ -143,7 +147,7 @@ export function DesktopSettingsRow(props: {
                   variant="link"
                   aria-label={`Reset ${props.label} to default`}
                   className={cn(
-                    "inline h-auto border-0 p-0 align-baseline text-[15px] leading-6",
+                    "inline h-auto border-0 p-0 align-baseline text-[14px] leading-[22px]",
                     "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
                   )}
                   onClick={reset}
@@ -186,7 +190,7 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;
   ariaLabel: string;
   children: ReactNode;
-  items: readonly DesktopSettingsNavEntry<Id>[];
+  groups: readonly DesktopSettingsNavGroup<Id>[];
   navigationLabel: string;
   onClose?: () => void;
   /** Pinned to the content's bottom right, over the scrolling page. */

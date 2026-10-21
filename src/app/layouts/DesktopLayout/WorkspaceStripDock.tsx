@@ -1,5 +1,4 @@
 import { BrowserDownloadsButton } from "@/features/browser/workspace";
-import { BrowserMistyButton } from "@/features/browser/workspace/BrowserMistyPanel";
 import { browserInternalUrl, useWorkspaceStore } from "@/features/workspace";
 
 /** Downloads, at a sidebar's bottom-right: a progress ring while something downloads. */
@@ -20,20 +19,6 @@ export function StripDownloads() {
           useWorkspaceStore.getState().openBrowserView({ url: browserInternalUrl("downloads") })
         }
       />
-    </div>
-  );
-}
-
-/** The chat panel's toggle, at a sidebar's bottom-right: your Space's chat beside the page. */
-export function StripChat() {
-  return (
-    <div
-      className="flex shrink-0 items-center"
-      data-browser-toolbar
-      data-sidebar
-      data-misty-window-drag-block="true"
-    >
-      <BrowserMistyButton />
     </div>
   );
 }

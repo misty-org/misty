@@ -1,13 +1,14 @@
 import { AgentTabAway } from "@/features/agents";
 import type { browserInternalPage } from "@/features/workspace";
 import { blankBrowserUrl, type WorkspaceView } from "@/features/workspace";
+import { useBrowserRuntimeStore } from "./browserRuntime";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { cn } from "@/shared/ui";
-import type { RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 import { BrowserInternalPage } from "../internal/BrowserInternalPage";
 import { BrowserAnnotationLayer } from "./BrowserAnnotationLayer";
 import { setBrowserError } from "./browserErrors";
-import { BrowserMistyRow, useBrowserMistyPanel } from "./BrowserMistyPanel";
+import { BrowserMistyRow } from "./BrowserMistyPanel";
 import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
 import { ReaderView } from "./ReaderView";
@@ -55,15 +56,16 @@ export function BrowserPageStage({
   onGoHome: () => void;
   reader: { article: ReaderArticle | null; close: () => void };
 }) {
-  // Beside the Misty panel the page is a rounded panel of its own, on every corner.
-  const mistyOpen = useBrowserMistyPanel(tab.id).open;
+  // Until the native page is on screen here, nothing sits behind the transparent renderer.
+  const pagePresented = useBrowserRuntimeStore((state) => Boolean(state.presented[tab.id]));
+  const awaitingPage = nativeRuntime && !pagePresented && !internalPage && !away && !isOffline;
+  usePresentedPageHost(tab.id, nativeRuntime && pagePresented);
   return (
     <BrowserMistyRow tabId={tab.id}>
       <div
         data-browser-corner-clip=""
         className={cn(
           "flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden",
-          mistyOpen && "rounded-xl",
           viewport === "responsive" ? "p-0" : "p-3",
           viewport === "responsive" ? undefined : "bg-charcoal-workspace",
         )}
@@ -91,6 +93,8 @@ export function BrowserPageStage({
                 : `var(--browser-page-background, ${chromeBackground})`,
           }}
           data-browser-page-host
+          data-browser-page-awaiting={awaitingPage ? "" : undefined}
+          data-browser-page-presented={nativeRuntime && pagePresented ? "" : undefined}
           data-browser-viewport={viewport}
         >
           {away ? (
@@ -124,4 +128,25 @@ export function BrowserPageStage({
       </div>
     </BrowserMistyRow>
   );
+}
+
+const presentedHosts = new Set<string>();
+
+/**
+ * Marks the root while any mounted page host has its page on screen, which turns the window's
+ * transparent path on (`theme.css`). It changes in the same commit as the host's own attribute.
+ */
+function usePresentedPageHost(tabId: string, presented: boolean): void {
+  useLayoutEffect(() => {
+    if (!presented) return;
+    presentedHosts.add(tabId);
+    document.documentElement.toggleAttribute("data-browser-page-presented", true);
+    return () => {
+      presentedHosts.delete(tabId);
+      document.documentElement.toggleAttribute(
+        "data-browser-page-presented",
+        presentedHosts.size > 0,
+      );
+    };
+  }, [tabId, presented]);
 }

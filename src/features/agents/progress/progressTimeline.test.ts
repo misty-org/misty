@@ -6,10 +6,47 @@ import {
   stepsOf,
   toolGroupSummary,
   toolLabel,
+  withAnswer,
   withToolEvent,
 } from "./progressTimeline";
 
 describe("progress timeline", () => {
+  it("shows a text answer once when the run wraps up with the same answer", () => {
+    const answer = "The capital of France is Paris.";
+    let message: { content: string; progress?: AiProgressItem[] } = { content: "" };
+    message = withToolEvent(message, { id: "1", type: "tool.started", toolCallId: "a", toolName: "web_search" });
+    message = withToolEvent(message, { id: "2", type: "tool.completed", toolCallId: "a", toolName: "web_search" });
+    message = withAnswer(message, answer);
+    // The finish nudge: agent_finish starts and the answer moves into a note.
+    message = withToolEvent(message, { id: "3", type: "tool.started", toolCallId: "f", toolName: "agent_finish" });
+    message = withToolEvent(message, { id: "4", type: "tool.completed", toolCallId: "f", toolName: "agent_finish" });
+    expect(message.content).toBe("");
+    // The final text is that same answer: it becomes the reply and the note goes.
+    message = withAnswer(message, answer);
+    expect(message.content).toBe(answer);
+    const groups = groupProgress(message.progress ?? []);
+    expect(groups.map((group) => group.type)).toEqual(["tools"]);
+    expect(groups.some((group) => group.type === "note" && group.text === answer)).toBe(false);
+    expect(toolGroupSummary(groups[0].type === "tools" ? groups[0].tools : [])).toBe("Searched web, wrapped up");
+  });
+
+  it("drops the note for a partial answer and keeps notes the answer does not repeat", () => {
+    const progress: AiProgressItem[] = [
+      { type: "note", text: "Found two of three." },
+      { type: "tool", id: "f", name: "agent_finish", state: "completed" },
+    ];
+    expect(
+      withAnswer({ progress }, "Found two of three.\n\nStill incomplete:\n- Third: no source").progress,
+    ).toEqual([progress[1]]);
+    expect(withAnswer({ progress }, "A different summary.").progress).toEqual(progress);
+    // Narration before another tool stays a note.
+    const narrated: AiProgressItem[] = [
+      { type: "note", text: "Let me check." },
+      { type: "tool", id: "a", name: "web_search", state: "completed" },
+    ];
+    expect(withAnswer({ progress: narrated }, "Let me check.").progress).toEqual(narrated);
+  });
+
   it("turns text before a tool into a note and tracks the tool", () => {
     let message: { content: string; progress?: AiProgressItem[] } = {
       content: "Let me check your tabs.",

@@ -10,7 +10,7 @@ extern "C" {
 /// An agent controls a page while its input is locked to the agent or any of
 /// its grants can act on it, not only read it.
 pub(super) fn agent_controls_page(session: &BrowserSession) -> bool {
-    session.agent_input_locked || session.grants.values().any(grant_acts)
+    session.agent_input_locked || session.agent_ring || session.grants.values().any(grant_acts)
 }
 
 /// Grants that let an agent act on the page, not only read it.

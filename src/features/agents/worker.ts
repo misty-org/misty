@@ -1,3 +1,4 @@
+import { diag } from "./diagnostics";
 import { subscribeAccountEvents } from "@/api/accountEvents";
 import { devicesNative } from "@/native/devices";
 import { mistyDeviceJobsEnabled } from "./flags";
@@ -13,22 +14,15 @@ import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAg
 import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  browserFailureIsCertain,
   browserUncertainErrorCode,
-  isBrowserSnapshotStale,
   deviceContentReference,
   deviceWorkflowErrorCode,
 } from "./workerDeviceJobs";
 
-import {
-  browserAgentExecutionRequest,
-  browserDeviceRequest,
-  browserRuntimeIdForScope,
-  DeviceOperationNotAttempted,
-  registerRunBoundBrowserContext,
-  type ClaimedWorkflowNodeJob,
-} from "./workerBrowserJobs";
+import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { HeldClaims } from "./workerHeldClaim";
-import { touchHostedSession } from "./hostedSessionsState";
+import { browserExecutionControl, executeBrowserJob } from "./browserJobRun";
 
 export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
 export { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
@@ -36,7 +30,9 @@ export type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
 const leaseHeartbeatMs = 20_000;
 const nodeExecutionTimeoutMs = 5 * 60_000;
-const jobReconciliationMs = 60_000;
+// Realtime notifications drop while the socket reconnects (every 15 to 60 s on the dev stack), and
+// a run's first page then waited up to 90 s: reconcile on every presence tick instead.
+const jobReconciliationMs = 25_000;
 
 export class DesktopAgentJobWorker {
   private generation = 0;
@@ -112,9 +108,27 @@ export class DesktopAgentJobWorker {
           : heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
       while (current() && this.active.size < 8) {
         this.lastDiscoveryAt = Date.now();
+        const asked = Date.now();
+        diag("worker", `claim active=${this.active.size} holding=${this.held.holding()}`);
         const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id, this.held);
-        if (!current()) return;
+        diag(
+          "worker",
+          `claimed ${claim ? claim.job.operation : "none"} after=${Date.now() - asked}ms`,
+        );
+        if (!current()) {
+          // A claim answered after this worker stopped was dropped and stayed leased until its
+          // run gave up 30 s later (a run's first page never opened). Put it back instead.
+          if (claim)
+            void devicesApi
+              .releaseWorkflowJob(signedAgentDeviceRequest, localDevice.id, serverDevice.id, claim.job.id, claim.leaseToken)
+              .catch(() => undefined);
+          return;
+        }
         this.failures = 0;
+        // While a run's browser steps are coming, a held claim that came back empty is held
+        // again, so the next step is handed over the moment it is queued. One that came back at
+        // once was not held (the server keeps one per device): notifications wake the worker.
+        if (!claim && this.held.holding() && Date.now() - asked > 2_000) continue;
         if (!claim) break;
         void this.runWorkflowNodeClaim(claim, localDevice.id, serverDevice.id).finally(() =>
           this.wake(),
@@ -148,8 +162,11 @@ export class DesktopAgentJobWorker {
     const controller = new AbortController();
     this.active.add(controller);
     let job = claim.job;
-    const browser = job.operation.startsWith("browser.");
-    if (browser) this.held.noteBrowserJob();
+    const startedAt = Date.now();
+    controller.signal.addEventListener("abort", () =>
+      diag("worker", `aborted ${job.operation} after=${Date.now() - startedAt}ms`),
+    );
+    this.held.noteJob();
     let leaseExpiresAt = claim.leaseExpiresAt ?? job.leaseExpiresAt;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -171,6 +188,10 @@ export class DesktopAgentJobWorker {
         claim.leaseToken,
       );
       began = true;
+      diag(
+        "worker",
+        `began ${job.operation} after=${Date.now() - startedAt}ms active=${this.active.size}`,
+      );
       leaseExpiresAt = job.leaseExpiresAt;
       controller.signal.throwIfAborted();
       arm();
@@ -195,7 +216,9 @@ export class DesktopAgentJobWorker {
               throw new Error("device_execution_stopped");
             leaseExpiresAt = renewed.leaseExpiresAt;
             arm();
-            if (job.operation.startsWith("browser."))
+            // A program has no native execution of its own: each page call registers one under
+            // its own id and reads the current lease when it starts (programs/pageHost.ts).
+            if (job.operation.startsWith("browser.") && job.operation !== "browser.run")
               await invoke("browser_agent_execution_renew", {
                 request: browserExecutionControl(job, leaseExpiresAt),
               });
@@ -215,7 +238,7 @@ export class DesktopAgentJobWorker {
         })();
       }, leaseHeartbeatMs);
       const output = await abortable(
-        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt, deviceId),
+        executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt, deviceId),
         controller.signal,
       );
       report = () =>
@@ -229,7 +252,8 @@ export class DesktopAgentJobWorker {
       const uncertain =
         began &&
         job.operation.startsWith("browser.") &&
-        !(error instanceof DeviceOperationNotAttempted);
+        !(error instanceof DeviceOperationNotAttempted) &&
+        !browserFailureIsCertain(job.operation, error);
       report = () =>
         (uncertain ? devicesApi.uncertainWorkflowJob : devicesApi.failWorkflowJob)(
           signedAgentDeviceRequest,
@@ -247,7 +271,7 @@ export class DesktopAgentJobWorker {
       clearTimeout(timer);
       clearInterval(heartbeat);
       this.active.delete(controller);
-      if (browser) this.held.noteBrowserJob();
+      this.held.noteJob();
     }
     // Retry only delivery of the exact observed result, never the operation.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -279,19 +303,6 @@ export function deviceExecutionRemaining(
   return remaining;
 }
 
-function browserExecutionControl(
-  job: ClaimedWorkflowNodeJob["job"],
-  leaseExpiresAt: string | null | undefined,
-) {
-  return {
-    executionId: job.id,
-    deadlineAt: job.deadlineAt,
-    leaseExpiresAt,
-    scopeId: job.scopeId,
-    grantId: `${job.contextId}:${job.id}`,
-  };
-}
-
 async function claimNextWorkflowNodeJob(
   deviceId: string,
   localDeviceId: string,
@@ -315,7 +326,7 @@ async function claimNextWorkflowNodeJob(
 async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
-  leaseExpiresAt: string | null | undefined,
+  lease: () => string | null | undefined,
   deviceId: string,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
@@ -329,7 +340,7 @@ async function executeWorkflowNodeOnDevice(
   }
   signal.throwIfAborted();
   if (job.operation === "browser.session") {
-    // A browser session for a request made on another of the person's devices.
+    // The agent's own browser session on this computer, for a run sent from here.
     return (await import("./hostedSessions")).startHostedSession(job, signal);
   }
   if (job.operation === "browser.spawn_tabs") {
@@ -340,53 +351,11 @@ async function executeWorkflowNodeOnDevice(
     // One goal runs as a local loop: Midscene plans, Misty's native input acts.
     return (await import("./screenAct/screenActJob")).runScreenAct(job, signal);
   }
-  if (job.operation.startsWith("browser.")) {
-    touchHostedSession(job.scopeId, job.runId);
-    const cancel = () => {
-      void invoke("browser_agent_execution_cancel", {
-        request: browserExecutionControl(job, leaseExpiresAt),
-      }).catch(() => undefined);
-    };
-    signal.addEventListener("abort", cancel, { once: true });
-    try {
-      try {
-        await registerRunBoundBrowserContext(job);
-        signal.throwIfAborted();
-      } catch (error) {
-        throw new DeviceOperationNotAttempted(error);
-      }
-      return await invoke<Record<string, unknown>>("browser_agent_execute_bounded", {
-        request: {
-          control: browserExecutionControl(job, leaseExpiresAt),
-          operation: await browserDeviceRequest(job),
-        },
-      });
-    } catch (error) {
-      // Let the coordinator request a new frame; no input was attempted and
-      // this is not a terminal desktop-control error for the user.
-      if (isBrowserSnapshotStale(error)) throw new DeviceOperationNotAttempted(error);
-      if (job.operation.startsWith("browser.workspace.")) {
-        window.dispatchEvent(
-          new CustomEvent("misty:autopilot-error", {
-            detail: {
-              taskId: browserAgentExecutionRequest(job).input.__mistyTaskId,
-              message: String(error),
-            },
-          }),
-        );
-        if (job.operation === "browser.workspace.visual")
-          throw new DeviceOperationNotAttempted(error);
-      }
-      throw error;
-    } finally {
-      signal.removeEventListener("abort", cancel);
-      const id = await browserRuntimeIdForScope(job.scopeId).catch(() => null);
-      if (id)
-        await invoke("browser_agent_grant_revoke", {
-          request: { id, grantId: `${job.contextId}:${job.id}` },
-        }).catch(() => undefined);
-    }
+  if (job.operation === "browser.run") {
+    // A program the agent wrote, run in a sandbox against its own tabs (programs/runProgram.ts).
+    return (await import("./programs/runProgram")).runProgram(job, signal, lease);
   }
+  if (job.operation.startsWith("browser.")) return executeBrowserJob(job, signal, lease());
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
   }

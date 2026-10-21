@@ -26,5 +26,7 @@ pub(super) async fn run_grants(
     };
     let state = bridge.app.state::<MistyRuntime>();
     let signed = sign_run_grants(&state, &body.api_base, &body.account_id, body.grants).await;
-    reply(signed.and_then(|records| serde_json::to_value(records).map_err(|error| error.to_string())))
+    reply(
+        signed.and_then(|records| serde_json::to_value(records).map_err(|error| error.to_string())),
+    )
 }

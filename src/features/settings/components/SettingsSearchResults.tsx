@@ -1,6 +1,12 @@
 import { Pressable } from "@/shared/ui";
 import { settingSearchEntries } from "../profiles/registry";
-import { settingsPage, settingsPageTitle, settingsRegistry } from "../settingsRegistry";
+import {
+  settingsAreaEntry,
+  settingsAreas,
+  settingsGroups,
+  settingsPage,
+  settingsPageTitle,
+} from "../settingsRegistry";
 import type { SettingsSection } from "../settingsTypes";
 export interface SettingsSearchResult {
   key: string;
@@ -28,9 +34,15 @@ export function searchSettings(query: string): SettingsSearchResult[] {
         : (d.page as SettingsSection),
       focus: d.label,
     }));
-  const pages = settingsRegistry
-    .filter((p) => settingsPageTitle(p).toLowerCase().includes(needle))
-    .map((p) => ({ key: `page:${p.id}`, label: settingsPageTitle(p), page: p.id, focus: "" }));
+  const pages = settingsGroups
+    .flatMap((group) => group.areas)
+    .filter((area) => settingsAreas[area].label.toLowerCase().includes(needle))
+    .flatMap((area) => {
+      const entry = settingsAreaEntry(area);
+      return entry
+        ? [{ key: `page:${entry.id}`, label: settingsAreas[area].label, page: entry.id, focus: "" }]
+        : [];
+    });
   return [...pages, ...rows];
 }
 function Highlighted({ text, query }: { text: string; query: string }) {
@@ -69,7 +81,7 @@ export function SettingsSearchResults(props: {
             </span>
             {result.focus ? (
               <span className="truncate text-[11px] text-cream-muted">
-                {settingsPageTitle(page).replace(" / ", " › ")}
+                {settingsPageTitle(page)}
               </span>
             ) : null}
           </Pressable>

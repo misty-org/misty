@@ -6,13 +6,20 @@ import {
   useEmbeddedBrowserSuspension,
 } from "./useBrowserSuspension";
 import { useBrowserRuntimeServices } from "./useBrowserRuntimeServices";
-import { useBrowserSurfaceParking, useClosedBrowserTabCleanup } from "./useBrowserWorkspaceSync";
+import {
+  useBrowserFocusReturn,
+  useBrowserSurfaceParking,
+  useClosedBrowserTabCleanup,
+  useInstantBrowserSwitch,
+} from "./useBrowserWorkspaceSync";
 
 export { browserBlockingOverlayOpen } from "./browserBlockingOverlay";
 
 export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
   useBrowserRuntimeServices();
+  useInstantBrowserSwitch();
+  useBrowserFocusReturn();
   useBrowserSurfaceParking();
   useEmbeddedBrowserSuspension();
   useClosedBrowserTabCleanup();

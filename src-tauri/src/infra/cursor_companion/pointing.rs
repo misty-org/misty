@@ -11,7 +11,8 @@ use tauri::{AppHandle, Emitter, Webview};
 pub(super) fn forward_click(app: &AppHandle, state: &super::CursorCompanionState, x: f64, y: f64) {
     let turn = state.click_turn.load(Ordering::SeqCst);
     if state.watch_clicks.load(Ordering::SeqCst) && current(state, turn) {
-        let _ = crate::infra::space_windows::emit_to_primary(&app,
+        let _ = crate::infra::space_windows::emit_to_primary(
+            &app,
             "misty://cursor-click",
             json!({"turn":turn,"x":x,"y":y}),
         );

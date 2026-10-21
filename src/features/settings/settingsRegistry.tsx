@@ -1,28 +1,34 @@
 import { ExtensionsSettings } from "@/features/extensions/ExtensionsSettings";
 import { BrowserSyncSettings } from "@/features/browser-workspace/BrowserSyncSettings";
 import {
-  Globe,
-  Info,
-  Keyboard,
-  Layers,
+  Blocks,
+  Download,
+  Gauge,
   History,
+  KeyRound,
+  Keyboard,
+  MessagesSquare,
   Mic,
-  MonitorSmartphone,
+  MousePointer2,
   Palette,
-  PanelsTopLeft,
-  RefreshCw,
+  Puzzle,
+  Search,
   Shield,
   SlidersHorizontal,
-  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import type { SettingOwnership } from "./profiles/registry";
 import { AdvancedSection } from "./sections/AdvancedSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
-import { BrowserImportSettings } from "./sections/BrowserImportSettings";
 import { BrowserPermissionSettings } from "./sections/BrowserPermissionSettings";
-import { BrowserSection } from "./sections/BrowserSection";
+import {
+  BrowserLinksSettings,
+  BrowserLookSettings,
+  DownloadsSettings,
+  PerformanceSettings,
+  SearchSettings,
+} from "./sections/BrowserSection";
 import {
   AboutSection,
   AgentConnectionsSection,
@@ -30,12 +36,10 @@ import {
   AgentPermissionsSection,
   CompanionSection,
   DevicesSection,
-  ManageSpacesSection,
-  SpaceDefaultsSection,
 } from "./sections/FeatureSections";
 import { GeneralSection } from "./sections/GeneralSection";
-import { LayoutSection } from "./sections/LayoutSection";
 import { MistySection } from "./sections/MistySection";
+import { PasswordsSettings } from "./sections/PasswordsSettings";
 import { PrivacySection } from "./sections/PrivacySection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { UpdatesSection } from "./sections/UpdatesSection";
@@ -46,38 +50,50 @@ import { CodingToolsSection } from "./sections/CodingToolsSection";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
 /**
- * Flat sidebar areas. Registry entries within an area render together on one page.
- * Nav entries never show chevrons or group dividers.
+ * Sidebar pages. Each opens one scrolling page; the registry blocks of a page render on it in
+ * order. Page names are one word and never echo their group's name.
  */
 export type SettingsArea =
   | "general"
   | "appearance"
-  | "layout"
   | "shortcuts"
-  | "browser"
-  | "spaces"
-  | "agents"
   | "voice"
-  | "memory"
-  | "sync"
-  | "devices"
   | "privacy"
-  | "about";
-export const settingsAreas: Record<SettingsArea, { label: string; icon: LucideIcon }> = {
+  | "search"
+  | "downloads"
+  | "performance"
+  | "passwords"
+  | "extensions"
+  | "conversations"
+  | "cursor"
+  | "apps"
+  | "memory";
+export interface SettingsAreaInfo {
+  label: string;
+  icon: LucideIcon;
+}
+export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   general: { label: "General", icon: SlidersHorizontal },
   appearance: { label: "Appearance", icon: Palette },
-  layout: { label: "Layout", icon: PanelsTopLeft },
   shortcuts: { label: "Shortcuts", icon: Keyboard },
-  browser: { label: "Browser", icon: Globe },
-  spaces: { label: "Spaces", icon: Layers },
-  agents: { label: "Agents", icon: Sparkles },
   voice: { label: "Voice", icon: Mic },
-  memory: { label: "Memory", icon: History },
-  sync: { label: "Sync", icon: RefreshCw },
-  devices: { label: "Devices", icon: MonitorSmartphone },
   privacy: { label: "Privacy", icon: Shield },
-  about: { label: "About", icon: Info },
+  search: { label: "Search", icon: Search },
+  downloads: { label: "Downloads", icon: Download },
+  performance: { label: "Performance", icon: Gauge },
+  passwords: { label: "Passwords", icon: KeyRound },
+  extensions: { label: "Extensions", icon: Puzzle },
+  conversations: { label: "Conversations", icon: MessagesSquare },
+  cursor: { label: "Cursor", icon: MousePointer2 },
+  apps: { label: "Apps", icon: Blocks },
+  memory: { label: "Memory", icon: History },
 };
+/** Sidebar groups, named by feature, in sidebar order. */
+export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
+  { label: "Settings", areas: ["general", "appearance", "shortcuts", "voice", "privacy"] },
+  { label: "Browser", areas: ["search", "downloads", "performance", "passwords", "extensions"] },
+  { label: "Agents", areas: ["conversations", "cursor", "apps", "memory"] },
+];
 export interface SettingsRegistryEntry {
   id: SettingsSection;
   label: string;
@@ -94,57 +110,42 @@ const page = (
   owner: SettingOwnership = "account",
   native = false,
 ): SettingsRegistryEntry => ({ area, id, label, Component, owner, native });
-/** Order here is sidebar order; pages of one area must be adjacent. */
+/** The blocks of each page, in page order; blocks of one page must be adjacent. */
 export const settingsRegistry: readonly SettingsRegistryEntry[] = [
-  page("general", "general", "General", GeneralSection),
+  page("general", "general", "Startup", GeneralSection),
+  page("general", "browser-links", "Links", BrowserLinksSettings),
+  page("general", "sync", "Sync", BrowserSyncSettings),
+  page("general", "devices", "Devices", DevicesSection),
+  page("general", "updates", "Updates", UpdatesSection, "account", true),
+  page("general", "about", "About", AboutSection),
+  page("general", "diagnostics", "Diagnostics", AdvancedSection, "account", true),
   page("appearance", "appearance", "Appearance", AppearanceSection),
-  page("layout", "layout", "Layout", LayoutSection, "resource", true),
+  page("appearance", "browser-appearance", "Browser", BrowserLookSettings),
   page("shortcuts", "shortcuts", "Shortcuts", ShortcutsSection, "account", true),
-  page("browser", "browser", "Browsing", BrowserSection),
-  page("browser", "browser-downloads", "Downloads", (p) => (
-    <BrowserSection {...p} page="downloads" />
-  )),
+  page("voice", "voice", "Voice", VoiceSection, "account", true),
+  page("privacy", "privacy", "Privacy", PrivacySection),
   page(
-    "browser",
+    "privacy",
     "browser-permissions",
-    "Permissions",
+    "Website permissions",
     BrowserPermissionSettings,
     "resource",
     true,
   ),
-  page("browser", "browser-extensions", "Extensions", ExtensionsSettings, "resource", true),
-  page("browser", "browser-import", "Other browsers", BrowserImportSettings, "resource", true),
-  page(
-    "browser",
-    "browser-privacy",
-    "Privacy",
-    (p) => <PrivacySection {...p} page="browser" />,
-    "account",
-  ),
-  page("spaces", "spaces-defaults", "Defaults", SpaceDefaultsSection),
-  page("spaces", "spaces-manage", "Manage spaces", ManageSpacesSection, "resource"),
-  page("agents", "agents-defaults", "Defaults", AgentDefaultsSection),
-  page("agents", "agents-usage", "Usage", UsageSection, "account"),
-  page("agents", "misty", "Misty", MistySection, "account"),
-  page(
-    "agents",
-    "agents-memory",
-    "Memory",
-    (p) => <MistySection {...p} page="memory" />,
-    "account",
-  ),
-  page("agents", "agents-connections", "Connections", AgentConnectionsSection, "resource"),
-  page("agents", "agents-permissions", "Permissions", AgentPermissionsSection, "resource"),
-  page("agents", "agents-coding", "Coding tools", CodingToolsSection, "resource", true),
-  page("agents", "agents-companion", "Companion", CompanionSection, "account"),
-  page("voice", "voice", "Voice", VoiceSection, "account", true),
+  page("privacy", "agents-permissions", "Agent permissions", AgentPermissionsSection, "resource"),
+  page("search", "search", "Search", SearchSettings),
+  page("downloads", "browser-downloads", "Downloads", DownloadsSettings),
+  page("performance", "browser-performance", "Performance", PerformanceSettings),
+  page("passwords", "passwords", "Passwords", PasswordsSettings, "resource", true),
+  page("extensions", "browser-extensions", "Extensions", ExtensionsSettings, "resource", true),
+  page("conversations", "agents-defaults", "Conversations", AgentDefaultsSection),
+  page("conversations", "misty", "Misty", MistySection),
+  page("conversations", "agents-usage", "Usage", UsageSection),
+  page("cursor", "agents-companion", "Cursor", CompanionSection),
+  page("apps", "agents-connections", "Connected apps", AgentConnectionsSection, "resource"),
+  page("apps", "agents-coding", "Coding tools", CodingToolsSection, "resource", true),
+  page("memory", "agents-memory", "Remembered", (p) => <MistySection {...p} page="memory" />),
   page("memory", "recall", "Memory", MemorySection, "account", true),
-  page("sync", "sync", "Sync", BrowserSyncSettings),
-  page("devices", "devices", "Devices", DevicesSection, "account"),
-  page("privacy", "privacy", "Privacy", PrivacySection, "account"),
-  page("about", "about", "Version", AboutSection, "account"),
-  page("about", "updates", "Updates", UpdatesSection, "account", true),
-  page("about", "diagnostics", "Diagnostics", AdvancedSection, "account", true),
 ];
 /** Pages that no longer exist on their own resolve to where their settings now live. */
 export function canonicalSettingsSection(section: SettingsSection): SettingsSection {
@@ -152,15 +153,21 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
     (
       {
         advanced: "diagnostics",
+        layout: "appearance",
         agents: "agents-defaults",
         support: "about",
         server: "about",
-        account: "general",
+        account: "about",
         profiles: "sync",
         "browser-handoff": "sync",
-        social: "spaces-defaults",
-        journal: "spaces-defaults",
-        library: "spaces-manage",
+        browser: "search",
+        "browser-privacy": "privacy",
+        "browser-import": "general",
+        "spaces-defaults": "general",
+        "spaces-manage": "general",
+        social: "general",
+        journal: "general",
+        library: "general",
         terminal: "general",
         code: "general",
       } as Partial<Record<SettingsSection, SettingsSection>>
@@ -170,8 +177,11 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
 export function settingsPage(section: SettingsSection): SettingsRegistryEntry | undefined {
   return settingsRegistry.find((entry) => entry.id === section);
 }
-/** "Browser / Downloads" for pages inside a multi-page area, "General" otherwise. */
+/** The sidebar name of the page a block sits on. */
 export function settingsPageTitle(entry: SettingsRegistryEntry): string {
-  const siblings = settingsRegistry.filter((item) => item.area === entry.area).length;
-  return siblings > 1 ? `${settingsAreas[entry.area].label} / ${entry.label}` : entry.label;
+  return settingsAreas[entry.area].label;
+}
+/** The first block of a page, which the sidebar entry opens. */
+export function settingsAreaEntry(area: SettingsArea): SettingsRegistryEntry | undefined {
+  return settingsRegistry.find((entry) => entry.area === area);
 }

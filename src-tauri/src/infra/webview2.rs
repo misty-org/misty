@@ -13,8 +13,9 @@ use serde_json::Value;
 use tauri::Webview;
 use webview2_com::{
     CallDevToolsProtocolMethodCompletedHandler,
-    Microsoft::Web::WebView2::Win32::{ICoreWebView2, ICoreWebView2Controller},
+    Microsoft::Web::WebView2::Win32::{ICoreWebView2, ICoreWebView2Controller, ICoreWebView2_11},
 };
+use windows::core::Interface;
 use windows::core::{HSTRING, PWSTR};
 use windows::Win32::System::Com::CoTaskMemFree;
 use zeroize::Zeroizing;
@@ -86,6 +87,30 @@ pub(crate) async fn cdp_checked(
     parameters: &Value,
     check: impl FnOnce(&ICoreWebView2) -> Result<(), CdpError> + Send + 'static,
 ) -> Result<Value, CdpError> {
+    call(view, None, method, parameters, check).await
+}
+
+/// Calls one CDP method in a target session the view attached to, such as a
+/// cross-origin frame's (`Target.setAutoAttach` with `flatten`).
+pub(crate) async fn cdp_in_session(
+    view: &Webview,
+    session: &str,
+    method: &'static str,
+    parameters: &Value,
+) -> Result<Value, CdpError> {
+    call(view, Some(session.to_owned()), method, parameters, |_| {
+        Ok(())
+    })
+    .await
+}
+
+async fn call(
+    view: &Webview,
+    session: Option<String>,
+    method: &'static str,
+    parameters: &Value,
+    check: impl FnOnce(&ICoreWebView2) -> Result<(), CdpError> + Send + 'static,
+) -> Result<Value, CdpError> {
     let parameters =
         Zeroizing::new(serde_json::to_string(parameters).map_err(|_| CdpError::Invalid)?);
     if parameters.len() > MAX_CDP_BYTES {
@@ -121,11 +146,21 @@ pub(crate) async fn cdp_checked(
             }));
         // SAFETY: a live view on its UI thread; the handler owns its state.
         unsafe {
-            core.CallDevToolsProtocolMethod(
-                &HSTRING::from(method),
-                &HSTRING::from(parameters.as_str()),
-                &handler,
-            )
+            match &session {
+                None => core.CallDevToolsProtocolMethod(
+                    &HSTRING::from(method),
+                    &HSTRING::from(parameters.as_str()),
+                    &handler,
+                ),
+                Some(session) => core
+                    .cast::<ICoreWebView2_11>()?
+                    .CallDevToolsProtocolMethodForSession(
+                        &HSTRING::from(session.as_str()),
+                        &HSTRING::from(method),
+                        &HSTRING::from(parameters.as_str()),
+                        &handler,
+                    ),
+            }
         }
         .map_err(|_| CdpError::Unavailable)
     })
@@ -155,6 +190,26 @@ pub(crate) async fn evaluate(
     expression: String,
     context: Option<i64>,
 ) -> Result<Value, CdpError> {
+    evaluate_in(view, None, expression, context).await
+}
+
+/// `evaluate` in a target session the view attached to; `context` belongs to
+/// that session.
+pub(crate) async fn evaluate_in_session(
+    view: &Webview,
+    session: &str,
+    expression: String,
+    context: i64,
+) -> Result<Value, CdpError> {
+    evaluate_in(view, Some(session), expression, Some(context)).await
+}
+
+async fn evaluate_in(
+    view: &Webview,
+    session: Option<&str>,
+    expression: String,
+    context: Option<i64>,
+) -> Result<Value, CdpError> {
     let mut parameters = serde_json::json!({
         "expression": expression,
         "awaitPromise": true,
@@ -163,7 +218,10 @@ pub(crate) async fn evaluate(
     if let Some(context) = context {
         parameters["contextId"] = context.into();
     }
-    let result = cdp(view, "Runtime.evaluate", &parameters).await?;
+    let result = match session {
+        Some(session) => cdp_in_session(view, session, "Runtime.evaluate", &parameters).await?,
+        None => cdp(view, "Runtime.evaluate", &parameters).await?,
+    };
     if result.get("exceptionDetails").is_some() {
         return Err(CdpError::Invalid);
     }

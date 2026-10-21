@@ -48,7 +48,10 @@ it("captures a visible page and clears its snapshot and closes the runtime when 
   expect(runtime.useBrowserRuntimeStore.getState().previews[tab.id]).toEqual({
     ...image,
   });
-  await runtime.closeBrowserRuntime(tab, () => true);
+  // The page is destroyed once the switch has landed, a couple of frames after the close.
+  const closing = runtime.closeBrowserRuntime(tab, () => true);
+  await vi.advanceTimersByTimeAsync(100);
+  await closing;
   expect(runtime.useBrowserRuntimeStore.getState().previews).toEqual({});
   expect(native.invoke).toHaveBeenCalledWith("browser_webview_close", {
     request: { id: runtime.browserRuntimeId(tab) },

@@ -16,11 +16,18 @@ function CursorOverlay() {
   const bubble = useRef<HTMLDivElement>(null);
   const marker = useRef<HTMLDivElement>(null);
   const meter = useRef<HTMLDivElement>(null);
-  useEffect(() => startCursorOverlayLoop({ latest, group, bubble, marker, meter }), []);
+  const focus = useRef<HTMLDivElement>(null);
+  const sketch = useRef<HTMLDivElement>(null);
+  useEffect(
+    () => startCursorOverlayLoop({ latest, group, bubble, marker, meter, focus, sketch }),
+    [],
+  );
   return (
     <CursorOverlayMarkup
       presentation={presentation}
       marker={marker}
+      focus={focus}
+      sketch={sketch}
       group={group}
       bubble={bubble}
       meter={meter}

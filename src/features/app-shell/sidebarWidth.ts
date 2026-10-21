@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
 const storageKey = "misty:sidebar-width:v1";
-export const sidebarWidthDefault = 280;
-export const sidebarWidthMin = 272;
-export const sidebarWidthMax = 420;
+export const sidebarWidthDefault = 320;
+export const sidebarWidthMin = 320;
+export const sidebarWidthMax = 480;
 
 const clamp = (value: number) =>
   Math.min(sidebarWidthMax, Math.max(sidebarWidthMin, Math.round(value)));

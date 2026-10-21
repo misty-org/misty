@@ -12,7 +12,8 @@ import {
   waveformHeight,
   type Point,
 } from "./motion";
-import { pointBubbleText, pointLayout, type PointLayout } from "./pointLayout";
+import { createSketchPainter } from "./overlaySketch";
+import { focusBoxes, pointBubbleText, pointLayout, type PointLayout } from "./pointLayout";
 import type { CursorSample, Presentation } from "./protocol";
 
 export type CursorOverlayRefs = {
@@ -21,6 +22,10 @@ export type CursorOverlayRefs = {
   bubble: RefObject<HTMLDivElement | null>;
   marker: RefObject<HTMLDivElement | null>;
   meter: RefObject<HTMLDivElement | null>;
+  /** Teach mode's outlined regions. */
+  focus?: RefObject<HTMLDivElement | null>;
+  /** A reply's drawing: a whiteboard card or marks on the screen. */
+  sketch?: RefObject<HTMLDivElement | null>;
 };
 
 function paintWaveform(meter: HTMLDivElement | null, power: number) {
@@ -38,7 +43,11 @@ export function startCursorOverlayLoop({
   bubble,
   marker,
   meter,
+  focus,
+  sketch,
 }: CursorOverlayRefs): () => void {
+  let focusSeen = "";
+  let paintSketch: ReturnType<typeof createSketchPainter> | undefined;
   let disposed = false;
   let lastMeterFrame = 0;
   const inputs: CursorInputs = { sample: undefined, power: 0, meterTurn: -1 };
@@ -111,6 +120,25 @@ export function startCursorOverlayLoop({
       ...follow,
     };
     const state = latest.current;
+    // Teach mode's regions: rebuilt only when they or this display change.
+    const focusKey = `${JSON.stringify(state.focus)}:${d.x},${d.y},${d.width},${d.height},${factor}`;
+    if (focus?.current && focusKey !== focusSeen) {
+      focusSeen = focusKey;
+      focus.current.replaceChildren(
+        ...focusBoxes(state.focus, d, factor).map((box) => {
+          const outline = document.createElement("div");
+          outline.className = "cursor-focus-box";
+          outline.style.transform = `translate(${box.x}px, ${box.y}px)`;
+          outline.style.width = `${box.width}px`;
+          outline.style.height = `${box.height}px`;
+          return outline;
+        }),
+      );
+    }
+    if (sketch?.current) {
+      paintSketch ??= createSketchPainter(sketch.current);
+      paintSketch(state.sketch, d, factor, mouse);
+    }
     const key = `${state.generation}:${JSON.stringify(state.point)}`;
     if (key !== seen) {
       seen = key;

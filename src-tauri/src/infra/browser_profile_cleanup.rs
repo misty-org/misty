@@ -29,7 +29,8 @@ pub(super) async fn remove(app: AppHandle, profile_id: String) -> Result<(), Str
     let _ = identifier;
     // The profile's whole folder under `~/.misty/profiles`. On macOS its `webview` is a link
     // that is removed without following it (WebKit's own store was erased above).
-    let home = super::super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let home =
+        super::super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     let directory = super::super::browser_profile::webview_home(&home, Some(&profile_id))?;
     let profile_folder = directory.parent().ok_or("Invalid profile folder.")?;
     remove_profile_directory(profile_folder).await

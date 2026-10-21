@@ -220,7 +220,8 @@ pub fn tab_event(app: &tauri::AppHandle, space: Option<&str>, id: &str, event: &
 
 pub fn register(view: &tauri::Webview, space: &str, id: &str, private: bool, url: &str) {
     #[cfg(target_os = "macos")]
-    if let (Ok(space), Ok(id), Ok(url)) = (CString::new(space), CString::new(id), CString::new(url)) {
+    if let (Ok(space), Ok(id), Ok(url)) = (CString::new(space), CString::new(id), CString::new(url))
+    {
         let _ = view.with_webview(move |platform| unsafe {
             misty_extensions_register_tab(
                 space.as_ptr(),

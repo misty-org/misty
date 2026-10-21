@@ -10,6 +10,7 @@ import { useLocalExecution } from "./localExecution";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
+import { agentPageBounds, trackAgentTab } from "./agentTabs";
 
 /** What a sub-agent may do in its tab: everything but start sub-agents. */
 export const childTabCapabilities = browserTabAgentFileCapabilities.filter(
@@ -29,10 +30,11 @@ export async function spawnChildTabs(
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
   const config = (job.config ?? {}) as { taskId?: string; agentId?: string };
-  const input = (job.input ?? {}) as { count?: number };
+  const input = (job.input ?? {}) as { count?: number; labels?: unknown };
+  const labels = Array.isArray(input.labels) ? input.labels.map((label) => String(label)) : [];
   const local = useLocalExecution.getState().execution;
-  // The parent works either in this computer's own task or in a session it
-  // runs for another device's request.
+  // The parent works either in this computer's own task or in the agent's own
+  // browser session here.
   const hosted = config.taskId ? hostedSessionForTask(config.taskId) : undefined;
   const execution =
     local && local.state === "running" && local.taskId === config.taskId
@@ -66,16 +68,25 @@ export async function spawnChildTabs(
           scopeId,
           url: browserHomeUrl(),
           originSpaceId: execution.spaceId,
-          x: 0,
-          y: 64,
-          width: Math.max(200, window.innerWidth - 440),
-          height: Math.max(300, window.innerHeight - 128),
           theme: "dark",
+          agentRunId: job.runId,
+          ...agentPageBounds(),
         },
       });
       created.push({ id, scopeId });
       await invoke("agent_workspace_bind_scope", { taskId: execution.taskId, scopeId });
-      await invoke("browser_webview_hide", { request: { id } });
+      // Parked out of sight rather than hidden, so it keeps painting for its sub-agent.
+      await invoke("browser_webview_hide", { request: { id, keepLive: true } });
+      // It sleeps when its sub-agent moves on, and wakes for its next step (agentTabs.ts).
+      // Each sub-agent works in a view of its own in the parent's chat (agent-browser BRIEF).
+      trackAgentTab({
+        scopeId,
+        viewId: id,
+        taskId: execution.taskId,
+        runId: job.runId,
+        conversationId: hosted?.conversationId,
+        view: { id: scopeId, label: labels[index] || `Helper ${index + 1}` },
+      });
     }
     // The task may have stopped while the tabs opened.
     if (!running()) throw new Error("agent_task_paused");
@@ -116,7 +127,7 @@ export async function spawnChildTabs(
           window_label: windowLabel,
           agentOwned: true,
           delegated: true,
-          // A session for another device's request: its task holds the lease.
+          // The agent's own session: its task holds the lease.
           ...(hosted ? { remote_session: true, task_id: execution.taskId } : {}),
         },
         run_grant: grants[index],

@@ -1,0 +1,90 @@
+import { invoke } from "@tauri-apps/api/core";
+import { agentTab, noteAgentTabJob, pictureAgentTab, wakeAgentTab } from "./agentTabs";
+import { touchHostedSession } from "./hostedSessionsState";
+import { isBrowserSnapshotStale } from "./workerDeviceJobs";
+import {
+  browserAgentExecutionRequest,
+  browserDeviceRequest,
+  browserRuntimeIdForScope,
+  DeviceOperationNotAttempted,
+  registerRunBoundBrowserContext,
+  type ClaimedWorkflowNodeJob,
+} from "./workerBrowserJobs";
+
+/** The native lease a browser job's execution runs under: its own id, the job's deadline. */
+export function browserExecutionControl(
+  job: ClaimedWorkflowNodeJob["job"],
+  leaseExpiresAt: string | null | undefined,
+) {
+  return {
+    executionId: job.id,
+    deadlineAt: job.deadlineAt,
+    leaseExpiresAt,
+    scopeId: job.scopeId,
+    grantId: `${job.contextId}:${job.id}`,
+  };
+}
+
+/**
+ * One browser operation in a tab, as a device job runs it: the tab wakes if it sleeps, a
+ * run-bound grant names this operation alone, and the native side runs it under the job's
+ * lease. A browser_run program's page calls take the same path (programs/runProgram.ts).
+ */
+export async function executeBrowserJob(
+  job: ClaimedWorkflowNodeJob["job"],
+  signal: AbortSignal,
+  leaseExpiresAt: string | null | undefined,
+): Promise<Record<string, unknown>> {
+  touchHostedSession(job.scopeId, job.runId);
+  // An agent's sleeping tab opens its page again first (agentTabs.ts); one whose run's lease
+  // ended stays asleep and the job is not attempted.
+  if (agentTab(job.scopeId) && !(await wakeAgentTab(job.scopeId)))
+    throw new DeviceOperationNotAttempted(new Error("agent_tab_closed"));
+  noteAgentTabJob(job.scopeId, job.runId, true);
+  const cancel = () => {
+    void invoke("browser_agent_execution_cancel", {
+      request: browserExecutionControl(job, leaseExpiresAt),
+    }).catch(() => undefined);
+  };
+  signal.addEventListener("abort", cancel, { once: true });
+  try {
+    try {
+      await registerRunBoundBrowserContext(job);
+      signal.throwIfAborted();
+    } catch (error) {
+      throw new DeviceOperationNotAttempted(error);
+    }
+    return await invoke<Record<string, unknown>>("browser_agent_execute_bounded", {
+      request: {
+        control: browserExecutionControl(job, leaseExpiresAt),
+        operation: await browserDeviceRequest(job),
+      },
+    });
+  } catch (error) {
+    // Let the coordinator request a new frame; no input was attempted and
+    // this is not a terminal desktop-control error for the user.
+    if (isBrowserSnapshotStale(error)) throw new DeviceOperationNotAttempted(error);
+    if (job.operation.startsWith("browser.workspace.")) {
+      window.dispatchEvent(
+        new CustomEvent("misty:autopilot-error", {
+          detail: {
+            taskId: browserAgentExecutionRequest(job).input.__mistyTaskId,
+            message: String(error),
+          },
+        }),
+      );
+      if (job.operation === "browser.workspace.visual")
+        throw new DeviceOperationNotAttempted(error);
+    }
+    throw error;
+  } finally {
+    noteAgentTabJob(job.scopeId, job.runId, false);
+    void pictureAgentTab(job.scopeId);
+    signal.removeEventListener("abort", cancel);
+    const id = await browserRuntimeIdForScope(job.scopeId).catch(() => null);
+    if (id)
+      await invoke("browser_agent_grant_revoke", {
+        request: { id, grantId: `${job.contextId}:${job.id}` },
+      }).catch(() => undefined);
+  }
+}

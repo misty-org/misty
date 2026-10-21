@@ -40,20 +40,27 @@ and the approval policy below.
 
 ## Architecture
 
+Revised October 20, 2026 with harness v3 ([agent-harness-v3.md](../../plans/agent-harness-v3.md)):
+browser work is programs against the agent's own tabs, and a run starts with a small set of tools.
+
 ```
 Composer (one input, no modes)
-  └─ Agent loop (Vercel Workflow; plans, picks API or screen)
-       └─ Capability gateway (Go: catalog · policy/approvals · journal · billing)
-            ├─ Misty data tools — notes, tasks, calendar, drawings, roadmaps,
-            │  library, messages, memory; optional `space` argument
-            ├─ Composio session — per Misty user; search, connect, execute
-            └─ Screen tasks — screen.open / screen.act / screen.read
-                 └─ Desktop host — Midscene Agent.aiAct + device adapter,
-                    visible cursor, Stop, inline approvals
+  └─ Agent loop (Vercel Workflow): small tool surface, prompt stable between compactions,
+     │  transcript summarized every 20 turns, a turn that only narrates goes back
+     ├─ browser_run ─ Capability gateway (Go: catalog · policy/approvals · journal · billing)
+     │    └─ Device: the program in a sandbox inside the Misty app (no network, files or globals)
+     │         └─ Page API: open · read · text · find · click · type · fill · goto · wait · keep
+     │              └─ The agent's own tabs only (page layer, native input, consent and popup
+     │                 handling, proof tabs that stay awake)
+     ├─ web_search · web_fetch · agent_delegate (sub-agents for breadth)
+     ├─ Misty data tools and Composio apps (loaded when the request is about them)
+     └─ Completion check: kept tabs not error pages; counts met; sources read; then one model review
 ```
 
 - **Agent loop.** One durable loop for every entry point (panel, Agents page,
-  companion, voice). All tools are active on every turn.
+  companion, voice). A run starts with a small set of tools; Misty's own data tools,
+  connected apps, sub-agents and the single-step page tools load when the request
+  needs them (`agent_tool_load`, `agent_tool_use`).
 - **Capability gateway.** Resolves the run's catalog, authorizes each call with
   the owner's account and Space permissions, applies the approval policy,
   journals effects and meters usage. MCP is only its transport to the runtime.
@@ -69,10 +76,16 @@ Composer (one input, no modes)
   Connect Links become an in-chat "Connect Google Drive" card, and the
   connecting call waits while the user signs in. The remote workbench and bash
   tools stay disabled until the gateway can authorize what they run.
-- **Screen tasks.** `screen.act(goal)` is one device job per goal, not one per
-  click. The desktop runs Midscene's agent loop against a device adapter for the
-  Misty window, the agent window or the full desktop. Midscene's model calls go
-  through a Go vision proxy with their own meter.
+- **Browser work.** The agent works in tabs of its own on the computer the request
+  came from, never in the person's tabs. `browser_run` takes a short program the
+  agent writes; the Misty app runs it in a QuickJS sandbox whose only reach is a
+  page API on those tabs, each call a page operation under the run's grant and the
+  same confirm rules. Tabs the person asked to keep open are marked with `keep()`
+  and stay awake. Single-step page tools remain for what a program cannot do.
+- **Screen tasks.** `screen.act(goal)` is one device job per goal, for visual work
+  with no readable controls and for other apps on the desktop. The desktop runs
+  Midscene's agent loop against a device adapter; its model calls go through a Go
+  vision proxy with their own meter.
 
 ## Policy
 

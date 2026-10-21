@@ -23,13 +23,13 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("lets a lone Agents view own its header and restores window tabs when another surface opens", () => {
+it("keeps the tab sidebar for a lone Agents view", () => {
   render(
     <MemoryRouter initialEntries={["/apps/agents"]}>
       <WorkspaceCanvas />
     </MemoryRouter>,
   );
-  expect(screen.queryByRole("navigation", { name: "Window tabs" })).toBeNull();
+  expect(screen.getByRole("navigation", { name: "Window tabs" })).toBeTruthy();
   act(() => {
     useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/spaces/family/notes")!);
   });

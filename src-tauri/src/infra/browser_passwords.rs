@@ -229,7 +229,8 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                     );
                 }
                 // The renderer learns the site and username, never the password.
-                let _ = crate::infra::space_windows::emit(&app,
+                let _ = crate::infra::space_windows::emit(
+                    &app,
                     "misty://browser-password-offer",
                     json!({"id": id, "origin": origin, "username": username, "update": update}),
                 );
@@ -241,7 +242,7 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    if crate::infra::space_windows::is_space_window(webview.label()) {
+    if crate::infra::space_windows::is_person_window(webview.label()) {
         Ok(())
     } else {
         Err("Only Misty's trusted shell can manage passwords.".into())

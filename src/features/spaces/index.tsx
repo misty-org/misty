@@ -10,3 +10,5 @@ export * from "./store/useSpacesStore";
 export * from "./store/useSpacesTabsStore";
 export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
 export { SocialPicker } from "./chat/SocialRuntime";
+
+export { SpaceRow } from "./components/spaceRow/SpaceRow";

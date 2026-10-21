@@ -1,0 +1,40 @@
+/* A reply's drawing in the transcript: a plain white whiteboard with a hairline, in the
+   monochrome palette. The drawing keeps its own near-black strokes in both themes. */
+.misty-sketch {
+  margin: 12px 0;
+}
+.misty-sketch figcaption {
+  margin-bottom: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.misty-sketch-canvas {
+  display: grid;
+  place-items: center;
+  height: 280px;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  background: #ffffff;
+}
+.misty-sketch-canvas > svg {
+  width: 100%;
+  height: 100%;
+}
+.misty-sketch-skeleton {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+}
+.misty-sketch-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.misty-sketch-notice {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}

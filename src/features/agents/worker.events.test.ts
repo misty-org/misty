@@ -39,11 +39,11 @@ it("recovers a missed job notification with bounded reconciliation while retaini
   worker.start("account");
   await vi.advanceTimersByTimeAsync(0);
   expect(mocks.claim).toHaveBeenCalledTimes(1);
-  await vi.advanceTimersByTimeAsync(59_999);
+  await vi.advanceTimersByTimeAsync(29_999);
   expect(mocks.claim).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(1);
   expect(mocks.claim).toHaveBeenCalledTimes(2);
-  expect(mocks.heartbeat).toHaveBeenCalledTimes(2);
+  expect(mocks.heartbeat).toHaveBeenCalledTimes(1);
   mocks.event?.({ topic: "jobs" });
   await vi.advanceTimersByTimeAsync(0);
   expect(mocks.claim).toHaveBeenCalledTimes(3);

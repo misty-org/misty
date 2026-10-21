@@ -91,6 +91,8 @@ pub(super) const FILES: &[FileSpec] = &[
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "CLAUDE_API_KEY",
+            "NVIDIA_API_KEY",
+            "NVIDIA_BASE_URL",
             "ELEVENLABS_API_KEY",
             "MISTY_VOICE_ID",
             "MISTY_VOICE_TTS_MODEL",

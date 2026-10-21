@@ -10,16 +10,16 @@ pub(crate) use native::{page_host, EXTENSION_SCHEME};
 mod native_windows;
 mod package;
 pub(crate) mod runtime;
-mod spaces;
 pub(crate) mod space;
+mod spaces;
 mod sync;
 mod tabs;
+pub(crate) use spaces::{release_space, remove_space};
 pub(crate) use tabs::{
     agent_action, agent_extension_id, authorize_agent_url, context_menu, has_extensions,
     is_chrome_store_id, pending_navigation, request_store_install, request_store_remove,
     store_installation,
 };
-pub(crate) use spaces::{release_space, remove_space};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -180,8 +180,9 @@ fn identity(value: &str) -> String {
 /// Extension page hosts, with the Spaces that run each extension. The same
 /// extension keeps one host in every Space; each Space's controller serves it.
 fn origins() -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
-    static ORIGINS: OnceLock<std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>>> =
-        OnceLock::new();
+    static ORIGINS: OnceLock<
+        std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>>,
+    > = OnceLock::new();
     ORIGINS.get_or_init(Default::default)
 }
 fn allow_origin(space: &str, host: String) {
@@ -342,7 +343,6 @@ pub async fn close_account() {
     let _ = native::request(json!({"operation":"configure", "account":""})).await;
     CLOSING.store(false, std::sync::atomic::Ordering::Release);
 }
-
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

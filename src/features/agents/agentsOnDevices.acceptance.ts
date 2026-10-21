@@ -2,10 +2,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { liveAcceptanceEnabled } from "@/tests/acceptance/liveEnv";
 import { MistyClient } from "@/tests/acceptance/mistyClient";
 
-// Agents on devices (docs/design/agents-on-devices/BRIEF.md), live on the local
-// server: the keep-awake setting and the request state a device reads to end
-// a session. Opening a session on another device needs two signed-in desktops;
-// server/test/contract/http/api/remote_sessions_test.go covers it with real keys.
+// Agents on this computer, live on the local server: the keep-awake setting and
+// the request state a device reads to end the agent's own session.
+// server/test/contract/http/api/remote_sessions_test.go covers the session itself
+// with real keys.
 let client: MistyClient;
 
 describe.skipIf(!liveAcceptanceEnabled)("agents on devices on the local server", () => {

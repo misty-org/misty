@@ -21,7 +21,8 @@ pub(crate) const MEDIA_SESSION_PAGE_SCRIPT: &str = r#"(() => {
 })();"#;
 
 /// Reads the page's now-playing state. Only https artwork leaves the page.
-const MEDIA_INFO_SCRIPT: &str = r#"(() => window.__mistyMediaSnapshot ? window.__mistyMediaSnapshot() : null)()"#;
+const MEDIA_INFO_SCRIPT: &str =
+    r#"(() => window.__mistyMediaSnapshot ? window.__mistyMediaSnapshot() : null)()"#;
 
 /// Runs one of the page's own controls; play and pause fall back to the
 /// playing element when the page registered none.
@@ -100,4 +101,116 @@ pub fn browser_webview_media_action(
                 .replace("__POSITION__", &position),
         )
         .map_err(|error| error.to_string())
+}
+
+/// Reads what the page is playing with its cached captions (`__mistyMediaContext` in
+/// browser_scripts.rs). It never fetches: captions arrive when the video starts playing.
+const MEDIA_CONTEXT_SCRIPT: &str =
+    r#"(() => window.__mistyMediaContext ? window.__mistyMediaContext() : null)()"#;
+
+/// How much was said before the current moment that a question gets, in seconds.
+const SAID_BEFORE_SECONDS: f64 = 90.0;
+/// A little after now, for a line that started just before the person paused.
+const SAID_AFTER_SECONDS: f64 = 5.0;
+/// The most transcript text one question carries.
+const SAID_MAX_CHARS: usize = 2_500;
+
+#[derive(Debug, Deserialize)]
+struct PageMediaContext {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    url: String,
+    time: Option<f64>,
+    duration: Option<f64>,
+    #[serde(default)]
+    paused: bool,
+    #[serde(default, rename = "hasMedia")]
+    has_media: bool,
+    #[serde(default)]
+    captions: Option<Vec<(f64, String)>>,
+}
+
+/// The lines said from `SAID_BEFORE_SECONDS` before `time` to just after it, newest kept
+/// when they run long, each with its start time.
+pub(crate) fn transcript_window(captions: &[(f64, String)], time: f64) -> Vec<(f64, String)> {
+    let mut lines: Vec<(f64, String)> = captions
+        .iter()
+        .filter(|(start, text)| {
+            start.is_finite()
+                && *start >= time - SAID_BEFORE_SECONDS
+                && *start <= time + SAID_AFTER_SECONDS
+                && !text.trim().is_empty()
+        })
+        .map(|(start, text)| (*start, text.chars().take(300).collect()))
+        .collect();
+    let mut total = 0;
+    let mut keep = lines.len();
+    while keep > 0 {
+        total += lines[keep - 1].1.chars().count() + 1;
+        if total > SAID_MAX_CHARS {
+            break;
+        }
+        keep -= 1;
+    }
+    lines.drain(..keep);
+    lines
+}
+
+/// What the front page is playing, for a question at the cursor: its title, address, the
+/// current time and the transcript around it. Nothing when the page plays nothing.
+#[tauri::command]
+pub async fn browser_webview_media_context(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<Value, String> {
+    let webview = running_webview(&app, &request.id)?;
+    let value = eval_json(&webview, MEDIA_CONTEXT_SCRIPT.to_owned()).await?;
+    let Ok(Some(page)) = serde_json::from_str::<Option<PageMediaContext>>(&value) else {
+        return Ok(Value::Null);
+    };
+    let Some(time) = page.time.filter(|t| t.is_finite() && *t >= 0.0) else {
+        return Ok(Value::Null);
+    };
+    if !page.has_media {
+        return Ok(Value::Null);
+    }
+    let transcript = page
+        .captions
+        .as_deref()
+        .map(|captions| transcript_window(captions, time))
+        .unwrap_or_default();
+    Ok(serde_json::json!({
+        "title": page.title.chars().take(200).collect::<String>(),
+        "url": page.url.chars().take(2048).collect::<String>(),
+        "time": time,
+        "duration": page.duration.filter(|d| d.is_finite() && *d > 0.0),
+        "paused": page.paused,
+        "transcript": transcript.into_iter().map(|(t, text)| serde_json::json!({"t": t, "text": text})).collect::<Vec<_>>(),
+    }))
+}
+
+#[cfg(test)]
+mod media_context_tests {
+    use super::transcript_window;
+
+    #[test]
+    fn keeps_what_was_said_around_now() {
+        let captions: Vec<(f64, String)> = (0..200)
+            .map(|i| (i as f64 * 2.0, format!("line {i}")))
+            .collect();
+        let window = transcript_window(&captions, 200.0);
+        assert_eq!(window.first().unwrap().0, 110.0);
+        assert_eq!(window.last().unwrap().0, 204.0);
+    }
+
+    #[test]
+    fn keeps_the_newest_lines_when_they_run_long() {
+        let captions: Vec<(f64, String)> = (0..90).map(|i| (i as f64, "x".repeat(100))).collect();
+        let window = transcript_window(&captions, 89.0);
+        let chars: usize = window.iter().map(|(_, text)| text.len() + 1).sum();
+        assert!(chars <= 2_500);
+        assert_eq!(window.last().unwrap().0, 89.0);
+        assert!(transcript_window(&captions, 1_000.0).is_empty());
+    }
 }

@@ -30,8 +30,12 @@ static const CGFloat PillHeight = 26, PillInset = 8;
 @property(nonatomic) BOOL waiting;
 @property(nonatomic) BOOL docked;
 @property(nonatomic, strong) NSView *container;
-// Misty's control mist, at the content's full size, so it shrinks with the page.
-@property(nonatomic, strong) NSView *mist;
+// Inside the container, at the content's full size and unscaled: the app and its pages live
+// here, since wry places a page from its parent's frame height.
+@property(nonatomic, strong) NSView *stage;
+// The app's own view, kept at the content's full size while docked: Tauri sizes it to the
+// window, which docked is the small frame.
+@property(nonatomic, weak) NSView *appView;
 @property(nonatomic, strong) MistyDockOverlay *overlay;
 @property(nonatomic) NSSize full;
 @property(nonatomic) NSRect savedFrame;
@@ -249,15 +253,12 @@ static NSInteger Offset(NSInteger index) {
   MistyDockEntry *entry = self.entry;
   NSWindow *window = entry.window;
   if (!window) return;
-  NSSize size = window.contentView.frame.size;
-  self.frame = NSMakeRect(0, 0, entry.full.width, entry.full.height);
-  [self setBoundsOrigin:NSZeroPoint];
-  [self setBoundsSize:size];
+  NSSize size = window.contentView.bounds.size;
+  self.frame = NSMakeRect(0, 0, size.width, size.height);
   self.dim = dim;
   [CATransaction begin];
   [CATransaction setDisableActions:YES];
   CGFloat w = size.width, h = size.height;
-  if (entry.mist) MistyAgentMistSetWaiting(entry.mist, entry.waiting);
   self.dimLayer.frame = CGRectMake(0, 0, w, h);
   self.dimLayer.opacity = (float)MAX(dim, self.hovering && dim == 0 ? 0.32 : 0);
   CGFloat pillX = PillInset, pillW = MAX(0, w - 2 * PillInset), pillY = h - PillInset - PillHeight;
@@ -542,14 +543,44 @@ static void PlaceCaption(void) {
   [caption.panel makeKeyWindow];
 }
 
+// An agent's window has no title bar, so macOS gives it square corners: round its frame view
+// in window points, which holds whether it is docked small or open, and let the shadow follow.
+static const CGFloat WindowCorner = 12;
+static void RoundCorners(NSWindow *window, BOOL docked) {
+  // An open window with a title bar has macOS's own corners.
+  if (!window || (!docked && (window.styleMask & NSWindowStyleMaskTitled))) return;
+  window.opaque = NO;
+  window.backgroundColor = NSColor.clearColor;
+  NSView *frameView = window.contentView.superview ?: window.contentView;
+  frameView.wantsLayer = YES;
+  frameView.layer.cornerRadius = WindowCorner;
+  frameView.layer.cornerCurve = kCACornerCurveContinuous;
+  frameView.layer.masksToBounds = YES;
+  window.hasShadow = YES;
+  [window invalidateShadow];
+}
+
+static void HoldAppView(MistyDockEntry *entry) {
+  NSRect full = NSMakeRect(0, 0, entry.full.width, entry.full.height);
+  if (entry.appView && !NSEqualRects(entry.appView.frame, full)) entry.appView.frame = full;
+}
+
 static void ApplyFrame(MistyDockEntry *entry, NSRect frame, CGFloat dim) {
   NSWindow *window = entry.window;
   if (!window) return;
   [window setFrame:frame display:YES animate:NO];
+  // Only the container scales: the page keeps its full size inside it, drawn small. The
+  // content view stays at the window's real size, since AppKit lays the window out from it:
+  // scaling it made each layout pass size the window from the full page and grow it again.
   NSView *content = window.contentView;
-  [content setBoundsOrigin:NSZeroPoint];
-  [content setBoundsSize:entry.full];
-  entry.container.frame = NSMakeRect(0, 0, entry.full.width, entry.full.height);
+  // Its views keep the page's size: the app fills it, pages sit where the app put them.
+  entry.container.autoresizesSubviews = NO;
+  entry.container.frame = content.bounds;
+  [entry.container setBoundsOrigin:NSZeroPoint];
+  [entry.container setBoundsSize:entry.full];
+  entry.stage.frame = NSMakeRect(0, 0, entry.full.width, entry.full.height);
+  HoldAppView(entry);
+  RoundCorners(window, YES);
   [entry.overlay sync:dim];
 }
 
@@ -646,9 +677,9 @@ static void ShowCarousel(BOOL show) {
 
 #pragma mark - Docking
 
-// Pages are moved into one full-size container, so the content view's bounds
-// can be scaled without the webviews resizing. wry positions child webviews
-// from their superview's frame height, which is the container's full height.
+// Pages are moved into a full-size stage inside one container, so the container can scale
+// them without the webviews resizing. wry positions child webviews from their superview's
+// frame height, which is the stage's full height.
 static void Adopt(MistyDockEntry *entry) {
   NSWindow *window = entry.window;
   NSView *content = window.contentView;
@@ -657,11 +688,14 @@ static void Adopt(MistyDockEntry *entry) {
     entry.container = [[NSView alloc] initWithFrame:content.bounds];
     entry.container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [content addSubview:entry.container positioned:NSWindowBelow relativeTo:nil];
+    entry.stage = [[NSView alloc] initWithFrame:entry.container.bounds];
+    entry.stage.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [entry.container addSubview:entry.stage];
   }
   NSResponder *responder = window.firstResponder;
-  CGFloat frameHeight = content.frame.size.height, fullHeight = entry.container.frame.size.height;
+  CGFloat frameHeight = content.frame.size.height, fullHeight = entry.stage.frame.size.height;
   for (NSView *view in [content.subviews copy]) {
-    if (view == entry.container || view == entry.overlay || view == entry.mist) continue;
+    if (view == entry.container || view == entry.overlay) continue;
     NSRect frame = view.frame;
     // Added while docked: wry placed it against the small frame height.
     if (entry.docked) {
@@ -669,10 +703,9 @@ static void Adopt(MistyDockEntry *entry) {
       frame.origin.y = fullHeight - top - frame.size.height;
     }
     [view removeFromSuperview];
-    [entry.container addSubview:view positioned:NSWindowAbove relativeTo:nil];
+    [entry.stage addSubview:view positioned:NSWindowAbove relativeTo:nil];
     view.frame = frame;
   }
-  if (entry.mist) [content addSubview:entry.mist positioned:NSWindowAbove relativeTo:nil];
   if (entry.overlay) [content addSubview:entry.overlay positioned:NSWindowAbove relativeTo:nil];
   if (responder && responder != window.firstResponder) [window makeFirstResponder:responder];
 }
@@ -685,13 +718,15 @@ static void AdoptLater(void) {
       adoption = nil;
       return;
     }
-    for (MistyDockEntry *entry in docked)
+    for (MistyDockEntry *entry in docked) {
+      HoldAppView(entry);
       for (NSView *view in entry.window.contentView.subviews)
-        if (view != entry.container && view != entry.overlay && view != entry.mist) {
+        if (view != entry.container && view != entry.overlay) {
           Adopt(entry);
           SetOcclusionDetection(entry.container, NO);
           break;
         }
+    }
   }];
   [NSRunLoop.mainRunLoop addTimer:adoption forMode:NSRunLoopCommonModes];
 }
@@ -767,9 +802,13 @@ static void Dock(MistyDockEntry *entry) {
   Adopt(entry);
   entry.full = window.contentView.bounds.size;
   entry.container.autoresizingMask = NSViewNotSizable;
-  if (!entry.mist) entry.mist = MistyAgentMistMake(NSMakeRect(0, 0, entry.full.width, entry.full.height), 10);
-  entry.mist.frame = NSMakeRect(0, 0, entry.full.width, entry.full.height);
-  [window.contentView addSubview:entry.mist positioned:NSWindowAbove relativeTo:nil];
+  // The app's view fills the content before it shrinks; the agent's own ring is on its pages.
+  entry.appView = nil;
+  for (NSView *view in entry.stage.subviews)
+    if (NSEqualRects(view.frame, NSMakeRect(0, 0, entry.full.width, entry.full.height))) {
+      entry.appView = view;
+      break;
+    }
   if (!entry.overlay) entry.overlay = [[MistyDockOverlay alloc] initWithEntry:entry];
   [window.contentView addSubview:entry.overlay positioned:NSWindowAbove relativeTo:nil];
   entry.docked = YES;
@@ -787,7 +826,6 @@ static void Release(MistyDockEntry *entry) {
   // Opened at full size, the agent may still be working: the page keeps
   // ignoring cover until it returns to the person's window.
   [entry.overlay removeFromSuperview];
-  [entry.mist removeFromSuperview];
 }
 
 static void Restore(MistyDockEntry *entry) {
@@ -801,8 +839,10 @@ static void Restore(MistyDockEntry *entry) {
   window.styleMask = entry.savedMask;
   window.titlebarAppearsTransparent = entry.savedTransparentTitlebar;
   window.titleVisibility = entry.savedTitleVisibility;
+  // An agent's window shows no window buttons: the tab strip's Back to the dock button docks it
+  // and Stop in its panel ends the run, which closes it.
   for (NSNumber *button in @[@(NSWindowCloseButton), @(NSWindowMiniaturizeButton), @(NSWindowZoomButton)])
-    [window standardWindowButton:button.unsignedIntegerValue].hidden = NO;
+    [window standardWindowButton:button.unsignedIntegerValue].hidden = YES;
   NSRect target = entry.savedFrame;
   BOOL onScreen = NO;
   for (NSScreen *screen in NSScreen.screens) onScreen = onScreen || NSIntersectsRect(target, screen.visibleFrame);
@@ -812,11 +852,16 @@ static void Restore(MistyDockEntry *entry) {
   }
   [window setFrame:target display:YES animate:NO];
   NSView *content = window.contentView;
-  [content setBoundsOrigin:NSZeroPoint];
-  [content setBoundsSize:content.frame.size];
   entry.container.frame = content.bounds;
+  [entry.container setBoundsOrigin:NSZeroPoint];
+  [entry.container setBoundsSize:content.bounds.size];
   entry.container.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  entry.container.autoresizesSubviews = YES;
+  entry.stage.frame = entry.container.bounds;
+  // Only the app's view fills the window again; its pages keep the places the app gave them.
+  if (entry.appView) entry.appView.frame = entry.stage.bounds;
   window.contentMinSize = entry.savedMinSize;
+  RoundCorners(window, NO);
 }
 
 static void OpenEntry(MistyDockEntry *entry) {
@@ -912,13 +957,15 @@ void misty_agent_dock_status(const char *identifier, const char *status, bool wa
   if (carousel && selected < (NSInteger)docked.count && docked[(NSUInteger)selected] == entry) [caption updateFor:entry];
 }
 
-/// A page moved into a dock host fills the host below its bar and follows its size.
-void misty_agent_dock_fill(void *pointer, double top) {
+/// A page moved into a dock host fills the host above a strip of `bottom` points (the agent's
+/// island while the window is open) and follows its size.
+void misty_agent_dock_fill(void *pointer, double bottom) {
   NSView *view = (__bridge NSView *)pointer;
   NSView *parent = view.superview;
   if (!parent) return;
   NSRect bounds = parent.bounds;
-  view.frame = NSMakeRect(0, 0, bounds.size.width, MAX(0, bounds.size.height - top));
+  CGFloat inset = MIN(MAX(0, bottom), bounds.size.height);
+  view.frame = NSMakeRect(0, inset, bounds.size.width, bounds.size.height - inset);
   view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   view.hidden = NO;
 }
@@ -926,11 +973,27 @@ void misty_agent_dock_fill(void *pointer, double top) {
 /// Whether macOS reports each docked window as visible (WebKit keeps painting it).
 char *misty_agent_dock_visibility(void) {
   NSMutableArray *rows = [NSMutableArray array];
-  for (MistyDockEntry *entry in allEntries)
+  NSString *(^rect)(NSRect) = ^NSString *(NSRect r) {
+    return [NSString stringWithFormat:@"%.0f,%.0f %.0fx%.0f", r.origin.x, r.origin.y, r.size.width, r.size.height];
+  };
+  for (MistyDockEntry *entry in allEntries) {
+    // Every view the window holds, for the dock check: where each page sits in the content.
+    NSMutableArray *views = [NSMutableArray array];
+    for (NSView *view in entry.window.contentView.subviews) {
+      [views addObject:[NSString stringWithFormat:@"%@ %@%@", NSStringFromClass(view.class), rect(view.frame), view.hidden ? @" hidden" : @""]];
+      if (view == entry.container)
+        for (NSView *inner in entry.stage.subviews)
+          [views addObject:[NSString stringWithFormat:@"  %@ %@%@", NSStringFromClass(inner.class), rect(inner.frame), inner.hidden ? @" hidden" : @""]];
+    }
+    NSMutableArray *children = [NSMutableArray array];
+    for (NSWindow *child in entry.window.childWindows) [children addObject:rect(child.frame)];
     [rows addObject:@{@"id": entry.identifier, @"docked": @(entry.docked),
                       @"visible": @((entry.window.occlusionState & NSWindowOcclusionStateVisible) != 0),
                       @"contentWidth": @(entry.full.width), @"contentHeight": @(entry.full.height),
-                      @"screenWidth": @(entry.window.frame.size.width)}];
+                      @"screenWidth": @(entry.window.frame.size.width),
+                      @"frame": rect(entry.window.frame), @"bounds": rect(entry.window.contentView.bounds),
+                      @"views": views, @"childWindows": children}];
+  }
   NSData *data = [NSJSONSerialization dataWithJSONObject:rows options:0 error:nil];
   return strdup([[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding].UTF8String);
 }

@@ -50,6 +50,57 @@ become tools every agent has.
    inside that window (or along the display for desktop control) and the island sits at the
    bottom. Hidden tabs and other devices get no mist.
 
+## Teach mode (revision 4, October 19, 2026)
+
+Decision 1 drops teaching as a mode; this revision adds one back on purpose. Running "show me how to
+solve this" through the full agent loop made the agent plan, solve and verify: slow, too long to read
+aloud, and it handed over the answer. Teach mode is a hands-on tutor instead.
+
+- **A conversation mode.** Teach sits beside Ask, Auto and Plan in the mode menu, and the companion
+  has a Teach mode switch. A chat in Teach mode stays in it, so every follow-up is a lesson step.
+- **A fast lane, not the agent loop.** A Teach turn is one streamed model call with no tools, no
+  `agent_finish`, no reviews and low reasoning (`server/apps/agent-runtime/src/teach-turn.ts`,
+  `companion_teach_mode.txt`). Its text reaches the person a sentence at a time. When the person
+  wants the work done, it says Auto mode will do it; it never acts.
+- **Teach, stop, check.** Each reply teaches one step and ends; Misty never watches or waits. The
+  person does the step and says "check this" (by voice, or typed); the next turn captures the screens
+  plus a full-resolution close-up of the step's region (`focus1`) and checks only that step's
+  contract. Answers come as a hint ladder (nudge, hint, then the exact line), and never the full
+  solution unless the person chose code for each step.
+- **Lessons.** Each topic is its own lesson and its own chat. A lesson (goal, three to six objectives
+  with contracts, current step, answer policy, hint level, mistakes so far) lives on the device beside
+  its chat (`agent_chats` kind `lesson`) and travels with each turn; the server keeps none. One lesson
+  per agent is active; the model starts a new one, resumes a paused one or continues, says so, and
+  the turn moves to that lesson's chat. Saying they are done finishes the lesson with a summary of
+  what was achieved.
+- **Where to look.** A step outlines its region on screen while it is explained (monochrome, cleared
+  when the step has been read), alongside the existing pointer.
+- **In Agents.** Lessons have their own section under a plain "Lessons" header in the agent's
+  sidebar: in progress, paused, then finished, with progress as text ("Paused · 2 of 4"). A lesson
+  chat shows its objectives in the shared status table above the transcript.
+- **Looking things up.** A lesson turn may call `web_search` and `web_fetch`, and nothing else:
+  up to four lookups while planning a lesson, one on a step, so steps stay fast. It says one short
+  sentence before a lookup, offers at most one reference link from what it found, and never acts.
+- **Courses.** A broad topic ("teach me React") becomes a course of three to six lessons
+  (`[COURSE:{…}]`, kept on the device as `agent_chats` kind `course`). The sidebar shows a course as
+  a row with its lessons hanging off it, and a finished lesson offers **Next lesson**.
+
+## Drawing and video context (October 19, 2026)
+
+- **Drawing, only when asked.** Any companion reply, in Teach or Auto, can draw when the person
+  asks to see something drawn, diagrammed, sketched or marked. It says a sentence or two first,
+  then a ` ```misty-sketch ` block in JSON Lines (Excalidraw element skeletons), so it renders while
+  it streams. The model picks the surface: a **board** (a white whiteboard card beside the cursor,
+  to explain an idea) or **screen** marks (white strokes with a dark shadow over what the person
+  is looking at, in that screenshot's pixels). The overlay ignores the mouse, so the card clears on
+  its own after the reply is read, or with the next turn or Stop. In the transcript the drawing
+  renders in place, with **Save as drawing** to make it a Space drawing.
+- **What the video said.** When a video plays in the front Misty tab, a question at the cursor
+  carries its title, the current time and the captions from about 90 seconds before now. YouTube
+  pages fetch their own captions once per video when it starts playing; the turn reads only what
+  the page already holds, with a 300 ms budget alongside the screen capture, so it never waits on
+  them. Videos in other apps get screenshots only.
+
 ## What "sees what you see" means
 
 A screenshot is taken when you invoke the agent, and attached to that turn. Nothing is captured
@@ -169,7 +220,8 @@ your window never hides, moves or resizes it (`browser.rs` checks the caller's w
 **The docked window.** Like a video in picture in picture on iPhone:
 
 - Small (288 points wide, the content's own aspect) in a corner of Misty's window, which it moves
-  with; it never floats over other apps (owner's choice, October 11, like Codex). The mist shows inside it while the agent acts; a
+  with; it never floats over other apps (owner's choice, October 11, like Codex). It is the whole window drawn small, so the
+  agent's pages show their own ring there; the dock adds no mist of its own (owner's call, October 18). A
   small pill floating 8 points in from the bottom and side edges says what it's doing, or what it needs, with an icon, never a
   color. Hover puts Open and Stop inside the pill, before the count.
 - Drag it anywhere; it snaps to the nearest corner. Drop it by a side edge and it floats there,
@@ -210,6 +262,29 @@ minimized, and opened full size while covered. In every state the page kept its 
 Misty window, snapshots stayed full resolution and macOS reported every docked window visible.
 While docked, a native drag drew a rectangle in Excalidraw, a pasted image landed on its canvas,
 and native typing in the doc was saved (read back through Docs' export).
+
+**Agent windows.** Approved October 18, superseding *Separate window* above for agents that
+work on the web or in Misty. A working agent gets its own Misty window (`agent-<n>`, bound to its
+chat in `space_windows/agents.rs`): the same app window as yours, opened on your Space and docked
+the moment it opens.
+
+- **Its tabs and its chat.** The agent's tabs are real tabs in that window's strip, kept painting
+  when not shown. The Agents panel sits beside them, pinned to the run's chat, so you read its
+  context and steer it there.
+- **Dock and close.** The panel's PiP button and the window's close button send it back to the
+  dock. It closes only with its task: Stop ends the run and closes it; a run that finishes stays
+  for review until Done.
+- **Your input.** While the agent acts, the window takes no input from you outside the panel:
+  its tabs are locked natively under the pulsing mist, and a cover holds the rest of the app.
+- **Take over.** Pauses the run (`/pause`); it waits at its next step without model turns and the
+  window is yours. Resume (`/resume`) hands it back, and the agent reads its tabs again before
+  acting.
+- **Everything in Misty.** `app.window` opens Misty's own pages as tabs, switches and closes tabs
+  and moves the window to another Space. The window's own pages are a screen for the page tools,
+  with the same gates as websites. The side panel is never in the agent's view, and Settings
+  pages don't open as its tabs.
+- **Where it can't dock** (no dock on the platform), agents keep hidden background tabs, listed
+  on the island.
 
 **App commands.** Under takeover, opening and switching tabs and windows are one structured tool
 over the app's own commands (new tab, new window, switch tab, close tab, as

@@ -312,18 +312,8 @@ function startGesture(
         preview.classList.add("pointer-reorder-tab-preview");
         // Inactive tabs belong to a transparent strip at rest, but the lifted
         // tab must be opaque so its neighbors visibly pass underneath it.
-        // Horizontal workspace tabs lift with their own curved tab shape.
         const lifted = preview.firstElementChild as HTMLElement | null;
-        const tabShape = lifted?.querySelector<SVGElement>(".misty-workspace-tab-shape");
-        if (tabShape && list.dataset.reorderAxis !== "y") {
-          // Computed styles were frozen per node, so each descendant inherited "hidden".
-          for (const node of [tabShape, ...tabShape.querySelectorAll<SVGElement>("*")])
-            node.style.visibility = "visible";
-          lifted!.style.overflow = "visible";
-          preview.classList.add("pointer-reorder-shaped-preview");
-        } else if (lifted) {
-          lifted.style.backgroundColor = "var(--color-charcoal-bg)";
-        }
+        if (lifted) lifted.style.backgroundColor = "var(--color-charcoal-bg)";
       }
       restorePresentation = onLift?.();
       surface.dataset.reorderDragging = "true";

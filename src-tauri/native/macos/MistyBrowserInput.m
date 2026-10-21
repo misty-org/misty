@@ -68,12 +68,15 @@ char *misty_browser_native_action(void *pointer, const char *json) {
     NSDictionary *action = input[@"action"];
     NSString *kind = action[@"kind"];
     NSTimeInterval time = NSProcessInfo.processInfo.systemUptime;
-    if ([kind isEqual:@"click"] || [kind isEqual:@"drag"] || [kind isEqual:@"scroll"]) {
+    if ([kind isEqual:@"click"] || [kind isEqual:@"drag"] || [kind isEqual:@"scroll"] || [kind isEqual:@"move"]) {
       BOOL drag = [kind isEqual:@"drag"];
       NSPoint point = BrowserInputPoint(view,[action[drag ? @"fromX" : @"x"] doubleValue],[action[drag ? @"fromY" : @"y"] doubleValue]);
       NSView *target = [view hitTest:[view convertPoint:point toView:view.superview]];
       if (!target || !(target == view || [target isDescendantOf:view])) return BrowserInputJSON(@{@"error":@"The inspected browser target is unavailable"});
-      if ([kind isEqual:@"scroll"]) {
+      if ([kind isEqual:@"move"]) {
+        // The pointer comes to rest over the control, so the page's own :hover menus open.
+        [target mouseMoved:BrowserMouseEvent(view,NSEventTypeMouseMoved,point,0,time)];
+      } else if ([kind isEqual:@"scroll"]) {
         CGEventRef cg = CGEventCreateScrollWheelEvent(NULL,kCGScrollEventUnitPixel,2,-[action[@"deltaY"] intValue],-[action[@"deltaX"] intValue]);
         NSPoint screen = [window convertPointToScreen:[view convertPoint:point toView:nil]];
         CGEventSetLocation(cg,CGPointMake(screen.x,NSScreen.screens.firstObject.frame.size.height-screen.y));

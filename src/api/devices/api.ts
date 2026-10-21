@@ -66,6 +66,15 @@ export const devicesApi = {
     jobId: string,
     body: unknown,
   ) => signed(request, localId, `${workflowJobPath(deviceId, jobId)}/complete`, "POST", body),
+  /** Puts back a claimed job that never began, so the next claim takes it at once. */
+  releaseWorkflowJob: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    jobId: string,
+    leaseToken: string,
+  ) =>
+    signed(request, localId, `${workflowJobPath(deviceId, jobId)}/release`, "POST", { leaseToken }),
   failWorkflowJob: (
     request: SignedDeviceRequest,
     localId: string,

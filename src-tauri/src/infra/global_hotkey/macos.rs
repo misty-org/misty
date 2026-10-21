@@ -27,9 +27,21 @@ pub(crate) fn modifiers_from_flags(flags: u64) -> Modifiers {
         let (l, r) = (flags & left != 0, flags & right != 0);
         (generic && (l || !r), generic && r)
     };
-    let (left_control, right_control) = side(has(CGEventFlags::CGEventFlagControl), LEFT_CONTROL, RIGHT_CONTROL);
-    let (left_option, right_option) = side(has(CGEventFlags::CGEventFlagAlternate), LEFT_OPTION, RIGHT_OPTION);
-    let (left_command, right_command) = side(has(CGEventFlags::CGEventFlagCommand), LEFT_COMMAND, RIGHT_COMMAND);
+    let (left_control, right_control) = side(
+        has(CGEventFlags::CGEventFlagControl),
+        LEFT_CONTROL,
+        RIGHT_CONTROL,
+    );
+    let (left_option, right_option) = side(
+        has(CGEventFlags::CGEventFlagAlternate),
+        LEFT_OPTION,
+        RIGHT_OPTION,
+    );
+    let (left_command, right_command) = side(
+        has(CGEventFlags::CGEventFlagCommand),
+        LEFT_COMMAND,
+        RIGHT_COMMAND,
+    );
     Modifiers {
         left_control,
         right_control,
@@ -58,7 +70,11 @@ pub(crate) fn run(dispatch: fn(Input)) {
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged, CGEventType::KeyDown, CGEventType::LeftMouseDown],
+            vec![
+                CGEventType::FlagsChanged,
+                CGEventType::KeyDown,
+                CGEventType::LeftMouseDown,
+            ],
             move |_, kind, event| {
                 match kind {
                     CGEventType::KeyDown => dispatch(Input::KeyboardActivity),
@@ -68,7 +84,9 @@ pub(crate) fn run(dispatch: fn(Input)) {
                     }
                     // Only modifier changes move chords: arrow keys also carry
                     // the Fn flag, but on KeyDown, never on FlagsChanged.
-                    CGEventType::FlagsChanged => dispatch(Input::Modifiers(modifiers_from_flags(event.get_flags().bits()))),
+                    CGEventType::FlagsChanged => dispatch(Input::Modifiers(modifiers_from_flags(
+                        event.get_flags().bits(),
+                    ))),
                     _ => {}
                 }
                 None // Listen-only taps always preserve the original event.

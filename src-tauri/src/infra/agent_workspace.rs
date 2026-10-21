@@ -470,7 +470,11 @@ fn acquire_lease(
             agent: request.agent_id,
             account: request.account_id,
             window: window.clone(),
-            expires: Instant::now() + Duration::from_secs(30),
+            // A hidden session's renewals come from a timer in the app window, which WebKit
+            // throttles while the window is in the background; a longer lease keeps the
+            // agent's tabs alive. Stop and the session's end still release it at once.
+            expires: Instant::now()
+                + Duration::from_secs(if request.background { 600 } else { 30 }),
             background: request.background,
         },
     );

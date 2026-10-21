@@ -16,6 +16,7 @@ import {
 import { AgentFolderGroup } from "../folders/AgentFolderGroup";
 import { useAgentFoldersStore, type AgentConversationFolder } from "../folders/agentFoldersStore";
 import { useConversationDrop, type ConversationDrop } from "../folders/useConversationDrop";
+import { AgentLessons, useAgentLessons } from "../lessons/AgentLessons";
 import { AgentRecentRow } from "./AgentRecentRow";
 import type { RecentStatus } from "./RecentStatusBadge";
 
@@ -34,8 +35,8 @@ export type RecentFolder = { folder: AgentConversationFolder; conversations: Rec
 /** Memoized: the open conversation's streaming updates must not re-render every row. */
 export const AgentRecentConversations = memo(function AgentRecentConversations({
   agentId,
-  folders = [],
-  recent,
+  folders: allFolders = [],
+  recent: allRecent,
   statuses,
   activeId,
   disabled,
@@ -54,6 +55,23 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   /** Opens the New project dialog, which the frame owns so Get started can open it too. */
   onNewProject(): void;
 }) {
+  // Lessons (Teach mode) have their own section and leave Projects and Conversations.
+  const lessons = useAgentLessons(agentId);
+  const lessonIds = useMemo(() => new Set(lessons.map((lesson) => lesson.id)), [lessons]);
+  const folders = useMemo(
+    () =>
+      lessonIds.size
+        ? allFolders.map((group) => ({
+            ...group,
+            conversations: group.conversations.filter((c) => !lessonIds.has(c.id)),
+          }))
+        : allFolders,
+    [allFolders, lessonIds],
+  );
+  const recent = useMemo(
+    () => (lessonIds.size ? allRecent.filter((c) => !lessonIds.has(c.id)) : allRecent),
+    [allRecent, lessonIds],
+  );
   const [selected, setSelected] = useState<string[]>([]);
   const anchor = useRef<string | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
@@ -216,6 +234,12 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
           {conversations.map(row)}
         </AgentFolderGroup>
       ))}
+      <AgentLessons
+        lessons={lessons}
+        activeId={activeId}
+        disabled={disabled}
+        onConversation={onConversation}
+      />
       <div
         ref={recentsRef}
         className="agent-studio-recents-group"

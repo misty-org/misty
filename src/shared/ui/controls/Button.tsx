@@ -31,7 +31,7 @@ const buttonVariants = cva(
         // Every variant fills on hover and while open/pressed, so interactive
         // controls read the same across the app.
         outline: [
-          "border-charcoal-border bg-transparent shadow-none",
+          "border-charcoal-border-strong bg-transparent shadow-none",
           "hover:border-charcoal-active hover:bg-charcoal-hover",
           "hover:text-cream-bright aria-expanded:bg-charcoal-hover",
           "aria-expanded:text-cream-bright aria-pressed:bg-charcoal-hover",

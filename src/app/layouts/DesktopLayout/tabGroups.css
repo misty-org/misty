@@ -44,15 +44,6 @@
   background: var(--tab-group-color);
   flex-shrink: 0;
 }
-.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
-  & .misty-tab-group-header:not(:first-child) {
-    margin-left: 8px;
-  }
-  & .misty-tab-group-header + .misty-tab-group-member,
-  & .misty-tab-group-member + .misty-tab-group-header {
-    margin-left: 4px;
-  }
-}
 .misty-tab-group-swatch {
   display: grid;
   place-items: center;

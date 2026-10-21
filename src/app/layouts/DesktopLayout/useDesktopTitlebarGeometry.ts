@@ -14,19 +14,21 @@ export function useDesktopTitlebarGeometry(options: {
   docking: ReturnType<typeof useWindowDockingLayout>;
   focusMode: boolean;
   shouldShowWindowsControls: boolean;
+  /** The caption buttons sit inside the sidebar, so the window's corner reserves nothing. */
+  captionInline: boolean;
   appZoom: number;
 }) {
-  const { shellRef, pathname, docking, focusMode, shouldShowWindowsControls, appZoom } = options;
-  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+  const {
+    shellRef,
+    pathname,
+    docking,
+    focusMode,
+    shouldShowWindowsControls,
+    captionInline,
     appZoom,
-    shouldShowWindowsControls
-      ? styles.windowsTitlebarNavigationInset
-      : styles.desktopTitlebarNavigationInset,
-  );
+  } = options;
   const isAuthRoute = isAuthPath(pathname);
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(pathname);
-  const sharedTitlebar =
-    !isAuthRoute && !standaloneRouteTitle && !focusMode && docking.tabs === "top";
   const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
   const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
@@ -39,32 +41,31 @@ export function useDesktopTitlebarGeometry(options: {
     if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
   }, [isAuthRoute, shouldShowWindowsControls]);
+  // The caption buttons sit on the left, where macOS puts its traffic lights, so both platforms
+  // share one layout.
+  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+    appZoom,
+    shouldShowWindowsControls
+      ? captionInline
+        ? 0
+        : windowsTitlebarControlsWidth || styles.windowsTitlebarControlsFallbackWidth
+      : styles.desktopTitlebarNavigationInset,
+  );
   const sideTabsWidth = useSidebarWidthStore((state) => state.width);
-  const geometry = dockingGeometry({
-    sideTabsWidth,
-    ...docking,
-    // The tab strip carries the navigation; no rail takes room.
-    autoHide: true,
-    shareTopBand: !isAuthRoute && !standaloneRouteTitle && !focusMode,
-    chromeLeft: titlebarNavigationGeometry.left,
-    chromeRight: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
-  });
-  const topTabInsets = geometry.titlebarInsets;
+  const geometry = dockingGeometry({ sideTabsWidth, ...docking });
   useMergedTitlebar(
     shellRef,
     `${docking.navigation}:${docking.tabs}:${focusMode}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
-    shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
+    0,
   );
 
   return {
     isAuthRoute,
     standaloneRouteTitle,
-    sharedTitlebar,
     windowsTitlebarControlsRef,
     titlebarNavigationGeometry,
     geometry,
-    topTabInsets,
   };
 }

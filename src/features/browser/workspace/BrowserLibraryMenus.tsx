@@ -36,7 +36,7 @@ function FolderItems({ folderId, depth = 0 }: { folderId: string; depth?: number
   );
 }
 
-/** Favorites and Bookmarks as hover panels in the browser menu, where horizontal tabs keep them. */
+/** Favorites and Bookmarks as hover panels in the menu of a page's own toolbar (focus mode). */
 export function BrowserLibraryMenus() {
   const favorites = useFavorites();
   const roots = bookmarkRoots.filter((root) => root.id !== favoritesId);

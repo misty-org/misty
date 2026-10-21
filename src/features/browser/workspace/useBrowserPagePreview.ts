@@ -38,11 +38,13 @@ export function useBrowserPagePreview(
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
+    // Leaving the tab captures nothing: a capture then measured the page in the middle of the
+    // switch, forcing a layout of the whole window before the next tab could paint, and its
+    // result arrived after `disposed` and was always dropped.
     return () => {
       disposed = true;
       window.clearTimeout(initial);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      capture();
     };
   }, [enabled, host, privateTab, tab.id, tab.instanceKey, url]);
 }

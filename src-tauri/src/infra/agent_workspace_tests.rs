@@ -67,6 +67,10 @@ fn hidden_sessions_run_beside_other_tasks() {
     assert!(acquire_lease(&mut state, "space-personal", visible).is_ok());
     let other = personal_request("other", false);
     assert!(acquire_lease(&mut state, "space-personal", other).is_err());
+    // A hidden session outlives a throttled renewal timer; a task on screen does not.
+    let hidden = state.leases["hidden-one"].expires;
+    let shown = state.leases["visible"].expires;
+    assert!(hidden > shown + Duration::from_secs(300));
 }
 #[test]
 fn revealing_a_worker_requires_the_exact_owner_and_agent() {
@@ -124,7 +128,12 @@ fn worker_receipt_is_bound_to_its_window_and_cannot_be_replaced() {
 #[test]
 fn personal_tasks_acquire_and_renew_without_space() {
     let mut state = WorkspaceState::default();
-    assert!(acquire_lease(&mut state, "space-personal", personal_request("task", false)).is_ok());
+    assert!(acquire_lease(
+        &mut state,
+        "space-personal",
+        personal_request("task", false)
+    )
+    .is_ok());
     assert!(acquire_lease(&mut state, "space-personal", personal_request("task", true)).is_ok());
     assert!(acquire_lease(&mut state, "worker", personal_request("other", false)).is_err());
     assert!(acquire_lease(&mut state, "worker", personal_request("task", true)).is_err());

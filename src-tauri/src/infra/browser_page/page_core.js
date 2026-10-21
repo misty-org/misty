@@ -140,7 +140,20 @@
     if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE" || tag === "HEAD" || tag === "META" || tag === "LINK") return true;
     if (tag === "INPUT" && (el.getAttribute("type") || "").toLowerCase() === "hidden") return true;
     const style = el.ownerDocument.defaultView.getComputedStyle(el);
-    return style.display === "none";
+    if (style.display === "none") return true;
+    // A layer drawn behind the page (a negative z-index, such as an app's loading placeholder
+    // under its frame) is hidden when something else covers its center.
+    if (Number.parseInt(style.zIndex, 10) < 0 && style.position !== "static") {
+      const box = el.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const view = el.ownerDocument.defaultView;
+      if (box.width > 0 && box.height > 0 && x >= 0 && y >= 0 && x < view.innerWidth && y < view.innerHeight) {
+        const top = el.ownerDocument.elementFromPoint(x, y);
+        if (top && top !== el && !el.contains(top)) return true;
+      }
+    }
+    return false;
   };
   P.invisible = (el) => {
     const style = el.ownerDocument.defaultView.getComputedStyle(el);

@@ -144,14 +144,11 @@ it("switches agents in place, guarding drafts and leaving the current agent unto
   expect(useMistyStore.getState().selectedAgentId).toBe("research");
 });
 
-it("prevents switching while a response is running", () => {
+it("lets the person switch while an agent works: it keeps working in its own chat", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
   act(() => useMistyStore.setState({ working: true }));
   fireEvent.click(screen.getByRole("button", { name: "Switch agent: Communications" }));
   const research = screen.getByRole("option", { name: "Research" });
-  expect(research.getAttribute("aria-disabled")).toBe("true");
-  fireEvent.click(research);
-  expect(useMistyStore.getState().selectedAgentId).not.toBe("research");
-  expect(screen.getByRole("button", { name: "Switch agent: Communications" })).toBeTruthy();
+  expect(research.getAttribute("aria-disabled")).not.toBe("true");
 });

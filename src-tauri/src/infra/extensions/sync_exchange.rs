@@ -68,7 +68,12 @@ pub(super) async fn pass(
             }
         }
         drop(state);
-        crate::infra::space_windows::emit_to_space(app,space,"misty://extensions",json!({"kind":"uninstalled","account":account,"space":space,"id":installation.id,"generation":installation.generation}));
+        crate::infra::space_windows::emit_to_space(
+            app,
+            space,
+            "misty://extensions",
+            json!({"kind":"uninstalled","account":account,"space":space,"id":installation.id,"generation":installation.generation}),
+        );
         return Ok(());
     }
     let matching = |r: &&ViewRecord| {

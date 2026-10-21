@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export type SetupStep = "spaces" | "layout" | "theme" | "import";
+export type SetupStep = "spaces" | "theme" | "import";
 
 const guestAccountKey = "guest";
 export const setupStorageKey = "misty-first-run-setup";

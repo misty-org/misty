@@ -56,6 +56,30 @@ describe("Clicky companion protocol", () => {
       resolvePoint(companionReply("[POINT:10,20:button:screen3]").point, displays),
     ).toBeUndefined();
   });
+  it("maps points on the focused window through the window's own area", () => {
+    const window: DisplayCapture = {
+      ...capture("screen2", 0, 0, 2),
+      id: "window1",
+      screen: "window1",
+      source: "desktop-window",
+      width: 1000,
+      height: 500,
+      display: { id: 2, x: -2000, y: 100, width: 1000, height: 500, scale: 2 },
+    };
+    const captures = [
+      capture("screen1", 0, 0, 1, true),
+      capture("screen2", -2560, -900, 2),
+      window,
+    ];
+    const point = companionReply("there [POINT:250,100:click Save:window1]").point;
+    expect(point?.screen).toBe("window1");
+    expect(resolvePoint(point, captures)).toEqual({
+      x: -1750,
+      y: 200,
+      displayId: 2,
+      label: "click Save",
+    });
+  });
   it("supports legacy unlabelled callers using the cursor display", () => {
     expect(
       resolvePoint(companionReply("[POINT:640,360:button]").point, [

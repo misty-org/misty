@@ -144,7 +144,10 @@ async function persist(ctx: Context, edit: PendingEdit) {
 export function setSettingsStaging(on: boolean) {
   stagingOn = on;
   if (!on && useSettingsProfiles.getState().dirty)
-    void useSettingsProfiles.getState().discardStaged().catch(() => {});
+    void useSettingsProfiles
+      .getState()
+      .discardStaged()
+      .catch(() => {});
 }
 /** True, and the save bar draws attention, when leaving settings would lose unsaved edits. */
 export function blockIfUnsaved(): boolean {

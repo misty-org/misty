@@ -21,7 +21,9 @@ const ACCOUNT_DATA: [&str; 12] = [
 
 pub fn allows(label: &str, command: &str) -> bool {
     if space_windows::is_incognito_window(label)
-        && ACCOUNT_DATA.iter().any(|prefix| command.starts_with(prefix))
+        && ACCOUNT_DATA
+            .iter()
+            .any(|prefix| command.starts_with(prefix))
     {
         return false;
     }
@@ -131,6 +133,7 @@ mod tests {
             "browser_sync_flush",
             "browser_sync_lock",
             "browser_sync_forget_key",
+            "browser_sync_delete_vault",
             "browser_recovery_open",
             "browser_recovery_read",
             "browser_recovery_write",

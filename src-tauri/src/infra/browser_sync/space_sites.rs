@@ -2,7 +2,6 @@
 //! apps. They live in the Space's vault (`space_settings`, sealed like every record)
 //! and are copied to the Space registry so links route while the vault is locked.
 use super::*;
-use serde_json::Value;
 use misty_browser_sync::{
     collections::SPACE_SETTINGS,
     document::{
@@ -10,6 +9,7 @@ use misty_browser_sync::{
         ViewRecord,
     },
 };
+use serde_json::Value;
 
 /// The one record a Space vault keeps its sites in.
 const SITES_RECORD: &str = "sites";
@@ -23,7 +23,10 @@ async fn space_handle(space_id: Option<&str>) -> Option<WorkerHandle> {
     let slot = {
         let all = sessions();
         match space_id {
-            None => all.personal.as_ref().and_then(|vault| all.vaults.get(vault)),
+            None => all
+                .personal
+                .as_ref()
+                .and_then(|vault| all.vaults.get(vault)),
             Some(id) => all
                 .vaults
                 .values()
@@ -105,7 +108,9 @@ pub(super) fn watch(handle: WorkerHandle, space_id: Option<String>) {
                 }
             }
             if ready {
-                let Some(sites) = read(&handle).await else { return };
+                let Some(sites) = read(&handle).await else {
+                    return;
+                };
                 crate::infra::space_windows::set_space_sites(&key, sites);
             }
             tokio::time::sleep(if ready {
@@ -129,7 +134,11 @@ pub async fn browser_sync_space_sites(
     let key = space_key(&space_id, personal)?;
     let handle = space_handle((!personal).then_some(space_id.as_str())).await;
     if let Some(handle) = handle {
-        if handle.records_ready(SPACE_SETTINGS.into()).await.unwrap_or(false) {
+        if handle
+            .records_ready(SPACE_SETTINGS.into())
+            .await
+            .unwrap_or(false)
+        {
             if let Some(sites) = read(&handle).await {
                 crate::infra::space_windows::set_space_sites(&key, sites);
             }

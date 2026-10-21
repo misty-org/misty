@@ -60,6 +60,7 @@ export function AgentRecentRow({
         <ContextMenuTrigger asChild disabled={disabled}>
           <div
             className="agent-studio-recent-row"
+            data-current={active || undefined}
             data-reorder-preview="true"
             data-selected={selected || undefined}
           >

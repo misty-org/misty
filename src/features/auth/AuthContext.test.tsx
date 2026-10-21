@@ -594,7 +594,7 @@ describe("AuthProvider account switching", () => {
     await act(async () => {
       accountButton().click();
     });
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       "Could not resume this account. Account state reset failed",
     );
     expect(container.textContent).toContain("Choose an account");

@@ -66,10 +66,6 @@ html[data-pointer-dragging="true"] * {
   opacity: 1;
   filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.18));
 }
-/* A connected tab joins the toolbar; a drop shadow would smear onto it. */
-.pointer-reorder-shaped-preview {
-  filter: none;
-}
 
 /* How many files ride along with a lifted explorer row. */
 .explorer-drag-count {

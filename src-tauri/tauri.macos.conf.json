@@ -3,6 +3,8 @@
   "app": {
     "windows": [
       {
+        "label": "space-personal",
+        "create": false,
         "title": "Misty",
         "visible": false,
         "width": 1280,

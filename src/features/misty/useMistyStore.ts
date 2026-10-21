@@ -44,11 +44,17 @@ import {
   updateConversation,
 } from "@/features/global-search/globalSearchStoreHelpers";
 import { create } from "zustand";
+import { settleRun } from "./settleRun";
+import { startRunReconciler } from "./runReconciler";
 import { assertMistyAvailable } from "./availability";
 import { requestHostContext } from "./contextBridge";
 import { resetMistyDraftAttachments } from "./draftAttachments";
 import { continueAfterScreenRequest } from "./screenRequests";
 import { createMistyConversationActions } from "./mistyConversationActions";
+import { historyTurns } from "./localChats";
+import { lessonTurnPayload } from "@/features/agents/lessons/lessonRouter";
+import { useLessonStore } from "@/features/agents/lessons/lessonStore";
+import { keepChatOnThisDevice, persistLocalChats } from "./localChatSync";
 import { advanceSubmissionEpoch, submissionEpoch } from "./mistySubmissionEpoch";
 
 export type { GlobalSearchState } from "@/features/global-search/globalSearchState";
@@ -103,31 +109,13 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     advanceSubmissionEpoch();
     const accountId = get().accountId;
     const invocationId = get().invocationId;
+    // Stop shows at once. The window, local task and server are told after,
+    // and none of them failing can leave the chat looking busy.
+    settleRun(set, get, { state: "canceled" });
     await stopAgentWindowTask().catch(() => {});
-    await pauseLocalExecution();
-    if (invocationId) await aiSurfaceApi.cancelInvocation(invocationId);
-    if (get().accountId === accountId && get().invocationId === invocationId) {
-      const conversationId = get().invocationConversationId ?? get().activeConversationId;
-      updateConversation(set, get, conversationId, (conversation) => ({
-        ...conversation,
-        messages: conversation.messages.map((message) =>
-          message.role === "assistant" &&
-          (message.state === "pending" || message.state === "streaming")
-            ? {
-                ...message,
-                state: "canceled",
-                activity: undefined,
-              }
-            : message,
-        ),
-      }));
-      set({
-        working: false,
-        invocationId: undefined,
-        invocationConversationId: undefined,
-      });
-      replaceActiveGlobalInvocationStream();
-    }
+    await pauseLocalExecution().catch(() => {});
+    if (invocationId && get().accountId === accountId)
+      await aiSurfaceApi.cancelInvocation(invocationId).catch(() => {});
   },
   steerResponse: async (text, conversationId = get().activeConversationId) => {
     const state = get();
@@ -495,7 +483,10 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     const startsConversation = !get()
       .conversations.find((c) => c.id === conversationId)
       ?.messages.some((message) => !isEcho(message));
-    const { collaborationMode, permissionMode } = turnModes(conversationId, startsConversation);
+    const modes = turnModes(conversationId, startsConversation);
+    const permissionMode = modes.permissionMode;
+    // The companion in Teach mode sends every turn as a lesson step.
+    const collaborationMode = companion?.collaborationMode ?? modes.collaborationMode;
     echo.settle(conversationId);
     // The server names a new conversation with a separate model call; until then its title is a skeleton.
     if (startsConversation && !companion?.continuation)
@@ -521,6 +512,13 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     });
     replaceActiveGlobalInvocationStream();
     try {
+      // A chat from before chats moved to devices becomes this device's once it continues here.
+      const unkept = get().conversations.find((c) => c.id === conversationId);
+      if (unkept?.remote && !unkept.keptOnDeviceId && !conversationId.startsWith("local-")) {
+        const kept = await keepChatOnThisDevice(conversationId);
+        if (kept)
+          updateConversation(set, get, conversationId, (c) => ({ ...c, keptOnDeviceId: kept }));
+      }
       const admission = JSON.stringify([
         accountId,
         conversationId,
@@ -532,8 +530,7 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
         uncertainAdmissions.get(admission) ??
         `global-answer-${globalMistyId()}`;
       uncertainAdmissions.set(admission, idempotencyKey);
-      // The chat's project and the Misty browser travel with a desktop chat,
-      // plus whatever the devices picked in the composer allow.
+      // The chat's project and this computer's Misty browser travel with a desktop chat.
       const grants = workerReceipt
         ? []
         : await chatDeviceGrants(conversationId, startsConversation);
@@ -560,13 +557,24 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           displayCaptures: companion?.displayCaptures,
           methodVersionId: companion?.methodVersionId,
           methodInputs: companion?.methodInputs,
-          ...(companion?.schedule && { scheduleId: companion.schedule.id, scheduleClaim: companion.schedule.claim }),
+          ...(companion?.schedule && {
+            scheduleId: companion.schedule.id,
+            scheduleClaim: companion.schedule.claim,
+          }),
           skillVersionIds: companion?.skillVersionIds,
           surfaceId: handoff?.surfaceId ?? "global",
           // Turns sent to carry on after a card read as events, not as typed messages.
-          trigger: companion?.schedule ? "scheduled_task" : selection ? "selection" : companion?.continuation ? "continuation" : "message",
+          trigger: companion?.schedule
+            ? "scheduled_task"
+            : selection
+              ? "selection"
+              : companion?.continuation
+                ? "continuation"
+                : "message",
           requestedArtifactKind: handoff?.requestedArtifactKind,
           prompt: normalized,
+          // Earlier turns from this device's copy of the chat; the server keeps none.
+          historyTurns: historyTurns(get().conversations.find((c) => c.id === conversationId)),
           context: invocationContext,
           attachmentIds: attachments.map((attachment) => attachment.id),
           deviceContexts: [
@@ -579,6 +587,15 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
           thinkingMode:
             collaborationMode === "plan" && planDeepThinking() ? "deep" : requestedThinking,
           collaborationMode,
+          ...(companion?.mediaContext ? { mediaContext: companion.mediaContext } : {}),
+          ...(collaborationMode === "teach"
+            ? lessonTurnPayload(
+                useLessonStore.getState().lessons,
+                conversationId,
+                Date.now(),
+                useLessonStore.getState().courses,
+              )
+            : {}),
           permissionMode,
           codingTool: codingToolForTurn(conversationId, startsConversation),
           selection,
@@ -716,21 +733,23 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               get().invocationId !== created.invocationId
             )
               return;
-            patchConversationMessage(set, get, conversationId, assistantMessage.id, {
-              content:
-                get()
-                  .conversations.find((conversation) => conversation.id === conversationId)
-                  ?.messages.find((message) => message.id === assistantMessage.id)?.content ||
-                "Misty lost the response stream. Review the task before retrying.",
+            const current = get()
+              .conversations.find((conversation) => conversation.id === conversationId)
+              ?.messages.find((message) => message.id === assistantMessage.id);
+            // Never leave the spinner on for a stream that is gone. Reloading
+            // from the server re-attaches if the task is still running.
+            settleRun(set, get, {
               state: "failed",
-              retryable: false,
-              activity: "Connection lost; the task may still be running.",
-            });
-            set({
-              working: true,
+              conversationId,
               error: streamError.message,
+              patch: {
+                content:
+                  current?.content ||
+                  "Misty lost the response stream. Review the task before retrying.",
+              },
             });
             if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
+            void get().loadConversations(true);
           },
         }),
       );
@@ -750,3 +769,8 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     }
   },
 }));
+
+// Every change to a chat is saved on this device (docs/design/agent-chats-local/BRIEF.md).
+persistLocalChats((listener) => useMistyStore.subscribe(listener));
+
+startRunReconciler(useMistyStore);

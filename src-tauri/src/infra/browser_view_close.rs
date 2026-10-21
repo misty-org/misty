@@ -17,6 +17,7 @@ pub(super) fn park_windows_webview(webview: &Webview) -> Result<(), String> {
         },
     };
 
+    wake(webview);
     let renderer = renderer(webview.window().label()).native;
     webview
         .with_webview(move |platform_webview| {
@@ -47,27 +48,49 @@ pub(super) fn park_windows_webview(webview: &Webview) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), String> {
-    let mut errors = Vec::new();
-    for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-")
-            && webview.window().label() == caller.window().label()
-        {
-            if let Err(error) = webview
-                .hide()
-                .map_err(|error| error.to_string())
-                .and_then(|()| refresh_browser_cursor_ownership(&webview))
-            {
-                errors.push(error);
-            }
-        }
-    }
+/// The pages of the caller's window whose label starts with `prefix`, except the ids in `keep`.
+fn window_pages(caller: &Webview, app: &AppHandle, prefix: &str, keep: &[String]) -> Vec<Webview> {
+    let keep: HashSet<String> = keep
+        .iter()
+        .filter_map(|id| webview_label(id).ok())
+        .collect();
+    app.webviews()
+        .into_iter()
+        .filter(|(label, webview)| {
+            label.starts_with(prefix)
+                && !keep.contains(label)
+                && webview.window().label() == caller.window().label()
+        })
+        .map(|(_, webview)| webview)
+        .collect()
+}
+
+/// Runs `step` on every page, collecting each failure.
+fn each_page(
+    pages: Vec<Webview>,
+    step: impl Fn(&Webview) -> Result<(), String>,
+) -> Result<(), String> {
+    let errors: Vec<String> = pages.iter().filter_map(|page| step(page).err()).collect();
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors.join("; "))
     }
+}
+
+fn hide_page(webview: &Webview) -> Result<(), String> {
+    webview
+        .hide()
+        .map_err(|error| error.to_string())
+        .and_then(|()| refresh_browser_cursor_ownership(webview))
+}
+
+#[tauri::command]
+pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), String> {
+    each_page(
+        window_pages(&caller, &app, "misty-browser-", &[]),
+        hide_page,
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,32 +108,16 @@ pub fn browser_webviews_hide_except(
     app: AppHandle,
     request: BrowserWebviewsHideExceptRequest,
 ) -> Result<(), String> {
-    let keep: HashSet<String> = request
-        .keep
-        .iter()
-        .filter_map(|id| webview_label(id).ok())
-        .collect();
-    let mut errors = Vec::new();
-    for (label, webview) in app.webviews() {
-        if !label.starts_with("misty-browser-tab-")
-            || keep.contains(&label)
-            || webview.window().label() != caller.window().label()
-        {
-            continue;
-        }
-        #[cfg(windows)]
-        let hidden = park_windows_webview(&webview);
-        #[cfg(not(windows))]
-        let hidden = webview.hide().map_err(|error| error.to_string());
-        if let Err(error) = hidden.and_then(|()| refresh_browser_cursor_ownership(&webview)) {
-            errors.push(error);
-        }
-    }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("; "))
-    }
+    #[cfg(windows)]
+    let hide = |webview: &Webview| {
+        park_windows_webview(webview).and_then(|()| refresh_browser_cursor_ownership(webview))
+    };
+    #[cfg(not(windows))]
+    let hide = hide_page;
+    each_page(
+        window_pages(&caller, &app, "misty-browser-tab-", &request.keep),
+        hide,
+    )
 }
 
 /// Closes every tab page in the caller's window whose tab no longer exists. Pages outlive the
@@ -125,11 +132,6 @@ pub async fn browser_webviews_close_except(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewsHideExceptRequest,
 ) -> Result<(), String> {
-    let keep: HashSet<String> = request
-        .keep
-        .iter()
-        .filter_map(|id| webview_label(id).ok())
-        .collect();
     let pending: HashSet<String> = state
         .pending_popups
         .lock()
@@ -137,27 +139,27 @@ pub async fn browser_webviews_close_except(
         .iter()
         .cloned()
         .collect();
-    let orphans: Vec<String> = app
-        .webviews()
-        .into_iter()
-        .filter(|(label, webview)| {
-            label.starts_with("misty-browser-tab-")
-                && !keep.contains(label)
-                && webview.window().label() == caller.window().label()
+    let orphans: Vec<String> = window_pages(&caller, &app, "misty-browser-tab-", &request.keep)
+        .iter()
+        .filter_map(|webview| {
+            webview
+                .label()
+                .strip_prefix("misty-browser-")
+                .map(str::to_owned)
         })
-        .filter_map(|(label, _)| label.strip_prefix("misty-browser-").map(str::to_owned))
         .filter(|id| !pending.contains(id))
         .collect();
-    let mut errors = Vec::new();
-    for id in orphans {
-        if let Err(error) = close_browser_webview(
-            app.clone(),
-            app.state::<BrowserSessionState>(),
-            BrowserWebviewIdRequest { id },
-        ) {
-            errors.push(error);
-        }
-    }
+    let errors: Vec<String> = orphans
+        .into_iter()
+        .filter_map(|id| {
+            close_browser_webview(
+                app.clone(),
+                app.state::<BrowserSessionState>(),
+                BrowserWebviewIdRequest { id },
+            )
+            .err()
+        })
+        .collect();
     if errors.is_empty() {
         Ok(())
     } else {
@@ -165,13 +167,28 @@ pub async fn browser_webviews_close_except(
     }
 }
 
+/// Parks every page in the caller's window except the ones the interface still shows outside a
+/// browser tab (`keep`: an agent's page beside its chat), which stay where they are.
 #[tauri::command]
-pub fn browser_webviews_park_all(caller: Webview, app: AppHandle) -> Result<(), String> {
+pub fn browser_webviews_park_all(
+    caller: Webview,
+    app: AppHandle,
+    request: Option<BrowserWebviewsHideExceptRequest>,
+) -> Result<(), String> {
+    let keep = request.map(|request| request.keep).unwrap_or_default();
+    // On Windows pages stay in place beneath the renderer (`stacked_pages`):
+    // overlays leave stacked pages where they are, and the renderer is opaque
+    // while no page is presented, so they never show over Home or Agents, and
+    // coming back only raises them, already drawn.
+    #[cfg(windows)]
+    let park = |webview: &Webview| stack_windows_webview(&app, webview);
     // Inactive pages must be hidden, not merely stacked below the renderer.
     // Closing an overlay restacks browser children above it, which otherwise
-    // exposes parked WebView2 pages over Home or Agents. Hiding retains the
-    // native page and its session for the next explicit reconciliation.
-    browser_webviews_hide_all(caller, app)
+    // exposes parked pages over Home or Agents. Hiding retains the native page
+    // and its session for the next explicit reconciliation.
+    #[cfg(not(windows))]
+    let park = hide_page;
+    each_page(window_pages(&caller, &app, "misty-browser-", &keep), park)
 }
 
 /// Caller holds the browser lifecycle write lease. Enumerate real native views
@@ -288,6 +305,8 @@ pub fn close_browser_webview(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
+    #[cfg(windows)]
+    let _ = unstack(&request.id);
     let space = super::super::extensions::native::page_space(&app, &request.id);
     super::super::extensions::native::tab_event(&app, space.as_deref(), &request.id, "close");
     let children = {
@@ -336,6 +355,10 @@ pub fn close_browser_webview(
             let _: () = objc2::msg_send![view, stopLoading];
         }
     });
+    // Out of sight before it is blanked: stopping the page and loading about:blank repaint it
+    // as an empty white page, which shows if it is still anywhere on screen, such as stacked
+    // just beneath the renderer behind a transparent area.
+    let _ = webview.hide();
     let _ = webview.eval(
         "try { window.stop(); document.querySelectorAll('audio, video').forEach(el => { el.pause(); el.muted = true; el.src = ''; el.load(); }); } catch (_) {}"
     );
@@ -347,6 +370,16 @@ pub fn close_browser_webview(
     unregister_browser_cursor_ownership(&webview)?;
     #[cfg(target_os = "macos")]
     url_observer::remove(&webview, &request.id);
+    // Close the page itself last, which lets go of its WebKit page process. Removing the view
+    // alone left every closed tab's process running (40 to 470 MB each), since something still
+    // held the view; the app reached 250 page processes for 54 open pages.
+    #[cfg(target_os = "macos")]
+    let _ = webview.with_webview(|platform_webview| unsafe {
+        let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();
+        if objc2::msg_send![view, respondsToSelector: objc2::sel!(_close)] {
+            let _: () = objc2::msg_send![view, _close];
+        }
+    });
     webview.close().map_err(|error| error.to_string())?;
     Ok(())
 }
@@ -361,11 +394,108 @@ pub(crate) fn end_incognito_session(app: &AppHandle, session: &str) {
     super::super::browser_site_permissions::forget_private_session();
 }
 
+/// Puts an agent's tab to sleep (docs/design/agent-browser/BRIEF.md, "Memory"): reads where its
+/// page is, then closes the page through the one close path, so its page process goes too. The
+/// tab wakes later from what this returns.
+#[tauri::command]
+pub async fn browser_webview_sleep(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserWebviewIdRequest,
+) -> Result<Value, String> {
+    let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
+        return Ok(json!({ "closed": false }));
+    };
+    let url = webview.url().map(|url| url.to_string()).unwrap_or_default();
+    let title = page_title(&webview).await;
+    close_browser_webview(app.clone(), state, request)?;
+    Ok(json!({ "closed": true, "url": url, "title": title }))
+}
+
+/// Waits for a new agent tab's first page to load before the agent reads it
+/// (browser_page/mod.rs, `first_load`). True once it loaded; false after the wait ran out.
+#[tauri::command]
+pub async fn browser_webview_await_load(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<bool, String> {
+    Ok(super::page_agent::first_load(&app, &request.id).await)
+}
+
+/// A small picture of an agent's page (docs/design/agent-browser/BRIEF.md): the PiP and the view
+/// switcher show it instead of a second live page.
+#[tauri::command]
+pub async fn browser_webview_picture(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<Value, String> {
+    let webview = app
+        .get_webview(&webview_label(&request.id)?)
+        .ok_or_else(|| "Browser page is unavailable.".to_owned())?;
+    #[cfg(target_os = "macos")]
+    {
+        let scale = webview
+            .window()
+            .scale_factor()
+            .map_err(|error| error.to_string())?;
+        let size = webview
+            .size()
+            .map_err(|error| error.to_string())?
+            .to_logical::<f64>(scale);
+        super::super::browser_macos::capture_webview_region_sized(
+            webview,
+            0.0,
+            0.0,
+            size.width,
+            size.height,
+            480.0,
+        )
+        .await
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = webview;
+        Err("Pictures of pages are not available here yet.".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn page_title(webview: &Webview) -> String {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    let _ = webview.with_webview(move |platform_webview| unsafe {
+        let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();
+        let title: *mut objc2::runtime::AnyObject = objc2::msg_send![view, title];
+        let text = if title.is_null() {
+            String::new()
+        } else {
+            let raw: *const std::ffi::c_char = objc2::msg_send![title, UTF8String];
+            if raw.is_null() {
+                String::new()
+            } else {
+                std::ffi::CStr::from_ptr(raw).to_string_lossy().into_owned()
+            }
+        };
+        let _ = sender.send(text);
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(1), receiver)
+        .await
+        .ok()
+        .and_then(Result::ok)
+        .unwrap_or_default()
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn page_title(_webview: &Webview) -> String {
+    String::new()
+}
+
 /// A window closed with its pages: forget the pages its renderer can no longer close.
 pub(crate) fn forget_closed_pages(app: &AppHandle) {
     if let Some(state) = app.try_state::<BrowserSessionState>() {
         if let Ok(mut sessions) = state.sessions.lock() {
-            sessions.retain(|id, _| app.get_webview(&format!("misty-browser-{id}")).is_some());
+            sessions.retain(|id, _| {
+                super::webview_label(id).is_ok_and(|label| app.get_webview(&label).is_some())
+            });
         }
     }
 }

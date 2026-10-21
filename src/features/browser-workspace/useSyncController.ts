@@ -9,6 +9,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import {
   lockNativeSync,
+  deleteNativeSyncVault,
   forgetNativeSyncKey,
   unlockNativeSync,
   vaultAvailability,
@@ -169,6 +170,20 @@ export function useSyncController(accountId: string) {
       if (forget) setAvailable((previous) => (previous ? { ...previous, local: false } : previous));
       setForm(true);
     });
+  /** Throws so the confirmation can show what went wrong; nothing changes on failure. */
+  const deleteVault = async () => {
+    if (!vault || isApiSessionTransitioning() || vault.generation !== readApiSessionGeneration())
+      throw new Error("Your account changed. Reopen sync.");
+    await readApiAuthToken();
+    await deleteNativeSyncVault(vault.account);
+    if (!mounted.current || vault.generation !== readApiSessionGeneration()) return;
+    useBrowserSyncStore.setState({ session: null, issue: null, reenroll: null, locked: null });
+    setAvailable((previous) =>
+      previous ? { ...previous, local: false, remote: false } : previous,
+    );
+    setError(null);
+    setForm(true);
+  };
   return {
     accountId,
     session,
@@ -182,6 +197,7 @@ export function useSyncController(accountId: string) {
     setForm,
     unlock,
     lock,
+    deleteVault,
   };
 }
 export type SyncController = ReturnType<typeof useSyncController>;

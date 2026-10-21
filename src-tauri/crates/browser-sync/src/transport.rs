@@ -250,6 +250,19 @@ impl SyncApi {
         Ok(response.vault)
     }
 
+    /// Deletes the account's vault and every Space vault sealed to it, so a
+    /// new one can be created. Reports whether a vault existed.
+    pub async fn delete_vault(&self) -> Result<bool> {
+        #[derive(Deserialize)]
+        struct Response {
+            deleted: bool,
+        }
+        let response: Response = self
+            .request(reqwest::Method::DELETE, "vault", None::<&()>)
+            .await?;
+        Ok(response.deleted)
+    }
+
     pub async fn bootstrap(
         &self,
         root_public_key: &str,

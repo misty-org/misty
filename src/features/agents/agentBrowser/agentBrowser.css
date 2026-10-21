@@ -1,0 +1,173 @@
+/* The agent browser (docs/design/agent-browser/BRIEF.md): the split beside the chat and its PiP.
+   The split is a small copy of Misty's browser: the window's sidebar card (head, address, tab
+   rows, foot; docking-*.css) beside a rounded page. Monochrome; status is a word. */
+
+.agent-browser {
+  /* The sidebar card's head starts after the window buttons; here it is far from them. */
+  --window-chrome-left: 0px;
+  --shell-tab-height: 30px;
+  display: flex;
+  flex: 1.4;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 420px;
+  min-height: 0;
+  padding: 8px 8px 8px 0;
+}
+
+.agent-browser > .agent-view-switcher {
+  flex-shrink: 0;
+}
+
+.agent-browser-body {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.agent-browser-sidebar {
+  flex: 0 0 auto;
+  width: clamp(160px, 30%, 220px);
+}
+
+/* The page is a rounded pane like a tab's, its outline just outside where the native page
+   cannot cover it; the page's corners are cut to it (browserHostBounds.ts). */
+.agent-browser-page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--workspace-tab-surface);
+}
+
+.agent-browser-page-host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Until the page is on screen the host paints the page's color, never the window through it
+   (theme.css, `data-browser-page-awaiting`). */
+.agent-browser-page-host[data-agent-page-awaiting] {
+  background: var(--browser-page-background, var(--misty-theme-bg));
+}
+
+.agent-browser-page-skeleton {
+  position: absolute;
+  inset: 0;
+}
+
+.agent-browser-page-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.agent-browser-page-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+
+.agent-view-switcher {
+  display: flex;
+  gap: 4px;
+}
+
+.agent-view {
+  display: grid;
+  grid-template-columns: 36px auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  align-items: center;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.agent-view:hover {
+  background: var(--color-charcoal-hover);
+}
+
+.agent-view[aria-selected="true"] {
+  background: var(--color-charcoal-card);
+}
+
+.agent-view img,
+.agent-view .agent-view-blank {
+  grid-row: span 2;
+  width: 36px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+  object-position: top;
+  background: var(--color-charcoal-card);
+}
+
+.agent-view-label {
+  max-width: 120px;
+  color: var(--color-cream);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-view-status {
+  color: var(--color-cream-muted);
+  font-size: 11px;
+}
+
+.agent-view-status[data-working] {
+  color: var(--color-cream);
+}
+
+.agent-browser-pip {
+  margin: 8px 12px 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-charcoal-bg);
+  overflow: hidden;
+}
+
+.agent-browser-pip-picture {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--color-charcoal-card);
+}
+
+.agent-browser-pip-picture img,
+.agent-browser-pip-picture .agent-view-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.agent-browser-pip-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+}
+
+.agent-browser-pip-flip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+}

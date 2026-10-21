@@ -12,6 +12,91 @@ pub(crate) async fn evaluate_in_content_world(
     world_name: &'static str,
     function_body: String,
 ) -> Result<String, String> {
+    evaluate_in(webview, world_name, function_body, None).await
+}
+
+/// Runs `function_body` in the named world of one cross-origin frame the tab announced
+/// (browser_frames.rs). A frame that no longer answers is forgotten.
+#[cfg(target_os = "macos")]
+pub(crate) async fn evaluate_in_frame(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: u64,
+) -> Result<String, String> {
+    let result = evaluate_in(webview.clone(), world_name, function_body, Some(frame)).await;
+    if result.is_err() {
+        let _ = webview.with_webview(move |platform| unsafe {
+            super::browser_frames::forget(&*platform.inner().cast(), frame);
+        });
+    }
+    result
+}
+
+/// Runs `function_body` in the named isolated world of one cross-origin frame the tab
+/// listed (browser_frames_windows.rs), through the session that runs the frame. A frame
+/// that no longer answers is forgotten.
+#[cfg(windows)]
+pub(crate) async fn evaluate_in_frame(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: u64,
+) -> Result<String, String> {
+    use crate::infra::webview2::{cdp, cdp_in_session, evaluate, evaluate_in_session, CdpError};
+    use serde_json::json;
+
+    let target =
+        super::browser_frames::target(webview.label(), frame).ok_or("The frame is gone.")?;
+    let session = target.session.as_deref();
+    let result = async {
+        // A frame keeps one world per name for as long as its document lives, so asking
+        // again returns the same world and the globals left in it.
+        let parameters =
+            json!({ "frameId": target.frame, "worldName": world_name, "grantUniveralAccess": false });
+        let created = match session {
+            Some(session) => {
+                cdp_in_session(&webview, session, "Page.createIsolatedWorld", &parameters).await?
+            }
+            None => cdp(&webview, "Page.createIsolatedWorld", &parameters).await?,
+        };
+        let context = created["executionContextId"]
+            .as_i64()
+            .ok_or(CdpError::Invalid)?;
+        let expression = format!("(async () => {{\n{function_body}\n}})()");
+        match session {
+            Some(session) => evaluate_in_session(&webview, session, expression, context).await,
+            None => evaluate(&webview, expression, Some(context)).await,
+        }
+    }
+    .await;
+    let result = answer(result);
+    if result.is_err() {
+        super::browser_frames::forget(webview.label(), frame);
+    }
+    result
+}
+
+#[cfg(windows)]
+fn answer(
+    result: Result<serde_json::Value, crate::infra::webview2::CdpError>,
+) -> Result<String, String> {
+    use serde_json::Value;
+    match result {
+        Ok(Value::String(value)) => Ok(value),
+        Ok(Value::Null) => Ok("null".to_owned()),
+        Ok(_) => Err("The page returned an invalid answer.".to_owned()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn evaluate_in(
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: Option<u64>,
+) -> Result<String, String> {
     use block2::RcBlock;
     use objc2::{rc::Retained, runtime::AnyObject, MainThreadMarker};
     use objc2_foundation::{NSError, NSString};
@@ -46,6 +131,16 @@ pub(crate) async fn evaluate_in_content_world(
                     })
                     .clone()
             });
+            let frame = match frame {
+                Some(id) => match super::browser_frames::info(view, id) {
+                    Some(info) => Some(info),
+                    None => {
+                        fail(Err("The frame is gone.".to_owned()));
+                        return;
+                    }
+                },
+                None => None,
+            };
             let done = finish.clone();
             let handler = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
                 let result = if !error.is_null() {
@@ -62,7 +157,7 @@ pub(crate) async fn evaluate_in_content_world(
             view.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
                 &NSString::from_str(&function_body),
                 None,
-                None,
+                frame.as_deref(),
                 &world,
                 Some(&*handler),
             );
@@ -85,7 +180,7 @@ pub(crate) async fn evaluate_in_content_world(
     function_body: String,
 ) -> Result<String, String> {
     use crate::infra::webview2::{cdp, evaluate, CdpError};
-    use serde_json::{json, Value};
+    use serde_json::json;
     use std::{
         collections::HashMap,
         sync::{Mutex, OnceLock},
@@ -130,10 +225,5 @@ pub(crate) async fn evaluate_in_content_world(
         }
     };
     let expression = format!("(async () => {{\n{function_body}\n}})()");
-    match evaluate(&webview, expression, Some(context)).await {
-        Ok(Value::String(value)) => Ok(value),
-        Ok(Value::Null) => Ok("null".to_owned()),
-        Ok(_) => Err("The page returned an invalid answer.".to_owned()),
-        Err(error) => Err(error.into()),
-    }
+    answer(evaluate(&webview, expression, Some(context)).await)
 }

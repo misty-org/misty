@@ -36,6 +36,19 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     }
   };
 
+  const restyled = new Set<Element>();
+  let idle = 0;
+  const recheckRestyled = () => {
+    idle = 0;
+    for (const label of tracked)
+      for (const element of restyled)
+        if (element.contains(label)) {
+          queue(label);
+          break;
+        }
+    restyled.clear();
+  };
+
   const queue = (element: HTMLElement) => {
     pending.add(element);
     if (!frame) frame = requestAnimationFrame(flush);
@@ -56,14 +69,14 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     }
     queue(element);
   };
+  const inspectCandidate = (element: Element) => {
+    inspect(element);
+    // Tailwind descendant variants can apply truncation to unclassed children.
+    if (element.className.toString().includes(":")) {
+      element.querySelectorAll("*").forEach(inspect);
+    }
+  };
   const discover = (node: Element) => {
-    const inspectCandidate = (element: Element) => {
-      inspect(element);
-      // Tailwind descendant variants can apply truncation to unclassed children.
-      if (element.className.toString().includes(":")) {
-        element.querySelectorAll("*").forEach(inspect);
-      }
-    };
     if (node.matches(candidates)) inspectCandidate(node);
     node.querySelectorAll(candidates).forEach(inspectCandidate);
     if (node.parentElement?.closest(candidates)) {
@@ -89,8 +102,22 @@ export function installOverflowFade(root: HTMLElement = document.body) {
           if (node instanceof Element) discover(node);
         });
       } else if (record.attributeName === "class" || record.attributeName === "style") {
-        discover(element);
-        for (const label of tracked) if (element.contains(label)) queue(label);
+        // Only the changed element can start or stop being a label; nothing below it changed.
+        // Searching its whole subtree read the style of every label on a page each time a tab
+        // or panel was shown or hidden, in the middle of the switch.
+        if (element.matches(candidates)) inspectCandidate(element);
+        else if (element.parentElement?.closest(candidates)) inspect(element);
+        // A style change above a label can still change its text width. A class that styles
+        // its descendants (a `[&>…]:` variant, before or after) is rechecked at once; any other
+        // is checked once the app is idle, so showing a whole page waits on none of its labels.
+        const variants =
+          (record.oldValue ?? "").includes(":") || element.className.toString().includes(":");
+        if (record.attributeName === "class" && variants) {
+          for (const label of tracked) if (element.contains(label)) queue(label);
+        } else {
+          restyled.add(element);
+          if (!idle) idle = whenIdle(recheckRestyled);
+        }
       } else if (record.attributeName === "dir") {
         refresh();
       }
@@ -111,6 +138,7 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     childList: true,
     characterData: true,
     attributes: true,
+    attributeOldValue: true,
     attributeFilter: ["class", "style", "dir"],
   });
   window.addEventListener("resize", refresh);
@@ -124,10 +152,23 @@ export function installOverflowFade(root: HTMLElement = document.body) {
     mutations.disconnect();
     resize?.disconnect();
     cancelAnimationFrame(frame);
+    cancelIdle(idle);
     window.removeEventListener("resize", refresh);
     document.fonts?.removeEventListener?.("loadingdone", refresh);
     tracked.forEach((element) => element.removeAttribute(marker));
     tracked.clear();
     pending.clear();
   };
+}
+
+function whenIdle(run: () => void): number {
+  return typeof requestIdleCallback === "function"
+    ? requestIdleCallback(run, { timeout: 1000 })
+    : window.setTimeout(run, 200);
+}
+
+function cancelIdle(handle: number) {
+  if (!handle) return;
+  if (typeof cancelIdleCallback === "function") cancelIdleCallback(handle);
+  else window.clearTimeout(handle);
 }

@@ -12,15 +12,6 @@ import { useMistyStore } from "./useMistyStore";
 
 function status(request: ScreenRequest) {
   const look = request.kind === "look";
-  const remote = request.remote?.deviceName;
-  if (remote)
-    return {
-      opening: `Continuing on ${remote}`,
-      opened: `Continuing on ${remote}`,
-      declined: "Not continued",
-      failed: request.error || `The browser on ${remote} could not be used.`,
-      pending: `Continuing on ${remote}`,
-    }[request.state ?? "pending"];
   if (request.kind === "desktop")
     return {
       opening: "Starting desktop control",
@@ -87,7 +78,11 @@ export function ScreenRequestCard({
     stalled || asking ? (
       <>
         {stalled ? (
-          <Button size="sm" variant="primary" onClick={() => choose(screenChoice(request.location))}>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => choose(screenChoice(request.location))}
+          >
             Continue
           </Button>
         ) : (
@@ -95,7 +90,12 @@ export function ScreenRequestCard({
             <Button size="sm" variant="primary" disabled={working} onClick={() => choose("window")}>
               <AppWindow className="size-3.5" /> New tab
             </Button>
-            <Button size="sm" variant="outline" disabled={working} onClick={() => choose("separate")}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={working}
+              onClick={() => choose("separate")}
+            >
               <PanelsTopLeft className="size-3.5" /> Separate window
             </Button>
             <Button

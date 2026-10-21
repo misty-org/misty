@@ -124,7 +124,8 @@ pub(super) fn remove(webview: &Webview, id: &str) {
             })
             .unwrap_or_default();
         for observer in observers {
-            let key: *mut Object = msg_send![class!(NSString), stringWithUTF8String: b"URL\0".as_ptr()];
+            let key: *mut Object =
+                msg_send![class!(NSString), stringWithUTF8String: b"URL\0".as_ptr()];
             let observer_object = observer as *mut Object;
             let _: () = msg_send![view, removeObserver: observer_object forKeyPath: key];
             if let Ok(mut targets) = targets().lock() {

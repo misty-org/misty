@@ -9,6 +9,8 @@ import {
   deferHideUntilHandoff,
   hasPendingHandoff,
   markBrowserPerf,
+  notifyBrowserSettled,
+  onBrowserSettled,
 } from "./browserSwitchHandoff";
 import type { BrowserBounds, BrowserTheme } from "./types";
 export { useBrowserRuntimeStore } from "./browserRuntimeStore";
@@ -76,7 +78,7 @@ export async function browserProfileChanged(
   createdRuntimeIds.clear();
   visibleRuntimeIds.clear();
   lastBounds.clear();
-  useBrowserRuntimeStore.setState({ grants: {}, errors: {}, loading: {} });
+  useBrowserRuntimeStore.setState({ grants: {}, errors: {}, loading: {}, presented: {} });
   if (typeof window !== "undefined") window.dispatchEvent(new Event(browserRuntimeResumeEvent));
 }
 
@@ -113,6 +115,80 @@ export function browserScopeId(tab: BrowserRuntimeTab): string {
 
 export function browserTabIdForRuntime(runtimeId: string): string | null {
   return runtimeTabIds.get(runtimeId) ?? null;
+}
+
+/** New pages the host keeps parked until their first paint (Windows). */
+const awaitingFirstPaint = new Set<string>();
+
+/** Whether the tab's page is on screen in its host; until it is, the host paints a fill. */
+function setBrowserPagePresented(runtimeId: string, presented: boolean): void {
+  const tabId = runtimeTabIds.get(runtimeId) ?? adoptedPages.get(runtimeId);
+  if (tabId) useBrowserRuntimeStore.getState().setPresented(tabId, presented);
+}
+
+/**
+ * Pages another owner creates and closes, shown through this runtime all the same: an agent's
+ * pages beside its chat (agentTabs.ts). They take the tab pages' placement, presented state,
+ * first-paint hold, parking and switching, under their own runtime id, with the key their
+ * presented state is kept under. This runtime never creates them, and they are not tabs: their
+ * page events never reach the person's tabs or history.
+ */
+const adoptedPages = new Map<string, string>();
+/** The newest bounds for an adopted page whose placement is queued. */
+const adoptedBounds = new Map<string, BrowserBounds>();
+
+/** Shows an adopted page at `bounds`, as a tab's page is shown in its host. */
+export function showAdoptedBrowserPage(
+  runtimeId: string,
+  presentedKey: string,
+  bounds: BrowserBounds,
+): Promise<void> {
+  adoptedPages.set(runtimeId, presentedKey);
+  // Parking leaves this page up, so showing it never calls off a park as a tab's sync does.
+  desiredVisibleRuntimeIds.add(runtimeId);
+  cancelDeferredHide(runtimeId);
+  if (visibleRuntimeIds.has(runtimeId) && lastBounds.get(runtimeId) === serializeBounds(bounds))
+    return Promise.resolve();
+  // Only the newest measurement is applied, like a tab's sync.
+  const queued = adoptedBounds.has(runtimeId);
+  adoptedBounds.set(runtimeId, bounds);
+  if (queued) return Promise.resolve();
+  return enqueue(runtimeId, async () => {
+    const latest = adoptedBounds.get(runtimeId);
+    adoptedBounds.delete(runtimeId);
+    if (!latest || !adoptedPages.has(runtimeId) || !desiredVisibleRuntimeIds.has(runtimeId)) return;
+    // Coming on screen, it may still be parked for its first paint (a page just woken).
+    const arriving = !visibleRuntimeIds.has(runtimeId);
+    const exists = await invoke<boolean>("browser_webview_reconcile", {
+      request: { id: runtimeId, nativeLiveResize: false, ...latest },
+    });
+    // Its owner closed it meanwhile, and only its owner opens it again.
+    if (!exists) {
+      visibleRuntimeIds.delete(runtimeId);
+      lastBounds.delete(runtimeId);
+      setBrowserPagePresented(runtimeId, false);
+      return;
+    }
+    lastBounds.set(runtimeId, serializeBounds(latest));
+    await presentReconciledPage(runtimeId, arriving);
+  });
+}
+
+/** Takes an adopted page off screen; its owner keeps it live or closes it. */
+export function hideAdoptedBrowserPage(runtimeId: string): Promise<void> {
+  if (!adoptedPages.has(runtimeId)) return Promise.resolve();
+  adoptedBounds.delete(runtimeId);
+  return hideBrowserRuntime(runtimeId).then(() => {
+    // Shown again while it was going.
+    if (desiredVisibleRuntimeIds.has(runtimeId)) return;
+    adoptedPages.delete(runtimeId);
+    lastBounds.delete(runtimeId);
+  });
+}
+
+/** Adopted pages wanted on screen now, which parking and switching leave in place. */
+function shownAdoptedPages(): string[] {
+  return [...adoptedPages.keys()].filter((id) => desiredVisibleRuntimeIds.has(id));
 }
 
 export function browserRuntimeIdForTabId(tabId: string): string | null {
@@ -337,6 +413,8 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
   }
   closedRuntimes.delete(id);
   const boundsKey = serializeBounds(input.bounds, input.nativeLiveResize);
+  // A page created here may be parked until its first paint.
+  let createdNow = !createdRuntimeIds.has(id);
   if (!createdRuntimeIds.has(id)) {
     markBrowserPerf(id, "create start");
     await invoke("browser_webview_create", {
@@ -366,9 +444,11 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
   let exists = await invoke<boolean>("browser_webview_reconcile", {
     request: { id, nativeLiveResize: Boolean(input.nativeLiveResize), ...input.bounds },
   });
+  if (!exists) createdNow = true;
   if (!exists) {
     createdRuntimeIds.delete(id);
     visibleRuntimeIds.delete(id);
+    setBrowserPagePresented(id, false);
     await invoke("browser_webview_create", {
       request: {
         id,
@@ -391,22 +471,36 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     if (!exists) throw new Error("Browser webview could not be attached.");
   }
   lastBounds.set(id, boundsKey);
+  await presentReconciledPage(id, createdNow);
+}
+
+/**
+ * Brings a reconciled page on screen, unless its host stopped wanting it meanwhile. A page still
+ * parked for its first paint is not presented yet, and its host keeps its fill until it is.
+ */
+async function presentReconciledPage(id: string, createdNow: boolean): Promise<void> {
   markBrowserPerf(id, "reconciled");
   // The Browser surface can unmount while native creation or reconciliation
   // is still in flight. Honor the latest desired visibility before exposing
   // the child, otherwise that late completion can cover Home or another tool.
   if (!desiredVisibleRuntimeIds.has(id)) {
     visibleRuntimeIds.delete(id);
+    setBrowserPagePresented(id, false);
     await invoke("browser_webview_hide", { request: hideRequest(id) }).catch(() => undefined);
     return;
   }
   visibleRuntimeIds.add(id);
   // A new page can exist yet still be parked until its first paint. The page
-  // it replaces must stay up until it is really on screen.
-  const held = hasPendingHandoff()
-    ? await invoke<boolean>("browser_webview_held", { request: { id } }).catch(() => false)
-    : false;
+  // it replaces must stay up until it is really on screen, and its host keeps
+  // its fill until then (its reveal comes back through this path).
+  const held =
+    createdNow || awaitingFirstPaint.has(id) || hasPendingHandoff()
+      ? await invoke<boolean>("browser_webview_held", { request: { id } }).catch(() => false)
+      : false;
+  if (held) awaitingFirstPaint.add(id);
+  else awaitingFirstPaint.delete(id);
   markBrowserPerf(id, held ? "held for first paint" : "presented");
+  setBrowserPagePresented(id, !held);
   if (!held) completeHandoff(id);
   scheduleStrayPageSweep();
 }
@@ -441,6 +535,7 @@ export function scheduleStrayPageSweep(): void {
       for (const id of [...visibleRuntimeIds]) {
         if (keep.has(id)) continue;
         visibleRuntimeIds.delete(id);
+        setBrowserPagePresented(id, false);
         lastBounds.delete(id);
       }
     })();
@@ -462,9 +557,78 @@ export async function closeOrphanBrowserPages(liveTabs: () => BrowserRuntimeTab[
   );
 }
 
+/**
+ * Windows: switches the window's native pages the moment its active tabs change, before React
+ * renders or any page measures itself. Hidden tabs wait in place beneath the renderer, already
+ * drawn, so a switch only changes which page is on top: `ids` come up, every other page goes
+ * under. The ordinary sync still runs afterward and corrects any page whose bounds moved.
+ */
+export function switchBrowserPages(ids: readonly string[]): void {
+  // An agent's page beside its chat is not a tab, and stays up through any switch.
+  const wanted = ids.filter((id) => createdRuntimeIds.has(id)).concat(shownAdoptedPages());
+  const leaving = [...visibleRuntimeIds].filter((id) => !wanted.includes(id));
+  for (const id of wanted) markBrowserPerf(id, "instant switch sent", true);
+  // With no page coming up the window turns opaque now and covers the pages going under.
+  if (!wanted.length) leaving.forEach((id) => setBrowserPagePresented(id, false));
+  void invoke<string[]>("browser_webviews_show_only", { request: { ids: wanted } })
+    .then((raised) => {
+      for (const id of raised ?? []) {
+        setBrowserPagePresented(id, true);
+        markBrowserPerf(id, "instant switch raised");
+      }
+      // Pages going under stay presented until one has come up, so the window never turns
+      // opaque in between.
+      leaving.forEach((id) => setBrowserPagePresented(id, false));
+    })
+    .catch(() => undefined);
+}
+
 /** Whether a native page already exists for this tab, so showing it is only a reconcile. */
 export function isBrowserRuntimeCreated(tab: BrowserRuntimeTab): boolean {
   return createdRuntimeIds.has(registerBrowserRuntime(tab));
+}
+
+/**
+ * Loads a tab's page before the tab is shown, so clicking it finds the page ready instead of
+ * loading it then. The page is created out of sight at `bounds` and stays hidden until its tab
+ * shows it; a page that exists, or has work on its way, is left alone.
+ */
+export function prewarmBrowserWebview(input: BrowserSyncInput): Promise<void> {
+  const id = registerBrowserRuntime(input.tab);
+  if (createdRuntimeIds.has(id) || browserSyncStates.has(id) || runtimeQueues.has(id))
+    return Promise.resolve();
+  markBrowserPerf(id, "prewarm requested", true);
+  const wanted = () => desiredVisibleRuntimeIds.has(id) || !createdRuntimeIds.has(id);
+  // Not wanted on screen, so the sync creates it, places it and hides it again.
+  return enqueue(id, () => applyBrowserSync(id, input)).then(async () => {
+    if (!/win/i.test(navigator.platform) || wanted()) return;
+    // Windows holds a new page off screen until it paints, and a page shown from off screen
+    // has to draw again first. Once it has painted it waits beneath the renderer, in place and
+    // drawn, like any tab hidden there. The wait stays outside the page's queue, so a click
+    // meanwhile shows it at once.
+    for (let waited = 0; waited < 2500; waited += 150) {
+      const held = await invoke<boolean>("browser_webview_held", { request: { id } }).catch(
+        () => false,
+      );
+      if (!held || wanted()) break;
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+    }
+    await enqueue(id, async () => {
+      if (wanted()) return;
+      await invoke("browser_webview_reconcile", {
+        request: {
+          id,
+          nativeLiveResize: Boolean(input.nativeLiveResize),
+          ...input.bounds,
+          beneath: true,
+        },
+      });
+      lastBounds.delete(id);
+      if (wanted()) return;
+      await invoke("browser_webview_hide", { request: hideRequest(id) });
+      markBrowserPerf(id, "prewarmed beneath");
+    });
+  });
 }
 
 export function browserContentHash(value: string): string {
@@ -476,6 +640,9 @@ export function browserContentHash(value: string): string {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
+/** Dispatched when the window's chrome color changes (its Space's color). */
+export const windowChromeChangedEvent = "misty:window-chrome-changed";
+
 /** Whether a layout move holds the pages: they keep their place until it has settled. */
 export function isBrowserLayoutMoving(): boolean {
   return browserWebviewSuspensions.has("docking-layout");
@@ -485,7 +652,8 @@ export function setBrowserWebviewsSuspended(suspended: boolean, reason = "defaul
   const wasSuspended = browserWebviewSuspensions.size > 0;
   if (suspended) browserOverlayResumeGeneration += 1;
   if (suspended) browserWebviewSuspensions.add(reason);
-  else browserWebviewSuspensions.delete(reason);
+  else if (browserWebviewSuspensions.delete(reason) && reason === "docking-layout")
+    notifyBrowserSettled();
   const isSuspended = browserWebviewSuspensions.size > 0;
   if (isSuspended && !wasSuspended) {
     setBrowserOverlayActive(true);
@@ -621,15 +789,20 @@ function scheduleBrowserOverlayResume(): void {
 
 function setBrowserOverlayActive(active: boolean): void {
   browserOverlayActive = active;
-  if (typeof document !== "undefined") {
-    document.documentElement.toggleAttribute("data-browser-overlay-active", active);
-    if (active) checkBrowserOverlayTransparency();
+  if (active && typeof document !== "undefined") {
+    document.documentElement.toggleAttribute("data-browser-overlay-active", true);
+    checkBrowserOverlayTransparency();
   }
   browserOverlayQueue = browserOverlayQueue
     .catch(() => undefined)
-    .then(() => {
+    .then(async () => {
       if (browserOverlayActive !== active) return;
-      return invoke<void>("browser_webviews_set_overlay_active", { active }).catch(() => undefined);
+      await invoke<void>("browser_webviews_set_overlay_active", { active }).catch(() => undefined);
+      // While the page is still below the renderer it shows through the transparent host, and
+      // painting the host's fill sooner covers it with a flat rectangle for a frame. Only once
+      // the page is back above the renderer does the host get its fill again.
+      if (!active && !browserOverlayActive && typeof document !== "undefined")
+        document.documentElement.toggleAttribute("data-browser-overlay-active", false);
     });
 }
 
@@ -654,7 +827,10 @@ export function setBrowserRuntimeKeepLive(runtimeId: string, keepLive: boolean):
 const hideRequest = (id: string) => ({ id, keepLive: keepLiveRuntimeIds.has(id) });
 
 export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
-  const id = registerBrowserRuntime(tab);
+  return hideBrowserRuntime(registerBrowserRuntime(tab), graceMs);
+}
+
+function hideBrowserRuntime(id: string, graceMs = 0): Promise<void> {
   desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
   releaseDeferredNavigation(id);
@@ -670,12 +846,16 @@ export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise
         if (desiredVisibleRuntimeIds.has(id)) return resolve();
         void enqueue(id, async () => {
           if (desiredVisibleRuntimeIds.has(id)) return;
+          // It stays presented until the next page is, so the window never turns opaque between.
+          setBrowserPagePresented(id, false);
           await invoke("browser_webview_hide", { request: hideRequest(id) }).catch(() => undefined);
         }).then(resolve);
       });
     });
   }
   cancelDeferredHide(id);
+  // The fill goes in under the page before the page leaves, never after.
+  setBrowserPagePresented(id, false);
   // Always enqueue the hide. A create/reconcile operation may still be in
   // flight even when the frontend has not marked this runtime visible yet.
   // The native command safely no-ops when no child exists.
@@ -695,6 +875,33 @@ export function onBrowserRuntimeClose(listener: (tabId: string) => void): () => 
 
 /** Destroy a closed tab's native page so its media stops with it. `isClosed`
  * reports whether the tab is still gone; reopening it keeps the runtime. */
+/**
+ * Resolves once a tab switch has landed: no handoff or layout move is pending and a page is on
+ * screen (or none is wanted), then a frame later so the new page has been presented. Driven by
+ * the events that end a switch, not by a clock.
+ */
+function whenSwitchSettled(): Promise<void> {
+  const ready = () =>
+    !hasPendingHandoff() &&
+    !isBrowserLayoutMoving() &&
+    (desiredVisibleRuntimeIds.size === 0 ||
+      Object.values(useBrowserRuntimeStore.getState().presented).some(Boolean));
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      stops.forEach((stop) => stop());
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    };
+    const check = () => {
+      if (ready()) done();
+    };
+    const stops: Array<() => void> = [
+      useBrowserRuntimeStore.subscribe(check),
+      onBrowserSettled(check),
+    ];
+    if (ready()) done();
+  });
+}
+
 export async function closeBrowserRuntime(
   tab: BrowserRuntimeTab,
   isClosed: () => boolean,
@@ -726,6 +933,21 @@ export async function closeBrowserRuntime(
       closedRuntimes.delete(id);
       return;
     }
+    // Closing a tab that was in front is a tab switch: the neighbor comes up first, and the old
+    // page is destroyed behind it. Destroying a page window while it is still on screen repaints
+    // its area white for a frame. It is silenced at once, so it cannot keep playing meanwhile.
+    void invoke("browser_webview_set_muted", { request: { id, muted: true } }).catch(
+      () => undefined,
+    );
+    await whenSwitchSettled();
+    if (!isClosed()) {
+      // Reopened while it waited: it stays, and plays again.
+      void invoke("browser_webview_set_muted", { request: { id, muted: false } }).catch(
+        () => undefined,
+      );
+      closedRuntimes.delete(id);
+      return;
+    }
     // Close even when this module lost track of the page (a profile switch or
     // renderer reload clears createdRuntimeIds); the native command no-ops
     // when no page exists.
@@ -744,8 +966,18 @@ export async function closeBrowserRuntime(
 
 export async function parkAllBrowserWebviews(): Promise<void> {
   const generation = ++browserParkGeneration;
-  desiredVisibleRuntimeIds.clear();
-  visibleRuntimeIds.clear();
+  // Adopted pages on screen stay where they are: an agent's page beside its chat is on the
+  // Agents page, which is what parks the tabs.
+  const kept = new Set(shownAdoptedPages());
+  const keptKeys = new Set([...kept].map((id) => adoptedPages.get(id)!));
+  for (const id of [...desiredVisibleRuntimeIds])
+    if (!kept.has(id)) desiredVisibleRuntimeIds.delete(id);
+  for (const id of [...visibleRuntimeIds]) if (!kept.has(id)) visibleRuntimeIds.delete(id);
+  useBrowserRuntimeStore.setState((state) => ({
+    presented: Object.fromEntries(
+      Object.entries(state.presented).filter(([key]) => keptKeys.has(key)),
+    ),
+  }));
   [...deferredNavigations.keys()].forEach(releaseDeferredNavigation);
   createdRuntimeIds.forEach((id) => lastBounds.delete(id));
 
@@ -753,9 +985,14 @@ export async function parkAllBrowserWebviews(): Promise<void> {
   // before hiding every native child. Keep the pages loaded, but do not
   // expose them again until their Browser surface requests reconciliation.
   await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
-  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
-  await invoke<void>("browser_webviews_park_all").catch(() => undefined);
-  if (desiredVisibleRuntimeIds.size > 0 && typeof window !== "undefined") {
+  const keep = shownAdoptedPages();
+  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > keep.length) return;
+  await (
+    keep.length
+      ? invoke<void>("browser_webviews_park_all", { request: { keep } })
+      : invoke<void>("browser_webviews_park_all")
+  ).catch(() => undefined);
+  if (desiredVisibleRuntimeIds.size > keep.length && typeof window !== "undefined") {
     desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
     window.dispatchEvent(new Event(browserRuntimeResumeEvent));
   }
@@ -770,7 +1007,8 @@ function serializeBounds(bounds: BrowserBounds, nativeLiveResize = false): strin
     nativeLiveResize ? 1 : 0,
     ...(bounds.cornerRadii ?? []),
   ]
-    .map((value) => Math.round(value * 2) / 2)
+    .map((value) => String(Math.round(value * 2) / 2))
+    .concat(bounds.cornerColor ? [bounds.cornerColor] : [])
     .join(":");
 }
 

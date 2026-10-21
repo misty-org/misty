@@ -121,14 +121,11 @@ export function useMergedTitlebar(
           '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
         )
         .forEach((element) => apply(element, false, true));
-      // A top tab strip already owns the titlebar band; panes start below it (overlapping
-      // only by the connected-tab seam) and never need the fallback title header.
-      const topTabs = shell.querySelector('.misty-workspace-tabs[data-tab-position="top"]');
       // A side strip owns the titlebar band, so no page needs a title header of its own.
       const sideTabs = shell.querySelector(
         '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
       );
-      if (!topTabs && !sideTabs)
+      if (!sideTabs)
         shell.querySelectorAll<HTMLElement>("[data-workspace-pane]").forEach((pane) => {
           if (![...retained].some((element) => pane.contains(element))) apply(pane, true);
         });
