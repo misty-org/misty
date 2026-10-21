@@ -9,7 +9,7 @@ const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>
       ref={ref}
       data-slot="input-group"
       className={cn(
-        "flex w-full flex-col overflow-hidden rounded-lg border border-charcoal-border bg-transparent shadow-xs transition-[color,box-shadow] bg-charcoal-card",
+        "flex w-full flex-col overflow-hidden rounded-lg border border-charcoal-border-strong bg-transparent shadow-xs transition-[color,box-shadow] bg-charcoal-card",
         className,
       )}
       {...props}

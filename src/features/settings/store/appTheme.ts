@@ -145,6 +145,7 @@ function applySnapshot(snapshot: AppThemeSnapshot): void {
     "--misty-theme-sidebar": tokens.surface,
     "--misty-theme-card": tokens.surfaceRaised,
     "--misty-theme-border": tokens.border,
+    "--misty-theme-border-strong": tokens.borderStrong,
     "--misty-theme-hover": tokens.surfaceHover,
     "--misty-theme-active": tokens.selection,
     "--misty-theme-text": tokens.text,

@@ -105,12 +105,12 @@ export function BrowserSyncBadge({
         className="layer-blocking-popup max-h-[calc(100dvh-64px)] w-88 max-w-[calc(100vw-24px)] overflow-y-auto p-1.5"
         data-misty-window-drag-block="true"
       >
-        {(status.action || status.tone === "attention") && (
+        {/* The unlock form carries its own title, so it replaces the status row. */}
+        {!controller.form && (status.action || status.tone === "attention") && (
           <SyncStatusView
             compact
             status={status}
             busy={controller.busy}
-            hideAction={controller.form}
             onAction={() => void controller.retry()}
           />
         )}

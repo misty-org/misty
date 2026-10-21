@@ -12,6 +12,8 @@
   --misty-theme-sidebar: #161616;
   --misty-theme-card: #191919;
   --misty-theme-border: #262626;
+  /* Edges of fields people type into or pick from: stronger than the row hairline. */
+  --misty-theme-border-strong: #3c3c3c;
   --misty-theme-hover: #2b2b2b;
   --misty-theme-active: #3e3e3e;
   --misty-theme-text: #e0e0e0;
@@ -198,6 +200,7 @@
   --color-charcoal-sidebar: var(--misty-theme-sidebar);
   --color-charcoal-card: var(--misty-theme-card);
   --color-charcoal-border: var(--misty-theme-border);
+  --color-charcoal-border-strong: var(--misty-theme-border-strong);
   --color-charcoal-hover: var(--misty-theme-hover);
   --color-charcoal-active: var(--misty-theme-active);
 

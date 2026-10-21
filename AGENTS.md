@@ -21,3 +21,7 @@
 - Settings pages are plain lists: no card boxes, hairlines between rows, every control right-aligned to one shared edge. Rows and sections carry a short muted line of helper text that explains what the setting does, its scope or its privacy and destructive consequences; keep it to a sentence or two and never repeat the label. Reset appears only while a value differs from its default and never moves the control. Up to four short choices use a segmented control; longer lists use a checkmarked dropdown, never a stack of radio buttons. Failures show as an inline notice in plain language, never raw setting keys or server errors.
 - Settings belong to the device: they are saved in `misty.db` and never sync or reach the server. Do not add account-synced settings, outboxes, or "Settings sync" surfaces. Server-owned resources (conversation retention, hosted Misty, the model catalog) keep their own APIs and are not settings. Device identity and OS keychain secrets stay distinct from preferences.
 - Approved Sync direction: `docs/design/sync/BRIEF.md`, revision 2, including the approved monochrome palette. Its server-account settings model is superseded: settings are device-local. Historical mockup screenshots do not override these instructions.
+
+# Commits
+
+- Commit messages and pull request descriptions never carry a `Co-Authored-By:` trailer or any other AI attribution line ("Generated with ...", tool or model names). Commits are authored by the person alone.
