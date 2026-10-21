@@ -1,4 +1,9 @@
-# Agents on devices — approved direction
+# Agents on devices — superseded
+
+> Superseded on October 19, 2026 by [agent-chats-local/BRIEF.md](../agent-chats-local/BRIEF.md):
+> there is no device picker, and an agent run works only on the device it was sent from. The
+> keep-awake setting below still applies to that device.
+
 
 Approved October 10, 2026, with the owner's answers to the proposal's questions. It is Phase 6 of
 [docs/plans/agentic-browser.md](../../plans/agentic-browser.md) and builds on the

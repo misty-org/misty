@@ -260,16 +260,6 @@ impl DevicePolicy {
         }
     }
 
-    pub fn allows_surface(&self, surface: &str) -> bool {
-        self.agent_surfaces.iter().any(|value| value == surface)
-    }
-
-    pub fn shares_folder(&self, scope_id: &str) -> bool {
-        self.shared_folders
-            .iter()
-            .any(|folder| folder.scope_id == scope_id)
-    }
-
     pub fn payload(
         &self,
         account_id: &str,

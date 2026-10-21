@@ -37,6 +37,34 @@ export function withToolEvent(
   return { content: "", progress };
 }
 
+/**
+ * Applies the reply's text. A run that answered in text and then wrapped up
+ * sends that same answer as its final text (with any "Still incomplete" list
+ * after it), so the note the answer became when the wrap-up started is dropped:
+ * the answer shows once, as the reply, and "Wrapped up" stays a quiet step.
+ */
+export function withAnswer(
+  message: { progress?: AiProgressItem[] },
+  text: string,
+): { content: string; progress?: AiProgressItem[] } {
+  const progress = message.progress ?? [];
+  let index = progress.length - 1;
+  while (index >= 0 && progress[index].type === "tool" && isFinishTool(progress[index]))
+    index -= 1;
+  const note = progress[index];
+  const answer = text.trim();
+  const repeated =
+    index < progress.length - 1 &&
+    note?.type === "note" &&
+    (answer === note.text.trim() || answer.startsWith(`${note.text.trim()}\n\nStill incomplete:`));
+  if (!repeated) return { content: text, progress: message.progress };
+  return { content: text, progress: progress.filter((_, position) => position !== index) };
+}
+
+function isFinishTool(item: AiProgressItem) {
+  return item.type === "tool" && /finish[._]task$|^agent[._]finish$/.test(item.name);
+}
+
 /** A tool that never finished because the reply stopped. */
 export function settleProgress(progress: AiProgressItem[] | undefined) {
   return progress?.map((item) =>

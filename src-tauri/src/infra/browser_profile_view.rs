@@ -11,8 +11,7 @@ pub(crate) fn open_hidden_profile_view(
 ) -> Result<Webview, String> {
     // Any Space window can hold the off-screen page; the store, not the window,
     // decides whose data it reaches.
-    let owner = crate::infra::space_windows::primary(app)
-        .ok_or("No Space window is open")?;
+    let owner = crate::infra::space_windows::primary(app).ok_or("No Space window is open")?;
     let builder = tauri::WebviewBuilder::new(
         format!("misty-browser-capture-{}", uuid::Uuid::new_v4()),
         tauri::WebviewUrl::External("about:blank".parse().map_err(|_| "Invalid capture URL")?),

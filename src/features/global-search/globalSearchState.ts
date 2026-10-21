@@ -98,6 +98,10 @@ export interface GlobalSearchState {
       capture?: AiCaptureAttachment;
       /** Continues the conversation after a screen opened; shows no new user turn. */
       continuation?: boolean;
+      /** Sends the turn as a lesson step (Teach mode) whatever the chat's saved mode. */
+      collaborationMode?: "teach";
+      /** What the video in front was saying (companion/mediaContext.ts). */
+      mediaContext?: import("@/features/agents/companion/mediaContext").MediaContext;
       /** A scheduled run this computer claimed (roadmap C1). */
       schedule?: { id: string; claim: string };
       /** Opens a tab in this window for the task, at this page when given. */

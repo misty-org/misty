@@ -1,20 +1,14 @@
-import { cn } from "@/shared/ui";
+import { Notification } from "@/shared/ui";
 
-const toneClasses: Record<AuthMessageProps["tone"], string> = {
-  error: "text-cream",
-  success: "text-cream",
-  muted: "text-cream-muted",
-};
-
-/** A short status line under a form: small text, no box, so it never pushes the layout wide. */
+/** Form feedback shows as a popup in the corner, so it never shifts the form around. */
 export default function AuthMessage({ tone, message }: AuthMessageProps) {
   return (
-    <p
-      role={tone === "error" ? "alert" : "status"}
-      className={cn("break-words text-center text-xs leading-5", toneClasses[tone])}
+    <Notification
+      tone={tone === "error" ? "error" : tone === "success" ? "success" : "neutral"}
+      duration={8000}
     >
       {message}
-    </p>
+    </Notification>
   );
 }
 

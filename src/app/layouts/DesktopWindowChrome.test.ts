@@ -7,7 +7,7 @@ import {
 import {
   desktopTitlebarNavigationGeometry,
   desktopTitlebarNavigationInset,
-  windowsTitlebarNavigationInset,
+  windowsTitlebarControlsFallbackWidth,
 } from "@/app/layouts/DesktopLayout/styles";
 
 describe("desktop window chrome drag suppression", () => {
@@ -88,9 +88,12 @@ describe("desktop titlebar zoom geometry", () => {
   it.each([0.8, 1, 1.4, 2])(
     "keeps the Windows left controls at a native-pixel inset at %sx zoom",
     (zoom) => {
-      const geometry = desktopTitlebarNavigationGeometry(zoom, windowsTitlebarNavigationInset);
+      const geometry = desktopTitlebarNavigationGeometry(
+        zoom,
+        windowsTitlebarControlsFallbackWidth,
+      );
 
-      expect(geometry.left * zoom).toBeCloseTo(windowsTitlebarNavigationInset);
+      expect(geometry.left * zoom).toBeCloseTo(windowsTitlebarControlsFallbackWidth);
       expect(geometry.scale * zoom).toBeCloseTo(1);
     },
   );

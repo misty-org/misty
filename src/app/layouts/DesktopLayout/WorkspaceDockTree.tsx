@@ -5,6 +5,7 @@ import { panePlacement } from "@/features/workspace/panePlacement";
 import { isSideDock } from "@/features/app-shell/dockingLayout";
 import { PaneToolbarHostProvider } from "@/features/browser/workspace";
 import { PaneToolbarFallback } from "./PaneToolbarFallback";
+import { keepsLayoutWhileHidden } from "./keptTabs";
 import { usePaneToolbarDrag } from "./usePaneToolbarDrag";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { browserRuntimeId } from "@/features/webviews/browserRuntime";
@@ -29,7 +30,7 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
-import { memo, useEffect, useRef, useState, type DragEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   Panel,
   PanelGroup,
@@ -185,23 +186,49 @@ function DockSplitView(
  * boundary: store updates keep an untouched tab's object identical, and a
  * change to another tab, the layout or the app route leaves this page alone.
  */
-const MountedWorkspaceView = memo(function MountedWorkspaceView(props: {
-  paneId: string;
-  tab: WorkspaceView;
-  active: boolean;
-}) {
-  return (
-    <AiPaneHost
-      paneId={props.paneId}
-      defaultAdapter={workspaceAiAdapter(props.tab)}
-      active={props.active}
-    >
-      <WorkspaceViewTitleProvider tabId={props.tab.id}>
-        <WorkspaceSurface tab={props.tab} />
-      </WorkspaceViewTitleProvider>
-    </AiPaneHost>
-  );
-});
+const MountedWorkspaceView = memo(
+  function MountedWorkspaceView(props: { paneId: string; tab: WorkspaceView; active: boolean }) {
+    const tab = useRenderedView(props.tab);
+    const defaultAdapter = useMemo(() => workspaceAiAdapter(tab), [tab]);
+    // Showing or hiding the tab only tells the AI host; the page itself does not render again.
+    const surface = useMemo(
+      () => (
+        <WorkspaceViewTitleProvider tabId={tab.id}>
+          <WorkspaceSurface tab={tab} />
+        </WorkspaceViewTitleProvider>
+      ),
+      [tab],
+    );
+    return (
+      <AiPaneHost paneId={props.paneId} defaultAdapter={defaultAdapter} active={props.active}>
+        {surface}
+      </AiPaneHost>
+    );
+  },
+  (previous, next) =>
+    previous.paneId === next.paneId &&
+    previous.active === next.active &&
+    sameRenderedView(previous.tab, next.tab),
+);
+
+/**
+ * Selecting a tab stamps it with `lastFocusedAt`, which only the store's own ordering reads. A
+ * page handed that new object rendered again in full on every switch (a Space with a long
+ * collection took a third of a second), so the page keeps the object it has until something
+ * it shows changes.
+ */
+function sameRenderedView(previous: WorkspaceView, next: WorkspaceView): boolean {
+  if (previous === next) return true;
+  const keys = Object.keys(next) as (keyof WorkspaceView)[];
+  if (keys.length !== Object.keys(previous).length) return false;
+  return keys.every((key) => key === "lastFocusedAt" || previous[key] === next[key]);
+}
+
+function useRenderedView(view: WorkspaceView): WorkspaceView {
+  const rendered = useRef(view);
+  if (!sameRenderedView(rendered.current, view)) rendered.current = view;
+  return rendered.current;
+}
 
 function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const { pane } = props;
@@ -386,22 +413,30 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
         <span className="truncate">{activeTab?.title || "New tab"}</span>
       </header>
       {showToolbar ? (
-        <div ref={setToolbarHost} className="min-w-0">
+        <div ref={setToolbarHost} className="min-w-0" data-pane-layer>
           {activeTab && activeTab.surfaceId !== "browser" ? (
             <PaneToolbarFallback tab={activeTab} />
           ) : null}
         </div>
       ) : null}
       <PaneToolbarHostProvider value={showToolbar ? toolbarHost : null}>
-        <div className="min-h-0 min-w-0 overflow-hidden">
+        <div
+          className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden"
+          data-pane-layer
+        >
           {activeTab ? (
             mountedTabs.map((mountedTab) => {
               const isActive = props.workspaceActive !== false && mountedTab.id === activeTab.id;
+              const kept = !isActive && keepsLayoutWhileHidden(mountedTab);
               return (
                 <div
                   key={mountedTab.id}
-                  className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
+                  className={cn(
+                    "relative col-start-1 row-start-1 h-full min-h-0 w-full",
+                    isActive ? "z-[1] block" : kept ? "z-0 block" : "hidden",
+                  )}
                   aria-hidden={!isActive}
+                  data-tab-kept={kept ? "" : undefined}
                 >
                   <MountedWorkspaceView paneId={pane.id} tab={mountedTab} active={isActive} />
                 </div>

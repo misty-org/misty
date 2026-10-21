@@ -70,8 +70,10 @@ static void breathe(CALayer *layer, NSString *key, id from, id to, CFTimeInterva
     [self.wide removeAllAnimations];
     return;
   }
-  breathe(self.near, @"shadowOpacity", @0.45, @0.65, 3.5);
-  breathe(self.near, @"shadowRadius", @16, @22, 3.5);
+  // A clear pulse: the glow at the edge swells and fades, and the wide fog breathes with it.
+  breathe(self.near, @"shadowOpacity", @0.3, @1.0, 2.4);
+  breathe(self.near, @"shadowRadius", @14, @30, 2.4);
+  breathe(self.wide, @"shadowOpacity", @0.12, @0.42, 2.4);
   breathe(self.wide, @"shadowOffset", [NSValue valueWithSize:NSMakeSize(5, -3)], [NSValue valueWithSize:NSMakeSize(-5, 3)], 14);
 }
 // Core Animation drops a layer's animations when its view leaves a window, and a docked
@@ -96,7 +98,11 @@ static void breathe(CALayer *layer, NSString *key, id from, id to, CFTimeInterva
     CGMutablePathRef path = CGPathCreateMutable();
     CGPathAddRect(path, NULL, CGRectInset(bounds, -fog.shadowRadius * 4, -fog.shadowRadius * 4));
     CGFloat corner = MIN(radius, MIN(bounds.size.width, bounds.size.height) / 2);
-    CGPathAddRoundedRect(path, NULL, bounds, corner, corner);
+    // Core Animation fills a shadow path by the nonzero rule, whatever the layer's fill rule:
+    // the hole must wind against the frame, or the shadow covers the whole page in white.
+    // Mirroring the rounded rect across its center line reverses its direction.
+    CGAffineTransform mirror = CGAffineTransformMake(-1, 0, 0, 1, 2 * CGRectGetMidX(bounds), 0);
+    CGPathAddRoundedRect(path, &mirror, bounds, corner, corner);
     fog.frame = bounds;
     fog.path = path;
     fog.shadowPath = path;
@@ -114,19 +120,6 @@ static MistyAgentMistView *mistIn(NSView *host, NSNumber *radius) {
   [host addSubview:mist positioned:NSWindowAbove relativeTo:nil];
   [mist fit];
   return mist;
-}
-
-NSView *MistyAgentMistMake(NSRect frame, CGFloat radius) {
-  MistyAgentMistView *mist = [[MistyAgentMistView alloc] initWithFrame:frame];
-  mist.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  mist.radius = @(radius);
-  [mist build];
-  [mist fit];
-  return mist;
-}
-
-void MistyAgentMistSetWaiting(NSView *mist, BOOL waiting) {
-  mist.alphaValue = waiting ? mistWaitingAlpha : mistActingAlpha;
 }
 
 // Fades a mist's container in; the mist view itself keeps its waiting alpha.

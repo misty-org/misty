@@ -13,7 +13,8 @@ async fn activate(
     let package_root = root(app, account, space)?.join("packages").join(&id);
     let removed = service(space).lock().await.removed.contains(&id);
     if !installation.enabled || removed {
-        native::request(json!({"operation":"unload","account":account,"space":space,"id":id})).await?;
+        native::request(json!({"operation":"unload","account":account,"space":space,"id":id}))
+            .await?;
         service(space).lock().await.loaded.remove(&id);
         sync::forget(account, space, &id);
         drop_origin(space, &installation_origin(account, &installation.guid));
@@ -108,7 +109,11 @@ async fn activate(
             }
             return Err(error);
         }
-        service(space).lock().await.loaded.insert(id.clone(), signature);
+        service(space)
+            .lock()
+            .await
+            .loaded
+            .insert(id.clone(), signature);
         prune_versions(&package_root);
     } else if let Some(previous) = service(space).lock().await.states.get(&id).cloned() {
         if matches!(previous.status.as_str(), "needs-attention" | "needs-review") {
@@ -151,8 +156,11 @@ async fn space_store(
     space: &str,
 ) -> Result<(crate::infra::browser_sync::BrowserProfileLease, String), String> {
     let requested = crate::infra::space_windows::space_store_identity(space);
-    let lease = crate::infra::browser_sync::browser_profile_lease(Some(app), requested.as_deref(), None).await?;
-    let identifier = crate::infra::browser_profile::data_store_identifier(lease.profile_id.as_deref())?;
+    let lease =
+        crate::infra::browser_sync::browser_profile_lease(Some(app), requested.as_deref(), None)
+            .await?;
+    let identifier =
+        crate::infra::browser_profile::data_store_identifier(lease.profile_id.as_deref())?;
     Ok((lease, uuid::Uuid::from_bytes(identifier).to_string()))
 }
 
@@ -369,7 +377,12 @@ pub async fn extensions_check_updates(
                         .insert(installation.id.clone(), status);
                 }
                 Err(error) => {
-                    if let Some(status) = service(&space).lock().await.states.get_mut(&installation.id) {
+                    if let Some(status) = service(&space)
+                        .lock()
+                        .await
+                        .states
+                        .get_mut(&installation.id)
+                    {
                         status.detail = Some(format!("Could not check for updates: {error}"));
                     }
                 }
@@ -382,7 +395,13 @@ pub async fn extensions_check_updates(
             "misty://extensions",
             json!({"kind":"changed","account":account,"space":space}),
         );
-        Ok(service(&space).lock().await.states.values().cloned().collect())
+        Ok(service(&space)
+            .lock()
+            .await
+            .states
+            .values()
+            .cloned()
+            .collect())
     }
     .await;
     result.map_err(ExtensionFailure::from)

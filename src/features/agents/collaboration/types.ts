@@ -1,5 +1,8 @@
-/** Plan mode researches and proposes; otherwise the agent does the work. */
-export type ConversationMode = "act" | "plan";
+/**
+ * Plan mode researches and proposes; Teach mode is a lesson that teaches one step
+ * at a time and never acts (src/features/agents/lessons); otherwise the agent does the work.
+ */
+export type ConversationMode = "act" | "plan" | "teach";
 
 /**
  * Ask pauses before every action that changes something; Auto continues when a

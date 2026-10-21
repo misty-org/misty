@@ -79,6 +79,7 @@ impl Step {
             action,
             "click"
                 | "fill"
+                | "type"
                 | "select"
                 | "check"
                 | "uncheck"
@@ -120,6 +121,7 @@ impl Step {
         }
         match action {
             "fill" if self.text.is_none() => return Err("A fill step needs text.".into()),
+            "type" if self.text.is_none() => return Err("A type step needs text.".into()),
             "select" => {
                 let values = self.values.as_deref().unwrap_or_default();
                 if values.is_empty()
@@ -258,6 +260,15 @@ pub(super) fn form_steps(input: &Value) -> Result<Vec<Step>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_type_step_needs_text() {
+        let step = |value: Value| serde_json::from_value::<Step>(value).unwrap().validate();
+        assert!(step(json!({"action": "type", "ref": "e12", "text": "pediatrician"})).is_ok());
+        assert!(step(json!({"action": "type", "text": "into the focused field"})).is_ok());
+        assert!(step(json!({"action": "type", "ref": "e12"})).is_err());
+        assert!(step(json!({"action": "teleport", "ref": "e12"})).is_err());
+    }
 
     #[test]
     fn steps_are_checked_before_any_runs() {

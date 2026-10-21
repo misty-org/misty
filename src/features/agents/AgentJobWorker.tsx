@@ -15,7 +15,10 @@ function useHostWindow() {
   useEffect(() => {
     let active = true;
     void isHostWindow().then((value) => active && setHost(value));
-    const stop = onHostWindow(() => active && setHost(true));
+    // The hand-off event reaches every window, so each asks whether it is the host now; taking
+    // it on the event alone started a worker in every window, agent windows too, and a job one
+    // of them claimed was lost when that window closed.
+    const stop = onHostWindow(() => void isHostWindow().then((value) => active && setHost(value)));
     return () => {
       active = false;
       stop();
@@ -52,7 +55,7 @@ export function AgentJobWorker() {
       canceled = true;
       worker?.stop();
       unwatch();
-      // Sessions for other devices end with this account here.
+      // The agent's own sessions end with this account here.
       void endAllHostedSessions();
     };
   }, [host, user?.id]);

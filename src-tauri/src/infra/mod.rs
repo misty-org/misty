@@ -2,13 +2,8 @@ pub mod agent_dock;
 pub mod agent_projects;
 pub mod agent_workspace;
 pub mod agents;
-pub mod web_fetch;
-pub mod link_preview;
-mod link_preview_meta;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
-#[cfg(desktop)]
-pub mod space_windows;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
@@ -16,9 +11,16 @@ pub mod browser;
 pub mod browser_agent_control;
 pub mod default_browser;
 pub mod extension_popup;
+pub mod link_preview;
+mod link_preview_meta;
 #[cfg(desktop)]
 pub mod power_keep_awake;
+#[cfg(desktop)]
+pub mod space_windows;
+pub mod system_memory;
+pub mod web_fetch;
 
+pub mod api_cache;
 #[cfg(all(desktop, any(target_os = "macos", windows)))]
 pub(crate) mod browser_content_world;
 pub(crate) mod browser_frames;
@@ -47,7 +49,6 @@ pub mod clipboard_bridge;
 pub mod cloud_clipboard;
 pub mod command_defaults;
 pub mod commands;
-pub mod api_cache;
 pub mod credential_store;
 pub mod credentials;
 #[cfg(desktop)]
@@ -84,10 +85,10 @@ pub mod environment;
 pub mod explorer;
 pub mod explorer_library;
 pub mod extensions;
+pub mod global_hotkey;
 pub mod kura;
 pub mod misty;
 pub mod misty_home;
-pub mod global_hotkey;
 pub mod native_clipboard;
 pub mod paths;
 #[cfg(desktop)]
@@ -110,6 +111,8 @@ pub mod browser_provider;
 
 pub mod navigation_names;
 
+pub mod agent_chats;
+
 #[cfg(windows)]
 pub mod agent_dock_windows;
 #[cfg(windows)]
@@ -119,6 +122,8 @@ pub mod desktop_overlays_windows;
 pub mod misty_context;
 #[cfg(windows)]
 pub mod misty_context_windows;
+#[cfg(windows)]
+pub mod window_snap_target_windows;
 #[cfg(windows)]
 pub mod window_snap_windows;
 #[cfg(windows)]

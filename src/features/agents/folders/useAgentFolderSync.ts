@@ -4,9 +4,10 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useAgentFoldersStore } from "./agentFoldersStore";
 
 /**
- * Loads the account's agent folders and follows folder, filing, read and title
- * changes, including names generated after a conversation starts. The first
- * run only needs folders; the Agents page already loads conversations on its own.
+ * Loads this device's agent folders and follows the names the server generates
+ * after a conversation starts. Folders, filing and read state live on this device
+ * (docs/design/agent-chats-local/BRIEF.md), so only titles arrive from the account.
+ * The first run only needs folders; the Agents page already loads conversations.
  */
 export function useAgentFolderSync(accountId: string): void {
   useEffect(() => {
@@ -15,17 +16,13 @@ export function useAgentFolderSync(accountId: string): void {
       return;
     }
     let initial = true;
-    return observeAccountChanges(
-      accountId,
-      ["agent-folders", "conversation-reads", "conversation-titles"],
-      () => {
-        const reloadConversations = !initial;
-        initial = false;
-        return Promise.all([
-          useAgentFoldersStore.getState().load(accountId),
-          reloadConversations ? useMistyStore.getState().loadConversations() : undefined,
-        ]);
-      },
-    );
+    return observeAccountChanges(accountId, ["conversation-titles"], () => {
+      const reloadConversations = !initial;
+      initial = false;
+      return Promise.all([
+        useAgentFoldersStore.getState().load(accountId),
+        reloadConversations ? useMistyStore.getState().loadConversations() : undefined,
+      ]);
+    });
   }, [accountId]);
 }

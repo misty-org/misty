@@ -10,6 +10,7 @@ import type { AgentProfile } from "@/shared/schemas";
 vi.mock("@/features/webviews/browserRuntime", () => ({
   onBrowserRuntimeClose: () => () => undefined,
   setBrowserWebviewsSuspended: vi.fn(),
+  browserOverlayReady: vi.fn(() => Promise.resolve()),
 }));
 beforeEach(() => {
   useWorkspaceStore.getState().reset();

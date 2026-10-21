@@ -37,20 +37,32 @@ struct Running {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_person_window(webview.label())
+        .then_some(())
+        .ok_or_else(|| "Main Misty window required.".into())
 }
 
 fn emit_chunks(app: &AppHandle, session: u64, chunks: Vec<PcmChunk>) {
     for chunk in chunks {
-        let channel = if chunk.channel == Channel::Mic { "mic" } else { "system" };
-        let _ = crate::infra::space_windows::emit_to_primary(&app,
+        let channel = if chunk.channel == Channel::Mic {
+            "mic"
+        } else {
+            "system"
+        };
+        let _ = crate::infra::space_windows::emit_to_primary(
+            &app,
             "misty://capture-audio",
             json!({"session": session, "channel": channel, "startFrame": chunk.start_frame, "power": chunk.power(), "pcm": STANDARD.encode(chunk.to_le_bytes())}),
         );
     }
 }
 
-fn open(app: &AppHandle, session: u64, source: AudioSource, router: Arc<Mutex<DuplexRouter>>) -> Result<Capture, String> {
+fn open(
+    app: &AppHandle,
+    session: u64,
+    source: AudioSource,
+    router: Arc<Mutex<DuplexRouter>>,
+) -> Result<Capture, String> {
     let chunk_app = app.clone();
     let failure_app = app.clone();
     let channel = source.channel();
@@ -75,13 +87,20 @@ fn open(app: &AppHandle, session: u64, source: AudioSource, router: Arc<Mutex<Du
 pub fn voice_capture_sources(webview: Webview) -> Result<serde_json::Value, String> {
     require_main(&webview)?;
     let sources = audeeo_core::capture_sources().unwrap_or_default();
-    Ok(json!({"microphone": sources.microphone, "applications": sources.applications, "capabilities": audeeo_core::capabilities()}))
+    Ok(
+        json!({"microphone": sources.microphone, "applications": sources.applications, "capabilities": audeeo_core::capabilities()}),
+    )
 }
 
 /// Starts a capture and returns its session number. Audio arrives as
 /// `misty://capture-audio` events, one channel per stream.
 #[tauri::command]
-pub fn voice_capture_start(webview: Webview, app: AppHandle, state: State<'_, CaptureState>, request: CaptureRequest) -> Result<u64, String> {
+pub fn voice_capture_start(
+    webview: Webview,
+    app: AppHandle,
+    state: State<'_, CaptureState>,
+    request: CaptureRequest,
+) -> Result<u64, String> {
     require_main(&webview)?;
     if !request.mic && !request.system && request.pids.is_empty() {
         return Err("Choose at least one sound to capture.".into());
@@ -95,22 +114,43 @@ pub fn voice_capture_start(webview: Webview, app: AppHandle, state: State<'_, Ca
     // With both channels open, the system channel is the echo reference.
     let router = Arc::new(Mutex::new(DuplexRouter::new(request.mic && has_other)));
     let other = if has_other {
-        let source = if request.pids.is_empty() { AudioSource::System { exclude_self: true } } else { AudioSource::Processes(request.pids.clone()) };
+        let source = if request.pids.is_empty() {
+            AudioSource::System { exclude_self: true }
+        } else {
+            AudioSource::Processes(request.pids.clone())
+        };
         Some(open(&app, session, source, router.clone())?)
     } else {
         None
     };
-    let mic = if request.mic { Some(open(&app, session, AudioSource::Mic, router.clone())?) } else { None };
-    *running = Some(Running { id: session, mic, other, router, want_mic: request.mic });
+    let mic = if request.mic {
+        Some(open(&app, session, AudioSource::Mic, router.clone())?)
+    } else {
+        None
+    };
+    *running = Some(Running {
+        id: session,
+        mic,
+        other,
+        router,
+        want_mic: request.mic,
+    });
     Ok(session)
 }
 
 /// Mute closes the microphone; other channels keep going.
 #[tauri::command]
-pub fn voice_capture_mute(webview: Webview, app: AppHandle, state: State<'_, CaptureState>, muted: bool) -> Result<(), String> {
+pub fn voice_capture_mute(
+    webview: Webview,
+    app: AppHandle,
+    state: State<'_, CaptureState>,
+    muted: bool,
+) -> Result<(), String> {
     require_main(&webview)?;
     let mut guard = state.running.lock().map_err(|_| "Capture is busy.")?;
-    let Some(running) = guard.as_mut() else { return Ok(()) };
+    let Some(running) = guard.as_mut() else {
+        return Ok(());
+    };
     if !running.want_mic {
         return Ok(());
     }
@@ -119,14 +159,27 @@ pub fn voice_capture_mute(webview: Webview, app: AppHandle, state: State<'_, Cap
             mic.stop();
         }
     } else if running.mic.is_none() {
-        running.mic = Some(open(&app, running.id, AudioSource::Mic, running.router.clone())?);
+        running.mic = Some(open(
+            &app,
+            running.id,
+            AudioSource::Mic,
+            running.router.clone(),
+        )?);
     }
-    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://capture-state", json!({"session": running.id, "muted": muted}));
+    let _ = crate::infra::space_windows::emit_to_primary(
+        &app,
+        "misty://capture-state",
+        json!({"session": running.id, "muted": muted}),
+    );
     Ok(())
 }
 
 #[tauri::command]
-pub fn voice_capture_stop(webview: Webview, app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+pub fn voice_capture_stop(
+    webview: Webview,
+    app: AppHandle,
+    state: State<'_, CaptureState>,
+) -> Result<(), String> {
     require_main(&webview)?;
     let mut guard = state.running.lock().map_err(|_| "Capture is busy.")?;
     if let Some(mut running) = guard.take() {
@@ -136,9 +189,17 @@ pub fn voice_capture_stop(webview: Webview, app: AppHandle, state: State<'_, Cap
         if let Some(other) = running.other.take() {
             other.stop();
         }
-        let rest = running.router.lock().map(|mut r| r.flush()).unwrap_or_default();
+        let rest = running
+            .router
+            .lock()
+            .map(|mut r| r.flush())
+            .unwrap_or_default();
         emit_chunks(&app, running.id, rest);
-        let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://capture-state", json!({"session": running.id, "stopped": true}));
+        let _ = crate::infra::space_windows::emit_to_primary(
+            &app,
+            "misty://capture-state",
+            json!({"session": running.id, "stopped": true}),
+        );
     }
     Ok(())
 }

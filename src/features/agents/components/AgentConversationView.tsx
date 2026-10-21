@@ -10,6 +10,7 @@ import { Button, cn } from "@/shared/ui";
 import { CalendarClock, Flag, Inbox } from "lucide-react";
 import { AgentAnsweredQuestions } from "../collaboration/AgentAnsweredQuestions";
 import { AgentMessageChecklist } from "../collaboration/AgentChecklist";
+import { LessonObjectives } from "../lessons/LessonObjectives";
 import { Fragment, memo, useMemo, useState } from "react";
 import { AgentMessageActions } from "./AgentMessageActions";
 import { AnswerChanges } from "./changes/AnswerChanges";
@@ -58,6 +59,7 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
   return (
     <div className="agent-transcript mx-auto w-full max-w-[760px] px-6 py-7 max-sm:px-4">
       <div className="space-y-7">
+        <LessonObjectives conversationId={props.conversation.id} />
         {turns.map((turn) => {
           const handlers = {
             conversationId: props.conversation?.id,

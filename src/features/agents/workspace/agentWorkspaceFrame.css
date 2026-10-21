@@ -174,8 +174,8 @@
 /* The button sits 4px from the row's edge and is 26px wide; the title already stops at
    the row padding, so only the rest needs clearing. */
 .agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) .agent-studio-recent-title,
-.agent-studio-recent-row:has(> button[aria-current="page"], > [data-state="open"])
-  .agent-studio-recent-title {
+.agent-studio-recent-row[data-current] .agent-studio-recent-title,
+.agent-studio-recent-row:has(> [data-state="open"]) .agent-studio-recent-title {
   --agent-studio-title-clear: calc(4px + 26px - var(--misty-sidebar-row-padding));
 }
 /* Get started: a quiet card at the foot of the sidebar until every step is done. */
@@ -657,7 +657,10 @@ html:has(.agent-studio-resizer[data-dragging]) {
 .agent-studio-recent-row:has(> [data-state="open"]) {
   background: var(--color-charcoal-hover);
 }
-.agent-studio-recent-row:has(> button[aria-current="page"]) {
+/* The row says it is current itself (`data-current`). Matching its button's aria-current with
+   :has() made the browser restyle the whole window whenever any aria-current changed, as every
+   tab switch does. */
+.agent-studio-recent-row[data-current] {
   background: var(--color-charcoal-active);
 }
 .agent-studio-recent-row > button,
@@ -666,7 +669,7 @@ html:has(.agent-studio-resizer[data-dragging]) {
 .agent-studio-recent-row > button[data-state="open"] {
   background: transparent;
 }
-.agent-studio-recent-row:has(> button[aria-current="page"]) > button:first-child {
+.agent-studio-recent-row[data-current] > button:first-child {
   color: var(--color-cream-bright);
 }
 /* The overflow button floats over the title's faded end instead of reserving its width. */
@@ -687,7 +690,7 @@ html:has(.agent-studio-resizer[data-dragging]) {
   opacity: 0;
 }
 .agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) > :not(:first-child),
-.agent-studio-recent-row:has(> button[aria-current="page"]) > :not(:first-child),
+.agent-studio-recent-row[data-current] > :not(:first-child),
 .agent-studio-recent-row > [aria-expanded="true"],
 .agent-studio-recent-row > [data-state="open"] {
   opacity: 1;
@@ -762,4 +765,22 @@ html:has(.agent-studio-resizer[data-dragging]) {
 }
 .agent-studio-recents-selection > span {
   flex: 1;
+}
+
+/* Lessons (Teach mode): rows hang off the section header with the shared tree branch. */
+.agent-lesson-row {
+  position: relative;
+  padding-left: 18px;
+}
+.agent-lesson-row > button:first-child {
+  gap: 8px;
+}
+.agent-lesson-detail {
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+/* A course's lessons hang one level further in. */
+.agent-lesson-row[data-depth="1"] {
+  padding-left: 30px;
 }

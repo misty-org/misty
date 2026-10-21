@@ -12,10 +12,15 @@ export interface DisplayFrame {
 }
 export interface DisplayCapture extends AiCaptureAttachment {
   capturedAt?: number;
-  source?: "desktop-display";
+  /** "desktop-window" is window1: the window in front, at full resolution. */
+  source?: "desktop-display" | "focus-region" | "desktop-window";
   screen: string;
   primary: boolean;
+  /** The captured area in global units: a whole display, or the part a window or focus region covers. */
   display: DisplayFrame;
+  /** The focused window's app and title, on window1. */
+  app?: string;
+  title?: string;
   /** Misty's own visible controls on this screen, in this capture's pixels. */
   controls?: ScreenControl[];
 }
@@ -48,6 +53,8 @@ export interface Presentation {
   mode: CompanionMode;
   /** Require human confirmation before acquiring desktop control. Defaults off. */
   ask?: boolean;
+  /** Teach mode: every turn is a lesson step that teaches and never acts. Defaults off. */
+  teach?: boolean;
   model: string;
   models?: {
     id: string;
@@ -55,6 +62,28 @@ export interface Presentation {
   }[];
   error?: string;
   point?: PresentedPoint;
+  /** Teach mode: the regions to look at while Misty explains the step. */
+  focus?: PresentedFocus[];
+  /** A drawing the reply is making (companionSketch.ts), drawn as it streams. */
+  sketch?: PresentedSketch;
+}
+/**
+ * A drawing on its way to the overlay. A board sits beside the cursor; screen marks
+ * are in the same global units as cursor samples, on one display.
+ */
+export interface PresentedSketch {
+  /** Changes with each reply, so the overlay starts a fresh card. */
+  id: string;
+  surface: "board" | "screen";
+  title?: string;
+  displayId?: number;
+  elements: import("./companionSketch").SketchElement[];
+  done: boolean;
+}
+/** A region outlined on screen, in the same global units as cursor samples. */
+export interface PresentedFocus {
+  displayId: number;
+  frame: PointFrame;
 }
 /** A rectangle in the same global units as cursor samples. */
 export interface PointFrame {

@@ -152,6 +152,16 @@ const MIGRATIONS: &[&str] = &[
     // 15: projects' old access switches become remembered approvals on the server; this
     // marks a project whose switches were carried over (the switches stay for reference)
     "ALTER TABLE local_agent_scopes ADD COLUMN grants_migrated INTEGER NOT NULL DEFAULT 0;",
+    // 16: agent chats kept on this device (conversations with their messages, their
+    // folders, and import markers), one JSON document per row
+    "CREATE TABLE agent_chats (
+         account TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         id TEXT NOT NULL,
+         document TEXT NOT NULL,
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (account, kind, id)
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]

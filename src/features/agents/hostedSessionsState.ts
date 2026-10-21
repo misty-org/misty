@@ -1,10 +1,10 @@
 import { create } from "zustand";
 
 /**
- * Browser sessions this computer runs for a request made on another of the
- * person's devices (docs/design/agents-on-devices/BRIEF.md). The asking device
- * signed a grant naming this one; the job worker checked it and this device's
- * own policy before calling here. Each session holds its own native lease,
+ * The agent's own browser sessions on this computer (docs/plans/odysseys-campaign.md):
+ * a hidden tab of the agent's own that joins the run. This computer signed the run's
+ * grant itself, and the job worker checked it before calling here; a grant another
+ * device signed is refused. Each session holds its own native lease,
  * signs the grant for its own tab, and ends on Stop here, when the request is
  * stopped, or after ten idle minutes.
  */
@@ -19,8 +19,6 @@ export interface HostedSession {
   childViews: string[];
   /** The scopes of the session's other tabs, whose jobs keep it in use too. */
   childScopes?: string[];
-  /** The docked window its first tab works in (hostedSessionDock.ts), when it has one. */
-  host?: string;
   /** The request currently using the session. */
   runId: string;
   lastUsed: number;

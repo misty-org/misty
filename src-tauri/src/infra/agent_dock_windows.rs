@@ -82,7 +82,8 @@ fn stack(app: &AppHandle) -> Result<WebviewWindow, String> {
     // Owned by Misty's window: above it, minimized and closed with it.
     if let (Some(stack), Some(main)) = (
         hwnd(&window),
-        crate::infra::space_windows::primary(app).and_then(|main| main.hwnd().ok().map(|handle| handle.0 as isize)),
+        crate::infra::space_windows::primary(app)
+            .and_then(|main| main.hwnd().ok().map(|handle| handle.0 as isize)),
     ) {
         // SAFETY: both are live windows of this process.
         unsafe { SetWindowLongPtrW(stack as _, GWLP_HWNDPARENT, main) };

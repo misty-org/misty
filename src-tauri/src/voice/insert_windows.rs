@@ -6,9 +6,15 @@ use windows_sys::Win32::{
     System::{
         DataExchange::*,
         Memory::{GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE},
-        Threading::{GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION},
+        Threading::{
+            GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+            PROCESS_QUERY_LIMITED_INFORMATION,
+        },
     },
-    UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId}},
+    UI::{
+        Input::KeyboardAndMouse::*,
+        WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
+    },
 };
 
 const CF_UNICODETEXT: u32 = 13;
@@ -85,7 +91,10 @@ impl Desktop for System {
                     continue;
                 }
                 let handle = unsafe { GetClipboardData(format) };
-                if let Some(bytes) = (!handle.is_null()).then(|| unsafe { copy_global(handle) }).flatten() {
+                if let Some(bytes) = (!handle.is_null())
+                    .then(|| unsafe { copy_global(handle) })
+                    .flatten()
+                {
                     formats.push((format, bytes));
                 }
             }
@@ -95,7 +104,11 @@ impl Desktop for System {
 
     fn write_clipboard_text(&self, text: &str) -> Result<u64, String> {
         let _open = Open::new().ok_or("The clipboard is busy.")?;
-        let wide: Vec<u8> = text.encode_utf16().chain([0]).flat_map(u16::to_le_bytes).collect();
+        let wide: Vec<u8> = text
+            .encode_utf16()
+            .chain([0])
+            .flat_map(u16::to_le_bytes)
+            .collect();
         unsafe {
             EmptyClipboard();
             if !set_bytes(CF_UNICODETEXT, &wide) {
@@ -143,14 +156,30 @@ impl Desktop for System {
         }
         let key = |vk: u16, up: bool| INPUT {
             r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { 0 }, time: 0, dwExtraInfo: 0 } },
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: if up { KEYEVENTF_KEYUP } else { 0 },
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
         };
         let mut inputs: Vec<INPUT> = held.iter().map(|vk| key(*vk, false)).collect();
         inputs.push(key(0x56, false)); // V
         inputs.push(key(0x56, true));
         inputs.extend(held.iter().rev().map(|vk| key(*vk, true)));
-        let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
-        (sent as usize == inputs.len()).then_some(()).ok_or_else(|| "Paste couldn't be sent.".into())
+        let sent = unsafe {
+            SendInput(
+                inputs.len() as u32,
+                inputs.as_ptr(),
+                std::mem::size_of::<INPUT>() as i32,
+            )
+        };
+        (sent as usize == inputs.len())
+            .then_some(())
+            .ok_or_else(|| "Paste couldn't be sent.".into())
     }
 
     fn sleep(&self, duration: Duration) {
@@ -175,7 +204,14 @@ fn foreground_image() -> Option<String> {
     }
     let mut buffer = [0u16; 1024];
     let mut length = buffer.len() as u32;
-    let ok = unsafe { QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, buffer.as_mut_ptr(), &mut length) };
+    let ok = unsafe {
+        QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            buffer.as_mut_ptr(),
+            &mut length,
+        )
+    };
     unsafe { CloseHandle(process) };
     (ok != 0).then(|| String::from_utf16_lossy(&buffer[..length as usize]))
 }

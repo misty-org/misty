@@ -14,7 +14,10 @@ pub(super) fn apply_macos_webview_theme(webview: &Webview, _value: &str) -> Resu
 }
 
 #[cfg(target_os = "macos")]
-pub(super) fn remember_main_macos_webview(app: &AppHandle, window_label: &str) -> Result<(), String> {
+pub(super) fn remember_main_macos_webview(
+    app: &AppHandle,
+    window_label: &str,
+) -> Result<(), String> {
     use objc2_app_kit::NSView;
     let main_webview = app
         .get_webview(window_label)
@@ -47,7 +50,10 @@ pub(super) fn remember_main_macos_webview(app: &AppHandle, window_label: &str) -
 }
 
 #[cfg(windows)]
-pub(super) fn remember_main_macos_webview(app: &AppHandle, window_label: &str) -> Result<(), String> {
+pub(super) fn remember_main_macos_webview(
+    app: &AppHandle,
+    window_label: &str,
+) -> Result<(), String> {
     use windows_sys::Win32::{Foundation::HWND, UI::WindowsAndMessaging::FindWindowExW};
 
     let main_webview = app
@@ -72,37 +78,22 @@ pub(super) fn remember_main_macos_webview(app: &AppHandle, window_label: &str) -
     if renderer(window_label).native == 0 {
         return Err("Misty's main WebView2 window is unavailable.".to_owned());
     }
-    Ok(())
-}
-
-/// The renderer is transparent only while an overlay needs the external page
-/// beneath it to show through. Otherwise it is opaque: a permanently
-/// transparent WebView2 composites against a white backdrop for a frame
-/// whenever the page content changes, which flashes on every page switch.
-#[cfg(windows)]
-pub(super) fn set_windows_renderer_transparency(
-    app: &AppHandle,
-    window_label: &str,
-    transparent: bool,
-) -> Result<(), String> {
-    if renderer(window_label).transparent == transparent {
-        return Ok(());
-    }
-    let main_webview = app
-        .get_webview(window_label)
-        .ok_or_else(|| "Misty's main webview is unavailable.".to_owned())?;
-    let color = if transparent {
-        Color(0, 0, 0, 0)
-    } else if matches!(main_webview.window().theme(), Ok(tauri::Theme::Light)) {
-        Color(255, 255, 255, 255)
-    } else {
-        Color(19, 19, 19, 255)
-    };
-    main_webview
-        .set_background_color(Some(color))
-        .map_err(|error| error.to_string())?;
-    if let Ok(mut map) = renderers().lock() {
-        map.entry(window_label.to_owned()).or_default().transparent = transparent;
+    // Make the renderer transparent once, when the first page is created and
+    // before any is on screen, and leave it that way. Popovers, menus and
+    // dialogs then only move the pages beneath the renderer and back, which
+    // lands in one frame. Changing WebView2's background per overlay instead
+    // reaches the screen frames after the pages move, so the renderer's fill
+    // flashed over the page every time one opened or closed. The window
+    // itself is painted the theme color behind the renderer
+    // (`DesktopWindowReady`), so nothing shows through where no page is.
+    if !renderer(window_label).transparent {
+        main_webview
+            .set_background_color(Some(Color(0, 0, 0, 0)))
+            .map_err(|error| error.to_string())?;
+        engine_menu::install(&main_webview, true);
+        if let Ok(mut map) = renderers().lock() {
+            map.entry(window_label.to_owned()).or_default().transparent = true;
+        }
     }
     Ok(())
 }
@@ -112,7 +103,10 @@ pub(super) fn browser_child_should_be_below_renderer(overlay_active: bool) -> bo
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-pub(super) fn remember_main_macos_webview(_app: &AppHandle, _window_label: &str) -> Result<(), String> {
+pub(super) fn remember_main_macos_webview(
+    _app: &AppHandle,
+    _window_label: &str,
+) -> Result<(), String> {
     Ok(())
 }
 
@@ -159,7 +153,10 @@ pub(super) fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<
 /// The page sits above the app renderer, so CSS cannot clip it. Mask its
 /// layer to match the workspace corners it reaches.
 #[cfg(target_os = "macos")]
-pub(super) fn round_macos_webview_corners(webview: &Webview, radii: [f64; 4]) -> Result<(), String> {
+pub(super) fn round_macos_webview_corners(
+    webview: &Webview,
+    radii: [f64; 4],
+) -> Result<(), String> {
     use objc2::runtime::AnyObject;
     webview
         .with_webview(move |platform_webview| unsafe {
@@ -306,6 +303,7 @@ pub(super) fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     if is_held_view(webview) {
         return park_windows_webview(webview);
     }
+    wake(webview);
     position_windows_webview(
         webview,
         true,

@@ -24,6 +24,8 @@ pub fn browser_agent_set_locked(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
     locked: bool,
+    // Set by the agent browser: whether its run goes on, ringing the tab whether locked or not.
+    ring: Option<bool>,
 ) -> Result<(), String> {
     let view = app
         .get_webview(&webview_label(&request.id)?)
@@ -38,6 +40,9 @@ pub fn browser_agent_set_locked(
             .map_err(|_| "browser_state_unavailable")?;
         sessions.get_mut(&request.id).map(|session| {
             session.agent_input_locked = locked;
+            if let Some(ring) = ring {
+                session.agent_ring = ring;
+            }
             agent_controls_page(session)
         })
     };

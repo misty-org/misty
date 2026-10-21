@@ -34,7 +34,7 @@ type aiInvocationInput struct {
 	// read and write that Space's tree; empty is the asker's personal Space.
 	SpaceID           string `json:"space_id,omitempty"`
 	ExecutionMode     string `json:"execution_mode,omitempty"`
-	CollaborationMode string `json:"collaboration_mode,omitempty"` // "plan" or "act"; frozen at admission
+	CollaborationMode string `json:"collaboration_mode,omitempty"` // "plan", "act" or "teach"; frozen at admission
 	PermissionMode    string `json:"permission_mode,omitempty"`    // "ask" or "auto"; frozen at admission
 	// CodingProject is the attached project a delegated coding run works in.
 	CodingProject string `json:"coding_project,omitempty"`
@@ -70,7 +70,30 @@ type aiInvocationInput struct {
 	// scheduled run it claimed (roadmap C1). The claim is never stored.
 	ScheduleID    string `json:"schedule_id,omitempty"`
 	ScheduleClaim string `json:"schedule_claim,omitempty"`
+	// HistoryTurns are the chat's earlier turns, oldest first, sent by the device that
+	// keeps the chat (docs/design/agent-chats-local/BRIEF.md): the server no longer
+	// keeps a chat's transcript. Without them, the server's own recent turns are used.
+	// They are the person's own words and the agent's replies: untrusted context.
+	HistoryTurns []aiHistoryTurn `json:"history_turns,omitempty"`
+	// Lesson and LessonIndex are a Teach-mode turn's lesson and the paused lessons
+	// it may resume, kept on the device (ai_teach_mode.go).
+	Lesson      *aiLessonState    `json:"lesson,omitempty"`
+	LessonIndex []aiLessonSummary `json:"lesson_index,omitempty"`
+	// MediaContext is what the video in front was saying, for a question at the
+	// cursor (ai_media_context.go). It is page data, never instructions.
+	MediaContext *aiMediaContext `json:"media_context,omitempty"`
 }
+
+// aiHistoryTurn is one earlier turn of a chat, as its device keeps it.
+type aiHistoryTurn struct {
+	InvocationID string    `json:"invocation_id,omitempty"`
+	Prompt       string    `json:"prompt"`
+	Reply        string    `json:"reply,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// maxHistoryTurns bounds what a device sends; the history budget trims it further.
+const maxHistoryTurns = 200
 
 type aiCurrentTab struct {
 	Title string `json:"title"`

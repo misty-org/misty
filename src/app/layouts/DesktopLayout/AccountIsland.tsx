@@ -1,8 +1,6 @@
-import { Bot, Settings } from "lucide-react";
-import { useMistyPanelStore } from "@/features/agents";
-import { showAgentsPanel } from "@/features/browser/workspace/BrowserMistyPanel";
+import { Settings } from "lucide-react";
+import type { ReactNode } from "react";
 import {
-  appIcon,
   DropdownMenu,
   DropdownMenuTrigger,
   IconButton,
@@ -12,22 +10,9 @@ import {
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
-const AgentsIcon = appIcon("agents") ?? Bot;
-
-/** Agents in a side panel beside the page; pressed while that panel is open. */
-function AgentsPanelButton() {
-  const shown = useMistyPanelStore((s) => s.open);
-  return (
-    <IconButton label="Agents" aria-pressed={shown} onClick={showAgentsPanel}>
-      {/* Fills its box like the gear, so the sidebar draws it a size down too. */}
-      <AgentsIcon {...toolbarIconProps} className="size-4" />
-    </IconButton>
-  );
-}
-
 /**
- * The sidebar's closing row, inside its panel: the signed-in profile, then Agents and
- * Settings as quiet buttons.
+ * The sidebar's closing row, inside its panel: the signed-in profile, then Sync and Settings
+ * as quiet buttons.
  */
 export function AccountIsland(props: {
   open: boolean;
@@ -35,6 +20,8 @@ export function AccountIsland(props: {
   onOpenAccountSettings: () => void;
   settingsOpen: boolean;
   onSettingsClick: () => void;
+  /** The Sync button, beside Settings. */
+  sync?: ReactNode;
 }) {
   return (
     <div
@@ -63,7 +50,7 @@ export function AccountIsland(props: {
           onOpenAccountSettings={props.onOpenAccountSettings}
         />
       </DropdownMenu>
-      <AgentsPanelButton />
+      {props.sync}
       <IconButton
         label="Settings"
         aria-pressed={props.settingsOpen}

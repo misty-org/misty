@@ -32,7 +32,7 @@ vi.mock("./GlobalNavigator", () => ({
   GlobalNavigator: () => <div data-testid="global-navigator">Global Navigator</div>,
 }));
 
-vi.mock("./AccountIsland", () => ({ AccountIsland: () => null }));
+vi.mock("./AccountIsland", () => ({ AccountIsland: () => null, AccountTab: () => null }));
 vi.mock("./WorkspaceStripDock", () => ({
   BrowserProfileButton: () => null,
   StripDownloads: () => null,
@@ -127,6 +127,7 @@ vi.mock("@/features/webviews/browserRuntime", () => ({
   setBrowserPointerTrackingEnabled: vi.fn(),
   isBrowserRuntimeCreated: vi.fn(() => false),
   onBrowserRuntimeClose: vi.fn(() => () => {}),
+  windowChromeChangedEvent: "misty:window-chrome-changed",
 }));
 vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
   BrowserContextMenuBridge: () => null,

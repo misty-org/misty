@@ -38,8 +38,13 @@ fn key(code: u16, up: bool) -> INPUT {
 }
 
 /// Opens Snap Layouts for Misty's main window while it is the window in use.
+///
+/// Takes the calling webview, not a `WebviewWindow`: a window holding browser
+/// pages has child webviews of its own, and Tauri then refuses to hand the
+/// command a `WebviewWindow`, so the flyout never opened once a tab had loaded.
 #[tauri::command]
-pub fn window_show_snap_layouts(window: tauri::WebviewWindow) -> Result<(), String> {
+pub fn window_show_snap_layouts(webview: tauri::Webview) -> Result<(), String> {
+    let window = webview.window();
     if !crate::infra::space_windows::is_space_window(window.label()) || !has_snap_layouts() {
         return Ok(());
     }

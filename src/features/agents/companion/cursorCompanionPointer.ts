@@ -1,6 +1,7 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { CompanionGuideStep, type CompanionClick } from "./companionGuide";
-import { companionReply, resolvePoint } from "./companionReply";
+import { companionReply, resolveFocus, resolvePoint } from "./companionReply";
+import { withoutSketch } from "./companionSketch";
 import { refinePoint, REFINE_MIN_MOVE, snapPoint, type SharpenedPoint } from "./companionSharpen";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
 import type { PresentedPoint } from "./protocol";
@@ -43,6 +44,11 @@ export class CursorCompanionPointer {
     const s = this.s;
     const parsed = companionReply(text);
     const estimate = resolvePoint(parsed.point, s.captures);
+    // Teach mode's regions to look at: shown while the step is read, or for about as
+    // long as reading it takes.
+    const focus = (parsed.focus ?? []).flatMap((region) => resolveFocus(region, s.captures) ?? []);
+    const words = withoutSketch(parsed.text).split(/\s+/).length;
+    s.showFocus(focus, voice ? undefined : Math.min(20_000, Math.max(6_000, words * 350)));
     this.cancel();
     const token = this.token;
     const expected = s.turn;

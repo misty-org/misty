@@ -14,9 +14,13 @@ pub const DOUBLE_TAP: Duration = Duration::from_millis(350);
 pub enum Phase {
     Idle,
     /// The key is held and the microphone is open.
-    Holding { since: Instant },
+    Holding {
+        since: Instant,
+    },
     /// A short tap: keep listening briefly in case a second tap locks it.
-    Tapped { released: Instant },
+    Tapped {
+        released: Instant,
+    },
     /// Hands-free: listening until the next press.
     Locked,
 }
@@ -41,7 +45,10 @@ pub struct Dictation {
 
 impl Dictation {
     pub fn new(hands_free: bool) -> Self {
-        Self { phase: Phase::Idle, hands_free }
+        Self {
+            phase: Phase::Idle,
+            hands_free,
+        }
     }
 
     pub fn phase(&self) -> Phase {

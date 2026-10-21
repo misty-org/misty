@@ -104,8 +104,9 @@ These close the gaps that stop Misty from claiming "does what Muse, Dots and
 Grok Bot do". The IDs come from `ai-browser-comparison.md`.
 
 - **C1 Scheduled tasks that drive the browser.**
-  - Schedules can pick a computer and run browser work there while Misty is open
-    and the computer is awake (keep-awake already exists).
+  - A schedule runs on the computer it was made on, while Misty is open and the
+    computer is awake (keep-awake already exists). There is no computer picker
+    (2026-10-19, [agent-chats-local](../design/agent-chats-local/BRIEF.md)).
   - Today scheduled runs get no device (`workflow_schedules.go`).
   - A missed run waits until the computer is back and says so. It never runs in
     the cloud.

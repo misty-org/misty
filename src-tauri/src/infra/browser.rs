@@ -37,11 +37,11 @@ mod page_frame;
 pub(crate) mod pane_dim;
 use download_names::{reserve_download_path, sanitize_download_name};
 
+#[path = "browser_load_watch.rs"]
+mod load_watch;
 #[cfg(target_os = "macos")]
 #[path = "browser_url_observer.rs"]
 mod url_observer;
-#[path = "browser_load_watch.rs"]
-mod load_watch;
 #[cfg(target_os = "macos")]
 use load_watch::emit_navigated;
 use load_watch::{next_load_generation, watch_load};
@@ -71,6 +71,24 @@ use popups::provider_popup;
 
 #[path = "browser_context_menu.rs"]
 mod context_menu;
+#[cfg(windows)]
+#[path = "browser_engine_menu.rs"]
+mod engine_menu;
+#[cfg(windows)]
+#[path = "browser_stacked_pages.rs"]
+mod stacked_pages;
+#[cfg(windows)]
+pub use stacked_pages::browser_webviews_show_only;
+#[cfg(windows)]
+use stacked_pages::{is_stacked, place_beneath, stack_windows_webview, unstack, wake};
+
+/// Pages switch by stacking order only on Windows; elsewhere the engine shows
+/// and hides views in one frame on its own.
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn browser_webviews_show_only() -> Vec<String> {
+    Vec::new()
+}
 
 #[cfg(all(desktop, debug_assertions))]
 #[path = "browser_eval_bridge.rs"]
@@ -171,9 +189,9 @@ use super::browser_macos::{
     refresh_browser_cursor_ownership, reload_browser_webview, unregister_browser_cursor_ownership,
 };
 use super::browser_scripts::{
-    browser_scrollbar_script, browser_status_script, browser_status_update_script,
-    browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
-    BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
+    browser_captions_script, browser_scrollbar_script, browser_status_script,
+    browser_status_update_script, browser_viewport_script, emit_browser_pointer,
+    set_status_bubble_enabled, BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
 use super::browser_shortcuts::{
     apply as apply_shortcuts, forget_shortcut_token, forward_navigation, shortcut_token_for,
@@ -276,6 +294,9 @@ impl Default for BrowserSessionState {
 #[derive(Default)]
 struct BrowserSession {
     agent_input_locked: bool,
+    // An agent's tab while its run goes on: the ring stays even when the person has taken it
+    // over and the lock is off (docs/design/agent-browser/BRIEF.md).
+    agent_ring: bool,
     workspace_tab_id: Option<String>,
     // Native auxiliary windows stay attached to this live integration view.
     popup_parent: Option<String>,
@@ -296,6 +317,9 @@ struct BrowserSession {
     pending_agent_download: Option<PendingAgentDownload>,
     /// Private tabs keep no download list and share one throwaway data store.
     private: bool,
+    /// The agent run a tab works for, when an agent opened it in the person's window
+    /// (docs/design/agent-browser/BRIEF.md): the benchmark pictures each run's own tabs.
+    agent_run_id: Option<String>,
 }
 
 impl BrowserSession {
@@ -376,6 +400,9 @@ pub struct BrowserWebviewCreateRequest {
     /// A private tab: shared throwaway website data, nothing saved or synced.
     #[serde(default)]
     pub private: bool,
+    /// The agent run this tab works for, for an agent's own tab.
+    #[serde(default)]
+    pub agent_run_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -392,6 +419,14 @@ pub struct BrowserWebviewBoundsRequest {
     /// meets a rounded workspace corner.
     #[serde(default)]
     pub corner_radii: Option<[f64; 4]>,
+    /// The window chrome around those corners, as `#rrggbb`, which smooths
+    /// their edge on Windows.
+    #[serde(default)]
+    pub corner_color: Option<String>,
+    /// Places a hidden page beneath the renderer instead of on top (a tab
+    /// loaded in the background on Windows), so it waits there drawn.
+    #[serde(default)]
+    pub beneath: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -602,7 +637,6 @@ struct RawInteractiveElement {
     name: String,
 }
 
-
 fn webview_label(id: &str) -> Result<String, String> {
     let valid = !id.is_empty()
         && id.len() <= 96
@@ -707,11 +741,17 @@ fn logical_bounds(
 }
 
 fn set_webview_bounds_if_changed(
-    _app: &AppHandle,
+    app: &AppHandle,
     webview: &Webview,
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
+    let scale = webview
+        .window()
+        .scale_factor()
+        .map_err(|error| error.to_string())?;
+    #[cfg(not(windows))]
+    let _ = app;
     // A view still waiting for its first paint takes its size but stays parked,
     // so no caller can pull the blank surface on screen early.
     let position = if is_held_view(webview) {
@@ -719,15 +759,11 @@ fn set_webview_bounds_if_changed(
     } else {
         position
     };
-    let scale = webview
-        .window()
-        .scale_factor()
-        .map_err(|error| error.to_string())?;
     let desired_position = position.to_physical::<i32>(scale);
     let desired_size = size.to_physical::<u32>(scale);
-    if webview.position().map_err(|error| error.to_string())? == desired_position
-        && webview.size().map_err(|error| error.to_string())? == desired_size
-    {
+    let current_position = webview.position().map_err(|error| error.to_string())?;
+    let current_size = webview.size().map_err(|error| error.to_string())?;
+    if current_position == desired_position && current_size == desired_size {
         return Ok(());
     }
     webview
@@ -736,7 +772,64 @@ fn set_webview_bounds_if_changed(
             size: size.into(),
         })
         .map_err(|error| error.to_string())?;
+    #[cfg(windows)]
+    if current_position.x > -10_000 && desired_position.x > -10_000 && !is_stacked(webview) {
+        follow_siblings(
+            app,
+            webview,
+            (current_position, current_size),
+            (position, size),
+        );
+    }
     refresh_browser_cursor_ownership(webview)
+}
+
+/// Equal sizes after logical-to-physical rounding at fractional display scales.
+#[cfg(windows)]
+fn about_same_size(a: tauri::PhysicalSize<u32>, b: tauri::PhysicalSize<u32>) -> bool {
+    a.width.abs_diff(b.width) <= 2 && a.height.abs_diff(b.height) <= 2
+}
+
+/// When a page on screen moves or changes size (the window, the sidebar or a
+/// split moved), the hidden tabs that shared its old place follow it: stacked
+/// ones to its new place and size, parked ones to its new size. Switching to
+/// one then only raises it, already laid out where it shows.
+#[cfg(windows)]
+fn follow_siblings(
+    app: &AppHandle,
+    moved: &Webview,
+    (old_position, old_size): (tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>),
+    (position, size): (LogicalPosition<f64>, LogicalSize<f64>),
+) {
+    let window = moved.window().label().to_owned();
+    for (label, webview) in app.webviews() {
+        if label == moved.label()
+            || !label.starts_with("misty-browser-")
+            || webview.window().label() != window
+        {
+            continue;
+        }
+        let (Ok(current_position), Ok(current_size)) = (webview.position(), webview.size()) else {
+            continue;
+        };
+        if !about_same_size(current_size, old_size) {
+            continue;
+        }
+        let parked = current_position.x <= -10_000 && current_position.y <= -10_000;
+        let same_place = current_position.x.abs_diff(old_position.x) <= 2
+            && current_position.y.abs_diff(old_position.y) <= 2;
+        let target = if parked {
+            PARKED_POSITION
+        } else if is_stacked(&webview) && same_place {
+            position
+        } else {
+            continue;
+        };
+        let _ = webview.set_bounds(tauri::Rect {
+            position: target.into(),
+            size: size.into(),
+        });
+    }
 }
 
 fn register_session(state: &BrowserSessionState, id: &str, scope_id: &str) -> Result<(), String> {
@@ -762,8 +855,6 @@ fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<()
         .map_err(|error| error.to_string())
 }
 
-
-
 #[cfg(test)]
 #[path = "browser_tests.rs"]
 mod tests;
@@ -788,4 +879,3 @@ pub fn browser_runtime_for_scope(
         .map(|(id, _)| id.clone())
         .ok_or_else(|| "browser_context_closed".into())
 }
-

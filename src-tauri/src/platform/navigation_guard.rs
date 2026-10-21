@@ -96,9 +96,21 @@ mod tests {
     #[test]
     fn the_dev_server_is_allowed_only_when_configured() {
         let dev = Some("http://127.0.0.1:5173");
-        assert!(allows("space-personal", &url("http://127.0.0.1:5173/"), dev));
-        assert!(!allows("space-personal", &url("http://127.0.0.1:5174/"), dev));
-        assert!(!allows("space-personal", &url("http://localhost:5173/"), dev));
+        assert!(allows(
+            "space-personal",
+            &url("http://127.0.0.1:5173/"),
+            dev
+        ));
+        assert!(!allows(
+            "space-personal",
+            &url("http://127.0.0.1:5174/"),
+            dev
+        ));
+        assert!(!allows(
+            "space-personal",
+            &url("http://localhost:5173/"),
+            dev
+        ));
     }
 
     #[test]

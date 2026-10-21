@@ -1,4 +1,6 @@
 import { assistantApi } from "@/api/assistant/api";
+import { currentLessonConversation } from "../lessons/lessonEntry";
+import { frontMediaContext } from "./mediaContext";
 import { useSettingsProfiles } from "@/features/settings/sync";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -103,6 +105,7 @@ async function listenToNative(
   listen<{ turn: number; held: boolean }>("misty://cursor-shortcut", (payload) => {
     if (payload.turn < s.turn) return;
     if (payload.held) {
+      if (s.state.teach) currentLessonConversation();
       const current = useMistyStore.getState();
       s.recordingOrigin = {
         conversationId: current.activeConversationId,
@@ -111,6 +114,8 @@ async function listenToNative(
       s.turn = payload.turn;
       s.captures = [];
       s.invocationId = undefined;
+      // Read while the person speaks, so the request never waits on it.
+      s.pendingMedia = { turn: payload.turn, lookup: frontMediaContext() };
       void s.interrupt(false).catch((e) => s.fail(payload.turn, e));
       voice.start().begin();
       s.change({

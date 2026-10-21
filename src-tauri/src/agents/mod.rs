@@ -5,6 +5,6 @@
 pub mod checkpoints;
 pub mod project_diff;
 pub mod project_git;
-pub mod project_snapshot;
 pub mod project_root;
+pub mod project_snapshot;
 pub mod runners;

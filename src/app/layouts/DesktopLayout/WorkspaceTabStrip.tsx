@@ -5,28 +5,30 @@ import { cn, Pressable, OverlaySideProvider, inwardSide, IconButton } from "@/sh
 import { Plus } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { isEmptyTab, layoutTabs } from "@/features/workspace/layoutTabs";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
+import { useWorkspaceStore } from "@/features/workspace";
 import { useTabPresenceMotion } from "./useTabPresenceMotion";
 import { useTabStripFade } from "./useTabStripGeometry";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 import { FavoritesStrip } from "./FavoritesStrip";
 import { useTabHoverCards } from "./TabHoverCard";
 import { navigatorMotionClass } from "./styles";
-import { WindowsWorkspaceTitlebarControls } from "./WindowsWorkspaceTitlebarControls";
 import { useTabStripReorder } from "./useTabStripReorder";
-import { useFocusedPaneSplit } from "./useFocusedPaneSplit";
 import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
-import { SpaceRow } from "@/features/spaces/components/spaceRow/SpaceRow";
+import { SpaceRow } from "@/features/spaces";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
+import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 import { dockingMetrics } from "./dockingGeometry";
+import { useMistyPanelColumn } from "./WorkspaceMistyDock";
 
 const setNavSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setNav(element);
 const setTopSlot = (element: HTMLDivElement | null) =>
   useBrowserToolbarSlot.getState().setTop(element);
+const setFootSlot = (element: HTMLDivElement | null) =>
+  useBrowserToolbarSlot.getState().setFoot(element);
 
 export function WorkspaceTabStrip(
   props: Omit<WorkspaceDockTreeProps, "node"> & {
@@ -40,6 +42,7 @@ export function WorkspaceTabStrip(
 ) {
   const position = props.position ?? "top";
   const vertical = isSideDock(position);
+  const mistyColumn = useMistyPanelColumn();
   const layout = useWorkspaceStore((state) => state.layout);
   // A workspace with no tabs keeps one empty layout tab that is never shown.
   const allTabs = layoutTabs(layout).filter((tab) => !isEmptyTab(tab));
@@ -60,7 +63,6 @@ export function WorkspaceTabStrip(
   useTabPresenceMotion(tabListRef, !vertical);
   const hoverCards = useTabHoverCards();
   useTabStripFade(tabListRef, true, tabs.length, vertical ? "y" : "x");
-  const { pane, ClosePaneIcon, canRight, canDown } = useFocusedPaneSplit(layout);
   const { reorder, bindTabList } = useTabStripReorder({
     vertical,
     groups,
@@ -118,18 +120,6 @@ export function WorkspaceTabStrip(
     const view = useWorkspaceStore.getState().selectTab(id);
     if (view) props.onOpen(view);
   };
-  const closePaneControl = (
-    <IconButton
-      size="xs"
-      tooltip={false}
-      disabled={dockLeaves(layout.root).length <= 1}
-      label="Close pane"
-      title="Close pane"
-      onClick={() => props.onClosePane(pane.id)}
-    >
-      <ClosePaneIcon className="size-4" size={16} />
-    </IconButton>
-  );
   const cardBody = (
     <>
       {vertical && (
@@ -211,7 +201,10 @@ export function WorkspaceTabStrip(
             : {
                 // The first shoulder starts a little past the window buttons, and never closer to the
                 // edge than a rounded pane corner.
-                paddingLeft: `max(12px, ${(props.titlebarInsets?.left ?? 0) + dockingMetrics.tabLead}px)`,
+                // Beside a Misty panel on the left, the tabs start where the page does.
+                paddingLeft: `max(12px, ${(props.titlebarInsets?.left ?? 0) + dockingMetrics.tabLead}px, ${
+                  mistyColumn.side === "left" ? mistyColumn.width + dockingMetrics.paneMargin : 0
+                }px)`,
                 paddingRight: 8 + (props.titlebarInsets?.right ?? 0),
               }
         }
@@ -220,25 +213,37 @@ export function WorkspaceTabStrip(
         {vertical ? (
           <div className="misty-sidebar-card">
             <div className="misty-sidebar-head" data-misty-window-titlebar-region="true">
+              {props.windowsTitlebarControls ? (
+                <div id={windowsCaptionSlotId} className="flex shrink-0 items-center" />
+              ) : null}
               <SidebarToggleButton side={position === "right" ? "right" : "left"} />
               <div className="misty-sidebar-nav flex items-center">
                 <div ref={setNavSlot} className="flex items-center" />
                 <SidebarNavFallback />
               </div>
             </div>
-            <SpaceRow />
             {cardBody}
             <SidebarNowPlaying />
             <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
-              {props.footEnd}
+              {/* Downloads keep the left edge and the pane layout the right, never side by side. */}
+              <div className="flex items-center gap-1.5">{props.footEnd}</div>
+              <div ref={setFootSlot} className="ml-auto flex items-center" />
             </div>
           </div>
         ) : (
           <>
             {cardBody}
             {/* With the sidebar collapsed the Space ends the tab strip, sized like a tab. */}
-            <SpaceRow compact />
-            {props.account}
+            {/* Over a Misty panel on the right they take its column, so the tabs end where the
+                page does and the Space keeps the window's edge. Below the strip's top margin,
+                they center on the tabs. */}
+            <div
+              className="flex shrink-0 items-center justify-end pt-[var(--tab-inset)]"
+              style={{ minWidth: mistyColumn.side === "right" ? mistyColumn.width : 0 }}
+            >
+              <SpaceRow compact />
+              {props.account}
+            </div>
           </>
         )}
         {vertical ? props.account : null}
@@ -251,15 +256,6 @@ export function WorkspaceTabStrip(
             onOpen={props.onOpen}
           />
         )}
-        <WindowsWorkspaceTitlebarControls
-          enabled={Boolean(props.windowsTitlebarControls)}
-          focused
-          paneId={pane.id}
-          canSplitSideways={canRight}
-          canSplitVertically={canDown}
-          closePaneControl={closePaneControl}
-          onSplitPane={props.onSplitPane}
-        />
       </header>
     </OverlaySideProvider>
   );

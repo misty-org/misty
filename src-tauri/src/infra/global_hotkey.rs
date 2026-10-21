@@ -144,7 +144,14 @@ impl Tracker {
             let now = chord.held(modifiers);
             if now != *held {
                 *held = now;
-                changes.push((*id, if now { HotkeyEvent::Down } else { HotkeyEvent::Up }));
+                changes.push((
+                    *id,
+                    if now {
+                        HotkeyEvent::Down
+                    } else {
+                        HotkeyEvent::Up
+                    },
+                ));
             }
         }
         changes
@@ -160,7 +167,14 @@ struct Hub {
 
 fn hub() -> &'static Arc<Mutex<Hub>> {
     static HUB: OnceLock<Arc<Mutex<Hub>>> = OnceLock::new();
-    HUB.get_or_init(|| Arc::new(Mutex::new(Hub { tracker: Tracker::default(), subscribers: Vec::new(), next: 1, started: false })))
+    HUB.get_or_init(|| {
+        Arc::new(Mutex::new(Hub {
+            tracker: Tracker::default(),
+            subscribers: Vec::new(),
+            next: 1,
+            started: false,
+        }))
+    })
 }
 
 /// A registered chord. Dropping it unregisters the chord.
@@ -191,7 +205,9 @@ impl Drop for Subscription {
 /// activity, clicks and hook errors reach every subscriber.
 pub fn subscribe(chord: Chord) -> Subscription {
     let (tx, events) = mpsc::channel();
-    let mut state = hub().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut state = hub()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let id = state.next;
     state.next += 1;
     state.tracker.set(id, chord);
@@ -261,10 +277,27 @@ mod tests {
         tracker.set(1, Chord::companion());
         tracker.set(2, Chord(vec![Key::Fn]));
         assert!(tracker.update(&mods(|m| m.left_control = true)).is_empty());
-        assert_eq!(tracker.update(&mods(|m| { m.left_control = true; m.right_option = true })), vec![(1, HotkeyEvent::Down)]);
-        assert!(tracker.update(&mods(|m| { m.left_control = true; m.right_option = true })).is_empty());
-        assert_eq!(tracker.update(&mods(|m| m.function = true)), vec![(1, HotkeyEvent::Up), (2, HotkeyEvent::Down)]);
-        assert_eq!(tracker.update(&Modifiers::default()), vec![(2, HotkeyEvent::Up)]);
+        assert_eq!(
+            tracker.update(&mods(|m| {
+                m.left_control = true;
+                m.right_option = true
+            })),
+            vec![(1, HotkeyEvent::Down)]
+        );
+        assert!(tracker
+            .update(&mods(|m| {
+                m.left_control = true;
+                m.right_option = true
+            }))
+            .is_empty());
+        assert_eq!(
+            tracker.update(&mods(|m| m.function = true)),
+            vec![(1, HotkeyEvent::Up), (2, HotkeyEvent::Down)]
+        );
+        assert_eq!(
+            tracker.update(&Modifiers::default()),
+            vec![(2, HotkeyEvent::Up)]
+        );
     }
 
     #[test]
@@ -272,7 +305,10 @@ mod tests {
         let mut tracker = Tracker::default();
         tracker.set(1, Chord(vec![Key::RightOption]));
         assert!(tracker.update(&mods(|m| m.left_option = true)).is_empty());
-        assert_eq!(tracker.update(&mods(|m| m.right_option = true)), vec![(1, HotkeyEvent::Down)]);
+        assert_eq!(
+            tracker.update(&mods(|m| m.right_option = true)),
+            vec![(1, HotkeyEvent::Down)]
+        );
     }
 
     #[test]
@@ -289,7 +325,10 @@ mod tests {
     #[test]
     fn parses_settings_values() {
         assert_eq!(Chord::parse("Fn"), Some(Chord(vec![Key::Fn])));
-        assert_eq!(Chord::parse("RightAlt"), Some(Chord(vec![Key::RightOption])));
+        assert_eq!(
+            Chord::parse("RightAlt"),
+            Some(Chord(vec![Key::RightOption]))
+        );
         assert_eq!(Chord::parse("Control + Option"), Some(Chord::companion()));
         assert_eq!(Chord::parse("ctrl+ctrl"), Some(Chord(vec![Key::Control])));
         assert_eq!(Chord::parse("Hyper"), None);

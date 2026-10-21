@@ -30,7 +30,10 @@ fn window(app: &AppHandle) -> Option<WebviewWindow> {
 
 #[cfg(target_os = "macos")]
 fn place(window: &WebviewWindow) {
-    use core_graphics::{event::CGEvent, event_source::{CGEventSource, CGEventSourceStateID}};
+    use core_graphics::{
+        event::CGEvent,
+        event_source::{CGEventSource, CGEventSourceStateID},
+    };
     let Some(point) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
         .ok()
         .and_then(|source| CGEvent::new(source).ok())
@@ -38,7 +41,10 @@ fn place(window: &WebviewWindow) {
     else {
         return;
     };
-    let _ = window.set_position(tauri::LogicalPosition::new(point.x + OFFSET.0, point.y + OFFSET.1));
+    let _ = window.set_position(tauri::LogicalPosition::new(
+        point.x + OFFSET.0,
+        point.y + OFFSET.1,
+    ));
 }
 
 #[cfg(windows)]
@@ -63,7 +69,8 @@ pub fn show(app: &AppHandle) {
     std::thread::spawn(move || {
         let Some(pill) = window(&handle) else { return };
         place(&pill);
-        let _ = handle.run_on_main_thread(move || crate::infra::cursor_companion::show_overlay(&pill));
+        let _ =
+            handle.run_on_main_thread(move || crate::infra::cursor_companion::show_overlay(&pill));
     });
 }
 

@@ -69,7 +69,11 @@ pub fn is_terminal(app: &str) -> bool {
 /// Waits until none of the modifiers are held, polling `held`. Returns false
 /// when they're still down at the timeout, so the caller can leave the text
 /// on the clipboard instead of sending a mangled shortcut.
-pub fn wait_for_release(held: impl Fn() -> Modifiers, timeout: Duration, sleep: impl Fn(Duration)) -> bool {
+pub fn wait_for_release(
+    held: impl Fn() -> Modifiers,
+    timeout: Duration,
+    sleep: impl Fn(Duration),
+) -> bool {
     let start = Instant::now();
     loop {
         if !held().any() {
@@ -125,7 +129,11 @@ pub fn paste_with<D: Desktop>(desktop: &D, text: &str) -> Result<Inserted, Strin
         desktop.request_post_keys();
         return Ok(Inserted::OnClipboard);
     }
-    if !wait_for_release(|| desktop.held_modifiers(), RELEASE_TIMEOUT, |d| desktop.sleep(d)) {
+    if !wait_for_release(
+        || desktop.held_modifiers(),
+        RELEASE_TIMEOUT,
+        |d| desktop.sleep(d),
+    ) {
         return Ok(Inserted::KeysHeld);
     }
     let terminal = desktop.frontmost_app().is_some_and(|app| is_terminal(&app));
@@ -172,7 +180,13 @@ mod tests {
 
     impl Fake {
         fn new(contents: &str) -> Self {
-            Fake { contents: contents.to_string().into(), count: Cell::new(7), pasted: Cell::new(None), racing_copy: None, trusted: true }
+            Fake {
+                contents: contents.to_string().into(),
+                count: Cell::new(7),
+                pasted: Cell::new(None),
+                racing_copy: None,
+                trusted: true,
+            }
         }
         fn write(&self, text: &str) -> u64 {
             *self.contents.borrow_mut() = text.to_string();
@@ -183,14 +197,28 @@ mod tests {
 
     impl Desktop for Fake {
         type Saved = String;
-        fn snapshot_clipboard(&self) -> String { self.contents.borrow().clone() }
-        fn write_clipboard_text(&self, text: &str) -> Result<u64, String> { Ok(self.write(text)) }
-        fn clipboard_change_count(&self) -> u64 { self.count.get() }
-        fn restore_clipboard(&self, saved: String) { self.write(&saved); }
-        fn can_post_keys(&self) -> bool { self.trusted }
+        fn snapshot_clipboard(&self) -> String {
+            self.contents.borrow().clone()
+        }
+        fn write_clipboard_text(&self, text: &str) -> Result<u64, String> {
+            Ok(self.write(text))
+        }
+        fn clipboard_change_count(&self) -> u64 {
+            self.count.get()
+        }
+        fn restore_clipboard(&self, saved: String) {
+            self.write(&saved);
+        }
+        fn can_post_keys(&self) -> bool {
+            self.trusted
+        }
         fn request_post_keys(&self) {}
-        fn held_modifiers(&self) -> Modifiers { Modifiers::default() }
-        fn frontmost_app(&self) -> Option<String> { Some("com.apple.TextEdit".into()) }
+        fn held_modifiers(&self) -> Modifiers {
+            Modifiers::default()
+        }
+        fn frontmost_app(&self) -> Option<String> {
+            Some("com.apple.TextEdit".into())
+        }
         fn post_paste(&self, keys: PasteKeys) -> Result<(), String> {
             self.pasted.set(Some(keys));
             if let Some(copy) = self.racing_copy {
@@ -211,14 +239,20 @@ mod tests {
 
     #[test]
     fn a_copy_during_the_paste_wins_the_race() {
-        let fake = Fake { racing_copy: Some("copied meanwhile"), ..Fake::new("old") };
+        let fake = Fake {
+            racing_copy: Some("copied meanwhile"),
+            ..Fake::new("old")
+        };
         assert_eq!(paste_with(&fake, "dictated"), Ok(Inserted::Pasted));
         assert_eq!(*fake.contents.borrow(), "copied meanwhile");
     }
 
     #[test]
     fn without_accessibility_the_text_waits_on_the_clipboard() {
-        let fake = Fake { trusted: false, ..Fake::new("old") };
+        let fake = Fake {
+            trusted: false,
+            ..Fake::new("old")
+        };
         assert_eq!(paste_with(&fake, "dictated"), Ok(Inserted::OnClipboard));
         assert_eq!(fake.pasted.get(), None);
         assert_eq!(*fake.contents.borrow(), "dictated");
@@ -229,7 +263,10 @@ mod tests {
         let polls = Cell::new(0);
         let held = || {
             polls.set(polls.get() + 1);
-            Modifiers { function: polls.get() < 4, ..Default::default() }
+            Modifiers {
+                function: polls.get() < 4,
+                ..Default::default()
+            }
         };
         assert!(wait_for_release(held, Duration::from_secs(1), |_| {}));
         assert_eq!(polls.get(), 4);
@@ -237,8 +274,15 @@ mod tests {
 
     #[test]
     fn gives_up_when_keys_stay_down() {
-        let held = || Modifiers { right_option: true, ..Default::default() };
-        assert!(!wait_for_release(held, Duration::from_millis(30), std::thread::sleep));
+        let held = || Modifiers {
+            right_option: true,
+            ..Default::default()
+        };
+        assert!(!wait_for_release(
+            held,
+            Duration::from_millis(30),
+            std::thread::sleep
+        ));
     }
 
     #[test]

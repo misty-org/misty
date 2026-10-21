@@ -19,13 +19,14 @@ mod voice;
 #[cfg(desktop)]
 use app::commands::{};
 use app::commands::{
-    agents_choose_folder_scope, agents_device_snapshot, agents_list_scoped_files,
-    agents_prepare_scoped_document, agents_revoke_folder_scope, app_snapshot,
-    clipboard_apply_shared, clipboard_native_file_refs, clipboard_publish_image_bytes,
-    clipboard_publish_shared, clipboard_set_local, clipboard_shared_image_bytes,
-    clipboard_snapshot, clipboard_write_file_bytes, clipboard_write_file_refs, devices_snapshot,
-    explorer_list_directory, explorer_prepare_open_item, navigation_names_snapshot,
-    navigation_names_update, settings_apply_launch_on_login, settings_default_browser_snapshot,
+    agent_chats_delete, agent_chats_list, agent_chats_put, agents_choose_folder_scope,
+    agents_device_snapshot, agents_list_scoped_files, agents_prepare_scoped_document,
+    agents_revoke_folder_scope, app_snapshot, clipboard_apply_shared, clipboard_native_file_refs,
+    clipboard_publish_image_bytes, clipboard_publish_shared, clipboard_set_local,
+    clipboard_shared_image_bytes, clipboard_snapshot, clipboard_write_file_bytes,
+    clipboard_write_file_refs, devices_snapshot, explorer_list_directory,
+    explorer_prepare_open_item, navigation_names_snapshot, navigation_names_update,
+    settings_apply_launch_on_login, settings_default_browser_snapshot,
     settings_launch_on_login_snapshot, settings_profile_commit, settings_profile_state,
     settings_request_default_browser, settings_save, settings_snapshot,
 };
@@ -44,8 +45,8 @@ use app::device_job_commands::{
 };
 #[cfg(desktop)]
 use app::runner_commands::{
-    coding_engines_detect, coding_project_remote, coding_route, coding_run_turn, coding_runner_answer,
-    coding_runner_stop,
+    coding_engines_detect, coding_project_remote, coding_route, coding_run_turn,
+    coding_runner_answer, coding_runner_stop,
 };
 use app::runtime::MistyRuntime;
 use app::shortcut_commands::{shortcuts_replace, shortcuts_snapshot};
@@ -58,7 +59,7 @@ use infra::browser::host_messages::passwords::{
 };
 #[cfg(desktop)]
 use infra::browser::page_tools::media_tools::session::{
-    browser_webview_media_action, browser_webview_media_info,
+    browser_webview_media_action, browser_webview_media_context, browser_webview_media_info,
 };
 #[cfg(desktop)]
 use infra::browser::page_tools::media_tools::{
@@ -73,12 +74,13 @@ use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_webview_back, browser_webview_capture_region, browser_webview_close,
     browser_webview_create, browser_webview_forward, browser_webview_held, browser_webview_hide,
-    browser_webview_navigate, browser_webview_preview_document, browser_webview_reconcile,
-    browser_webview_reload, browser_webview_set_bounds, browser_webview_set_theme,
-    browser_webview_set_zoom, browser_webview_show, browser_webviews_close_except,
-    browser_webviews_hide_all, browser_webviews_hide_except, browser_webviews_park_all,
-    browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
-    browser_webviews_set_status_bubble, BrowserSessionState,
+    browser_webview_navigate, browser_webview_picture, browser_webview_preview_document,
+    browser_webview_reconcile, browser_webview_reload, browser_webview_set_bounds,
+    browser_webview_set_theme, browser_webview_set_zoom, browser_webview_show,
+    browser_webview_sleep, browser_webviews_close_except, browser_webviews_hide_all,
+    browser_webviews_hide_except, browser_webviews_park_all, browser_webviews_set_overlay_active,
+    browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble,
+    browser_webviews_show_only, BrowserSessionState,
 };
 #[cfg(desktop)]
 use infra::browser::{
@@ -355,8 +357,10 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_control_device,
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_set_frequency,
-                    crate::infra::browser_sync::browser_sync_forget_key, crate::infra::browser_sync::browser_sync_space_window,
-                    crate::infra::browser_sync::browser_sync_space_sites, crate::infra::browser_sync::browser_sync_set_space_sites,
+                    crate::infra::browser_sync::browser_sync_forget_key,
+                    crate::infra::browser_sync::browser_sync_space_window,
+                    crate::infra::browser_sync::browser_sync_space_sites,
+                    crate::infra::browser_sync::browser_sync_set_space_sites,
                     crate::infra::auth_cookies::auth_cookie_capture,
                     crate::infra::auth_cookies::auth_cookie_restore,
                     crate::infra::auth_cookies::auth_cookie_forget,
@@ -378,6 +382,8 @@ pub fn run() {
                     crate::infra::agent_dock_windows::agent_dock_card,
                     #[cfg(windows)]
                     crate::infra::window_snap_windows::window_show_snap_layouts,
+                    #[cfg(windows)]
+                    crate::infra::window_snap_target_windows::window_set_maximize_button,
                     crate::infra::default_browser::app_take_launch_urls,
                     mac_rounded_corners::reveal_main_window,
                     mac_rounded_corners::enable_modern_window_style,
@@ -395,7 +401,8 @@ pub fn run() {
                     infra::agent_files::agent_files_revoke,
                     agents_revoke_folder_scope,
                     agents_choose_folder_scope,
-                    agents_list_scoped_files, infra::web_fetch::agents_web_fetch,
+                    agents_list_scoped_files,
+                    infra::web_fetch::agents_web_fetch,
                     infra::link_preview::link_preview_fetch,
                     agents_prepare_scoped_document,
                     #[cfg(desktop)]
@@ -495,6 +502,7 @@ pub fn run() {
                     infra::agent_dock::agent_dock_status,
                     infra::agent_dock::agent_dock_visibility,
                     infra::agent_dock::agent_dock_host_action,
+                    infra::space_windows::diagnostic_log,
                     infra::agent_dock::agent_tab_detach,
                     infra::agent_dock::agent_tab_attach,
                     infra::extension_popup::extension_popup_open,
@@ -631,6 +639,7 @@ pub fn run() {
                     browser_webview_media_playback,
                     browser_webview_media_action,
                     browser_webview_media_info,
+                    browser_webview_media_context,
                     #[cfg(desktop)]
                     browser_webview_reader_article,
                     #[cfg(desktop)]
@@ -638,11 +647,14 @@ pub fn run() {
                     crate::infra::space_windows::space_window_info,
                     crate::infra::space_windows::space_windows_set_spaces,
                     crate::infra::space_windows::space_window_open,
-                    crate::infra::space_windows::space_window_switch, crate::infra::space_windows::space_window_is_host,
-                    crate::infra::space_windows::space_incognito_open, crate::infra::space_windows::space_window_set_color,
+                    crate::infra::space_windows::space_window_switch,
+                    crate::infra::space_windows::space_window_is_host,
+                    crate::infra::space_windows::space_incognito_open,
+                    crate::infra::space_windows::space_window_set_color,
                     crate::infra::space_windows::space_window_close,
                     crate::infra::space_windows::space_windows_menu,
-                    crate::infra::space_windows::space_window_link_target, crate::infra::space_windows::space_window_remove,
+                    crate::infra::space_windows::space_window_link_target,
+                    crate::infra::space_windows::space_window_remove,
                     #[cfg(desktop)]
                     browser_set_mouse_gestures,
                     #[cfg(desktop)]
@@ -710,7 +722,12 @@ pub fn run() {
                     #[cfg(desktop)]
                     browser_webviews_park_all,
                     #[cfg(desktop)]
+                    browser_webviews_show_only,
+                    #[cfg(desktop)]
                     browser_webview_close,
+                    browser_webview_sleep,
+                    browser_webview_picture,
+                    infra::system_memory::system_memory_pressure,
                     #[cfg(desktop)]
                     browser_agent_grant_register,
                     #[cfg(desktop)]
@@ -748,6 +765,9 @@ pub fn run() {
                     #[cfg(desktop)]
                     navigation_names_snapshot,
                     navigation_names_update,
+                    agent_chats_list,
+                    agent_chats_put,
+                    agent_chats_delete,
                     settings_snapshot,
                     settings_profile_state,
                     settings_profile_commit,

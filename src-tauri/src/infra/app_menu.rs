@@ -1,10 +1,10 @@
 #[cfg(target_os = "macos")]
+use super::space_windows;
+#[cfg(target_os = "macos")]
 use tauri::{
     menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
     App, AppHandle, Emitter, Manager, Runtime,
 };
-#[cfg(target_os = "macos")]
-use super::space_windows;
 
 #[cfg(target_os = "macos")]
 use super::commands::ShortcutsSnapshot;
@@ -90,7 +90,10 @@ pub fn refresh_spaces<R: Runtime>(app: &AppHandle<R>) {
 
 /// Shows the Spaces menu at the pointer in `window` (⌘⇧N).
 #[cfg(target_os = "macos")]
-pub fn popup_spaces<R: Runtime>(app: &AppHandle<R>, window: &tauri::Window<R>) -> Result<(), String> {
+pub fn popup_spaces<R: Runtime>(
+    app: &AppHandle<R>,
+    window: &tauri::Window<R>,
+) -> Result<(), String> {
     let menu = spaces_menu(app, "Spaces").map_err(|error| error.to_string())?;
     window.popup_menu(&menu).map_err(|error| error.to_string())
 }

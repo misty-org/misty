@@ -56,6 +56,18 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
             let down = matches!(message as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
             STATE.with(|state| {
                 if let Some((dispatch, modifiers)) = state.borrow_mut().as_mut() {
+                    // A key-up the hook never saw (another hook swallowed it, or focus moved
+                    // while Alt was down) would leave a modifier "held" for good, and the chord
+                    // could not be pressed again. Drop any modifier the system says is up. The
+                    // system's state never sets one: AltGr's fake Control must stay out.
+                    let system = current_modifiers();
+                    modifiers.left_control &= system.left_control;
+                    modifiers.right_control &= system.right_control;
+                    modifiers.left_option &= system.left_option;
+                    modifiers.right_option &= system.right_option;
+                    modifiers.left_command &= system.left_command;
+                    modifiers.right_command &= system.right_command;
+                    modifiers.shift &= system.shift;
                     if apply(modifiers, event.vkCode as u16, event.scanCode, down) {
                         dispatch(Input::Modifiers(*modifiers));
                     } else if down {
@@ -87,7 +99,9 @@ pub(crate) fn run(dispatch: fn(Input)) {
     unsafe {
         let keys = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard), null_mut(), 0);
         if keys.is_null() {
-            dispatch(Input::Error("Voice shortcuts couldn't start. Restart Misty.".into()));
+            dispatch(Input::Error(
+                "Voice shortcuts couldn't start. Restart Misty.".into(),
+            ));
             return;
         }
         // Walkthroughs fall back to "next" by voice or text without click hints.
@@ -111,7 +125,12 @@ mod tests {
     #[test]
     fn altgr_does_not_count_as_control() {
         let mut modifiers = Modifiers::default();
-        assert!(apply(&mut modifiers, VK_LCONTROL, ALTGR_FAKE_CONTROL_SCAN, true));
+        assert!(apply(
+            &mut modifiers,
+            VK_LCONTROL,
+            ALTGR_FAKE_CONTROL_SCAN,
+            true
+        ));
         assert!(apply(&mut modifiers, VK_RMENU, 0x138, true));
         assert!(!modifiers.left_control && modifiers.right_option);
         assert!(apply(&mut modifiers, VK_LCONTROL, 0x1D, true));

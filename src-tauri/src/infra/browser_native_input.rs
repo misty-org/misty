@@ -33,6 +33,7 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
                     .get("clickCount")
                     .is_none_or(|v| matches!(v.as_u64(), Some(1 | 2)))
         }
+        "move" => point("x") && point("y"),
         "drag" => ["fromX", "fromY", "toX", "toY"]
             .iter()
             .all(|key| point(key)),
@@ -106,7 +107,7 @@ pub(super) fn validate(input: &Value) -> Result<(), String> {
 #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 pub(super) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
     let (x, y) = match input["kind"].as_str()? {
-        "click" | "scroll" => ("x", "y"),
+        "click" | "scroll" | "move" => ("x", "y"),
         "drag" => ("toX", "toY"),
         _ => return None,
     };
@@ -124,7 +125,8 @@ pub(super) fn cursor_script(input: &Value, viewport: &Value) -> Option<String> {
     };
     let (width, height) = (viewport["width"].as_f64()?, viewport["height"].as_f64()?);
     Some(format!(
-        "window[Symbol.for('misty.browser.agent.cursor')]?.move({:.1},{:.1},{{hold:true}});",
+        "{}\nwindow[Symbol.for('misty.browser.agent.cursor')]?.move({:.1},{:.1},{{hold:true}});",
+        include_str!("browser_agent_cursor.js"),
         x * width,
         y * height
     ))
@@ -195,7 +197,10 @@ pub(super) async fn dispatch(
         if let Some(script) = cursor_script(input, &observed["viewport"]) {
             // Let the user watch the cursor arrive before the input lands.
             let _ = webview.eval(script);
-            tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(
+                super::page_agent::CURSOR_GLIDE_MS,
+            ))
+            .await;
         }
         let (send, receive) = tokio::sync::oneshot::channel();
         webview
@@ -283,7 +288,10 @@ async fn dispatch_windows(
     if let Some(script) = cursor_script(input, &observed["viewport"]) {
         // Let the user watch the cursor arrive before the input lands.
         let _ = webview.eval(script);
-        tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(
+            super::page_agent::CURSOR_GLIDE_MS,
+        ))
+        .await;
     }
     let authorize: windows::Authorize = {
         let app = app.clone();

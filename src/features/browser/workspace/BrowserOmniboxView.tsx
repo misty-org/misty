@@ -50,7 +50,7 @@ export function BrowserOmniboxView(props: {
   }, [props.trailing]);
 
   return (
-    <div className="relative min-w-0 flex-1" style={{ height: props.hostOnly ? 44 : 36 }}>
+    <div className="relative min-w-0 flex-1" style={{ height: 36 }}>
       <form
         ref={formRef}
         className="relative z-50 min-w-0 flex-1"
@@ -72,7 +72,7 @@ export function BrowserOmniboxView(props: {
           variant="address"
           style={props.trailing && trailingWidth ? { paddingRight: trailingWidth + 8 } : undefined}
           className={cn(
-            props.hostOnly ? "h-11" : "h-9",
+            "h-9",
             "rounded-lg px-3 text-left text-sm",
             props.trailing && "pr-10",
             props.leading && "pl-9",

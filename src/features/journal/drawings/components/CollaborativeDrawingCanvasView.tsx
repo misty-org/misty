@@ -9,6 +9,7 @@ import { useDrawingChangeHandler } from "./useDrawingChangeHandler";
 import { useDrawingFileSharing } from "./useDrawingFileSharing";
 import { useDrawingImageHydration } from "./useDrawingImageHydration";
 import { useDrawingSceneSync } from "./useDrawingSceneSync";
+import { useDrawingSeed } from "./useDrawingSeed";
 import { useFigmaReferenceImport } from "./useFigmaReferenceImport";
 import "./collaborativeDrawingCanvas.css";
 
@@ -27,6 +28,7 @@ export default function CollaborativeDrawingCanvasView(props: CollaborativeDrawi
   const { followTracker, pointerPublisher } = useDrawingSceneSync(props, api, role);
   useDrawingImageHydration(props, api);
   useFigmaReferenceImport(props, api, role);
+  useDrawingSeed(props, api, role);
   const handleChange = useDrawingChangeHandler(props, api, role, shareBinaryFiles);
   useDrawingAiController(props, api, role);
 

@@ -21,7 +21,9 @@ const ACCOUNT_DATA: [&str; 12] = [
 
 pub fn allows(label: &str, command: &str) -> bool {
     if space_windows::is_incognito_window(label)
-        && ACCOUNT_DATA.iter().any(|prefix| command.starts_with(prefix))
+        && ACCOUNT_DATA
+            .iter()
+            .any(|prefix| command.starts_with(prefix))
     {
         return false;
     }

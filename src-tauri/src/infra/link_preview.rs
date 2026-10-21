@@ -65,11 +65,16 @@ async fn preview(address: &str) -> Option<LinkPreview> {
 }
 
 fn host_label(url: &url::Url) -> String {
-    url.host_str().unwrap_or_default().trim_start_matches("www.").to_string()
+    url.host_str()
+        .unwrap_or_default()
+        .trim_start_matches("www.")
+        .to_string()
 }
 
 fn html(content_type: &str) -> bool {
-    content_type.is_empty() || content_type.starts_with("text/html") || content_type.starts_with("application/xhtml+xml")
+    content_type.is_empty()
+        || content_type.starts_with("text/html")
+        || content_type.starts_with("application/xhtml+xml")
 }
 
 fn json(content_type: &str) -> bool {
@@ -95,14 +100,20 @@ async fn page(address: &url::Url) -> Option<(PageMeta, url::Url)> {
         return None;
     }
     let text = String::from_utf8_lossy(&response.body);
-    Some((link_preview_meta::parse(&text, &response.final_url), response.final_url))
+    Some((
+        link_preview_meta::parse(&text, &response.final_url),
+        response.final_url,
+    ))
 }
 
 /// YouTube answers oEmbed with the title and channel, and its thumbnails follow one pattern, so
 /// a video needs no page fetch. The 16:9 thumbnail has no letterbox bars, unlike the one oEmbed
 /// names.
 async fn youtube(address: &url::Url) -> Option<PageMeta> {
-    let host = address.host_str()?.trim_start_matches("www.").trim_start_matches("m.");
+    let host = address
+        .host_str()?
+        .trim_start_matches("www.")
+        .trim_start_matches("m.");
     if host != "youtube.com" && host != "youtu.be" {
         return None;
     }
@@ -111,22 +122,35 @@ async fn youtube(address: &url::Url) -> Option<PageMeta> {
         .query_pairs_mut()
         .append_pair("format", "json")
         .append_pair("url", address.as_str());
-    let response = fetch_raw(endpoint.as_str(), "application/json", OEMBED_BYTES, json).await.ok()?;
+    let response = fetch_raw(endpoint.as_str(), "application/json", OEMBED_BYTES, json)
+        .await
+        .ok()?;
     if response.status >= 400 {
         return None;
     }
     let data: serde_json::Value = serde_json::from_slice(&response.body).ok()?;
-    let text = |key: &str| data.get(key).and_then(|value| value.as_str()).unwrap_or_default().to_string();
+    let text = |key: &str| {
+        data.get(key)
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
     let image_url = data
         .get("thumbnail_url")
         .and_then(|value| value.as_str())
         .and_then(|source| url::Url::parse(source).ok())
         .and_then(|source| {
             let mut segments = source.path_segments()?;
-            (segments.next()? == "vi").then(|| segments.next().map(str::to_string)).flatten()
+            (segments.next()? == "vi")
+                .then(|| segments.next().map(str::to_string))
+                .flatten()
         })
         .map(|id| format!("https://i.ytimg.com/vi/{id}/mqdefault.jpg"))
-        .or_else(|| data.get("thumbnail_url").and_then(|value| value.as_str()).map(str::to_string));
+        .or_else(|| {
+            data.get("thumbnail_url")
+                .and_then(|value| value.as_str())
+                .map(str::to_string)
+        });
     Some(PageMeta {
         site_name: "YouTube".into(),
         title: text("title"),
@@ -147,12 +171,18 @@ async fn thumbnail(address: &str) -> Option<String> {
     if response.status >= 400 || response.truncated {
         return None;
     }
-    let content_type = response.content_type.split(';').next().unwrap_or("image/jpeg").trim().to_string();
+    let content_type = response
+        .content_type
+        .split(';')
+        .next()
+        .unwrap_or("image/jpeg")
+        .trim()
+        .to_string();
     let bytes = response.body;
     tokio::task::spawn_blocking(move || {
-        shrink(&bytes).map(|jpeg| data_url("image/jpeg", &jpeg)).or_else(|| {
-            (bytes.len() <= RAW_IMAGE_BYTES).then(|| data_url(&content_type, &bytes))
-        })
+        shrink(&bytes)
+            .map(|jpeg| data_url("image/jpeg", &jpeg))
+            .or_else(|| (bytes.len() <= RAW_IMAGE_BYTES).then(|| data_url(&content_type, &bytes)))
     })
     .await
     .ok()
@@ -170,5 +200,8 @@ fn shrink(bytes: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn data_url(content_type: &str, bytes: &[u8]) -> String {
-    format!("data:{content_type};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))
+    format!(
+        "data:{content_type};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
 }

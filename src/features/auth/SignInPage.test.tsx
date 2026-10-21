@@ -237,7 +237,7 @@ describe("SignInPage", () => {
       });
       expect(mocks.navigate).not.toHaveBeenCalled();
       if (outcome === "expired") {
-        expect(container.textContent).toContain(
+        expect(document.body.textContent).toContain(
           "Your saved sign-in for alice@example.com is no longer available",
         );
         expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(
@@ -245,7 +245,7 @@ describe("SignInPage", () => {
         );
       } else {
         expect(container.textContent).toContain("Choose an account");
-        expect(container.textContent).toContain("Could not reach the Misty server");
+        expect(document.body.textContent).toContain("Could not reach the Misty server");
         expect(account.disabled).toBe(false);
       }
     },
@@ -326,7 +326,7 @@ describe("SignInPage", () => {
     });
 
     expect(mocks.accountForgotPassword).toHaveBeenCalledWith("alice@example.com");
-    expect(container.textContent).toContain("Check your email for the reset link.");
+    expect(document.body.textContent).toContain("Check your email for the reset link.");
     expect(container.textContent).toContain("Resend in 60s");
 
     const back = Array.from(container.querySelectorAll("button")).find(
@@ -357,7 +357,7 @@ describe("SignInPage", () => {
     });
 
     expect(container.textContent).toContain("Sign in again");
-    expect(container.textContent).toContain("Your saved sign-in for alice@example.com has expired");
+    expect(document.body.textContent).toContain("Your saved sign-in for alice@example.com has expired");
     expect(container.querySelector<HTMLInputElement>('input[type="email"]')!.value).toBe(
       "alice@example.com",
     );

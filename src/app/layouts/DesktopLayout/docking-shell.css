@@ -248,18 +248,26 @@
   min-height: 28px;
   flex-wrap: wrap;
 }
-.misty-workspace-tabs svg,
-#misty-windows-workspace-controls svg {
+.misty-workspace-tabs svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
-#misty-windows-workspace-controls svg {
-  stroke-width: 1.5;
-}
 .misty-workspace-tabs [role="tab"] img {
   width: 16px;
   height: 16px;
+}
+
+/* A hidden tab that keeps its layout (`keptTabs.ts`): nothing in it renders, is hit, focused or
+   read out, but its boxes stay laid out, so showing it again is a single paint. It sits beneath
+   the shown tab in the same cell. Nothing inherited changes with it (no inert, no
+   pointer-events), since that would restyle the whole page when it is shown. */
+[data-tab-kept] {
+  content-visibility: hidden;
+}
+.misty-docking-frame [data-workspace-panes] > [role="tabpanel"][data-tab-kept]::before,
+.misty-docking-frame [data-workspace-panes] > [role="tabpanel"][data-tab-kept]::after {
+  content: none;
 }
 
 /* Every orientation uses the reference pane seam. Geometry chooses the edges
@@ -405,4 +413,12 @@
 .misty-workspace-tabs[data-tab-position="bottom"] {
   margin-top: -1px;
   background-position: bottom;
+}
+
+/* Beside a vertical sidebar the caption buttons share its header row, which starts below the
+   pane margin and the card's border; centre them on that row's 40px. */
+.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-windows-caption-controls {
+  top: calc(var(--pane-frame, 6px) + 1px);
+  height: 40px;
 }

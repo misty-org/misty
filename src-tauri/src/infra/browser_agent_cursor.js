@@ -54,14 +54,15 @@
         host.setAttribute("aria-hidden", "true");
         host.style.cssText = "all:initial;position:fixed;left:0;top:0;width:26px;height:30px;pointer-events:none;z-index:2147483647;opacity:0;contain:strict;";
         const shadow = host.attachShadow({ mode: "closed" });
-        shadow.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="30" viewBox="0 0 26 30" style="display:block;pointer-events:none"><path d="M2 2 L22 17 L13 18 L9 26 Z" fill="#a0c4d4" stroke="#131313" stroke-width="2" stroke-linejoin="round"/></svg>';
+        shadow.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="30" viewBox="0 0 26 30" style="display:block;pointer-events:none"><path d="M2 2 L22 17 L13 18 L9 26 Z" fill="#ffffff" stroke="#131313" stroke-width="2" stroke-linejoin="round"/></svg>';
         document.documentElement.append(host);
         placed = false;
       }
       // No idle loops or invented movement. Reduced motion keeps the target
       // visible but snaps to it rather than travelling across the page.
       const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      host.style.transition = placed && !reduced ? "transform 140ms cubic-bezier(0.16,1,0.3,1), opacity 100ms" : "opacity 100ms";
+      // Slow enough to follow (step.rs waits for it before pressing).
+      host.style.transition = placed && !reduced ? "transform 320ms cubic-bezier(0.16,1,0.3,1), opacity 100ms" : "opacity 100ms";
       host.style.transform = `translate3d(${x - 2}px,${y - 2}px,0)`;
       host.style.opacity = "1";
       placed = true;

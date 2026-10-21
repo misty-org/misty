@@ -131,11 +131,14 @@ export function researchNote(use: ResearchUse, messages: ModelMessage[], tools: 
   if (said) return undefined;
   const spent = `${use.searches} search${use.searches === 1 ? "" : "es"} and ${use.fetches} page read${use.fetches === 1 ? "" : "s"}` +
     (use.repeats ? `, ${use.repeats} of them repeats` : "");
-  // A fact a page holds behind a toggle, a click or JavaScript is found by opening the page, not by searching.
-  const browse = tools.open
-    ? ` Facts on pages a fetch could not show (behind a toggle, a click, JavaScript or a sign-in) are not found by searching: open them in your own tab with ${tools.open} and the first page's url, then go to each other page that needs it with browser_navigate. Browser tools are not counted here, so finish every page the request needs.`
-    : "";
+  // A run with its own tabs does its remaining work on pages, not in searches. "Answer now" made
+  // such runs give up: a 20-school task ended "not finished" after 24 lookups (October 19).
+  if (tools.open) {
+    if (use.stage === "wrap-up")
+      return `${marker}: this run has used ${spent}. Stop searching with new wording. Do the rest of the request on pages: open the sites you already know in your own tabs with ${tools.open}, use their own search boxes, menus and links (browser_steps), and read them with browser_snapshot or browser_extract, which are not counted here. Finish every part the request names before agent_finish.`;
+    return `${marker}: this run has used ${spent}, so web search and fetch are closed. Keep working in your own tabs: ${tools.open} opens a site's address, and its own search, menus and links reach the rest. Finish every part the request names, then call agent_finish and say plainly what you could not confirm.`;
+  }
   if (use.stage === "wrap-up")
-    return `${marker}: this run has used ${spent}. Answer now from what you have unless one specific fact is still missing. If it is, name it and make the single call that finds it; do not search again with new wording.${browse}`;
-  return `${marker}: this run has used ${spent}, so search and page reading are closed. Answer from what you found${tools.open ? ` or from pages you open with ${tools.open}` : ""}, say plainly what you could not confirm, and call agent_finish.`;
+    return `${marker}: this run has used ${spent}. Answer now from what you have unless one specific fact is still missing. If it is, name it and make the single call that finds it; do not search again with new wording.`;
+  return `${marker}: this run has used ${spent}, so search and page reading are closed. Answer from what you found, say plainly what you could not confirm, and call agent_finish.`;
 }

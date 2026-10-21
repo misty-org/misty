@@ -6,7 +6,7 @@ import {
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId } from "./globalMistyActions";
 import type { GlobalSearchState } from "./globalSearchState";
-import { settleProgress, withToolEvent } from "@/features/agents";
+import { settleProgress, withAnswer, withToolEvent } from "@/features/agents";
 import type {
   GlobalAiCitation,
   GlobalAiContextRef,
@@ -169,8 +169,11 @@ export function applyGlobalInvocationEvent(
     return;
   }
   if (event.type === "assistant.message") {
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
     patchConversationMessage(set, get, conversationId, messageId, {
-      content: event.text,
+      ...withAnswer(current ?? {}, event.text),
       state: "streaming",
       activity: undefined,
     });

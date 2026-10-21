@@ -6,7 +6,9 @@ import {
   setBrowserPointerTrackingEnabled,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
+  browserRuntimeId,
   reconcileBrowserOverlayState,
+  switchBrowserPages,
   syncBrowserWebview,
   useBrowserRuntimeStore,
 } from "./browserRuntime";
@@ -82,6 +84,65 @@ describe("browser native view synchronization", () => {
     );
   });
 
+  it("switches pages in one native call the moment the active tab changes", async () => {
+    const shown = browserTab("instant-shown");
+    const coming = browserTab("instant-coming");
+    const bounds = { x: 0, y: 0, width: 800, height: 600 };
+    await syncBrowserWebview({ tab: coming, url: "https://example.com", bounds, theme: "dark" });
+    await hideBrowserWebview(coming);
+    await syncBrowserWebview({ tab: shown, url: "https://example.com", bounds, theme: "dark" });
+    const comingId = browserRuntimeId(coming);
+    invoke.mockClear();
+    invoke.mockImplementation((command) =>
+      Promise.resolve(command === "browser_webviews_show_only" ? [comingId] : undefined),
+    );
+    const presented = (tab: WorkspaceView) =>
+      useBrowserRuntimeStore.getState().presented[tab.id] ?? false;
+    expect(presented(shown)).toBe(true);
+
+    switchBrowserPages([comingId]);
+
+    // One call, sent at once, before anything measures; the page that came up is presented
+    // and the one that went under is not.
+    expect(invoke).toHaveBeenCalledWith("browser_webviews_show_only", {
+      request: { ids: [comingId] },
+    });
+    await vi.waitFor(() => expect(presented(coming)).toBe(true));
+    expect(presented(shown)).toBe(false);
+  });
+
+  it("keeps the host filled until a new page is really on screen", async () => {
+    const tab = browserTab("presented-fill");
+    const bounds = { x: 10, y: 20, width: 800, height: 600 };
+    let held = true;
+    invoke.mockImplementation((command) =>
+      Promise.resolve(
+        command === "browser_webview_reconcile"
+          ? true
+          : command === "browser_webview_held"
+            ? held
+            : undefined,
+      ),
+    );
+    const presented = () => useBrowserRuntimeStore.getState().presented[tab.id] ?? false;
+
+    await syncBrowserWebview({ tab, url: "https://example.com", bounds, theme: "dark" });
+    expect(presented()).toBe(false);
+
+    // The page paints and is revealed; its layout runs again.
+    held = false;
+    await syncBrowserWebview({
+      tab,
+      url: "https://example.com",
+      bounds: { ...bounds, width: 801 },
+      theme: "dark",
+    });
+    expect(presented()).toBe(true);
+
+    await hideBrowserWebview(tab);
+    expect(presented()).toBe(false);
+  });
+
   it("forces a native layout pass immediately after creating the child", async () => {
     const tab = browserTab("initial-layout");
     await syncBrowserWebview({
@@ -94,6 +155,7 @@ describe("browser native view synchronization", () => {
     expect(invoke.mock.calls.map(([command]) => command)).toEqual([
       "browser_webview_create",
       "browser_webview_reconcile",
+      "browser_webview_held",
     ]);
     const createArgs = invoke.mock.calls[0]?.[1] as { request?: Record<string, unknown> };
     expect(createArgs.request).not.toHaveProperty("userAgent");
@@ -252,6 +314,7 @@ describe("browser native view synchronization", () => {
       "browser_webview_reconcile",
       "browser_webview_create",
       "browser_webview_reconcile",
+      "browser_webview_held",
     ]);
   });
 
@@ -349,7 +412,7 @@ describe("browser native view synchronization", () => {
     );
   });
 
-  it("switches overlay input ownership without a renderer repaint delay", async () => {
+  it("keeps the page host transparent until the page is back above the renderer", async () => {
     setBrowserWebviewsSuspended(true, "test-resume-order");
     await vi.waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: true }),
@@ -368,12 +431,14 @@ describe("browser native view synchronization", () => {
 
     setBrowserWebviewsSuspended(false, "test-resume-order");
     await vi.waitFor(() => expect(releaseRaise).toBeTypeOf("function"));
-    expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false);
+    // The page is still below the renderer, so the host must not paint its fill over it yet.
+    expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(true);
 
     releaseRaise?.();
     await vi.waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false }),
+      expect(document.documentElement.hasAttribute("data-browser-overlay-active")).toBe(false),
     );
+    expect(invoke).toHaveBeenCalledWith("browser_webviews_set_overlay_active", { active: false });
   });
 
   it("does not raise the native page until the closing pointer gesture finishes", async () => {

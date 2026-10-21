@@ -1,0 +1,83 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const calls = vi.hoisted(() => ({ list: [] as Array<{ command: string; args: any }>, fail: new Set<string>() }));
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(async (command: string, args: any) => {
+    calls.list.push({ command, args });
+    if (calls.fail.has(command)) throw new Error(`${command} failed`);
+    if (command === "browser_webview_sleep") return { closed: true, url: "https://example.com/item", title: "Item" };
+    return undefined;
+  }),
+}));
+vi.mock("@/features/workspace/browserHome", () => ({ browserHomeUrl: () => "misty://home" }));
+
+import {
+  agentTab,
+  noteAgentTabJob,
+  resetAgentTabs,
+  sleepIdleAgentTabs,
+  sleepTaskTabs,
+  SLEEP_AFTER_MS,
+  trackAgentTab,
+  wakeAgentTab,
+} from "./agentTabs";
+
+const commands = (name: string) => calls.list.filter((call) => call.command === name);
+
+beforeEach(() => {
+  resetAgentTabs();
+  calls.list.length = 0;
+  calls.fail.clear();
+});
+
+describe("agent tabs", () => {
+  it("sleeps tabs the agent left, keeping its newest and any in use", async () => {
+    trackAgentTab({ scopeId: "old", viewId: "v-old", taskId: "t", runId: "r" });
+    trackAgentTab({ scopeId: "busy", viewId: "v-busy", taskId: "t", runId: "r" });
+    noteAgentTabJob("busy", "r", true);
+    trackAgentTab({ scopeId: "newest", viewId: "v-new", taskId: "t", runId: "r" });
+    agentTab("old")!.lastUsed -= SLEEP_AFTER_MS;
+    agentTab("busy")!.lastUsed -= SLEEP_AFTER_MS + 1;
+    agentTab("newest")!.lastUsed -= SLEEP_AFTER_MS - 1;
+    await sleepIdleAgentTabs(Date.now() + SLEEP_AFTER_MS);
+    expect(commands("browser_webview_sleep").map((call) => call.args.request.id)).toEqual(["v-old"]);
+    expect(agentTab("old")).toMatchObject({ viewId: "", url: "https://example.com/item", title: "Item" });
+    expect(agentTab("busy")!.viewId).toBe("v-busy");
+    expect(agentTab("newest")!.viewId).toBe("v-new");
+  });
+
+  it("wakes a sleeping tab under the same scope and run before a job", async () => {
+    trackAgentTab({ scopeId: "s", viewId: "v", taskId: "t", runId: "run-1" });
+    await sleepTaskTabs("t");
+    expect(await wakeAgentTab("s")).toBe(true);
+    const created = commands("browser_webview_create")[0]!.args.request;
+    expect(created).toMatchObject({ scopeId: "s", url: "https://example.com/item", agentRunId: "run-1" });
+    expect(commands("agent_workspace_bind_scope")[0]!.args).toEqual({ taskId: "t", scopeId: "s" });
+    expect(commands("browser_webview_hide")[0]!.args.request).toEqual({ id: created.id, keepLive: true });
+    expect(agentTab("s")!.viewId).toBe(created.id);
+    // Awake already: nothing opens twice.
+    expect(await wakeAgentTab("s")).toBe(true);
+    expect(commands("browser_webview_create")).toHaveLength(1);
+  });
+
+  it("closes a half-opened page when its task's lease is gone", async () => {
+    trackAgentTab({ scopeId: "s", viewId: "v", taskId: "t", runId: "r" });
+    await sleepTaskTabs("t");
+    calls.fail.add("agent_workspace_bind_scope");
+    expect(await wakeAgentTab("s")).toBe(false);
+    const created = commands("browser_webview_create")[0]!.args.request.id;
+    expect(commands("browser_webview_close").map((call) => call.args.request.id)).toEqual([created]);
+    expect(agentTab("s")!.viewId).toBe("");
+    expect(await wakeAgentTab("unknown")).toBe(false);
+  });
+
+  it("sleeps every tab of a run that ended, its newest and busy ones too", async () => {
+    trackAgentTab({ scopeId: "a", viewId: "va", taskId: "t", runId: "r" });
+    trackAgentTab({ scopeId: "b", viewId: "vb", taskId: "t", runId: "r" });
+    noteAgentTabJob("b", "r", true);
+    trackAgentTab({ scopeId: "other", viewId: "vo", taskId: "u", runId: "r2" });
+    await sleepTaskTabs("t");
+    expect(commands("browser_webview_sleep").map((call) => call.args.request.id).sort()).toEqual(["va", "vb"]);
+    expect(agentTab("other")!.viewId).toBe("vo");
+  });
+});

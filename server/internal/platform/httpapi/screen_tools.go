@@ -30,8 +30,6 @@ type screenRequest struct {
 	// Chosen reports that the user's words named the place; otherwise the
 	// desktop reuses an open tab that matches before using Location.
 	Chosen bool `json:"chosen,omitempty"`
-	// Remote is a browser session another device opened for this request.
-	Remote *remoteScreen `json:"remote,omitempty"`
 }
 
 // screenToolRegistrations are offered to desktop runs only; other surfaces
@@ -66,6 +64,8 @@ func (s *SpacesService) screenToolRegistrations(record *db.AIInvocationRecord) [
 			map[string]any{"reason": reason}, "reason"),
 			Handler: s.screenRequestHandler(screenLookTool)},
 		s.screenCloseRegistration(),
+		// app.window (app_window_tool.go) returns with the agent browser, which shows Misty's own
+		// pages (docs/design/agent-browser/BRIEF.md); there is no agent window to open them in now.
 	}
 }
 

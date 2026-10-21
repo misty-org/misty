@@ -74,7 +74,10 @@ pub(in crate::infra) async fn change_account_if<T>(
 /// This device's sync frequency ("live", "balanced" or "saver"), which scales how soon edits
 /// are sent. It is a setting of this device alone and takes effect immediately.
 #[tauri::command]
-pub fn browser_sync_set_frequency(webview: tauri::Webview, frequency: String) -> Result<(), String> {
+pub fn browser_sync_set_frequency(
+    webview: tauri::Webview,
+    frequency: String,
+) -> Result<(), String> {
     require_main(&webview)?;
     if misty_browser_sync::batch::set_frequency(&frequency) {
         Ok(())

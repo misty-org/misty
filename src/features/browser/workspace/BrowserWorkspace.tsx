@@ -185,7 +185,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     ) : null;
   const paneLayout = <BrowserPaneLayoutMenu tabId={tab.id} />;
   const chrome = useBrowserChromeSlot();
-  const { nav: navSlot, top: topSlot } = useBrowserToolbarSlot();
+  const { nav: navSlot, top: topSlot, foot: footSlot } = useBrowserToolbarSlot();
   const paneFocused = useWorkspaceStore((store) =>
     dockLeaves(store.layout.root).some(
       (pane) => pane.id === store.layout.focusedPaneId && pane.activeViewId === tab.id,
@@ -369,6 +369,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
                 data-misty-window-drag-block="true"
               >
                 {navButtons}
+              </div>
+            </Portal>
+          ) : null}
+          {paneFocused && footSlot ? (
+            <Portal container={footSlot}>
+              <div className={cn(browserToolbarStyles.group)} data-browser-toolbar data-sidebar>
                 {paneLayout}
               </div>
             </Portal>

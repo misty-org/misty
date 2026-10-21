@@ -41,11 +41,30 @@ export const assistantApi = {
       `/misty/conversations${query ? `?q=${encodeURIComponent(query)}` : ""}`,
       { onCached },
     ),
-  createConversation: <T>(title: string, spaceId?: string, agentId?: string) =>
+  /**
+   * The device that starts a chat keeps it (docs/design/agent-chats-local/BRIEF.md);
+   * without a device the chat waits in the inbox for the first device to take it.
+   */
+  createConversation: <T>(title: string, spaceId?: string, agentId?: string, deviceId?: string) =>
     apiRequest<T>("/misty/conversations", {
       method: "POST",
-      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId }),
+      body: JSON.stringify({ title, space_id: spaceId, agent_id: agentId, device_id: deviceId }),
     }),
+  /**
+   * What a device needs for its local chats: "legacy" is the one-time copy of chats from
+   * before chats moved to devices; "device" is this device's chats that ran in the last
+   * two days, and the inbox of chats no device keeps yet.
+   */
+  conversationsInScope: <T>(scope: "legacy" | "device", deviceId = "") =>
+    apiRequest<{ conversations: T[] }>(
+      `/misty/conversations?${new URLSearchParams({ scope, ...(deviceId ? { device_id: deviceId } : {}) })}`,
+    ),
+  /** Takes a chat from the inbox, or one from before chats moved to devices, for this device. */
+  keepConversationOnDevice: (conversationId: string, deviceId: string) =>
+    apiRequest<{ id: string; keptOnDeviceId: string }>(
+      `/misty/conversations/${encodeURIComponent(conversationId)}`,
+      { method: "PATCH", body: JSON.stringify({ keep_on_device: deviceId }) },
+    ),
   deleteConversation: (conversationId: string) =>
     apiRequest(`/misty/conversations/${encodeURIComponent(conversationId)}`, {
       method: "DELETE",

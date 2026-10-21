@@ -151,6 +151,9 @@ mod tests {
     #[test]
     fn popup_hosts_are_protected_like_dock_hosts() {
         let label = format!("{HOST_PREFIX}popup-1");
-        assert!(super::super::agent_dock::hosted_elsewhere("space-personal", &label));
+        assert!(super::super::agent_dock::hosted_elsewhere(
+            "space-personal",
+            &label
+        ));
     }
 }

@@ -85,7 +85,13 @@ pub async fn fetch_raw(
             .header("Accept", accept)
             .send()
             .await
-            .map_err(|error| if error.is_timeout() { "fetch_timeout".to_string() } else { "fetch_failed".to_string() })?;
+            .map_err(|error| {
+                if error.is_timeout() {
+                    "fetch_timeout".to_string()
+                } else {
+                    "fetch_failed".to_string()
+                }
+            })?;
         let status = response.status();
         if status.is_redirection() {
             let location = response
@@ -93,7 +99,9 @@ pub async fn fetch_raw(
                 .get(reqwest::header::LOCATION)
                 .and_then(|value| value.to_str().ok())
                 .ok_or_else(|| "fetch_failed".to_string())?;
-            current = current.join(location).map_err(|_| "invalid_url".to_string())?;
+            current = current
+                .join(location)
+                .map_err(|_| "invalid_url".to_string())?;
             continue;
         }
         let content_type = response
@@ -131,18 +139,31 @@ pub async fn fetch_raw(
 
 fn readable(content_type: &str) -> bool {
     content_type.is_empty()
-        || ["text/html", "application/xhtml+xml", "text/plain", "text/markdown", "application/json", "application/xml", "text/xml"]
-            .iter()
-            .any(|kind| content_type.starts_with(kind))
+        || [
+            "text/html",
+            "application/xhtml+xml",
+            "text/plain",
+            "text/markdown",
+            "application/json",
+            "application/xml",
+            "text/xml",
+        ]
+        .iter()
+        .any(|kind| content_type.starts_with(kind))
 }
 
 /// The address to connect to, once the URL and every address its host resolves to pass.
 async fn public_target(url: &url::Url) -> Result<SocketAddr, String> {
-    if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
         return Err("invalid_url".into());
     }
     let host = url.host_str().ok_or_else(|| "invalid_url".to_string())?;
-    let port = url.port_or_known_default().ok_or_else(|| "invalid_url".to_string())?;
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| "invalid_url".to_string())?;
     let host = host.trim_start_matches('[').trim_end_matches(']');
     let addresses: Vec<SocketAddr> = tokio::net::lookup_host((host, port))
         .await
@@ -195,19 +216,49 @@ mod tests {
 
     #[test]
     fn private_and_special_addresses_are_refused() {
-        for address in ["127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fc00::1", "fe80::1", "::ffff:127.0.0.1"] {
-            assert!(!is_public(address.parse().unwrap()), "{address} should be refused");
+        for address in [
+            "127.0.0.1",
+            "10.1.2.3",
+            "172.16.0.1",
+            "192.168.1.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "0.0.0.0",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+            "::ffff:127.0.0.1",
+        ] {
+            assert!(
+                !is_public(address.parse().unwrap()),
+                "{address} should be refused"
+            );
         }
         for address in ["93.184.216.34", "1.1.1.1", "2606:4700:4700::1111"] {
-            assert!(is_public(address.parse().unwrap()), "{address} should be allowed");
+            assert!(
+                is_public(address.parse().unwrap()),
+                "{address} should be allowed"
+            );
         }
     }
 
     #[tokio::test]
     async fn addresses_outside_http_and_local_hosts_never_connect() {
-        assert_eq!(fetch("file:///etc/passwd").await.err().as_deref(), Some("invalid_url"));
-        assert_eq!(fetch("http://user:pw@example.com/").await.err().as_deref(), Some("invalid_url"));
-        assert_eq!(fetch("http://127.0.0.1:8081/health").await.err().as_deref(), Some("private_address"));
-        assert_eq!(fetch("http://localhost/").await.err().as_deref(), Some("private_address"));
+        assert_eq!(
+            fetch("file:///etc/passwd").await.err().as_deref(),
+            Some("invalid_url")
+        );
+        assert_eq!(
+            fetch("http://user:pw@example.com/").await.err().as_deref(),
+            Some("invalid_url")
+        );
+        assert_eq!(
+            fetch("http://127.0.0.1:8081/health").await.err().as_deref(),
+            Some("private_address")
+        );
+        assert_eq!(
+            fetch("http://localhost/").await.err().as_deref(),
+            Some("private_address")
+        );
     }
 }

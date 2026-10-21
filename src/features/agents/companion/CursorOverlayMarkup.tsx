@@ -6,6 +6,8 @@ import type { Presentation } from "./protocol";
 export type CursorOverlayMarkupProps = {
   presentation: Presentation;
   marker: RefObject<HTMLDivElement | null>;
+  focus: RefObject<HTMLDivElement | null>;
+  sketch?: RefObject<HTMLDivElement | null>;
   group: RefObject<HTMLDivElement | null>;
   bubble: RefObject<HTMLDivElement | null>;
   meter: RefObject<HTMLDivElement | null>;
@@ -14,12 +16,16 @@ export type CursorOverlayMarkupProps = {
 export function CursorOverlayMarkup({
   presentation,
   marker,
+  focus,
+  sketch,
   group,
   bubble,
   meter,
 }: CursorOverlayMarkupProps) {
   return (
     <div className="cursor-overlay" aria-hidden="true">
+      <div ref={focus} className="cursor-focus-layer" />
+      <div ref={sketch} className="cursor-sketch-layer" />
       <div ref={marker} className="cursor-point-marker" />
       <div
         ref={group}

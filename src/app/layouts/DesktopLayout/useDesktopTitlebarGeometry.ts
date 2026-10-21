@@ -14,15 +14,19 @@ export function useDesktopTitlebarGeometry(options: {
   docking: ReturnType<typeof useWindowDockingLayout>;
   focusMode: boolean;
   shouldShowWindowsControls: boolean;
+  /** The caption buttons sit inside the sidebar, so the window's corner reserves nothing. */
+  captionInline: boolean;
   appZoom: number;
 }) {
-  const { shellRef, pathname, docking, focusMode, shouldShowWindowsControls, appZoom } = options;
-  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+  const {
+    shellRef,
+    pathname,
+    docking,
+    focusMode,
+    shouldShowWindowsControls,
+    captionInline,
     appZoom,
-    shouldShowWindowsControls
-      ? styles.windowsTitlebarNavigationInset
-      : styles.desktopTitlebarNavigationInset,
-  );
+  } = options;
   const isAuthRoute = isAuthPath(pathname);
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(pathname);
   const sharedTitlebar =
@@ -39,6 +43,16 @@ export function useDesktopTitlebarGeometry(options: {
     if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
   }, [isAuthRoute, shouldShowWindowsControls]);
+  // The caption buttons sit on the left, where macOS puts its traffic lights, so both platforms
+  // share one layout.
+  const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
+    appZoom,
+    shouldShowWindowsControls
+      ? captionInline
+        ? 0
+        : windowsTitlebarControlsWidth || styles.windowsTitlebarControlsFallbackWidth
+      : styles.desktopTitlebarNavigationInset,
+  );
   const sideTabsWidth = useSidebarWidthStore((state) => state.width);
   const geometry = dockingGeometry({
     sideTabsWidth,
@@ -47,7 +61,6 @@ export function useDesktopTitlebarGeometry(options: {
     autoHide: true,
     shareTopBand: !isAuthRoute && !standaloneRouteTitle && !focusMode,
     chromeLeft: titlebarNavigationGeometry.left,
-    chromeRight: shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
   });
   const topTabInsets = geometry.titlebarInsets;
   useMergedTitlebar(
@@ -55,7 +68,7 @@ export function useDesktopTitlebarGeometry(options: {
     `${docking.navigation}:${docking.tabs}:${focusMode}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
-    shouldShowWindowsControls ? (windowsTitlebarControlsWidth || 140) / appZoom : 0,
+    0,
   );
 
   return {

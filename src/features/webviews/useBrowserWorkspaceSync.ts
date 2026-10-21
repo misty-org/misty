@@ -5,13 +5,47 @@ import {
   workspaceTabsById,
   type WorkspaceDockNode,
 } from "@/features/workspace";
-import { closeBrowserRuntime, parkAllBrowserWebviews } from "./browserRuntime";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import {
+  browserRuntimeId,
+  closeBrowserRuntime,
+  parkAllBrowserWebviews,
+  switchBrowserPages,
+} from "./browserRuntime";
 
 function activeBrowserSurfaceExists(root: WorkspaceDockNode): boolean {
   return dockLeaves(root).some((pane) => {
     const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId);
     return activeTab?.surfaceId === "browser";
   });
+}
+
+/** The runtime of every browser tab a pane shows now. */
+function activeBrowserRuntimeIds(root: WorkspaceDockNode): string[] {
+  return dockLeaves(root)
+    .map((pane) => pane.views.find((tab) => tab.id === pane.activeViewId))
+    .filter((tab) => tab?.surfaceId === "browser")
+    .map((tab) => browserRuntimeId(tab!))
+    .sort();
+}
+
+/**
+ * Windows: the moment the active tabs change, the native pages follow in one call, before
+ * React renders the new surface or any page measures itself (`switchBrowserPages`). Switching
+ * to or from a browser tab is then one change of stacking order, not a wait for layout.
+ */
+export function useInstantBrowserSwitch(): void {
+  useEffect(() => {
+    if (!hasTauriInternals() || !/win/i.test(navigator.platform)) return;
+    let current = activeBrowserRuntimeIds(useWorkspaceStore.getState().layout.root).join("\n");
+    return useWorkspaceStore.subscribe((state) => {
+      const ids = activeBrowserRuntimeIds(state.layout.root);
+      const key = ids.join("\n");
+      if (key === current) return;
+      current = key;
+      switchBrowserPages(ids);
+    });
+  }, []);
 }
 
 /** Parks native browser pages while another workspace surface is in front. */

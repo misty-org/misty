@@ -137,7 +137,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
       data-collapsed={collapsed || undefined}
       data-revealed={revealed || undefined}
       data-resizing={resizing || undefined}
-      style={{ order: props.side === "right" ? 2 : 0 }}
+      style={{ gridColumn: props.side === "right" ? 2 : 1, gridRow: "1 / -1" }}
     >
       {/* The strip above the page, across the whole window, moves the window. */}
       <div

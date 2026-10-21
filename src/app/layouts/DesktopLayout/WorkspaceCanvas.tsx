@@ -24,6 +24,7 @@ import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 import { closePeek, usePeekStore } from "@/features/workspace/peek";
 import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
+import { SpaceBar } from "./SpaceBar";
 import type { WorkspaceTab } from "@/features/workspace/model";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
@@ -271,12 +272,22 @@ export function WorkspaceCanvas(props: {
     (props.tabPosition ?? "top") === "top";
 
   const windowMenuSlot = useSpaceWindowMenu();
+  const sideDock = isSideDock(props.tabPosition ?? "top");
+  const contentColumn = props.tabPosition === "right" ? 1 : 2;
 
   return (
     <BrowserChromeSlotContext.Provider value={props.browserChrome ?? null}>
       <WindowMenuSlotContext.Provider value={windowMenuSlot}>
         <div
-          className={`flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace ${isSideDock(props.tabPosition ?? "top") ? "flex-row" : "flex-col"}`}
+          className={`h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-workspace ${
+            sideDock
+              ? `grid grid-rows-[auto_minmax(0,1fr)] ${
+                  props.tabPosition === "right"
+                    ? "grid-cols-[minmax(0,1fr)_auto]"
+                    : "grid-cols-[auto_minmax(0,1fr)]"
+                }`
+              : "grid grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]"
+          }`}
           data-workspace-panes={leaves.length}
           data-workspace-scope={activeScopeKey}
         >
@@ -329,7 +340,11 @@ export function WorkspaceCanvas(props: {
                 footEnd={props.stripFootEnd}
               />
             ))}
+          {sideDock && !standaloneAgents && !props.hideTabStrip ? (
+            <SpaceBar gridColumn={contentColumn} />
+          ) : null}
           <WorkspaceTabPanels
+            gridColumn={sideDock ? contentColumn : undefined}
             layout={layout}
             renderTree={dockTree}
             onClosePeek={() => {

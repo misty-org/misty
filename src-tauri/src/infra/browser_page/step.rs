@@ -1,8 +1,8 @@
 //! One page action: find its control, check it, then click or type natively
 //! when the tab is visible, or through the page script otherwise.
 use super::{
-    call, call_at, frame_of, native_input, poll, resolve_agent_webview,
-    BrowserAgentExecuteRequest, BrowserSessionState, Step,
+    call, call_at, frame_of, native_input, poll, resolve_agent_webview, BrowserAgentExecuteRequest,
+    BrowserSessionState, Step,
 };
 use crate::infra::browser::action_confirm as confirm;
 use serde_json::{json, Value};
@@ -76,14 +76,20 @@ async fn prepare(
     Ok(prepared)
 }
 
+/// How long the cursor glides to a control (browser_agent_cursor.js) before the click.
+pub(crate) const CURSOR_GLIDE_MS: u64 = 320;
+
 fn cursor_script(prepared: &Value) -> Option<String> {
     let (x, y) = (
         prepared["point"]["x"].as_f64()?,
         prepared["point"]["y"].as_f64()?,
     );
+    // The cursor installs itself the first time (it is idempotent), so every agent tab shows it.
     Some(format!(
-        "window[Symbol.for('misty.browser.agent.cursor')]?.move({:.4}*innerWidth,{:.4}*innerHeight,{{hold:true}});",
-        x, y
+        "{}\nwindow[Symbol.for('misty.browser.agent.cursor')]?.move({:.4}*innerWidth,{:.4}*innerHeight,{{hold:true}});",
+        include_str!("../browser_agent_cursor.js"),
+        x,
+        y
     ))
 }
 
@@ -115,7 +121,9 @@ pub(super) async fn run_step(
     }
     // A ref inside a cross-origin frame runs there, against that frame's document.
     let frame = frame_of(view, resolved.reference.as_deref());
-    let document = frame.as_ref().map_or(document, |(_, document)| document.as_str());
+    let document = frame
+        .as_ref()
+        .map_or(document, |(_, document)| document.as_str());
     let frame = frame.as_ref().map(|(frame, _)| *frame);
     let locator = match &resolved.reference {
         Some(reference) => call_at(
@@ -176,7 +184,14 @@ async fn run_step_checked(
     }
     // A fill that submits is judged by the Enter that follows it.
     let submits = step.action == "fill" && step.submit == Some(true);
-    let gate = if submits { "key" } else { step.action.as_str() };
+    // Typing is judged like filling: the same fields (payment, passwords) need the same care.
+    let gate = if submits {
+        "key"
+    } else if step.action == "type" {
+        "fill"
+    } else {
+        step.action.as_str()
+    };
     let key = if submits {
         Some("Enter")
     } else {
@@ -254,7 +269,10 @@ async fn run_step_checked(
                 );
             }
             if let Some(cursor) = cursor_script(&prepared).filter(|_| frame.is_none()) {
-                let _ = view.eval(cursor);
+                // The person watching sees the cursor reach the control before it is pressed.
+                if view.eval(cursor).is_ok() {
+                    tokio::time::sleep(std::time::Duration::from_millis(CURSOR_GLIDE_MS)).await;
+                }
             }
             call_at(view, frame, "perform", step_args(document, step), false).await
         }
@@ -267,6 +285,90 @@ async fn run_step_checked(
             }
             if let Some(_result) = native(step.native_key(), prepared.clone()).await? {
                 return Ok(json!({"ok": true, "attempted": true, "input": "native"}));
+            }
+            call_at(view, frame, "perform", step_args(document, step), false).await
+        }
+        // Hover with a real pointer as well as the page's own events: the pointer opens CSS
+        // :hover menus while the window is in front (WebKit ignores pointer moves into a window
+        // behind others), and the events open menus built in script either way.
+        "hover" => {
+            let input = json!({"kind": "move", "x": prepared["point"]["x"], "y": prepared["point"]["y"]});
+            let moved = cfg!(target_os = "macos") && native(input, prepared.clone()).await?.is_some();
+            let mut result = call_at(view, frame, "perform", step_args(document, step), false).await?;
+            if moved {
+                tokio::time::sleep(Duration::from_millis(150)).await;
+                result["input"] = json!("native");
+            }
+            Ok(result)
+        }
+        // Typing as a person types, through the text input path, so suggest-as-you-type fields,
+        // search boxes and editors respond. The field's text is replaced.
+        "type" => {
+            if step.reference.is_some() {
+                let focused = script("focus").await?;
+                if focused["ok"] != true {
+                    return Ok(focused);
+                }
+                let select_all = json!({"kind": "key", "key": "a", "modifiers": [if cfg!(target_os = "macos") { "Meta" } else { "Control" }]});
+                let _ = native(select_all, prepared.clone()).await?;
+            }
+            let typed = json!({"kind": "type", "text": step.text});
+            let mut result = match native(typed, prepared.clone()).await? {
+                Some(_) => json!({"ok": true, "attempted": true, "input": "native"}),
+                None => {
+                    let fill = Step {
+                        action: "fill".into(),
+                        ..step.clone()
+                    };
+                    call_at(view, frame, "perform", step_args(document, &fill), false).await?
+                }
+            };
+            if step.submit == Some(true) && result["ok"] == true {
+                let enter = Step {
+                    action: "key".into(),
+                    key: Some("Enter".into()),
+                    reference: None,
+                    ..step.clone()
+                };
+                let submitted = match native(enter.native_key(), prepared.clone()).await? {
+                    Some(_) => json!({"ok": true, "input": "native"}),
+                    None => {
+                        call_at(view, frame, "perform", step_args(document, &enter), false).await?
+                    }
+                };
+                result["submitted"] = json!(submitted["ok"] == true);
+            }
+            Ok(result)
+        }
+        // A page scroll turns the wheel, so pages that load or move on wheel events respond.
+        // Scrolling a named panel, or text into view, stays with the page script.
+        "scroll"
+            if step.reference.is_none()
+                && step.text.is_none()
+                && matches!(
+                    step.direction.as_deref(),
+                    Some("up" | "down" | "left" | "right")
+                ) =>
+        {
+            let horizontal = matches!(step.direction.as_deref(), Some("left" | "right"));
+            let size = prepared["viewport"][if horizontal { "width" } else { "height" }]
+                .as_f64()
+                .unwrap_or(800.0);
+            let sign = if matches!(step.direction.as_deref(), Some("up" | "left")) {
+                -1.0
+            } else {
+                1.0
+            };
+            let delta = (sign * step.amount.unwrap_or(0.8) * size)
+                .round()
+                .clamp(-2000.0, 2000.0) as i64;
+            let input = json!({"kind": "scroll", "x": 0.5, "y": 0.5,
+                "deltaX": if horizontal { delta } else { 0 }, "deltaY": if horizontal { 0 } else { delta }});
+            if native(input, prepared.clone()).await?.is_some() {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                return Ok(
+                    json!({"ok": true, "attempted": true, "scrolled": true, "input": "native"}),
+                );
             }
             call_at(view, frame, "perform", step_args(document, step), false).await
         }

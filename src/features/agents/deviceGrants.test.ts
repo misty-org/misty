@@ -13,9 +13,7 @@ vi.mock("./store/useAgentsStore", () => ({
 }));
 vi.mock("./store/useAgentDeviceStore", () => ({
   ensureServerAgentDevice: vi.fn(async () => ({ id: "device_1" })),
-  deviceAccount: vi.fn(async () => null),
 }));
-vi.mock("@/native/devices", () => ({ devicesNative: { view: vi.fn() } }));
 
 import { chatDeviceGrants, desktopDeviceGrants, projectCapabilities } from "./deviceGrants";
 import { useConversationProject } from "./store/useConversationProject";
@@ -26,19 +24,24 @@ const kinds = (contexts: Awaited<ReturnType<typeof desktopDeviceGrants>>) =>
   contexts.map((context) => `${context.kind}:${context.opaqueRef}`);
 
 it("attaches no folder when the chat has no project", async () => {
-  expect(kinds(await desktopDeviceGrants([], null))).toEqual(["workspace:workspace:device_1"]);
+  expect(kinds(await desktopDeviceGrants(null))).toEqual(["workspace:workspace:device_1"]);
 });
 
 it("attaches only the chat's project, for delegated coding", async () => {
-  const contexts = await desktopDeviceGrants([], "scope_site");
+  const contexts = await desktopDeviceGrants("scope_site");
   expect(kinds(contexts)).toEqual(["project_folder:scope_site", "workspace:workspace:device_1"]);
   expect(contexts[0]!.capabilities).toEqual(projectCapabilities);
-  expect(projectCapabilities).toEqual(["folder.list", "folder.read", "folder.send", "code.delegate"]);
+  expect(projectCapabilities).toEqual([
+    "folder.list",
+    "folder.read",
+    "folder.send",
+    "code.delegate",
+  ]);
   expect(projectCapabilities).toContain("folder.read");
 });
 
 it("gives a folder shared read-only before projects only the read-only tools", async () => {
-  const contexts = await desktopDeviceGrants([], "scope_docs");
+  const contexts = await desktopDeviceGrants("scope_docs");
   expect(kinds(contexts)[0]).toBe("local_folder:scope_docs");
   expect(contexts[0]!.capabilities.some((capability) => capability.startsWith("code."))).toBe(
     false,

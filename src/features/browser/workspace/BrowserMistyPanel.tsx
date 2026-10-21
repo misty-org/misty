@@ -1,20 +1,7 @@
 import type { ReactNode } from "react";
 import { Bot, MessagesSquare } from "lucide-react";
 import { useMistyPanelStore, type MistyPanelView } from "@/features/agents";
-import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { appIcon, IconButton } from "@/shared/ui";
-
-/**
- * Whether the Misty panel is open. The panel is a column of its own beside the workspace's
- * panes, a panel apart from the page like the tab drawer, so every browser tab shares it.
- */
-export function useBrowserMistyPanel(tabId: string) {
-  const paneId = useWorkspaceStore(
-    (state) => dockLeaves(state.layout.root).find((pane) => pane.activeViewId === tabId)?.id,
-  );
-  const open = useMistyPanelStore((s) => s.open);
-  return { paneId, here: open, open };
-}
 
 /** Whether the side panel is open on `view`, for the buttons' pressed state. */
 function usePanelShows(view: MistyPanelView) {

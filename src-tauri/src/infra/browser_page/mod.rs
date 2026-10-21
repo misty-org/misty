@@ -18,6 +18,7 @@ mod batch;
 mod frames;
 mod site_blocks;
 mod step;
+pub(crate) use step::CURSOR_GLIDE_MS;
 mod steps;
 pub(super) use batch::upload;
 use batch::{run_skill, run_steps};
@@ -194,12 +195,50 @@ pub(super) async fn landed(
     })
 }
 
+/// An agent's tab answers a cookie banner as each page loads, so it never covers the page the
+/// person watches, even when the agent does not read it. Consent managers often draw the
+/// banner seconds after the load, so it looks again for about ten seconds.
+pub(crate) fn answer_consent_after_load(view: Webview) {
+    tauri::async_runtime::spawn(async move {
+        let mut consent = false;
+        let mut popups = 0;
+        for wait in [1_200, 1_800, 3_000, 4_000] {
+            tokio::time::sleep(Duration::from_millis(wait)).await;
+            if !consent {
+                consent = decline_consent(&view).await.is_some();
+            }
+            // Popups that open with the page or a few seconds after it (page_read.js), as a
+            // person closes them before reading; at most two per load.
+            if popups < 2 && dismiss_popup(&view).await.is_some() {
+                popups += 1;
+            }
+        }
+    });
+}
+
+/// Closes an uninvited popup covering the page (page_read.js), and says what it pressed.
+async fn dismiss_popup(view: &Webview) -> Option<String> {
+    let result = call(view, "dismissPopup", json!({}), false).await.ok()?;
+    let label = result["dismissed"].as_str().filter(|label| !label.is_empty())?.to_owned();
+    let _ = call(view, "settle", json!({"quietMs": 300, "maxMs": 1500}), false).await;
+    Some(label)
+}
+
 /// Answers a cookie or consent banner the most private way before the agent reads the page
 /// (page_read.js), and says which control it pressed.
 async fn decline_consent(view: &Webview) -> Option<String> {
     let result = call(view, "declineConsent", json!({}), false).await.ok()?;
-    let label = result["declined"].as_str().filter(|label| !label.is_empty())?.to_owned();
-    let _ = call(view, "settle", json!({"quietMs": 300, "maxMs": 1500}), false).await;
+    let label = result["declined"]
+        .as_str()
+        .filter(|label| !label.is_empty())?
+        .to_owned();
+    let _ = call(
+        view,
+        "settle",
+        json!({"quietMs": 300, "maxMs": 1500}),
+        false,
+    )
+    .await;
     Some(label)
 }
 
@@ -232,7 +271,7 @@ fn rejected(code: &str, message: impl Into<String>) -> Value {
 }
 
 fn webview(app: &AppHandle, id: &str) -> Result<Webview, String> {
-    app.get_webview(&webview_label(id)?)
+    app.get_webview(&super::webview_label(id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())
 }
 
@@ -277,7 +316,11 @@ pub(super) async fn execute(
                 args["scopeRef"] = json!(scope);
             }
             let scoped = !input["scopeRef"].is_null();
-            let declined = if scoped { None } else { decline_consent(&view).await };
+            let declined = if scoped {
+                None
+            } else {
+                decline_consent(&view).await
+            };
             let mut result = call(&view, "snapshot", args, true).await?;
             if let Some(label) = declined {
                 result["consentDeclined"] = json!(label);
@@ -380,7 +423,8 @@ async fn poll(view: &Webview, condition: &Value, timeout_ms: u64) -> Result<Valu
         let check = call(view, "waitCheck", condition.clone(), false).await?;
         // Text can appear inside an embedded widget's frame rather than the page itself.
         #[cfg(any(target_os = "macos", windows))]
-        let met = check["met"] == true || (condition["text"].is_string() && frames::shows(view, condition).await);
+        let met = check["met"] == true
+            || (condition["text"].is_string() && frames::shows(view, condition).await);
         #[cfg(not(any(target_os = "macos", windows)))]
         let met = check["met"] == true;
         let waited = started.elapsed().as_millis() as u64;

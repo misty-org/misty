@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pointBubbleText, pointLayout, POINT_RING_RADIUS } from "./pointLayout";
+import { focusBoxes, pointBubbleText, pointLayout, POINT_RING_RADIUS } from "./pointLayout";
 import type { PresentedPoint } from "./protocol";
 
 const display = { x: 0, y: 0, width: 1440, height: 900 };
@@ -52,5 +52,18 @@ describe("pointBubbleText", () => {
       "2 of 4 · click Commit",
     );
     expect(pointBubbleText(at(0, 0, { label: " " }), () => 0)).toBe("right here!");
+  });
+});
+
+describe("focus regions", () => {
+  it("outlines only this display's regions, padded and kept on screen", () => {
+    const focus = [
+      { displayId: 1, frame: { x: 2, y: 100, width: 400, height: 200 } },
+      { displayId: 2, frame: { x: 0, y: 0, width: 10, height: 10 } },
+    ];
+    expect(focusBoxes(focus, { id: 1, ...display }, 1)).toEqual([
+      { x: 0, y: 94, width: 412, height: 212 },
+    ]);
+    expect(focusBoxes(undefined, { id: 1, ...display }, 1)).toEqual([]);
   });
 });

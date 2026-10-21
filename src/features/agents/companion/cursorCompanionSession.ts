@@ -7,8 +7,12 @@ import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
 import { companionStage } from "./companionStage";
 import { useCompanionState } from "./companionState";
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
+import { CursorCompanionSketch } from "./cursorCompanionSketch";
+import { focusCapture } from "./focusCapture";
+import type { MediaContext } from "./mediaContext";
+import { useCollaborationStore } from "../collaboration/store";
 import { withMistyControls } from "./mistyControls";
-import type { DisplayCapture, Presentation } from "./protocol";
+import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
 
@@ -37,8 +41,15 @@ export class CursorCompanionSession {
   delegatedTask: { id: string; conversationId: string; awaitingContinuation?: boolean } | undefined;
   /** Pointing and walkthrough steps for finished replies. */
   readonly pointer: CursorCompanionPointer = new CursorCompanionPointer(this);
+  /** A reply's drawing, drawn while it streams. */
+  readonly sketch: CursorCompanionSketch = new CursorCompanionSketch(this);
   hideTimer: ReturnType<typeof setTimeout> | undefined;
   pointTimer: ReturnType<typeof setTimeout> | undefined;
+  focusTimer: ReturnType<typeof setTimeout> | undefined;
+  /** What the video in front was saying, looked up the moment the talk shortcut went down. */
+  pendingMedia: { turn: number; lookup: Promise<MediaContext | undefined> } | undefined;
+  /** The region the last lesson step pointed at; the next check captures it close up. */
+  lastFocus: PresentedFocus | undefined;
   speechRetry: string | undefined;
   recordingOrigin: CompanionOrigin | undefined;
   show = true;
@@ -51,12 +62,14 @@ export class CursorCompanionSession {
 
   constructor(readonly accountId: string) {
     let ask = false,
+      teach = false,
       model = "",
       size = companionSizeDefault;
     try {
       const saved = JSON.parse(localStorage.getItem(`misty.cursor-companion:${accountId}`) || "{}");
       this.show = saved.visible !== false;
       ask = saved.ask === true;
+      teach = saved.teach === true;
       size = normalizeCompanionSize(saved.size);
       model = typeof saved.model === "string" ? saved.model : "";
     } catch {
@@ -69,6 +82,7 @@ export class CursorCompanionSession {
       showCompanion: this.show,
       mode: "auto",
       ask,
+      teach,
       model,
       size,
     };
@@ -130,11 +144,33 @@ export class CursorCompanionSession {
       visible: this.show || this.state.phase !== "idle" || this.pointPending,
       size: normalizeCompanionSize(values["agents.companion.size"]),
       ask: values["agents.companion.ask"] === true,
+      teach: values["agents.companion.teach"] === true,
       model:
         typeof values["agents.companion.model"] === "string"
           ? values["agents.companion.model"]
           : "",
     });
+  };
+
+  /**
+   * Outlines where to look while Misty explains a step (Teach mode). A spoken step
+   * keeps it until the speech ends; a typed one for `holdMs`.
+   */
+  showFocus = (focus: PresentedFocus[], holdMs?: number) => {
+    clearTimeout(this.focusTimer);
+    if (!focus.length) return this.clearFocus();
+    this.lastFocus = focus[0];
+    this.change({ focus });
+    const expected = this.turn;
+    // A spoken step clears when it is read; this bounds one whose speech never ends.
+    this.focusTimer = setTimeout(() => {
+      if (this.active(expected)) this.clearFocus();
+    }, holdMs ?? 60_000);
+  };
+
+  clearFocus = () => {
+    clearTimeout(this.focusTimer);
+    if (this.state.focus) this.change({ focus: undefined });
   };
 
   maybeHide = () => {
@@ -178,8 +214,12 @@ export class CursorCompanionSession {
     this.pointPending = false;
     const shouldCancel = this.owned && cancelTask;
     this.owned = false;
+    clearTimeout(this.focusTimer);
+    this.sketch.cancel();
     this.change({
       point: undefined,
+      focus: undefined,
+      sketch: undefined,
       phase: "idle",
       error: this.nativeReady ? undefined : this.state.error,
     });
@@ -259,6 +299,19 @@ export class CursorCompanionSession {
     }
     this.pointer.present(reply.content, this.invocationId);
     this.maybeHide();
+  };
+
+  /**
+   * A Teach turn's screens plus a close-up of the region the last step pointed at,
+   * so a check reads the person's work exactly. Without one, the screens alone.
+   */
+  withFocusCapture = async (screens: DisplayCapture[], generation: number) => {
+    const chat = useMistyStore.getState().activeConversationId;
+    // The server takes a close-up only on a lesson step.
+    const lesson = useCollaborationStore.getState().modeFor(chat) === "teach";
+    if (!this.state.teach || !lesson || !this.lastFocus || !screens.length) return screens;
+    const close = await focusCapture(generation, this.lastFocus).catch(() => undefined);
+    return close ? [...screens, close] : screens;
   };
 
   /** The screens, with Misty's own visible controls named on the one showing them. */

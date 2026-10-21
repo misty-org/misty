@@ -12,8 +12,6 @@ export {
   noteServerAgentDeviceSeen,
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
-export { useAgentDeviceTargets } from "./store/useAgentDeviceTargets";
-export type { RemoteAgentDevice } from "./deviceGrants";
 export * from "./store/useAiServerStore";
 
 export { companionReply } from "./companion/companionReply";
@@ -24,6 +22,7 @@ export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { mistyPanelHost, useMistyPanelHost, useMistyPanelSide } from "./panel/mistyPanelHost";
 export {
   MISTY_PANEL_WIDTH,
+  mistyPanelWidth,
   useMistyPanelStore,
   type MistyPanelView,
 } from "./panel/mistyPanelStore";
@@ -45,7 +44,7 @@ export { AppRequestCard } from "./apps/AppRequestCard";
 export { StatusRow, StatusTable, type StatusState } from "./progress/StatusTable";
 export { codingToolForTurn, useConversationCodingTool } from "./store/useConversationCodingTool";
 
-export { settleProgress, withToolEvent } from "./progress/progressTimeline";
+export { settleProgress, withAnswer, withToolEvent } from "./progress/progressTimeline";
 export { describeNextRun } from "./workflows/scheduleSummary";
 export { useWorkflowSchedulesStore } from "./workflows/useWorkflowSchedulesStore";
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";

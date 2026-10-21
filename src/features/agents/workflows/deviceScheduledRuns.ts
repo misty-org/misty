@@ -91,7 +91,7 @@ async function pickUp(accountId: string) {
           methodInputs: claim.inputs,
           scheduleId: claim.schedule_id,
           scheduleClaim: claim.claim,
-          deviceContexts: await desktopDeviceGrants([], null),
+          deviceContexts: await desktopDeviceGrants(null),
           executionMode: "user",
           idempotencyKey: claim.idempotency_key,
           timezone: claim.timezone,

@@ -1,3 +1,4 @@
+import { diag } from "./diagnostics";
 import { subscribeAccountEvents } from "@/api/accountEvents";
 import { devicesNative } from "@/native/devices";
 import { mistyDeviceJobsEnabled } from "./flags";
@@ -28,6 +29,7 @@ import {
   type ClaimedWorkflowNodeJob,
 } from "./workerBrowserJobs";
 import { HeldClaims } from "./workerHeldClaim";
+import { agentTab, noteAgentTabJob, pictureAgentTab, wakeAgentTab } from "./agentTabs";
 import { touchHostedSession } from "./hostedSessionsState";
 
 export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
@@ -36,7 +38,9 @@ export type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 
 const leaseHeartbeatMs = 20_000;
 const nodeExecutionTimeoutMs = 5 * 60_000;
-const jobReconciliationMs = 60_000;
+// Realtime notifications drop while the socket reconnects (every 15 to 60 s on the dev stack), and
+// a run's first page then waited up to 90 s: reconcile on every presence tick instead.
+const jobReconciliationMs = 25_000;
 
 export class DesktopAgentJobWorker {
   private generation = 0;
@@ -112,9 +116,27 @@ export class DesktopAgentJobWorker {
           : heartbeatServerAgentDevice(serverDevice.id, localDevice.id);
       while (current() && this.active.size < 8) {
         this.lastDiscoveryAt = Date.now();
+        const asked = Date.now();
+        diag("worker", `claim active=${this.active.size} holding=${this.held.holding()}`);
         const claim = await claimNextWorkflowNodeJob(serverDevice.id, localDevice.id, this.held);
-        if (!current()) return;
+        diag(
+          "worker",
+          `claimed ${claim ? claim.job.operation : "none"} after=${Date.now() - asked}ms`,
+        );
+        if (!current()) {
+          // A claim answered after this worker stopped was dropped and stayed leased until its
+          // run gave up 30 s later (a run's first page never opened). Put it back instead.
+          if (claim)
+            void devicesApi
+              .releaseWorkflowJob(signedAgentDeviceRequest, localDevice.id, serverDevice.id, claim.job.id, claim.leaseToken)
+              .catch(() => undefined);
+          return;
+        }
         this.failures = 0;
+        // While a run's browser steps are coming, a held claim that came back empty is held
+        // again, so the next step is handed over the moment it is queued. One that came back at
+        // once was not held (the server keeps one per device): notifications wake the worker.
+        if (!claim && this.held.holding() && Date.now() - asked > 2_000) continue;
         if (!claim) break;
         void this.runWorkflowNodeClaim(claim, localDevice.id, serverDevice.id).finally(() =>
           this.wake(),
@@ -148,8 +170,11 @@ export class DesktopAgentJobWorker {
     const controller = new AbortController();
     this.active.add(controller);
     let job = claim.job;
-    const browser = job.operation.startsWith("browser.");
-    if (browser) this.held.noteBrowserJob();
+    const startedAt = Date.now();
+    controller.signal.addEventListener("abort", () =>
+      diag("worker", `aborted ${job.operation} after=${Date.now() - startedAt}ms`),
+    );
+    this.held.noteJob();
     let leaseExpiresAt = claim.leaseExpiresAt ?? job.leaseExpiresAt;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let heartbeat: ReturnType<typeof setInterval> | undefined;
@@ -171,6 +196,10 @@ export class DesktopAgentJobWorker {
         claim.leaseToken,
       );
       began = true;
+      diag(
+        "worker",
+        `began ${job.operation} after=${Date.now() - startedAt}ms active=${this.active.size}`,
+      );
       leaseExpiresAt = job.leaseExpiresAt;
       controller.signal.throwIfAborted();
       arm();
@@ -247,7 +276,7 @@ export class DesktopAgentJobWorker {
       clearTimeout(timer);
       clearInterval(heartbeat);
       this.active.delete(controller);
-      if (browser) this.held.noteBrowserJob();
+      this.held.noteJob();
     }
     // Retry only delivery of the exact observed result, never the operation.
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -329,7 +358,7 @@ async function executeWorkflowNodeOnDevice(
   }
   signal.throwIfAborted();
   if (job.operation === "browser.session") {
-    // A browser session for a request made on another of the person's devices.
+    // The agent's own browser session on this computer, for a run sent from here.
     return (await import("./hostedSessions")).startHostedSession(job, signal);
   }
   if (job.operation === "browser.spawn_tabs") {
@@ -342,6 +371,11 @@ async function executeWorkflowNodeOnDevice(
   }
   if (job.operation.startsWith("browser.")) {
     touchHostedSession(job.scopeId, job.runId);
+    // An agent's sleeping tab opens its page again first (agentTabs.ts); one whose run's lease
+    // ended stays asleep and the job is not attempted.
+    if (agentTab(job.scopeId) && !(await wakeAgentTab(job.scopeId)))
+      throw new DeviceOperationNotAttempted(new Error("agent_tab_closed"));
+    noteAgentTabJob(job.scopeId, job.runId, true);
     const cancel = () => {
       void invoke("browser_agent_execution_cancel", {
         request: browserExecutionControl(job, leaseExpiresAt),
@@ -379,6 +413,8 @@ async function executeWorkflowNodeOnDevice(
       }
       throw error;
     } finally {
+      noteAgentTabJob(job.scopeId, job.runId, false);
+      void pictureAgentTab(job.scopeId);
       signal.removeEventListener("abort", cancel);
       const id = await browserRuntimeIdForScope(job.scopeId).catch(() => null);
       if (id)

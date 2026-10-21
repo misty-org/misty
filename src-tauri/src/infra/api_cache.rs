@@ -102,7 +102,9 @@ fn with_cache<T>(
     work: impl FnOnce(&Cache) -> Result<T, String>,
 ) -> Result<T, String> {
     let slot = CACHE.get_or_init(|| Mutex::new(None));
-    let mut guard = slot.lock().map_err(|_| "The cache is unavailable".to_string())?;
+    let mut guard = slot
+        .lock()
+        .map_err(|_| "The cache is unavailable".to_string())?;
     if guard.is_none() {
         *guard = Some(open(runtime.environment.cache_dir().join("api"))?);
     }

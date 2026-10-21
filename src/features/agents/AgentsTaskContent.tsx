@@ -3,6 +3,9 @@ import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversat
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
 import type { AgentsPageActions, AgentsPageView } from "./agentsPageActions";
 import type { AgentsPageState } from "./useAgentsPageState";
+import { AgentBrowser } from "./agentBrowser/AgentBrowser";
+import { AgentBrowserPip } from "./agentBrowser/AgentBrowserPip";
+import { setBrowserExpanded } from "./agentBrowser/agentBrowserStore";
 
 type AgentsTaskContentProps = {
   state: AgentsPageState;
@@ -48,6 +51,11 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               disabled={disabled}
               working={taskWorking}
             />
+            {/* The agent browser shrunk to a picture; clicking it opens the split again. */}
+            <AgentBrowserPip
+              conversationId={activeConversationId ?? undefined}
+              onExpand={() => activeConversationId && setBrowserExpanded(activeConversationId, true)}
+            />
               <AgentWorkspaceConversation
                 key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
                 agent={profile}
@@ -70,6 +78,8 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 onCreate={create}
               />
           </div>
+          {/* The agent's own browser beside the chat (docs/design/agent-browser/BRIEF.md). */}
+          <AgentBrowser conversationId={activeConversationId ?? undefined} />
         </div>
       </div>
     </>

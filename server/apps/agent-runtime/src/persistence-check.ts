@@ -9,6 +9,16 @@ import type { TaskCompletion } from "./task-completion.js";
 /** Unfinished parts only the person can unblock: an account, a payment, a human check. */
 const needsPerson = /\b(sign[ -]?in|log[ -]?in|password|account|captcha|verification|verify|2fa|one-time code|payment|pay|purchase|checkout|paywall|subscri)/i;
 
+/**
+ * Whether another early give-up may be sent back. Three were allowed whatever the time, and a
+ * 20-school run gave up for good 8 minutes into its own 45-minute estimate (October 19): while a
+ * run is under 80% of its estimate it may be sent back up to eight times.
+ */
+export function mayRefuseGiveUp(refusals: number, elapsedMs: number, estimateMinutes: number | undefined): boolean {
+  if (refusals < 3) return true;
+  return refusals < 8 && estimateMinutes !== undefined && elapsedMs < estimateMinutes * 60_000 * 0.8;
+}
+
 /** The refusal message, or undefined when the finish should stand. */
 export function earlyGiveUp(report: TaskCompletion, turn: number, limit: number): string | undefined {
   if (report.outcome === "completed" || !report.remaining.length) return undefined;

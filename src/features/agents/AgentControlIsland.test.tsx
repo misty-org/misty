@@ -203,14 +203,10 @@ it("sends a message to steer the task, or queues it as a new task", async () => 
   expect(await screen.findByText("Queued after this task.")).toBeDefined();
 });
 
-it("says which agents work here for another device, with Stop", async () => {
+it("leaves agents working in tabs of their own to their chat's agent browser", () => {
   useHostedSessions.setState({ sessions: [{ taskId: "hosted", agentId: "agent" }] as never });
   render(<AgentControlIsland />);
-  expect(screen.getByRole("status").textContent).toBe(
-    "Misty is working here for one of your other devices",
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Stop" }));
-  await waitFor(() => expect(mocks.endHosted).toHaveBeenCalledWith("hosted"));
+  expect(screen.queryByRole("status")).toBeNull();
 });
 
 it("mirrors itself on the desktop island and acts on its presses", async () => {

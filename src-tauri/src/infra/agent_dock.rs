@@ -18,8 +18,6 @@ pub(super) use host_view::{fill_host, page_returned};
 
 /// Host windows for detached tabs: `misty-dock-<uuid>`.
 pub const HOST_PREFIX: &str = "misty-dock-";
-/// Height of a host window's bar above its page.
-const HOST_BAR: f64 = 44.0;
 const EVENT: &str = "misty://agent-dock";
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -290,7 +288,7 @@ pub fn detach(
         .append_pair("title", &title)
         .append_pair("agent", &name)
         .finish();
-    let host = WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         &app,
         &label,
         WebviewUrl::App(format!("index.html?{query}").into()),
@@ -300,13 +298,18 @@ pub fn detach(
     } else {
         format!("{title} · {name}")
     })
-    .inner_size(size.width.max(640.0), size.height.max(420.0) + HOST_BAR)
+    .inner_size(size.width.max(640.0), size.height.max(420.0))
     .min_inner_size(480.0, 360.0)
     .focused(false)
     // The agent works here while the person is in another window.
-    .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled)
-    .build()
-    .map_err(|e| e.to_string())?;
+    .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+    // An OS window of its own, without a title bar: the page fills it under the window buttons,
+    // whose close docks it again, and the strip around its island moves it.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true);
+    let host = builder.build().map_err(|e| e.to_string())?;
     hosts()
         .lock()
         .map_err(|_| "agent_dock_unavailable")?
@@ -318,14 +321,17 @@ pub fn detach(
                 name: name.clone(),
             },
         );
-    let closing = (app.clone(), label.clone());
+    let events = (app.clone(), label.clone(), name.clone());
     host.on_window_event(move |event| match event {
-        // Closing the agent's window brings its tab home; the task goes on.
+        // It is the agent's window, not the person's to close: closing it docks it again, and
+        // it goes only when its task ends or stops (attach destroys it).
         tauri::WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            let _ = attach(&closing.0, &closing.1);
+            if !is_docked(&events.1) {
+                let _ = dock(&events.0, &events.1, &events.2);
+            }
         }
-        tauri::WindowEvent::Destroyed => forget(&closing.0, &closing.1),
+        tauri::WindowEvent::Destroyed => forget(&events.0, &events.1),
         _ => {}
     });
     let target = app.get_window(&label).ok_or("The agent window closed.")?;
@@ -336,7 +342,7 @@ pub fn detach(
         let _ = target.destroy();
         return Err(error.to_string());
     }
-    fill_host(&webview, HOST_BAR)?;
+    fill_host(&webview, 0.0)?;
     dock(&app, &label, &name)?;
     Ok(label)
 }

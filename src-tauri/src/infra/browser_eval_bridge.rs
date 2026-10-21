@@ -28,10 +28,12 @@ use std::sync::Arc;
 
 #[path = "browser_eval_bridge_dock.rs"]
 mod dock;
-#[path = "browser_eval_bridge_pages.rs"]
-mod pages;
 #[path = "browser_eval_bridge_grants.rs"]
 mod grants;
+#[path = "browser_eval_bridge_pages.rs"]
+mod pages;
+#[path = "browser_eval_bridge_processes.rs"]
+mod processes;
 
 const AGENT: &str = "browser-eval";
 const ACCOUNT: &str = "browser-eval";
@@ -122,6 +124,7 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/close", post(close))
             .route("/dock", post(dock::dock))
             .route("/pages", post(pages::pages))
+            .route("/processes", post(processes::processes))
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
             .with_state(bridge);

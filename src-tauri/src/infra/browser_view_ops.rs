@@ -135,6 +135,17 @@ pub async fn browser_webview_capture_region(
     }
 }
 
+/// `#rrggbb` as its channels.
+#[cfg(windows)]
+fn hex_color(value: &str) -> Option<[u8; 3]> {
+    let hex = value.strip_prefix('#')?;
+    if hex.len() != 6 || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |start: usize| u8::from_str_radix(&hex[start..start + 2], 16).ok();
+    Some([channel(0)?, channel(2)?, channel(4)?])
+}
+
 #[tauri::command]
 pub fn browser_webview_reconcile(
     caller: Webview,
@@ -150,15 +161,28 @@ pub fn browser_webview_reconcile(
     }
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     configure_browser_webview(&webview, request.native_live_resize)?;
+    // A tab loaded in the background drops beneath the renderer before it
+    // moves into place, so it never shows over the tab on screen.
+    #[cfg(windows)]
+    if request.beneath && !is_held_view(&webview) {
+        place_beneath(&webview)?;
+    }
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     pane_dim::apply(&webview, &request.id)?;
     #[cfg(target_os = "macos")]
     round_macos_webview_corners(&webview, request.corner_radii.unwrap_or_default())?;
     #[cfg(windows)]
-    page_frame::set_corners(&webview, request.corner_radii.unwrap_or_default())?;
+    page_frame::set_corners(
+        &webview,
+        request.corner_radii.unwrap_or_default(),
+        request.corner_color.as_deref().and_then(hex_color),
+    )?;
     // Reconciliation owns geometry, visibility, and sibling order so a stale
-    // frontend cache cannot leave the page detached from its Browser host.
-    present_macos_webview(&webview)?;
+    // frontend cache cannot leave the page detached from its Browser host. A
+    // page placed beneath stays there until its tab shows it.
+    if !request.beneath {
+        present_macos_webview(&webview)?;
+    }
     // A reloaded shell forgot the page's color; the page will not resend it.
     #[cfg(target_os = "macos")]
     host_messages::replay_page_background(&app, &request.id);
@@ -268,8 +292,10 @@ pub(crate) fn apply_page_zoom_policy(webview: &Webview, app: &AppHandle, id: &st
     let state = app.state::<BrowserSessionState>();
     let sessions = state.sessions.lock().ok();
     let session = sessions.as_ref().and_then(|sessions| sessions.get(id));
-    let factor =
-        super::super::browser_site_zoom::page_factor(webview, session.map(|s| (s.private, s.zoom_factor)));
+    let factor = super::super::browser_site_zoom::page_factor(
+        webview,
+        session.map(|s| (s.private, s.zoom_factor)),
+    );
     let _ = webview.set_zoom(factor);
 }
 
@@ -353,8 +379,9 @@ pub fn browser_webviews_set_overlay_active(
     }
     #[cfg(windows)]
     {
+        // Only the stacking changes: the renderer is already transparent, so
+        // the page reads the same above or below it.
         remember_main_macos_webview(&app, caller.window().label())?;
-        set_windows_renderer_transparency(&app, caller.window().label(), active)?;
         if let Ok(mut map) = renderers().lock() {
             map.entry(caller.window().label().to_owned())
                 .or_default()
@@ -365,6 +392,10 @@ pub fn browser_webviews_set_overlay_active(
             if label.starts_with("misty-browser-")
                 && webview.window().label() == caller.window().label()
             {
+                // Stacked tabs stay beneath everything, overlay or not.
+                if is_stacked(&webview) {
+                    continue;
+                }
                 if let Err(error) = position_windows_webview(&webview, false, active) {
                     errors.push(error);
                 }
@@ -471,11 +502,16 @@ pub fn browser_webview_hide(
     if detached_from(&caller, &webview) {
         return Ok(());
     }
-    // Switching tabs parks the page offscreen on Windows instead of hiding it.
-    // WebView2 drops its render surface when hidden and paints its default
-    // color until the first new frame, which flashes on the next switch back.
+    // Switching tabs on Windows keeps the page in place beneath the renderer
+    // (see `stacked_pages`). WebView2 drops its render surface when hidden and
+    // paints its default color until the first new frame, and a page moved
+    // offscreen redraws when it comes back; either one flashes.
     #[cfg(windows)]
-    park_windows_webview(&webview)?;
+    if request.keep_live {
+        park_windows_webview(&webview)?;
+    } else {
+        stack_windows_webview(&app, &webview)?;
+    }
     #[cfg(not(windows))]
     {
         if request.keep_live {

@@ -100,22 +100,6 @@ pub(crate) async fn sign_run_grants(
         .collect()
 }
 
-fn surface_for(operation: &str, scope_id: &str) -> &'static str {
-    if scope_id.starts_with("inbox:") {
-        "inbox"
-    } else if operation.starts_with("folder.") || operation == "read_content" {
-        "folders"
-    } else if operation.starts_with("terminal.") {
-        "terminal"
-    } else if operation.starts_with("code.") || operation.starts_with("git.") {
-        // Code projects are local-only: no device policy grants this surface
-        // to another device, so only this device's own grants pass.
-        "code"
-    } else {
-        "browser"
-    }
-}
-
 /// Checks a device job's grant before this device acts on it.
 #[tauri::command]
 pub async fn device_verify_job(
@@ -127,14 +111,9 @@ pub async fn device_verify_job(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    device_trust::verify_job_grant(
-        &grant,
-        &scope_id,
-        &operation,
-        surface_for(&operation, &scope_id),
-    )
-    .map(|_| ())
-    .map_err(|_| "device_grant_invalid".to_owned())
+    device_trust::verify_job_grant(&grant, &scope_id, &operation)
+        .map(|_| ())
+        .map_err(|_| "device_grant_invalid".to_owned())
 }
 
 /// Reads the file a `folder.send` job names: checks its grant and resolves the
@@ -151,7 +130,7 @@ pub async fn device_read_shared_file(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    device_trust::verify_job_grant(&grant, &scope_id, "folder.send", "folders")
+    device_trust::verify_job_grant(&grant, &scope_id, "folder.send")
         .map_err(|_| "device_grant_invalid".to_owned())?;
     if input["scopeId"].as_str() != Some(scope_id.as_str()) {
         return Err("invalid_scope".into());

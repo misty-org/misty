@@ -75,7 +75,7 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if crate::infra::space_windows::is_space_window(window.label()) && must_ask() {
+        if crate::infra::space_windows::is_person_window(window.label()) && must_ask() {
             api.prevent_close();
             ask(window.app_handle(), Some(window.label()));
         }
@@ -90,7 +90,7 @@ pub fn app_quit_confirmed(
     app: AppHandle,
     closing: bool,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::space_windows::is_person_window(webview.label()) {
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {

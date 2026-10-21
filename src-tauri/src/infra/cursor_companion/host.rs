@@ -55,11 +55,15 @@ pub enum Shortcut {
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::space_windows::is_person_window(webview.label()) {
         return Err("Main Misty window required.".into());
     }
     Ok(())
 }
+/// The overlay windows (one full web view per display, about 46 MB each) are built the first time
+/// the companion has something to show, not at sign-in: most sessions never show it.
+static OVERLAYS_WANTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 fn host_state(app: &AppHandle) -> Arc<CursorCompanionState> {
     app.state::<Arc<CursorCompanionState>>().inner().clone()
 }
@@ -67,7 +71,8 @@ fn current(state: &CursorCompanionState, turn: u64) -> bool {
     state.enabled.load(Ordering::SeqCst) && state.turn.load(Ordering::SeqCst) == turn
 }
 fn error(app: &AppHandle, turn: u64, message: String) {
-    let _ = crate::infra::space_windows::emit_to_primary(&app,
+    let _ = crate::infra::space_windows::emit_to_primary(
+        &app,
         "misty://cursor-error",
         json!({"turn":turn,"error":message}),
     );
@@ -81,6 +86,10 @@ pub async fn cursor_companion_configure(
 ) -> Result<u64, String> {
     require_main(&webview)?;
     let state = host_state(&app);
+    eprintln!(
+        "[companion] configure account_empty={}",
+        account_id.is_empty()
+    );
     stop(&app);
     if account_id.is_empty() {
         return Ok(state.turn.load(Ordering::SeqCst));
@@ -104,6 +113,7 @@ pub fn stop(app: &AppHandle) {
     };
     let state = managed.inner().clone();
     state.enabled.store(false, Ordering::SeqCst);
+    eprintln!("[companion] stop (account boundary or reconfigure)");
     state.held.store(false, Ordering::SeqCst);
     state.watch_clicks.store(false, Ordering::SeqCst);
     let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
@@ -140,6 +150,7 @@ pub fn cursor_companion_interrupt(
         .turn
         .compare_exchange(expected, expected + 1, Ordering::SeqCst, Ordering::SeqCst)
         .map_err(|_| "Companion already interrupted")?;
+    eprintln!("[companion] interrupt expected={expected}");
     state.held.store(false, Ordering::SeqCst);
     state.watch_clicks.store(false, Ordering::SeqCst);
     if let Ok(mut data) = state.data.lock() {
@@ -168,6 +179,9 @@ pub async fn cursor_companion_present(
         .map_err(|_| "Companion unavailable")?
         .presentation = presentation.clone();
     let visible = presentation["visible"].as_bool().unwrap_or(false);
+    if visible && !OVERLAYS_WANTED.swap(true, Ordering::SeqCst) {
+        rebuild(&app).await?;
+    }
     on_main(&app, move |app| {
         if !current(&state, turn) {
             return Ok(());
@@ -255,7 +269,7 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
     static REBUILD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     let _serialized = REBUILD.lock().await;
     let state = host_state(app);
-    if !state.enabled.load(Ordering::SeqCst) {
+    if !state.enabled.load(Ordering::SeqCst) || !OVERLAYS_WANTED.load(Ordering::SeqCst) {
         return Ok(());
     }
     let old = state
@@ -265,9 +279,10 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
         .displays
         .clone();
     if old == frames
-        && frames
-            .iter()
-            .all(|d| app.get_webview_window(&format!("{PREFIX}{}", d.id)).is_some())
+        && frames.iter().all(|d| {
+            app.get_webview_window(&format!("{PREFIX}{}", d.id))
+                .is_some()
+        })
     {
         return Ok(());
     }
@@ -331,7 +346,11 @@ async fn rebuild(app: &AppHandle) -> Result<(), String> {
             .lock()
             .map_err(|_| "Companion unavailable")?
             .displays = frames;
-        let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://cursor-displays-changed", ());
+        let _ = crate::infra::space_windows::emit_to_primary(
+            &app,
+            "misty://cursor-displays-changed",
+            (),
+        );
         Ok(())
     })
     .await
@@ -374,7 +393,8 @@ pub async fn task_visual(app: &AppHandle, task_id: &str) -> Result<Option<Vec<Va
         return Err("Companion interrupted".into());
     }
     // Only the main authenticated controller receives refreshed screenshot data.
-    let _ = crate::infra::space_windows::emit_to_primary(&app,
+    let _ = crate::infra::space_windows::emit_to_primary(
+        &app,
         "misty://cursor-captures",
         json!({"turn":turn,"captures":captures}),
     );
@@ -393,7 +413,14 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
         state: state.clone(),
     };
     let result=async {
-        on_main(&app,|app| { for (label,w) in app.webview_windows() { if label.starts_with(PREFIX) { w.hide().map_err(|e|e.to_string())?; } } Ok(()) }).await?;
+        let ignored = on_main(&app,|app| {
+            let mut ignored = Vec::new();
+            for (label,w) in app.webview_windows() {
+                if label.starts_with(PREFIX) { w.hide().map_err(|e|e.to_string())?; }
+                if !person_works_in(&label) { if let Some(handle) = native_handle(&w) { ignored.push(handle); } }
+            }
+            Ok(ignored)
+        }).await?;
         tokio::time::sleep(Duration::from_millis(80)).await;
         let state=state.clone();
         tauri::async_runtime::spawn_blocking(move|| {
@@ -403,18 +430,40 @@ async fn capture_displays(app: AppHandle, turn: u64) -> Result<Vec<Value>, Strin
             if !current(&state,turn) { return Err("Capture interrupted".into()); }
             let cursor=platform::cursor().ok_or("Cursor unavailable")?;
             let frames=displays()?;
+            // The screen the person works on holds the window in front, not
+            // wherever the pointer is parked (on the companion panel, say).
+            let foreground=platform::foreground_window(&ignored);
+            let (primary_id,focused)=choose_primary(&frames,foreground.as_ref(),cursor).ok_or("No display is available for capture")?;
+            let focused=focused.then_some(foreground).flatten();
             let mut monitors=xcap::Monitor::all().map_err(|e|e.to_string())?;
-            monitors.sort_by_key(|m| !frames.iter().any(|d|m.id().ok()==Some(d.id)&&contains(d,cursor)));
+            monitors.sort_by_key(|m| m.id().ok()!=Some(primary_id));
+            let captured_at=||Ok::<u64,String>(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64);
+            use sha2::{Digest,Sha256};
             let mut result=Vec::new();
             for (index,m) in monitors.iter().enumerate() {
                 if !current(&state,turn) { return Err("Capture interrupted".into()); }
                 let frame=frames.iter().find(|d|Some(d.id)==m.id().ok()).ok_or("Display disconnected")?;
                 let (bytes, width, height) = platform::capture_display(m)?;
                 if width == 0 || height == 0 || bytes.is_empty() { return Err("Screen capture returned no pixels".into()); }
-                let captured_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
-                use sha2::{Digest,Sha256}; let content_hash=format!("{:x}",Sha256::digest(&bytes));
-                let screen=format!("screen{}",index+1);let primary=contains(frame,cursor);
-                result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("{screen}{} ({} × {})",if primary {" — primary (cursor)"}else{""},width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at,"source":"desktop-display","screen":screen,"primary":primary,"display":frame}));
+                let content_hash=format!("{:x}",Sha256::digest(&bytes));
+                let screen=format!("screen{}",index+1);let primary=frame.id==primary_id;
+                let focus=match (&focused,primary) { (Some(w),true)=>format!(" — primary ({})",window_name(w)), (None,true)=>" — primary (cursor)".into(), _=>String::new() };
+                result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("{screen}{focus} ({} × {})",width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at()?,"source":"desktop-display","screen":screen,"primary":primary,"display":frame}));
+            }
+            // The focused window again at full resolution, for detail a
+            // whole-display capture shrinks away.
+            if let (Some(window),Some(m)) = (&focused,monitors.first()) {
+                if !current(&state,turn) { return Err("Capture interrupted".into()); }
+                let frame=frames.iter().find(|d|d.id==primary_id).ok_or("Display disconnected")?;
+                match platform::capture_window(m,frame,window) {
+                    Ok((bytes,width,height,area)) if width>0 && height>0 && !bytes.is_empty() => {
+                        let content_hash=format!("{:x}",Sha256::digest(&bytes));
+                        result.push(json!({"id":uuid::Uuid::new_v4().to_string(),"name":format!("window1 — {} ({} × {})",window_name(window),width,height),"mimeType":"image/jpeg","dataUrl":format!("data:image/jpeg;base64,{}",STANDARD.encode(&bytes)),"width":width,"height":height,"contentHash":content_hash,"capturedAt":captured_at()?,"source":"desktop-window","screen":"window1","primary":false,"display":area,"app":window.app,"title":window.title}));
+                    }
+                    // The displays still answer the turn without the closer look.
+                    Ok(_) => {}
+                    Err(message) => eprintln!("[companion] focused window capture skipped: {message}"),
+                }
             }
             if !current(&state,turn) { return Err("Capture interrupted".into()); }
             if result.is_empty() { return Err("No display is available for capture".into()); }
@@ -456,6 +505,127 @@ impl Drop for CaptureGuard {
 fn contains(d: &Display, p: (f64, f64)) -> bool {
     p.0 >= d.x && p.0 < d.x + d.width && p.1 >= d.y && p.1 < d.y + d.height
 }
+/// Misty windows a person works in: app windows, agent windows and docked
+/// agents. The companion, its overlays and other panels are never "in front".
+fn person_works_in(label: &str) -> bool {
+    crate::infra::space_windows::is_app_window(label)
+        || label.starts_with("misty-agent-")
+        || (label.starts_with(crate::infra::agent_dock::HOST_PREFIX) && label != "misty-dock-stack")
+}
+#[cfg(windows)]
+fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
+    window.hwnd().ok().map(|hwnd| hwnd.0 as isize)
+}
+#[cfg(target_os = "macos")]
+fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
+    let native = window.ns_window().ok()? as *const objc2_app_kit::NSWindow;
+    // SAFETY: called on the main thread with a live window.
+    Some(unsafe { (*native).windowNumber() })
+}
+/// "App: title", short enough for a capture label.
+fn window_name(window: &platform::ForegroundWindow) -> String {
+    let title: String = window.title.trim().chars().take(120).collect();
+    match (window.app.trim(), title.as_str()) {
+        ("", "") => "focused window".into(),
+        (app, "") => app.into(),
+        ("", title) => title.into(),
+        (app, title) => format!("{app}: {title}"),
+    }
+}
+/// The display the person is working on: the one holding the window in
+/// front, else the one under the cursor, else the first. The flag says
+/// whether the foreground window decided it.
+fn choose_primary(
+    frames: &[Display],
+    foreground: Option<&platform::ForegroundWindow>,
+    cursor: (f64, f64),
+) -> Option<(u32, bool)> {
+    if let Some(window) = foreground {
+        let reported = window.monitor.and_then(|(x, y, width, height)| {
+            frames
+                .iter()
+                .find(|d| d.x == x && d.y == y && d.width == width && d.height == height)
+        });
+        let overlap = |d: &&Display| {
+            let w = (window.x + window.width).min(d.x + d.width) - window.x.max(d.x);
+            let h = (window.y + window.height).min(d.y + d.height) - window.y.max(d.y);
+            w.max(0.) * h.max(0.)
+        };
+        let largest = frames
+            .iter()
+            .filter(|d| overlap(d) > 0.)
+            .max_by(|a, b| overlap(a).total_cmp(&overlap(b)));
+        if let Some(display) = reported.or(largest) {
+            return Some((display.id, true));
+        }
+    }
+    frames
+        .iter()
+        .find(|d| contains(d, cursor))
+        .or(frames.first())
+        .map(|d| (d.id, false))
+}
+#[cfg(test)]
+mod primary_display_tests {
+    use super::{choose_primary, platform, Display};
+
+    fn display(id: u32, x: f64) -> Display {
+        Display {
+            id,
+            x,
+            y: 0.,
+            width: 1920.,
+            height: 1080.,
+            scale: 1.,
+        }
+    }
+    fn window(handle: isize, x: f64) -> platform::ForegroundWindow {
+        platform::ForegroundWindow {
+            handle,
+            x,
+            y: 100.,
+            width: 1200.,
+            height: 800.,
+            app: "Code".into(),
+            title: "main.rs".into(),
+            monitor: None,
+        }
+    }
+
+    #[test]
+    fn the_window_in_front_beats_the_cursor() {
+        let frames = [display(1, 0.), display(2, 1920.)];
+        let editor = window(7, 2100.);
+        assert_eq!(
+            choose_primary(&frames, Some(&editor), (500., 500.)),
+            Some((2, true))
+        );
+        let reported = platform::ForegroundWindow {
+            monitor: Some((1920., 0., 1920., 1080.)),
+            x: 1500.,
+            ..editor
+        };
+        assert_eq!(
+            choose_primary(&frames, Some(&reported), (500., 500.)),
+            Some((2, true))
+        );
+    }
+
+    #[test]
+    fn the_companion_in_front_falls_back_to_the_cursor() {
+        let frames = [display(1, 0.), display(2, 1920.)];
+        let companion = platform::usable_foreground(window(9, 2100.), &[9]);
+        assert_eq!(companion, None);
+        assert_eq!(
+            choose_primary(&frames, companion.as_ref(), (500., 500.)),
+            Some((1, false))
+        );
+        assert_eq!(
+            choose_primary(&frames, None, (-50., -50.)),
+            Some((1, false))
+        );
+    }
+}
 fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || platform::shortcut(tx));
@@ -464,6 +634,15 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let events_state = state.clone();
     std::thread::spawn(move || {
         while let Ok(event) = rx.recv() {
+            // TEMP: chasing "the shortcut works once". Remove with the other [companion] lines.
+            if let Shortcut::Held(held) = &event {
+                eprintln!(
+                    "[companion] shortcut held={held} enabled={} hostHeld={} turn={}",
+                    events_state.enabled.load(Ordering::SeqCst),
+                    events_state.held.load(Ordering::SeqCst),
+                    events_state.turn.load(Ordering::SeqCst)
+                );
+            }
             if !events_state.enabled.load(Ordering::SeqCst) {
                 continue;
             }
@@ -489,7 +668,8 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                             let _ = window.hide();
                         }
                     }
-                    let _ = crate::infra::space_windows::emit_to_primary(&events_app,
+                    let _ = crate::infra::space_windows::emit_to_primary(
+                        &events_app,
                         "misty://cursor-shortcut",
                         json!({"turn":turn,"held":held}),
                     );
@@ -517,7 +697,8 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if let Some((turn, _, record)) = recording.as_mut() {
                 if let Some((sequence, pcm)) = record.drain() {
                     if current(&audio_state, *turn) {
-                        let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
+                        let _ = crate::infra::space_windows::emit_to_primary(
+                            &audio_app,
                             "misty://cursor-audio",
                             json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
                         );
@@ -535,7 +716,8 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         continue;
                     }
                     if !audio_state.held.load(Ordering::SeqCst) {
-                        let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
+                        let _ = crate::infra::space_windows::emit_to_primary(
+                            &audio_app,
                             "misty://cursor-recorded",
                             json!({"turn":turn,"durationMs":0}),
                         );
@@ -550,7 +732,8 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                         Ok(_) => {
                             if current(&audio_state, turn) {
-                                let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
+                                let _ = crate::infra::space_windows::emit_to_primary(
+                                    &audio_app,
                                     "misty://cursor-recorded",
                                     json!({"turn":turn,"durationMs":0}),
                                 );
@@ -573,16 +756,22 @@ fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         let (sequence, pcm, duration) = record.finish();
                         if current(&audio_state, turn) {
                             if !pcm.is_empty() {
-                                let _ = crate::infra::space_windows::emit_to_primary(&audio_app, "misty://cursor-audio", json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}));
+                                let _ = crate::infra::space_windows::emit_to_primary(
+                                    &audio_app,
+                                    "misty://cursor-audio",
+                                    json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
+                                );
                             }
-                            let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
+                            let _ = crate::infra::space_windows::emit_to_primary(
+                                &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":duration}),
                             );
                         }
                     } else if let Ok((turn, false)) = event {
                         if current(&audio_state, turn) {
-                            let _ = crate::infra::space_windows::emit_to_primary(&audio_app,
+                            let _ = crate::infra::space_windows::emit_to_primary(
+                                &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":0}),
                             );

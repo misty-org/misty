@@ -14,6 +14,8 @@ import { AgentConversationHeading } from "../page/AgentConversationHeading";
 import { PanelConversationPicker } from "./PanelConversationPicker";
 import { usePersonalAgentsStore } from "../personalAgentsStore";
 import { MISTY_PANEL_WIDTH, useMistyPanelStore } from "./mistyPanelStore";
+import { AgentBrowserPip } from "../agentBrowser/AgentBrowserPip";
+import { setBrowserExpanded } from "../agentBrowser/agentBrowserStore";
 
 export type MistyPanelSide = "left" | "right";
 
@@ -33,7 +35,6 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const root = useRef<HTMLElement>(null);
   const identityRef = useRef<HTMLButtonElement>(null);
-  const working = useMistyStore((s) => s.working);
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);
@@ -108,21 +109,20 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                       conversations,
                       selectedAgent: profile,
                       conversationId: activeConversationId,
-                      disabled: working,
+                      disabled: false,
                       restoreTriggerFocus: true,
                       triggerRef: identityRef,
                       onSelect: select,
                       onCreate: openInAgents,
                       onSettings: openInAgents,
                     }}
-                    disabled={working}
+                    disabled={false}
                     panelPicker={
                       <PanelConversationPicker
                         accountId={accountId}
                         agentId={profile?.id}
                         includeUnassigned={profile?.system_managed}
                         title={conversation?.title}
-                        disabled={working}
                         onSelect={(id) => profile && select(profile.id, false, id)}
                         onNew={() => profile && select(profile.id, true)}
                         onViewAll={openInAgents}
@@ -138,6 +138,15 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                         </IconButton>
                       </>
                     }
+                  />
+                  {/* The chat's agent browser as a picture; the split opens on the Agents page. */}
+                  <AgentBrowserPip
+                    always
+                    conversationId={conversation?.id}
+                    onExpand={() => {
+                      if (conversation?.id) setBrowserExpanded(conversation.id, true);
+                      openInAgents();
+                    }}
                   />
                   <AgentWorkspaceConversation
                     key={`${accountId}:${profile?.id}:${chatRevision}`}

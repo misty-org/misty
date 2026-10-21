@@ -15,7 +15,6 @@ import { useCodingIncluded } from "../coding/useCodingIncluded";
 import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot, chooseProject } from "../store/useAgentsStore";
 import { projectRemote } from "../store/projectGitHub";
-import { useAgentDeviceTargets } from "../store/useAgentDeviceTargets";
 import { useConversationProject } from "../store/useConversationProject";
 import { FromGitHubDialog, PublishDialog } from "./GitHubDialogs";
 import { NewProjectDialog } from "./ProjectDialogs";
@@ -47,7 +46,6 @@ export function AgentProjectMenu({
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
   const setProject = useConversationProject((s) => s.setProject);
-  const otherDevice = useAgentDeviceTargets((s) => s.targets.length > 0);
   const load = useCallback(
     () =>
       agentsDeviceSnapshot()
@@ -68,7 +66,7 @@ export function AgentProjectMenu({
     if (chosen && hasTauriInternals())
       void projectRemote(chosen).then((found) => setRemote(found ?? ""));
   }, [chosen]);
-  if (!hasTauriInternals() || otherDevice) return null;
+  if (!hasTauriInternals()) return null;
   if (included === false)
     return (
       <DropdownMenu>

@@ -65,14 +65,92 @@
       el.click();
       return { ok: true, declined: label };
     }
+    // No private choice offered: close the banner with its own close control, still never
+    // accepting. A banner that offers only "Accept" is hidden in the agent's own tab instead,
+    // so it no longer covers the page, and nothing is agreed to.
+    for (const el of allControls()) {
+      const label = P.clip(el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "", 60).replace(/[.!]+$/, "");
+      if (!label || !CLOSE.test(label) || P.hidden(el) || !consentBanner(el)) continue;
+      el.click();
+      return { ok: true, declined: label };
+    }
+    for (const el of allControls()) {
+      const label = P.clip(el.innerText || el.value || "", 60);
+      if (!/accept|agree|allow|got it|^ok$|understand/i.test(label) || P.hidden(el)) continue;
+      const banner = consentBanner(el, true);
+      if (!banner) continue;
+      banner.style.setProperty("display", "none", "important");
+      return { ok: true, declined: "hid the cookie banner" };
+    }
     return { ok: true, declined: "" };
+  };
+  const CLOSE = /^(close|dismiss|no,? thanks|not now|maybe later|skip|×|✕|x)( (banner|notice|dialog|cookie (banner|notice)))?$/i;
+
+  // Popups a person closes before reading (docs/plans/agent-harness-v2.md): newsletter and
+  // discount offers, app prompts, surveys, sign-up walls. The agent read pages as text and never
+  // noticed them, so its proof tabs stayed covered. A popup is the box on top in the middle of the
+  // view, fixed or a dialog, over a quarter of it or more. Its own close control closes it, never
+  // one that signs up, subscribes, accepts or logs in.
+  const NOT_CLOSE = /sign ?up|subscribe|join|register|log ?in|sign ?in|accept|agree|allow|claim|get |yes|continue(?! without)|submit|buy|shop/i;
+  const closeLabel = (el) => P.clip(el.innerText || el.value || el.getAttribute("aria-label") || el.getAttribute("title") || "", 60).replace(/[.!]+$/, "").trim();
+  P.coveringPopup = () => {
+    if (typeof document.elementFromPoint !== "function") return null;
+    const area = innerWidth * innerHeight;
+    for (const [x, y] of [[0.5, 0.5], [0.5, 0.3], [0.5, 0.7]]) {
+      let box = null;
+      for (let el = document.elementFromPoint(innerWidth * x, innerHeight * y); el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+        const style = getComputedStyle(el);
+        const modal = el.matches('dialog[open],[role=dialog],[role=alertdialog],[aria-modal=true]');
+        if (!modal && style.position !== "fixed") continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width * rect.height >= area * 0.25) box = el;
+      }
+      if (!box) continue;
+      let close = null;
+      for (const el of box.querySelectorAll(CONTROLS + ",[aria-label],[class*=close i],[id*=close i]")) {
+        const label = closeLabel(el);
+        const named = `${typeof el.className === "string" ? el.className : ""} ${el.id || ""}`;
+        if (P.hidden(el) || NOT_CLOSE.test(label)) continue;
+        if (CLOSE.test(label) || /^(close|dismiss)\b/i.test(el.getAttribute("aria-label") || "") || (/close|dismiss/i.test(named) && label.length <= 3)) { close = el; break; }
+      }
+      const heading = box.querySelector("h1,h2,h3,[role=heading]");
+      const name = P.clip((box.getAttribute("aria-label") || heading?.innerText || heading?.textContent || box.innerText || box.textContent || "").replace(/\s+/g, " ").trim(), 80);
+      return { box, close, name };
+    }
+    return null;
+  };
+  /** Closes an uninvited popup covering the page: its close control, else Escape. */
+  P.dismissPopup = () => {
+    const popup = P.coveringPopup();
+    if (!popup) return { ok: true, dismissed: "" };
+    if (popup.close) {
+      const label = closeLabel(popup.close) || "close";
+      popup.close.click();
+      return { ok: true, dismissed: `${label} (${popup.name})` };
+    }
+    const target = document.activeElement || document.body;
+    for (const type of ["keydown", "keyup"]) target.dispatchEvent(new KeyboardEvent(type, { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
+    return { ok: true, dismissed: `Escape (${popup.name})` };
+  };
+  /** The cookie or consent banner holding a control, or with `pinned`, only one fixed or sticky
+   * over the page (the box a person would see covering it). */
+  const consentBanner = (el, pinned = false) => {
+    const up = (node) => node.parentElement || node.parentNode?.host || null;
+    let about = null;
+    for (let box = up(el), depth = 0; box && depth < 10; box = up(box), depth++) {
+      const named = `${box.id || ""} ${typeof box.className === "string" ? box.className : ""} ${box.getAttribute?.("aria-label") || ""}`;
+      if (!about && (/cookie|consent|gdpr|onetrust|didomi|cmp/i.test(named) || /cookie|consent/i.test((box.textContent || "").slice(0, 2000))))
+        about = box;
+      if (about && (!pinned || /fixed|sticky/.test(getComputedStyle(box).position))) return box;
+    }
+    return null;
   };
 
   const operations = {
     snapshot: (args) => P.snapshot(args), find: (args) => P.find(args), markdown: (args) => P.markdown(args),
     prepare: (args) => P.prepare(args), perform: (args) => P.perform(args), observe: () => P.observe(),
     waitCheck: (args) => P.waitCheck(args), settle: (args) => P.settle(args),
-    skill: (args) => P.skill(args), locate: (args) => P.locate(args), declineConsent: () => P.declineConsent(),
+    skill: (args) => P.skill(args), locate: (args) => P.locate(args), declineConsent: () => P.declineConsent(), dismissPopup: () => P.dismissPopup(),
     locatorFor: (args) => {
       const resolved = P.resolve(args.documentId, args.ref);
       return resolved.ok && resolved.el ? { ok: true, locator: P.locatorOf(resolved.el) } : resolved;

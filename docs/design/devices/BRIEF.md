@@ -69,7 +69,12 @@ What Misty does not claim: hardware attestation that the machine is uncompromise
 
 ### Cross-device agent work
 
-When you ask from device A for work on device B:
+> Retired on October 19, 2026 ([agent-chats-local/BRIEF.md](../agent-chats-local/BRIEF.md)): an
+> agent run works only on the device it was sent from. Every grant names its signer as the
+> target, and the server, the device and the agent's own session refuse any other. The policy
+> record still carries agent surfaces so older records verify; they are no longer read.
+
+When you asked from device A for work on device B:
 
 - **Run grant.** Device A signs a grant naming the run, the target device, the agent, the capabilities and an expiry.
 - **Check on B.** B runs a job only if it carries a valid run grant from an admitted device and the capability is allowed by both the grant and B's own policy.

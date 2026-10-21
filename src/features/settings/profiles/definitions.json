@@ -645,6 +645,17 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.companion.teach",
+    "label": "Teach mode",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "teach",
+    "default": false,
+    "type": "boolean",
+    "owner": "account",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "agents.companion.model",
     "label": "Companion model",
     "page": "agents-companion",

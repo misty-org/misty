@@ -3,7 +3,10 @@ use super::*;
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 
-fn window_config<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<tauri::utils::config::WindowConfig, String> {
+fn window_config<R: Runtime>(
+    app: &AppHandle<R>,
+    label: &str,
+) -> Result<tauri::utils::config::WindowConfig, String> {
     let mut config = app
         .config()
         .app
@@ -252,11 +255,15 @@ pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
 /// opened get a color now, so their first window is already tinted.
 pub fn set_spaces<R: Runtime>(app: &AppHandle<R>, spaces: Vec<(String, bool, String)>) {
     let changed = {
-        let Ok(mut state) = lock_registry() else { return };
+        let Ok(mut state) = lock_registry() else {
+            return;
+        };
         let mut changed = Vec::new();
         let mut known = BTreeSet::new();
         for (space_id, personal, name) in spaces {
-            let Ok(key) = space_key(&space_id, personal) else { continue };
+            let Ok(key) = space_key(&space_id, personal) else {
+                continue;
+            };
             let name: String = name.trim().chars().take(80).collect();
             known.insert(key.clone());
             let before = state.spaces.get(&key).cloned();
@@ -287,7 +294,11 @@ pub fn set_spaces<R: Runtime>(app: &AppHandle<R>, spaces: Vec<(String, bool, Str
     refresh_menus(app);
 }
 
-pub fn set_color<R: Runtime>(app: &AppHandle<R>, key: &str, color: &str) -> Result<SpaceEntry, String> {
+pub fn set_color<R: Runtime>(
+    app: &AppHandle<R>,
+    key: &str,
+    color: &str,
+) -> Result<SpaceEntry, String> {
     if !valid_color(color) {
         return Err("Choose one of the Space colors.".into());
     }
@@ -334,7 +345,9 @@ pub fn delete_space(app: &AppHandle, key: &str) -> Result<(), String> {
         if let Err(error) = crate::infra::extensions::remove_space(&app, &key).await {
             eprintln!("Could not remove a Space's extension data: {error}");
         }
-        if let Err(error) = crate::infra::browser::profile_cleanup::remove_space_data(app, key).await {
+        if let Err(error) =
+            crate::infra::browser::profile_cleanup::remove_space_data(app, key).await
+        {
             eprintln!("Could not remove a Space's website data: {error}");
         }
     });

@@ -1,8 +1,5 @@
 import type { CSSProperties } from "react";
-import {
-  isSideDock,
-  type DockingLayout,
-} from "@/features/app-shell/dockingLayout";
+import { isSideDock, type DockingLayout } from "@/features/app-shell/dockingLayout";
 
 export const dockingMetrics = {
   titlebar: 38,
@@ -23,7 +20,7 @@ export const dockingMetrics = {
   gap: 8,
   tab: 28,
   /** Chrome margin around the page, which is always a rounded pane. */
-  paneMargin: 8,
+  paneMargin: 6,
   paneRadius: 12,
 };
 export const dockingMotion = { duration: 300, easing: "ease-in-out" };

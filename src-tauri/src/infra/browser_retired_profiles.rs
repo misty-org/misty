@@ -14,7 +14,9 @@ fn marker() -> Option<std::path::PathBuf> {
 
 fn retired(id: &str) -> bool {
     id.len() == 64
-        && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         && !crate::infra::space_windows::is_space_store(id)
         && !super::super::browser_sync::vault_uses_store(id)
 }
@@ -27,7 +29,7 @@ pub async fn browser_retired_profiles_erase(
     app: AppHandle,
     profile_ids: Vec<String>,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) || profile_ids.len() > 100 {
+    if !crate::infra::space_windows::is_person_window(webview.label()) || profile_ids.len() > 100 {
         return Err("Only a Space window can erase retired profiles.".into());
     }
     let marker = marker().ok_or("Misty's data folder is unavailable.")?;

@@ -53,11 +53,13 @@ describe("research budget", () => {
   it("does nothing when the run has no research tools", () => {
     expect(researchUse(calls(search("a b c")), {}).cost).toBe(0);
   });
-  it("points a run that can open its own tab at it for facts a fetch can't show", () => {
+  it("sends a run with its own tabs to work on pages instead of answering early", () => {
     const tools = { search: "web_search", fetch: "web_fetch", open: "screen_open" };
-    const use = { searches: 3, fetches: 3, repeats: 0, cost: 6, stage: "wrap-up" as const };
-    expect(researchNote(use, [], tools)).toContain("open them in your own tab with screen_open");
-    expect(researchNote(use, [], { search: "web_search", fetch: "web_fetch" })).not.toContain("screen_open");
+    const wrapUp = { searches: 3, fetches: 3, repeats: 0, cost: 6, stage: "wrap-up" as const };
+    expect(researchNote(wrapUp, [], tools)).toContain("in your own tabs with screen_open");
+    expect(researchNote(wrapUp, [], tools)).not.toContain("Answer now");
+    expect(researchNote({ ...wrapUp, stage: "closed" }, [], tools)).toContain("Keep working in your own tabs");
+    expect(researchNote(wrapUp, [], { search: "web_search", fetch: "web_fetch" })).toContain("Answer now");
   });
   it("gives a long, planned request a longer budget", () => {
     const tools = { search: "web_search", fetch: "web_fetch" };

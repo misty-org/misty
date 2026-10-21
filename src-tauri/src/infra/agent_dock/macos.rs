@@ -63,9 +63,11 @@ pub(super) fn add(app: &AppHandle, label: &str, name: &str) -> Result<(), String
     let (label, name) = (label.to_owned(), name.to_owned());
     on_main(app, move |app| {
         let Some(window) = app.get_window(&label) else {
+            eprintln!("agent_dock reason=no_window label={label}");
             return;
         };
         let Ok(pointer) = window.ns_window() else {
+            eprintln!("agent_dock reason=no_ns_window label={label}");
             return;
         };
         // Docked windows live in the Space window they came from and move with it.

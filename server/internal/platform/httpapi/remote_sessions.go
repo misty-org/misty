@@ -8,21 +8,21 @@ import (
 	"sync"
 	"time"
 
-	serveragent "github.com/kannachi323/misty/server/internal/agents"
 	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
-// Agents on devices (docs/design/agents-on-devices/BRIEF.md): a request can
-// name another of the person's devices to work on. When the agent needs a
-// browser there, the device opens a session under its own lease and signs the
-// grants for its tab; the asking device continues the conversation with it.
+// The agent's own browser session (docs/plans/odysseys-campaign.md): when the
+// agent needs a browser, the computer the person sent the request from opens a
+// hidden tab of the agent's own under its own lease and signs the grant for it,
+// and the tab joins the run. An agent run works only on the device it was sent
+// from; no request names another device (docs/design/agent-browser/BRIEF.md).
 const (
 	remoteSessionOp = "browser.session"
 	// deviceOnlineWindow matches the claim check (validateDeviceJobTargetTx).
 	deviceOnlineWindow = 90 * time.Second
 )
 
-// remoteSessionWait: a device that does not open the session by then is
+// remoteSessionWait: a computer that does not open the session by then is
 // treated as offline.
 var remoteSessionWait = 30 * time.Second
 
@@ -31,36 +31,28 @@ var remoteSessionWait = 30 * time.Second
 type deviceOfflineError struct{ name, reason string }
 
 func (e deviceOfflineError) Error() string {
-	return "device_offline: " + e.name + " " + e.reason + " Pick another device and ask again."
+	return "device_offline: " + e.name + " " + e.reason + " Ask again once Misty is open there."
 }
 
-// remoteScreen is what the asking device needs to continue on the other one.
+// remoteScreen is the agent's own tab a computer opened, with the grant it signed.
 type remoteScreen struct {
 	DeviceID   string                      `json:"deviceId"`
 	DeviceName string                      `json:"deviceName"`
 	Contexts   []aiInvocationDeviceContext `json:"contexts"`
 }
 
-// sessionTarget is the workspace grant a browser session opens under: a device
-// the person picked for this request first, otherwise this computer's own when
-// local is true (the agent's own hidden tab, docs/plans/odysseys-campaign.md).
-func sessionTarget(contexts []db.AIInvocationContext, local bool) *db.AIInvocationContext {
-	var own *db.AIInvocationContext
+// sessionTarget is the workspace grant a browser session opens under: the
+// sending computer's own (the agent's own hidden tab,
+// docs/plans/odysseys-campaign.md). A workspace grant for any other device is
+// never used.
+func sessionTarget(contexts []db.AIInvocationContext) *db.AIInvocationContext {
 	for index := range contexts {
 		item := &contexts[index]
 		var capabilities []string
-		if item.Kind != "workspace" || item.State != "attached" || json.Unmarshal(item.Capabilities, &capabilities) != nil || !containsString(capabilities, remoteSessionOp) {
+		if item.Kind != "workspace" || item.State != "attached" || !fromThisComputer(item.Metadata) || json.Unmarshal(item.Capabilities, &capabilities) != nil || !containsString(capabilities, remoteSessionOp) {
 			continue
 		}
-		if !fromThisComputer(item.Metadata) {
-			return item
-		}
-		if own == nil {
-			own = item
-		}
-	}
-	if local {
-		return own
+		return item
 	}
 	return nil
 }
@@ -83,10 +75,14 @@ func (s *SpacesService) deviceDisplayName(ctx context.Context, userID, deviceID 
 	return name, time.Since(device.LastSeenAt) < deviceOnlineWindow
 }
 
-// openRemoteSession asks the picked device to open a browser session for this
-// run and returns its tab, signed by that device.
+// openRemoteSession asks the sending computer to open a browser session for
+// this run and returns its tab, signed by that computer.
 func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, target *db.AIInvocationContext, callID, url, reason string, newTab bool) (*remoteScreen, error) {
+	// Where opening a page spends its time, one line per call (docs/plans/agent-harness-v2.md, change 5).
+	timing := newPhaseTimer("screen_open_timing", record.ID)
+	defer timing.log()
 	name, online := s.deviceDisplayName(ctx, record.UserID, target.DeviceID)
+	timing.mark("device")
 	if !online {
 		return nil, deviceOfflineError{name: name, reason: "is offline."}
 	}
@@ -106,7 +102,9 @@ func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvo
 	if err != nil {
 		return nil, err
 	}
+	timing.mark("queued")
 	current, err := waitForDeviceJob(waitCtx, s.database, record.UserID, job.ID, job.DeadlineAt)
+	timing.mark("device_job")
 	if err != nil {
 		_, _ = s.database.StopWorkflowDeviceNodeJob(record.UserID, job.ID)
 		return nil, deviceOfflineError{name: name, reason: "did not answer."}
@@ -118,7 +116,7 @@ func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvo
 			return nil, deviceOfflineError{name: name, reason: "is busy with another task for this agent."}
 		}
 		if strings.Contains(current.ErrorCode, "device_grant_invalid") {
-			return nil, serveragent.ErrInvalidRequest(name + " does not let agents use its browser. Tell the person to allow it in Settings › Devices on " + name + ", or to pick another device.")
+			return nil, deviceOfflineError{name: name, reason: "refused the browser session."}
 		}
 		return nil, deviceOfflineError{name: name, reason: "could not open a browser."}
 	default:
@@ -133,14 +131,16 @@ func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvo
 	if err := validateDeviceOpenedTabs(output.Tabs, target.DeviceID, 1); err != nil {
 		return nil, err
 	}
+	timing.mark("validated")
 	if err := verifyDeviceContextGrants(ctx, s.database, record.UserID, body.AgentID, output.Tabs); err != nil {
 		return nil, err
 	}
+	timing.mark("grants")
 	return &remoteScreen{DeviceID: target.DeviceID, DeviceName: name, Contexts: output.Tabs}, nil
 }
 
 // validateDeviceOpenedTabs checks tabs a device opened for agents itself: a
-// sub-agent's tab or another device's session. They come from the device,
+// sub-agent's tab or the agent's own session. They come from the device,
 // never from page content, so no page reference applies; each must be a
 // browser tab on that device with browser-only capabilities and its own grant.
 func validateDeviceOpenedTabs(tabs []aiInvocationDeviceContext, deviceID string, count int) error {
@@ -180,8 +180,8 @@ func scopeContextMetadata(contexts []aiInvocationDeviceContext, scope, field str
 	return ""
 }
 
-// scopeTaskID is the task whose lease guards a scope: the device's own task
-// for another device's session, otherwise the request's task.
+// scopeTaskID is the task whose lease guards a scope: the session's own task
+// for the agent's own tab, otherwise the request's task.
 func scopeTaskID(body aiInvocationInput, scope string) string {
 	if task := scopeContextMetadata(body.DeviceContexts, scope, "task_id"); task != "" {
 		return task
@@ -189,7 +189,7 @@ func scopeTaskID(body aiInvocationInput, scope string) string {
 	return body.TaskID
 }
 
-// remoteScopeDevice names the device of another device's session scope, so
+// remoteScopeDevice names the device of an agent's own session scope, so
 // losing it ends the step instead of waiting.
 func (s *SpacesService) remoteScopeDevice(ctx context.Context, userID string, body aiInvocationInput, scope string) (string, bool) {
 	for _, item := range body.DeviceContexts {
@@ -202,12 +202,11 @@ func (s *SpacesService) remoteScopeDevice(ctx context.Context, userID string, bo
 	return "", false
 }
 
-// remoteScreenOpen handles screen_open with a browser session: on a device the
-// person picked, or on this computer unless the agent asked for the person's own page
-// or other apps. The
-// device opens the agent's own tab, and the tab joins this run, so the agent
-// keeps working in the same run with browser tools from its next step instead
-// of handing off to a new run. It returns nil, nil when no session applies.
+// remoteScreenOpen handles screen_open with a browser session on the sending
+// computer, unless the agent asked for the person's own page or other apps.
+// The computer opens the agent's own tab, and the tab joins this run, so the
+// agent keeps working in the same run with browser tools from its next step
+// instead of handing off to a new run. It returns nil, nil when no session applies.
 func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, callID, url, reason string, desktop bool, place string) (json.RawMessage, error) {
 	// Calls made together (one per site) take turns, so each sees the tabs the one before
 	// it opened and gets its own instead of racing for the first.
@@ -220,17 +219,14 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 	}
 	// Only acting in the person's own page (current_tab) or other apps (desktop) hands off;
 	// a new tab or window becomes a tab of the agent's own, in this run.
-	target := sessionTarget(contexts, place != "current_tab" && !desktop)
+	if place == "current_tab" || desktop {
+		return nil, nil
+	}
+	target := sessionTarget(contexts)
 	if target == nil {
 		return nil, nil
 	}
-	name, _ := s.deviceDisplayName(ctx, record.UserID, target.DeviceID)
-	if fromThisComputer(target.Metadata) {
-		name = "this computer"
-	}
-	if desktop {
-		return nil, serveragent.ErrInvalidRequest("Other apps can be used only on the device the person is asking from. Use a browser on " + name + " (omit target), or tell them to pick this device.")
-	}
+	name := "this computer"
 	// The agent's own tabs on that device in this run. A call with a url opens another
 	// one beside them (up to maxOwnTabs), so pages the person asked to keep open stay
 	// open; a call without one goes back to the first.
@@ -302,7 +298,8 @@ func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json
 	if reused {
 		opened = "Your own browser tab on " + name + " is already open"
 	}
-	next := "Read it with browser_snapshot"
+	// The runtime adds the new page's snapshot right after this result (agent-runtime src/opened-pages.ts).
+	next := "Its page snapshot follows, so act on it next"
 	if url == "" || reused {
 		next = "Go to pages in it with browser_navigate, which returns each page's snapshot"
 	}

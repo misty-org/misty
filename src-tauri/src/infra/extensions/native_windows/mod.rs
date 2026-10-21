@@ -253,7 +253,10 @@ pub fn register(view: &Webview) {
             return;
         };
         let mut hosts = hosts().lock().await;
-        if let Some(host) = hosts.get_mut(&space).filter(|host| !host.account.is_empty()) {
+        if let Some(host) = hosts
+            .get_mut(&space)
+            .filter(|host| !host.account.is_empty())
+        {
             let _ = reconcile(host, &view).await;
         }
     });
@@ -490,10 +493,6 @@ fn options(host: &Host, id: &str) -> Result<Value, String> {
         .or_else(|| loaded.manifest["options_page"].as_str())
         .ok_or("This extension has no options page.")?;
     let url = page_url(loaded, page)?;
-    emit(
-        host,
-        "open-tab",
-        json!({"url": url, "private": false}),
-    );
+    emit(host, "open-tab", json!({"url": url, "private": false}));
     Ok(json!({}))
 }

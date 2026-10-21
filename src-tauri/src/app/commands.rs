@@ -587,6 +587,49 @@ pub async fn navigation_names_update(
     state.navigation_names.update(account, key, name).await
 }
 
+/// Agent chats kept on this device (docs/design/agent-browser/BRIEF.md, local chats).
+#[tauri::command]
+pub async fn agent_chats_list(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    kind: String,
+) -> Result<Vec<String>, String> {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
+        return Err("Only the trusted Misty shell can read agent chats.".into());
+    }
+    state.agent_chats.list(account, kind).await
+}
+
+#[tauri::command]
+pub async fn agent_chats_put(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    kind: String,
+    id: String,
+    document: String,
+) -> Result<(), String> {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
+        return Err("Only the trusted Misty shell can save agent chats.".into());
+    }
+    state.agent_chats.put(account, kind, id, document).await
+}
+
+#[tauri::command]
+pub async fn agent_chats_delete(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    kind: String,
+    id: String,
+) -> Result<(), String> {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
+        return Err("Only the trusted Misty shell can delete agent chats.".into());
+    }
+    state.agent_chats.delete(account, kind, id).await
+}
+
 #[tauri::command]
 pub async fn settings_profile_state(
     webview: tauri::Webview,

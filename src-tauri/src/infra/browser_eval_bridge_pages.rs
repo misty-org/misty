@@ -30,7 +30,15 @@ pub(super) async fn pages(
         .filter(|(label, _)| label.starts_with(PAGE_PREFIX))
         .map(|(label, view)| {
             let url = view.url().map(|url| url.to_string()).unwrap_or_default();
-            json!({ "label": label, "url": url })
+            // The window it lives in, and the run an agent's tab works for (its own session
+            // carries it, agent-browser BRIEF), so a pass running several tasks pictures each
+            // task's own tabs.
+            let window = view.window().label().to_owned();
+            let id = label.strip_prefix(PAGE_PREFIX).unwrap_or_default();
+            let run = bridge.app.try_state::<BrowserSessionState>().and_then(|state| {
+                state.sessions.lock().ok()?.get(id)?.agent_run_id.clone()
+            });
+            json!({ "label": label, "url": url, "window": window, "runId": run })
         })
         .collect();
     reply(Ok(json!({ "pages": pages })))

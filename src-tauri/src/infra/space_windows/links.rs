@@ -84,7 +84,10 @@ pub fn route_links<R: Runtime>(app: &AppHandle<R>, label: &str, urls: Vec<String
     let Some(here) = parse(label) else {
         return Vec::new();
     };
-    let urls: Vec<_> = urls.into_iter().filter(|url| link_host(url).is_some()).collect();
+    let urls: Vec<_> = urls
+        .into_iter()
+        .filter(|url| link_host(url).is_some())
+        .collect();
     let mut mine = Vec::new();
     for (key, urls) in targets(app, urls, Some(&here.space)) {
         if key == here.space && !here.incognito {
@@ -98,7 +101,10 @@ pub fn route_links<R: Runtime>(app: &AppHandle<R>, label: &str, urls: Vec<String
 
 /// Links the system handed to the app itself (no window asked for them yet).
 pub fn route_app_links<R: Runtime>(app: &AppHandle<R>, urls: Vec<String>) {
-    let urls: Vec<_> = urls.into_iter().filter(|url| link_host(url).is_some()).collect();
+    let urls: Vec<_> = urls
+        .into_iter()
+        .filter(|url| link_host(url).is_some())
+        .collect();
     for (key, urls) in targets(app, urls, None) {
         deliver(app, &key, urls);
     }
@@ -167,10 +173,22 @@ mod tests {
             entry(mail, &["mail.example.com"]),
         ]
         .into();
-        assert_eq!(claimed_space(&spaces, "https://example.com/a").as_deref(), Some(work));
-        assert_eq!(claimed_space(&spaces, "https://www.example.com").as_deref(), Some(work));
-        assert_eq!(claimed_space(&spaces, "https://docs.example.com").as_deref(), Some(work));
-        assert_eq!(claimed_space(&spaces, "https://mail.example.com/inbox").as_deref(), Some(mail));
+        assert_eq!(
+            claimed_space(&spaces, "https://example.com/a").as_deref(),
+            Some(work)
+        );
+        assert_eq!(
+            claimed_space(&spaces, "https://www.example.com").as_deref(),
+            Some(work)
+        );
+        assert_eq!(
+            claimed_space(&spaces, "https://docs.example.com").as_deref(),
+            Some(work)
+        );
+        assert_eq!(
+            claimed_space(&spaces, "https://mail.example.com/inbox").as_deref(),
+            Some(mail)
+        );
         assert_eq!(claimed_space(&spaces, "https://notexample.com"), None);
         assert_eq!(claimed_space(&spaces, "mailto:someone@example.com"), None);
     }

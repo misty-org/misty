@@ -132,6 +132,36 @@ export function AppearanceSection(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
 
+      <SettingsSectionBlock title="Space bar">
+        <SettingsRow
+          label="Alignment"
+          description="Where the Space, its pages and People sit along the Space bar."
+        >
+          <ChoiceControl
+            value={stringSetting(props.document, "appearance", "space_bar_alignment", "left")}
+            disabled={props.working}
+            options={[
+              { value: "left", label: "Left" },
+              { value: "center", label: "Center" },
+              { value: "right", label: "Right" },
+            ]}
+            onValueChange={(value) =>
+              props.onSettingChange("appearance", "space_bar_alignment", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Auto-hide the Space bar"
+          description="With vertical tabs, tuck the Space bar away until you move the pointer to the top edge of the page. It makes room for itself when it returns."
+        >
+          <SwitchControl
+            checked={booleanSetting(props.document, "appearance", "space_bar_auto_hide", false)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
       <SettingsSectionBlock title="Pane focus">
         <SettingsRow
           label="Dim inactive panes"

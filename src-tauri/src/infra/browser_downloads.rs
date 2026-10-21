@@ -2,7 +2,11 @@
 
 use super::*;
 
-pub(super) fn handle_download_event(app: &AppHandle, tab_id: &str, event: DownloadEvent<'_>) -> bool {
+pub(super) fn handle_download_event(
+    app: &AppHandle,
+    tab_id: &str,
+    event: DownloadEvent<'_>,
+) -> bool {
     let Some(state) = app.try_state::<BrowserSessionState>() else {
         return false;
     };
@@ -48,7 +52,8 @@ pub(super) fn handle_download_event(app: &AppHandle, tab_id: &str, event: Downlo
                 if let Ok(mut reserved) = state.reserved_downloads.lock() {
                     reserved.remove(&path);
                 }
-                let Some(chosen) = super::super::browser_macos::ask_download_destination(&path) else {
+                let Some(chosen) = super::super::browser_macos::ask_download_destination(&path)
+                else {
                     return false;
                 };
                 // The save dialog already confirmed replacing an existing file,

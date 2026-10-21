@@ -1,4 +1,6 @@
 import { conversationForGlobalPrompt } from "@/features/global-search/globalMistyConversationScope";
+import { useCollaborationStore } from "../collaboration/store";
+import { frontMediaContext, withinBudget } from "./mediaContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import {
   CompanionConversation,
@@ -41,6 +43,8 @@ export class CursorCompanionVoice {
       await this.start().readResult(id);
       if (!s.active(generation)) return;
       s.voicePending = false;
+      s.clearFocus();
+      s.sketch.release();
       s.change({ phase: "idle" });
       s.maybeHide();
     } catch (error) {
@@ -70,13 +74,20 @@ export class CursorCompanionVoice {
       // Every spoken request carries every display, the cursor's first; the
       // run decides what matters (docs/plans/agent-harness.md, phase 4).
       s.captures = [];
+      // Looked up when the shortcut went down; a turn without one reads it now.
+      const media =
+        s.pendingMedia?.turn === generation ? s.pendingMedia.lookup : frontMediaContext();
       const screens = s.nativeReady
-        ? await s.capture(generation, new AbortController().signal).catch(() => [])
+        ? await s
+            .capture(generation, new AbortController().signal)
+            .then((captured) => s.withFocusCapture(captured, generation))
+            .catch(() => [])
         : [];
       if (!s.originIsCurrent(origin) || !s.active(generation)) return undefined;
       if (useMistyStore.getState().working)
         throw new Error("A task is already running; use steering.");
       s.captures = screens;
+      const mediaContext = await withinBudget(media);
       await useMistyStore.getState().submitAnswer(
         tool.instruction,
         [],
@@ -91,12 +102,18 @@ export class CursorCompanionVoice {
           model: s.state.model,
           idempotencyKey: tool.key,
           ...(screens.length ? { displayCaptures: screens } : {}),
+          ...(mediaContext ? { mediaContext } : {}),
+          // Teach mode steps go only to lesson chats (the shortcut opened one).
+          ...(s.state.teach && useCollaborationStore.getState().modeFor(conversationId) === "teach"
+            ? { collaborationMode: "teach" as const }
+            : {}),
         },
       );
       const admitted = useMistyStore.getState();
       if (!s.originIsCurrent(origin)) return undefined;
       if (admitted.error) throw new Error(admitted.error);
       if (admitted.invocationId) {
+        s.sketch.follow(admitted.invocationId);
         s.delegatedTask = { id: admitted.invocationId, conversationId };
         queueMicrotask(() => this.settleDelegatedTask());
       }

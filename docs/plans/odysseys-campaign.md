@@ -293,3 +293,87 @@ subscription row and the license record, both `pro` before); restore both after 
 Effort, on the pricing task with the agent's own tab: at `low`, Haiku opens one page and stops; at
 `medium` and `high` it visits and toggles all three vendors' pages. The first batch runs at `medium`,
 Haiku's own default, while the per-turn effort policy is built.
+
+### Batch 17 (October 18)
+
+Ten tasks, one perfect (the hard 341d7a7056), rubric average 0.54, $2.46 for the batch and $11.37 of
+the $50 cap so far. Eight of ten runs ended `invocation.failed`, mostly the agent's own "not finished"
+ending; one hit the 20-minute timeout one rubric item short (0.86). The batch ran on hidden agent tabs.
+The next ones run in agent windows (docs/design/agents-at-cursor/BRIEF.md, "Agent windows"), so their
+first job is to show the move cost nothing.
+
+### Batch 18 (October 18): stopped, the app signed out
+
+Batch 17's ten tasks again, now in agent windows. The first two failed fast and the next three never
+started: the desktop's session had been revoked. Every new window restores the saved account at
+startup, and a restore without an account replaced the app's live cookie jar with an empty one. The
+device worker kept the old jar and the next restore loaded the keychain copy, so two jars rotated one
+refresh token until the server saw a stale one and deleted the session. Agent windows open once per
+run, so a batch hit it quickly. They no longer change or forget the account (`auth_cookies.rs`);
+they report whether the person's session is the one they expect. Spend: $0.07.
+
+### Batches 18 to 20 (October 19): agent windows
+
+| Batch | How | Perfect | Rubric avg | Typical run |
+|---|---|---|---|---|
+| 18 | Agent windows, one task at a time (6 of 10 before a restart) | 0/6 | 0.35 | 7–12 min |
+| 19 | Three at a time, agents' own time estimates | 0/10 | 0.29 | 18 min median |
+| 20 | Three at a time, estimates held to 30 minutes (4 clean results before a restart) | 0/4 | 0.40 | 6–30 min |
+
+Many fixes landed in agent windows along the way: background sign-out, cross-talk between windows,
+request races, duplicate tabs, held claims, model stream stalls and per-run screenshots. Speed
+and reliability improved; accuracy did not. The analysis of all 116 graded runs and the plan that
+followed are in [agent-harness-v2.md](agent-harness-v2.md). No more batches until those changes
+are in.
+
+### Comparison pass A (October 19): harness v2, first half
+
+Batch 17's ten tasks, three at a time in agent windows, with the first harness-v2 changes: Misty's
+own tools deferred (first turn 22,000 → 10,700 input tokens), cache-safe working set, content-first
+snapshots, pushed page state, proof-tab check, loop guard and time estimates.
+
+| | Perfect | Rubric avg | Median run | Median tools | Cost |
+|---|---|---|---|---|---|
+| Batch 17 (hidden tabs, one at a time) | 1/10 | 0.540 | 724 s | 92 | $2.46 |
+| Pass A (agent windows, three at a time) | 0/10 | 0.367 | 926 s | 78 | $1.97 |
+
+Pass A matches batches 18 to 20, so the changes did not recover what the move into agent windows
+lost. What the runs showed:
+
+- **Slower turns.** 17.3 s per turn at the median against 13.0 s, though input fell from 82,000 to
+  49,000 tokens: the time went to device jobs. `screen_open`'s p90 was 30 s, its timeout. Nine tab
+  opens were never claimed (the realtime socket reconnects every 15 to 60 s here and dropped their
+  notifications; the worker waited 60 s to look again) and six were claimed but never began (the
+  claim's answer was lost on the way).
+- **No breadth.** Tasks with 10 to 20 items were worked one at a time. `agent_delegate` sat behind
+  `agent_tool_load` and was never used, and the research budget's "Answer now" note ended runs early.
+- **Finishes.** Every run called `agent_finish` 4 to 7 times; 15 of the refusals were "not finished
+  yet". One run ended on its progress line ("Next: I'll read …") as its answer.
+
+Fixed before pass B: held claims for ten minutes after any job and a 25 s reconcile; a claim not
+begun within 8 s goes back to the queue, and held claims look again every 5 s; sub-agents are
+offered to every run with its own tabs, and their tabs open in the parent's agent window; the budget
+note sends such runs to work on pages instead of answering; a bare progress line is sent back; the
+prompt asks for several similar items per turn. Spend so far: $19.56 of $50 (eval ledger).
+
+### Comparison pass B (October 19): harness v2 with the fixes above
+
+| | Perfect | Rubric avg | Median run | Median tools | Cost |
+|---|---|---|---|---|---|
+| Batch 17 | 1/10 | 0.540 | 724 s | 92 | $2.46 |
+| Pass A | 0/10 | 0.367 | 926 s | 78 | $1.97 |
+| Pass B | 0/10 | 0.406 | 966 s | 67 | $1.55 |
+
+Three tasks rose (341d7a7056 0.57 → 0.86, 48a6cb73b8 0.00 → 0.50, adc644f33f 0.14 → 0.43) and three
+fell, two of them after 34 and 38 minutes with few tools: device jobs slowed through the pass
+(`screen_open` median 4.8 s → 7.4 s, p90 41 s; snapshots timing out). The cause was on the device:
+250 WebKit page processes for 54 open pages. Destroying an agent window left its pages' processes
+behind, so every run made the app slower for the next. Agent windows now close their pages one by
+one before they go (`close_window_pages`), but that was not the whole leak: a fresh app starts
+with four page processes and still gains about eight per run (4 → 12 → 20) after the run's window
+and pages are gone. The dock, lock and ring hold views weakly and the eval's private session is one
+per app, so the holder is still unknown; restart the app before each pass until it is found.
+
+Still open: runs give up early (one tried to finish at step 20 of 67 and stopped 8 minutes into its
+own 45-minute estimate). Give-ups are now sent back up to eight times while a run is under 80% of
+its estimate. The next comparison runs on a fresh app with both changes.

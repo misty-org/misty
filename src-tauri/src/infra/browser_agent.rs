@@ -29,7 +29,8 @@ pub async fn browser_agent_execute(
         return super::super::workspace_autopilot::execute(&app, &request).await;
     }
     if let Some(view) = app.get_webview(&webview_label(&id)?) {
-        super::super::extensions::authorize_agent_url(&view.url().map_err(|e| e.to_string())?).await?;
+        super::super::extensions::authorize_agent_url(&view.url().map_err(|e| e.to_string())?)
+            .await?;
     }
     if let Some(url) = request
         .input
@@ -146,7 +147,8 @@ pub async fn browser_agent_execute(
                 .ok_or_else(|| "Browser tab is not running.".to_owned())?;
             let previous = view.url().map_err(|error| error.to_string())?;
             let target = external_url(url)?;
-            view.navigate(target.clone()).map_err(|error| error.to_string())?;
+            view.navigate(target.clone())
+                .map_err(|error| error.to_string())?;
             let mut landed = json!({"ok": true, "url": url});
             // The page it lands on, read once it has loaded, unless the caller only navigates.
             if request.input["includeSnapshot"] != false {

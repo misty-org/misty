@@ -37,12 +37,12 @@ const PAGE_INTERACTIVE_SELECTOR = [
 ].join(",");
 
 /**
- * The top tenth of the window (at most 72px) moves it from empty space on any page, as the same
+ * The top twentieth of the window (at most 72px) moves it from empty space on any page, as the same
  * edge of a native browser page does: links, controls, fields and anything draggable keep
  * their presses.
  */
 export function isTopEdgeDragPress(event: { clientY: number; target: EventTarget | null }) {
-  if (event.clientY > Math.min(72, window.innerHeight * 0.1)) return false;
+  if (event.clientY > Math.min(72, window.innerHeight * 0.05)) return false;
   if (shouldSuppressWindowDrag(event.target)) return false;
   const element = event.target instanceof Element ? event.target : null;
   return !element?.closest(PAGE_INTERACTIVE_SELECTOR);

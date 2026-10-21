@@ -323,7 +323,7 @@ before it counts as done; add rows above as they close.
 - **Top-edge drag and double-click zoom.** The page script (`browser_scripts.rs`) and the app-page
   handler (`handleTopEdgePointerDown`) call `togglePseudoMaximize` on macOS and
   `toggleTitlebarMaximize` elsewhere. Check on Windows that a double press zooms, that snap
-  layouts still work, and that dragging from the top tenth does not fight resize borders.
+  layouts still work, and that dragging from the top twentieth does not fight resize borders.
 - **Panel look and corner masks.** Vertical tabs make the page a rounded panel with an 8px margin
   (`dockingGeometry.ts`, `docking.css`). The page's rounded corners come from the macOS layer mask
   in `browser.rs` (`position_macos_webview`); confirm Windows clips the WebView2 child to the same

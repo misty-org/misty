@@ -6,12 +6,11 @@ import { useUserStore } from "@/features/auth/core";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { devicesNative } from "@/native/devices";
 import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
-import { dockHostedTab, listenHostedDock, undockHostedTab } from "./hostedSessionDock";
 import { holdAwake, releaseAwake } from "./keepAwake";
-import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
+import { agentPageBounds, agentTab, agentTabsForTask, closeAgentTab, sleepTaskTabs, trackAgentTab } from "./agentTabs";
 import {
   addHostedChildViews,
   hostedSessionForTask,
@@ -34,7 +33,6 @@ const idleMs = 10 * 60_000;
 const renewMs = 10_000;
 const timers = new Map<string, ReturnType<typeof setInterval>>();
 let unsubscribe: (() => void) | undefined;
-let stopDockListener: (() => void) | undefined;
 
 // A hosted session is the agent's own hidden tab, so it runs beside the person's
 // tasks and other sessions instead of waiting for them.
@@ -52,20 +50,13 @@ export async function endHostedSession(taskId: string): Promise<void> {
   update(sessions().filter((item) => item.taskId !== taskId));
   clearInterval(timers.get(taskId));
   timers.delete(taskId);
-  // A docked first tab comes back to this window before it closes, so its window goes too.
-  await undockHostedTab(session.host);
-  await Promise.allSettled([
-    invoke("agent_workspace_release", { taskId }),
-    ...[session.viewId, ...session.childViews].map((id) =>
-      invoke("browser_webview_close", { request: { id } }),
-    ),
-  ]);
+  // Its tabs sleep as the run's proof (agentTabs.ts); their pages close, then the lease goes.
+  await sleepTaskTabs(taskId);
+  await invoke("agent_workspace_release", { taskId }).catch(() => undefined);
   void releaseAwake(`hosted:${taskId}`);
   if (!sessions().length) {
     unsubscribe?.();
     unsubscribe = undefined;
-    stopDockListener?.();
-    stopDockListener = undefined;
   }
 }
 
@@ -74,7 +65,8 @@ export async function endAllHostedSessions(): Promise<void> {
   await Promise.allSettled(sessions().map((session) => endHostedSession(session.taskId)));
 }
 
-// A stopped request ends its session at once rather than after the idle limit.
+// A request that stopped or finished ends its session at once rather than after the idle limit:
+// its tabs sleep, so nothing it opened keeps a page alive.
 function watchRequests(accountId: string) {
   if (unsubscribe) return;
   unsubscribe = subscribeAccountEvents(accountId, (event) => {
@@ -85,7 +77,8 @@ function watchRequests(accountId: string) {
         `/ai/invocations/${encodeURIComponent(session.runId)}/state`,
       )
         .then(({ state }) => {
-          if (state === "canceled") void endHostedSession(session.taskId);
+          if (state === "canceled" || state === "completed" || state === "failed")
+            void endHostedSession(session.taskId);
         })
         .catch(() => undefined);
     }
@@ -123,11 +116,7 @@ async function openSessionTab(session: HostedSession, url: string, signal: Abort
   try {
     signal.throwIfAborted();
     await invoke("browser_webview_create", {
-      request: {
-        id, scopeId, url, originSpaceId: "", x: 0, y: 64, theme: "dark",
-        width: Math.max(200, window.innerWidth - 440),
-        height: Math.max(300, window.innerHeight - 128),
-      },
+      request: { id, scopeId, url, originSpaceId: "", theme: "dark", agentRunId: session.runId, ...agentPageBounds() },
     });
     await invoke("agent_workspace_bind_scope", { taskId: session.taskId, scopeId });
     await invoke("browser_webview_hide", { request: { id, keepLive: true } });
@@ -136,7 +125,23 @@ async function openSessionTab(session: HostedSession, url: string, signal: Abort
     throw new DeviceOperationNotAttempted(error);
   }
   addHostedChildViews(session.taskId, [id], [scopeId]);
+  trackAgentTab({ scopeId, viewId: id, taskId: session.taskId, runId: session.runId, url, conversationId: session.conversationId });
   return scopeId;
+}
+
+/** The scope of the task's tab already at `url` (hash and trailing slash aside), so a page
+ * the agent opens twice is not opened twice. */
+function tabShowing(taskId: string, url: string): string | undefined {
+  const key = (value: string) => {
+    try {
+      const parsed = new URL(value);
+      parsed.hash = "";
+      return parsed.href.replace(/\/$/, "");
+    } catch {
+      return value;
+    }
+  };
+  return agentTabsForTask(taskId).find((tab) => tab.url && key(tab.url) === key(url))?.scopeId;
 }
 
 function startUrl(value: unknown): string {
@@ -157,8 +162,11 @@ export async function startHostedSession(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
+  // An agent's tabs live in the person's window (docs/design/agent-browser/BRIEF.md).
   const config = (job.config ?? {}) as { agentId?: unknown };
-  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown; newTab?: unknown; closeScope?: unknown };
+  const input = (job.input ?? {}) as { url?: unknown; conversationId?: unknown; scopeId?: unknown; newTab?: unknown; closeScope?: unknown; appCommand?: unknown };
+  // Misty's own pages open in the agent browser in a later step; there is no agent window now.
+  if (input.appCommand) throw new DeviceOperationNotAttempted(new Error("app_window_unavailable"));
   const agentId = typeof config.agentId === "string" ? config.agentId : "";
   const conversationId = typeof input.conversationId === "string" ? input.conversationId : "";
   const accountId = useUserStore.getState().me?.id ?? "";
@@ -177,8 +185,8 @@ export async function startHostedSession(
   // screen_close: one of the session's other tabs, which the run no longer keeps open.
   if (typeof input.closeScope === "string") {
     const view = session && removeHostedChildTab(session.taskId, input.closeScope);
-    if (!view) throw new DeviceOperationNotAttempted(new Error("unknown_tab"));
-    await invoke("browser_webview_close", { request: { id: view } }).catch(() => undefined);
+    if (!view || !agentTab(input.closeScope)) throw new DeviceOperationNotAttempted(new Error("unknown_tab"));
+    await closeAgentTab(input.closeScope);
     return { closed: true };
   }
   if (!session) {
@@ -199,11 +207,9 @@ export async function startHostedSession(
           scopeId,
           url: startUrl(input.url),
           originSpaceId: "",
-          x: 0,
-          y: 64,
-          width: Math.max(200, window.innerWidth - 440),
-          height: Math.max(300, window.innerHeight - 128),
           theme: "dark",
+          agentRunId: job.runId,
+          ...agentPageBounds(),
         },
       });
       await invoke("agent_workspace_bind_scope", { taskId, scopeId });
@@ -227,58 +233,67 @@ export async function startHostedSession(
       lastUsed: Date.now(),
     };
     update([...sessions(), session]);
+    trackAgentTab({ scopeId, viewId, taskId, runId: job.runId, url: startUrl(input.url), conversationId });
     keepAlive(session);
     watchRequests(accountId);
-    // The agent's window: its first tab docks with the others in the corner.
-    stopDockListener ??= listenHostedDock();
-    const name = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId)?.name || "Misty";
-    const host = await dockHostedTab(viewId, name);
-    if (host) {
-      update(sessions().map((item) => (item.taskId === taskId ? { ...item, host } : item)));
-      session = { ...session, host };
-    }
     void holdAwake(`hosted:${taskId}`);
   } else {
     touchHostedSession(session.scopeId, job.runId);
   }
   // Another tab of the agent's own beside the first, when the run asks to keep a page open.
+  // A page one of its tabs already shows is that tab, not a second one.
   let tabScope = session.scopeId;
-  if (input.newTab === true && typeof input.url === "string" && session.childViews.length < maxOwnTabs - 1)
-    tabScope = await openSessionTab(session, startUrl(input.url), signal);
+  if (input.newTab === true && typeof input.url === "string") {
+    const url = startUrl(input.url);
+    tabScope =
+      tabShowing(session.taskId, url) ??
+      (session.childViews.length < maxOwnTabs - 1 ? await openSessionTab(session, url, signal) : session.scopeId);
+  }
   try {
-    const [grant] = await devicesNative.signRunGrants(
-      { apiBase: await resolveApiBase(), accountId },
-      [
-        {
-          targetDeviceId: device.id,
-          agentId,
-          capabilities: [...browserTabAgentFileCapabilities].sort(),
-          scopes: [tabScope],
-        },
-      ],
-    );
-    return {
-      tabs: [
-        {
-          device_id: device.id,
-          kind: "browser_tab",
-          opaque_ref: tabScope,
-          display_name: `Browser on ${snapshot.device.displayName || "this computer"}`,
-          capabilities: browserTabAgentFileCapabilities,
-          metadata: {
-            kind: "browser_tab",
-            app_id: "browser",
-            label: snapshot.device.displayName || "Browser",
-            agentOwned: true,
-            remote_session: true,
-            task_id: session.taskId,
-          },
-          run_grant: grant,
-        },
-      ],
-    };
+    return await signedSessionTab(job, tabScope, session.taskId);
   } catch (error) {
     await endHostedSession(session.taskId);
     throw new DeviceOperationNotAttempted(error);
   }
+}
+
+/** A tab of the agent's own as the job's answer: its scope and the grant this device signs. */
+export async function signedSessionTab(
+  job: ClaimedWorkflowNodeJob["job"],
+  tabScope: string,
+  taskId: string,
+): Promise<Record<string, unknown>> {
+  const agentId = String((job.config as { agentId?: unknown } | undefined)?.agentId ?? "");
+  const accountId = useUserStore.getState().me?.id ?? "";
+  const snapshot = await agentsDeviceSnapshot();
+  if (!snapshot.device) throw new DeviceOperationNotAttempted(new Error("device_unavailable"));
+  const device = await ensureServerAgentDevice(snapshot.device);
+  const [grant] = await devicesNative.signRunGrants({ apiBase: await resolveApiBase(), accountId }, [
+    {
+      targetDeviceId: device.id,
+      agentId,
+      capabilities: [...browserTabAgentFileCapabilities].sort(),
+      scopes: [tabScope],
+    },
+  ]);
+  return {
+    tabs: [
+      {
+        device_id: device.id,
+        kind: "browser_tab",
+        opaque_ref: tabScope,
+        display_name: `Browser on ${snapshot.device.displayName || "this computer"}`,
+        capabilities: browserTabAgentFileCapabilities,
+        metadata: {
+          kind: "browser_tab",
+          app_id: "browser",
+          label: snapshot.device.displayName || "Browser",
+          agentOwned: true,
+          remote_session: true,
+          task_id: taskId,
+        },
+        run_grant: grant,
+      },
+    ],
+  };
 }

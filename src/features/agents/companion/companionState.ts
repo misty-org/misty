@@ -26,6 +26,10 @@ export type CompanionControl =
       ask: boolean;
     }
   | {
+      kind: "teach";
+      teach: boolean;
+    }
+  | {
       kind: "model";
       model: string;
     }

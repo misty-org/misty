@@ -41,14 +41,19 @@ describe.each(layouts)("$navigation navigation / $tabs tabs", (layout) => {
 it("hangs a horizontal strip's tabs from the page's top seam", () => {
   const frame = dockingGeometry({ navigation: "left", tabs: "top" }).frame;
   expect(frame["--pane-seam-top"]).toBe("1px");
-  expect(frame["--pane-seam-left"]).toBe("8px");
+  expect(frame["--pane-seam-left"]).toBe(`${dockingMetrics.paneMargin}px`);
   expect(frame["--pane-corner-top-left"]).toBe("12px");
-  expect(frame["--pane-corner-bottom-right"]).toBe("20px");
+  expect(frame["--pane-corner-bottom-right"]).toBe(
+    `${dockingMetrics.paneMargin + dockingMetrics.paneRadius}px`,
+  );
 });
 it("makes the page a rounded pane with an even margin beside vertical tabs", () => {
   const frame = dockingGeometry({ navigation: "left", tabs: "left" }).frame;
-  for (const edge of dockPositions) expect(frame[`--pane-seam-${edge}`]).toBe("8px");
-  expect(frame["--pane-corner-bottom-right"]).toBe("20px");
+  for (const edge of dockPositions)
+    expect(frame[`--pane-seam-${edge}`]).toBe(`${dockingMetrics.paneMargin}px`);
+  expect(frame["--pane-corner-bottom-right"]).toBe(
+    `${dockingMetrics.paneMargin + dockingMetrics.paneRadius}px`,
+  );
   expect(frame["--pane-seam-color"]).toBe("transparent");
 });
 it("subtracts occupied rails from native controls on both sides at zoom", () => {

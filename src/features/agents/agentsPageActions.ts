@@ -117,7 +117,9 @@ export function deriveAgentsPageView(state: AgentsPageState, actions: AgentsPage
     settingsModalOpen,
     identityRef,
   } = state;
-  const disabled = working || guard.busy;
+  // Agents keep working in their own chats while the person switches between them
+  // (docs/design/agent-browser/BRIEF.md); only an unsaved change holds the page.
+  const disabled = guard.busy;
   const showWorkspace = Boolean(profile);
   const switcher = {
     agents,

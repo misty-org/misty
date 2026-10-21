@@ -1,6 +1,7 @@
 import { accountScopeWillResetEvent } from "@/features/auth";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Search, ArrowUpRight } from "lucide-react";
 import {
   cn,
@@ -12,7 +13,11 @@ import {
   Input,
 } from "@/shared/ui";
 import { browserSearchEngine } from "@/features/workspace/browserSearchEngine";
-import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
+import {
+  browserOverlayReady,
+  setBrowserWebviewsSuspended,
+} from "@/features/webviews/browserRuntime";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { browserSearchDestination, useBrowserSearchStore, type SearchAnchor } from "./search";
 import { SearchResultList, type SearchListItem } from "./SearchResultList";
 import { openInNewBrowserTab, openMatch, openTargetBeside } from "./searchTargets";
@@ -52,6 +57,32 @@ export function BrowserSearchDialog() {
       setNotice(null);
     }
     return () => setBrowserWebviewsSuspended(false, "browser-search");
+  }, [open]);
+
+  // A page's native view can hold keyboard focus when the panel opens (Ctrl+T pressed over a
+  // page), and DOM focus alone never takes it back. Return focus to the app first, then the field.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const focusField = () =>
+      document
+        .querySelector<HTMLInputElement>('input[aria-label="Search or enter a URL"]')
+        ?.focus();
+    void (async () => {
+      await browserOverlayReady().catch(() => undefined);
+      if (hasTauriInternals())
+        await getCurrentWebview()
+          .setFocus()
+          .catch(() => undefined);
+      if (cancelled) return;
+      focusField();
+      // The panel may still be mounting, or focus may settle a frame late.
+      window.requestAnimationFrame(() => !cancelled && focusField());
+      window.setTimeout(() => !cancelled && focusField(), 80);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   useEffect(() => setActiveIndex(0), [query]);

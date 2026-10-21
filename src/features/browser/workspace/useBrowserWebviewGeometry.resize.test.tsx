@@ -5,12 +5,15 @@ const runtime = vi.hoisted(() => ({
   sync: vi.fn().mockResolvedValue(undefined),
   layout: vi.fn(),
   hide: vi.fn(),
+  prewarm: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("./browserRuntime", () => ({
   browserRuntimeResumeEvent: "misty:browser-runtime-resume",
+  windowChromeChangedEvent: "misty:window-chrome-changed",
   syncBrowserWebview: runtime.sync,
   requestBrowserWebviewLayout: runtime.layout,
   hideBrowserWebview: runtime.hide,
+  prewarmBrowserWebview: runtime.prewarm,
   isBrowserRuntimeCreated: () => false,
   isBrowserLayoutMoving: () => false,
   useBrowserRuntimeStore: { getState: () => ({ errors: {}, setError: vi.fn() }) },

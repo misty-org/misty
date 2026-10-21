@@ -7,6 +7,13 @@
 //! the page keeps working and nothing is injected into it. A subclass of the
 //! host window reapplies both whenever it is resized, whichever path resized
 //! it, and lets go of them when the window is destroyed.
+//!
+//! A region keeps or cuts whole pixels, so on its own a curve comes out as a
+//! staircase. The region therefore keeps every pixel the curve touches, and a
+//! small layered window over each rounded corner paints the window chrome
+//! over the part of those edge pixels that lies outside the curve, with
+//! smooth alpha. Pixels wholly outside stay cut, so the renderer's own chrome
+//! shows there and only the one-pixel fringe uses the reported color.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
@@ -14,10 +21,12 @@ use std::{
 
 use tauri::Webview;
 use windows_sys::Win32::{
-    Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
+    Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM},
     Graphics::Gdi::{
-        CombineRgn, CreateEllipticRgn, CreateRectRgn, DeleteObject, GetStockObject, SetWindowRgn,
-        BLACK_BRUSH, HBRUSH, HRGN, RGN_DIFF,
+        CombineRgn, CreateCompatibleDC, CreateDIBSection, CreateRectRgn, DeleteDC, DeleteObject,
+        GetStockObject, SelectObject, SetWindowRgn, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, BLACK_BRUSH, BLENDFUNCTION, DIB_RGB_COLORS, HBRUSH, HRGN,
+        RGN_DIFF,
     },
     System::LibraryLoader::GetModuleHandleW,
     UI::{
@@ -25,9 +34,9 @@ use windows_sys::Win32::{
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::{
             CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassW,
-            SetLayeredWindowAttributes, SetWindowPos, ShowWindow, HWND_TOP, LWA_ALPHA,
-            SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, WM_NCDESTROY, WM_SIZE, WNDCLASSW, WS_CHILD,
-            WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
+            SetLayeredWindowAttributes, SetWindowPos, ShowWindow, UpdateLayeredWindow, HWND_TOP,
+            LWA_ALPHA, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, ULW_ALPHA, WM_NCDESTROY, WM_SIZE,
+            WNDCLASSW, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
         },
     },
 };
@@ -42,6 +51,10 @@ struct Frame {
     dim: f64,
     /// The dim window, once a dim has been shown.
     overlay: Option<isize>,
+    /// The chrome color around the page's rounded corners, when it is known.
+    corner_color: Option<[u8; 3]>,
+    /// Each corner's cap window and the radius and color it last painted.
+    caps: [Option<(isize, i32, [u8; 3])>; 4],
 }
 
 fn frames() -> &'static Mutex<HashMap<isize, Frame>> {
@@ -49,8 +62,13 @@ fn frames() -> &'static Mutex<HashMap<isize, Frame>> {
     FRAMES.get_or_init(Default::default)
 }
 
-/// Rounds the page's corners by `radii` (logical pixels; zero is square).
-pub(super) fn set_corners(webview: &Webview, radii: [f64; 4]) -> Result<(), String> {
+/// Rounds the page's corners by `radii` (logical pixels; zero is square),
+/// smoothing them with `color`, the window chrome around them, when given.
+pub(super) fn set_corners(
+    webview: &Webview,
+    radii: [f64; 4],
+    color: Option<[u8; 3]>,
+) -> Result<(), String> {
     let radii = radii.map(|radius| {
         if radius.is_finite() {
             radius.max(0.0)
@@ -58,7 +76,10 @@ pub(super) fn set_corners(webview: &Webview, radii: [f64; 4]) -> Result<(), Stri
             0.0
         }
     });
-    change(webview, move |frame| frame.radii = radii)
+    change(webview, move |frame| {
+        frame.radii = radii;
+        frame.corner_color = color;
+    })
 }
 
 /// Lays a dim of `strength` (0 to 1) over the page; zero removes it.
@@ -77,15 +98,24 @@ fn change(webview: &Webview, edit: impl FnOnce(&mut Frame) + Send + 'static) -> 
                 return;
             }
             let host = host.0 as HWND;
-            if let Ok(mut frames) = frames().lock() {
+            let changed = if let Ok(mut frames) = frames().lock() {
                 let fresh = !frames.contains_key(&(host as isize));
-                edit(frames.entry(host as isize).or_default());
+                let frame = frames.entry(host as isize).or_default();
+                let before = (frame.radii, frame.dim, frame.corner_color);
+                edit(frame);
                 if fresh {
                     // SAFETY: a live window owned by this thread.
                     unsafe { SetWindowSubclass(host, Some(on_message), SUBCLASS, 0) };
                 }
+                fresh || before != (frame.radii, frame.dim, frame.corner_color)
+            } else {
+                false
+            };
+            // Every reconcile restates the frame; only a change is reapplied. A
+            // resize reapplies it through the subclass.
+            if changed {
+                apply(host);
             }
-            apply(host);
         })
         .map_err(|error| error.to_string())
 }
@@ -115,6 +145,11 @@ fn apply(host: HWND) {
         let region = rounded_region(width, height, radii);
         SetWindowRgn(host, region, 1);
     }
+    apply_dim(host, frame, width, height);
+    apply_caps(host, frame, width, height, radii);
+}
+
+fn apply_dim(host: HWND, frame: &mut Frame, width: i32, height: i32) {
     if frame.dim <= 0.0 {
         if let Some(overlay) = frame.overlay {
             // SAFETY: the dim window this module created.
@@ -142,8 +177,155 @@ fn apply(host: HWND) {
     }
 }
 
-/// The client area minus whatever lies outside each rounded corner, or null
-/// (no clipping) when every corner is square.
+/// Lays a cap over each rounded corner, above the page and its dim, or hides
+/// it when the corner is square or its chrome color is unknown.
+fn apply_caps(host: HWND, frame: &mut Frame, width: i32, height: i32, radii: [i32; 4]) {
+    let radii = radii.map(|radius| radius.clamp(0, width.min(height).max(0) / 2));
+    for (corner, radius) in radii.into_iter().enumerate() {
+        let Some(color) = frame.corner_color.filter(|_| radius > 0) else {
+            if let Some((cap, ..)) = frame.caps[corner] {
+                // SAFETY: a cap window this module created.
+                unsafe { ShowWindow(cap as HWND, SW_HIDE) };
+            }
+            continue;
+        };
+        let cap = match frame.caps[corner] {
+            Some((cap, painted_radius, painted_color)) => {
+                if painted_radius != radius || painted_color != color {
+                    paint_cap(cap as HWND, corner, radius, color);
+                    frame.caps[corner] = Some((cap, radius, color));
+                }
+                cap as HWND
+            }
+            None => {
+                let Some(cap) = create_overlay(host) else {
+                    continue;
+                };
+                paint_cap(cap, corner, radius, color);
+                frame.caps[corner] = Some((cap as isize, radius, color));
+                cap
+            }
+        };
+        let x = if corner == 1 || corner == 2 {
+            width - radius
+        } else {
+            0
+        };
+        let y = if corner >= 2 { height - radius } else { 0 };
+        // SAFETY: as above; the caps go above the page's windows and its dim.
+        unsafe {
+            SetWindowPos(cap, HWND_TOP, x, y, radius, radius, SWP_NOACTIVATE);
+            ShowWindow(cap, SW_SHOWNA);
+        }
+    }
+}
+
+/// How much of the pixel at (`x`, `y`) of a top-left corner square of side
+/// `radius` lies inside the corner's arc, from 0 to 1.
+fn arc_coverage(radius: i32, x: i32, y: i32) -> f32 {
+    const SAMPLES: i32 = 8;
+    let center = radius as f32;
+    let mut inside = 0;
+    for sample_y in 0..SAMPLES {
+        for sample_x in 0..SAMPLES {
+            let dx = center - (x as f32 + (sample_x as f32 + 0.5) / SAMPLES as f32);
+            let dy = center - (y as f32 + (sample_y as f32 + 0.5) / SAMPLES as f32);
+            if dx * dx + dy * dy <= center * center {
+                inside += 1;
+            }
+        }
+    }
+    inside as f32 / (SAMPLES * SAMPLES) as f32
+}
+
+/// A pixel of `corner`'s cap in the top-left orientation `arc_coverage` uses.
+fn top_left_pixel(corner: usize, radius: i32, x: i32, y: i32) -> (i32, i32) {
+    let flip_x = corner == 1 || corner == 2;
+    let flip_y = corner >= 2;
+    (
+        if flip_x { radius - 1 - x } else { x },
+        if flip_y { radius - 1 - y } else { y },
+    )
+}
+
+/// Paints the chrome `color` over the part of each pixel outside the arc.
+fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
+    if radius <= 0 {
+        return;
+    }
+    // SAFETY: a DIB and memory DC created, used and released here.
+    unsafe {
+        let info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: radius,
+                // Negative: rows run top to bottom.
+                biHeight: -radius,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB,
+                ..std::mem::zeroed()
+            },
+            ..std::mem::zeroed()
+        };
+        let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
+        let bitmap = CreateDIBSection(
+            std::ptr::null_mut(),
+            &info,
+            DIB_RGB_COLORS,
+            &mut bits,
+            std::ptr::null_mut(),
+            0,
+        );
+        if bitmap.is_null() || bits.is_null() {
+            return;
+        }
+        let pixels = std::slice::from_raw_parts_mut(bits.cast::<u32>(), (radius * radius) as usize);
+        for y in 0..radius {
+            for x in 0..radius {
+                let (tx, ty) = top_left_pixel(corner, radius, x, y);
+                let alpha = 1.0 - arc_coverage(radius, tx, ty);
+                let premultiply = |channel: u8| (f32::from(channel) * alpha).round() as u32;
+                // Premultiplied BGRA.
+                pixels[(y * radius + x) as usize] = ((alpha * 255.0).round() as u32) << 24
+                    | premultiply(color[0]) << 16
+                    | premultiply(color[1]) << 8
+                    | premultiply(color[2]);
+            }
+        }
+        let source = CreateCompatibleDC(std::ptr::null_mut());
+        let previous = SelectObject(source, bitmap);
+        let size = SIZE {
+            cx: radius,
+            cy: radius,
+        };
+        let origin = POINT { x: 0, y: 0 };
+        let blend = BLENDFUNCTION {
+            BlendOp: AC_SRC_OVER as u8,
+            BlendFlags: 0,
+            SourceConstantAlpha: 255,
+            AlphaFormat: AC_SRC_ALPHA as u8,
+        };
+        UpdateLayeredWindow(
+            cap,
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            &size,
+            source,
+            &origin,
+            0,
+            &blend,
+            ULW_ALPHA,
+        );
+        SelectObject(source, previous);
+        DeleteDC(source);
+        DeleteObject(bitmap);
+    }
+}
+
+/// The client area minus the pixels wholly outside each rounded corner's arc,
+/// or null (no clipping) when every corner is square. Pixels the arc crosses
+/// stay, for the corner caps to smooth.
 ///
 /// # Safety
 /// Returns a region the caller must hand to the system or delete.
@@ -152,28 +334,26 @@ unsafe fn rounded_region(width: i32, height: i32, radii: [i32; 4]) -> HRGN {
         return std::ptr::null_mut();
     }
     let region = CreateRectRgn(0, 0, width, height);
-    let [top_left, top_right, bottom_right, bottom_left] =
-        radii.map(|radius| radius.clamp(0, width.min(height) / 2));
-    for (radius, x, y) in [
-        (top_left, 0, 0),
-        (top_right, width - top_right, 0),
-        (bottom_right, width - bottom_right, height - bottom_right),
-        (bottom_left, 0, height - bottom_left),
-    ] {
-        if radius <= 0 {
-            continue;
+    let radii = radii.map(|radius| radius.clamp(0, width.min(height) / 2));
+    for (corner, radius) in radii.into_iter().enumerate() {
+        for row in 0..radius {
+            // Pixels wholly outside the arc, counted in from the outer edge.
+            let cut = (0..radius)
+                .take_while(|&x| arc_coverage(radius, x, row) == 0.0)
+                .count() as i32;
+            if cut == 0 {
+                continue;
+            }
+            let (left, right) = if corner == 1 || corner == 2 {
+                (width - cut, width)
+            } else {
+                (0, cut)
+            };
+            let top = if corner >= 2 { height - 1 - row } else { row };
+            let strip = CreateRectRgn(left, top, right, top + 1);
+            CombineRgn(region, region, strip, RGN_DIFF);
+            DeleteObject(strip);
         }
-        // The corner square, minus the circle the corner's arc belongs to.
-        let corner = CreateRectRgn(x, y, x + radius, y + radius);
-        let (cx, cy) = (
-            if x == 0 { 0 } else { width - 2 * radius },
-            if y == 0 { 0 } else { height - 2 * radius },
-        );
-        let circle = CreateEllipticRgn(cx, cy, cx + 2 * radius + 1, cy + 2 * radius + 1);
-        CombineRgn(corner, corner, circle, RGN_DIFF);
-        CombineRgn(region, region, corner, RGN_DIFF);
-        DeleteObject(corner);
-        DeleteObject(circle);
     }
     region
 }
@@ -251,6 +431,21 @@ mod tests {
         Graphics::Gdi::PtInRegion,
         UI::WindowsAndMessaging::{WindowFromPoint, WS_EX_TOPMOST, WS_POPUP, WS_VISIBLE},
     };
+
+    #[test]
+    fn caps_cover_only_what_lies_outside_the_arc() {
+        // The outer corner pixel is wholly outside, the arc's center wholly inside.
+        assert_eq!(arc_coverage(12, 0, 0), 0.0);
+        assert_eq!(arc_coverage(12, 11, 11), 1.0);
+        // A pixel on the arc is partly covered, which is what the cap smooths.
+        let edge = arc_coverage(12, 3, 3);
+        assert!(edge > 0.0 && edge < 1.0, "{edge}");
+        // Every corner maps its own outer pixel to the top-left outer pixel.
+        assert_eq!(top_left_pixel(0, 12, 0, 0), (0, 0));
+        assert_eq!(top_left_pixel(1, 12, 11, 0), (0, 0));
+        assert_eq!(top_left_pixel(2, 12, 11, 11), (0, 0));
+        assert_eq!(top_left_pixel(3, 12, 0, 11), (0, 0));
+    }
 
     #[test]
     fn corners_cut_only_outside_their_arcs() {

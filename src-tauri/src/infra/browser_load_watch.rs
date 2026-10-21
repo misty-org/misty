@@ -7,7 +7,11 @@ pub(super) fn emit_navigated(app: &AppHandle, id: &str, url: String) {
     let _ = app.emit_to(
         browser_owner_label(app, id),
         "misty://browser-page",
-        BrowserPageEvent { id: id.to_owned(), url, phase: "navigated" },
+        BrowserPageEvent {
+            id: id.to_owned(),
+            url,
+            phase: "navigated",
+        },
     );
 }
 
@@ -15,7 +19,10 @@ pub(super) fn emit_navigated(app: &AppHandle, id: &str, url: String) {
 /// the current one.
 static LOAD_GENERATIONS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
 pub(super) fn next_load_generation(id: &str) -> u64 {
-    let mut generations = LOAD_GENERATIONS.get_or_init(Mutex::default).lock().unwrap_or_else(|e| e.into_inner());
+    let mut generations = LOAD_GENERATIONS
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let generation = generations.entry(id.to_owned()).or_insert(0);
     *generation = generation.wrapping_add(1);
     *generation
@@ -49,17 +56,33 @@ pub(super) fn watch_load(app: &AppHandle, id: &str, generation: u64) {
 
 /// A page changed its address without a load. It names the new one, which is accepted only within
 /// the view's own origin (the History API cannot go further); the view's own URL is the fallback.
-pub(super) fn emit_location(app: &AppHandle, owner: &str, id: &str, webview: &str, reported: Option<&str>) {
+pub(super) fn emit_location(
+    app: &AppHandle,
+    owner: &str,
+    id: &str,
+    webview: &str,
+    reported: Option<&str>,
+) {
     let view_url = app.get_webview(webview).and_then(|view| view.url().ok());
     let accepted = reported
-        .and_then(|encoded| percent_encoding::percent_decode_str(encoded).decode_utf8().ok())
+        .and_then(|encoded| {
+            percent_encoding::percent_decode_str(encoded)
+                .decode_utf8()
+                .ok()
+        })
         .and_then(|decoded| Url::parse(&decoded).ok())
         .filter(|new| {
             matches!(new.scheme(), "http" | "https")
-                && view_url.as_ref().is_some_and(|view| view.origin() == new.origin())
+                && view_url
+                    .as_ref()
+                    .is_some_and(|view| view.origin() == new.origin())
         });
     if let Some(url) = accepted.or(view_url) {
-        let event = BrowserPageEvent { id: id.to_owned(), url: url.to_string(), phase: "navigated" };
+        let event = BrowserPageEvent {
+            id: id.to_owned(),
+            url: url.to_string(),
+            phase: "navigated",
+        };
         let _ = app.emit_to(owner, "misty://browser-page", event);
     }
 }

@@ -59,7 +59,7 @@ func TestScreenGuidanceOffersOnDemandScreensInsteadOfAModeChoice(t *testing.T) {
 
 func TestARunThatCanOpenItsOwnTabLearnsTheBrowserToolsUpFront(t *testing.T) {
 	own := agentCapabilityGuidance([]string{"web.search", "web.fetch", "screen.open", "screen.look"}, false, true)
-	for _, want := range []string{"opens your own browser tab in the background and this run continues", "Act with browser_steps", "Use browser_act only for visual work"} {
+	for _, want := range []string{"opens your own browser tab, which the person can watch, and this run continues", "Work the pages your answer relies on in your own browser tab", "Act with browser_steps", "Use browser_act only for visual work"} {
 		if !strings.Contains(own, want) {
 			t.Fatalf("guidance lacks %q:\n%s", want, own)
 		}

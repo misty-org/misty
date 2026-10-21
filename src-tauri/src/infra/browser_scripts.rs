@@ -153,6 +153,37 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     };
   };
   window.__mistyMediaSnapshot = mediaSnapshot;
+
+  // What a video has said, for questions at the cursor (browser_media_session.rs). Captions are
+  // read in every frame by browser_captions.js before a question, so this never waits: the top
+  // document's own video first, else the video playing in a frame below it (a course video in
+  // Canvas plays in a frame from Canvas Studio, Kaltura, Panopto or YouTube).
+  window.__mistyMediaContext = () => {
+    const now = mediaSnapshot();
+    const own = window.__mistyFrameMedia ? window.__mistyFrameMedia() : null;
+    const local = {
+      title: String(now.title || document.title || '').slice(0, 200),
+      url: String(location.href).slice(0, 2048),
+      time: now.position,
+      duration: now.duration,
+      paused: now.paused,
+      hasMedia: now.hasMedia,
+      captions: (own && own.captions) || null,
+    };
+    if (local.hasMedia && !local.paused) return local;
+    const framed = window.__mistyFramedMedia ? window.__mistyFramedMedia() : null;
+    if (!framed || !framed.hasMedia || (local.hasMedia && framed.paused)) return local;
+    // The page around the frame names the video better than the player does.
+    return {
+      title: String(now.title || document.title || framed.title || '').slice(0, 200),
+      url: local.url,
+      time: framed.time,
+      duration: framed.duration,
+      paused: framed.paused,
+      hasMedia: true,
+      captions: framed.captions,
+    };
+  };
   let mediaTimer = 0;
   const reportMedia = () => {
     mediaTimer = 0;
@@ -168,7 +199,9 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
     // Media events do not bubble, so they are caught on the way down.
     document.addEventListener(name, (event) => {
       const target = event.target;
-      if (target && (target.tagName === 'VIDEO' || target.tagName === 'AUDIO')) scheduleMediaReport();
+      if (target && (target.tagName === 'VIDEO' || target.tagName === 'AUDIO')) {
+        scheduleMediaReport();
+      }
     }, true);
   });
   try {
@@ -205,7 +238,7 @@ pub(super) const BROWSER_VIEWPORT_SCRIPT: &str = r#"
   // The top edge of a page moves the window, as a titlebar would: press on empty space there
   // and drag. Links, controls, text and anything the page gives a special cursor keep their
   // clicks. The drag starts only once the pointer has moved, so a plain click is the page's.
-  const dragZone = () => Math.min(72, window.innerHeight * 0.1);
+  const dragZone = () => Math.min(72, window.innerHeight * 0.05);
   // A wrapper that spans the page (an app shell with a tabindex, or a pointer cursor set on a
   // whole layout) must not turn the whole top edge into content.
   const spansPage = (element) => {
@@ -408,6 +441,23 @@ pub(super) fn browser_status_script(shortcut_token: &str) -> String {
         )
 }
 
+/// Reads what videos say in every frame and gathers it in the top document
+/// (browser_captions.js). It carries no token: frames talk to the top over postMessage.
+pub(super) fn browser_captions_script() -> String {
+    concat!(
+        "(() => {
+",
+        include_str!("browser_caption_parsers.js"),
+        "
+",
+        include_str!("browser_captions.js"),
+        "
+})();
+"
+    )
+    .to_owned()
+}
+
 pub(super) fn browser_scrollbar_script() -> String {
     include_str!("browser_scrollbars.js").replace(
         "__MISTY_SCROLLBAR_CSS_PLACEHOLDER__",
@@ -491,9 +541,23 @@ pub(super) fn emit_browser_pointer(app: &AppHandle, id: &str, pointer: BrowserPo
 #[cfg(test)]
 mod tests {
     use super::{
-        browser_status_script, browser_viewport_script, BROWSER_COMPANION_SCRIPT,
-        BROWSER_VIEWPORT_SCRIPT,
+        browser_captions_script, browser_status_script, browser_viewport_script,
+        BROWSER_COMPANION_SCRIPT, BROWSER_VIEWPORT_SCRIPT,
     };
+
+    #[test]
+    fn captions_run_in_every_frame_without_the_tab_token() {
+        let captions = browser_captions_script();
+        assert!(captions.starts_with("(() => {"));
+        assert!(captions.contains("const mistyCaptions"));
+        assert!(captions.contains("track.mode = 'hidden'"));
+        assert!(captions.contains("topWindow.postMessage"));
+        assert!(!captions.contains("shortcutToken"));
+        assert!(!captions.contains("PLACEHOLDER"));
+        // The top document reads frames' captions; YouTube is no longer read only there.
+        assert!(BROWSER_VIEWPORT_SCRIPT.contains("window.__mistyFramedMedia"));
+        assert!(!BROWSER_VIEWPORT_SCRIPT.contains("prefetchCaptions"));
+    }
 
     #[test]
     fn pointer_reporting_uses_no_page_dom_mutation_or_remote_desktop_ipc() {

@@ -47,10 +47,6 @@ export async function continueAfterScreenRequest(
 ) {
   const request = findRequest(get, conversationId, messageId);
   if (request?.state !== "pending") return;
-  if (request.remote) {
-    void continueOnRemoteDevice(set, get, conversationId, messageId);
-    return;
-  }
   if (request.kind === "open" && request.location === "ask") {
     // Without the matcher, the card still lets the person choose.
     const tabs = await import("@/features/agents/companion/normalTabs").catch(() => null);
@@ -151,61 +147,6 @@ export async function openScreenAndContinue(
               }
             : undefined,
       },
-    );
-    const error = get().error;
-    patch(error ? { state: "failed", error } : { state: "opened" });
-  } catch (error) {
-    patch({ state: "failed", error: globalMistyError(error) });
-  }
-}
-
-/**
- * Continues on the browser another device opened for this request
- * (docs/design/agents-on-devices/BRIEF.md). Its tab arrives with a grant that
- * device signed; every step runs there.
- */
-async function continueOnRemoteDevice(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
-  conversationId: string,
-  messageId: string,
-) {
-  const request = findRequest(get, conversationId, messageId);
-  const remote = request?.remote;
-  if (request?.state !== "pending" || !remote?.contexts.length) return;
-  const patch = (next: Partial<ScreenRequest>) =>
-    patchRequest(set, get, conversationId, messageId, next);
-  patch({ state: "opening", error: undefined });
-  try {
-    if (get().working) throw new Error("Another task is running. Try again when it finishes.");
-    const deviceContexts = remote.contexts.map((item) => ({
-      deviceId: item.device_id,
-      kind: item.kind,
-      opaqueRef: item.opaque_ref,
-      displayName: item.display_name,
-      capabilities: item.capabilities,
-      metadata: item.metadata,
-      runGrant: item.run_grant,
-    }));
-    const context = deviceContexts.map((item) => ({
-      kind: "browser-tab",
-      id: `browser:${item.opaqueRef}`,
-      title: item.displayName || `Browser on ${remote.deviceName}`,
-      source: "current" as const,
-      privacy: "device" as const,
-      spaceId: "",
-      opaqueScopeId: item.opaqueRef,
-      attached: true,
-      metadata: { app_id: "browser" },
-    }));
-    await get().submitAnswer(
-      `Continue the request above. A browser on ${remote.deviceName} is now attached; work there.`,
-      [],
-      undefined,
-      get().panel === "closed" ? "workspace" : "panel",
-      deviceContexts,
-      { conversationId, context },
-      { executionMode: "user", continuation: true },
     );
     const error = get().error;
     patch(error ? { state: "failed", error } : { state: "opened" });

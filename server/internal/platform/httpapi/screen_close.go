@@ -46,7 +46,7 @@ func (s *SpacesService) screenCloseHandler(ctx context.Context, invocation agent
 	if err != nil {
 		return nil, err
 	}
-	target := sessionTarget(contexts, true)
+	target := sessionTarget(contexts)
 	if target == nil {
 		return nil, serveragent.ErrInvalidRequest("This run has no tabs of its own to close.")
 	}

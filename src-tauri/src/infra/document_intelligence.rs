@@ -65,12 +65,15 @@ pub async fn prepare_document(
         .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(2)))
         .clone()
         .try_acquire_owned()
-        .map_err(|_| ApiError::Message("Finish an earlier document before opening another.".into()))?;
+        .map_err(|_| {
+            ApiError::Message("Finish an earlier document before opening another.".into())
+        })?;
     let stop = Arc::new(AtomicBool::new(false));
     let _cancel = CancelOnDrop(stop.clone());
     tokio::task::spawn_blocking(move || {
         let _slot = slot;
-        let value = super::document_worker_macos::process(&path, &stop).map_err(ApiError::Message)?;
+        let value =
+            super::document_worker_macos::process(&path, &stop).map_err(ApiError::Message)?;
         serde_json::from_value(value["document"].clone())
             .map_err(|_| ApiError::Message("The document worker returned no document.".into()))
     })

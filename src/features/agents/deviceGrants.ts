@@ -1,12 +1,10 @@
 import type { AiInvocationDeviceContext } from "@/features/ai-surface/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
-import { deviceAccount, ensureServerAgentDevice } from "./store/useAgentDeviceStore";
-import { devicesNative } from "@/native/devices";
-import { useAgentDeviceTargets } from "./store/useAgentDeviceTargets";
+import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { useConversationProject } from "./store/useConversationProject";
 
-/** Each device's Misty browser has its own grant reference. */
+/** The Misty browser's grant reference on this computer. */
 const workspaceGrantRef = (deviceId: string) => `workspace:${deviceId}`;
 
 const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
@@ -14,8 +12,8 @@ const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
  * only, plus reading documents and sending files to the Space Library the way
  * read-only folders do. */
 export const projectCapabilities = [...folderCapabilities, "code.delegate"];
-/** On any device, this one included, the agent may open its own browser session:
- * a hidden tab of its own that joins the run (docs/plans/odysseys-campaign.md). */
+/** The agent may open its own browser session on this computer: a hidden tab of its
+ * own that joins the run (docs/plans/odysseys-campaign.md). */
 const workspaceCapabilities = [
   "browser.tab.list",
   "browser.tab.open",
@@ -24,25 +22,14 @@ const workspaceCapabilities = [
   "web.fetch",
   "browser.session",
 ];
-const remoteWorkspaceCapabilities = workspaceCapabilities;
-
-/** Another of the person's devices picked for this chat, as its own signed
- * policy describes it (docs/design/devices/BRIEF.md). */
-export interface RemoteAgentDevice {
-  deviceId: string;
-  name: string;
-  agentSurfaces: string[];
-  sharedFolders: { scopeId: string; name: string }[];
-}
 
 /**
  * Grants a desktop chat carries to the server: the project picked for the
- * chat (if any), the Misty browser, and whatever the
- * picked devices' own policies allow. Each is signed by this device when the
- * chat is sent, and each target checks it before acting.
+ * chat (if any) and the Misty browser. An agent run works on the computer the
+ * person sent it from, never another device. Each grant is signed by this
+ * device when the chat is sent, and this device checks it before acting.
  */
 export async function desktopDeviceGrants(
-  remote: RemoteAgentDevice[] = [],
   projectId: string | null = null,
 ): Promise<AiInvocationDeviceContext[]> {
   if (!hasTauriInternals()) return [];
@@ -50,11 +37,6 @@ export async function desktopDeviceGrants(
   if (!local?.device || local.device.status === "revoked") return [];
   const device = await ensureServerAgentDevice(local.device).catch(() => null);
   if (!device) return [];
-  // Agents may always use the computer the person is at. Reaching other
-  // devices needs this one added to the account (with Sync or approval).
-  const account = await deviceAccount().catch(() => null);
-  const view = account ? await devicesNative.view(account.accountId).catch(() => null) : null;
-  const targets = view?.admitted ? remote : [];
   // Only the chat's own project travels; a folder still shared read-only
   // (from before projects) gets the read-only folder tools.
   const picked = local.scopes.filter((scope) => scope.id === projectId && scope.available);
@@ -78,7 +60,7 @@ export async function desktopDeviceGrants(
       capabilities: projectCapabilities,
       metadata: { source: "project" },
     }));
-  const contexts: AiInvocationDeviceContext[] = [
+  return [
     ...folders,
     ...projects,
     {
@@ -90,38 +72,12 @@ export async function desktopDeviceGrants(
       metadata: { source: "desktop" },
     },
   ];
-  for (const target of targets) {
-    if (target.deviceId === device.id) continue;
-    if (target.agentSurfaces.includes("folders")) {
-      for (const folder of target.sharedFolders) {
-        contexts.push({
-          deviceId: target.deviceId,
-          kind: "local_folder",
-          opaqueRef: folder.scopeId,
-          displayName: folder.name,
-          capabilities: folderCapabilities,
-          metadata: { source: "device" },
-        });
-      }
-    }
-    if (target.agentSurfaces.includes("browser")) {
-      contexts.push({
-        deviceId: target.deviceId,
-        kind: "workspace",
-        opaqueRef: workspaceGrantRef(target.deviceId),
-        displayName: `Misty browser on ${target.name}`,
-        capabilities: remoteWorkspaceCapabilities,
-        metadata: { source: "device" },
-      });
-    }
-  }
-  return contexts;
 }
 
 /**
  * The grants for one chat message: its conversation's project (a new chat's
- * draft choice, which the new conversation adopts) and the devices picked in
- * the composer. A failure sends no grants rather than blocking the message.
+ * draft choice, which the new conversation adopts) and this computer's
+ * browser. A failure sends no grants rather than blocking the message.
  */
 export async function chatDeviceGrants(
   conversationId: string,
@@ -130,6 +86,5 @@ export async function chatDeviceGrants(
   const projects = useConversationProject.getState();
   const project = projects.project(conversationId) ?? (startsConversation ? projects.draft : null);
   if (startsConversation) projects.adoptDraft(conversationId);
-  const targets = useAgentDeviceTargets.getState().targets;
-  return desktopDeviceGrants(targets, project).catch(() => []);
+  return desktopDeviceGrants(project).catch(() => []);
 }

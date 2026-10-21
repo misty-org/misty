@@ -26,7 +26,8 @@ export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
 
 export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 export const desktopTitlebarNavigationInset = 84;
-export const windowsTitlebarNavigationInset = 8;
+/** Three 36px caption buttons, before they are measured. */
+export const windowsTitlebarControlsFallbackWidth = 108;
 
 export function desktopTitlebarNavigationGeometry(
   appZoom: number,
@@ -43,13 +44,14 @@ export function desktopTitlebarNavigationGeometry(
 }
 
 export const windowsTitlebarControlsClass =
-  "pointer-events-auto absolute right-0 top-0 z-[3] flex h-full w-max flex-nowrap items-center";
-
-export const windowsWorkspaceControlsClass =
-  "mx-2 flex h-7 shrink-0 flex-nowrap items-center gap-1 empty:hidden";
+  "misty-windows-caption-controls pointer-events-auto absolute left-0 top-0 z-[3] flex h-full w-max flex-nowrap items-center";
 
 export const windowsTitlebarControlButtonClass =
-  "grid h-full w-[46px] shrink-0 place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
+  "grid h-full w-[36px] shrink-0 place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
+/** The same buttons seated in the sidebar's header row, sized like the icons beside them. */
+export const windowsInlineControlsClass = "mr-1 flex shrink-0 items-center gap-0.5";
+export const windowsInlineControlButtonClass =
+  "grid size-7 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
 export const windowsTitlebarCloseButtonClass = `${windowsTitlebarControlButtonClass} hover:bg-charcoal-active hover:text-cream-bright`;
 
 export const frameOverlayBaseClass = [

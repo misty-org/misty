@@ -2,12 +2,13 @@ import { WorkflowAgent } from "@ai-sdk/workflow";
 import { admissionInput } from "../src/admission-input.js";
 import { withRuntimeInstructions } from "../src/prompt-cache.js";
 import { isStepCount, tool, type ModelMessage, type ToolSet } from "ai";
-import { FatalError, getWorkflowMetadata } from "workflow";
+import { FatalError, getWorkflowMetadata, sleep } from "workflow";
+import { afterTakeover, TAKEOVER_LIMIT, TAKEOVER_POLL } from "../src/person-takeover.js";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
 import { summarizeOlderSteps } from "../src/compaction-step.js";
 import { closingAnswer } from "../src/closing-answer.js";
 import { contextWindow, messageBytes } from "../src/context-compaction.js";
-import { condense, oldToolResults, staleCodeResults, staleSnapshots, summarizedSteps } from "../src/condenser.js";
+import { condense, oldToolResults, staleCodeResults, staleSnapshots, summarizedSteps, workingSet } from "../src/condenser.js";
 import type { RuntimeIdentity } from "../src/control-plane.js";
 import { activateRuntime, admitModelTurn, checkpoint, complete, fetchContext, fetchExecutionBudget, takeSteering } from "../src/control-plane-steps.js";
 import { MISTY_HARNESS_VERSION, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
@@ -22,10 +23,16 @@ import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
-import { earlyGiveUp } from "../src/persistence-check.js";
+import { earlyGiveUp, mayRefuseGiveUp } from "../src/persistence-check.js";
 import { ledgerNote, openPages, requirementsLedger, reviewAnswer, reviewRefusal, skippedRefusal, worthLedger, worthReviewing } from "../src/requirements-review.js";
 import { deadlineNote } from "../src/turn-deadline.js";
-import { finalTaskCompletion, taskCompletionInstructions, taskCompletionOutcome, taskCompletionSchema, taskCompletionText, taskCompletionTool } from "../src/task-completion.js";
+import { estimateMinutes, timeBudget } from "../src/time-budget.js";
+import { loopNote } from "../src/loop-guard.js";
+import { proofTabsRefusal } from "../src/proof-tabs.js";
+import { openedScopes, PAGE_STATE_CHARS, pageStateMessages } from "../src/opened-pages.js";
+import { contextParts } from "../src/working-set.js";
+import { finalTaskCompletion, finishMissingNote, isProgressNote, progressNoteNudge, summaryMissingNote, taskCompletionInputSchema, taskCompletionInstructions, taskCompletionOutcome, taskCompletionText, taskCompletionTool, withAnswerSummary } from "../src/task-completion.js";
+import { runTeachTurn } from "../src/teach-turn.js";
 import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolMonitor } from "../src/tool-monitor.js";
@@ -76,6 +83,18 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     await execution.complete({ status: "failed", text: "", error_code: failure.code, error_message: failure.message });
     throw error;
   }
+  if (context.teach) {
+    // A lesson step: one streamed call, no tools (src/teach-turn.ts).
+    try {
+      const completion = await runTeachTurn(identity, context);
+      await execution.complete(completion);
+      return { mistyRunId: input.mistyRunId, text: completion.text, steps: 1, incomplete: completion.status !== "success" };
+    } catch (error) {
+      const failure = classifyRuntimeError(error);
+      await execution.complete({ status: "failed", text: "", error_code: failure.code, error_message: failure.message });
+      throw new FatalError(failure.message);
+    }
+  }
   const mcpCatalog = await discoverRemoteMCPTools(identity);
   if (!mcpCatalog.supported) {
     await execution.complete({
@@ -92,6 +111,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     if (declined) throw new Error(declined);
   };
   let finishRefused = false;
+  let proofChecked = false;
   let citationRefused = false;
   // Early give-ups refused so far, and the turn of the last refusal (src/persistence-check.ts).
   let persistenceRefusals = 0;
@@ -101,6 +121,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   // The turn a finish was last sent back, and how often a plain answer then skipped it.
   let finishRefusedTurn = -1;
   let plainPushbacks = 0;
+  let finishAsked = false;
+  let progressNudges = 0;
   // Recomputed from the transcript before every model call.
   let visibleTools: string[] = [];
   let modelTurn = 0;
@@ -116,7 +138,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const advertised = new Set(descriptors.map((descriptor) => descriptor.name));
     const monitor = toolMonitor({ catalog, order, checkpoint: execution.checkpoint, rejected });
     // agent.tool: answer by default; browse, desktop, code and loaded families on request.
-    const toolsets = agentTools(catalog);
+    const toolsets = agentTools(catalog, context.prompt);
     const researchTools = { search: catalog.modelName("web.search"), fetch: catalog.modelName("web.fetch"), open: catalog.modelName("screen.open") };
     const tools: ToolSet = {
       ...catalogTools(catalog, async (callId, name, value) => {
@@ -125,12 +147,16 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       }),
       ...toolsets.tools,
       [taskCompletionTool]: tool({
-        description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. This records a report; it grants no capabilities and performs no external action.",
-        inputSchema: taskCompletionSchema,
-        execute: async (report, options) => {
+        description: "Report the final task outcome and user-facing answer. Call alone after completing all possible work, or when a real blocker prevents further progress. Leave summary out when your previous response already gave the answer as text. This records a report; it grants no capabilities and performs no external action.",
+        inputSchema: taskCompletionInputSchema,
+        execute: async (sent, options) => {
           guard(options.toolCallId);
           // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
           const messages = options.messages ?? [];
+          // A finish after a text answer leaves summary out: that answer is the summary, so the
+          // person reads it once (src/task-completion.ts).
+          const report = withAnswerSummary(sent, messages);
+          if (!report) return { status: "failure", tool_error: { message: summaryMissingNote } };
           // Refused once when it cites a page the run never read (src/citation-check.ts).
           if (!citationRefused) {
             const unread = unreadCitations(report.summary, messages, researchTools);
@@ -140,15 +166,26 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
               return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
             }
           }
-          // An early give-up with room left is sent back to work up to three times, each
+          // An early give-up with room left is sent back to work (three times, more while the run is
+          // well inside its own time estimate), each
           // later time only after more work since the last (src/persistence-check.ts).
-          if (persistenceRefusals < 3 && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 3)) {
+          if (mayRefuseGiveUp(persistenceRefusals, Date.now() - startedAt - pausedMs, estimate) && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 3)) {
             const unfinished = earlyGiveUp(report, modelTurn, limit);
             if (unfinished) {
               persistenceRefusals++;
               refusedAtTurn = modelTurn;
               finishRefusedTurn = modelTurn;
               return { status: "failure", tool_error: { message: unfinished } };
+            }
+          }
+          // Proof tabs (src/proof-tabs.ts): asked to leave pages open, the run checks its tabs once.
+          const tabList = catalog.modelName("browser.tab.list");
+          if (!proofChecked && tabList && modelTurn < limit - 2) {
+            const proof = proofTabsRefusal(context.prompt, messages, tabList);
+            if (proof) {
+              proofChecked = true;
+              finishRefusedTurn = modelTurn;
+              return { status: "failure", tool_error: { message: proof } };
             }
           }
           if (!reviewed && worthReviewing(context.prompt, report, modelTurn, limit)) {
@@ -245,7 +282,11 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     return await finish(ending);
   };
   const limit = modelTurnLimit(context.model_turn_limit);
-  const legacyDeadline = Date.now() + 30 * 60_000;
+  const startedAt = Date.now();
+  let pausedMs = 0;
+  // The agent's own estimate of the task's minutes (its first checklist), kept past compaction.
+  let estimate: number | undefined;
+  const legacyDeadline = startedAt + 30 * 60_000;
   // The transcript so far, also read after the loop when a stopped run writes its answer.
   let transcript: ModelMessage[] = [];
   try {
@@ -276,7 +317,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     // Keeps the next call inside the model's window: clear old tool results
     // first, then summarize older steps (see src/context-compaction.ts).
     // Keeps the next call inside the model's window (src/condenser.ts).
-    const condensers = [staleSnapshots, staleCodeResults, oldToolResults,
+    const condensers = [staleSnapshots, staleCodeResults, workingSet, oldToolResults,
       summarizedSteps((older) => summarizeOlderSteps(identity, context.model_id, older, window, ++compactions))];
     // agent.tool survives a summary that drops the calls that chose it.
     // A long request's requirements, listed once before work starts (src/requirements-review.ts).
@@ -285,10 +326,28 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       if (ledger) messages.push({ role: "user", content: ledgerNote(ledger) });
     }
     let toolsetState = toolState(messages, toolsets.initial);
+    let lastToolKey = "";
     for (; modelTurn < limit; modelTurn++) {
       const steering = await takeSteering(identity, `${modelTurn}:before`, false);
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
+      // Taken over (src/person-takeover.ts): wait without model turns until the person resumes.
+      if (steering.paused) {
+        const sent: string[] = [];
+        let paused = true;
+        const pauseStarted = Date.now();
+        for (let poll = 1; paused && poll <= TAKEOVER_LIMIT; poll++) {
+          await sleep(TAKEOVER_POLL);
+          const next = await takeSteering(identity, `${modelTurn}:paused:${poll}`, false);
+          for (const message of next.messages) sent.push(message.text);
+          paused = Boolean(next.paused);
+        }
+        // The person's turn in the window doesn't spend the agent's time.
+        pausedMs += Date.now() - pauseStarted;
+        messages = afterTakeover(messages, sent);
+      }
       messages = await condense(messages, { inputTokens: lastInputTokens, sentBytes: lastSentBytes, window }, condensers);
+      // Where a long run's context goes (docs/plans/agent-harness-v2.md): the largest parts, every 5 turns.
+      if (modelTurn % 5 === 4) console.log(`[misty-agent-runtime] context_parts ${JSON.stringify({ run: identity.mistyRunId, turn: modelTurn, ...contextParts(messages) })}`);
       const observed = toolState(messages, toolsets.initial);
       if (observed.seen || !toolsetState.seen) toolsetState = observed;
       visibleTools = toolsets.visible(toolNames, toolsetState);
@@ -299,16 +358,45 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       if (closed.size) visibleTools = visibleTools.filter((name) => !closed.has(name));
       const researchWarning = researchNote(research, messages, researchTools);
       if (researchWarning) messages.push({ role: "user", content: researchWarning });
+      // The loop guard (src/loop-guard.ts): the same call or address three times brings a note.
+      const loop = loopNote(messages);
+      if (loop) messages.push({ role: "user", content: loop });
       // The deliverable deadline (src/turn-deadline.ts): near the turn limit the run writes its
       // answer from what it found instead of ending with nothing.
       const deadline = deadlineNote(modelTurn, limit, messages);
       if (deadline) messages.push({ role: "user", content: deadline });
-      if (modelTurn >= limit - 1) visibleTools = visibleTools.filter((name) => name === taskCompletionTool);
+      // The person's time (src/time-budget.ts), against the agent's own estimate: paced at
+      // 80%, wrapping up at 100%, only the answer past about 130%.
+      estimate = estimateMinutes(messages) ?? estimate;
+      const time = timeBudget(Date.now() - startedAt - pausedMs, messages, estimate);
+      if (time.note) messages.push({ role: "user", content: time.note });
+      if (modelTurn >= limit - 1 || time.answerOnly)
+        visibleTools = visibleTools.filter((name) => name === taskCompletionTool);
+      // Tool definitions come first in the request, so a change costs this turn its cached prefix.
+      const toolKey = visibleTools.join(",");
+      if (modelTurn > 0 && toolKey !== lastToolKey) {
+        const before = new Set(lastToolKey.split(","));
+        const now = new Set(visibleTools);
+        console.log(`[misty-agent-runtime] tools_changed ${JSON.stringify({ run: identity.mistyRunId, turn: modelTurn, added: visibleTools.filter((name) => !before.has(name)), removed: [...before].filter((name) => !now.has(name)) })}`);
+      }
+      lastToolKey = toolKey;
       const budget = await fetchExecutionBudget(identity, modelTurn + 1);
       lastSentBytes = messageBytes(messages);
       // Admission (billing's hold for this turn) happens before the model call and
       // outside the agent's hooks, so a refusal stops the call instead of being
       // swallowed while the model runs unmetered.
+      // What the first turn carries (docs/plans/agent-harness-v2.md): the fixed cost of every turn.
+      if (modelTurn === 0) {
+        const toolSizes = catalog.tools.map((tool) => [tool.modelName, JSON.stringify(tool).length] as const);
+        console.log(`[misty-agent-runtime] context_breakdown ${JSON.stringify({
+          run: identity.mistyRunId,
+          systemChars: instructions.length,
+          toolChars: toolSizes.reduce((sum, [, size]) => sum + size, 0),
+          tools: toolSizes.length,
+          toolSizes: [...toolSizes].sort((a, b) => b[1] - a[1]),
+          messageChars: messageBytes(messages),
+        })}`);
+      }
       const admission = await admitModelTurn(identity, {
         node_id: `model:${modelTurn + 1}`, state: "running", phase: "thinking", progress: Math.min(85, 10 + modelTurn * 6),
         // Native payload size only, with images counted apart from text. Billing estimates tokens/rates.
@@ -334,6 +422,22 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         if (next.supported) {
           ({ catalog, advertised, monitor, toolsets, researchTools, toolNames, instructions, agent } = assemble(next.tools));
           toolsetState = toolState(messages, toolsets.initial);
+        }
+      }
+      // Pushed page state (src/opened-pages.ts): the pages this turn opened, shown before the
+      // next turn, so the agent acts on them instead of spending a turn asking for each.
+      const openTool = catalog.modelName("screen.open");
+      const snapshotTool = catalog.modelName("browser.snapshot");
+      if (openTool && snapshotTool) {
+        const scopes = openedScopes(current.toolResults as ReadonlyArray<{ toolName?: string; output?: unknown }>, openTool);
+        for (const [index, scopeId] of scopes.entries()) {
+          const callId = `page-state-${modelTurn}-${index}`;
+          try {
+            const state = await executeTool(identity, callId, "browser.snapshot", { scopeId, maxChars: PAGE_STATE_CHARS });
+            messages.push(...pageStateMessages(callId, snapshotTool, scopeId, state));
+          } catch {
+            // The agent can still take the snapshot itself.
+          }
         }
       }
       if (streamAborted || order.stoppedReason) break;
@@ -375,6 +479,22 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
           continue;
         }
       }
+      // A run that used its tools and then answered in plain text never said whether the work is
+      // done, so it ended as unreported and the person saw a failure (31 Odysseys runs, one of
+      // them a perfect answer). It is asked once to confirm with agent_finish.
+      const actedSoFar = (result?.steps ?? []).some((step) => step.content.some((part) => part.type.startsWith("tool-")));
+      // The turn's progress line ("Last: … Next: …") written with no tool call is not an answer: a
+      // run ended on one and the person got "Next: I'll read … then finish" (October 19).
+      if (plainAnswer && actedSoFar && isProgressNote(plainAnswer) && progressNudges < 2 && modelTurn < limit - 1) {
+        progressNudges++;
+        messages.push({ role: "user", content: progressNoteNudge });
+        continue;
+      }
+      if (plainAnswer && actedSoFar && !finishAsked && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults) && modelTurn < limit - 1) {
+        finishAsked = true;
+        messages.push({ role: "user", content: finishMissingNote });
+        continue;
+      }
       if (finalTaskCompletion(current.steps, current.toolResults) || current.finishReason !== "tool-calls" || current.steps.length !== 1) {
         const finalSteering = await takeSteering(identity, `${modelTurn}:finish`, true);
         if (!finalSteering.messages.length) break;
@@ -404,6 +524,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   // answered directly) is a reply, with nothing to confirm. Any run that acted
   // must still confirm its outcome with agent_finish.
   const acted = result.steps.some((step) => step.content.some((part) => part.type.startsWith("tool-")));
+  // How runs end (docs/plans/agent-harness-v2.md): most Odysseys runs ended as partial or unreported.
+  console.log(`[misty-agent-runtime] run_finish ${JSON.stringify({ run: identity.mistyRunId, turns: modelTurn, reported: Boolean(taskReport), outcome: taskReport?.outcome, remaining: taskReport?.remaining.map((item) => item.requirement.slice(0, 120)), acted, plainText: !taskReport && Boolean(text) })}`);
   if (!taskReport && !acted && text) return await finish({ status: "success", text });
   const outcome = taskCompletionOutcome(taskReport);
   return await finish({ ...outcome, text: taskReport ? taskCompletionText(taskReport) : text || outcome.error_message! });

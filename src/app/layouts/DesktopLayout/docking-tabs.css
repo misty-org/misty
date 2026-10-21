@@ -234,7 +234,7 @@
 /* Vertical tabs: a roomy sidebar. Favorites are a four-column tile grid, tabs are 40px
    rounded rows with hover-only close buttons, and the window actions sit in a footer. */
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
-  --shell-tab-height: 40px;
+  --shell-tab-height: 32px;
   gap: 0;
   padding-bottom: 8px;
 }
@@ -264,7 +264,7 @@
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab-list {
-  gap: 8px;
+  gap: 2px;
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
   .misty-workspace-tab {

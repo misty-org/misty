@@ -37,7 +37,7 @@ export type ToolOutcome =
   /** The run stops: the outcome needs the user, or the run lost its authority. */
   | { kind: "stop"; reason: string };
 
-// device_offline: the device the person picked dropped out; they pick another.
+// device_offline: the computer the run works on stopped answering; the person asks again once Misty is open there.
 const runEndingCodes = ["authorization_or_state_changed", "agent_execution_time_limit", "agent_model_turn_limit", "permission_denied", "device_offline"];
 
 const handoffDefaults: Record<string, string> = {

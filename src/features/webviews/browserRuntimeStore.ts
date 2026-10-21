@@ -17,6 +17,9 @@ export interface BrowserRuntimeUiState {
   notices: Record<string, string | null>;
   compatibilityIssues: Record<string, BrowserCompatibilityIssue | null>;
   loading: Record<string, boolean>;
+  /** Tabs whose native page is on screen in its host, above or below the renderer. Until then
+   * the host paints a fill, since the renderer is transparent there and nothing else is. */
+  presented: Record<string, boolean>;
   setGrants: (tabId: string, grants: ActiveBrowserAgentGrant[]) => void;
   ensureHistory: (tabId: string, url: string) => void;
   pushHistory: (tabId: string, url: string) => void;
@@ -28,6 +31,7 @@ export interface BrowserRuntimeUiState {
   setNotice: (tabId: string, notice: string | null) => void;
   setCompatibilityIssue: (tabId: string, issue: BrowserCompatibilityIssue | null) => void;
   setLoading: (tabId: string, loading: boolean) => void;
+  setPresented: (tabId: string, presented: boolean) => void;
   removeTab: (tabId: string) => void;
 }
 
@@ -39,6 +43,7 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
   notices: {},
   compatibilityIssues: {},
   loading: {},
+  presented: {},
   setGrants: (tabId, grants) => set((state) => ({ grants: { ...state.grants, [tabId]: grants } })),
   ensureHistory: (tabId, url) =>
     set((state) =>
@@ -131,6 +136,12 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
     })),
   setLoading: (tabId, loading) =>
     set((state) => ({ loading: { ...state.loading, [tabId]: loading } })),
+  setPresented: (tabId, presented) =>
+    set((state) =>
+      Boolean(state.presented[tabId]) === presented
+        ? state
+        : { presented: { ...state.presented, [tabId]: presented } },
+    ),
   removeTab: (tabId) =>
     set((state) => {
       const grants = { ...state.grants };
@@ -140,6 +151,7 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
       const compatibilityIssues = { ...state.compatibilityIssues };
       const loading = { ...state.loading };
       const previews = { ...state.previews };
+      const presented = { ...state.presented };
       delete grants[tabId];
       delete histories[tabId];
       delete errors[tabId];
@@ -147,6 +159,16 @@ export const useBrowserRuntimeStore = create<BrowserRuntimeUiState>((set, get) =
       delete compatibilityIssues[tabId];
       delete loading[tabId];
       delete previews[tabId];
-      return { grants, histories, errors, notices, compatibilityIssues, loading, previews };
+      delete presented[tabId];
+      return {
+        grants,
+        histories,
+        errors,
+        notices,
+        compatibilityIssues,
+        loading,
+        previews,
+        presented,
+      };
     }),
 }));

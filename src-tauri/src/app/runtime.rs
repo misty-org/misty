@@ -13,6 +13,7 @@ use crate::infra::{
 
 pub struct MistyRuntime {
     pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
+    pub agent_chats: crate::infra::agent_chats::AgentChatsService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
     pub settings: SettingsService,
@@ -67,6 +68,7 @@ impl MistyRuntime {
                 environment.store(),
                 environment.config_dir().join("navigation.json"),
             ),
+            agent_chats: crate::infra::agent_chats::AgentChatsService::new(environment.store()),
             environment,
             clipboard,
             settings,

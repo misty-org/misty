@@ -20,7 +20,6 @@ import { AgentControlBar } from "../workspace/AgentControlBar";
 import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ComposerStrip } from "./ComposerStrip";
 import { AgentModeMenu } from "../collaboration/AgentModeToggle";
-import { AgentDeviceMenu } from "../page/AgentDeviceMenu";
 import { usePermissionMode } from "../collaboration/permissionMode";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import { AgentCodingToolMenu } from "../collaboration/AgentCodingToolMenu";
@@ -431,7 +430,6 @@ export function AgentWorkspaceConversation({
           }
         />
         <ComposerStrip
-          device={<AgentDeviceMenu disabled={state.working} />}
           project={<AgentProjectMenu conversationId={conversation?.id} />}
           mode={
             <AgentModeMenu
@@ -442,9 +440,7 @@ export function AgentWorkspaceConversation({
           }
           code={<AgentCodingToolMenu conversationId={conversation?.id} disabled={state.working} />}
           usage={
-            showControlBar && agent ? (
-              <AgentUsageControl working={state.working} />
-            ) : undefined
+            showControlBar && agent ? <AgentUsageControl working={state.working} /> : undefined
           }
         />
         {/* Working status belongs to the transcript, under the message that started it. */}

@@ -6,7 +6,6 @@ import {
   useConnectedDevices,
   type DevicePeer,
 } from "@/features/connected-devices";
-import type { AgentSurface } from "@/native/devices";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button } from "@/shared/ui";
 import {
@@ -58,19 +57,16 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => setBusy(false));
   };
-  const setPolicy = (change: { clipboard?: boolean; surface?: [AgentSurface, boolean] }) => {
+  const setPolicy = (change: { clipboard: boolean }) => {
     if (!policy) return;
-    const surfaces = new Set(policy.agentSurfaces);
-    if (change.surface) {
-      if (change.surface[1]) surfaces.add(change.surface[0]);
-      else surfaces.delete(change.surface[0]);
-    }
     run(() =>
       devices.setPolicy({
-        // The signed policy still carries files; keep it as it is.
+        // The signed policy still carries files and agent surfaces; keep them as they are.
+        // Agents work only on the device a request was sent from, so other devices'
+        // surfaces are no longer read.
         files: policy.files,
-        clipboard: change.clipboard ?? policy.clipboard,
-        agentSurfaces: [...surfaces],
+        clipboard: change.clipboard,
+        agentSurfaces: policy.agentSurfaces,
       }),
     );
   };
@@ -120,36 +116,11 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
           <span className="text-sm text-cream-muted">{policy?.clipboard ? "On" : "Off"}</span>
         )}
       </Row>
-      {(
-        [
-          ["folders", "Agents: shared folders", "Folders you shared with agents on this device."],
-          ["browser", "Agents: Misty browser", "Open tabs and bookmarks in Misty on this device."],
-          [
-            "terminal",
-            "Agents: terminal",
-            "Run commands on this device. Off unless you turn it on.",
-          ],
-        ] as const
-      ).map(([surface, label, description]) => (
-        <Row key={surface} label={label} description={peer.isSelf ? description : readOnly}>
-          {peer.isSelf && policy ? (
-            <SwitchControl
-              checked={policy.agentSurfaces.includes(surface)}
-              disabled={busy}
-              onChange={(enabled) => setPolicy({ surface: [surface, enabled] })}
-            />
-          ) : (
-            <span className="text-sm text-cream-muted">
-              {policy?.agentSurfaces.includes(surface) ? "On" : "Off"}
-            </span>
-          )}
-        </Row>
-      ))}
       <Row
         label="Remove device"
         description={
           devices.view?.canSign
-            ? `${peer.name} loses sync, the shared clipboard and agent access everywhere. ${readdNote}`
+            ? `${peer.name} loses sync and the shared clipboard. ${readdNote}`
             : "Unlock sync on this device to remove devices."
         }
       >

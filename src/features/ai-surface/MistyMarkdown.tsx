@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { SketchBlock } from "@/features/agents/companion/SketchBlock";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
@@ -25,6 +26,13 @@ type HastNode = {
   properties?: Record<string, unknown>;
   children?: HastNode[];
 };
+
+/** The plain text inside a node, through any highlighting spans. */
+function hastText(node: HastNode | undefined): string {
+  if (!node) return "";
+  if (node.type === "text") return node.value ?? "";
+  return (node.children ?? []).map(hastText).join("");
+}
 
 const callouts = {
   note: { label: "Note", Icon: Info },
@@ -76,6 +84,8 @@ const components: Components = {
       .map(String)
       .find((name) => name.startsWith("language-"))
       ?.slice("language-".length);
+    // A companion drawing (companionSketch.ts) shows as the drawing, not its source.
+    if (language === "misty-sketch") return <SketchBlock source={hastText(code)} />;
     return <CodeBlock language={language}>{children}</CodeBlock>;
   },
   table: ({ children }) => (

@@ -76,7 +76,8 @@ pub fn queue_removal(
     installation: &Installation,
 ) -> Result<(), String> {
     let account = &journal_scope(account, space);
-    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let home =
+        crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     crate::infra::store::Store::at(home.join(".local").join("data").join("misty.db"))
         .connect()
         .and_then(|connection| {
@@ -231,7 +232,12 @@ pub async fn observe(app: &tauri::AppHandle, event: Value) {
         }
     }
     if result.is_err() {
-        crate::infra::space_windows::emit_to_space(app,space,"misty://extensions",json!({"kind":"sync-status","account":account,"space":space,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}));
+        crate::infra::space_windows::emit_to_space(
+            app,
+            space,
+            "misty://extensions",
+            json!({"kind":"sync-status","account":account,"space":space,"id":id,"detail":"Extension settings could not be saved for sync. Retry after checking sync access."}),
+        );
     }
 }
 
@@ -246,7 +252,10 @@ pub fn start(app: tauri::AppHandle, account: String, space: String) {
         timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             timer.tick().await;
-            if loops().lock().map_or(true, |loops| loops.get(&space) != Some(&epoch)) {
+            if loops()
+                .lock()
+                .map_or(true, |loops| loops.get(&space) != Some(&epoch))
+            {
                 break;
             }
             let installations = {
@@ -280,13 +289,23 @@ pub fn start(app: tauri::AppHandle, account: String, space: String) {
             }
             let scope = journal_scope(&account, &space);
             for installation in queued_removals(&scope) {
-                if valid_installation(&installation) && remove(&account, &space, &installation).await {
+                if valid_installation(&installation)
+                    && remove(&account, &space, &installation).await
+                {
                     forget_removal(&scope, &installation.generation);
                 }
             }
             for installation in installations {
-                if pass(&app, &account, &space, &installation, &handle).await.is_err() {
-                    crate::infra::space_windows::emit_to_space(&app,&space,"misty://extensions",json!({"kind":"sync-status","account":account,"space":space,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}));
+                if pass(&app, &account, &space, &installation, &handle)
+                    .await
+                    .is_err()
+                {
+                    crate::infra::space_windows::emit_to_space(
+                        &app,
+                        &space,
+                        "misty://extensions",
+                        json!({"kind":"sync-status","account":account,"space":space,"id":installation.id,"detail":"Extension settings are waiting for sync. Local changes are retained."}),
+                    );
                 }
             }
         }

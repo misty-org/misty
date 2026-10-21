@@ -20,7 +20,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const focused = useWorkspaceViewFocused();
   const setViewingSpace = useSpacesStore((state) => state.setViewingSpace);
   const route = useSpacePanelRoute();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -57,11 +56,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       navigate(`${base}/home${location.search}${location.hash}`, { replace: true });
     }
   }, [location.hash, location.pathname, location.search, navigate, route.activeSpaceId]);
-  useEffect(() => {
-    if (!focused || !user || !space) return;
-    setViewingSpace(space.id);
-    return () => setViewingSpace("");
-  }, [focused, user, space, setViewingSpace]);
 
   if (!user)
     return (
@@ -124,6 +118,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (!space) return <p className="p-6 text-sm text-cream-muted">This Space is unavailable.</p>;
   return (
     <SpaceOverviewProvider accountId={user.id} space={space}>
+      <ViewingSpace spaceId={space.id} onView={setViewingSpace} />
       <section
         className="relative flex h-full min-h-0 min-w-0 overflow-hidden bg-charcoal-bg"
         data-space-workspace={route.activeSpaceId}
@@ -144,4 +139,19 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       </section>
     </SpaceOverviewProvider>
   );
+}
+
+/**
+ * Marks the Space as the one being viewed while this tab has focus. Focus is read here rather
+ * than by the page, so a tab gaining or losing focus renders this alone, not the whole Space.
+ */
+function ViewingSpace(props: { spaceId: string; onView(spaceId: string): void }) {
+  const focused = useWorkspaceViewFocused();
+  const { spaceId, onView } = props;
+  useEffect(() => {
+    if (!focused) return;
+    onView(spaceId);
+    return () => onView("");
+  }, [focused, spaceId, onView]);
+  return null;
 }

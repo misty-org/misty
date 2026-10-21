@@ -55,7 +55,8 @@ static REGISTRY: Mutex<Option<Registry>> = Mutex::new(None);
 pub(super) static QUITTING: AtomicBool = AtomicBool::new(false);
 /// The last focused app window, incognito included; never saved.
 pub(super) static LAST_FOCUSED: Mutex<Option<String>> = Mutex::new(None);
-pub(super) static INCOGNITO_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+pub(super) static INCOGNITO_GENERATION: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
 
 pub(super) struct RegistryGuard(std::sync::MutexGuard<'static, Option<Registry>>);
 impl std::ops::Deref for RegistryGuard {
@@ -105,7 +106,11 @@ pub(super) fn load() -> Registry {
             .filter(|entry| current_key(&entry.key))
             .map(|entry| (entry.key.clone(), entry))
             .collect(),
-        open: saved.open.into_iter().filter(|key| current_key(key)).collect(),
+        open: saved
+            .open
+            .into_iter()
+            .filter(|key| current_key(key))
+            .collect(),
         // Labels are numbered per launch, so the last one means nothing now.
         last_focused: None,
         incognito: BTreeMap::new(),
@@ -116,13 +121,17 @@ pub(super) fn save(state: &Registry) {
     let Some(path) = saved_path() else { return };
     let open: Vec<String> = current_windows()
         .into_iter()
-        .filter(|(label, _)| is_space_window(label))
+        .filter(|(label, _)| is_person_window(label))
         .map(|(_, key)| key)
         .collect();
     let saved = Saved {
         spaces: state.spaces.values().cloned().collect(),
         // Before any window opens (or after the last closed), keep what was saved.
-        open: if open.is_empty() { state.open.clone() } else { open },
+        open: if open.is_empty() {
+            state.open.clone()
+        } else {
+            open
+        },
         last_focused: None,
     };
     if let Ok(bytes) = serde_json::to_vec_pretty(&saved) {
@@ -256,7 +265,9 @@ pub(super) fn forget_incognito(label: &str, key: &str) -> Option<String> {
 
 /// The app window used last in this launch.
 pub(super) fn last_focused_space() -> Option<String> {
-    lock_registry().ok().and_then(|state| state.last_focused.clone())
+    lock_registry()
+        .ok()
+        .and_then(|state| state.last_focused.clone())
 }
 
 /// The app window used last, incognito included.

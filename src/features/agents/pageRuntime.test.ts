@@ -262,6 +262,47 @@ describe("agent page runtime", () => {
     expect(result.tree.length).toBeLessThanOrEqual(2000);
   });
 
+  it("keeps a long page's content and search box ahead of its menus", () => {
+    const links = Array.from({ length: 300 }, (_, i) => `<li><a href="/c/${i}">Category number ${i}</a></li>`).join("");
+    const page = load(`
+      <header><nav aria-label="Departments"><ul>${links}</ul></nav></header>
+      <main><h1>Find a doctor</h1><form role="search"><input aria-label="Doctor name or specialty"><button>Search</button></form>
+      <p>Results appear below.</p></main>
+      <footer><nav aria-label="Footer"><ul>${links}</ul></nav></footer>`);
+    const result = snapshot(page, { maxChars: 8000 });
+    expect(result.tree.length).toBeLessThanOrEqual(8000);
+    expect(result.tree).toContain("Find a doctor");
+    expect(refFor(result.tree, /textbox "Doctor name or specialty"/)).toMatch(/^e\d+$/);
+    expect(result.tree).toMatch(/more items in this navigation left out/);
+    expect(result.tree).toContain("Category number 0");
+  });
+
+  it("names a popup covering the page and closes it with its own close control", () => {
+    const page = load(`
+      <main><h1>Hotel results</h1><p>Twelve hotels near the park.</p></main>
+      <div id="promo" style="position:fixed"><h2>Get 10% off your first stay</h2>
+        <button>Subscribe</button><button aria-label="Close">×</button></div>`);
+    const promo = document.getElementById("promo")!;
+    const inside = promo.querySelector("h2")!;
+    document.elementFromPoint = vi.fn(() => inside);
+    vi.spyOn(promo, "getBoundingClientRect").mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 1024, bottom: 768, width: 1024, height: 768, toJSON: () => ({}) } as DOMRect);
+    const result = snapshot(page);
+    expect(result.tree.split("\n")[0]).toMatch(/^- note: A popup covers this page \("Get 10% off your first stay"\)\. Close it first: click ref=e\d+\.$/);
+    const pressed: string[] = [];
+    promo.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => pressed.push(button.textContent ?? "")));
+    expect(page.call("dismissPopup").dismissed).toContain("Get 10% off");
+    expect(pressed).toEqual(["×"]);
+  });
+
+  it("scrolls what it finds into view", () => {
+    const page = load(`<p>Intro</p><p>Check-in is at 4 pm and parking costs $35 a night.</p>`);
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    const result = page.call("find", { candidateId: "doc-1", query: "parking costs" });
+    expect(result.scrolledTo).toContain("parking costs $35");
+    expect(scrolled).toHaveBeenCalledWith(expect.objectContaining({ block: "center" }));
+  });
+
   it("checks wait conditions without acting", () => {
     const page = load(`<p>Saving…</p>`);
     expect(page.call("waitCheck", { text: "saved" }).met).toBe(false);
