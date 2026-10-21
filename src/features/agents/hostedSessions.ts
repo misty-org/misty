@@ -6,7 +6,9 @@ import { useUserStore } from "@/features/auth/core";
 import { browserHomeUrl } from "@/features/workspace/browserHome";
 import { devicesNative } from "@/native/devices";
 import { browserTabAgentFileCapabilities } from "./browserTabCapabilities";
+import { dockHostedTab, listenHostedDock, undockHostedTab } from "./hostedSessionDock";
 import { holdAwake, releaseAwake } from "./keepAwake";
+import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
@@ -32,6 +34,7 @@ const idleMs = 10 * 60_000;
 const renewMs = 10_000;
 const timers = new Map<string, ReturnType<typeof setInterval>>();
 let unsubscribe: (() => void) | undefined;
+let stopDockListener: (() => void) | undefined;
 
 // A hosted session is the agent's own hidden tab, so it runs beside the person's
 // tasks and other sessions instead of waiting for them.
@@ -49,6 +52,8 @@ export async function endHostedSession(taskId: string): Promise<void> {
   update(sessions().filter((item) => item.taskId !== taskId));
   clearInterval(timers.get(taskId));
   timers.delete(taskId);
+  // A docked first tab comes back to this window before it closes, so its window goes too.
+  await undockHostedTab(session.host);
   await Promise.allSettled([
     invoke("agent_workspace_release", { taskId }),
     ...[session.viewId, ...session.childViews].map((id) =>
@@ -59,6 +64,8 @@ export async function endHostedSession(taskId: string): Promise<void> {
   if (!sessions().length) {
     unsubscribe?.();
     unsubscribe = undefined;
+    stopDockListener?.();
+    stopDockListener = undefined;
   }
 }
 
@@ -222,6 +229,14 @@ export async function startHostedSession(
     update([...sessions(), session]);
     keepAlive(session);
     watchRequests(accountId);
+    // The agent's window: its first tab docks with the others in the corner.
+    stopDockListener ??= listenHostedDock();
+    const name = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId)?.name || "Misty";
+    const host = await dockHostedTab(viewId, name);
+    if (host) {
+      update(sessions().map((item) => (item.taskId === taskId ? { ...item, host } : item)));
+      session = { ...session, host };
+    }
     void holdAwake(`hosted:${taskId}`);
   } else {
     touchHostedSession(session.scopeId, job.runId);

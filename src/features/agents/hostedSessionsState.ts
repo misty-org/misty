@@ -19,6 +19,8 @@ export interface HostedSession {
   childViews: string[];
   /** The scopes of the session's other tabs, whose jobs keep it in use too. */
   childScopes?: string[];
+  /** The docked window its first tab works in (hostedSessionDock.ts), when it has one. */
+  host?: string;
   /** The request currently using the session. */
   runId: string;
   lastUsed: number;
