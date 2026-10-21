@@ -416,6 +416,8 @@ pub async fn browser_webview_create(
     #[cfg(windows)]
     watch_page_focus(&webview, &request.id);
     #[cfg(windows)]
+    super::super::window_focus_windows::watch(&webview);
+    #[cfg(windows)]
     engine_menu::install(&webview, false);
     #[cfg(target_os = "macos")]
     attachment_download::install(&webview)?;

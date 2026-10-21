@@ -7,6 +7,8 @@ const runtime = vi.hoisted(() => ({
   hide: vi.fn(),
   prewarm: vi.fn().mockResolvedValue(undefined),
   created: true,
+  presented: {} as Record<string, boolean>,
+  listeners: new Set<() => void>(),
 }));
 vi.mock("./browserRuntime", () => ({
   browserRuntimeResumeEvent: "misty:browser-runtime-resume",
@@ -17,7 +19,13 @@ vi.mock("./browserRuntime", () => ({
   prewarmBrowserWebview: runtime.prewarm,
   isBrowserRuntimeCreated: () => runtime.created,
   isBrowserLayoutMoving: () => false,
-  useBrowserRuntimeStore: { getState: () => ({ errors: {}, setError: vi.fn() }) },
+  useBrowserRuntimeStore: {
+    getState: () => ({ errors: {}, setError: vi.fn(), presented: runtime.presented }),
+    subscribe: (listener: () => void) => {
+      runtime.listeners.add(listener);
+      return () => void runtime.listeners.delete(listener);
+    },
+  },
 }));
 vi.mock("@/shared/hooks/useAppZoom", () => ({
   appZoomChangedEvent: "misty:app-zoom-changed",
@@ -63,6 +71,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useWorkspaceStore.setState({ layout: initial });
+  runtime.presented = {};
+  runtime.listeners.clear();
   runtime.hide.mockClear();
   runtime.prewarm.mockClear();
   runtime.created = true;
@@ -118,7 +128,11 @@ it("loads a tab's page in the background before it is shown, at the shown page's
   mount();
   frames.splice(0).forEach((callback) => callback(0));
   expect(runtime.prewarm).not.toHaveBeenCalled();
-  // It waits for the app to be idle.
+  // It waits for the page in front to be drawn, then for the app to be idle.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(runtime.prewarm).not.toHaveBeenCalled();
+  runtime.presented = { front: true };
+  runtime.listeners.forEach((listener) => listener());
   await new Promise((resolve) => setTimeout(resolve, 300));
   expect(runtime.prewarm).toHaveBeenCalledTimes(1);
   expect(runtime.prewarm).toHaveBeenCalledWith(

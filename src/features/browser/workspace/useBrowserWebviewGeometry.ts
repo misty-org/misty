@@ -14,6 +14,7 @@ import {
   useBrowserRuntimeStore,
   windowChromeChangedEvent,
 } from "./browserRuntime";
+import { browserSlideActive, browserSlideExtra } from "@/features/webviews/browserSlide";
 import { opaqueColorHex } from "./opaqueColorHex";
 import type { BrowserBounds, BrowserTheme } from "./types";
 import {
@@ -159,6 +160,16 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
         scheduleResizeSettle();
         return;
       }
+      // While a panel above the page slides (the Space bar), the observer's measurement is
+      // already current for this frame, so measuring now sends the page its new size a frame
+      // sooner than waiting for the next one. Any other layout change keeps the next frame, so
+      // closing or switching tabs settles before the page moves.
+      if (browserSlideActive()) {
+        if (disposed) return;
+        if (frame) window.cancelAnimationFrame(frame);
+        synchronize();
+        return;
+      }
       schedule();
     };
     const observeWindowResize = () => {
@@ -252,8 +263,11 @@ function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
   const right = Math.min(window.innerWidth, rect.right);
   const bottom = Math.min(window.innerHeight, rect.bottom);
   const width = right - x;
-  const height = bottom - y;
-  if (width < 2 || height < 2) return null;
+  // A page whose bottom is the window's keeps its full size while a panel above it slides, so
+  // only its top edge appears to move (browserSlide.ts).
+  const slideExtra = rect.bottom >= window.innerHeight - 1 ? browserSlideExtra() : 0;
+  const height = bottom - y + slideExtra;
+  if (width < 2 || bottom - y < 2) return null;
   const cornerRadii = clippedCornerRadii(host, rect);
   const cornerColor = cornerRadii ? paneChromeColor(host) : undefined;
   return browserBoundsAtAppZoom(
@@ -394,10 +408,32 @@ function browserTabReplaced(tabId: string): boolean {
 
 let prewarmQueue: Promise<void> = Promise.resolve();
 
+/**
+ * Resolves once the page on screen has been drawn, or when no browser page is on screen to wait
+ * for. A restored window of tabs then draws the tab in front first instead of starting every
+ * page's process beside it.
+ */
+function whenFirstPagePresented(): Promise<void> {
+  const ready = () =>
+    !browserSurfaceStillActive() ||
+    Object.values(useBrowserRuntimeStore.getState().presented).some(Boolean);
+  return new Promise<void>((resolve) => {
+    if (ready()) return resolve();
+    const stops = [useBrowserRuntimeStore, useWorkspaceStore].map((store) =>
+      store.subscribe(() => {
+        if (!ready()) return;
+        stops.forEach((stop) => stop());
+        resolve();
+      }),
+    );
+  });
+}
+
 /** Background page loads run one at a time while the app is idle, so they never crowd out what
  * the person is doing. */
 function queueBrowserPrewarm(run: () => Promise<void> | void): void {
   prewarmQueue = prewarmQueue
+    .then(whenFirstPagePresented)
     .then(
       () =>
         new Promise<void>((resolve) => {

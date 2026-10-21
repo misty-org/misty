@@ -1,6 +1,6 @@
 import "katex/dist/katex.min.css";
 import "./mistyMarkdown.css";
-import { Button, IconButton } from "@/shared/ui";
+import { Button, IconButton, Skeleton } from "@/shared/ui";
 import {
   Check,
   CircleAlert,
@@ -11,13 +11,27 @@ import {
   MessageSquareWarning,
   OctagonAlert,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import { SketchBlock } from "@/features/agents/companion/SketchBlock";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+
+// Drawings are rare and their renderer is large: it loads when the first one appears.
+const SketchBlock = lazy(() =>
+  import("@/features/agents/companion/SketchBlock").then(({ SketchBlock }) => ({
+    default: SketchBlock,
+  })),
+);
 
 type HastNode = {
   type: string;
@@ -85,7 +99,12 @@ const components: Components = {
       .find((name) => name.startsWith("language-"))
       ?.slice("language-".length);
     // A companion drawing (companionSketch.ts) shows as the drawing, not its source.
-    if (language === "misty-sketch") return <SketchBlock source={hastText(code)} />;
+    if (language === "misty-sketch")
+      return (
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+          <SketchBlock source={hastText(code)} />
+        </Suspense>
+      );
     return <CodeBlock language={language}>{children}</CodeBlock>;
   },
   table: ({ children }) => (

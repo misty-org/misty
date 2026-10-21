@@ -3,10 +3,9 @@ import { cn } from "@/shared/ui";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 
 /**
- * The one toolbar every page shows with horizontal tabs: navigation buttons, badges, the
- * address field and the tool buttons, with the bar's height, border and surface fixed here.
- * A browser page fills each slot from its live tab; a page that isn't a browser page fills
- * them with their resting forms (see PaneToolbarFallback), so the two can't drift apart.
+ * A browser page's own toolbar, for when no tab sidebar holds it (focus mode): navigation
+ * buttons, badges, the address field and the tool buttons, with the bar's height, border and
+ * surface fixed here.
  */
 export function BrowserToolbar({
   nav,

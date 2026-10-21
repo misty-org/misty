@@ -362,6 +362,10 @@ pub fn close_browser_webview(
             let _: () = objc2::msg_send![view, stopLoading];
         }
     });
+    // Out of sight before it is blanked: stopping the page and loading about:blank repaint it
+    // as an empty white page, which shows if it is still anywhere on screen, such as stacked
+    // just beneath the renderer behind a transparent area.
+    let _ = webview.hide();
     let _ = webview.eval(
         "try { window.stop(); document.querySelectorAll('audio, video').forEach(el => { el.pause(); el.muted = true; el.src = ''; el.load(); }); } catch (_) {}"
     );

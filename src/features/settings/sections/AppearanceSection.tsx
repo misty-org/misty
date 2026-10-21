@@ -23,6 +23,8 @@ import type { SettingsContentProps } from "../settingsTypes";
 import { Input } from "@/shared/ui";
 import { validClockTime } from "../store/nightLight";
 import { MAX_PANE_DIM } from "@/features/workspace/paneFocus";
+import { normalizeDockingLayout } from "@/features/app-shell/dockingLayout";
+import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 
 export function AppearanceSection(props: SettingsContentProps) {
   const appZoom = useAppZoomValue();
@@ -100,7 +102,38 @@ export function AppearanceSection(props: SettingsContentProps) {
         ) : null}
       </SettingsSectionBlock>
 
-      <SettingsSectionBlock title="Layout">
+      <SettingsSectionBlock title="Window">
+        <WindowTabsRow />
+        <SettingsRow
+          label="Space bar alignment"
+          description="Where the Space, its pages and People sit along the Space bar."
+        >
+          <ChoiceControl
+            value={stringSetting(props.document, "appearance", "space_bar_alignment", "left")}
+            disabled={props.working}
+            options={[
+              { value: "left", label: "Left" },
+              { value: "center", label: "Center" },
+              { value: "right", label: "Right" },
+            ]}
+            onValueChange={(value) =>
+              props.onSettingChange("appearance", "space_bar_alignment", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Auto-hide the Space bar"
+          description="Tuck the Space bar away until you move the pointer to the top edge of the page. It makes room for itself when it returns."
+        >
+          <SwitchControl
+            checked={booleanSetting(props.document, "appearance", "space_bar_auto_hide", false)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+
+      <SettingsSectionBlock title="Size">
         <SettingsRow
           label="App zoom"
           description="Scales the whole interface. Use Cmd/Ctrl +, Cmd/Ctrl −, or Cmd/Ctrl 0."
@@ -128,36 +161,6 @@ export function AppearanceSection(props: SettingsContentProps) {
             checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
             disabled={props.working}
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Space bar">
-        <SettingsRow
-          label="Alignment"
-          description="Where the Space, its pages and People sit along the Space bar."
-        >
-          <ChoiceControl
-            value={stringSetting(props.document, "appearance", "space_bar_alignment", "left")}
-            disabled={props.working}
-            options={[
-              { value: "left", label: "Left" },
-              { value: "center", label: "Center" },
-              { value: "right", label: "Right" },
-            ]}
-            onValueChange={(value) =>
-              props.onSettingChange("appearance", "space_bar_alignment", value)
-            }
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Auto-hide the Space bar"
-          description="With vertical tabs, tuck the Space bar away until you move the pointer to the top edge of the page. It makes room for itself when it returns."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "space_bar_auto_hide", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -208,5 +211,29 @@ function ClockTimeControl(props: {
         if (validClockTime(event.target.value)) props.onChange(event.target.value);
       }}
     />
+  );
+}
+
+/** Which side of this window the tab sidebar sits on. Each Space's window keeps its own. */
+function WindowTabsRow() {
+  const layout = useWindowDockingLayout();
+  const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
+  return (
+    <SettingsRow
+      label="Tabs"
+      description="Which side of this window the tab sidebar sits on. Each Space's window keeps its own."
+    >
+      <ChoiceControl
+        value={layout.tabs}
+        disabled={false}
+        options={[
+          { value: "left", label: "Left" },
+          { value: "right", label: "Right" },
+        ]}
+        onValueChange={(value) =>
+          setLayout(normalizeDockingLayout({ navigation: layout.navigation, tabs: value }))
+        }
+      />
+    </SettingsRow>
   );
 }

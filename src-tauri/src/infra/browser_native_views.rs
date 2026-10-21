@@ -291,6 +291,26 @@ pub(super) fn present_macos_webview(webview: &Webview) -> Result<(), String> {
     position_macos_webview(webview, true)
 }
 
+/// Returns keyboard focus to a page that lost it to the app view, so typing continues where
+/// it stopped. The page keeps its own caret while it is unfocused.
+#[tauri::command]
+pub fn browser_webview_restore_focus(
+    caller: Webview,
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<(), String> {
+    let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
+        return Ok(());
+    };
+    if detached_from(&caller, &webview) {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    return crate::infra::window_focus_windows::restore_page(&webview);
+    #[cfg(not(windows))]
+    Ok(())
+}
+
 /// Whether the page exists but is still parked for its first paint. The
 /// frontend keeps the previous page up until this turns false.
 #[tauri::command]

@@ -55,10 +55,14 @@ async function bootstrap() {
     );
     return;
   }
+  // The app and its styles load while the session is prepared, not after it. The shell
+  // loads beside them too, instead of when the first route renders.
+  const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);
+  void import("./layouts/DesktopLayout").catch(() => undefined);
   const { bootstrapDemoSession } = await import("@/features/auth");
   await bootstrapDemoSession();
   void analytics.initialize().then(initializeAnalyticsLifecycle);
-  const [{ App }] = await Promise.all([import("./App"), import("@/styles/styles.css")]);
+  const [{ App }] = await appModules;
   root.render(
     <TelemetryErrorBoundary>
       <App />

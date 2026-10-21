@@ -350,10 +350,11 @@
   border-radius: 6px;
 }
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-workspace-tab:is(:hover, :focus-within)
-  [data-text-overflowing="true"] {
-  /* The title makes way for the close button: it fades out and is gone before the button, so
-     the button needs no backing of its own and nothing shows through it. */
+  .misty-workspace-tab:not([data-pinned], .misty-tab-has-chips):is(:hover, :focus-within)
+  .misty-workspace-tab-title {
+  /* The title makes way for the close button whenever the button shows, also when the title
+     fits its row but still runs under the button: it fades out and is gone before the button,
+     so the button needs no backing of its own and nothing shows through it. */
   -webkit-mask-image: linear-gradient(
     to right,
     black calc(100% - 54px),

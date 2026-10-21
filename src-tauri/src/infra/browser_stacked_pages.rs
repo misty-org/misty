@@ -10,7 +10,8 @@
 //! hidden pages are parked offscreen instead.
 //!
 //! A stacked page still counts as on screen to the engine, so it would keep
-//! drawing. After a minute hidden it is asked to behave as a background tab
+//! drawing. After a while hidden (a minute unless the person chose otherwise)
+//! it is asked to behave as a background tab
 //! (`browser_background_tab.js`): it reads as hidden and stops drawing, with
 //! its last frame kept. Tabs playing sound, in picture in picture, capturing,
 //! downloading or driven by an agent keep running. Showing the tab undoes it
@@ -19,8 +20,26 @@
 use super::*;
 
 /// How long a tab stays hidden before it is backgrounded, and how often a
-/// stacked tab's exemptions are checked again after that.
-const BACKGROUND_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+/// stacked tab's exemptions are checked again after that, in seconds. The
+/// person chooses it (Settings › Performance); 0 never backgrounds a tab.
+static BACKGROUND_AFTER_SECS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(60);
+
+fn background_after() -> Option<std::time::Duration> {
+    match BACKGROUND_AFTER_SECS.load(std::sync::atomic::Ordering::Relaxed) {
+        0 => None,
+        seconds => Some(std::time::Duration::from_secs(seconds)),
+    }
+}
+
+/// Sets how long hidden tabs keep drawing (`BACKGROUND_AFTER_SECS`). Pages
+/// hidden from now on follow it; a tab already asleep wakes when shown.
+#[tauri::command]
+pub fn browser_set_hidden_tab_sleep(seconds: u64) {
+    BACKGROUND_AFTER_SECS.store(
+        seconds.min(24 * 60 * 60),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
 
 /// The window's client size when each page was stacked. A page is raised in
 /// place only while the window still has that size; otherwise its layout may
@@ -103,7 +122,7 @@ pub(super) fn wake(webview: &Webview) {
     }
 }
 
-/// Backgrounds the stacked page after `BACKGROUND_AFTER`, then keeps checking:
+/// Backgrounds the stacked page after `background_after`, then keeps checking:
 /// a page that starts or stops being exempt, or loads a new document, follows.
 fn schedule_background(app: &AppHandle, id: &str) {
     let generation = {
@@ -123,7 +142,10 @@ fn schedule_background(app: &AppHandle, id: &str) {
                 .is_ok_and(|states| states.get(id).is_some_and(|state| state.0 == generation))
         };
         loop {
-            tokio::time::sleep(BACKGROUND_AFTER).await;
+            let Some(after) = background_after() else {
+                return;
+            };
+            tokio::time::sleep(after).await;
             if !current(&id) {
                 return;
             }
@@ -248,9 +270,17 @@ pub(super) fn stack_windows_webview(app: &AppHandle, webview: &Webview) -> Resul
             let child = child.0 as HWND;
             // SAFETY: windows owned by this thread.
             unsafe {
+                // Just beneath the renderer, not the very bottom: the page left last is then
+                // the first one a gap in a fast switch can show through, instead of a tab
+                // hidden long ago that now sits above every recent one.
+                let insert_after = if renderer != 0 {
+                    renderer as HWND
+                } else {
+                    HWND_BOTTOM
+                };
                 SetWindowPos(
                     child,
-                    HWND_BOTTOM,
+                    insert_after,
                     0,
                     0,
                     0,
@@ -313,6 +343,9 @@ pub fn browser_webviews_show_only(
     let window = caller.window().label().to_owned();
     let size = window_size(&caller);
     let mut raised = Vec::new();
+    // The pages coming up are raised before any page goes under, so the window is never left
+    // with nothing in front for the renderer's transparent area to show through.
+    let mut leaving = Vec::new();
     for (label, webview) in app.webviews() {
         let Some(id) = label.strip_prefix("misty-browser-") else {
             continue;
@@ -330,6 +363,9 @@ pub fn browser_webviews_show_only(
             }
             continue;
         }
+        leaving.push(webview);
+    }
+    for webview in leaving {
         let parked = webview
             .position()
             .is_ok_and(|position| position.x <= -10_000 && position.y <= -10_000);

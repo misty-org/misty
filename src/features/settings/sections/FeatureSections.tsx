@@ -4,12 +4,11 @@ import {
   removeProject,
   CompanionAppearanceSettings,
 } from "@/features/agents";
-import { useSpacesStore } from "@/features/spaces";
+import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
@@ -26,48 +25,6 @@ import { AgentSitesSection } from "./AgentSitesSection";
 import { InboundTasksSection } from "./InboundTasksSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "./PreferenceRow";
-export function SpaceDefaultsSection() {
-  return (
-    <Section
-      title="Opening a Space"
-      description="Used when opening a Space without an explicit destination. Restored sessions keep their place."
-    >
-      <PreferenceRow id="spaces.openingTool" />
-    </Section>
-  );
-}
-export function ManageSpacesSection(props: SettingsContentProps) {
-  const spaces = useSpacesStore((s) => s.spaces);
-  const navigate = useNavigate();
-  return (
-    <Section
-      title="Your Spaces"
-      description="These settings belong to the selected Space and follow its membership permissions."
-    >
-      {spaces.length ? (
-        spaces.map((s) => (
-          <Row key={s.id} label={s.name} description={s.role}>
-            <Button
-              variant="outline"
-              onClick={() =>
-                (props.onOpenResource ?? navigate)(
-                  `/spaces/${encodeURIComponent(s.id)}/settings/general`,
-                )
-              }
-            >
-              Manage Space
-            </Button>
-          </Row>
-        ))
-      ) : (
-        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          Join or create a Space to manage its settings.
-        </p>
-      )}
-    </Section>
-  );
-}
-
 export function AgentDefaultsSection() {
   return (
     <>
@@ -137,9 +94,8 @@ export function AgentConnectionsSection() {
   return (
     <>
       <AppActionsSection />
-      <ScreenLocationSection />
-      <AgentSitesSection />
       <InboundTasksSection />
+      <ScreenLocationSection />
     </>
   );
 }
@@ -147,18 +103,20 @@ export function CompanionSection() {
   return hasTauriInternals() ? (
     <CompanionAppearanceSettings />
   ) : (
-    <NativeAvailability feature="Companion" />
+    <NativeAvailability feature="Cursor" />
   );
 }
 export function DevicesSection() {
   return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
 }
-/** Remembered approvals (server-owned), and on a desktop its project folders. */
+/** What agents may do: remembered approvals (server-owned), project folders on a desktop, and
+ * sites they only read. */
 export function AgentPermissionsSection() {
   return (
     <>
       <AgentGrantsSection />
       {hasTauriInternals() ? <AgentScopeList /> : null}
+      <AgentSitesSection />
     </>
   );
 }
@@ -224,11 +182,22 @@ function AgentScopeList() {
     </Section>
   );
 }
+/** The version, and the way to the account on the website, which owns billing and account data. */
 export function AboutSection(props: SettingsContentProps) {
   return (
-    <Section title="Misty" description="Your workspace for Browser, Spaces, Files and Agents.">
+    <Section title="About">
       <Row label="Version">
-        <span className="text-sm">{props.app?.version ?? "Available in the installed app"}</span>
+        <span className="text-[15px] text-cream-muted">
+          {props.app?.version ?? "Available in the installed app"}
+        </span>
+      </Row>
+      <Row
+        label="Account"
+        description="Your plan, billing, invites and account data are managed on the Misty website."
+      >
+        <Button variant="outline" size="sm" onClick={() => void openAccountSettingsInBrowser()}>
+          Manage account
+        </Button>
       </Row>
     </Section>
   );

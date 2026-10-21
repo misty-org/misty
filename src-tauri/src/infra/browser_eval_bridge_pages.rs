@@ -35,9 +35,10 @@ pub(super) async fn pages(
             // task's own tabs.
             let window = view.window().label().to_owned();
             let id = label.strip_prefix(PAGE_PREFIX).unwrap_or_default();
-            let run = bridge.app.try_state::<BrowserSessionState>().and_then(|state| {
-                state.sessions.lock().ok()?.get(id)?.agent_run_id.clone()
-            });
+            let run = bridge
+                .app
+                .try_state::<BrowserSessionState>()
+                .and_then(|state| state.sessions.lock().ok()?.get(id)?.agent_run_id.clone());
             json!({ "label": label, "url": url, "window": window, "runId": run })
         })
         .collect();

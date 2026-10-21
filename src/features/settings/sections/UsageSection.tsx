@@ -10,7 +10,7 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { CopyableValueText, SettingsNote } from "../SettingsControls";
+import { SettingsNote } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 
 const planNames: Record<string, string> = {
@@ -21,17 +21,10 @@ const planNames: Record<string, string> = {
   ultra_plus: "Ultra+",
 };
 
-interface Referral {
-  code: string;
-  link: string;
-  referrals?: { active: number; pending: number; bonus_units: number };
-}
-
 interface UsageState {
   generation: number;
   usage?: BillingUsage;
   me?: AccountMeResponse;
-  referral?: Referral;
   failed?: boolean;
 }
 
@@ -87,14 +80,10 @@ export function UsageSection(_props: SettingsContentProps) {
     const controller = new AbortController();
     const request = <T,>(path: string) =>
       cachedRequest<T>(path, { init: { signal: controller.signal } });
-    void Promise.all([
-      request<BillingUsage>("/billing/usage"),
-      request<AccountMeResponse>("/me"),
-      request<Referral>("/me/referral").catch(() => undefined),
-    ])
-      .then(([usage, me, referral]) => {
+    void Promise.all([request<BillingUsage>("/billing/usage"), request<AccountMeResponse>("/me")])
+      .then(([usage, me]) => {
         if (!controller.signal.aborted && generation === readApiSessionGeneration())
-          setState({ generation, usage, me, referral });
+          setState({ generation, usage, me });
       })
       .catch(() => {
         if (!controller.signal.aborted)
@@ -127,10 +116,12 @@ export function UsageSection(_props: SettingsContentProps) {
       );
     }
   };
-  const referrals = current?.referral?.referrals;
   return (
     <>
-      <SettingsSectionBlock title="Plan">
+      <SettingsSectionBlock
+        title="AI usage"
+        description="Work is measured by what it costs to run, so faster models stretch further. A task already running may finish a little past a limit."
+      >
         <SettingsRow
           label="Current plan"
           description="Coding needs Pro or above. Higher plans add more AI, smarter models and more storage."
@@ -161,12 +152,6 @@ export function UsageSection(_props: SettingsContentProps) {
           </SettingsRow>
         )}
         {notice && <SettingsNote>{notice}</SettingsNote>}
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
-        title="AI usage"
-        description="Work is measured by what it costs to run, so faster models stretch further. A task already running may finish a little past a limit."
-      >
         {current?.failed && !ai ? (
           <SettingsNote>
             Usage is unavailable right now. AI requests still check your limits before they run.
@@ -192,50 +177,6 @@ export function UsageSection(_props: SettingsContentProps) {
               description="A ceiling over any 31 days; steady weekly use never reaches it."
             />
           </>
-        )}
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
-        title="Invite friends"
-        description="Each friend who subscribes adds AI to your plan every month, for as long as they stay. They get the same bonus for their first two months."
-      >
-        <SettingsRow
-          label="Your invite link"
-          description="Share it anywhere. It works for new accounts only."
-        >
-          {current?.referral ? (
-            <CopyableValueText value={current.referral.link} />
-          ) : (
-            <Skeleton className="h-4 w-[240px]" />
-          )}
-        </SettingsRow>
-        <SettingsRow
-          label="Friends who subscribed"
-          description="A friend counts two weeks after their first payment, while they stay subscribed."
-        >
-          {referrals ? (
-            <span className="text-[15px] tabular-nums text-cream">
-              {`${referrals.active} active${referrals.pending ? ` · ${referrals.pending} pending` : ""}`}
-            </span>
-          ) : (
-            <Skeleton className="h-4 w-16" />
-          )}
-        </SettingsRow>
-        {referrals && referrals.bonus_units > 0 && limits?.monthly && (
-          <SettingsRow
-            label="Your bonus"
-            description="Extra AI each month from friends who subscribed."
-          >
-            <span className="text-[15px] tabular-nums text-cream">
-              +
-              {Math.round(
-                (referrals.bonus_units /
-                  Math.max(1, limits.monthly.limit - referrals.bonus_units)) *
-                  100,
-              )}
-              % AI
-            </span>
-          </SettingsRow>
         )}
       </SettingsSectionBlock>
     </>

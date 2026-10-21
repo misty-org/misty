@@ -20,6 +20,7 @@ import type * as SettingsStoreModule from "./store/useSettingsStore";
 
 // Import the registry so the test always mirrors the real nav list.
 import SettingsWorkspace, { settingsRegistry } from "./SettingsPage";
+import { settingsAreas, settingsGroups } from "./settingsRegistry";
 const SECTIONS: SettingsSection[] = settingsRegistry.map((entry) => entry.id);
 const mocks = vi.hoisted(() => {
   const settingsState = {
@@ -154,25 +155,44 @@ describe("SettingsWorkspace", () => {
     expect(main.textContent!.length).toBeGreaterThan(30);
     expect(main.textContent).not.toContain("Coming soon");
   });
-  it("renders all Browser sections together without expanding navigation", async () => {
-    await render("browser");
-    expect(container.querySelector('[data-settings-page="browser-downloads"]')).not.toBeNull();
-    expect(container.querySelector('[data-settings-page="browser-privacy"]')).not.toBeNull();
-    expect(container.querySelector('[data-settings-nav-entry="browser-downloads"]')).toBeNull();
+  it("groups one-word pages under feature labels", async () => {
+    await render();
+    const groups = [...container.querySelectorAll('nav [role="group"]')];
+    expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
+      "Settings",
+      "Browser",
+      "Agents",
+    ]);
+    for (const group of settingsGroups)
+      for (const area of group.areas) {
+        const label = settingsAreas[area].label;
+        expect(label.split(" ")).toHaveLength(1);
+        expect(label.toLowerCase()).not.toContain(group.label.toLowerCase());
+      }
+    expect(settingsRegistry.find((e) => e.id === "passwords")?.area).toBe("passwords");
+  });
+  it("renders every block of a page together without expanding navigation", async () => {
+    await render("general");
+    for (const id of ["general", "browser-links", "sync", "devices", "about"])
+      expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
+    expect(container.querySelector('[data-settings-nav-entry="browser-links"]')).toBeNull();
     // Dropdown controls report aria-expanded; navigation never discloses entries.
     expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
   it("keeps system pages individually addressable", () => {
     for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])
       expect(settingsRegistry.find((e) => e.id === id)).toBeDefined();
-    expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("about");
+    expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("general");
   });
-  it("redirects browser handoff to the single Sync area", () => {
+  it("sends retired pages to where their settings live now", () => {
     expect(canonicalSettingsSection("advanced")).toBe("diagnostics");
     expect(canonicalSettingsSection("server")).toBe("about");
     expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
     expect(canonicalSettingsSection("profiles")).toBe("sync");
-    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");
+    expect(canonicalSettingsSection("browser")).toBe("search");
+    expect(canonicalSettingsSection("browser-privacy")).toBe("privacy");
+    expect(canonicalSettingsSection("spaces-manage")).toBe("general");
+    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("general");
     expect(settingsRegistry.find((e) => e.id === "browser-handoff")).toBeUndefined();
     expect(canonicalSettingsSection("browser-handoff")).toBe("sync");
   });
@@ -190,6 +210,6 @@ describe("SettingsWorkspace", () => {
     ) as HTMLButtonElement;
     expect(result.textContent).toContain("Homepage");
     await act(async () => result.click());
-    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser");
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-appearance");
   });
 });

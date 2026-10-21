@@ -292,9 +292,12 @@ async fn run_step_checked(
         // :hover menus while the window is in front (WebKit ignores pointer moves into a window
         // behind others), and the events open menus built in script either way.
         "hover" => {
-            let input = json!({"kind": "move", "x": prepared["point"]["x"], "y": prepared["point"]["y"]});
-            let moved = cfg!(target_os = "macos") && native(input, prepared.clone()).await?.is_some();
-            let mut result = call_at(view, frame, "perform", step_args(document, step), false).await?;
+            let input =
+                json!({"kind": "move", "x": prepared["point"]["x"], "y": prepared["point"]["y"]});
+            let moved =
+                cfg!(target_os = "macos") && native(input, prepared.clone()).await?.is_some();
+            let mut result =
+                call_at(view, frame, "perform", step_args(document, step), false).await?;
             if moved {
                 tokio::time::sleep(Duration::from_millis(150)).await;
                 result["input"] = json!("native");

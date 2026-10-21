@@ -29,8 +29,6 @@ export function useDesktopTitlebarGeometry(options: {
   } = options;
   const isAuthRoute = isAuthPath(pathname);
   const standaloneRouteTitle = standaloneWorkspaceRouteTitle(pathname);
-  const sharedTitlebar =
-    !isAuthRoute && !standaloneRouteTitle && !focusMode && docking.tabs === "top";
   const windowsTitlebarControlsRef = useRef<HTMLDivElement>(null);
   const [windowsTitlebarControlsWidth, setWindowsTitlebarControlsWidth] = useState(0);
   useLayoutEffect(() => {
@@ -54,15 +52,7 @@ export function useDesktopTitlebarGeometry(options: {
       : styles.desktopTitlebarNavigationInset,
   );
   const sideTabsWidth = useSidebarWidthStore((state) => state.width);
-  const geometry = dockingGeometry({
-    sideTabsWidth,
-    ...docking,
-    // The tab strip carries the navigation; no rail takes room.
-    autoHide: true,
-    shareTopBand: !isAuthRoute && !standaloneRouteTitle && !focusMode,
-    chromeLeft: titlebarNavigationGeometry.left,
-  });
-  const topTabInsets = geometry.titlebarInsets;
+  const geometry = dockingGeometry({ sideTabsWidth, ...docking });
   useMergedTitlebar(
     shellRef,
     `${docking.navigation}:${docking.tabs}:${focusMode}`,
@@ -74,10 +64,8 @@ export function useDesktopTitlebarGeometry(options: {
   return {
     isAuthRoute,
     standaloneRouteTitle,
-    sharedTitlebar,
     windowsTitlebarControlsRef,
     titlebarNavigationGeometry,
     geometry,
-    topTabInsets,
   };
 }

@@ -123,6 +123,8 @@ pub mod misty_context;
 #[cfg(windows)]
 pub mod misty_context_windows;
 #[cfg(windows)]
+pub(crate) mod window_focus_windows;
+#[cfg(windows)]
 pub mod window_snap_target_windows;
 #[cfg(windows)]
 pub mod window_snap_windows;

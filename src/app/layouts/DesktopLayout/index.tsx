@@ -26,10 +26,8 @@ import { isTopEdgeDragPress } from "./windowChromeHelpers";
 import { useDockingTransition } from "./useDockingTransition";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
-import { AccountIsland, AccountTab } from "./AccountIsland";
+import { AccountIsland } from "./AccountIsland";
 import { StripDownloads } from "./WorkspaceStripDock";
-import { isSideDock } from "@/features/app-shell/dockingLayout";
-import { dockingMetrics } from "./dockingGeometry";
 import { AppNoticePublisher, RouteNotice } from "./RouteNotices";
 import { StandaloneRouteSurface } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
@@ -111,20 +109,17 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}:${focusMode}`);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
-  // Beside a vertical sidebar the buttons belong to its header, like the traffic lights on
-  // macOS: they slide away when the sidebar collapses and come back when it peeks out, and
-  // never float over the window's corner on their own.
-  const sideTabs = isSideDock(docking.tabs);
-  const captionSlot = useCaptionSlot(shellRef, shouldShowWindowsControls && sideTabs);
+  // The buttons belong to the sidebar's header, like the traffic lights on macOS: they slide
+  // away when the sidebar collapses and come back when it peeks out, and never float over the
+  // window's corner on their own.
+  const captionSlot = useCaptionSlot(shellRef, shouldShowWindowsControls);
   const sidebarCollapsed = useSidebarCollapsedStore((state) => state.collapsed);
   const {
     isAuthRoute,
     standaloneRouteTitle,
-    sharedTitlebar,
     windowsTitlebarControlsRef,
     titlebarNavigationGeometry,
     geometry,
-    topTabInsets,
   } = useDesktopTitlebarGeometry({
     shellRef,
     pathname: location.pathname,
@@ -135,9 +130,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     appZoom,
   });
   useSignedOutWindow(isAuthRoute);
-  // Over the window's corner only where no sidebar can hold them: top or bottom tabs, sign-in,
-  // or a page that shows no sidebar. A collapsed sidebar takes them away with it.
-  const floatingCaption = !sideTabs || isAuthRoute || !sidebarCollapsed;
+  // Over the window's corner only where no sidebar can hold them: sign-in, or a page that
+  // shows no sidebar. A collapsed sidebar takes them away with it.
+  const floatingCaption = isAuthRoute || !sidebarCollapsed;
   useOtherWindowsHiddenWhileAddingAccount(
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
@@ -155,14 +150,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useSettingsStore.getState().setActiveSection("sync");
     openSettingsOverlay();
   };
-  const AccountStrip = sideTabs ? AccountIsland : AccountTab;
-  // Beside a vertical sidebar Sync is a button next to Settings; otherwise it opens from the
-  // page's ⋯ menu, below the toolbar.
+  // Sync is a button next to Settings, under the tabs.
   const syncButton = (
     <BrowserSyncBadge key={user?.id} accountId={user?.id ?? ""} onOpenSettings={openSyncSettings} />
   );
   const stripAccount = !isAuthRoute ? (
-    <AccountStrip
+    <AccountIsland
       open={profileOpen}
       onOpenChange={(open) => {
         if (open) {
@@ -174,7 +167,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       onOpenAccountSettings={openAccountSettings}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
       onSettingsClick={openSettingsOverlay}
-      {...(sideTabs ? { sync: syncButton } : {})}
+      sync={syncButton}
     />
   ) : null;
   // The sidebar's bottom edge: downloads on the left, chat on the right.
@@ -184,14 +177,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     </>
   );
   const browserChrome = {
-    sync: sideTabs ? null : (
-      <BrowserSyncBadge
-        key={user?.id}
-        accountId={user?.id ?? ""}
-        onOpenSettings={openSyncSettings}
-        menuOnly
-      />
-    ),
     accountItems: <SyncMenuItem accountId={user?.id ?? ""} />,
   };
   return (
@@ -229,24 +214,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       >
         <header
           className={cn("misty-docking-titlebar", isAuthRoute && "border-b-0 bg-transparent")}
-          data-shared-tabs={sharedTitlebar}
           data-shared-chrome={!isAuthRoute}
           onPointerDown={handleDesktopTitlebarPointerDown}
         >
-          {sharedTitlebar ? (
-            <div
-              className={cn(
-                "misty-docking-titlebar-drag-region",
-                "transition-[width]",
-                styles.navigatorMotionClass,
-              )}
-              aria-hidden="true"
-              // Stops where the first tab's curve starts, so the curve is not painted over.
-              style={{
-                width: Math.max(0, (topTabInsets?.left ?? 0) + dockingMetrics.tabLead),
-              }}
-            />
-          ) : null}
           {shouldShowWindowsControls && (captionSlot || floatingCaption) ? (
             <WindowsTitlebarControls
               slot={captionSlot}
@@ -284,7 +254,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               <WorkspaceCanvas
                 windowsTitlebarControls={shouldShowWindowsControls}
                 tabPosition={docking.tabs}
-                titlebarInsets={topTabInsets}
                 hideTabStrip={focusMode}
                 stripFootEnd={stripFootEnd}
                 stripAccount={stripAccount}

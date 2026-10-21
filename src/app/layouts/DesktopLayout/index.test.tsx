@@ -19,7 +19,7 @@ vi.mock("@/features/auth", () => ({
 }));
 
 vi.mock("@/features/workspace", () => ({
-  useWindowDockingLayout: () => ({ navigation: "left", tabs: "top" }),
+  useWindowDockingLayout: () => ({ navigation: "right", tabs: "left" }),
   useWorkspaceStore: (selector: (state: { openSurface: () => void }) => unknown) =>
     selector({
       openSurface: vi.fn(),
@@ -255,10 +255,10 @@ describe("DesktopLayout on Auth Routes", () => {
   });
 
   it.each([
-    ["/browser", "true", "1 / 4"],
-    ["/invite/token", "false", "1 / 4"],
-    ["/signin", "false", "2"],
-  ])("reserves native chrome correctly on %s", async (route, sharedTabs, row) => {
+    ["/browser", "1 / 4"],
+    ["/invite/token", "1 / 4"],
+    ["/signin", "2"],
+  ])("reserves native chrome correctly on %s", async (route, row) => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={[route]}>
@@ -266,9 +266,6 @@ describe("DesktopLayout on Auth Routes", () => {
         </MemoryRouter>,
       );
     });
-    expect(
-      container.querySelector(".misty-docking-titlebar")?.getAttribute("data-shared-tabs"),
-    ).toBe(sharedTabs);
     expect((container.querySelector("[data-misty-route-shell]") as HTMLElement).style.gridRow).toBe(
       row,
     );

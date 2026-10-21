@@ -6,70 +6,64 @@ import { booleanSetting, stringSetting, SwitchControl, TextAreaControl } from ".
 import type { SettingsContentProps } from "../settingsTypes";
 import { ClearBrowsingDataRow } from "./ClearBrowsingDataRow";
 
-export function PrivacySection(props: SettingsContentProps & { page?: "app" | "browser" }) {
+export function PrivacySection(props: SettingsContentProps) {
   return (
     <>
-      {props.page === "browser" && (
-        <>
-          <SettingsSectionBlock title="Page capture exclusions">
-            <SettingsRow
-              label="Don't capture page state on these sites"
-              description="One site per line. Subdomains are included. Only the address and scroll position are kept."
-              stacked
-            >
-              <TextAreaControl
-                value={stringSetting(props.document, "privacy", "page_state_excluded_sites", "")}
-                rows={5}
-                disabled={props.working}
-                onCommit={(value) =>
-                  props.onSettingChange("privacy", "page_state_excluded_sites", value)
-                }
-              />
-            </SettingsRow>
-          </SettingsSectionBlock>
-          <SettingsSectionBlock title="Browsing data">
-            <ClearBrowsingDataRow />
-          </SettingsSectionBlock>
-        </>
-      )}
-      {props.page !== "browser" && (
-        <SettingsSectionBlock title="Data handling">
-          <SettingsRow
-            label="Share anonymous usage analytics"
-            description="Share first-open, onboarding, and application-session events. No filenames, paths, or content."
-          >
-            <SwitchControl
-              checked={booleanSetting(
-                props.document,
-                "privacy",
-                "anonymous_usage_analytics_enabled",
-                false,
-              )}
-              disabled={props.working}
-              onChange={(value) =>
-                props.onSettingChange("privacy", "anonymous_usage_analytics_enabled", value)
-              }
-            />
-          </SettingsRow>
-          <SettingsRow
-            label="Send anonymous crash reports"
-            description="Share sanitized unexpected React and Rust errors without file or account data."
-          >
-            <SwitchControl
-              checked={booleanSetting(
-                props.document,
-                "privacy",
-                "anonymous_error_reporting_enabled",
-                false,
-              )}
-              disabled={props.working}
-              onChange={(value) =>
-                props.onSettingChange("privacy", "anonymous_error_reporting_enabled", value)
-              }
-            />
-          </SettingsRow>
-        </SettingsSectionBlock>
-      )}
+      <SettingsSectionBlock title="Page capture exclusions">
+        <SettingsRow
+          label="Don't capture page state on these sites"
+          description="One site per line. Subdomains are included. Only the address and scroll position are kept."
+          stacked
+        >
+          <TextAreaControl
+            value={stringSetting(props.document, "privacy", "page_state_excluded_sites", "")}
+            rows={5}
+            disabled={props.working}
+            onCommit={(value) =>
+              props.onSettingChange("privacy", "page_state_excluded_sites", value)
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
+      <SettingsSectionBlock title="Browsing data">
+        <ClearBrowsingDataRow />
+      </SettingsSectionBlock>
+      <SettingsSectionBlock title="Data handling">
+        <SettingsRow
+          label="Share anonymous usage analytics"
+          description="Share first-open, onboarding, and application-session events. No filenames, paths, or content."
+        >
+          <SwitchControl
+            checked={booleanSetting(
+              props.document,
+              "privacy",
+              "anonymous_usage_analytics_enabled",
+              false,
+            )}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("privacy", "anonymous_usage_analytics_enabled", value)
+            }
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Send anonymous crash reports"
+          description="Share sanitized unexpected React and Rust errors without file or account data."
+        >
+          <SwitchControl
+            checked={booleanSetting(
+              props.document,
+              "privacy",
+              "anonymous_error_reporting_enabled",
+              false,
+            )}
+            disabled={props.working}
+            onChange={(value) =>
+              props.onSettingChange("privacy", "anonymous_error_reporting_enabled", value)
+            }
+          />
+        </SettingsRow>
+      </SettingsSectionBlock>
     </>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "./useBrowserSuspension";
 import { useBrowserRuntimeServices } from "./useBrowserRuntimeServices";
 import {
+  useBrowserFocusReturn,
   useBrowserSurfaceParking,
   useClosedBrowserTabCleanup,
   useInstantBrowserSwitch,
@@ -18,6 +19,7 @@ export function BrowserRuntimeBridge() {
   const navigate = useNavigate();
   useBrowserRuntimeServices();
   useInstantBrowserSwitch();
+  useBrowserFocusReturn();
   useBrowserSurfaceParking();
   useEmbeddedBrowserSuspension();
   useClosedBrowserTabCleanup();

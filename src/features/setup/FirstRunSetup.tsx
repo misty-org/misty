@@ -1,4 +1,3 @@
-import type { DockingLayout } from "@/features/app-shell/dockingLayout";
 import { useAuth } from "@/features/auth";
 import { BrowserImportFlow } from "@/features/browser-import";
 import {
@@ -7,7 +6,6 @@ import {
   type AppThemeMode,
 } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
-import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   Button,
@@ -19,8 +17,8 @@ import {
   Pressable,
 } from "@/shared/ui";
 import { Check } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { LayoutPreview, ThemePreview } from "./SetupPreviews";
+import { useEffect, type ReactNode } from "react";
+import { ThemePreview } from "./SetupPreviews";
 import { SpacesStep } from "./SpacesStep";
 import { useSetupStore, type SetupStep } from "./useSetupStore";
 
@@ -28,19 +26,6 @@ const themeChoices: Array<{ value: AppThemeMode; label: string }> = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
-];
-
-const layoutChoices: Array<{ label: string; detail: string; layout: DockingLayout }> = [
-  {
-    label: "Horizontal tabs",
-    detail: "Tabs across the top, navigation on the left",
-    layout: { navigation: "left", tabs: "top" },
-  },
-  {
-    label: "Vertical tabs",
-    detail: "Tabs in a sidebar, navigation on the opposite side",
-    layout: { navigation: "right", tabs: "left" },
-  },
 ];
 
 const stepCopy: Record<SetupStep, { title: string; description: string }> = {
@@ -52,11 +37,6 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
     title: "Choose a theme",
     description: "System follows your computer's light or dark appearance.",
   },
-  layout: {
-    title: "Choose a layout",
-    description:
-      "Pick where tabs sit in every Space's window. Navigation sits on the opposite side, and you can switch later in Settings.",
-  },
   import: {
     title: "Import from your browser",
     description: "Bring bookmarks, history, settings and sign-ins into Misty, or skip this step.",
@@ -64,7 +44,7 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
 };
 
 /**
- * First-run setup after sign-in, in place of a walkthrough: theme, layout and, in the desktop app,
+ * First-run setup after sign-in, in place of a walkthrough: Spaces, theme and, in the desktop app,
  * importing from another browser. Each choice applies immediately; all of them stay in Settings.
  */
 export function FirstRunSetup() {
@@ -76,10 +56,8 @@ export function FirstRunSetup() {
   const visible = isOpen && !transitioning && Boolean(user?.id);
   // Importing reads other browsers on this computer, so it needs the native app.
   const steps: SetupStep[] = hasTauriInternals()
-    ? ["spaces", "layout", "theme", "import"]
-    : ["spaces", "layout", "theme"];
-  // There is no default layout: the person picks one before going on.
-  const [layoutChosen, setLayoutChosen] = useState(false);
+    ? ["spaces", "theme", "import"]
+    : ["spaces", "theme"];
   const index = Math.max(0, steps.indexOf(step));
   const finish = () => finishSetup(user?.id);
   const next = () => (index < steps.length - 1 ? setStep(steps[index + 1]) : finish());
@@ -107,9 +85,6 @@ export function FirstRunSetup() {
         <div className="mt-6">
           {steps[index] === "spaces" ? <SpacesStep /> : null}
           {steps[index] === "theme" ? <ThemeStep /> : null}
-          {steps[index] === "layout" ? (
-            <LayoutStep chosen={layoutChosen} onChoose={() => setLayoutChosen(true)} />
-          ) : null}
           {steps[index] === "import" ? (
             <BrowserImportFlow onClose={finish} closeLabel="Skip" />
           ) : null}
@@ -125,15 +100,7 @@ export function FirstRunSetup() {
                   Back
                 </Button>
               ) : null}
-              <Button
-                onClick={next}
-                disabled={steps[index] === "layout" && !layoutChosen}
-                title={
-                  steps[index] === "layout" && !layoutChosen ? "Choose a layout first" : undefined
-                }
-              >
-                {index === steps.length - 1 ? "Done" : "Continue"}
-              </Button>
+              <Button onClick={next}>{index === steps.length - 1 ? "Done" : "Continue"}</Button>
             </div>
           </div>
         ) : null}
@@ -158,33 +125,6 @@ function ThemeStep() {
           onSelect={() => updateSetting("appearance", "theme_mode", choice.value)}
         >
           <ThemePreview mode={choice.value} />
-        </Choice>
-      ))}
-    </div>
-  );
-}
-
-function LayoutStep({ chosen, onChoose }: { chosen: boolean; onChoose(): void }) {
-  const current = useWindowDockingLayout();
-  const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
-  return (
-    <div role="radiogroup" aria-label="Layout" className="grid grid-cols-2 gap-3">
-      {layoutChoices.map((choice) => (
-        <Choice
-          key={choice.label}
-          label={choice.label}
-          detail={choice.detail}
-          selected={
-            chosen &&
-            current.navigation === choice.layout.navigation &&
-            current.tabs === choice.layout.tabs
-          }
-          onSelect={() => {
-            setLayout(choice.layout);
-            onChoose();
-          }}
-        >
-          <LayoutPreview layout={choice.layout} />
         </Choice>
       ))}
     </div>

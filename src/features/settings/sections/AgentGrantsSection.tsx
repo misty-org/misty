@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  grantsApi,
-  groupGrants,
-  lastUsedText,
-  type AgentGrant,
-} from "@/features/agents";
+import { grantsApi, groupGrants, lastUsedText, type AgentGrant } from "@/features/agents";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button, SkeletonList } from "@/shared/ui";
 import {

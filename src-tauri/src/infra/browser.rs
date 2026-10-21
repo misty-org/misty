@@ -78,9 +78,16 @@ mod engine_menu;
 #[path = "browser_stacked_pages.rs"]
 mod stacked_pages;
 #[cfg(windows)]
-pub use stacked_pages::browser_webviews_show_only;
+pub use stacked_pages::{browser_set_hidden_tab_sleep, browser_webviews_show_only};
 #[cfg(windows)]
 use stacked_pages::{is_stacked, place_beneath, stack_windows_webview, unstack, wake};
+
+/// Hidden tabs sleep on their own elsewhere: a hidden view stops drawing.
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn browser_set_hidden_tab_sleep(seconds: u64) {
+    let _ = seconds;
+}
 
 /// Pages switch by stacking order only on Windows; elsewhere the engine shows
 /// and hides views in one frame on its own.
@@ -232,6 +239,10 @@ fn watch_page_focus(webview: &Webview, id: &str) {
     let id = id.to_owned();
     let _ = webview.with_webview(move |platform| {
         let handler = FocusChangedEventHandler::create(Box::new(move |_, _| {
+            // Focus we gave back ourselves changes nothing the app should answer.
+            if crate::infra::window_focus_windows::take_programmatic(&format!("misty-browser-{id}")) {
+                return Ok(());
+            }
             let _ = app.emit_to(
                 browser_owner_label(&app, &id),
                 "misty://browser-focus",

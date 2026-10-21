@@ -110,7 +110,7 @@ async function mount() {
 it("groups every sync concern on one page and explains the publisher", async () => {
   await mount();
   for (const name of [
-    "Overview",
+    "Sync",
     "Workspace devices",
     "Website sign-ins",
     "Switching devices",

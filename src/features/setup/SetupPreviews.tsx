@@ -1,4 +1,3 @@
-import type { DockingLayout, DockPosition } from "@/features/app-shell/dockingLayout";
 import type { AppThemeMode } from "@/features/settings";
 
 /** A tiny window in one theme: title bar, rail, tab strip and a page. Fixed grays, not theme tokens. */
@@ -45,44 +44,6 @@ export function ThemePreview(props: { mode: AppThemeMode }) {
       ) : (
         <MiniWindow tone={props.mode} />
       )}
-    </div>
-  );
-}
-
-const side = (position: DockPosition) => position === "left" || position === "right";
-
-/** Where navigation and tabs sit. On the same edge, tabs sit inside navigation, as in the app. */
-export function LayoutPreview(props: { layout: DockingLayout }) {
-  const { navigation, tabs } = props.layout;
-  const railSize = side(navigation) ? "14%" : "16%";
-  const tabSize = side(tabs) ? "22%" : "14%";
-  const tabOffset = navigation === tabs ? railSize : "0%";
-  const edge = (position: DockPosition, size: string, offset: string) =>
-    side(position)
-      ? { top: 0, bottom: 0, [position]: offset, width: size }
-      : { left: 0, right: 0, [position]: offset, height: size };
-  return (
-    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md border border-charcoal-border bg-charcoal-bg">
-      <div className="absolute bg-charcoal-hover" style={edge(navigation, railSize, "0%")} />
-      <div
-        className="absolute flex gap-[3px] p-[3px]"
-        style={{
-          ...edge(tabs, tabSize, tabOffset),
-          flexDirection: side(tabs) ? "column" : "row",
-          // A strip across the rail's edge starts where the rail ends.
-          ...(side(tabs) !== side(navigation) ? { [navigation]: railSize } : {}),
-        }}
-      >
-        {[0, 1, 2].map((tab) => (
-          <div
-            key={tab}
-            className={
-              tab === 0 ? "rounded-[2px] bg-cream-muted/45" : "rounded-[2px] bg-cream-muted/20"
-            }
-            style={side(tabs) ? { height: "12%" } : { width: "18%" }}
-          />
-        ))}
-      </div>
     </div>
   );
 }

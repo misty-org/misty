@@ -34,6 +34,7 @@ fn build_window<R: Runtime>(app: &AppHandle<R>, label: &str, title: &str) -> Res
     #[cfg(windows)]
     if let Some(view) = app.get_webview(label) {
         crate::infra::browser_process_ended::watch_page_process(&view);
+        crate::infra::window_focus_windows::watch(&view);
     }
     Ok(())
 }
@@ -193,6 +194,13 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         if let Ok(mut last) = LAST_FOCUSED.lock() {
             *last = Some(label.to_owned());
         }
+        // Alt+Tab focuses the window but none of its webviews; give focus back.
+        #[cfg(windows)]
+        crate::infra::window_focus_windows::window_activated(window);
+    }
+    #[cfg(windows)]
+    if matches!(event, tauri::WindowEvent::Destroyed) {
+        crate::infra::window_focus_windows::forget(label);
     }
     match event {
         tauri::WindowEvent::Focused(true) if !parsed.incognito => {

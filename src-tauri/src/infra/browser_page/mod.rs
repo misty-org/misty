@@ -219,8 +219,17 @@ pub(crate) fn answer_consent_after_load(view: Webview) {
 /// Closes an uninvited popup covering the page (page_read.js), and says what it pressed.
 async fn dismiss_popup(view: &Webview) -> Option<String> {
     let result = call(view, "dismissPopup", json!({}), false).await.ok()?;
-    let label = result["dismissed"].as_str().filter(|label| !label.is_empty())?.to_owned();
-    let _ = call(view, "settle", json!({"quietMs": 300, "maxMs": 1500}), false).await;
+    let label = result["dismissed"]
+        .as_str()
+        .filter(|label| !label.is_empty())?
+        .to_owned();
+    let _ = call(
+        view,
+        "settle",
+        json!({"quietMs": 300, "maxMs": 1500}),
+        false,
+    )
+    .await;
     Some(label)
 }
 

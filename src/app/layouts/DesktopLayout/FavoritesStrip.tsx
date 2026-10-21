@@ -8,7 +8,6 @@ import { activeLayoutView } from "@/features/workspace/layoutTabs";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import {
-  cn,
   ContextMenu,
   ContextMenuAction,
   ContextMenuContent,
@@ -39,10 +38,9 @@ function isFavoritePage(view: WorkspaceView | null | undefined, favorite: Bookma
  * Favorites lead the tab strip in every virtual window. A favorite always opens a new tab, never
  * switching to one already open; the list syncs with bookmarks.
  */
-export function FavoritesStrip(props: { vertical: boolean; onOpen(view: WorkspaceView): void }) {
+export function FavoritesStrip(props: { onOpen(view: WorkspaceView): void }) {
   const favorites = useFavorites();
   const activeView = useWorkspaceStore((state) => activeLayoutView(state.layout));
-  if (!favorites.length && !props.vertical) return null;
   const open = (favorite: Bookmark) => {
     props.onOpen(
       useWorkspaceStore.getState().openBrowserView({ url: favorite.url, bookmarkId: favorite.id }),
@@ -54,10 +52,7 @@ export function FavoritesStrip(props: { vertical: boolean; onOpen(view: Workspac
       aria-label="Favorites"
       data-misty-window-drag-block="true"
       data-empty={favorites.length === 0 || undefined}
-      className={cn(
-        "misty-workspace-favorites",
-        props.vertical && "misty-workspace-favorites-grid",
-      )}
+      className="misty-workspace-favorites misty-workspace-favorites-grid"
     >
       {favorites.map((favorite) => (
         <FavoriteTile

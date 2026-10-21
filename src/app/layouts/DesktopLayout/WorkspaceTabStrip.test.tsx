@@ -16,10 +16,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-function mount(
-  position: "top" | "bottom" | "left" | "right" = "top",
-  windowsTitlebarControls = false,
-) {
+function mount(position: "left" | "right" = "left", windowsTitlebarControls = false) {
   const state = useWorkspaceStore.getState();
   return render(
     <WorkspaceTabStrip
@@ -39,7 +36,7 @@ function mount(
     />,
   );
 }
-it.each(["top", "bottom", "left", "right"] as const)(
+it.each(["left", "right"] as const)(
   "shows no pane controls in the %s tab strip on Windows",
   (position) => {
     mount(position, true);
@@ -52,25 +49,25 @@ it("fades only the edges with tabs outside the visible scroll area", () => {
   mount();
   const list = screen.getByRole("tablist");
   Object.defineProperties(list, {
-    clientWidth: { configurable: true, value: 200 },
-    scrollWidth: { configurable: true, value: 400 },
+    clientHeight: { configurable: true, value: 200 },
+    scrollHeight: { configurable: true, value: 400 },
   });
   fireEvent.scroll(list);
   expect(list.style.getPropertyValue("--tab-fade-start")).toBe("0px");
-  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("16px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("28px");
 
-  list.scrollLeft = 100;
+  list.scrollTop = 100;
   fireEvent.scroll(list);
-  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("16px");
-  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("16px");
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("28px");
+  expect(list.style.getPropertyValue("--tab-fade-end")).toBe("28px");
 
-  list.scrollLeft = 200;
+  list.scrollTop = 200;
   fireEvent.scroll(list);
-  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("16px");
+  expect(list.style.getPropertyValue("--tab-fade-start")).toBe("28px");
   expect(list.style.getPropertyValue("--tab-fade-end")).toBe("0px");
 
-  Object.defineProperty(list, "clientWidth", { value: 400 });
-  list.scrollLeft = 0;
+  Object.defineProperty(list, "clientHeight", { value: 400 });
+  list.scrollTop = 0;
   fireEvent.scroll(list);
   expect(list.style.getPropertyValue("--tab-fade-start")).toBe("0px");
   expect(list.style.getPropertyValue("--tab-fade-end")).toBe("0px");
@@ -107,7 +104,7 @@ it.each(["left", "right"] as const)(
   },
 );
 
-it.each(["top", "bottom", "left", "right"] as const)(
+it.each(["left", "right"] as const)(
   "collapses and reopens a group from the %s strip",
   (position) => {
     const store = useWorkspaceStore.getState();
@@ -151,7 +148,7 @@ it("moves an expanded group past its own members with the keyboard", () => {
   const outside = useWorkspaceStore.getState().layout.activeTabId!;
   mount();
   fireEvent.keyDown(screen.getByRole("button", { name: "Reading, 2 tabs, expanded" }), {
-    key: "ArrowRight",
+    key: "ArrowDown",
     altKey: true,
     shiftKey: true,
   });
@@ -173,17 +170,17 @@ it.each(["release", "cancel"] as const)("handles a group pointer drag on %s", (f
   const rects = vi
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
     .mockImplementation(function (this: HTMLElement) {
-      if (this.hasAttribute("data-reorder-list")) return new DOMRect(0, 0, 500, 40);
+      if (this.hasAttribute("data-reorder-list")) return new DOMRect(0, 0, 280, 500);
       const item = this.closest<HTMLElement>("[data-reorder-item]");
       if (!item) return new DOMRect(0, 0, 600, 400);
-      return new DOMRect([...item.parentElement!.children].indexOf(item) * 100, 0, 100, 32);
+      return new DOMRect(0, [...item.parentElement!.children].indexOf(item) * 100, 280, 32);
     });
-  const pointer = (target: EventTarget, type: string, x: number) => {
+  const pointer = (target: EventTarget, type: string, y: number) => {
     const event = new MouseEvent(type, {
       bubbles: true,
       cancelable: true,
-      clientX: x,
-      clientY: 16,
+      clientX: 16,
+      clientY: y,
       button: 0,
       buttons: type === "pointerup" ? 0 : 1,
     });

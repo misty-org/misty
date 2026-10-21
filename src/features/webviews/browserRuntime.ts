@@ -9,6 +9,8 @@ import {
   deferHideUntilHandoff,
   hasPendingHandoff,
   markBrowserPerf,
+  notifyBrowserSettled,
+  onBrowserSettled,
 } from "./browserSwitchHandoff";
 import type { BrowserBounds, BrowserTheme } from "./types";
 export { useBrowserRuntimeStore } from "./browserRuntimeStore";
@@ -576,7 +578,8 @@ export function setBrowserWebviewsSuspended(suspended: boolean, reason = "defaul
   const wasSuspended = browserWebviewSuspensions.size > 0;
   if (suspended) browserOverlayResumeGeneration += 1;
   if (suspended) browserWebviewSuspensions.add(reason);
-  else browserWebviewSuspensions.delete(reason);
+  else if (browserWebviewSuspensions.delete(reason) && reason === "docking-layout")
+    notifyBrowserSettled();
   const isSuspended = browserWebviewSuspensions.size > 0;
   if (isSuspended && !wasSuspended) {
     setBrowserOverlayActive(true);
@@ -795,6 +798,33 @@ export function onBrowserRuntimeClose(listener: (tabId: string) => void): () => 
 
 /** Destroy a closed tab's native page so its media stops with it. `isClosed`
  * reports whether the tab is still gone; reopening it keeps the runtime. */
+/**
+ * Resolves once a tab switch has landed: no handoff or layout move is pending and a page is on
+ * screen (or none is wanted), then a frame later so the new page has been presented. Driven by
+ * the events that end a switch, not by a clock.
+ */
+function whenSwitchSettled(): Promise<void> {
+  const ready = () =>
+    !hasPendingHandoff() &&
+    !isBrowserLayoutMoving() &&
+    (desiredVisibleRuntimeIds.size === 0 ||
+      Object.values(useBrowserRuntimeStore.getState().presented).some(Boolean));
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      stops.forEach((stop) => stop());
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    };
+    const check = () => {
+      if (ready()) done();
+    };
+    const stops: Array<() => void> = [
+      useBrowserRuntimeStore.subscribe(check),
+      onBrowserSettled(check),
+    ];
+    if (ready()) done();
+  });
+}
+
 export async function closeBrowserRuntime(
   tab: BrowserRuntimeTab,
   isClosed: () => boolean,
@@ -823,6 +853,21 @@ export async function closeBrowserRuntime(
     // grant cleanup is still in flight. The new request owns the child now;
     // do not let the stale close tear it down or delete its id mapping.
     if (!isClosed()) {
+      closedRuntimes.delete(id);
+      return;
+    }
+    // Closing a tab that was in front is a tab switch: the neighbor comes up first, and the old
+    // page is destroyed behind it. Destroying a page window while it is still on screen repaints
+    // its area white for a frame. It is silenced at once, so it cannot keep playing meanwhile.
+    void invoke("browser_webview_set_muted", { request: { id, muted: true } }).catch(
+      () => undefined,
+    );
+    await whenSwitchSettled();
+    if (!isClosed()) {
+      // Reopened while it waited: it stays, and plays again.
+      void invoke("browser_webview_set_muted", { request: { id, muted: false } }).catch(
+        () => undefined,
+      );
       closedRuntimes.delete(id);
       return;
     }

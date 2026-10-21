@@ -2,7 +2,7 @@ import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { dockPositions } from "@/features/app-shell/dockingLayout";
+import { tabSides } from "@/features/app-shell/dockingLayout";
 import { dockingGeometry } from "./dockingGeometry";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 
@@ -24,37 +24,30 @@ vi.mock("./WorkspaceDockTree", async () => {
 });
 vi.mock("./WorkspaceTabStrip", () => ({ WorkspaceTabStrip: () => null }));
 afterEach(cleanup);
-it("changes docking orientation without remounting open work or rewriting the pane layout", () => {
+it("moves the tab sidebar without remounting open work or rewriting the pane layout", () => {
   useWorkspaceStore.getState().reset();
   lifecycle.mount.mockClear();
   lifecycle.unmount.mockClear();
   const initial = useWorkspaceStore.getState().layout;
-  const view = (
-    navigation: (typeof dockPositions)[number],
-    tabs: (typeof dockPositions)[number],
-    autoHide: boolean,
-  ) => {
-    const geometry = dockingGeometry({ navigation, tabs, autoHide });
+  const view = (tabs: (typeof tabSides)[number]) => {
+    const geometry = dockingGeometry({ navigation: tabs === "left" ? "right" : "left", tabs });
     return (
       <MemoryRouter>
         <div style={geometry.frame}>
           <section style={geometry.content}>
-            <WorkspaceCanvas tabPosition={tabs} titlebarInsets={geometry.titlebarInsets} />
+            <WorkspaceCanvas tabPosition={tabs} />
           </section>
         </div>
       </MemoryRouter>
     );
   };
-  const { rerender, getByTestId } = render(view("left", "top", false));
+  const { rerender, getByTestId } = render(view("left"));
   const surface = getByTestId("preserved-surface");
-  for (const navigation of dockPositions)
-    for (const tabs of dockPositions) {
-      for (const autoHide of [false, true]) {
-        rerender(view(navigation, tabs, autoHide));
-        expect(getByTestId("preserved-surface")).toBe(surface);
-        expect(useWorkspaceStore.getState().layout).toEqual(initial);
-      }
-    }
+  for (const tabs of [...tabSides, ...tabSides]) {
+    rerender(view(tabs));
+    expect(getByTestId("preserved-surface")).toBe(surface);
+    expect(useWorkspaceStore.getState().layout).toEqual(initial);
+  }
   expect(lifecycle.mount).toHaveBeenCalledTimes(1);
   expect(lifecycle.unmount).not.toHaveBeenCalled();
 });
@@ -62,7 +55,7 @@ it("keeps tab panels direct children of the pane frame so its rounded corner app
   useWorkspaceStore.getState().reset();
   const { container } = render(
     <MemoryRouter>
-      <WorkspaceCanvas tabPosition="top" />
+      <WorkspaceCanvas tabPosition="left" />
     </MemoryRouter>,
   );
   // docking.css draws the pane corner and seam on `[data-workspace-panes] > [role="tabpanel"]`.

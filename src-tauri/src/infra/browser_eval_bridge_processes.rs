@@ -39,14 +39,15 @@ async fn collect(app: &AppHandle) -> Result<Value, String> {
 
 #[cfg(target_os = "macos")]
 fn walk(labels: &std::collections::HashMap<usize, String>) -> Value {
-    use objc2::runtime::{AnyClass, AnyObject};
     use objc2::msg_send;
+    use objc2::runtime::{AnyClass, AnyObject};
     let Some(class) = AnyClass::get(c"WKWebView") else {
         return json!({ "views": [] });
     };
     let mut views = Vec::new();
     unsafe {
-        let shared: *mut AnyObject = msg_send![AnyClass::get(c"NSApplication").unwrap(), sharedApplication];
+        let shared: *mut AnyObject =
+            msg_send![AnyClass::get(c"NSApplication").unwrap(), sharedApplication];
         let windows: *mut AnyObject = msg_send![shared, windows];
         let count: usize = msg_send![windows, count];
         for index in 0..count {
@@ -57,7 +58,11 @@ fn walk(labels: &std::collections::HashMap<usize, String>) -> Value {
             // A view the window still holds outside its content tree (its first responder, or the
             // frame's other children), where a page left behind would hide from the content walk.
             let first: *mut AnyObject = msg_send![window, initialFirstResponder];
-            let frame: *mut AnyObject = if content.is_null() { content } else { msg_send![content, superview] };
+            let frame: *mut AnyObject = if content.is_null() {
+                content
+            } else {
+                msg_send![content, superview]
+            };
             let mut stack = vec![content, first, frame];
             let mut seen = std::collections::HashSet::new();
             while let Some(view) = stack.pop() {
@@ -95,13 +100,15 @@ fn walk(labels: &std::collections::HashMap<usize, String>) -> Value {
 #[cfg(target_os = "macos")]
 fn web_processes() -> Vec<i32> {
     let mut pids = vec![0i32; 8192];
-    let bytes = unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), (pids.len() * 4) as i32) };
+    let bytes =
+        unsafe { libc::proc_listallpids(pids.as_mut_ptr().cast(), (pids.len() * 4) as i32) };
     pids.truncate(bytes.max(0) as usize);
     pids.into_iter()
         .filter(|&pid| {
             let mut name = [0u8; 64];
             let length = pid > 0 && {
-                let length = unsafe { libc::proc_name(pid, name.as_mut_ptr().cast(), name.len() as u32) };
+                let length =
+                    unsafe { libc::proc_name(pid, name.as_mut_ptr().cast(), name.len() as u32) };
                 length > 0 && &name[..length as usize] == b"com.apple.WebKit.WebContent"
             };
             length

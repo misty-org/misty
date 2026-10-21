@@ -4,8 +4,8 @@ export interface ProfileWriteOptions {
   stage?: boolean;
 }
 let writer:
-  | ((id: string, value: PreferenceValue, options?: ProfileWriteOptions) => Promise<void>)
-  | null = null;
+  ((id: string, value: PreferenceValue, options?: ProfileWriteOptions) => Promise<void>) | null =
+  null;
 export function registerProfileWriter(next: typeof writer) {
   writer = next;
 }

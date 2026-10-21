@@ -43,7 +43,6 @@ import { BrowserNotices } from "./BrowserNotices";
 import { BrowserPageStage } from "./BrowserPageStage";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
 import { BrowserToolbar } from "./BrowserToolbar";
-import { usePaneToolbarHost } from "./paneToolbarHost";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { BrowserViewportMenu, useBrowserViewport } from "./BrowserViewportMenu";
 import { useBrowserMistyAiAdapter } from "./useBrowserMistyAiAdapter";
@@ -191,12 +190,9 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
       (pane) => pane.id === store.layout.focusedPaneId && pane.activeViewId === tab.id,
     ),
   );
-  // With vertical tabs the focused pane's toolbar lives in the sidebar; no pane keeps a row.
+  // The focused pane's toolbar lives in the tab sidebar. Without one (focus mode) the page
+  // keeps its own toolbar row.
   const sidebar = Boolean(topSlot);
-  // A pane with horizontal tabs owns the one toolbar row; this page's toolbar is portaled
-  // into it while the page is the pane's active one.
-  const paneToolbarHost = usePaneToolbarHost();
-  const hoisted = !sidebar && paneToolbarHost !== null;
   const claimsNav = paneFocused && sidebar && Boolean(navSlot);
   useEffect(
     () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
@@ -292,7 +288,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
         <ExtensionsToolbar tabId={browserRuntimeId(tab)} agentOwned={state.agentOwned} pinnedOnly />
       )}
       {siteInfo}
-      {chrome?.sync}
       {browserMenu(true)}
     </>
   );
@@ -321,13 +316,12 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
           onShowAll={() => page.commands.openPage("downloads")}
         />
       )}
-      {chrome?.sync}
       {browserMenu(false)}
     </>
   );
-  // Vertical tabs: back/forward/reload go beside the sidebar toggle, and the address field,
-  // pinned extensions and a ⋯ menu (bookmark, extensions, then the browser menu) fill
-  // the sidebar's top slot.
+  // In the sidebar back/forward/reload go beside the sidebar toggle, and the address field,
+  // pinned extensions and a ⋯ menu (bookmark, extensions, then the browser menu) fill its
+  // top slot.
   const toolbar = (
     <BrowserToolbar nav={navButtons} badges={badges} address={omnibox} tools={toolButtons} />
   );
@@ -351,7 +345,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     <section
       className={cn("grid h-full min-h-0 overflow-hidden", "text-cream")}
       style={{
-        gridTemplateRows: `${sidebar || hoisted ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
+        gridTemplateRows: `${sidebar ? 0 : browserToolbarStyles.rowHeight}px minmax(0,1fr) auto`,
         backgroundColor: browserChromeBackground,
       }}
       data-browser-theme={browserTheme}
@@ -380,11 +374,6 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
             </Portal>
           ) : null}
           {paneFocused && topSlot ? <Portal container={topSlot}>{sidebarTop}</Portal> : null}
-        </>
-      ) : hoisted ? (
-        <>
-          <div aria-hidden="true" />
-          {active ? <Portal container={paneToolbarHost}>{toolbar}</Portal> : null}
         </>
       ) : (
         toolbar

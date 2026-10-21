@@ -8,8 +8,6 @@ import { cn, IconButton, OverflowFadeText, Pressable, TreeBranch } from "@/share
 import { Blocks, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RefObject } from "react";
 import { BrowserViewAudioButton } from "@/features/browser/workspace";
-import { TabAudioHover } from "./TabAudioHover";
-import { ConnectedTabShape } from "./ConnectedTabShape";
 import type { useTabHoverCards } from "./TabHoverCard";
 import { TabPageMenu } from "./PinnedTabMenu";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
@@ -21,7 +19,6 @@ export function WorkspaceTabStripTab({
   firstInGroup = false,
   lastInGroup = false,
   active,
-  vertical,
   tabs,
   stripRef,
   pendingGroupEditor,
@@ -38,7 +35,6 @@ export function WorkspaceTabStripTab({
   firstInGroup?: boolean;
   lastInGroup?: boolean;
   active: boolean;
-  vertical: boolean;
   /** Visible (not collapsed) tabs, in order, for arrow-key navigation. */
   tabs: WorkspaceTab[];
   stripRef: RefObject<HTMLDivElement | null>;
@@ -55,9 +51,8 @@ export function WorkspaceTabStripTab({
     label = tabLabel(tab),
     panes = dockLeaves(tab.root),
     pinned = Boolean(tab.pinnedUrl),
-    iconOnly = pinned && !vertical,
-    // Any split tab's panes can be stepped through; a pinned icon has no room for the chip.
-    rotatable = panes.length > 1 && !iconOnly;
+    // Any split tab's panes can be stepped through.
+    rotatable = panes.length > 1;
   return (
     <Renameable
       menuItems={
@@ -88,7 +83,6 @@ export function WorkspaceTabStripTab({
         data-pinned={pinned || undefined}
         className={cn(
           group && "misty-tab-group-member",
-          iconOnly && "misty-workspace-tab-pinned",
           rotatable && "misty-tab-has-chips",
           "misty-workspace-tab group/tab flex items-center rounded-md border text-xs transition-colors",
           "duration-150 select-none focus-within:ring-1",
@@ -98,8 +92,7 @@ export function WorkspaceTabStripTab({
             : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
         )}
       >
-        {!vertical && <ConnectedTabShape />}
-        {group && vertical ? (
+        {group ? (
           <TreeBranch
             className="-left-3.5 w-3.5"
             color="var(--tab-group-color)"
@@ -114,21 +107,14 @@ export function WorkspaceTabStripTab({
           tabIndex={active ? 0 : -1}
           title={label}
           data-reorder-handle="true"
-          className={cn(
-            "flex h-full min-w-0 flex-1 items-center gap-1.5 overflow-hidden",
-            iconOnly
-              ? "justify-center px-0"
-              : vertical
-                ? "justify-start pl-2 pr-2"
-                : "justify-start pl-2 pr-1",
-          )}
+          className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-2"
           onClick={() => onSelect(tab.id)}
           onKeyDown={(event) => {
             const index = tabs.findIndex((item) => item.id === tab.id);
             const next =
-              event.key === (vertical ? "ArrowDown" : "ArrowRight")
+              event.key === "ArrowDown"
                 ? (index + 1) % tabs.length
-                : event.key === (vertical ? "ArrowUp" : "ArrowLeft")
+                : event.key === "ArrowUp"
                   ? (index + tabs.length - 1) % tabs.length
                   : event.key === "Home"
                     ? 0
@@ -149,17 +135,11 @@ export function WorkspaceTabStripTab({
             icon={Blocks}
             isActive={active}
           />
-          {!iconOnly && vertical ? (
-            // Room for the speaker, so the favicon, speaker and title are spaced evenly.
-            <span aria-hidden="true" className="misty-tab-audio-gap" />
-          ) : null}
-          {iconOnly ? (
-            <span className="sr-only">{label}, pinned</span>
-          ) : (
-            <OverflowFadeText className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-              {label}
-            </OverflowFadeText>
-          )}
+          {/* Room for the speaker, so the favicon, speaker and title are spaced evenly. */}
+          <span aria-hidden="true" className="misty-tab-audio-gap" />
+          <OverflowFadeText className="misty-workspace-tab-title min-w-0 flex-1 overflow-hidden whitespace-nowrap">
+            {label}
+          </OverflowFadeText>
         </Pressable>
         {rotatable ? (
           <PaneRotateChips
@@ -170,15 +150,10 @@ export function WorkspaceTabStripTab({
             onOpen={onOpen}
           />
         ) : null}
-        {!iconOnly &&
-          (vertical ? (
-            // Drawn over the row, just after the favicon, with room made for it beside the title.
-            <span className="misty-tab-audio-slot">
-              <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
-            </span>
-          ) : (
-            <TabAudioHover tabs={panes.flatMap((pane) => pane.views)} />
-          ))}
+        {/* Drawn over the row, just after the favicon, with room made for it beside the title. */}
+        <span className="misty-tab-audio-slot">
+          <BrowserViewAudioButton tabs={panes.flatMap((pane) => pane.views)} />
+        </span>
         {pinned ? null : (
           <IconButton
             size="xs"

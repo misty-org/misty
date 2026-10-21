@@ -40,7 +40,12 @@ export function SettingsSaveBar() {
         <Button
           variant="ghost"
           disabled={saving}
-          onClick={() => void useSettingsProfiles.getState().discardStaged().catch(() => {})}
+          onClick={() =>
+            void useSettingsProfiles
+              .getState()
+              .discardStaged()
+              .catch(() => {})
+          }
         >
           Cancel
         </Button>

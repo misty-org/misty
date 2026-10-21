@@ -56,15 +56,11 @@ function openSpaceRoute(route: string) {
 
 /**
  * The Space row: the Space this window shows, with its menu, and its Home, Chat and People.
- * It sits under the sidebar's window controls; with the sidebar collapsed it ends the
- * tab strip as `compact`, a tab hanging from the window's top edge (so it doesn't read as
- * another browser tab), and Home, Chat and People move into its menu.
+ * It fills the Space bar above the pages.
  */
 export function SpaceRow({
-  compact = false,
   alignment = "left",
 }: {
-  compact?: boolean;
   /** Where the Space bar's sections sit along it. */
   alignment?: "left" | "center" | "right";
 }) {
@@ -74,7 +70,7 @@ export function SpaceRow({
   const [error, setError] = useState("");
   const close = useCallback(() => setDialog(null), []);
   if (!space)
-    return compact ? null : (
+    return (
       <div className="flex h-9 items-center gap-2 px-2" aria-hidden>
         <Skeleton className="size-5 rounded-md" />
         <Skeleton className="h-3.5 w-24" />
@@ -131,17 +127,11 @@ export function SpaceRow({
         <div
           role="toolbar"
           aria-label={`${space.name || "Space"} controls`}
-          data-misty-window-drag-block={compact ? "true" : undefined}
           className={cn(
-            "min-w-0 items-center",
-            compact
-              ? "misty-workspace-space flex shrink-0 gap-0.5 self-stretch pl-2"
-              : cn(
-                  "flex h-full w-full px-2",
-                  alignment === "left" && "justify-start",
-                  alignment === "center" && "justify-center",
-                  alignment === "right" && "justify-end",
-                ),
+            "flex h-full w-full min-w-0 items-center px-2",
+            alignment === "left" && "justify-start",
+            alignment === "center" && "justify-center",
+            alignment === "right" && "justify-end",
           )}
         >
           <GlobalCreateSpaceDialog>
@@ -150,12 +140,7 @@ export function SpaceRow({
                 <DropdownMenuTrigger asChild>
                   <Pressable
                     aria-label={`${name}, Space menu`}
-                    className={cn(
-                      "flex min-w-0 items-center gap-2 text-sm text-cream-bright",
-                      compact
-                        ? "h-8 max-w-56 self-center rounded-lg px-2 hover:bg-control-hover data-[state=open]:bg-control-hover"
-                        : "h-8 max-w-full rounded-md px-1.5 hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover",
-                    )}
+                    className="flex h-8 max-w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-sm text-cream-bright hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover"
                   >
                     <SpaceAvatar
                       space={space}
@@ -163,18 +148,16 @@ export function SpaceRow({
                       fallbackClassName="text-[9px] font-semibold"
                     />
                     <span className="min-w-0 truncate font-medium">{name}</span>
-                    {!compact && <MenuChevron className="size-5 text-cream-muted" />}
+                    <MenuChevron className="size-5 text-cream-muted" />
                   </Pressable>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  side={compact ? undefined : "bottom"}
-                  align={compact ? "end" : "start"}
+                  side="bottom"
+                  align="start"
                   className="w-56 max-w-[calc(100vw-16px)]"
                 >
                   <SpaceMenuItems
                     space={space}
-                    compact={compact}
-                    onPage={page}
                     onDialog={setDialog}
                     onCreate={create}
                     onError={setError}
@@ -192,7 +175,7 @@ export function SpaceRow({
               {error}
             </p>
           )}
-          {!compact && actions}
+          {actions}
           <SpaceDialogs space={space} open={dialog} onClose={close} />
         </div>
       </PopoverAnchor>

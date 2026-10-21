@@ -10,7 +10,6 @@ export { browserToolbarStyles } from "./browserToolbarStyles";
 export { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 export { BrowserToolbar } from "./BrowserToolbar";
 export { BrowserNavigationButtons } from "./BrowserNavigationButtons";
-export { PaneToolbarHostProvider, usePaneToolbarHost } from "./paneToolbarHost";
 export { normalizeBrowserAddress } from "./browserAddress";
 export { BrowserLibraryMenus } from "./BrowserLibraryMenus";
 export { BrowserMenuView } from "./BrowserMenuView";

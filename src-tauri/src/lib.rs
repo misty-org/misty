@@ -72,15 +72,15 @@ use infra::browser::retired_profiles::browser_retired_profiles_erase;
 #[cfg(desktop)]
 use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
-    browser_webview_back, browser_webview_capture_region, browser_webview_close,
-    browser_webview_create, browser_webview_forward, browser_webview_held, browser_webview_hide,
-    browser_webview_navigate, browser_webview_picture, browser_webview_preview_document,
-    browser_webview_reconcile, browser_webview_reload, browser_webview_set_bounds,
-    browser_webview_set_theme, browser_webview_set_zoom, browser_webview_show,
-    browser_webview_sleep, browser_webviews_close_except, browser_webviews_hide_all,
-    browser_webviews_hide_except, browser_webviews_park_all, browser_webviews_set_overlay_active,
-    browser_webviews_set_pointer_tracking, browser_webviews_set_status_bubble,
-    browser_webviews_show_only, BrowserSessionState,
+    browser_set_hidden_tab_sleep, browser_webview_back, browser_webview_capture_region,
+    browser_webview_close, browser_webview_create, browser_webview_restore_focus, browser_webview_forward,
+    browser_webview_held, browser_webview_hide, browser_webview_navigate, browser_webview_picture,
+    browser_webview_preview_document, browser_webview_reconcile, browser_webview_reload,
+    browser_webview_set_bounds, browser_webview_set_theme, browser_webview_set_zoom,
+    browser_webview_show, browser_webview_sleep, browser_webviews_close_except,
+    browser_webviews_hide_all, browser_webviews_hide_except, browser_webviews_park_all,
+    browser_webviews_set_overlay_active, browser_webviews_set_pointer_tracking,
+    browser_webviews_set_status_bubble, browser_webviews_show_only, BrowserSessionState,
 };
 #[cfg(desktop)]
 use infra::browser::{
@@ -610,6 +610,8 @@ pub fn run() {
                     browser_webview_show,
                     browser_webview_held,
                     #[cfg(desktop)]
+                    browser_webview_restore_focus,
+                    #[cfg(desktop)]
                     browser_webviews_set_overlay_active,
                     #[cfg(desktop)]
                     browser_webviews_set_pointer_tracking,
@@ -723,6 +725,7 @@ pub fn run() {
                     browser_webviews_park_all,
                     #[cfg(desktop)]
                     browser_webviews_show_only,
+                    browser_set_hidden_tab_sleep,
                     #[cfg(desktop)]
                     browser_webview_close,
                     browser_webview_sleep,

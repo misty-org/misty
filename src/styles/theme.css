@@ -353,6 +353,14 @@
     background-color: var(--browser-page-background, var(--misty-theme-bg)) !important;
   }
 
+  /* While a panel above the page slides (the Space bar), the native page trails it by a frame.
+     The host fills with the chrome color so that gap never shows the window through it. Not the
+     page's color: the native page's rounded corners are cut out of it and show the renderer,
+     and a frame behind they land inside the host, where a page color shows as white pixels. */
+  html[data-browser-slide] [data-browser-page-host] {
+    background-color: var(--misty-window-chrome, var(--misty-theme-workspace)) !important;
+  }
+
   /* Browser chrome is application UI, not selectable page content. Prevent a
      stray drag or focus transfer elsewhere in Misty from painting selection
      or tap-highlight layers behind the native child view. */

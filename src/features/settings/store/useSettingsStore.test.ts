@@ -63,7 +63,10 @@ describe("server preference runtime projection", () => {
     });
     expect(native.login).toHaveBeenCalledWith(true);
     expect(native.shortcuts).toHaveBeenCalledWith(shortcuts);
-    expect(useDockingLayoutStore.getState().savedLayouts).toEqual(layouts);
+    // Tabs saved along the top move into the left sidebar.
+    expect(useDockingLayoutStore.getState().savedLayouts).toEqual([
+      { id: "one", name: "Writing", navigation: "right", tabs: "left" },
+    ]);
     expect(store.getState().settings?.document.general).toMatchObject({ launch_on_login: true });
   });
   it("reassigns shortcuts as one shared mutation, including the unbound conflict", async () => {

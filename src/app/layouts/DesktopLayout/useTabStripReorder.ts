@@ -8,13 +8,11 @@ import { groupName } from "./MistyTabGroups";
 
 /** Drag and keyboard reordering of tabs and group headers in the strip. */
 export function useTabStripReorder({
-  vertical,
   groups,
   tabs,
   allTabs,
   tabListRef,
 }: {
-  vertical: boolean;
   groups: MistyTabGroup[];
   tabs: WorkspaceTab[];
   allTabs: WorkspaceTab[];
@@ -23,7 +21,7 @@ export function useTabStripReorder({
   const reorder = usePointerReorder({
     scope: "workspace-layout-tabs",
     animate: true,
-    axis: vertical ? "y" : "x",
+    axis: "y",
     getDrag: (id) => {
       if (id.startsWith("group-header:")) {
         const group = groups.find((g) => `group-header:${g.id}` === id);

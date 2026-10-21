@@ -2,44 +2,37 @@ import { writeProfilePreference } from "@/features/settings/sync";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export const dockPositions = ["left", "top", "right", "bottom"] as const;
-export type DockPosition = (typeof dockPositions)[number];
+/** Tabs always sit in a sidebar, on the left or the right of the window. */
+export const tabSides = ["left", "right"] as const;
+export type TabSide = (typeof tabSides)[number];
 export interface DockingLayout {
-  navigation: DockPosition;
-  tabs: DockPosition;
+  /** The side opposite the tabs. */
+  navigation: TabSide;
+  tabs: TabSide;
 }
 export interface SavedDockingLayout extends DockingLayout {
   id: string;
   name: string;
 }
-export const defaultDockingLayout: DockingLayout = { navigation: "left", tabs: "top" };
-export const isSideDock = (position: DockPosition) => position === "left" || position === "right";
-export type TabOrientation = "horizontal" | "vertical";
-export const tabOrientation = (layout: DockingLayout): TabOrientation =>
-  isSideDock(layout.tabs) ? "vertical" : "horizontal";
 /**
- * Tab orientation is the one layout choice. Navigation always sits on a side, and never on
- * the tabs' edge: vertical tabs put it on the opposite side, horizontal tabs sit on top.
+ * A layout as stored. Layouts saved while tabs could also run along the top or bottom keep
+ * those positions until they are read; `normalizeDockingLayout` turns them into the left side.
  */
-export function normalizeDockingLayout(layout: DockingLayout): DockingLayout {
-  if (isSideDock(layout.tabs))
-    return { tabs: layout.tabs, navigation: layout.tabs === "left" ? "right" : "left" };
-  return { tabs: "top", navigation: isSideDock(layout.navigation) ? layout.navigation : "left" };
+export interface StoredDockingLayout {
+  navigation: string;
+  tabs: string;
 }
-export function layoutForOrientation(
-  orientation: TabOrientation,
-  current: DockingLayout,
-): DockingLayout {
-  const tabs =
-    orientation === "vertical" ? (isSideDock(current.tabs) ? current.tabs : "left") : "top";
-  return normalizeDockingLayout({ navigation: current.navigation, tabs });
+export const defaultDockingLayout: DockingLayout = { navigation: "right", tabs: "left" };
+/** The tabs' side is the one layout choice; navigation always takes the other side. */
+export function normalizeDockingLayout(layout: StoredDockingLayout): DockingLayout {
+  const tabs: TabSide = layout.tabs === "right" ? "right" : "left";
+  return { tabs, navigation: tabs === "left" ? "right" : "left" };
 }
-const isPosition = (value: unknown): value is DockPosition =>
-  dockPositions.includes(value as DockPosition);
-export function validDockingLayout(value: unknown): value is DockingLayout {
+const storedPositions = ["left", "top", "right", "bottom"];
+export function validDockingLayout(value: unknown): value is StoredDockingLayout {
   if (!value || typeof value !== "object") return false;
-  const layout = value as Partial<DockingLayout>;
-  return isPosition(layout.navigation) && isPosition(layout.tabs);
+  const layout = value as Partial<StoredDockingLayout>;
+  return storedPositions.includes(layout.navigation ?? "") && storedPositions.includes(layout.tabs ?? "");
 }
 interface DockingState {
   /** Previous device-wide choice, used only for windows without their own layout. */
@@ -61,7 +54,7 @@ export const useDockingLayoutStore = create<DockingState>()(
           (layout) => layout.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
         );
         const id = existing?.id ?? crypto.randomUUID();
-        const saved = { navigation: layout.navigation, tabs: layout.tabs, id, name: trimmed };
+        const saved = { ...normalizeDockingLayout(layout), id, name: trimmed };
         const savedLayouts = existing
           ? get().savedLayouts.map((item) => (item.id === id ? saved : item))
           : [...get().savedLayouts, saved];
@@ -83,15 +76,19 @@ export const useDockingLayoutStore = create<DockingState>()(
         const initialLayout = saved?.initialLayout ?? saved?.layout;
         return {
           ...current,
-          initialLayout: validDockingLayout(initialLayout) ? initialLayout : defaultDockingLayout,
+          initialLayout: validDockingLayout(initialLayout)
+            ? normalizeDockingLayout(initialLayout)
+            : defaultDockingLayout,
           savedLayouts: Array.isArray(saved?.savedLayouts)
-            ? saved.savedLayouts.filter(
-                (item) =>
-                  validDockingLayout(item) &&
-                  typeof item.id === "string" &&
-                  typeof item.name === "string" &&
-                  item.name.trim(),
-              )
+            ? saved.savedLayouts
+                .filter(
+                  (item) =>
+                    validDockingLayout(item) &&
+                    typeof item.id === "string" &&
+                    typeof item.name === "string" &&
+                    item.name.trim(),
+                )
+                .map((item) => ({ ...item, ...normalizeDockingLayout(item) }))
             : [],
         };
       },
