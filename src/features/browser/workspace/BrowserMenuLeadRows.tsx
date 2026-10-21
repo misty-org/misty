@@ -5,7 +5,7 @@ import { DropdownMenuSeparator, MenuItem } from "@/shared/ui";
 
 /**
  * What the sidebar's ⋯ menu adds above the browser menu: the page's bookmark
- * and the extensions, which sit beside the address field in the horizontal toolbar.
+ * and the extensions, which sit beside the address field in a page's own toolbar.
  */
 export function BrowserMenuLeadRows(props: {
   tabId: string;

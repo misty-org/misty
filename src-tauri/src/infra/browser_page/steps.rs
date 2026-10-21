@@ -63,7 +63,9 @@ impl Step {
         matches!(
             self.action.as_str(),
             "click" | "fill" | "select" | "check" | "uncheck" | "hover"
-        ) || (self.action == "scroll" && self.direction.as_deref() == Some("into_view"))
+        ) || (self.action == "scroll"
+            && self.direction.as_deref() == Some("into_view")
+            && self.text.is_none())
     }
 
     /// The key input native dispatch would receive, validated the same way.
@@ -77,6 +79,7 @@ impl Step {
             action,
             "click"
                 | "fill"
+                | "type"
                 | "select"
                 | "check"
                 | "uncheck"
@@ -118,6 +121,7 @@ impl Step {
         }
         match action {
             "fill" if self.text.is_none() => return Err("A fill step needs text.".into()),
+            "type" if self.text.is_none() => return Err("A type step needs text.".into()),
             "select" => {
                 let values = self.values.as_deref().unwrap_or_default();
                 if values.is_empty()
@@ -258,6 +262,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_type_step_needs_text() {
+        let step = |value: Value| serde_json::from_value::<Step>(value).unwrap().validate();
+        assert!(step(json!({"action": "type", "ref": "e12", "text": "pediatrician"})).is_ok());
+        assert!(step(json!({"action": "type", "text": "into the focused field"})).is_ok());
+        assert!(step(json!({"action": "type", "ref": "e12"})).is_err());
+        assert!(step(json!({"action": "teleport", "ref": "e12"})).is_err());
+    }
+
+    #[test]
     fn steps_are_checked_before_any_runs() {
         let ok = json!({"steps": [
             {"action": "click", "ref": "e3"},
@@ -265,9 +278,10 @@ mod tests {
             {"action": "select", "ref": "e5", "values": ["Blue"]},
             {"action": "key", "key": "Enter"},
             {"action": "scroll", "direction": "down", "amount": 2.0},
-            {"action": "wait_for", "text": "Saved", "timeoutMs": 5000}
+            {"action": "wait_for", "text": "Saved", "timeoutMs": 5000},
+            {"action": "scroll", "direction": "into_view", "text": "Class schedule"}
         ]});
-        assert_eq!(parse_steps(&ok).unwrap().len(), 6);
+        assert_eq!(parse_steps(&ok).unwrap().len(), 7);
         let replay = json!({"steps": [{"action": "click", "locator": {"role": "button", "name": "Save", "index": 1}}]});
         assert_eq!(
             parse_steps(&replay).unwrap()[0]
@@ -285,6 +299,7 @@ mod tests {
             json!({"steps": [{"action": "fill", "ref": "e1"}]}),
             json!({"steps": [{"action": "key", "key": "c", "modifiers": ["Meta"]}]}),
             json!({"steps": [{"action": "scroll", "direction": "sideways"}]}),
+            json!({"steps": [{"action": "scroll", "direction": "into_view"}]}),
             json!({"steps": [{"action": "wait_for", "timeoutMs": 50, "text": "x"}]}),
             json!({"steps": [{"action": "click", "ref": "e1", "clickCount": 3}]}),
             json!({"steps": [{"action": "click", "ref": "e1", "script": "alert(1)"}]}),

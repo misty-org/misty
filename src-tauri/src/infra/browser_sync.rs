@@ -47,9 +47,9 @@ mod profile;
 mod profile_selection;
 mod session_start;
 mod sessions;
-mod space_sites;
 #[cfg(desktop)]
 mod space_data;
+mod space_sites;
 mod space_vaults;
 mod vault_open;
 mod view;
@@ -59,7 +59,6 @@ mod workspace_edits;
 pub use account::browser_sync_lock;
 pub use account::browser_sync_set_frequency;
 use account::stop;
-use sessions::*;
 pub(crate) use account::{__cmd__browser_sync_lock, __tauri_command_name_browser_sync_lock};
 pub(crate) use account::{
     __cmd__browser_sync_set_frequency, __tauri_command_name_browser_sync_set_frequency,
@@ -67,30 +66,37 @@ pub(crate) use account::{
 pub(super) use account::{change_account, change_account_if};
 pub(super) use database::lock_database;
 pub(crate) use database::{
-    __cmd__browser_sync_availability, __cmd__browser_sync_forget_key,
-    __tauri_command_name_browser_sync_availability, __tauri_command_name_browser_sync_forget_key,
+    __cmd__browser_sync_availability, __cmd__browser_sync_delete_vault,
+    __cmd__browser_sync_forget_key, __tauri_command_name_browser_sync_availability,
+    __tauri_command_name_browser_sync_delete_vault, __tauri_command_name_browser_sync_forget_key,
 };
-pub use database::{browser_sync_availability, browser_sync_forget_key, VaultAvailability};
+pub use database::{
+    browser_sync_availability, browser_sync_delete_vault, browser_sync_forget_key,
+    VaultAvailability,
+};
 use database::{database_path, personal_vault_id, remember_personal_vault, retire_database};
 use os_version::os_version;
 #[cfg(any(target_os = "macos", windows))]
 pub(super) use profile::popup_lifecycle_lease;
 pub(super) use profile::{browser_profile_lease, BrowserProfileLease};
 use profile::{default_profile_id, SelectedProfile};
+#[cfg(test)]
+use profile::{local_tab_session, resolve_local_profile, select_bound_profile};
 use profile_selection::{
     clear_selected_profiles, selected_profile, set_selected_profile, store_lock,
 };
-#[cfg(test)]
-use profile::{local_tab_session, resolve_local_profile, select_bound_profile};
-pub use space_sites::{browser_sync_set_space_sites, browser_sync_space_sites};
+use sessions::*;
+#[cfg(desktop)]
+pub(crate) use space_data::{
+    device_name, hashed_id, space_vault, store_vault, window_space, SpaceVault,
+};
 pub(crate) use space_sites::{
     __cmd__browser_sync_set_space_sites, __cmd__browser_sync_space_sites,
     __tauri_command_name_browser_sync_set_space_sites,
     __tauri_command_name_browser_sync_space_sites,
 };
+pub use space_sites::{browser_sync_set_space_sites, browser_sync_space_sites};
 pub use space_vaults::browser_sync_space_window;
-#[cfg(desktop)]
-pub(crate) use space_data::{device_name, hashed_id, space_vault, store_vault, window_space, SpaceVault};
 pub(crate) use space_vaults::{
     __cmd__browser_sync_space_window, __tauri_command_name_browser_sync_space_window,
 };
@@ -230,7 +236,10 @@ pub(crate) async fn extension_sync_handle(account: &str, space: &str) -> Option<
 /// Whether a vault keeps its website data in `store` (its logical identity or the
 /// native store bound to it). Erasing retired device-profile stores skips these.
 pub(crate) fn vault_uses_store(store: &str) -> bool {
-    sessions().vaults.values().any(|entry| entry.logical == store)
+    sessions()
+        .vaults
+        .values()
+        .any(|entry| entry.logical == store)
         || profile_selection::any_selected(|selected| {
             selected.logical == store || selected.physical == store
         })

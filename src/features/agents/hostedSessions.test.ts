@@ -25,8 +25,10 @@ vi.mock("@/features/ai-surface/api", () => ({
   aiSurfaceApi: { settings: async () => ({ settings: { keep_awake_for_agents: true } }) },
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/workspace/browserHome", () => ({ browserHomeUrl: () => "misty://home" }));
+vi.mock("@/features/workspace/browserHome", () => ({ browserHomeUrl: () => "misty://home", browserNewTabUrl: () => "misty://home" }));
 vi.mock("@/native/devices", () => ({ devicesNative: { signRunGrants: mocks.sign } }));
+// These cover the hidden tabs, used where no agent window can dock.
+vi.mock("./agentWindowSessions", () => ({ delegateToAgentWindow: async () => undefined }));
 vi.mock("./store/useAgentsStore", () => ({
   agentsDeviceSnapshot: async () => ({
     device: { id: "local-1", status: "online", displayName: "Mac mini" },
@@ -145,7 +147,8 @@ it("ends with its lease, tabs and keep-awake released", async () => {
   await endHostedSession(session!.taskId);
   expect(useHostedSessions.getState().sessions).toHaveLength(0);
   expect(mocks.invoke).toHaveBeenCalledWith("agent_workspace_release", { taskId: session!.taskId });
-  expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_close", {
+  // Its tab sleeps as the run's proof: the page closes through the one close path.
+  expect(mocks.invoke).toHaveBeenCalledWith("browser_webview_sleep", {
     request: { id: session!.viewId },
   });
   await vi.waitFor(() =>

@@ -101,10 +101,14 @@
         const node = { role: "iframe", name: P.name(el, role), children: [], props: [] };
         let doc = null;
         try { doc = el.contentDocument; } catch { doc = null; }
-        if (doc?.body) visitChildren(doc.body, node, false);
+        // An editor frame's body is itself the editable area (CKEditor, TinyMCE): list the body.
+        if (doc?.body && (doc.body.isContentEditable || doc.designMode === "on")) visit(doc.body, node);
+        else if (doc?.body) visitChildren(doc.body, node, false);
         else {
           let origin = "";
-          try { origin = new URL(el.src, el.baseURI).origin; } catch { origin = ""; }
+          // A frame a script navigated (src empty or about:blank) is not the page's own origin.
+          const src = el.getAttribute("src") || "";
+          try { origin = src && !src.startsWith("about:") ? new URL(src, el.baseURI).origin : ""; } catch { origin = ""; }
           node.props.push(origin ? `cross-origin ${origin}` : "cross-origin");
         }
         parent.children.push(node);
@@ -171,33 +175,59 @@
     return line;
   };
 
-  /** YAML-like text in the shape of Playwright's aria snapshot. */
-  P.serialize = (tree, maxChars) => {
+  // Site menus (navigation, header, footer, sidebars) come first in most pages' order and used to
+  // take the whole budget, so a long page's snapshot showed menus and cut off the content, search
+  // box and filters the agent came for (docs/plans/agent-harness-v2.md). When a page doesn't fit,
+  // each menu gets a small share and says how much it left out; the rest goes to the content.
+  const CHROME = new Set(["navigation", "banner", "contentinfo", "complementary", "menubar"]);
+  const CHROME_CHARS = 1500;
+  const count = (node) => 1 + (node.children || []).reduce((sum, child) => sum + count(child), 0);
+
+  const render = (tree, maxChars, chromeCap) => {
     const lines = [];
     let chars = 0;
     let truncated = false;
-    const emit = (depth, line) => {
-      if (truncated) return;
+    /** Adds a line within the page budget and, inside a menu, the menu's share. */
+    const emit = (depth, line, box) => {
+      if (truncated || box?.full) return false;
       const text = "  ".repeat(depth) + line;
-      if (chars + text.length + 1 > maxChars) { truncated = true; return; }
+      if (box && box.used + text.length + 1 > box.cap) { box.full = true; return false; }
+      if (chars + text.length + 1 > maxChars) { truncated = true; return false; }
       lines.push(text);
       chars += text.length + 1;
+      if (box) box.used += text.length + 1;
+      return true;
     };
-    const walk = (node, depth) => {
+    const walk = (node, depth, box) => {
       for (const child of node.children) {
         if (truncated) return;
-        if (child.text !== undefined) { emit(depth, `- text: ${P.clip(child.text, 600)}`); continue; }
+        if (box?.full) { box.skipped += count(child); continue; }
+        if (child.text !== undefined) { if (!emit(depth, `- text: ${P.clip(child.text, 600)}`, box) && box) box.skipped++; continue; }
         const only = child.children.length === 1 && child.children[0].text !== undefined;
         if (only && !child.ref && !child.name && child.value === undefined) {
-          emit(depth, `${P.line(child)}: ${P.clip(child.children[0].text, 600)}`);
+          if (!emit(depth, `${P.line(child)}: ${P.clip(child.children[0].text, 600)}`, box) && box) box.skipped++;
           continue;
         }
-        emit(depth, child.children.length ? `${P.line(child)}:` : P.line(child));
-        walk(child, depth + 1);
+        if (!emit(depth, child.children.length ? `${P.line(child)}:` : P.line(child), box)) {
+          if (box) box.skipped += count(child);
+          continue;
+        }
+        if (!box && chromeCap < Infinity && CHROME.has(child.role)) {
+          const menu = { cap: chromeCap, used: 0, skipped: 0, full: false };
+          walk(child, depth + 1, menu);
+          if (menu.skipped) emit(depth + 1, `- text: (${menu.skipped} more items in this ${child.role} left out so the page's content fits; browser_find searches them)`);
+        } else walk(child, depth + 1, box);
       }
     };
-    walk(tree, 0);
+    walk(tree, 0, undefined);
     return { text: lines.join("\n"), truncated };
+  };
+
+  /** YAML-like text in the shape of Playwright's aria snapshot. */
+  P.serialize = (tree, maxChars) => {
+    const whole = render(tree, maxChars, Infinity);
+    if (!whole.truncated) return whole;
+    return render(tree, maxChars, Math.min(CHROME_CHARS, Math.floor(maxChars / 8)));
   };
 
   P.sweep = () => {
@@ -228,6 +258,9 @@
 
   P.snapshot = (args) => {
     if (!S.documentId) S.documentId = args.candidateId;
+    // A cross-origin frame numbers its refs from its own range, so one snapshot never
+    // names two controls alike (frames.rs routes a ref to its frame by that range).
+    if (args.refBase && S.next < args.refBase) S.next = args.refBase;
     if (args.readSemantic) {
       S.readSemantic = args.readSemantic;
       try { S.semantic = JSON.stringify(args.readSemantic()); } catch { S.semantic = null; }
@@ -251,9 +284,31 @@
       if (files.length) built.tree.children.push({ role: "group", name: "File inputs behind upload buttons", props: [], children: files });
     }
     const out = P.serialize(built.tree, args.maxChars ?? 24000);
+    // A popup over the page leads the snapshot, with its close control, so the agent closes it
+    // before it reads or acts: as text, a covered page read like any other (page_read.js).
+    let popup = null;
+    try {
+      popup = root === document && P.coveringPopup ? P.coveringPopup() : null;
+      // An empty backdrop has nothing to close; hidden, it stops catching clicks (page_read.js).
+      for (let tries = 0; popup?.empty && tries < 3; tries++) { P.hideCover(popup.box); popup = P.coveringPopup(); }
+      if (popup?.empty) popup = null;
+    } catch { popup = null; }
+    const cover = popup
+      ? `- note: A popup covers this page ("${popup.name}"). Close it first: ${popup.close ? `click ref=${P.register(popup.close)}` : "press Escape (browser_steps key Escape)"}.\n`
+      : "";
+    // An error page reads like any other, and a run that guessed an address took one as the
+    // site's answer ("We Can't Find That Page", Odysseys, October 20): say what it is.
+    let missing = "";
+    try {
+      const heading = document.querySelector("h1")?.innerText ?? "";
+      const said = `${document.title || ""} ${heading}`;
+      if (root === document && (document.body?.innerText ?? "").length < 6000 &&
+        /\b404\b|page not found|not found|can.?t (find|locate) (that|this|the) page|page (doesn.?t|does not|no longer) exist|no longer available/i.test(said))
+        missing = `- note: This is an error page ("${P.clip(said, 80)}"): the address is wrong or gone. Find the page through the site's own search or links, or a web search, instead of guessing another address.\n`;
+    } catch { missing = ""; }
     return {
       ok: true, documentId: S.documentId, url: location.href, title: document.title || "",
-      tree: out.text || "- text: (the page shows no readable content)",
+      tree: missing + cover + (out.text || "- text: (the page shows no readable content)"),
       truncated: out.truncated || built.scanLimited || built.refLimited,
       refCount: built.interactive.length, dialogs: P.dialogs(), focused: P.focused(),
       // Pattern and app skills that apply to this page (page_skills.js).
@@ -291,7 +346,28 @@
     const strong = scored.some((item) => content.length === 0 || item.named * 2 >= content.length);
     // A weak search says so, so the agent reads the page rather than acting on a poor guess.
     const hint = strong ? undefined : "No element matched most of these words; these are loose guesses. Read the page with browser_snapshot (use scopeRef for one region) instead of searching again.";
-    return { ok: true, documentId: S.documentId, url: location.href, matches: scored.map((item) => P.line(item.node)), ...(hint ? { weak: true, hint } : {}) };
+    // What was found comes into view, as a person scrolls to what they look for: the page on
+    // screen shows the evidence, which is what a tab kept as proof needs.
+    const shown = strong && scored[0]?.node.ref ? P.reveal(S.refs.get(scored[0].node.ref)?.el) && P.line(scored[0].node) : P.revealText(phrase);
+    return { ok: true, documentId: S.documentId, url: location.href, matches: scored.map((item) => P.line(item.node)), ...(shown ? { scrolledTo: shown } : {}), ...(hint ? { weak: true, hint } : {}) };
+  };
+
+  /** Scrolls an element to the middle of the view; whether it could. */
+  P.reveal = (el) => {
+    if (!el?.isConnected) return false;
+    try { el.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" }); return true; } catch { return false; }
+  };
+
+  /** Scrolls to the first visible text containing `phrase`, and returns that text, or "". */
+  P.revealText = (phrase) => {
+    if (!phrase || phrase.length < 3) return "";
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(), seen = 0; node && seen < 20000; node = walker.nextNode(), seen++) {
+      const text = node.data;
+      if (!text.toLowerCase().includes(phrase) || !node.parentElement || P.hidden(node.parentElement)) continue;
+      return P.reveal(node.parentElement) ? P.clip(text.replace(/\s+/g, " ").trim(), 120) : "";
+    }
+    return "";
   };
 
   /** Readable Markdown of the page for a model to extract from. */

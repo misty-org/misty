@@ -213,9 +213,17 @@ mod tests {
 
     #[test]
     fn ask_and_missing_sets_always_ask() {
-        assert!(!granted(Some(&set("ask")), "https://mail.example.com", "send"));
+        assert!(!granted(
+            Some(&set("ask")),
+            "https://mail.example.com",
+            "send"
+        ));
         assert!(!granted(None, "https://mail.example.com", "send"));
-        assert!(!granted(Some(&GrantSet::default()), "https://mail.example.com", "send"));
+        assert!(!granted(
+            Some(&GrantSet::default()),
+            "https://mail.example.com",
+            "send"
+        ));
     }
 
     #[test]
@@ -235,7 +243,8 @@ mod tests {
 
     #[test]
     fn a_malformed_set_reads_as_no_grants() {
-        let parsed: GrantSet = serde_json::from_value(serde_json::json!({"mode": 3})).unwrap_or_default();
+        let parsed: GrantSet =
+            serde_json::from_value(serde_json::json!({"mode": 3})).unwrap_or_default();
         assert!(!granted(Some(&parsed), "https://mail.example.com", "send"));
     }
 }

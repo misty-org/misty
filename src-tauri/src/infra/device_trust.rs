@@ -18,10 +18,6 @@ use crate::{
     infra::device_records::{DeviceList, DevicePolicy, RunGrant, SignedRecord},
 };
 
-/// A peer refuses new LAN connections when its newest verified list is older
-/// than this and nothing fresher can be reached.
-pub const LIST_FRESHNESS_SECONDS: i64 = 24 * 3600;
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TrustFile {
@@ -274,10 +270,6 @@ pub fn list_version() -> u64 {
     current_list().map(|list| list.version).unwrap_or_default()
 }
 
-fn fresh(current: &TrustState) -> bool {
-    now() - current.file.list_fresh_at <= LIST_FRESHNESS_SECONDS
-}
-
 /// Marks the current list fresh after the server confirmed it.
 pub fn confirm_fresh() {
     let _ = with_state(|current| {
@@ -336,58 +328,36 @@ pub fn forget_after_removal() {
     });
 }
 
-/// A device job's grant, checked before this device acts: signed by an added
-/// device (or this one), naming this device, covering the scope and the
-/// operation, unexpired, and, for another device's request, allowed by this
-/// device's own policy.
+/// A device job's grant, checked before this device acts: signed by this
+/// device itself, naming it, covering the scope and the operation, and
+/// unexpired. An agent run works on the device the person sent it from, so a
+/// grant another device signed is refused.
 pub fn verify_job_grant(
     record: &SignedRecord,
     scope_id: &str,
     capability: &str,
-    surface: &str,
 ) -> ApiResult<RunGrant> {
     let denied = || ApiError::Message("device_grant_invalid".to_owned());
     let guard = state().lock().map_err(lock_error)?;
     let current = guard.as_ref().ok_or_else(denied)?;
     let own_id = current.file.server_device_id.clone().ok_or_else(denied)?;
     let requester = RunGrant::claimed_requester(record).ok_or_else(denied)?;
-    let requester_key = if requester == own_id {
-        crate::infra::device_identity::DeviceIdentity::load(
-            &current.file.account_id,
-            &current.file.local_device_id,
-        )
-        .map_err(|_| denied())?
-        .public_key()
-    } else {
-        if !fresh(current) {
-            return Err(denied());
-        }
-        current
-            .list
-            .as_ref()
-            .and_then(|list| list.admitted_key(&requester))
-            .ok_or_else(denied)?
-            .to_owned()
-    };
-    let grant = RunGrant::verify(record, &requester_key, now()).ok_or_else(denied)?;
+    if requester != own_id {
+        return Err(denied());
+    }
+    let own_key = crate::infra::device_identity::DeviceIdentity::load(
+        &current.file.account_id,
+        &current.file.local_device_id,
+    )
+    .map_err(|_| denied())?
+    .public_key();
+    let grant = RunGrant::verify(record, &own_key, now()).ok_or_else(denied)?;
     if grant.account_id != current.file.account_id
-        || grant.requester_device_id != requester
+        || grant.requester_device_id != own_id
         || grant.target_device_id != own_id
         || !grant.allows(scope_id, capability)
     {
         return Err(denied());
-    }
-    if requester != own_id {
-        let policy = current
-            .file
-            .own_policy_state
-            .clone()
-            .unwrap_or_else(|| DevicePolicy::first(Vec::new()));
-        let allowed = policy.allows_surface(surface)
-            && (surface != "folders" || policy.shares_folder(scope_id));
-        if !allowed {
-            return Err(denied());
-        }
     }
     Ok(grant)
 }

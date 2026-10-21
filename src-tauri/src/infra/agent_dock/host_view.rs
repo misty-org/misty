@@ -2,16 +2,17 @@
 #[cfg(target_os = "macos")]
 use super::macos::{misty_agent_dock_fill, misty_agent_dock_page_returned};
 
-/// Sizes a reparented page to its host window, leaving `top` points for a bar.
-pub(in crate::infra) fn fill_host(webview: &tauri::Webview, top: f64) -> Result<(), String> {
+/// Sizes a reparented page to its host window, leaving `bottom` points under it for the
+/// agent's island while the window is open.
+pub(in crate::infra) fn fill_host(webview: &tauri::Webview, bottom: f64) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     return webview
-        .with_webview(move |platform| unsafe { misty_agent_dock_fill(platform.inner(), top) })
+        .with_webview(move |platform| unsafe { misty_agent_dock_fill(platform.inner(), bottom) })
         .map_err(|e| e.to_string());
     #[cfg(windows)]
     {
-        // WebView2 does not follow its parent's size; place the page under the
-        // bar now and again whenever the host window resizes.
+        // WebView2 does not follow its parent's size; place the page above the
+        // island now and again whenever the host window resizes.
         let place = {
             let webview = webview.clone();
             move || -> Result<(), String> {
@@ -23,8 +24,8 @@ pub(in crate::infra) fn fill_host(webview: &tauri::Webview, top: f64) -> Result<
                     .to_logical::<f64>(scale);
                 webview
                     .set_bounds(tauri::Rect {
-                        position: tauri::LogicalPosition::new(0.0, top).into(),
-                        size: tauri::LogicalSize::new(size.width, (size.height - top).max(0.0))
+                        position: tauri::LogicalPosition::new(0.0, 0.0).into(),
+                        size: tauri::LogicalSize::new(size.width, (size.height - bottom).max(0.0))
                             .into(),
                     })
                     .map_err(|e| e.to_string())
@@ -44,7 +45,7 @@ pub(in crate::infra) fn fill_host(webview: &tauri::Webview, top: f64) -> Result<
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
-        let _ = (webview, top);
+        let _ = (webview, bottom);
         Ok(())
     }
 }

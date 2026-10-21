@@ -637,7 +637,10 @@ void misty_extensions_tab_event(const char *spaceKey, const char *identifier, co
         NSString *space = [NSString stringWithUTF8String:spaceKey];
         NSString *key = [NSString stringWithUTF8String:identifier], *event = [NSString stringWithUTF8String:kind];
         MistyExtensionHost *host = space.length ? hosts[space] : nil;
-        if (!space.length) for (MistyExtensionHost *candidate in hosts.allValues) if (candidate.tabs[key]) host = candidate;
+        // The host that registered the tab, when the page's Space now names another (a tab opened
+        // before its window took a Space, a window that switched Space), so extensions
+        // hear every close.
+        if (!host.tabs[key]) for (MistyExtensionHost *candidate in hosts.allValues) if (candidate.tabs[key]) host = candidate;
         MistyExtensionTab *tab = host.tabs[key]; if (!tab) return;
         if (![event isEqual:@"close"]) [host registerOpenTab:tab];
         if ([event isEqual:@"close"]) { [host.controller didCloseTab:tab windowIsClosing:NO]; [host.tabs removeObjectForKey:key]; }

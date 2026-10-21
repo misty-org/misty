@@ -1,4 +1,6 @@
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { lessonConversation } from "../lessons/lessonEntry";
+import { frontMediaContext, withinBudget, type MediaContext } from "./mediaContext";
 import { nextStepPrompt, type CompanionGuideStep } from "./companionGuide";
 import { companionStage } from "./companionStage";
 import type { CompanionSubmission } from "./companionState";
@@ -32,6 +34,9 @@ export class CursorCompanionTypedTurns {
 
   private async submitOnce(request: CompanionSubmission) {
     const s = this.s;
+    // Teach mode: every turn at the cursor is a step in the current lesson's chat.
+    if (s.state.teach && !useMistyStore.getState().working)
+      request = { ...request, conversationId: await lessonConversation() };
     const current = useMistyStore.getState();
     if (request.conversationId && request.conversationId !== current.activeConversationId)
       throw new Error("The conversation changed. Send your request in the intended conversation.");
@@ -66,6 +71,8 @@ export class CursorCompanionTypedTurns {
       // Every request at the cursor carries every display, the cursor's first
       // (docs/plans/agent-harness.md, phase 4); the model judges what matters.
       // Without screen access the request still goes, with no screenshots.
+      // The video in front, read alongside the screens; it never holds the turn up.
+      const media = frontMediaContext();
       const screens = s.nativeReady
         ? await s.capture(generation, controller.signal).catch((error: unknown) => {
             if (request.look || controller.signal.aborted) throw error;
@@ -76,7 +83,14 @@ export class CursorCompanionTypedTurns {
         throw new Error(
           "The conversation changed. Send your request again in the intended conversation.",
         );
-      await this.submitCaptured(request, generation, screens, controller.signal, voiceOwned);
+      await this.submitCaptured(
+        request,
+        generation,
+        await s.withFocusCapture(screens, generation),
+        controller.signal,
+        voiceOwned,
+        await withinBudget(media),
+      );
     } catch (error) {
       if (!controller.signal.aborted) s.fail(generation, error);
       throw error;
@@ -89,6 +103,7 @@ export class CursorCompanionTypedTurns {
     screens: DisplayCapture[],
     signal: AbortSignal,
     voiceOwned: boolean,
+    mediaContext?: MediaContext,
   ) {
     const s = this.s;
     if (!s.active(generation)) return;
@@ -110,6 +125,8 @@ export class CursorCompanionTypedTurns {
           model: s.state.model,
           ...(screens.length ? { displayCaptures: screens } : {}),
           continuation: request.continuation,
+          ...(s.state.teach ? { collaborationMode: "teach" as const } : {}),
+          ...(mediaContext ? { mediaContext } : {}),
         },
       ),
       signal,
@@ -120,6 +137,8 @@ export class CursorCompanionTypedTurns {
     const current = useMistyStore.getState();
     s.invocationId = current.invocationId;
     s.submittedConversationId = current.activeConversationId;
+    // A drawing in the reply is drawn at the cursor as it streams.
+    if (s.invocationId) s.sketch.follow(s.invocationId);
     if (!s.invocationId) {
       s.owned = false;
       throw new Error(current.error || "The companion could not start. Please try again.");

@@ -20,16 +20,6 @@
 .misty-docking-titlebar[data-shared-chrome="true"] {
   pointer-events: none;
 }
-.misty-docking-titlebar-drag-region {
-  position: absolute;
-  /* Stops one row short of the bottom so the pane seam shows beneath it, edge to edge. */
-  inset: 0 auto 1px 0;
-  max-width: 100%;
-  /* Browser views make the shell transparent. Paint this otherwise empty
-     corner so the native window backing cannot show beside the traffic lights. */
-  background: var(--misty-window-chrome, var(--misty-theme-workspace));
-  pointer-events: auto;
-}
 .misty-docking-nav {
   position: relative;
   min-width: 0;
@@ -186,13 +176,12 @@
   position: relative;
 }
 
-/* One tab surface. Vertical tabs use the same 28px row, controls and spacing. */
+/* The tab sidebar. */
 .misty-workspace-tabs {
   height: var(--shell-titlebar, 38px);
   align-items: center;
   padding: 0 var(--shell-gap, 8px);
 }
-.misty-workspace-tabs[data-tab-position="bottom"],
 .misty-workspace-tabs[data-tab-position="right"] {
   order: 2;
 }
@@ -210,23 +199,16 @@
 .misty-workspace-tab-list::-webkit-scrollbar {
   display: none;
 }
-.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"])
-  .misty-workspace-tab-list {
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    black var(--tab-fade-start, 0px),
-    black calc(100% - var(--tab-fade-end, 0px)),
-    transparent
-  );
-}
 .misty-workspace-tab {
   height: var(--shell-tab-height, 28px);
   min-width: 80px;
   max-width: 160px;
   flex: 1 1 120px;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   width: 100%;
   min-width: 0;
@@ -248,18 +230,26 @@
   min-height: 28px;
   flex-wrap: wrap;
 }
-.misty-workspace-tabs svg,
-#misty-windows-workspace-controls svg {
+.misty-workspace-tabs svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
-#misty-windows-workspace-controls svg {
-  stroke-width: 1.5;
-}
 .misty-workspace-tabs [role="tab"] img {
   width: 16px;
   height: 16px;
+}
+
+/* A hidden tab that keeps its layout (`keptTabs.ts`): nothing in it renders, is hit, focused or
+   read out, but its boxes stay laid out, so showing it again is a single paint. It sits beneath
+   the shown tab in the same cell. Nothing inherited changes with it (no inert, no
+   pointer-events), since that would restyle the whole page when it is shown. */
+[data-tab-kept] {
+  content-visibility: hidden;
+}
+.misty-docking-frame [data-workspace-panes] > [role="tabpanel"][data-tab-kept]::before,
+.misty-docking-frame [data-workspace-panes] > [role="tabpanel"][data-tab-kept]::after {
+  content: none;
 }
 
 /* Every orientation uses the reference pane seam. Geometry chooses the edges
@@ -375,34 +365,10 @@
   padding-right: max(12px, var(--window-chrome-right, 0px));
 }
 
-/* Connected tabs. The strip shares the navigator's black frame; the active tab
-   (ConnectedTabShape) rises out of the pane below with matching fill. The strip
-   overlaps the pane's seam row by 1px so the tab can cover it, and the pane
-   keeps the standard corners and seams from dockingGeometry. Everything in the
-   strip shares the bar's center line with the traffic lights. Tabs fill the
-   strip below a small --tab-inset gap, and their content is centered on the strip,
-   the same line as New tab and the pane controls. */
-.misty-workspace-tabs:is([data-tab-position="top"], [data-tab-position="bottom"]) {
-  /* Corner and shoulder radius; ConnectedTabShape and the drag preview read it. */
-  --tab-shoulder: 12px;
-  --tab-inset: var(--shell-tab-inset, 8px);
-  position: relative;
-  z-index: 1;
-  height: var(--shell-tab-strip-height, 44px);
-  align-items: stretch;
-  border: 0;
-  /* WorkspaceTabStrip sets padding-left from the traffic-light inset. */
-  /* Leave the overlapped seam row unpainted so the pane outline shows. */
-  background: linear-gradient(
-      var(--misty-window-chrome, var(--misty-theme-workspace)),
-      var(--misty-window-chrome, var(--misty-theme-workspace))
-    )
-    top / 100% calc(100% - 1px) no-repeat;
-}
-.misty-workspace-tabs[data-tab-position="top"] {
-  margin-bottom: -1px;
-}
-.misty-workspace-tabs[data-tab-position="bottom"] {
-  margin-top: -1px;
-  background-position: bottom;
+/* Beside a vertical sidebar the caption buttons share its header row, which starts below the
+   pane margin and the card's border; centre them on that row's 40px. */
+.misty-docking-frame:is([data-tab-position="left"], [data-tab-position="right"])
+  .misty-windows-caption-controls {
+  top: calc(var(--pane-frame, 6px) + 1px);
+  height: 40px;
 }

@@ -32,7 +32,7 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
     session && deviceRows(session, user?.username).find((d) => d.device_id === publisherId);
   return (
     <>
-      <Section title="Overview">
+      <Section title="Sync">
         <div className="border-t border-charcoal-border py-3">
           <SyncStatusView
             status={controller.status}

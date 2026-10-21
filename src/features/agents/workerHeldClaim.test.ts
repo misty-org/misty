@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HeldClaims, heldClaimWaitMs } from "./workerHeldClaim";
+import { HeldClaims, heldClaimWaitMs, holdAfterJobMs } from "./workerHeldClaim";
 
 describe("held claims", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -9,17 +9,21 @@ describe("held claims", () => {
     expect(new HeldClaims().next()).toBeUndefined();
   });
 
-  it("holds the next claim for 30 seconds after a browser job", () => {
+  it("holds claims for three minutes after a browser job", () => {
     const held = new HeldClaims();
-    held.noteBrowserJob();
+    held.noteJob();
     expect(held.next()?.waitMs).toBe(heldClaimWaitMs);
-    vi.advanceTimersByTime(30_001);
+    expect(held.holding()).toBe(true);
+    vi.advanceTimersByTime(holdAfterJobMs - 1);
+    expect(held.holding()).toBe(true);
+    vi.advanceTimersByTime(2);
     expect(held.next()).toBeUndefined();
+    expect(held.holding()).toBe(false);
   });
 
   it("hangs up the held claim when the worker stops", () => {
     const held = new HeldClaims();
-    held.noteBrowserJob();
+    held.noteJob();
     const hold = held.next();
     held.cancel();
     expect(hold?.signal.aborted).toBe(true);
@@ -27,7 +31,7 @@ describe("held claims", () => {
 
   it("stops holding on a server that refuses the field, and only then", () => {
     const held = new HeldClaims();
-    held.noteBrowserJob();
+    held.noteJob();
     expect(held.refused({ status: 429 })).toBe(false);
     expect(held.next()).toBeDefined();
     expect(held.refused({ status: 400 })).toBe(true);

@@ -85,7 +85,9 @@ pub(super) fn forget_private_session() {
 }
 
 fn require_host(caller: &Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(caller.label()) && !caller.label().starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(caller.label())
+        && !caller.label().starts_with("misty-agent-")
+    {
         return Err("Only Misty's settings can change website permissions.".into());
     }
     Ok(())

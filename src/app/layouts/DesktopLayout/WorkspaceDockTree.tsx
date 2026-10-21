@@ -2,10 +2,7 @@ import { DockDropPreview } from "./DockDropPreview";
 import { StablePaneLayout } from "@/features/workspace/StablePaneLayout";
 import { useWorkspacePagePreview } from "@/features/workspace/useWorkspacePagePreview";
 import { panePlacement } from "@/features/workspace/panePlacement";
-import { isSideDock } from "@/features/app-shell/dockingLayout";
-import { PaneToolbarHostProvider } from "@/features/browser/workspace";
-import { PaneToolbarFallback } from "./PaneToolbarFallback";
-import { usePaneToolbarDrag } from "./usePaneToolbarDrag";
+import { keepsLayoutWhileHidden } from "./keptTabs";
 import { selectPaneFocusPreferences } from "@/features/workspace/paneFocus";
 import { browserRuntimeId } from "@/features/webviews/browserRuntime";
 import { useBrowserPaneDim } from "@/features/webviews/useBrowserPaneDim";
@@ -17,7 +14,6 @@ import {
   dockLeaves,
   dockWidgetRegistry,
   maxWorkspacePanes,
-  useWindowDockingLayout,
   useWorkspaceStore,
   WorkspaceViewTitleProvider,
   type DockSplitDirection,
@@ -29,7 +25,7 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
-import { memo, useEffect, useRef, useState, type DragEvent } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   Panel,
   PanelGroup,
@@ -59,7 +55,6 @@ export interface WorkspaceDockTreeProps {
   node: WorkspaceDockNode;
   dockEdge?: { top: boolean; left: boolean; right: boolean };
   paneDirection?: DockSplitDirection;
-  titlebarInsets?: { left: number; right: number; animate?: boolean };
   windowsTitlebarControls?: boolean;
   focusedPaneId: string;
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
@@ -185,23 +180,49 @@ function DockSplitView(
  * boundary: store updates keep an untouched tab's object identical, and a
  * change to another tab, the layout or the app route leaves this page alone.
  */
-const MountedWorkspaceView = memo(function MountedWorkspaceView(props: {
-  paneId: string;
-  tab: WorkspaceView;
-  active: boolean;
-}) {
-  return (
-    <AiPaneHost
-      paneId={props.paneId}
-      defaultAdapter={workspaceAiAdapter(props.tab)}
-      active={props.active}
-    >
-      <WorkspaceViewTitleProvider tabId={props.tab.id}>
-        <WorkspaceSurface tab={props.tab} />
-      </WorkspaceViewTitleProvider>
-    </AiPaneHost>
-  );
-});
+const MountedWorkspaceView = memo(
+  function MountedWorkspaceView(props: { paneId: string; tab: WorkspaceView; active: boolean }) {
+    const tab = useRenderedView(props.tab);
+    const defaultAdapter = useMemo(() => workspaceAiAdapter(tab), [tab]);
+    // Showing or hiding the tab only tells the AI host; the page itself does not render again.
+    const surface = useMemo(
+      () => (
+        <WorkspaceViewTitleProvider tabId={tab.id}>
+          <WorkspaceSurface tab={tab} />
+        </WorkspaceViewTitleProvider>
+      ),
+      [tab],
+    );
+    return (
+      <AiPaneHost paneId={props.paneId} defaultAdapter={defaultAdapter} active={props.active}>
+        {surface}
+      </AiPaneHost>
+    );
+  },
+  (previous, next) =>
+    previous.paneId === next.paneId &&
+    previous.active === next.active &&
+    sameRenderedView(previous.tab, next.tab),
+);
+
+/**
+ * Selecting a tab stamps it with `lastFocusedAt`, which only the store's own ordering reads. A
+ * page handed that new object rendered again in full on every switch (a Space with a long
+ * collection took a third of a second), so the page keeps the object it has until something
+ * it shows changes.
+ */
+function sameRenderedView(previous: WorkspaceView, next: WorkspaceView): boolean {
+  if (previous === next) return true;
+  const keys = Object.keys(next) as (keyof WorkspaceView)[];
+  if (keys.length !== Object.keys(previous).length) return false;
+  return keys.every((key) => key === "lastFocusedAt" || previous[key] === next[key]);
+}
+
+function useRenderedView(view: WorkspaceView): WorkspaceView {
+  const rendered = useRef(view);
+  if (!sameRenderedView(rendered.current, view)) rendered.current = view;
+  return rendered.current;
+}
 
 function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
   const { pane } = props;
@@ -344,19 +365,11 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
     props.onDockView(tabId, pane.id, zone);
   };
 
-  // With horizontal tabs the pane owns one browser toolbar for every page it shows: a browser
-  // page portals its live toolbar into the row, and any other page rests the same toolbar
-  // there, so Spaces, the profile and the address bar stay reachable.
-  const horizontalTabs = !isSideDock(useWindowDockingLayout().tabs);
-  const showToolbar = horizontalTabs && Boolean(activeTab);
-  const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
-  usePaneToolbarDrag(pane, toolbarHost);
   return (
     <section
       ref={sectionRef}
       className={cn(
-        "group/pane relative grid h-full min-h-0 min-w-0",
-        showToolbar ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[minmax(0,1fr)]",
+        "group/pane relative grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]",
         "overflow-hidden bg-charcoal-bg focus:outline-none",
       )}
       data-workspace-pane={pane.id}
@@ -385,33 +398,32 @@ function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePane }) {
       >
         <span className="truncate">{activeTab?.title || "New tab"}</span>
       </header>
-      {showToolbar ? (
-        <div ref={setToolbarHost} className="min-w-0">
-          {activeTab && activeTab.surfaceId !== "browser" ? (
-            <PaneToolbarFallback tab={activeTab} />
-          ) : null}
-        </div>
-      ) : null}
-      <PaneToolbarHostProvider value={showToolbar ? toolbarHost : null}>
-        <div className="min-h-0 min-w-0 overflow-hidden">
-          {activeTab ? (
-            mountedTabs.map((mountedTab) => {
-              const isActive = props.workspaceActive !== false && mountedTab.id === activeTab.id;
-              return (
-                <div
-                  key={mountedTab.id}
-                  className={cn("h-full min-h-0 w-full", isActive ? "block" : "hidden")}
-                  aria-hidden={!isActive}
-                >
-                  <MountedWorkspaceView paneId={pane.id} tab={mountedTab} active={isActive} />
-                </div>
-              );
-            })
-          ) : (
-            <EmptyWorkspacePane />
-          )}
-        </div>
-      </PaneToolbarHostProvider>
+      <div
+        className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden"
+        data-pane-layer
+      >
+        {activeTab ? (
+          mountedTabs.map((mountedTab) => {
+            const isActive = props.workspaceActive !== false && mountedTab.id === activeTab.id;
+            const kept = !isActive && keepsLayoutWhileHidden(mountedTab);
+            return (
+              <div
+                key={mountedTab.id}
+                className={cn(
+                  "relative col-start-1 row-start-1 h-full min-h-0 w-full",
+                  isActive ? "z-[1] block" : kept ? "z-0 block" : "hidden",
+                )}
+                aria-hidden={!isActive}
+                data-tab-kept={kept ? "" : undefined}
+              >
+                <MountedWorkspaceView paneId={pane.id} tab={mountedTab} active={isActive} />
+              </div>
+            );
+          })
+        ) : (
+          <EmptyWorkspacePane />
+        )}
+      </div>
       {dim > 0 ? (
         <div
           data-pane-dim

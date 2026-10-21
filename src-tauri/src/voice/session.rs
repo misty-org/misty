@@ -31,11 +31,17 @@ struct Running {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    crate::infra::space_windows::is_space_window(webview.label()).then_some(()).ok_or_else(|| "Main Misty window required.".into())
+    crate::infra::space_windows::is_person_window(webview.label())
+        .then_some(())
+        .ok_or_else(|| "Main Misty window required.".into())
 }
 
 fn emit(app: &AppHandle, turn: u64, phase: &str) {
-    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turn, "phase": phase}));
+    let _ = crate::infra::space_windows::emit_to_primary(
+        &app,
+        "misty://dictation",
+        json!({"turn": turn, "phase": phase}),
+    );
 }
 
 fn start_capture(app: &AppHandle, turn: u64, current: Arc<AtomicU64>) -> Result<Capture, String> {
@@ -74,7 +80,11 @@ fn act(app: &AppHandle, state: &Running, turn_counter: &Arc<AtomicU64>, action: 
                 }
                 Err(message) => {
                     let _ = state.machine.lock().map(|mut m| m.abort());
-                    let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turn, "phase": "error", "message": message}));
+                    let _ = crate::infra::space_windows::emit_to_primary(
+                        &app,
+                        "misty://dictation",
+                        json!({"turn": turn, "phase": "error", "message": message}),
+                    );
                 }
             }
         }
@@ -87,7 +97,15 @@ fn act(app: &AppHandle, state: &Running, turn_counter: &Arc<AtomicU64>, action: 
             if let Some(capture) = state.capture.lock().unwrap().take() {
                 capture.stop();
             }
-            emit(app, turn, if action == Action::Finish { "finish" } else { "cancel" });
+            emit(
+                app,
+                turn,
+                if action == Action::Finish {
+                    "finish"
+                } else {
+                    "cancel"
+                },
+            );
             if action == Action::Cancel {
                 super::pill::hide(app);
             }
@@ -103,7 +121,11 @@ fn listen(app: AppHandle, subscription: Subscription, running: Running, turns: A
             Ok(HotkeyEvent::Down) => running.machine.lock().unwrap().key_down(now),
             Ok(HotkeyEvent::Up) => running.machine.lock().unwrap().key_up(now),
             Ok(HotkeyEvent::Error(message)) => {
-                let _ = crate::infra::space_windows::emit_to_primary(&app, "misty://dictation", json!({"turn": turns.load(Ordering::SeqCst), "phase": "error", "message": message}));
+                let _ = crate::infra::space_windows::emit_to_primary(
+                    &app,
+                    "misty://dictation",
+                    json!({"turn": turns.load(Ordering::SeqCst), "phase": "error", "message": message}),
+                );
                 None
             }
             Ok(_) => None,
@@ -138,7 +160,10 @@ pub fn voice_dictation_configure(
         super::pill::hide(&app);
         return Ok(());
     }
-    let chord = chord.as_deref().and_then(Chord::parse).unwrap_or_else(Chord::dictation_default);
+    let chord = chord
+        .as_deref()
+        .and_then(Chord::parse)
+        .unwrap_or_else(Chord::dictation_default);
     let subscription = global_hotkey::subscribe(chord);
     let running = Running {
         machine: Arc::new(Mutex::new(Dictation::new(hands_free))),
@@ -157,7 +182,11 @@ pub fn voice_dictation_configure(
 
 /// Mute or the pill's Stop: end the current dictation without inserting.
 #[tauri::command]
-pub fn voice_dictation_stop(webview: Webview, app: AppHandle, state: State<'_, DictationState>) -> Result<(), String> {
+pub fn voice_dictation_stop(
+    webview: Webview,
+    app: AppHandle,
+    state: State<'_, DictationState>,
+) -> Result<(), String> {
     require_main(&webview)?;
     let inner = state.inner.lock().map_err(|_| "Dictation is busy.")?;
     if let Some(running) = inner.as_ref() {
@@ -173,7 +202,11 @@ pub fn voice_dictation_stop(webview: Webview, app: AppHandle, state: State<'_, D
 /// itself is frontmost, so the renderer inserts it without the clipboard;
 /// `force` pastes anyway (a web page in a tab has focus).
 #[tauri::command]
-pub async fn voice_dictation_insert(webview: Webview, text: String, force: bool) -> Result<serde_json::Value, String> {
+pub async fn voice_dictation_insert(
+    webview: Webview,
+    text: String,
+    force: bool,
+) -> Result<serde_json::Value, String> {
     require_main(&webview)?;
     if text.trim().is_empty() {
         return Ok(json!({"inserted": "nothing"}));

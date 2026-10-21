@@ -1,6 +1,7 @@
 import { writeProfilePreference } from "@/features/settings/sync";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
+import { lessonConversation } from "../lessons/lessonEntry";
 import { normalizeCompanionSize } from "./companionSize";
 import type { CompanionControl } from "./companionState";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
@@ -28,6 +29,11 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
         await writeProfilePreference("agents.companion.ask", control.ask);
         s.change({ ask: control.ask });
       }
+    } else if (control.kind === "teach") {
+      await writeProfilePreference("agents.companion.teach", control.teach);
+      s.change({ teach: control.teach });
+      // Spoken turns cannot wait for a new chat, so the lesson chat is ready up front.
+      if (control.teach) await lessonConversation();
     } else if (
       control.kind === "model" &&
       (control.model === "" || s.state.models?.some((m) => m.id === control.model))

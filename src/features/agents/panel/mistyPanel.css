@@ -3,10 +3,22 @@ aside[data-misty-panel] {
   --misty-panel-bg: var(--color-charcoal-bg, #131313);
   background: var(--misty-panel-bg);
 }
-/* Its own rounded panel, set off from the page by a margin of window chrome. */
+/* Each panel is its own rounded card, as the page is, set off from it and from the other panel
+   by a margin of window chrome. */
 aside[data-misty-panel] {
   border: 1px solid var(--color-charcoal-border);
   border-radius: 12px;
+}
+
+/* The page beside the panels is a rounded card too: round the pane's corners on that side so
+   the native page reports them (clippedCornerRadii reads the pane's border radius). */
+[role="tabpanel"]:has(> [data-misty-panel-dock="right"]) [data-workspace-pane] {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+[role="tabpanel"]:has(> [data-misty-panel-dock="left"]) [data-workspace-pane] {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
 }
 
 aside[data-misty-panel] .agent-studio,
@@ -44,8 +56,9 @@ aside[data-misty-panel] .agent-conversation[data-empty="true"] .agent-compose-ar
   max-width: calc(100% - 32px);
 }
 
-/* The panel's outline is the resize handle: drag it, or focus it and use the arrow keys. Like the
-   tab drawer's, it draws nothing of its own, only the resize cursor. */
+/* Each card's inner outline is its resize handle: drag it, or focus it and use the arrow keys.
+   Like the tab drawer's, it draws nothing of its own, only the resize cursor. The dock places
+   it on the card's edge, half over the margin beside the page. */
 .misty-panel-resizer {
   position: absolute;
   inset-block: 0;
@@ -55,14 +68,26 @@ aside[data-misty-panel] .agent-conversation[data-empty="true"] .agent-compose-ar
   outline: none;
   touch-action: none;
 }
-/* On the panel's own outline, 8px in from the dock's edge, not on the page beside it. */
-.misty-panel-resizer[data-side="right"] {
-  left: 2px;
+/* The margin between two stacked cards moves the line between them; its grip reaches a few
+   pixels onto each card's outline. */
+.misty-panel-splitter {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  cursor: row-resize;
+  outline: none;
+  touch-action: none;
 }
-.misty-panel-resizer[data-side="left"] {
-  right: 2px;
+.misty-panel-splitter::before {
+  content: "";
+  position: absolute;
+  inset: -3px 0;
 }
 html:has(.misty-panel-resizer[data-dragging]) {
   cursor: col-resize;
+  user-select: none;
+}
+html:has(.misty-panel-splitter[data-dragging]) {
+  cursor: row-resize;
   user-select: none;
 }

@@ -49,7 +49,6 @@ export function WorkflowScheduleDialog({
   const [inputs, setInputs] = useState<AgentMethodInputs>(existing?.inputs ?? {});
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
   const [deviceId, setDeviceId] = useState(existing?.device_id ?? "");
-  const needsBrowser = method.definition.target !== "cloud";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = async (action: () => Promise<void>) => {
@@ -73,8 +72,8 @@ export function WorkflowScheduleDialog({
       setError(`Answer “${missing.label}” so scheduled runs have it.`);
       return;
     }
-    if (needsBrowser && !deviceId) {
-      setError("Choose the computer whose Misty browser runs this workflow.");
+    if (!deviceId) {
+      setError("Schedules run on the computer they’re made on. Make this one in the Misty app.");
       return;
     }
     void run(async () => {
@@ -171,11 +170,7 @@ export function WorkflowScheduleDialog({
                 onChange={setInputs}
               />
             )}
-            <ScheduleComputerField
-              value={deviceId}
-              onChange={setDeviceId}
-              needsBrowser={needsBrowser}
-            />
+            <ScheduleComputerField value={deviceId} onChange={setDeviceId} />
             {existing?.state === "awaiting_device" && existing.due_at ? (
               <p className="agent-method-hint" role="status">
                 A run due {new Date(existing.due_at).toLocaleString()} is waiting for its computer.

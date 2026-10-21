@@ -7,6 +7,9 @@
 //! - `incognito-<n>`: an incognito window. It also shows one Space at a time; all of a
 //!   Space's incognito windows share one temporary session, erased when the last closes.
 //!
+//! Agents have no windows of their own; their tabs live in the person's window
+//! (docs/design/agent-browser/BRIEF.md, "What goes away").
+//!
 //! The current Space is kept here, natively, and changes only through
 //! [`switch_space`]; it is never taken from anything a renderer sends. Which Spaces exist,
 //! their names and colors come from the renderer's account Spaces and are kept on this
@@ -18,10 +21,12 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, Runtime, Window};
 
 mod commands;
+mod diagnostics;
 mod lifecycle;
 mod links;
 mod registry;
 pub use commands::*;
+pub use diagnostics::*;
 pub use lifecycle::*;
 pub use links::*;
 pub use registry::*;
@@ -90,7 +95,11 @@ fn label_number(label: &str, prefix: &str) -> Option<u32> {
 /// A new label for an app window or an incognito window.
 pub(super) fn new_label(incognito: bool) -> String {
     let number = NEXT_WINDOW.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let prefix = if incognito { INCOGNITO_PREFIX } else { WINDOW_PREFIX };
+    let prefix = if incognito {
+        INCOGNITO_PREFIX
+    } else {
+        WINDOW_PREFIX
+    };
     format!("{prefix}{number}")
 }
 
@@ -110,7 +119,12 @@ pub(super) fn forget_current(label: &str) -> Option<String> {
 pub(super) fn current_windows() -> Vec<(String, String)> {
     let mut windows: Vec<_> = CURRENT
         .lock()
-        .map(|current| current.iter().map(|(l, k)| (l.clone(), k.clone())).collect())
+        .map(|current| {
+            current
+                .iter()
+                .map(|(l, k)| (l.clone(), k.clone()))
+                .collect()
+        })
         .unwrap_or_default();
     windows.sort_by_key(|(label, _)| {
         label_number(label, WINDOW_PREFIX)
@@ -139,9 +153,15 @@ pub fn space_for_window(label: &str) -> Option<String> {
     parse(label).map(|window| window.space)
 }
 
-/// An app window (not incognito): the full workspace, with sync, recovery, history,
-/// memory and agents. Trust checks for account data accept these and nothing else.
+/// An app window (not incognito): the full workspace, with sync, history, memory and
+/// agents. Trust checks for account data accept these and nothing else.
 pub fn is_space_window(label: &str) -> bool {
+    is_person_window(label)
+}
+
+/// A window the person works in: not incognito. Menus, quitting, session recovery, voice
+/// and the device's background work belong to these alone.
+pub fn is_person_window(label: &str) -> bool {
     label_number(label, WINDOW_PREFIX).is_some()
 }
 
@@ -163,7 +183,7 @@ pub fn host_window() -> Option<String> {
     current_windows()
         .into_iter()
         .map(|(label, _)| label)
-        .find(|label| is_space_window(label))
+        .find(|label| is_person_window(label))
 }
 
 /// Whether any open window shows the Space now.
@@ -202,13 +222,17 @@ pub fn windows_for_space<R: Runtime>(app: &AppHandle<R>, key: &str) -> Vec<Windo
 pub fn primary<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
     let last = registry::last_focused_space();
     last.and_then(|label| app.get_window(&label))
-        .filter(|window| is_space_window(window.label()))
+        .filter(|window| is_person_window(window.label()))
         .or_else(|| {
             windows_for_space(app, PERSONAL)
                 .into_iter()
-                .find(|window| is_space_window(window.label()))
+                .find(|window| is_person_window(window.label()))
         })
-        .or_else(|| space_windows(app).into_iter().next())
+        .or_else(|| {
+            space_windows(app)
+                .into_iter()
+                .find(|window| is_person_window(window.label()))
+        })
 }
 
 /// The app window the person used last, incognito included: menu choices act there.
@@ -235,7 +259,9 @@ pub fn primary_label<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
 
 /// The app's own webview inside an app window (it shares the window's label).
 pub fn app_webview<R: Runtime>(app: &AppHandle<R>, label: &str) -> Option<tauri::Webview<R>> {
-    is_app_window(label).then(|| app.get_webview(label)).flatten()
+    is_app_window(label)
+        .then(|| app.get_webview(label))
+        .flatten()
 }
 
 /// The primary window's app webview.
@@ -267,7 +293,9 @@ pub fn emit_to_space<R: Runtime, S: Serialize + Clone>(
     payload: S,
 ) {
     let _ = app.emit_filter(event, payload, |target| {
-        targets(target, |label| space_for_window(label).as_deref() == Some(key))
+        targets(target, |label| {
+            space_for_window(label).as_deref() == Some(key)
+        })
     });
 }
 

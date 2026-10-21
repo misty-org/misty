@@ -48,8 +48,8 @@ pub(super) async fn inspect_browser(
         .get("extensionId")
         .and_then(super::super::extensions::agent_extension_id);
     let raw = if let Some(extension) = extension_id.clone() {
-        super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script)).await?
-            ["result"]
+        super::super::extensions::agent_action("popup-evaluate", Some(extension), id, Some(script))
+            .await?["result"]
             .clone()
     } else {
         eval_json(webview.clone(), script).await?
@@ -105,7 +105,8 @@ pub(super) fn browser_target_observation(session: &BrowserSession, url: &url::Ur
                 expected.origin() == url.origin() && expected.path() == url.path()
             })
         });
-    let required = callback_page || super::super::browser_provider::authentication_required(provider, url);
+    let required =
+        callback_page || super::super::browser_provider::authentication_required(provider, url);
     let mut target = json!({"scopeId":session.scope_id,"origin":browser_page_origin(url),"authentication":if required {"required"} else {"unknown"},"accountIdentity":"unverified","trust":"host-observation","observedAt":Utc::now().to_rfc3339()});
     if let Some(profile) = session.context_profile_id() {
         target["profileId"] = json!(profile);

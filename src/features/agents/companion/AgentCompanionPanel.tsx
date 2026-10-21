@@ -91,6 +91,17 @@ export function AgentCompanionPanel() {
             onCheckedChange={(visible) => act({ kind: "visibility", visible })}
           />
         </DesktopSettingsRow>
+        <DesktopSettingsRow
+          label="Teach mode"
+          description="Misty teaches one step at a time and checks your work when you ask, instead of doing it for you. Each topic becomes its own lesson."
+        >
+          <Switch
+            aria-label="Teach mode"
+            checked={state.teach === true}
+            disabled={!control}
+            onCheckedChange={(teach) => act({ kind: "teach", teach })}
+          />
+        </DesktopSettingsRow>
         <DesktopSettingsRow label="Ask before taking control">
           <Switch
             aria-label="Ask before taking control"

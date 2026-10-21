@@ -1,20 +1,35 @@
 import {
   MistyPanelDock,
+  mistyPanelWidth,
   useMistyPanelSide,
   useMistyPanelStore,
   type MistyPanelView,
 } from "@/features/agents";
+import { panelGap } from "@/features/agents/panel/MistyPanelDock";
 import { SpaceChatPanel } from "@/features/spaces/chat/SpaceChatPanel";
 import { dockLeaves, spaceWorkspaceToolFromRoute, useWorkspaceStore } from "@/features/workspace";
 import { useMemo } from "react";
 
 /**
- * The Misty panel beside the panes: a rounded panel of its own, set off from the page by a margin
- * of window chrome, as the tab drawer is on the other side. It holds an agent conversation, your
- * Space's chat, or both split in half (the Agents and Chat buttons), beside any page except a
+ * The Misty panels beside the panes: rounded cards of their own, set off from the page and from
+ * each other by a margin of window chrome. They hold an agent conversation, your Space's chat,
+ * or both stacked (the Agents and Chat buttons), beside any page except a
  * full chat or agents tab, which shows none: the panels stay open for the tabs that had them.
  */
 export function WorkspaceMistyDock() {
+  const views = useMistyPanelViews();
+  const side = useMistyPanelSide();
+  const chat = useMemo(
+    () => (
+      <SpaceChatPanel side={side} onClose={() => useMistyPanelStore.getState().close("chat")} />
+    ),
+    [side],
+  );
+  return <MistyPanelDock views={views} side={side} chat={chat} />;
+}
+
+/** The panels shown beside the focused page, top first; none beside a full chat or agents tab. */
+function useMistyPanelViews(): MistyPanelView[] {
   const agentsOpen = useMistyPanelStore((s) => s.open);
   const chatOpen = useMistyPanelStore((s) => s.chatOpen);
   const first = useMistyPanelStore((s) => s.first);
@@ -30,13 +45,18 @@ export function WorkspaceMistyDock() {
   });
   const order: MistyPanelView[] = first === "chat" ? ["chat", "agents"] : ["agents", "chat"];
   // A full chat or agents tab shows no panels; the panels stay open for the tabs that had them.
-  const views = order.filter((view) => (view === "agents" ? agentsOpen : chatOpen) && !page);
-  const side = useMistyPanelSide();
-  const chat = useMemo(
-    () => (
-      <SpaceChatPanel side={side} onClose={() => useMistyPanelStore.getState().close("chat")} />
-    ),
-    [side],
+  return order.filter((view) => (view === "agents" ? agentsOpen : chatOpen) && !page);
+}
+
+/**
+ * The column the Misty panels take beside the pages, so the tab strip can end its tabs where
+ * the pages end: its side, and its widest panel's width with the margin before the page (0
+ * while closed).
+ */
+export function useMistyPanelColumn() {
+  const views = useMistyPanelViews();
+  const width = useMistyPanelStore((s) =>
+    Math.max(0, ...views.map((view) => mistyPanelWidth(s, view))),
   );
-  return <MistyPanelDock views={views} side={side} chat={chat} />;
+  return { side: useMistyPanelSide(), width: views.length ? width + panelGap : 0 };
 }

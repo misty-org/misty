@@ -14,8 +14,11 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, Webview};
 
 mod batch;
+#[cfg(any(target_os = "macos", windows))]
+mod frames;
 mod site_blocks;
 mod step;
+pub(crate) use step::CURSOR_GLIDE_MS;
 mod steps;
 pub(super) use batch::upload;
 use batch::{run_skill, run_steps};
@@ -65,6 +68,31 @@ async fn call(
     args: Value,
     semantic: bool,
 ) -> Result<Value, String> {
+    call_at(webview, None, operation, args, semantic).await
+}
+
+/// The cross-origin frame a ref belongs to and its document id (frames.rs); None for the
+/// top document's refs.
+fn frame_of(view: &Webview, reference: Option<&str>) -> Option<(u64, String)> {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        reference.and_then(|reference| frames::frame_of(view.label(), reference))
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (view, reference);
+        None
+    }
+}
+
+/// `call` in the top document, or in one cross-origin frame of it.
+async fn call_at(
+    webview: &Webview,
+    frame: Option<u64>,
+    operation: &str,
+    args: Value,
+    semantic: bool,
+) -> Result<Value, String> {
     let semantic = if semantic {
         format!(
             "args.readSemantic = ({});",
@@ -83,17 +111,31 @@ async fn call(
         let body = format!(
             "{RUNTIME}\n{invocation}\nreturn JSON.stringify(await page.call({operation}, args));"
         );
-        let raw = crate::infra::browser_content_world::evaluate_in_content_world(
-            webview.clone(),
-            WORLD,
-            body,
-        )
-        .await?;
+        let raw = match frame {
+            Some(frame) => {
+                crate::infra::browser_content_world::evaluate_in_frame(
+                    webview.clone(),
+                    WORLD,
+                    body,
+                    frame,
+                )
+                .await?
+            }
+            None => {
+                crate::infra::browser_content_world::evaluate_in_content_world(
+                    webview.clone(),
+                    WORLD,
+                    body,
+                )
+                .await?
+            }
+        };
         serde_json::from_str(&raw)
             .map_err(|error| format!("The page returned invalid data: {error}"))
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
+        let _ = frame;
         // The page world has no awaiting evaluation; settle is a host sleep there.
         if operation == "\"settle\"" {
             tokio::time::sleep(Duration::from_millis(300)).await;
@@ -109,25 +151,85 @@ async fn call(
     }
 }
 
+/// A new agent tab's first page, loaded: it has left about:blank and reports ready, and a bot
+/// check is waited out as in `landed`. Without it a new tab's first read was a blank page, and a
+/// run that opened tabs in batches worked from blanks (Odysseys, October 20). True once loaded.
+pub(super) async fn first_load(app: &AppHandle, id: &str) -> bool {
+    let started = tokio::time::Instant::now();
+    loop {
+        let elapsed = started.elapsed();
+        if let Ok(view) = webview(app, id) {
+            let blank = view
+                .url()
+                .map(|url| url.as_str() == "about:blank")
+                .unwrap_or(true);
+            let check = call(&view, "waitCheck", json!({}), false).await.ok();
+            let ready = check.as_ref().is_some_and(|check| check["ready"] == true);
+            let challenge = check.as_ref().is_some_and(|check| check["challenge"] == true);
+            if !blank && ready && !(challenge && elapsed < Duration::from_secs(20)) {
+                return true;
+            }
+            if elapsed > Duration::from_secs(if blank { 15 } else { 25 }) {
+                return false;
+            }
+        } else if elapsed > Duration::from_secs(15) {
+            return false;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+}
+
+/// Marks the tab's document before a navigation (page_read.js), so `landed` can tell the new
+/// page from the old one still showing. None when the page did not answer.
+pub(super) async fn mark_document(app: &AppHandle, id: &str) -> Option<String> {
+    let view = webview(app, id).ok()?;
+    let token = uuid::Uuid::new_v4().to_string();
+    let marked = call(&view, "mark", json!({ "token": token }), false).await.ok()?;
+    (marked["ok"] == true).then_some(token)
+}
+
 /// The page a navigation lands on, once its document has loaded and gone quiet, as the
 /// model reads it: the agent sees the new page in the same step instead of guessing its
 /// next look (docs/plans/odysseys-campaign.md). None when the page never answered.
+///
+/// With the old document's `mark`, a page counts as landed only when another document
+/// replaced it, or the same one moved to the target (a fragment). A bot check that passes
+/// by waiting is waited out. When the old page is still showing at the end, the snapshot
+/// says so, instead of passing the old page off as the new one.
 pub(super) async fn landed(
     app: &AppHandle,
     id: &str,
     previous: &url::Url,
     target: &url::Url,
+    mark: Option<&str>,
 ) -> Option<Value> {
     let started = tokio::time::Instant::now();
+    let mut arrived;
+    let mut challenge;
     loop {
         tokio::time::sleep(Duration::from_millis(300)).await;
         let view = webview(app, id).ok()?;
-        let moved = view.url().ok().as_ref() != Some(previous)
-            || (previous == target && started.elapsed() > Duration::from_millis(1200));
-        let ready = call(&view, "waitCheck", json!({}), false)
-            .await
-            .is_ok_and(|check| check["ready"] == true);
-        if (moved && ready) || started.elapsed() > Duration::from_secs(15) {
+        let url = view.url().ok();
+        let check = call(&view, "waitCheck", json!({}), false).await.ok();
+        let ready = check.as_ref().is_some_and(|check| check["ready"] == true);
+        challenge = check.as_ref().is_some_and(|check| check["challenge"] == true);
+        let fragment = previous != target && url.as_ref() == Some(target);
+        arrived = match mark {
+            Some(token) => {
+                fragment
+                    || check
+                        .as_ref()
+                        .is_some_and(|check| check["mark"].as_str() != Some(token))
+            }
+            None => {
+                url.as_ref() != Some(previous)
+                    || (previous == target && started.elapsed() > Duration::from_millis(1200))
+            }
+        };
+        let elapsed = started.elapsed();
+        if (arrived && ready && !(challenge && elapsed < Duration::from_secs(20)))
+            || elapsed > Duration::from_secs(if arrived { 25 } else { 15 })
+        {
             break;
         }
     }
@@ -139,12 +241,98 @@ pub(super) async fn landed(
         false,
     )
     .await;
+    let declined = decline_consent(&view).await;
     let args = json!({"candidateId": uuid::Uuid::new_v4().to_string(), "maxChars": SNAPSHOT_CHARS, "maxRefs": 800});
-    let snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    let mut snapshot = call(&view, "snapshot", args, true).await.ok()?;
+    if let Some(label) = declined {
+        snapshot["consentDeclined"] = json!(label);
+    }
+    with_frame_trees(&view, &mut snapshot).await;
+    let note = if !arrived {
+        Some(format!("This tab still shows the page it was on: {target} did not load (the address may not exist, or the site is slow). Check the address, or search for the site to find its real one."))
+    } else if challenge {
+        Some("This site is showing a bot check that did not clear by waiting. Do not try to solve it: try another page of the site, a search result that links into it, or another source.".to_owned())
+    } else {
+        None
+    };
+    if let (Some(note), Some(tree)) = (note, snapshot["tree"].as_str()) {
+        snapshot["tree"] = json!(format!("- note: {note}\n{tree}"));
+    }
     (snapshot["ok"] == true).then(|| {
         json!({"documentId": snapshot["documentId"], "url": snapshot["url"], "title": snapshot["title"],
-            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"]})
+            "tree": snapshot["tree"], "truncated": snapshot["truncated"], "skills": snapshot["skills"],
+            "consentDeclined": snapshot["consentDeclined"], "loaded": arrived})
     })
+}
+
+/// An agent's tab answers a cookie banner as each page loads, so it never covers the page the
+/// person watches, even when the agent does not read it. Consent managers often draw the
+/// banner seconds after the load, so it looks again for about ten seconds.
+pub(crate) fn answer_consent_after_load(view: Webview) {
+    tauri::async_runtime::spawn(async move {
+        let mut consent = false;
+        let mut popups = 0;
+        for wait in [1_200, 1_800, 3_000, 4_000] {
+            tokio::time::sleep(Duration::from_millis(wait)).await;
+            if !consent {
+                consent = decline_consent(&view).await.is_some();
+            }
+            // Popups that open with the page or a few seconds after it (page_read.js), as a
+            // person closes them before reading; at most two per load.
+            if popups < 2 && dismiss_popup(&view).await.is_some() {
+                popups += 1;
+            }
+        }
+    });
+}
+
+/// Closes an uninvited popup covering the page (page_read.js), and says what it pressed.
+async fn dismiss_popup(view: &Webview) -> Option<String> {
+    let result = call(view, "dismissPopup", json!({}), false).await.ok()?;
+    let label = result["dismissed"]
+        .as_str()
+        .filter(|label| !label.is_empty())?
+        .to_owned();
+    let _ = call(
+        view,
+        "settle",
+        json!({"quietMs": 300, "maxMs": 1500}),
+        false,
+    )
+    .await;
+    Some(label)
+}
+
+/// Answers a cookie or consent banner the most private way before the agent reads the page
+/// (page_read.js), and says which control it pressed.
+async fn decline_consent(view: &Webview) -> Option<String> {
+    let result = call(view, "declineConsent", json!({}), false).await.ok()?;
+    let label = result["declined"]
+        .as_str()
+        .filter(|label| !label.is_empty())?
+        .to_owned();
+    let _ = call(
+        view,
+        "settle",
+        json!({"quietMs": 300, "maxMs": 1500}),
+        false,
+    )
+    .await;
+    Some(label)
+}
+
+/// Adds what the page's cross-origin frames show under their iframes (frames.rs).
+async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let reads = frames::trees(view).await;
+        if let (false, Some(tree)) = (reads.is_empty(), snapshot["tree"].as_str()) {
+            snapshot["tree"] = json!(frames::splice_trees(tree, &reads));
+            snapshot["skills"] = frames::merge_skills(&snapshot["skills"], &reads);
+        }
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = (view, snapshot);
 }
 
 fn page_error(result: &Value, fallback: &str) -> String {
@@ -162,7 +350,7 @@ fn rejected(code: &str, message: impl Into<String>) -> Value {
 }
 
 fn webview(app: &AppHandle, id: &str) -> Result<Webview, String> {
-    app.get_webview(&webview_label(id)?)
+    app.get_webview(&super::webview_label(id)?)
         .ok_or_else(|| "Browser tab is not running.".to_owned())
 }
 
@@ -206,9 +394,21 @@ pub(super) async fn execute(
             if let Some(scope) = input["scopeRef"].as_str() {
                 args["scopeRef"] = json!(scope);
             }
-            let result = call(&view, "snapshot", args, true).await?;
+            let scoped = !input["scopeRef"].is_null();
+            let declined = if scoped {
+                None
+            } else {
+                decline_consent(&view).await
+            };
+            let mut result = call(&view, "snapshot", args, true).await?;
+            if let Some(label) = declined {
+                result["consentDeclined"] = json!(label);
+            }
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
+            }
+            if !scoped {
+                with_frame_trees(&view, &mut result).await;
             }
             result
         }
@@ -231,9 +431,16 @@ pub(super) async fn execute(
             result
         }
         "browser.extract" => {
-            let result = call(&view, "markdown", json!({"maxChars": 120_000}), false).await?;
+            let mut result = call(&view, "markdown", json!({"maxChars": 120_000}), false).await?;
             if result["ok"] != true {
                 return Err(page_error(&result, "The page could not be read."));
+            }
+            #[cfg(any(target_os = "macos", windows))]
+            {
+                let reads = frames::markdown(&view).await;
+                if let (false, Some(markdown)) = (reads.is_empty(), result["markdown"].as_str()) {
+                    result["markdown"] = json!(frames::append_markdown(markdown, &reads));
+                }
             }
             result
         }
@@ -293,10 +500,16 @@ async fn poll(view: &Webview, condition: &Value, timeout_ms: u64) -> Result<Valu
     let started = Instant::now();
     loop {
         let check = call(view, "waitCheck", condition.clone(), false).await?;
+        // Text can appear inside an embedded widget's frame rather than the page itself.
+        #[cfg(any(target_os = "macos", windows))]
+        let met = check["met"] == true
+            || (condition["text"].is_string() && frames::shows(view, condition).await);
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let met = check["met"] == true;
         let waited = started.elapsed().as_millis() as u64;
-        if check["met"] == true || waited >= timeout_ms {
+        if met || waited >= timeout_ms {
             let page = call(view, "observe", json!({}), false).await?;
-            return Ok(json!({"met": check["met"] == true, "waitedMs": waited, "page": page}));
+            return Ok(json!({"met": met, "waitedMs": waited, "page": page}));
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }

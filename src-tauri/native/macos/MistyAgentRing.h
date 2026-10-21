@@ -25,13 +25,3 @@ void misty_agent_window_ring(void *view, bool active);
 // While an agent waits for the person (a sign-in, a code), every mist thins
 // instead of disappearing: the task still holds the screen, the person acts.
 void misty_agent_mist_waiting(bool waiting);
-
-#ifdef __OBJC__
-#import <AppKit/AppKit.h>
-// A mist view for any host: a click-through subview that fills `frame` and
-// fogs inward from its edges, rounded to `radius`. The dock puts one inside a
-// docked window's full-size content so it shrinks with the page.
-NSView *MistyAgentMistMake(NSRect frame, CGFloat radius);
-// Thins one mist while its agent waits for the person (any mist view).
-void MistyAgentMistSetWaiting(NSView *mist, BOOL waiting);
-#endif

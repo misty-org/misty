@@ -33,7 +33,8 @@ impl Recording {
                 );
             },
             move |e| {
-                let _ = crate::infra::space_windows::emit_to_primary(&app,
+                let _ = crate::infra::space_windows::emit_to_primary(
+                    &app,
                     "misty://cursor-error",
                     serde_json::json!({"turn":turn,"error":format!("Microphone stopped: {e}")}),
                 );
@@ -62,7 +63,11 @@ impl Recording {
             capture.stop();
         }
         let pcm = self.pending().unwrap_or_default();
-        let duration = self.samples.lock().map(|s| s.len() as u64 * 1000 / 16_000).unwrap_or(0);
+        let duration = self
+            .samples
+            .lock()
+            .map(|s| s.len() as u64 * 1000 / 16_000)
+            .unwrap_or(0);
         (self.sequence, pcm, duration)
     }
     /// Audio captured since the last call, as 24 kHz mono PCM16 bytes. The

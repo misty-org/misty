@@ -79,7 +79,9 @@ pub fn authorize_window_task(
     let state = app.state::<AgentWorkspaceState>();
     let inner = state.0.lock().map_err(|_| "agent_workspace_unavailable")?;
     if inner.leases.get(task).is_some_and(|lease| {
-        crate::infra::space_windows::is_space_window(&lease.window) && lease.account == account && lease.expires > Instant::now()
+        crate::infra::space_windows::is_space_window(&lease.window)
+            && lease.account == account
+            && lease.expires > Instant::now()
     }) {
         Ok(())
     } else {

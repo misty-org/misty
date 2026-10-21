@@ -120,7 +120,9 @@ pub(super) async fn commit(
     if review.blocked {
         return Err("This extension requires unavailable browser APIs.".into());
     }
-    let package = root(app, &account, space)?.join("packages").join(&review.entry.id);
+    let package = root(app, &account, space)?
+        .join("packages")
+        .join(&review.entry.id);
     std::fs::create_dir_all(&package).map_err(|e| e.to_string())?;
     let digest = review
         .entry

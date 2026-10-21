@@ -174,7 +174,11 @@ async fn notifications(
             if !alive {
                 break;
             }
-            crate::infra::space_windows::emit(&notify_app, "misty:browser-sync-changed", &notify_workspace);
+            crate::infra::space_windows::emit(
+                &notify_app,
+                "misty:browser-sync-changed",
+                &notify_workspace,
+            );
         }
     })
 }

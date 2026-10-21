@@ -4,12 +4,12 @@ import { cn } from "../utils";
 
 const textareaVariants = {
   default: [
-    "flex field-sizing-content min-h-16 w-full rounded-md border border-charcoal-border bg-transparent",
+    "flex field-sizing-content min-h-16 w-full rounded-md border border-charcoal-border-strong bg-transparent",
     "px-2.5 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none",
     "placeholder:text-cream-muted disabled:cursor-not-allowed disabled:opacity-50",
     "aria-invalid:border-charcoal-active aria-invalid:ring-3 aria-invalid:ring-charcoal-active/20",
     "md:text-sm bg-charcoal-card aria-invalid:border-charcoal-active/50",
-    "aria-invalid:ring-charcoal-active/40",
+    "aria-invalid:ring-charcoal-active/40 hover:border-charcoal-active focus-visible:border-cream-muted",
   ],
   // A chat composer's message box: no frame, since the composer card around it is the frame.
   composer: [

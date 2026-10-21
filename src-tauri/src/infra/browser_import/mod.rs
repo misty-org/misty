@@ -45,7 +45,7 @@ pub struct ImportTargetRequest {
 /// for the personal Space's. Never named by the renderer.
 fn space_store(webview: &tauri::Webview) -> Result<Option<String>, String> {
     let label = webview.label();
-    if !super::space_windows::is_space_window(label) {
+    if !super::space_windows::is_person_window(label) {
         return Err("Import from a Space window.".into());
     }
     let key = super::space_windows::space_for_window(label).ok_or("Import from a Space window.")?;

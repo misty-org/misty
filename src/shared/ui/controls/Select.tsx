@@ -30,12 +30,13 @@ const SelectTrigger = React.forwardRef<
     data-slot="select-trigger"
     className={cn(
       "flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border",
-      "border-charcoal-border bg-transparent px-2.5 py-2 text-sm shadow-xs transition-[color,box-shadow]",
+      "border-charcoal-border-strong bg-transparent px-2.5 py-2 text-sm shadow-xs transition-[color,box-shadow]",
       "outline-none data-[placeholder]:text-cream-muted disabled:cursor-not-allowed",
       "disabled:opacity-50 aria-invalid:border-charcoal-active aria-invalid:ring-3",
       "aria-invalid:ring-charcoal-active/20 bg-charcoal-card aria-invalid:border-charcoal-active/50",
       "aria-invalid:ring-charcoal-active/40 [&>span]:line-clamp-1 [&_svg]:pointer-events-none",
-      "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+      "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:border-charcoal-active",
+      "focus-visible:border-cream-muted",
       className,
     )}
     {...props}

@@ -19,8 +19,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
-use crate::app::runtime::MistyRuntime;
 use super::store::Store;
+use crate::app::runtime::MistyRuntime;
 #[path = "clipboard_bridge_approvals.rs"]
 mod approvals;
 use approvals::Approvals;
@@ -49,7 +49,6 @@ struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
-
 
 /// Starts listening on this platform's user-only channel.
 pub fn start(app: AppHandle, store: Store, config_dir: PathBuf) {

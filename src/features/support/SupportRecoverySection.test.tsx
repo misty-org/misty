@@ -108,7 +108,7 @@ describe("SupportRecoverySection", () => {
   });
 
   it("reopens setup and closes settings when requested", async () => {
-    useSetupStore.setState({ isOpen: false, step: "layout" });
+    useSetupStore.setState({ isOpen: false, step: "theme" });
     const closeSettingsListener = vi.fn();
     window.addEventListener("misty:close-settings", closeSettingsListener);
 

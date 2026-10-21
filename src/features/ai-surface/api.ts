@@ -199,9 +199,23 @@ export const aiSurfaceApi = {
     apiRequest<{ items: AiProgressItem[] }>(
       `/ai/invocations/${encodeURIComponent(invocationId)}/progress`,
     ),
+  /** The run's stored state: queued, running, awaiting_*, completed, failed or canceled. */
+  invocationState: (invocationId: string) =>
+    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/state`),
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",
+    }),
+  /** Take over: the run waits at its next step until resumed (an agent's window). */
+  pauseInvocation: (invocationId: string) =>
+    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/pause`, {
+      method: "POST",
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    }),
+  resumeInvocation: (invocationId: string) =>
+    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/resume`, {
+      method: "POST",
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
     }),
   decideArtifact: (
     artifactId: string,
@@ -288,6 +302,9 @@ function toServerInvocation(input: AiInvocationRequest) {
     companion_model: input.companionModel,
     model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
+    lesson: input.lesson,
+    lesson_index: input.lessonIndex,
+    media_context: input.mediaContext,
     permission_mode: input.permissionMode,
     coding_tool: input.codingTool,
     display_captures: input.displayCaptures?.map((c) => ({
@@ -322,6 +339,7 @@ function toServerInvocation(input: AiInvocationRequest) {
     execution_mode: input.executionMode,
     window_label: input.windowLabel,
     current_tab: input.currentTab,
+    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

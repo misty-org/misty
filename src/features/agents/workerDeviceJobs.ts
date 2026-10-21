@@ -80,6 +80,23 @@ export function deviceWorkflowErrorCode(error: unknown): string {
   return "device_execution_failed";
 }
 
+// Browser operations that only read the page: a failure there changed nothing.
+const browserReads = new Set([
+  "browser.snapshot",
+  "browser.find",
+  "browser.extract",
+  "browser.wait_for",
+  "browser.inspect",
+  "browser.visual",
+  "browser.downloads.list",
+]);
+
+/** A browser job's failure is certain when it only read, or its script never reached the page. */
+export function browserFailureIsCertain(operation: string, error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return browserReads.has(operation) || message.includes("failed to send message to the webview");
+}
+
 /** Preserve uncertainty while exposing only host-defined failure categories. */
 export function browserUncertainErrorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

@@ -28,10 +28,12 @@ use std::sync::Arc;
 
 #[path = "browser_eval_bridge_dock.rs"]
 mod dock;
-#[path = "browser_eval_bridge_pages.rs"]
-mod pages;
 #[path = "browser_eval_bridge_grants.rs"]
 mod grants;
+#[path = "browser_eval_bridge_pages.rs"]
+mod pages;
+#[path = "browser_eval_bridge_processes.rs"]
+mod processes;
 
 const AGENT: &str = "browser-eval";
 const ACCOUNT: &str = "browser-eval";
@@ -122,6 +124,7 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/close", post(close))
             .route("/dock", post(dock::dock))
             .route("/pages", post(pages::pages))
+            .route("/processes", post(processes::processes))
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
             .with_state(bridge);
@@ -253,12 +256,13 @@ async fn open(bridge: &Bridge, body: OpenTab) -> Result<Value, String> {
             let _ = window.show();
             let _ = window.set_focus();
         }
-        // Agents' own tabs are hidden, as sub-agents' tabs are in production.
+        // Agents' own tabs are parked out of sight, still rendering, as in production.
         if !body.visible {
             browser_webview_hide(
                 main_view(app)?,
                 app.clone(),
-                serde_json::from_value(json!({ "id": id })).map_err(|e| e.to_string())?,
+                serde_json::from_value(json!({ "id": id, "keepLive": true }))
+                    .map_err(|e| e.to_string())?,
             )?;
         }
         Ok::<(), String>(())

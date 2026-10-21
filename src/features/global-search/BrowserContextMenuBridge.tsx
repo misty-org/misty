@@ -113,6 +113,13 @@ function browserPageAtPoint(
   return null;
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest('input,textarea,[contenteditable="true"],[role="textbox"]') !== null
+  );
+}
+
 export function BrowserContextMenuView({
   menu,
   onSelect,
@@ -215,7 +222,12 @@ export function BrowserContextMenuBridge() {
     // renderer's own engine menu. Hand it to the page so this menu reopens there.
     const forwardContextMenu = (event: MouseEvent) => {
       const page = browserPageAtPoint(event.target, event.clientX, event.clientY);
-      if (!page) return;
+      if (!page) {
+        // While Misty's menu for a page is on its way or open, the renderer's own engine
+        // menu would open beside it for a few frames, so it never shows then. Fields keep theirs.
+        if (current.current && !isEditableTarget(event.target)) event.preventDefault();
+        return;
+      }
       event.preventDefault();
       void invoke("browser_webview_context_menu_at", { request: page }).catch(() => undefined);
     };

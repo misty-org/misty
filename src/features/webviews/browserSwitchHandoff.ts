@@ -23,6 +23,7 @@ export function cancelDeferredHide(id: string): void {
   if (!pending) return;
   window.clearTimeout(pending.timer);
   pendingHides.delete(id);
+  if (!pendingHides.size) notifyBrowserSettled();
 }
 
 function releaseDeferredHide(id: string): void {
@@ -31,10 +32,24 @@ function releaseDeferredHide(id: string): void {
   window.clearTimeout(pending.timer);
   pendingHides.delete(id);
   pending.run();
+  if (!pendingHides.size) notifyBrowserSettled();
 }
 
 export function hasPendingHandoff(): boolean {
   return pendingHides.size > 0;
+}
+
+const settledListeners = new Set<() => void>();
+
+/** Calls `listener` whenever a switch handoff or layout move ends, so work that must not run
+ * mid-switch can run the moment it may. */
+export function onBrowserSettled(listener: () => void): () => void {
+  settledListeners.add(listener);
+  return () => void settledListeners.delete(listener);
+}
+
+export function notifyBrowserSettled(): void {
+  settledListeners.forEach((listener) => listener());
 }
 
 /** A page was just presented: every page waiting to make way can go now. */

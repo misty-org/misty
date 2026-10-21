@@ -3,7 +3,10 @@ use super::*;
 use std::collections::BTreeSet;
 use std::sync::atomic::Ordering;
 
-fn window_config<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<tauri::utils::config::WindowConfig, String> {
+fn window_config<R: Runtime>(
+    app: &AppHandle<R>,
+    label: &str,
+) -> Result<tauri::utils::config::WindowConfig, String> {
     let mut config = app
         .config()
         .app
@@ -31,6 +34,7 @@ fn build_window<R: Runtime>(app: &AppHandle<R>, label: &str, title: &str) -> Res
     #[cfg(windows)]
     if let Some(view) = app.get_webview(label) {
         crate::infra::browser_process_ended::watch_page_process(&view);
+        crate::infra::window_focus_windows::watch(&view);
     }
     Ok(())
 }
@@ -190,6 +194,13 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         if let Ok(mut last) = LAST_FOCUSED.lock() {
             *last = Some(label.to_owned());
         }
+        // Alt+Tab focuses the window but none of its webviews; give focus back.
+        #[cfg(windows)]
+        crate::infra::window_focus_windows::window_activated(window);
+    }
+    #[cfg(windows)]
+    if matches!(event, tauri::WindowEvent::Destroyed) {
+        crate::infra::window_focus_windows::forget(label);
     }
     match event {
         tauri::WindowEvent::Focused(true) if !parsed.incognito => {
@@ -252,11 +263,15 @@ pub fn refresh_menus<R: Runtime>(app: &AppHandle<R>) {
 /// opened get a color now, so their first window is already tinted.
 pub fn set_spaces<R: Runtime>(app: &AppHandle<R>, spaces: Vec<(String, bool, String)>) {
     let changed = {
-        let Ok(mut state) = lock_registry() else { return };
+        let Ok(mut state) = lock_registry() else {
+            return;
+        };
         let mut changed = Vec::new();
         let mut known = BTreeSet::new();
         for (space_id, personal, name) in spaces {
-            let Ok(key) = space_key(&space_id, personal) else { continue };
+            let Ok(key) = space_key(&space_id, personal) else {
+                continue;
+            };
             let name: String = name.trim().chars().take(80).collect();
             known.insert(key.clone());
             let before = state.spaces.get(&key).cloned();
@@ -287,7 +302,11 @@ pub fn set_spaces<R: Runtime>(app: &AppHandle<R>, spaces: Vec<(String, bool, Str
     refresh_menus(app);
 }
 
-pub fn set_color<R: Runtime>(app: &AppHandle<R>, key: &str, color: &str) -> Result<SpaceEntry, String> {
+pub fn set_color<R: Runtime>(
+    app: &AppHandle<R>,
+    key: &str,
+    color: &str,
+) -> Result<SpaceEntry, String> {
     if !valid_color(color) {
         return Err("Choose one of the Space colors.".into());
     }
@@ -334,7 +353,9 @@ pub fn delete_space(app: &AppHandle, key: &str) -> Result<(), String> {
         if let Err(error) = crate::infra::extensions::remove_space(&app, &key).await {
             eprintln!("Could not remove a Space's extension data: {error}");
         }
-        if let Err(error) = crate::infra::browser::profile_cleanup::remove_space_data(app, key).await {
+        if let Err(error) =
+            crate::infra::browser::profile_cleanup::remove_space_data(app, key).await
+        {
             eprintln!("Could not remove a Space's website data: {error}");
         }
     });

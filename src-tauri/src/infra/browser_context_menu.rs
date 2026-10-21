@@ -217,6 +217,18 @@ fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+/// Misty's menu for a page in `window` is on its way or open.
+pub(super) fn menu_pending(app: &AppHandle, window: &str) -> bool {
+    app.state::<BrowserSessionState>()
+        .context_menu
+        .lock()
+        .is_ok_and(|pending| {
+            pending
+                .get(window)
+                .is_some_and(|menu| menu.created.elapsed() <= Duration::from_secs(120))
+        })
+}
+
 fn menu_action_allowed(menu: &PendingMenu, key: &str, action: &str) -> bool {
     menu.key == key
         && menu.created.elapsed() <= Duration::from_secs(120)
@@ -230,7 +242,9 @@ pub(super) fn select(
     key: &str,
     action: &str,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) && !webview.label().starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(webview.label())
+        && !webview.label().starts_with("misty-agent-")
+    {
         return Err("Only Misty's trusted shell can select a browser action.".into());
     }
     let state = app.state::<BrowserSessionState>();

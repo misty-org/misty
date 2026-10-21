@@ -1,14 +1,11 @@
 import {
   AppWindowMac,
   Globe,
-  House,
   LogOut,
-  MessagesSquare,
   Palette,
   Pencil,
   Plus,
   Trash2,
-  UsersRound,
 } from "lucide-react";
 import type { Space } from "@/api/spaces/dto/entities";
 import {
@@ -29,13 +26,10 @@ import type { SpaceDialog } from "./SpaceDialogs";
 /**
  * The Space menu: your Spaces (choosing one switches this window, with a checkmark on the
  * one it shows), the Space in a new window, a new Space, then this Space's name, color,
- * sites and leaving or deleting it. In the collapsed sidebar it also carries Home,
- * Chat and People.
+ * sites and leaving or deleting it.
  */
 export function SpaceMenuItems(props: {
   space: Space;
-  compact: boolean;
-  onPage: (page: "home" | "chat") => void;
   onDialog: (dialog: SpaceDialog) => void;
   onCreate: () => void;
   onError: (message: string) => void;
@@ -130,26 +124,6 @@ export function SpaceMenuItems(props: {
   );
   return (
     <>
-      {props.compact && (
-        <>
-          <MenuItem
-            icon={<House className="size-4" />}
-            label="Home"
-            onSelect={() => props.onPage("home")}
-          />
-          <MenuItem
-            icon={<MessagesSquare className="size-4" />}
-            label="Chat"
-            onSelect={() => props.onPage("chat")}
-          />
-          <MenuItem
-            icon={<UsersRound className="size-4" />}
-            label="People"
-            onSelect={later(() => onDialog("members"))}
-          />
-          <DropdownMenuSeparator />
-        </>
-      )}
       {spaceList}
       <DropdownMenuSeparator />
       {windowItems}

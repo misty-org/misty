@@ -1,3 +1,4 @@
+import type { LessonPayload, LessonSummaryPayload } from "@/features/agents/lessons/lessonTypes";
 import type { CollaborationEvent } from "@/features/agents/agentCollaboration";
 import type { DisplayCapture } from "@/features/agents";
 import type { AppRequest } from "@/features/agents";
@@ -11,25 +12,10 @@ export interface ScreenRequest {
   kind: "open" | "look" | "desktop";
   url?: string;
   reason: string;
-  /** current: the user's tab; window: a new tab in their window; separate: an agent window;
-   * remote: a browser another of the person's devices opened for this request. */
-  location: "current" | "separate" | "window" | "ask" | "remote";
+  /** current: the user's tab; window: a new tab in their window; separate: an agent window. */
+  location: "current" | "separate" | "window" | "ask";
   /** The user named where to work; otherwise a matching open tab is reused first. */
   chosen?: boolean;
-  /** The browser session another device opened, with the tab it signed for. */
-  remote?: {
-    deviceId: string;
-    deviceName: string;
-    contexts: Array<{
-      device_id: string;
-      kind: "browser_tab";
-      opaque_ref: string;
-      display_name?: string;
-      capabilities: string[];
-      metadata?: Record<string, string | number | boolean>;
-      run_grant?: { payload: string; signature: string };
-    }>;
-  };
   /** Client progress: waiting for a choice, opening, or done. */
   state?: "pending" | "opening" | "opened" | "declined" | "failed";
   error?: string;
@@ -208,6 +194,11 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
+  /**
+   * The chat's earlier turns, oldest first, from this device's copy: the server keeps no
+   * transcript (docs/design/agent-chats-local/BRIEF.md).
+   */
+  historyTurns?: { invocation_id?: string; prompt: string; reply?: string; created_at: string }[];
   /** A scheduled run this computer claimed and is starting (roadmap C1). */
   scheduleId?: string;
   scheduleClaim?: string;
@@ -239,8 +230,13 @@ export interface AiInvocationRequest {
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   requestedArtifactKind?: AiArtifactKind;
   conversationId?: string;
-  /** Plan researches and proposes; Act does the work. Omitted uses the conversation's mode. */
-  collaborationMode?: "act" | "plan";
+  /** Plan researches and proposes; Act does the work; Teach is a lesson. Omitted uses the conversation's mode. */
+  collaborationMode?: "act" | "plan" | "teach";
+  /** A Teach turn's lesson and the paused lessons it may resume, kept on this device. */
+  lesson?: LessonPayload;
+  lessonIndex?: LessonSummaryPayload[];
+  /** What the video in front was saying, for a question at the cursor. */
+  mediaContext?: import("@/features/agents/companion/mediaContext").MediaContext;
   /** Ask or Auto for this turn. Omitted uses the chat's choice or its agent's default. */
   permissionMode?: "ask" | "auto";
   /** The coding tool a delegated coding run uses this turn; omitted uses the Settings default. */

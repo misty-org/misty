@@ -75,7 +75,9 @@ impl Desktop for System {
     }
 
     fn post_paste(&self, _: PasteKeys) -> Result<(), String> {
-        unsafe { misty_post_command_v() }.then_some(()).ok_or_else(|| "Paste couldn't be sent.".into())
+        unsafe { misty_post_command_v() }
+            .then_some(())
+            .ok_or_else(|| "Paste couldn't be sent.".into())
     }
 
     fn sleep(&self, duration: Duration) {

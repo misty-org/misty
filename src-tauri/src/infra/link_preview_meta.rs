@@ -18,13 +18,18 @@ pub fn parse(html: &str, base: &url::Url) -> PageMeta {
     let mut at = 0;
     while let Some(found) = lower[at..head_end].find("<meta") {
         let start = at + found;
-        let Some(length) = lower[start..head_end].find('>') else { break };
+        let Some(length) = lower[start..head_end].find('>') else {
+            break;
+        };
         let attributes = attributes(&html[start + 5..start + length]);
         let key = attributes
             .iter()
             .find(|(name, _)| name == "property" || name == "name")
             .map(|(_, value)| value.to_ascii_lowercase());
-        let content = attributes.iter().find(|(name, _)| name == "content").map(|(_, value)| value.clone());
+        let content = attributes
+            .iter()
+            .find(|(name, _)| name == "content")
+            .map(|(_, value)| value.clone());
         if let (Some(key), Some(content)) = (key, content) {
             tags.entry(key).or_insert(content);
         }
@@ -42,11 +47,19 @@ pub fn parse(html: &str, base: &url::Url) -> PageMeta {
         title = title_tag(html, &lower).unwrap_or_default();
     }
     let site_name = first(&["og:site_name"]);
-    let image = first(&["og:image", "og:image:url", "twitter:image", "twitter:image:src"]);
+    let image = first(&[
+        "og:image",
+        "og:image:url",
+        "twitter:image",
+        "twitter:image:src",
+    ]);
     PageMeta {
         site_name: clip(&site_name, 80),
         title: clip(&title, 200),
-        description: clip(&first(&["og:description", "twitter:description", "description"]), 300),
+        description: clip(
+            &first(&["og:description", "twitter:description", "description"]),
+            300,
+        ),
         image_url: base
             .join(&image)
             .ok()
@@ -74,7 +87,11 @@ fn attributes(tag: &str) -> Vec<(String, String)> {
             i += 1;
         }
         let name_start = i;
-        while i < bytes.len() && !bytes[i].is_ascii_whitespace() && bytes[i] != b'=' && bytes[i] != b'/' {
+        while i < bytes.len()
+            && !bytes[i].is_ascii_whitespace()
+            && bytes[i] != b'='
+            && bytes[i] != b'/'
+        {
             i += 1;
         }
         if name_start == i {
@@ -95,7 +112,9 @@ fn attributes(tag: &str) -> Vec<(String, String)> {
         let value = match bytes.get(i) {
             Some(&quote) if quote == b'"' || quote == b'\'' => {
                 let start = i + 1;
-                let end = tag[start..].find(quote as char).map_or(bytes.len(), |n| start + n);
+                let end = tag[start..]
+                    .find(quote as char)
+                    .map_or(bytes.len(), |n| start + n);
                 i = (end + 1).min(bytes.len());
                 &tag[start..end]
             }
@@ -179,7 +198,10 @@ mod tests {
         assert_eq!(meta.title, "Tom & Jerry's");
         assert_eq!(meta.site_name, "Example");
         assert_eq!(meta.description, "A page.");
-        assert_eq!(meta.image_url.as_deref(), Some("https://example.com/img/cover.jpg"));
+        assert_eq!(
+            meta.image_url.as_deref(),
+            Some("https://example.com/img/cover.jpg")
+        );
     }
 
     #[test]

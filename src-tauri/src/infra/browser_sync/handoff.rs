@@ -213,9 +213,16 @@ pub(super) async fn capture_current(
         return Err("Finish restoring the browser profile before capturing sign-ins.".into());
     }
     // Only the personal vault inherits the pre-sync store; a Space starts in its own.
-    let physical = binding.active.as_ref().map(|v| v.physical_id.clone()).unwrap_or_else(|| {
-        active.space_id.as_ref().map_or_else(super::super::browser_profile::legacy_profile_identity, |_| logical.clone())
-    });
+    let physical = binding
+        .active
+        .as_ref()
+        .map(|v| v.physical_id.clone())
+        .unwrap_or_else(|| {
+            active.space_id.as_ref().map_or_else(
+                super::super::browser_profile::legacy_profile_identity,
+                |_| logical.clone(),
+            )
+        });
     let observer = capture::CaptureView::open(&app, &physical)?;
     let journal = active
         .handle
@@ -293,7 +300,11 @@ pub(super) async fn capture_current(
         .invalidate_browser_readiness()
         .await
         .map_err(issue)?;
-    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
+    let _ = crate::infra::space_windows::emit(
+        &app,
+        "misty:browser-sync-changed",
+        &active.scope.vault_id,
+    );
     Ok(())
 }
 
@@ -445,7 +456,11 @@ pub(super) async fn restore_current(
         // pages before refreshing cookies so capture cannot echo the old tokens.
         super::super::agent_workspace::stop_account_tasks(app)?;
         active.capture_view = None;
-        super::super::browser::close_profile_views_except(app, &logical, Some(observer.view.label()))?;
+        super::super::browser::close_profile_views_except(
+            app,
+            &logical,
+            Some(observer.view.label()),
+        )?;
         let result = misty_browser_sync::restore::refresh_active_profile(
             &active.handle,
             &logical,
@@ -454,10 +469,20 @@ pub(super) async fn restore_current(
         .await;
         if result.is_ok() {
             let physical = generation.physical_id.clone();
-            set_selected_profile(&active.scope.vault_id, Some(SelectedProfile { logical: logical.clone(), physical }))?;
+            set_selected_profile(
+                &active.scope.vault_id,
+                Some(SelectedProfile {
+                    logical: logical.clone(),
+                    physical,
+                }),
+            )?;
         }
         if mode == RestoreMode::Explicit {
-            let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
+            let _ = crate::infra::space_windows::emit(
+                &app,
+                "misty:browser-profile-changed",
+                &active.id,
+            );
         }
         return result
             .map(|_| ())
@@ -500,11 +525,16 @@ pub(super) async fn restore_current(
     if closed_live_views && mode == RestoreMode::Explicit {
         // Reopen only after the write lease is released. The frontend discards
         // old view handles and reconstructs visible panes from its workspace.
-        let _ = crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
+        let _ =
+            crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
     }
     active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
     note_issue(&active.scope.vault_id, active.credential_issue.clone());
-    let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", &active.scope.vault_id);
+    let _ = crate::infra::space_windows::emit(
+        &app,
+        "misty:browser-sync-changed",
+        &active.scope.vault_id,
+    );
     result?;
     Ok(())
 }

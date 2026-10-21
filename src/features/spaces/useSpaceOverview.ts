@@ -55,30 +55,47 @@ export function SpaceOverviewProvider({
 }) {
   const data = useSpaceOverviewData(accountId, space, true);
   const location = useLocation();
-  const focused = useWorkspaceViewFocused();
   const personal = useSpacePersonalItems(space.id);
   const activeKey = spaceItemKeyFromRoute(location.pathname + location.search, space.id);
   const valid = data.items.some((item) => item.id === activeKey);
+  return createElement(
+    OverviewContext.Provider,
+    { value: { accountId, spaceId: space.id, data } },
+    createElement(OpenedItemVisit, {
+      visit: valid && activeKey && accountId ? `${accountId}:${space.id}:${activeKey}` : "",
+      itemKey: activeKey,
+      update: personal.update,
+    }),
+    children,
+  );
+}
+
+/**
+ * Records the open item as opened while its tab has focus. Focus is read here rather than by the
+ * provider, so a tab gaining or losing focus renders this alone, not the whole Space page.
+ */
+function OpenedItemVisit(props: {
+  visit: string;
+  itemKey: string | null | undefined;
+  update: ReturnType<typeof useSpacePersonalItems>["update"];
+}) {
+  const focused = useWorkspaceViewFocused();
   const lastVisit = useRef("");
-  const updateRef = useRef(personal.update);
-  updateRef.current = personal.update;
+  const updateRef = useRef(props.update);
+  updateRef.current = props.update;
+  const { visit, itemKey } = props;
   useEffect(() => {
-    const visit = `${accountId}:${space.id}:${activeKey}`;
-    if (!focused || !valid || !activeKey || !accountId) {
+    if (!focused || !visit || !itemKey) {
       lastVisit.current = "";
       return;
     }
     if (lastVisit.current === visit) return;
     lastVisit.current = visit;
-    void updateRef.current(activeKey, { opened: true }).catch(() => {
+    void updateRef.current(itemKey, { opened: true }).catch(() => {
       lastVisit.current = "";
     });
-  }, [focused, valid, activeKey, space.id, accountId]);
-  return createElement(
-    OverviewContext.Provider,
-    { value: { accountId, spaceId: space.id, data } },
-    children,
-  );
+  }, [focused, visit, itemKey]);
+  return null;
 }
 export function useSpaceOverview(
   accountId: string,

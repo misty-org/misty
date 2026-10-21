@@ -74,7 +74,8 @@ fn media_message(raw: &str) -> Option<MediaMessage> {
     }
     let message: MediaMessage = serde_json::from_str(raw).ok()?;
     let m = &message.media;
-    let fine = |value: Option<f64>| value.is_none_or(|n| n.is_finite() && (0.0..=1.0e9).contains(&n));
+    let fine =
+        |value: Option<f64>| value.is_none_or(|n| n.is_finite() && (0.0..=1.0e9).contains(&n));
     (m.title.chars().count() <= 200
         && m.artist.chars().count() <= 200
         && m.artwork.len() <= 600
@@ -393,14 +394,28 @@ impl HostChannel for Channel {
             let owner = super::browser_owner_label(app, id);
             match status.status {
                 StatusChange::Stopped => {
-                    let _ = app.emit_to(owner, "misty://browser-stopped", BrowserFocusEvent { id: id.to_owned() });
+                    let _ = app.emit_to(
+                        owner,
+                        "misty://browser-stopped",
+                        BrowserFocusEvent { id: id.to_owned() },
+                    );
                 }
                 // A finished document ends the load even when WebKit never reports it finished.
                 StatusChange::Loaded if message.main_frame => {
-                    let _ = app.emit_to(owner, "misty://browser-stopped", BrowserFocusEvent { id: id.to_owned() });
+                    let _ = app.emit_to(
+                        owner,
+                        "misty://browser-stopped",
+                        BrowserFocusEvent { id: id.to_owned() },
+                    );
                 }
                 StatusChange::Location if message.main_frame => {
-                    super::load_watch::emit_location(app, &owner, id, message.webview, status.url.as_deref());
+                    super::load_watch::emit_location(
+                        app,
+                        &owner,
+                        id,
+                        message.webview,
+                        status.url.as_deref(),
+                    );
                 }
                 _ => {}
             }

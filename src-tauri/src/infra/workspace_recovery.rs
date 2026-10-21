@@ -38,7 +38,7 @@ pub(super) fn close_account() -> Result<(), String> {
     Ok(())
 }
 fn main_only(view: &tauri::Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(view.label()) {
+    if !crate::infra::space_windows::is_person_window(view.label()) {
         return Err("Workspace recovery is available only in the main workspace".into());
     }
     Ok(())

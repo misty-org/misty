@@ -1,4 +1,5 @@
 import { isAuthPath } from "@/features/app-shell/routes";
+import { appThemeChangedEvent } from "@/features/settings";
 import { appZoomChangedEvent, getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import type { RefObject } from "react";
 import { useLayoutEffect, useRef } from "react";
@@ -7,12 +8,21 @@ import {
   hideBrowserWebview,
   isBrowserLayoutMoving,
   isBrowserRuntimeCreated,
+  prewarmBrowserWebview,
   requestBrowserWebviewLayout,
   syncBrowserWebview,
   useBrowserRuntimeStore,
+  windowChromeChangedEvent,
 } from "./browserRuntime";
+import { browserSlideActive } from "@/features/webviews/browserSlide";
+import { browserBoundsAtAppZoom, visibleBrowserBounds } from "./browserHostBounds";
 import type { BrowserBounds, BrowserTheme } from "./types";
-import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
+import {
+  dockLeaves,
+  useWorkspaceStore,
+  type WorkspaceLayout,
+  type WorkspaceView,
+} from "@/features/workspace";
 
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
@@ -44,6 +54,33 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     const effectTab = { id: tabId, instanceKey: tabInstanceKey };
     const macNativeLiveResize = input.nativeLiveResize && isMacNativeRuntime();
 
+    // A tab in the panel that has not been shown yet loads its page in the background, so
+    // clicking it shows the page at once instead of loading it then.
+    let prewarmQueued = false;
+    const prewarm = () => {
+      if (prewarmQueued || isAuthPath(window.location.pathname)) return;
+      prewarmQueued = true;
+      queueBrowserPrewarm(() => {
+        const current = latest.current;
+        if (disposed || current.offline || !current.url || isBrowserRuntimeCreated(effectTab))
+          return;
+        // Shown meanwhile: its own sync creates it.
+        if (current.hostRef.current && visibleBrowserBounds(current.hostRef.current)) return;
+        const bounds = shownPageBounds();
+        if (!bounds) {
+          prewarmQueued = false;
+          return;
+        }
+        return prewarmBrowserWebview({
+          tab: current.tab,
+          url: current.url,
+          bounds,
+          theme: current.theme,
+          nativeLiveResize: current.nativeLiveResize,
+        });
+      });
+    };
+
     const synchronize = () => {
       frame = 0;
       if (disposed) return;
@@ -62,8 +99,11 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (!bounds) {
         if (!hiddenForInvalidBounds) {
           hiddenForInvalidBounds = true;
-          void hideBrowserWebview(current.tab);
+          // A tab hidden because another browser tab took its place keeps its page up until
+          // that page is on screen; parking it at once left a frame with no page at all.
+          void hideBrowserWebview(current.tab, browserTabReplaced(current.tab.id) ? 120 : 0);
         }
+        prewarm();
         return;
       }
       hiddenForInvalidBounds = false;
@@ -120,6 +160,16 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
         scheduleResizeSettle();
         return;
       }
+      // While a panel above the page slides (the Space bar), the observer's measurement is
+      // already current for this frame, so measuring now sends the page its new size a frame
+      // sooner than waiting for the next one. Any other layout change keeps the next frame, so
+      // closing or switching tabs settles before the page moves.
+      if (browserSlideActive()) {
+        if (disposed) return;
+        if (frame) window.cancelAnimationFrame(frame);
+        synchronize();
+        return;
+      }
       schedule();
     };
     const observeWindowResize = () => {
@@ -137,8 +187,22 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (!current || (event.target instanceof Node && event.target.contains(current))) schedule();
     };
     window.addEventListener("scroll", scrolled, true);
+    // Switching to a tab or view without this page hides it in the same tick as the switch,
+    // not a frame or two later when the host's size observer notices it is gone. On Windows
+    // the page drops beneath the renderer, so the old page is all that could show meanwhile.
+    // A browser tab taking its place keeps the handoff, which the observer runs.
+    const unsubscribeLayout = useWorkspaceStore.subscribe((state, previous) => {
+      if (disposed || hiddenForInvalidBounds || state.layout === previous.layout) return;
+      if (!viewActive(previous.layout.root, tabId) || viewActive(state.layout.root, tabId)) return;
+      if (browserTabReplaced(tabId)) return;
+      hiddenForInvalidBounds = true;
+      void hideBrowserWebview(latest.current.tab);
+    });
     window.addEventListener(browserRuntimeResumeEvent, schedule);
     window.addEventListener(appZoomChangedEvent, schedule);
+    // The chrome around rounded corners changes color with the theme and the Space.
+    window.addEventListener(appThemeChangedEvent, schedule);
+    window.addEventListener(windowChromeChangedEvent, schedule);
     window.visualViewport?.addEventListener("resize", observeWindowResize);
     window.visualViewport?.addEventListener("scroll", schedule);
     document.addEventListener("visibilitychange", schedule);
@@ -159,11 +223,14 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       if (settleTimer) window.clearTimeout(settleTimer);
       recoveryTimers.forEach((timer) => window.clearTimeout(timer));
       observer.disconnect();
+      unsubscribeLayout();
       window.removeEventListener("misty:workspace-geometry-changed", recoverLayout);
       window.removeEventListener("resize", observeWindowResize);
       window.removeEventListener("scroll", scrolled, true);
       window.removeEventListener(browserRuntimeResumeEvent, schedule);
       window.removeEventListener(appZoomChangedEvent, schedule);
+      window.removeEventListener(appThemeChangedEvent, schedule);
+      window.removeEventListener(windowChromeChangedEvent, schedule);
       window.visualViewport?.removeEventListener("resize", observeWindowResize);
       window.visualViewport?.removeEventListener("scroll", schedule);
       document.removeEventListener("visibilitychange", schedule);
@@ -188,118 +255,83 @@ function currentWindowSize(): string {
   return `${window.innerWidth}:${window.innerHeight}`;
 }
 
-function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
-  if (!host.isConnected || document.visibilityState === "hidden") return null;
-  const rect = host.getBoundingClientRect();
-  const x = Math.max(0, rect.left);
-  const y = Math.max(0, rect.top);
-  const right = Math.min(window.innerWidth, rect.right);
-  const bottom = Math.min(window.innerHeight, rect.bottom);
-  const width = right - x;
-  const height = bottom - y;
-  if (width < 2 || height < 2) return null;
-  const cornerRadii = clippedCornerRadii(host, rect);
-  return browserBoundsAtAppZoom(
-    { x, y, width, height, ...(cornerRadii ? { cornerRadii } : {}) },
-    getAppliedAppRenderScale(),
-  );
-}
-
-/** The native page sits above the app, so CSS cannot round it. Report the
- * radius of each rounded corner the page reaches (its own device frame, the
- * workspace pane and the Misty panel edge) so the host can mask it. */
-function clippedCornerRadii(
-  host: HTMLElement,
-  rect: DOMRect,
-): BrowserBounds["cornerRadii"] | undefined {
-  const radii: [number, number, number, number] = [0, 0, 0, 0];
-  for (
-    let clip: HTMLElement | null = host;
-    clip;
-    clip = clip.parentElement?.closest<HTMLElement>("[data-browser-corner-clip]") ?? null
-  ) {
-    const corners = clipCornerRadii(clip, rect);
-    for (let index = 0; index < 4; index += 1)
-      radii[index] = Math.max(radii[index]!, corners[index]!);
-  }
-  return radii.some((value) => value > 0) ? radii : undefined;
-}
-
-const cornerNames = ["top-left", "top-right", "bottom-right", "bottom-left"] as const;
-
-function clipCornerRadii(clip: HTMLElement, rect: DOMRect): [number, number, number, number] {
-  const style = getComputedStyle(clip);
-  const box = clip.getBoundingClientRect();
-  // A clip's border and padding both keep the page inside: a pane's seam is its padding, a
-  // page area's outline is its border.
-  const inset = (padding: string, border: string) =>
-    (parseFloat(padding) || 0) + (parseFloat(border) || 0);
-  const pad = {
-    top: inset(style.paddingTop, style.borderTopWidth),
-    right: inset(style.paddingRight, style.borderRightWidth),
-    bottom: inset(style.paddingBottom, style.borderBottomWidth),
-    left: inset(style.paddingLeft, style.borderLeftWidth),
-  };
-  // The page fills the clip's content box.
-  const edge = {
-    top: box.top + pad.top,
-    right: box.right - pad.right,
-    bottom: box.bottom - pad.bottom,
-    left: box.left + pad.left,
-  };
-  const meets = (a: number, b: number) => Math.abs(a - b) < 1;
-  return cornerNames.map((name) => {
-    const [y, x] = name.split("-") as ["top" | "bottom", "left" | "right"];
-    if (!meets(rect[y], edge[y]) || !meets(rect[x], edge[x])) return 0;
-    // Pane corners are masks drawn from the seam geometry, not border radii;
-    // custom properties inherit, so only the pane itself reads them.
-    const outer =
-      clip.dataset.browserCornerClip === "seam"
-        ? parseFloat(style.getPropertyValue(`--pane-corner-${name}`))
-        : parseFloat(style.getPropertyValue(`border-${name}-radius`));
-    return Math.max(0, (outer || 0) - Math.max(pad[y], pad[x]));
-  }) as [number, number, number, number];
-}
-
 function isMacNativeRuntime(): boolean {
   return /Mac/.test(navigator.platform);
-}
-
-function browserBoundsAtAppZoom(bounds: BrowserBounds, appZoom: number): BrowserBounds {
-  const zoom = Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1;
-  return quantizeBrowserBounds({
-    x: bounds.x * zoom,
-    y: bounds.y * zoom,
-    width: bounds.width * zoom,
-    height: bounds.height * zoom,
-    ...(bounds.cornerRadii
-      ? {
-          cornerRadii: bounds.cornerRadii.map((radius) => radius * zoom) as [
-            number,
-            number,
-            number,
-            number,
-          ],
-        }
-      : {}),
-  });
-}
-
-function quantizeBrowserBounds(bounds: BrowserBounds): BrowserBounds {
-  const quantize = (value: number) => Math.round(value * 2) / 2;
-  return {
-    x: quantize(bounds.x),
-    y: quantize(bounds.y),
-    width: Math.max(1, quantize(bounds.width)),
-    height: Math.max(1, quantize(bounds.height)),
-    ...(bounds.cornerRadii ? { cornerRadii: bounds.cornerRadii } : {}),
-  };
 }
 
 /**
  * Whether some pane still shows a browser tab, as when switching between them. Signed-out pages
  * show no pane at all, whatever the layout remembers, so no page is coming to take over.
  */
+/** Another browser tab is now showing and this one is no longer any pane's active view. */
+function browserTabReplaced(tabId: string): boolean {
+  if (!browserSurfaceStillActive()) return false;
+  return !dockLeaves(useWorkspaceStore.getState().layout.root).some(
+    (pane) => pane.activeViewId === tabId,
+  );
+}
+
+let prewarmQueue: Promise<void> = Promise.resolve();
+
+/**
+ * Resolves once the page on screen has been drawn, or when no browser page is on screen to wait
+ * for. A restored window of tabs then draws the tab in front first instead of starting every
+ * page's process beside it.
+ */
+function whenFirstPagePresented(): Promise<void> {
+  const ready = () =>
+    !browserSurfaceStillActive() ||
+    Object.values(useBrowserRuntimeStore.getState().presented).some(Boolean);
+  return new Promise<void>((resolve) => {
+    if (ready()) return resolve();
+    const stops = [useBrowserRuntimeStore, useWorkspaceStore].map((store) =>
+      store.subscribe(() => {
+        if (!ready()) return;
+        stops.forEach((stop) => stop());
+        resolve();
+      }),
+    );
+  });
+}
+
+/** Background page loads run one at a time while the app is idle, so they never crowd out what
+ * the person is doing. */
+function queueBrowserPrewarm(run: () => Promise<void> | void): void {
+  prewarmQueue = prewarmQueue
+    .then(whenFirstPagePresented)
+    .then(
+      () =>
+        new Promise<void>((resolve) => {
+          if (typeof window.requestIdleCallback === "function")
+            window.requestIdleCallback(() => resolve(), { timeout: 1500 });
+          else window.setTimeout(resolve, 200);
+        }),
+    )
+    .then(run)
+    .catch(() => undefined);
+}
+
+/** The size a page has once its tab is shown: a page on screen now, else a pane on screen. */
+function shownPageBounds(): BrowserBounds | null {
+  for (const selector of ["[data-browser-page-host]", "[data-workspace-pane]"]) {
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+      const rect = element.getBoundingClientRect();
+      const x = Math.max(0, rect.left);
+      const y = Math.max(0, rect.top);
+      const width = Math.min(window.innerWidth, rect.right) - x;
+      const height = Math.min(window.innerHeight, rect.bottom) - y;
+      if (width >= 2 && height >= 2)
+        return browserBoundsAtAppZoom({ x, y, width, height }, getAppliedAppRenderScale());
+    }
+  }
+  return null;
+}
+
+/** Some pane of the shown tab has this view in front. */
+function viewActive(root: WorkspaceLayout["root"], viewId: string): boolean {
+  return dockLeaves(root).some((pane) => pane.activeViewId === viewId);
+}
+
 function browserSurfaceStillActive(): boolean {
   if (isAuthPath(window.location.pathname)) return false;
   return dockLeaves(useWorkspaceStore.getState().layout.root).some(

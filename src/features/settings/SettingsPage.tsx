@@ -5,7 +5,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsFrame, DesktopSettingsNotice } from "./components/DesktopSettingsUI";
-import type { DesktopSettingsNavEntry } from "./components/SettingsNavigation";
+import type { DesktopSettingsNavGroup } from "./components/SettingsNavigation";
 import {
   searchSettings,
   SettingsSearchResults,
@@ -16,19 +16,26 @@ import { blockIfUnsaved, setSettingsStaging, useSettingsProfiles } from "./profi
 import { SettingsSaveBar } from "./components/SettingsSaveBar";
 import { NativeAvailability } from "./sections/FeatureSections";
 import { settingsErrorMessage } from "./settingsErrors";
-import { canonicalSettingsSection, settingsAreas, settingsRegistry } from "./settingsRegistry";
+import {
+  canonicalSettingsSection,
+  settingsAreaEntry,
+  settingsAreas,
+  settingsGroups,
+  settingsRegistry,
+} from "./settingsRegistry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import { useSettingsStore } from "./store/useSettingsStore";
 export { canonicalSettingsSection, settingsRegistry } from "./settingsRegistry";
 export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
-const navItems: DesktopSettingsNavEntry<SettingsSection>[] = settingsRegistry
-  .filter(
-    (entry, index) => settingsRegistry.findIndex((item) => item.area === entry.area) === index,
-  )
-  .map((entry) => ({
-    id: entry.id,
-    ...settingsAreas[entry.area],
-  }));
+const navGroups: DesktopSettingsNavGroup<SettingsSection>[] = settingsGroups.map((group) => ({
+  label: group.label,
+  items: group.areas.flatMap((area) => {
+    const info = settingsAreas[area];
+    const first = settingsAreaEntry(area);
+    const id = first?.id ?? (area as SettingsSection);
+    return [{ id, label: info.label, icon: info.icon }];
+  }),
+}));
 /** Scrolls to, focuses, and briefly highlights the row a search result pointed at. */
 function useFocusSettingRow(focus: { label: string; request: number }) {
   const content = useRef<HTMLDivElement>(null);
@@ -46,7 +53,16 @@ function useFocusSettingRow(focus: { label: string; request: number }) {
         find("[data-settings-target]", "data-settings-target");
       if (!element) return;
       const wholePage = focus.label.startsWith("page:");
-      element.scrollIntoView?.({ block: wholePage ? "start" : "center" });
+      // Scroll only the page. scrollIntoView also scrolls the clipped frame around it, which
+      // slid the whole settings window up and hid its close button.
+      const scroller = element.closest<HTMLElement>("[data-settings-scroller]");
+      if (scroller) {
+        const offset = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+        scroller.scrollTop =
+          scroller.scrollTop +
+          offset -
+          (wholePage ? 0 : (scroller.clientHeight - element.offsetHeight) / 2);
+      }
       const target = wholePage
         ? element
         : (element.querySelector<HTMLElement>(
@@ -130,7 +146,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
     <DesktopSettingsFrame
       activeId={areaEntries[0].id}
       ariaLabel="Settings"
-      items={navItems}
+      groups={navGroups}
       navigationLabel="Settings sections"
       onClose={() => {
         if (!blockIfUnsaved()) props.onClose?.();
@@ -161,7 +177,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
       }
       contentHeader={
         <>
-          {(store.error || (entry.area !== "sync" && profile.error)) && (
+          {(store.error || (entry.id !== "sync" && profile.error)) && (
             <DesktopSettingsNotice
               action={
                 <Button

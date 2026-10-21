@@ -133,7 +133,6 @@ pub fn space_windows_menu(webview: tauri::Webview, app: AppHandle) -> Result<(),
     }
 }
 
-
 /// Whether this window opens Misty's own links (`misty://`): the last focused Space
 /// window. Web links are routed natively instead (see `links`).
 #[tauri::command]

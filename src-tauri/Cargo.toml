@@ -109,7 +109,7 @@ objc2 = "0.6.4"
 security-framework = "3.7"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSBitmapImageRep", "NSImageRep", "NSEvent", "NSPasteboard", "NSResponder", "NSScrollView", "NSTrackingArea", "NSView", "NSWindow"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSData", "NSBundle", "NSDictionary", "NSError", "NSObject", "NSProcessInfo", "NSUserDefaults", "NSUUID", "NSString", "NSURL", "NSURLResponse", "NSHTTPCookie", "NSDate"] }
-objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
+objc2-web-kit = { version = "0.3.2", default-features = false, features = ["WKSecurityOrigin", "WKSnapshotConfiguration", "objc2-core-foundation", "WKContentWorld", "WKFrameInfo", "WKScriptMessage", "WKScriptMessageHandler", "objc2-app-kit", "WKWebView", "WKWebViewConfiguration", "WKUserContentController", "WKUserScript", "WKNavigationResponse", "WKNavigationDelegate", "WKHTTPCookieStore", "WKWebsiteDataStore", "block2"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }

@@ -6,7 +6,7 @@ import {
 import type { AiCitation, AiContextReference, AiInvocationEvent } from "@/features/ai-surface";
 import { globalMistyId } from "./globalMistyActions";
 import type { GlobalSearchState } from "./globalSearchState";
-import { settleProgress, withToolEvent } from "@/features/agents";
+import { settleProgress, withAnswer, withToolEvent } from "@/features/agents";
 import type {
   GlobalAiCitation,
   GlobalAiContextRef,
@@ -66,6 +66,26 @@ export function patchConversationMessage(
     updatedAt: new Date().toISOString(),
     messages: conversation.messages.map((message) =>
       message.id === messageId ? { ...message, ...patch } : message,
+    ),
+  }));
+}
+
+/** Ends a reply that will get no more events: its tools stop running and its
+ * activity line clears, so nothing keeps animating on a finished message. */
+export function settleConversationMessage(
+  set: GlobalSearchSet,
+  get: GlobalSearchGet,
+  conversationId: string,
+  messageId: string,
+  patch: Partial<GlobalAiMessage> & { state: NonNullable<GlobalAiMessage["state"]> },
+) {
+  updateConversation(set, get, conversationId, (conversation) => ({
+    ...conversation,
+    updatedAt: new Date().toISOString(),
+    messages: conversation.messages.map((message) =>
+      message.id === messageId
+        ? { ...message, ...patch, progress: settleProgress(message.progress), activity: undefined }
+        : message,
     ),
   }));
 }
@@ -169,8 +189,11 @@ export function applyGlobalInvocationEvent(
     return;
   }
   if (event.type === "assistant.message") {
+    const current = get()
+      .conversations.find((conversation) => conversation.id === conversationId)
+      ?.messages.find((message) => message.id === messageId);
     patchConversationMessage(set, get, conversationId, messageId, {
-      content: event.text,
+      ...withAnswer(current ?? {}, event.text),
       state: "streaming",
       activity: undefined,
     });

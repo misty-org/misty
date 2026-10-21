@@ -1,14 +1,9 @@
 import type { useMistyStore } from "@/features/misty/useMistyStore";
-import { cn } from "@/shared/ui";
 import type { GlobalAiMessage } from "@/features/global-search/types";
 import type { Execution } from "./localExecution";
 import { toolLabel } from "./progress/progressTimeline";
 
-export const islandClass = cn(
-  "pointer-events-auto fixed inset-x-0 bottom-4 layer-workspace-overlay mx-auto flex flex-col gap-2",
-  "w-[min(560px,calc(100dvw-32px))] rounded-2xl border border-charcoal-border bg-charcoal-card",
-  "p-2 text-cream shadow-lg",
-);
+export { islandClass } from "./islandStyle";
 
 export const settled = new Set(["completed", "failed", "canceled", "cancelled"]);
 

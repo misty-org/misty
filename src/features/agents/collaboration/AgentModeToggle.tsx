@@ -1,4 +1,4 @@
-import { ClipboardList, Flag, Shield, ShieldCheck } from "lucide-react";
+import { ClipboardList, Flag, GraduationCap, Shield, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -14,14 +14,20 @@ import { permissionModeLabel, permissionModes, setPermissionMode } from "./permi
 import { useCollaborationStore } from "./store";
 import type { ConversationMode, PermissionMode } from "./types";
 
-type Mode = PermissionMode | "plan";
+type Mode = PermissionMode | "plan" | "teach";
 
-const modeIcons = { ask: Shield, auto: ShieldCheck, plan: ClipboardList } as const;
+const modeIcons = {
+  ask: Shield,
+  auto: ShieldCheck,
+  plan: ClipboardList,
+  teach: GraduationCap,
+} as const;
 
 /**
  * How the agent works in this chat, in one menu: Manual pauses before every change, Auto
  * continues where an approval was remembered, and Plan researches read-only and proposes a
- * plan. Goal sits at the bottom. Shift+Tab in the composer switches Plan too. The next
+ * plan, and Teach makes the chat a lesson that teaches one step at a time and never
+ * acts. Goal sits at the bottom. Shift+Tab in the composer switches Plan too. The next
  * message uses the new mode; a running turn keeps the mode it started in.
  */
 export function AgentModeMenu({
@@ -40,12 +46,13 @@ export function AgentModeMenu({
     conversationId ? s.byConversation[conversationId]?.goal : undefined,
   );
   const active = goal?.status === "pursuing" || goal?.status === "paused";
-  const current: Mode = mode === "plan" ? "plan" : permission;
-  const label = current === "plan" ? "Plan" : permissionModeLabel(permission);
+  const current: Mode = mode === "plan" || mode === "teach" ? mode : permission;
+  const label =
+    current === "plan" ? "Plan" : current === "teach" ? "Teach" : permissionModeLabel(permission);
   const Icon = modeIcons[current];
   const choose = (next: Mode) => {
     const store = useCollaborationStore.getState();
-    if (next === "plan") return void store.setMode(conversationId, "plan");
+    if (next === "plan" || next === "teach") return void store.setMode(conversationId, next);
     void store.setMode(conversationId, "act");
     void setPermissionMode(conversationId, next);
   };
@@ -69,6 +76,7 @@ export function AgentModeMenu({
               </DropdownMenuRadioItem>
             ))}
             <DropdownMenuRadioItem value="plan">Plan</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="teach">Teach</DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem disabled={!conversationId} onSelect={() => setGoalOpen(true)}>
