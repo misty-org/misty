@@ -156,6 +156,8 @@ export class EvalClient {
       return run;
     } catch (error) {
       run.terminal = controller.signal.aborted ? "timeout" : `error: ${String(error).slice(0, 200)}`;
+      // A run past the eval's time keeps working otherwise, beside the next task.
+      if (controller.signal.aborted && run.invocationId) await this.raw(`/ai/invocations/${run.invocationId}/cancel`, { method: "POST" }).catch(() => undefined);
       return run;
     } finally {
       clearTimeout(timer);

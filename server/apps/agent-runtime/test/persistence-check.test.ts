@@ -10,7 +10,8 @@ describe("earlyGiveUp", () => {
 
   it("lets a finish stand when it is complete, late, or blocked on the person", () => {
     expect(earlyGiveUp({ outcome: "completed", summary: "Done.", remaining: [] }, 3, 120)).toBeUndefined();
-    expect(earlyGiveUp(partial("Tecovas boot options", "the page failed"), 70, 120)).toBeUndefined();
+    expect(earlyGiveUp(partial("Tecovas boot options", "the page failed"), 70, 120)).toContain("Tecovas boot options");
+    expect(earlyGiveUp(partial("Tecovas boot options", "the page failed"), 111, 120)).toBeUndefined();
     expect(earlyGiveUp(partial("Order history", "needs the person to sign in"), 3, 120)).toBeUndefined();
   });
 });

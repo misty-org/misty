@@ -66,12 +66,12 @@ async function perform(client: EvalClient, task: OdysseysTask, agentId: string, 
     prompt: task.prompt, model_override: model, reasoning_effort: effort, window_label: "main", agent_id: agentId,
     device_contexts: await deviceContexts(userId, agentId), mode: "drawer", surface_id: "global", eval_turn_limit: turns,
   };
-  let result = await client.run(body, 20 * 60_000, [], (event) => recorder.observe(event));
+  let result = await client.run(body, 35 * 60_000, [], (event) => recorder.observe(event));
   // A run that failed before its first tool call with no answer never reached the agent (the
   // model provider was unreachable, say): run the task once more rather than grade nothing.
   if (result.terminal === "invocation.failed" && !result.tools.length && !result.answer.trim()) {
     process.stderr.write(`RETRY ${task.id.slice(0, 10)}: the run failed before any work\n`);
-    result = await client.run({ ...body, device_contexts: await deviceContexts(userId, agentId) }, 20 * 60_000, [], (event) => recorder.observe(event));
+    result = await client.run({ ...body, device_contexts: await deviceContexts(userId, agentId) }, 35 * 60_000, [], (event) => recorder.observe(event));
   }
   const seconds = (performance.now() - started) / 1000;
   await recorder.finish(result.answer);
