@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { create } from "zustand";
 const mocks = vi.hoisted(() => ({
@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   unlock: vi.fn(),
   lock: vi.fn(),
   forget: vi.fn(),
+  deleteVault: vi.fn(),
   read: vi.fn(),
   control: vi.fn(),
   claim: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock("./native", () => ({
   unlockNativeSync: mocks.unlock,
   lockNativeSync: mocks.lock,
   forgetNativeSyncKey: mocks.forget,
+  deleteNativeSyncVault: mocks.deleteVault,
   vaultAvailability: mocks.availability,
   controlNativeDevice: mocks.control,
   claimNativeWorkspace: mocks.claim,
@@ -203,6 +205,33 @@ it("locks sync and prevents background auto-unlock; forgetting removes the saved
   expect(mocks.lock).toHaveBeenCalledWith("s", true);
   expect(useBrowserSyncStore.getState().locked).toBe("a");
   expect(screen.getByLabelText("Sync password")).toBeTruthy();
+});
+it("deletes a locked vault after confirmation, then offers to create a new one", async () => {
+  useBrowserSyncStore.setState({ session: null });
+  mocks.availability.mockResolvedValue({ local: false, remote: true });
+  mocks.deleteVault.mockResolvedValue(undefined);
+  await mount();
+  expect(screen.queryByRole("button", { name: "Create sync vault" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Delete vault" }));
+  expect(mocks.deleteVault).not.toHaveBeenCalled();
+  const dialog = screen.getByRole("alertdialog");
+  await act(async () =>
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete vault" })),
+  );
+  expect(mocks.deleteVault).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("button", { name: "Create sync vault" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Delete vault" })).toBeNull();
+});
+it("keeps the vault and shows why when deleting fails", async () => {
+  mocks.deleteVault.mockRejectedValue(new Error("Could not reach the sync server."));
+  await mount();
+  fireEvent.click(screen.getByRole("button", { name: "Delete vault" }));
+  const dialog = screen.getByRole("alertdialog");
+  await act(async () =>
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete vault" })),
+  );
+  expect(within(dialog).getByRole("alert").textContent).toBe("Could not reach the sync server.");
+  expect(useBrowserSyncStore.getState().session).toBeTruthy();
 });
 it("clears old-account forms when the account changes", async () => {
   useBrowserSyncStore.setState({ session: null });

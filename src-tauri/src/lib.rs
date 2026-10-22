@@ -358,6 +358,7 @@ pub fn run() {
                     crate::infra::browser_sync::browser_sync_lock,
                     crate::infra::browser_sync::browser_sync_set_frequency,
                     crate::infra::browser_sync::browser_sync_forget_key,
+                    crate::infra::browser_sync::browser_sync_delete_vault,
                     crate::infra::browser_sync::browser_sync_space_window,
                     crate::infra::browser_sync::browser_sync_space_sites,
                     crate::infra::browser_sync::browser_sync_set_space_sites,

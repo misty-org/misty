@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Button, cn, Skeleton } from "@/shared/ui";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "@/features/settings/desktop";
 import { SettingsNote } from "@/features/settings/SettingsControls";
+import { SyncDeleteVaultDialog } from "./SyncDeleteVaultDialog";
 import { SyncVaultForm } from "./SyncVaultForm";
 import { generateSyncSecret } from "./native";
 import type { SyncController } from "./useSyncController";
@@ -70,9 +72,39 @@ function SyncVaultFormSkeleton() {
     </div>
   );
 }
+/** An account has one vault at a time; deleting it is how a new one is created. */
+function DeleteVaultRow({ controller }: { controller: SyncController }) {
+  const [open, setOpen] = useState(false);
+  const { vault } = controller;
+  if (!vault || (!vault.local && vault.remote !== true)) return null;
+  return (
+    <Row
+      label="Delete vault"
+      description="Removes synced data from the server and stops sync on every device, so you can create a new vault. Use it if you lost your sync password or secret."
+    >
+      <Button variant="outline" disabled={controller.busy} onClick={() => setOpen(true)}>
+        Delete vault
+      </Button>
+      <SyncDeleteVaultDialog
+        open={open}
+        onOpenChange={setOpen}
+        onConfirm={controller.deleteVault}
+      />
+    </Row>
+  );
+}
 export function SyncAccountSettings({ controller }: { controller: SyncController }) {
   if (controller.accountId && controller.desktop && !controller.session && controller.vault)
-    return <SyncUnlockForm controller={controller} sectionTitle="Sync account" />;
+    return (
+      <>
+        <SyncUnlockForm controller={controller} sectionTitle="Sync account" />
+        {!controller.reenroll && (
+          <Section title="Start over">
+            <DeleteVaultRow controller={controller} />
+          </Section>
+        )}
+      </>
+    );
   return (
     <Section title="Sync account">
       {!controller.accountId ? (
@@ -99,6 +131,7 @@ export function SyncAccountSettings({ controller }: { controller: SyncController
               Forget key
             </Button>
           </Row>
+          <DeleteVaultRow controller={controller} />
         </>
       ) : (
         <div className="border-t border-charcoal-border pt-3">

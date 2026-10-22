@@ -163,6 +163,9 @@ export const lockNativeSync = (sessionId: string, forget = false) =>
   invoke<void>("browser_sync_lock", { sessionId, forget });
 export const forgetNativeSyncKey = (account: SyncAccount) =>
   invoke<void>("browser_sync_forget_key", { ...account });
+/** Deletes the account's only vault, everywhere, so a new one can be created. */
+export const deleteNativeSyncVault = (account: SyncAccount) =>
+  invoke<void>("browser_sync_delete_vault", { ...account });
 
 export const controlNativeDevice = (
   sessionId: string,

@@ -66,10 +66,14 @@ pub(crate) use account::{
 pub(super) use account::{change_account, change_account_if};
 pub(super) use database::lock_database;
 pub(crate) use database::{
-    __cmd__browser_sync_availability, __cmd__browser_sync_forget_key,
-    __tauri_command_name_browser_sync_availability, __tauri_command_name_browser_sync_forget_key,
+    __cmd__browser_sync_availability, __cmd__browser_sync_delete_vault,
+    __cmd__browser_sync_forget_key, __tauri_command_name_browser_sync_availability,
+    __tauri_command_name_browser_sync_delete_vault, __tauri_command_name_browser_sync_forget_key,
 };
-pub use database::{browser_sync_availability, browser_sync_forget_key, VaultAvailability};
+pub use database::{
+    browser_sync_availability, browser_sync_delete_vault, browser_sync_forget_key,
+    VaultAvailability,
+};
 use database::{database_path, personal_vault_id, remember_personal_vault, retire_database};
 use os_version::os_version;
 #[cfg(any(target_os = "macos", windows))]

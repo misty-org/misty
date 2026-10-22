@@ -133,6 +133,7 @@ mod tests {
             "browser_sync_flush",
             "browser_sync_lock",
             "browser_sync_forget_key",
+            "browser_sync_delete_vault",
             "browser_recovery_open",
             "browser_recovery_read",
             "browser_recovery_write",
