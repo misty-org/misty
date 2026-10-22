@@ -33,14 +33,61 @@ pub(crate) async fn evaluate_in_frame(
     result
 }
 
+/// Runs `function_body` in the named isolated world of one cross-origin frame the tab
+/// listed (browser_frames_windows.rs), through the session that runs the frame. A frame
+/// that no longer answers is forgotten.
 #[cfg(windows)]
 pub(crate) async fn evaluate_in_frame(
-    _webview: Webview,
-    _world_name: &'static str,
-    _function_body: String,
-    _frame: u64,
+    webview: Webview,
+    world_name: &'static str,
+    function_body: String,
+    frame: u64,
 ) -> Result<String, String> {
-    Err("Frames are read on macOS.".to_owned())
+    use crate::infra::webview2::{cdp, cdp_in_session, evaluate, evaluate_in_session, CdpError};
+    use serde_json::json;
+
+    let target =
+        super::browser_frames::target(webview.label(), frame).ok_or("The frame is gone.")?;
+    let session = target.session.as_deref();
+    let result = async {
+        // A frame keeps one world per name for as long as its document lives, so asking
+        // again returns the same world and the globals left in it.
+        let parameters =
+            json!({ "frameId": target.frame, "worldName": world_name, "grantUniveralAccess": false });
+        let created = match session {
+            Some(session) => {
+                cdp_in_session(&webview, session, "Page.createIsolatedWorld", &parameters).await?
+            }
+            None => cdp(&webview, "Page.createIsolatedWorld", &parameters).await?,
+        };
+        let context = created["executionContextId"]
+            .as_i64()
+            .ok_or(CdpError::Invalid)?;
+        let expression = format!("(async () => {{\n{function_body}\n}})()");
+        match session {
+            Some(session) => evaluate_in_session(&webview, session, expression, context).await,
+            None => evaluate(&webview, expression, Some(context)).await,
+        }
+    }
+    .await;
+    let result = answer(result);
+    if result.is_err() {
+        super::browser_frames::forget(webview.label(), frame);
+    }
+    result
+}
+
+#[cfg(windows)]
+fn answer(
+    result: Result<serde_json::Value, crate::infra::webview2::CdpError>,
+) -> Result<String, String> {
+    use serde_json::Value;
+    match result {
+        Ok(Value::String(value)) => Ok(value),
+        Ok(Value::Null) => Ok("null".to_owned()),
+        Ok(_) => Err("The page returned an invalid answer.".to_owned()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -133,7 +180,7 @@ pub(crate) async fn evaluate_in_content_world(
     function_body: String,
 ) -> Result<String, String> {
     use crate::infra::webview2::{cdp, evaluate, CdpError};
-    use serde_json::{json, Value};
+    use serde_json::json;
     use std::{
         collections::HashMap,
         sync::{Mutex, OnceLock},
@@ -178,10 +225,5 @@ pub(crate) async fn evaluate_in_content_world(
         }
     };
     let expression = format!("(async () => {{\n{function_body}\n}})()");
-    match evaluate(&webview, expression, Some(context)).await {
-        Ok(Value::String(value)) => Ok(value),
-        Ok(Value::Null) => Ok("null".to_owned()),
-        Ok(_) => Err("The page returned an invalid answer.".to_owned()),
-        Err(error) => Err(error.into()),
-    }
+    answer(evaluate(&webview, expression, Some(context)).await)
 }

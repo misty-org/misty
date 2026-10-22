@@ -388,6 +388,6 @@ back to work is for long requests only. The loop guard now remembers addresses a
 run, ignores `www.`, scheme and tracking differences, and also notes a call that failed twice and
 six of the last eight pages on one site.
 
-The campaign's Anthropic credit is nearly spent, so later passes run on NVIDIA's free Kimi K2.6
+The campaign's Anthropic credit is nearly spent, so later passes run on NVIDIA's free hosted models
 ([free-model-evals.md](free-model-evals.md)). Its scores compare only with passes on the same model:
 the first is batch 17's ten tasks before and after the change above, on the Mac.

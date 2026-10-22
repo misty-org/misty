@@ -1,7 +1,8 @@
 # Windows parity ledger
 
 What macOS can do that Windows couldn't, and how each gap was closed. Audited 2026-10-12 on `main`
-at `1b667b60`; brought to parity on 2026-10-13.
+at `1b667b60`; brought to parity on 2026-10-13. Cross-origin frames for agent page tools (K1 of the
+Odysseys campaign) came to macOS after that and to Windows on 2026-10-20 (B-31).
 
 Every row is now done (✓), decided not needed (—), or a recorded Windows limit (◐, with the reason
 in [Known Windows limits](#known-windows-limits)). Rows keep their original IDs so earlier
@@ -16,7 +17,7 @@ Legend: ✓ done · ◐ done with a stated Windows limit · — not needed on Wi
 | Phase 0 | 9 | 1 | 0 | 10 |
 | Foundations | 6 | 0 | 0 | 6 |
 | Shell, system and release | 15 | 1 | 5 | 21 |
-| Browser and Kiri | 27 | 2 | 1 | 30 |
+| Browser and Kiri | 28 | 2 | 1 | 31 |
 | Extensions | 14 | 9 | 0 | 23 |
 | Agents and desktop control | 19 | 1 | 2 | 22 |
 | Files and the document worker | 2 | 0 | 0 | 2 |
@@ -41,6 +42,9 @@ Real-system probes that run here:
 - A networked container can't reach loopback.
 - The pane dim lets clicks through.
 - The Kura pipe refuses a second owner.
+- An agent tab reads and types into cross-origin frames: `cargo test --lib webview2_frames --
+  --ignored` serves a page with a frame from another site, one from its own site and one nested
+  in the first, then snapshots, waits on, extracts and fills a field inside them (B-31).
 
 ## Testing alongside macOS
 
@@ -189,6 +193,7 @@ These need a person, a signed build or tools this machine lacks:
 | B-28 | Import: writing cookies | ✓ | Through a hidden view of the profile, so no tab needs to be open. |
 | B-29 | Kiri runtime on Windows | ✓ | `kiri\probes\runtime\run.ps1` passes. |
 | B-30 | Windows-path probes | — | The popup, render and agent-files probes have no caller on either platform. Windows coverage comes from the Windows tests listed above. |
+| B-31 | Cross-origin frames for agent page tools (K1) | ✓ | The tab's CDP session auto-attaches to out-of-process frames, and each frame's session to its own (`Target.setAutoAttach` with `flatten`). The frame trees of the tab and those sessions list the frames cross-origin to the top document and which session runs each (`browser_frames_windows.rs`). The page layer runs in an isolated world of each frame through `CallDevToolsProtocolMethodForSession`, so snapshots, find, extract, waits and steps work in frames with refs from per-frame ranges, as on macOS. Checked by the live probe above. |
 
 ## Extensions
 

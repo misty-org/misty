@@ -331,6 +331,10 @@ pub(super) fn append_markdown(markdown: &str, frames: &[FrameRead]) -> String {
     out
 }
 
+#[cfg(all(test, windows))]
+#[path = "frames_windows_probe.rs"]
+mod windows_probe;
+
 #[cfg(test)]
 mod tests {
     use super::*;

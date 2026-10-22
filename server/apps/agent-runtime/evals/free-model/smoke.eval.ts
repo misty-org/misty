@@ -2,14 +2,14 @@
 // it, in about a dozen requests: call tools and read their results, see a screenshot that a tool
 // returned, accept the agent's 32,000-token output cap, and take a judge's many screenshots in
 // one message. Run before a pass:
-//   NVIDIA_API_KEY=… MISTY_FREE_MODEL=nim/moonshotai/kimi-k2.6 npm run eval:free-model
+//   NVIDIA_API_KEY=… npm run eval:free-model   (MISTY_FREE_MODEL=nim/… checks another model)
 import { deflateSync } from "node:zlib";
 import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { RoutedModel } from "../../src/model-calls.js";
 
-const modelId = process.env.MISTY_FREE_MODEL?.trim() || "nim/moonshotai/kimi-k2.6";
+const modelId = process.env.MISTY_FREE_MODEL?.trim() || "nim/z-ai/glm-5.3-flash";
 const ready = Boolean(process.env.NVIDIA_API_KEY?.trim()) && modelId.startsWith("nim/");
 const model = () => new RoutedModel(modelId, { provider: "instance" });
 

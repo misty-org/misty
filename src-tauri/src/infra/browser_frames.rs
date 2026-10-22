@@ -3,7 +3,8 @@
 //! in a frame from another origin, which the page layer's script in the top document can
 //! neither read nor reach. Every frame of a tab announces itself from a private content
 //! world, so pages cannot forge or see it, and Misty keeps each cross-origin frame's
-//! handle to run the page layer inside it.
+//! handle to run the page layer inside it. On Windows the frame trees of the tab's
+//! DevTools sessions say the same (browser_frames_windows.rs).
 
 /// Content world of the announcement script and its handler.
 #[cfg(target_os = "macos")]
@@ -224,6 +225,12 @@ mod macos {
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{forget, info};
 
+#[cfg(windows)]
+#[path = "browser_frames_windows.rs"]
+mod cdp_frames;
+#[cfg(windows)]
+pub(crate) use cdp_frames::{forget, target};
+
 /// Starts announcing a tab's frames; call it when the tab's web view is created.
 pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -238,7 +245,11 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
         // with_webview runs on the main thread; from there it has already run.
         return receive.try_recv().unwrap_or(Ok(()));
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        cdp_frames::install(webview)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = webview;
         Ok(())
@@ -261,7 +272,11 @@ pub(crate) async fn list(webview: &tauri::Webview) -> Vec<Frame> {
         }
         receive.await.unwrap_or_default()
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        cdp_frames::list(webview).await
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let _ = webview;
         Vec::new()
