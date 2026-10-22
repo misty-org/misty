@@ -3,7 +3,8 @@
 // the trajectory's action history and every screenshot in order, and the same
 // success/failure parse. A rubric scores 1 when the trajectory satisfies it; a task is
 // perfect when every rubric does. Differences from the official runs are only the judge
-// model (MISTY_ODYSSEYS_JUDGE, a Claude model on Misty's own key) and a cap of 60 pictures
+// model (MISTY_ODYSSEYS_JUDGE: a Claude model on Misty's own key, or a free `nim/` model, see
+// docs/plans/free-model-evals.md) and a cap of 60 pictures
 // (the recorder skips unchanged ones, so long runs rarely reach it).
 import { readFileSync } from "node:fs";
 import { generateText } from "ai";
@@ -58,8 +59,11 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
   }));
   let inputTokens = 0;
   let outputTokens = 0;
-  // Each rubric item is judged on its own, as the original does; the calls run together.
-  const rubrics: RubricResult[] = await Promise.all(task.rubrics.map(async (rubric) => {
+  // Each rubric item is judged on its own, as the original does; the calls run together,
+  // except on a free model's rate limit (docs/plans/free-model-evals.md), where they take turns
+  // so a 429 isn't graded as a failed rubric.
+  const free = model.startsWith("nim/");
+  const judgeOne = async (rubric: OdysseysTask["rubrics"][number]): Promise<RubricResult> => {
     const lines = [`Rubric ID: ${rubric.id}`, `Requirement: ${rubric.requirement.trim()}`, ...(rubric.verification.trim() ? [`Verification: ${rubric.verification.trim()}`] : [])];
     const text = `User Task (context only): ${task.prompt.trim()}\n\nEvaluate ONLY this rubric item:\n${lines.join("\n")}` +
       `\n\nFull Action History:\n${history}\n\nScreenshots attached below: ${images.length} (trajectory had ${steps.length} total step(s)).` +
@@ -67,7 +71,7 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
     try {
       const result = await generateText({
         model: new RoutedModel(model, { provider: "instance", reasoning: "low" }),
-        system, maxOutputTokens: 4_000, maxRetries: 2,
+        system, maxOutputTokens: 4_000, maxRetries: free ? 6 : 2,
         messages: [{ role: "user", content: [{ type: "text" as const, text }, ...images] }],
       });
       inputTokens += result.usage.inputTokens ?? 0;
@@ -78,7 +82,10 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
     } catch (error) {
       return { id: rubric.id, success: false, reasoning: `Error judging rubric ${rubric.id}: ${String(error).slice(0, 300)}` };
     }
-  }));
+  };
+  const rubrics: RubricResult[] = [];
+  if (free) for (const rubric of task.rubrics) rubrics.push(await judgeOne(rubric));
+  else rubrics.push(...(await Promise.all(task.rubrics.map(judgeOne))));
   const passed = rubrics.filter((item) => item.success).length;
   return { rubrics, average: rubrics.length ? passed / rubrics.length : 0, perfect: rubrics.length > 0 && passed === rubrics.length, inputTokens, outputTokens };
 }

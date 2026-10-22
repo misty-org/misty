@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type {
   EmbeddingModelV4,
   LanguageModelV4,
@@ -65,6 +66,57 @@ export function anthropicModelName(modelId: string): string {
   return modelId.slice("anthropic/".length).replaceAll(".", "-");
 }
 
+function nimKey(env: Environment) {
+  return env.NVIDIA_API_KEY?.trim() || "";
+}
+
+/**
+ * A `nim/…` model runs on NVIDIA's hosted endpoints (build.nvidia.com), free with rate limits,
+ * so evals can run without paid credit (docs/plans/free-model-evals.md). Development only:
+ * production never admits a model the person didn't get from the catalog.
+ */
+function directNim(modelId: string, env: Environment) {
+  return modelId.startsWith("nim/") && nimKey(env) !== "";
+}
+
+function nim(modelId: string, env: Environment) {
+  return createOpenAICompatible({
+    name: "nim",
+    apiKey: nimKey(env),
+    baseURL: env.NVIDIA_BASE_URL?.trim() || "https://integrate.api.nvidia.com/v1",
+    fetch: loggedFetch,
+  }).chatModel(modelId.slice("nim/".length));
+}
+
+type Prompt = LanguageModelV4CallOptions["prompt"];
+
+/**
+ * Chat completions carry tool results as text only, so a screenshot in a tool result would
+ * reach the model as base64 text. The screenshots move to a user message right after the
+ * results, where they are images, and the results say so.
+ */
+export function imagesOutOfToolResults(prompt: Prompt): Prompt {
+  const moved: Prompt = [];
+  for (const message of prompt) {
+    if (message.role !== "tool") {
+      moved.push(message);
+      continue;
+    }
+    const images: Array<Extract<Extract<Prompt[number], { role: "user" }>["content"][number], { type: "file" }>> = [];
+    const content = message.content.map((part) => {
+      if (part.type !== "tool-result" || part.output.type !== "content") return part;
+      const shots = part.output.value.filter((item) => item.type === "file" && item.mediaType.startsWith("image"));
+      if (!shots.length) return part;
+      for (const shot of shots) if (shot.type === "file") images.push({ type: "file", data: shot.data, mediaType: shot.mediaType });
+      const text = part.output.value.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
+      return { ...part, output: { type: "text" as const, value: `${text}\n(${shots.length} screenshot${shots.length === 1 ? "" : "s"} in the next message)` } };
+    });
+    moved.push({ ...message, content });
+    if (images.length) moved.push({ role: "user", content: [{ type: "text", text: "Screenshots from the tool results above:" }, ...images] });
+  }
+  return moved;
+}
+
 function openAI(env: Environment) {
   return createOpenAI({ apiKey: openAIKey(env) });
 }
@@ -88,6 +140,11 @@ export function resolveInstanceModel(
       model: createAnthropic({ apiKey: anthropicKey(env), fetch: loggedFetch })(anthropicModelName(modelId)),
       options: { ...options, providerOptions },
     };
+  }
+  if (directNim(modelId, env)) {
+    const { gateway: _gateway, ...providerOptions } = options.providerOptions ?? {};
+    // NVIDIA's models switch thinking their own way and may refuse reasoning_effort.
+    return { model: nim(modelId, env), options: { ...options, prompt: imagesOutOfToolResults(options.prompt), reasoning: undefined, providerOptions } };
   }
   if (!directOpenAI(modelId, env)) return { model: instanceGateway(env)(modelId), options };
   // Gateway routing options mean nothing to OpenAI itself.

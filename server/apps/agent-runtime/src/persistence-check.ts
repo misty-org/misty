@@ -2,22 +2,13 @@ import type { TaskCompletion } from "./task-completion.js";
 
 // Long requests need persistence (docs/plans/odysseys-campaign.md): the first Odysseys
 // batch finished "partial" after a minute or two with most of each run's turns unused,
-// usually right after one page or tool failed. A partial or blocked finish is refused
-// (up to three times, with work between) while ten or more turns remain, unless every unfinished
-// part needs the person.
+// usually right after one page or tool failed. A long request's partial or blocked finish is
+// sent back as part of the run's one verification turn (src/finish-verification.ts) while ten or
+// more turns remain, unless every unfinished part needs the person. Repeated refusals (up to
+// eight by October 19) kept short questions refetching what they had already said was unconfirmed.
 
 /** Unfinished parts only the person can unblock: an account, a payment, a human check. */
 const needsPerson = /\b(sign[ -]?in|log[ -]?in|password|account|captcha|verification|verify|2fa|one-time code|payment|pay|purchase|checkout|paywall|subscri)/i;
-
-/**
- * Whether another early give-up may be sent back. Three were allowed whatever the time, and a
- * 20-school run gave up for good 8 minutes into its own 45-minute estimate (October 19): while a
- * run is under 80% of its estimate it may be sent back up to eight times.
- */
-export function mayRefuseGiveUp(refusals: number, elapsedMs: number, estimateMinutes: number | undefined): boolean {
-  if (refusals < 3) return true;
-  return refusals < 8 && estimateMinutes !== undefined && elapsedMs < estimateMinutes * 60_000 * 0.8;
-}
 
 /** The refusal message, or undefined when the finish should stand. */
 export function earlyGiveUp(report: TaskCompletion, turn: number, limit: number): string | undefined {

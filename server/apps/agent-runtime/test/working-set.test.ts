@@ -53,7 +53,7 @@ describe("the loop guard", () => {
       call("3", "browser_navigate", { url: "https://www.usnews.com/rankings#top" }),
     ];
     const note = loopNote(messages);
-    expect(note).toMatch(/opened https:\/\/www\.usnews\.com\/rankings 3 times/);
+    expect(note).toMatch(/opened https:\/\/usnews\.com\/rankings 3 times/);
     messages.push({ role: "user", content: note! });
     expect(loopNote(messages)).toBeUndefined();
   });

@@ -10,6 +10,8 @@ Differences from the paper's setup, kept on purpose:
 - The judge runs on a Claude model on Misty's own key (`MISTY_ODYSSEYS_JUDGE`), not Gemini 3.1 Flash-Lite, and sees at most the last 60 screenshots (unchanged pages are pictured once).
 - The browser profile has no saved sign-ins (`MISTY_EVAL_EPHEMERAL_PAGES=1` on the desktop).
 
+Without paid credit, the agent and the judge run on NVIDIA's free hosted models (`nim/…`); see [docs/plans/free-model-evals.md](../../../../../docs/plans/free-model-evals.md). Scores on a free model compare only with other passes on the same model.
+
 ## Splits
 
 `tasks.ts` fixes the splits by a stable hash of each task id, per level: **dev** (40: 9 easy, 9 medium, 22 hard) for every iteration, **holdout** (60) for milestones, **rest** (100) only in full passes.

@@ -5,8 +5,8 @@ import type { TaskCompletion } from "./task-completion.js";
 // Long requests list many requirements: every item, every field of each item, pages to keep
 // open, a step to carry out. Odysseys grades each one (docs/plans/odysseys-campaign.md), and
 // answers that read well still skipped some. Before a finish stands, one short call with the
-// run's own model checks the draft against the request; a run with turns left is sent back
-// once with the gaps. A review that fails never blocks the finish.
+// run's own model checks the draft against the request; its gaps join the run's one
+// verification note (src/finish-verification.ts). A review that fails never blocks the finish.
 
 export const REVIEW_SYSTEM = [
   "You check an agent's draft answer against the person's request before it is sent.",
@@ -95,10 +95,6 @@ export async function requirementsLedger(identity: RuntimeIdentity, modelId: str
     return "";
   }
 }
-
-/** For a plain answer that leaves out what the last finish was sent back for. */
-export const skippedRefusal = "Your last finish was sent back for the parts it listed, and this answer still leaves them out. " +
-  "Keep working on them with your tools (search, your own tabs, the sites' own search and links), then finish with agent_finish. Report a part as not done only when it needs the person or the sites truly lack it.";
 
 /** One durable review call, metered like any model call; it does not spend a model turn. */
 export async function reviewAnswer(

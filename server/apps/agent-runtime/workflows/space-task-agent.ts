@@ -23,22 +23,21 @@ import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
-import { earlyGiveUp, mayRefuseGiveUp } from "../src/persistence-check.js";
-import { ledgerNote, openPages, requirementsLedger, reviewAnswer, reviewRefusal, skippedRefusal, worthLedger, worthReviewing } from "../src/requirements-review.js";
+import { finishIssues, mayVerify, verificationNote } from "../src/finish-verification.js";
+import { ledgerNote, openPages, requirementsLedger, reviewAnswer, reviewRefusal, worthLedger, worthReviewing } from "../src/requirements-review.js";
 import { deadlineNote } from "../src/turn-deadline.js";
 import { estimateMinutes, timeBudget } from "../src/time-budget.js";
 import { loopNote } from "../src/loop-guard.js";
-import { proofTabsRefusal } from "../src/proof-tabs.js";
 import { openedScopes, PAGE_STATE_CHARS, pageStateMessages } from "../src/opened-pages.js";
 import { contextParts } from "../src/working-set.js";
-import { finalTaskCompletion, finishMissingNote, isProgressNote, progressNoteNudge, summaryMissingNote, taskCompletionInputSchema, taskCompletionInstructions, taskCompletionOutcome, taskCompletionText, taskCompletionTool, withAnswerSummary } from "../src/task-completion.js";
+import { finalTaskCompletion, finishMissingNote, isProgressNote, progressNoteNudge, summaryMissingNote, taskCompletionInputSchema, taskCompletionInstructions, taskCompletionOutcome, taskCompletionText, taskCompletionTool, withAnswerSummary, type TaskCompletion } from "../src/task-completion.js";
 import { runTeachTurn } from "../src/teach-turn.js";
 import { executeTool } from "../src/tool-calls.js";
 import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolMonitor } from "../src/tool-monitor.js";
 import { agentTools, toolLoadTool, toolState, toolUseTool } from "../src/toolsets.js";
 import { modelFamilyNote } from "../src/model-family.js";
-import { citationInstructions, citationRefusal, unreadCitations } from "../src/citation-check.js";
+import { citationInstructions } from "../src/citation-check.js";
 import { closedResearchTools, researchNote, researchUse } from "../src/research-budget.js";
 import { executionInstructions, finalText, incompleteToolResultText, unfinishedModelResult } from "../src/tool-outcomes.js";
 import type { SpaceTaskContext } from "../src/types.js";
@@ -110,17 +109,8 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     const declined = order.declined(callId);
     if (declined) throw new Error(declined);
   };
-  let finishRefused = false;
-  let proofChecked = false;
-  let citationRefused = false;
-  // Early give-ups refused so far, and the turn of the last refusal (src/persistence-check.ts).
-  let persistenceRefusals = 0;
-  let refusedAtTurn = -1;
-  // The draft answer is checked against the request once (src/requirements-review.ts).
-  let reviewed = false;
-  // The turn a finish was last sent back, and how often a plain answer then skipped it.
-  let finishRefusedTurn = -1;
-  let plainPushbacks = 0;
+  // A finish is verified once (src/finish-verification.ts); the next one stands.
+  let verified = false;
   let finishAsked = false;
   let progressNudges = 0;
   // Recomputed from the transcript before every model call.
@@ -151,59 +141,17 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         inputSchema: taskCompletionInputSchema,
         execute: async (sent, options) => {
           guard(options.toolCallId);
-          // Refused once when it claims work no tool did (src/finish-check.ts); the model sees why.
           const messages = options.messages ?? [];
           // A finish after a text answer leaves summary out: that answer is the summary, so the
           // person reads it once (src/task-completion.ts).
           const report = withAnswerSummary(sent, messages);
           if (!report) return { status: "failure", tool_error: { message: summaryMissingNote } };
-          // Refused once when it cites a page the run never read (src/citation-check.ts).
-          if (!citationRefused) {
-            const unread = unreadCitations(report.summary, messages, researchTools);
-            if (unread.length) {
-              citationRefused = true;
-              const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
-              return { status: "failure", tool_error: { message: citationRefusal(unread, canFetch) } };
-            }
-          }
-          // An early give-up with room left is sent back to work (three times, more while the run is
-          // well inside its own time estimate), each
-          // later time only after more work since the last (src/persistence-check.ts).
-          if (mayRefuseGiveUp(persistenceRefusals, Date.now() - startedAt - pausedMs, estimate) && (persistenceRefusals === 0 || modelTurn - refusedAtTurn >= 3)) {
-            const unfinished = earlyGiveUp(report, modelTurn, limit);
-            if (unfinished) {
-              persistenceRefusals++;
-              refusedAtTurn = modelTurn;
-              finishRefusedTurn = modelTurn;
-              return { status: "failure", tool_error: { message: unfinished } };
-            }
-          }
-          // Proof tabs (src/proof-tabs.ts): asked to leave pages open, the run checks its tabs once.
-          const tabList = catalog.modelName("browser.tab.list");
-          if (!proofChecked && tabList && modelTurn < limit - 2) {
-            const proof = proofTabsRefusal(context.prompt, messages, tabList);
-            if (proof) {
-              proofChecked = true;
-              finishRefusedTurn = modelTurn;
-              return { status: "failure", tool_error: { message: proof } };
-            }
-          }
-          if (!reviewed && worthReviewing(context.prompt, report, modelTurn, limit)) {
-            reviewed = true;
-            const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
-            const gaps = await reviewAnswer(identity, context.model_id, context.prompt, report, pages);
-            if (gaps.length) {
-              finishRefusedTurn = modelTurn;
-              return { status: "failure", tool_error: { message: reviewRefusal(gaps) } };
-            }
-          }
-          if (finishRefused) return afterRefusal(report, messages, catalog.readOnly);
-          const refusal = unbackedCompletion(report, messages, catalog.readOnly);
-          if (refusal) {
-            finishRefused = true;
-            return { status: "failure", tool_error: { message: refusal } };
-          }
-          return report;
+          // Every check runs together, once (src/finish-verification.ts); the next finish stands.
+          const note = await verify(report, messages);
+          if (note) return { status: "failure", tool_error: { message: note } };
+          // A completed report that still claims work no tool did becomes partial when the
+          // request named an app (src/finish-check.ts).
+          return unbackedCompletion(report, messages, catalog.readOnly) ? afterRefusal(report, messages, catalog.readOnly) : report;
         },
       }),
     };
@@ -248,6 +196,25 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   };
   let { catalog, advertised, monitor, toolsets, researchTools, toolNames, instructions, agent } = assemble(mcpCatalog.tools);
   visibleTools = toolNames;
+  // The one verification turn (src/finish-verification.ts): the note that sends a finish or a
+  // plain answer back, or undefined when it stands. Only the first finish with turns left is checked.
+  const verify = async (report: TaskCompletion, messages: ModelMessage[]): Promise<string | undefined> => {
+    if (!mayVerify(verified, modelTurn, limit)) return undefined;
+    verified = true;
+    const long = worthLedger(context.prompt);
+    const issues = finishIssues({
+      request: context.prompt, report, messages, turn: modelTurn, limit, long,
+      research: researchTools, tabList: catalog.modelName("browser.tab.list"), readOnly: catalog.readOnly,
+    });
+    if (long && worthReviewing(context.prompt, report, modelTurn, limit)) {
+      const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
+      const gaps = await reviewAnswer(identity, context.model_id, context.prompt, report, pages);
+      if (gaps.length) issues.push(reviewRefusal(gaps));
+    }
+    const note = verificationNote(issues);
+    console.log(`[misty-agent-runtime] finish_verified ${JSON.stringify({ run: identity.mistyRunId, turn: modelTurn, long, issues: issues.length })}`);
+    return note;
+  };
   await execution.checkpoint({
     node_id: "mcp:catalog", state: "completed", phase: "tools_ready", progress: 8,
     output: {
@@ -446,43 +413,20 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         if (monitor.requiredInspection) messages.push({ role: "user", content: browserReinspectionInstruction(monitor.requiredInspection) });
         continue;
       }
-      // A plain-text final answer is held to the same rule as agent_finish: refused once when
-      // it cites a page the run only saw in search results (src/citation-check.ts).
       const plainAnswer = finalText(current.steps);
-      if (!citationRefused && plainAnswer && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults)) {
-        const unread = unreadCitations(plainAnswer, messages, researchTools);
-        if (unread.length) {
-          citationRefused = true;
-          const canFetch = Boolean(researchTools.fetch) && researchUse(messages, researchTools).stage !== "closed";
-          messages.push({ role: "user", content: citationRefusal(unread, canFetch, "give your answer again") });
-          continue;
-        }
-      }
-      // A plain-text answer is held to agent_finish's checks too: a long request's draft is
-      // reviewed once (src/requirements-review.ts), and one written right after a finish was
-      // sent back, leaving out what it listed, goes back to work while turns remain.
-      if (plainAnswer && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults)) {
-        const draft = { outcome: "completed" as const, summary: plainAnswer.slice(0, 12_000), remaining: [] };
-        if (!reviewed && worthReviewing(context.prompt, draft, modelTurn, limit)) {
-          reviewed = true;
-          const pages = openPages(messages, { open: researchTools.open, navigate: catalog.modelName("browser.navigate") });
-          const gaps = await reviewAnswer(identity, context.model_id, context.prompt, draft, pages);
-          if (gaps.length) {
-            finishRefusedTurn = modelTurn;
-            messages.push({ role: "user", content: reviewRefusal(gaps) });
-            continue;
-          }
-        } else if (finishRefusedTurn === modelTurn - 1 && plainPushbacks < 2 && modelTurn < limit - 4) {
-          plainPushbacks++;
-          finishRefusedTurn = modelTurn;
-          messages.push({ role: "user", content: skippedRefusal });
+      const actedSoFar = (result?.steps ?? []).some((step) => step.content.some((part) => part.type.startsWith("tool-")));
+      // A plain-text answer after work goes through the same one verification as agent_finish
+      // (src/finish-verification.ts), so a run can't skip it by answering in text.
+      if (plainAnswer && actedSoFar && !isProgressNote(plainAnswer) && current.finishReason !== "tool-calls" && !finalTaskCompletion(current.steps, current.toolResults)) {
+        const note = await verify({ outcome: "completed", summary: plainAnswer.slice(0, 12_000), remaining: [] }, messages);
+        if (note) {
+          messages.push({ role: "user", content: note });
           continue;
         }
       }
       // A run that used its tools and then answered in plain text never said whether the work is
       // done, so it ended as unreported and the person saw a failure (31 Odysseys runs, one of
       // them a perfect answer). It is asked once to confirm with agent_finish.
-      const actedSoFar = (result?.steps ?? []).some((step) => step.content.some((part) => part.type.startsWith("tool-")));
       // The turn's progress line ("Last: … Next: …") written with no tool call is not an answer: a
       // run ended on one and the person got "Next: I'll read … then finish" (October 19).
       if (plainAnswer && actedSoFar && isProgressNote(plainAnswer) && progressNudges < 2 && modelTurn < limit - 1) {

@@ -377,3 +377,17 @@ per app, so the holder is still unknown; restart the app before each pass until 
 Still open: runs give up early (one tried to finish at step 20 of 67 and stopped 8 minutes into its
 own 45-minute estimate). Give-ups are now sent back up to eight times while a run is under 80% of
 its estimate. The next comparison runs on a fresh app with both changes.
+
+### October 20: one verification turn, and free models
+
+Outside the eval, the stacked finish guards made short questions loop: an answer that said one
+release date was unconfirmed was sent back as an early give-up and refetched the same site again
+and again. The citation, unbacked-claim, proof-tab, requirements-review and give-up checks now run
+together once (`src/finish-verification.ts`) and the next finish stands; sending a partial finish
+back to work is for long requests only. The loop guard now remembers addresses across the whole
+run, ignores `www.`, scheme and tracking differences, and also notes a call that failed twice and
+six of the last eight pages on one site.
+
+The campaign's Anthropic credit is nearly spent, so later passes run on NVIDIA's free Kimi K2.6
+([free-model-evals.md](free-model-evals.md)). Its scores compare only with passes on the same model:
+the first is batch 17's ten tasks before and after the change above, on the Mac.
