@@ -251,7 +251,12 @@ function AgentMessageView(props: AgentMessageProps) {
           running={message.state === "pending" || message.state === "streaming"}
           hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
         />
-        {progress?.length ? <AgentProgress items={progress} /> : null}
+        {progress?.length ? (
+          <AgentProgress
+            items={progress}
+            live={message.state === "pending" || message.state === "streaming"}
+          />
+        ) : null}
         {message.subagents?.length ? <AgentSubagents subagents={message.subagents} /> : null}
         {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}
         {content ? (
@@ -323,7 +328,12 @@ function EarlierReply({ message }: { message: GlobalAiMessage }) {
   const content = visibleConversationContent(message.content, message.role);
   return (
     <>
-      {progress?.length ? <AgentProgress items={progress} /> : null}
+      {progress?.length ? (
+        <AgentProgress
+          items={progress}
+          live={message.state === "pending" || message.state === "streaming"}
+        />
+      ) : null}
       {content ? (
         <div className="agent-progress-note misty-markdown-message">
           <MistyMarkdown>{content}</MistyMarkdown>

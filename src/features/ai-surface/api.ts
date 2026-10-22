@@ -199,6 +199,9 @@ export const aiSurfaceApi = {
     apiRequest<{ items: AiProgressItem[] }>(
       `/ai/invocations/${encodeURIComponent(invocationId)}/progress`,
     ),
+  /** The run's stored state: queued, running, awaiting_*, completed, failed or canceled. */
+  invocationState: (invocationId: string) =>
+    apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/state`),
   cancelInvocation: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/cancel`, {
       method: "POST",

@@ -12,6 +12,7 @@ import {
   type GlobalSearchGet,
   type GlobalSearchSet,
 } from "@/features/global-search/globalSearchStoreHelpers";
+import { settleRun } from "./settleRun";
 import { useCollaborationStore } from "@/features/agents/agentCollaboration";
 import { updateMistyDraftAttachments } from "./draftAttachments";
 import { localChats, markStoredChats } from "./localChats";
@@ -172,8 +173,13 @@ export function createMistyConversationActions(
                 }
               },
               onError: (error) => {
-                if (get().accountId === accountId && get().invocationId === invocationId)
-                  set({ error: error.message, working: true });
+                if (get().accountId !== accountId || get().invocationId !== invocationId) return;
+                // A reattach that drops again ends here; the next reload retries.
+                settleRun(set, get, {
+                  state: "failed",
+                  conversationId: conversation.id,
+                  error: error.message,
+                });
               },
             }),
           );

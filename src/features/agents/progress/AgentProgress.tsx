@@ -19,7 +19,7 @@ import {
  * each run of tools folded into one line that opens to a table of its steps,
  * as Claude shows its work. The answer itself follows below.
  */
-export function AgentProgress({ items }: { items: AiProgressItem[] }) {
+export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {
   if (!items.length) return null;
   return (
     <div className="agent-progress">
@@ -29,18 +29,18 @@ export function AgentProgress({ items }: { items: AiProgressItem[] }) {
             <MistyMarkdown>{group.text}</MistyMarkdown>
           </div>
         ) : (
-          <ToolGroup key={group.key} tools={group.tools} />
+          <ToolGroup key={group.key} tools={group.tools} live={live} />
         ),
       )}
     </div>
   );
 }
 
-function ToolGroup({ tools }: { tools: ProgressTool[] }) {
+function ToolGroup({ tools, live }: { tools: ProgressTool[]; live: boolean }) {
   return (
     <WorkGroup
       summary={toolGroupSummary(tools)}
-      running={tools.some((tool) => tool.state === "running")}
+      running={live && tools.some((tool) => tool.state === "running")}
     >
       <ol className="agent-progress-table" aria-label="Steps">
         {stepsOf(tools).map((step) => (

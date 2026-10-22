@@ -70,6 +70,26 @@ export function patchConversationMessage(
   }));
 }
 
+/** Ends a reply that will get no more events: its tools stop running and its
+ * activity line clears, so nothing keeps animating on a finished message. */
+export function settleConversationMessage(
+  set: GlobalSearchSet,
+  get: GlobalSearchGet,
+  conversationId: string,
+  messageId: string,
+  patch: Partial<GlobalAiMessage> & { state: NonNullable<GlobalAiMessage["state"]> },
+) {
+  updateConversation(set, get, conversationId, (conversation) => ({
+    ...conversation,
+    updatedAt: new Date().toISOString(),
+    messages: conversation.messages.map((message) =>
+      message.id === messageId
+        ? { ...message, ...patch, progress: settleProgress(message.progress), activity: undefined }
+        : message,
+    ),
+  }));
+}
+
 /**
  * Streamed text waiting to be applied, per message. Each token used to copy the
  * conversation list, re-rendering everything that shows it once per token;

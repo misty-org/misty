@@ -89,6 +89,10 @@ export function AgentWorkspaceConversation({
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === (conversationId ?? state.activeConversationId));
+  // The store runs one task at a time; only the conversation that owns it animates.
+  const shownWorking =
+    state.working &&
+    (!state.invocationConversationId || state.invocationConversationId === conversation?.id);
   const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
   const reportError = (error: string) =>
     useMistyStore.setState({
@@ -268,7 +272,7 @@ export function AgentWorkspaceConversation({
           <>
             <AgentConversationView
               conversation={conversation}
-              working={state.working}
+              working={shownWorking}
               onRetry={retryPrompt}
               onEdit={editPrompt}
               onReply={replyTo}
@@ -278,7 +282,7 @@ export function AgentWorkspaceConversation({
                 <AgentPlanCard
                   plan={proposedPlan}
                   history={collaboration.state?.planHistory}
-                  working={state.working}
+                  working={shownWorking}
                   onRun={(prompt) => void send(prompt, "")}
                   onKeepPlanning={() => textareaRef.current?.focus()}
                 />

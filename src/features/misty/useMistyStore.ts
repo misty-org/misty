@@ -44,6 +44,8 @@ import {
   updateConversation,
 } from "@/features/global-search/globalSearchStoreHelpers";
 import { create } from "zustand";
+import { settleRun } from "./settleRun";
+import { startRunReconciler } from "./runReconciler";
 import { assertMistyAvailable } from "./availability";
 import { requestHostContext } from "./contextBridge";
 import { resetMistyDraftAttachments } from "./draftAttachments";
@@ -107,31 +109,13 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
     advanceSubmissionEpoch();
     const accountId = get().accountId;
     const invocationId = get().invocationId;
+    // Stop shows at once. The window, local task and server are told after,
+    // and none of them failing can leave the chat looking busy.
+    settleRun(set, get, { state: "canceled" });
     await stopAgentWindowTask().catch(() => {});
-    await pauseLocalExecution();
-    if (invocationId) await aiSurfaceApi.cancelInvocation(invocationId);
-    if (get().accountId === accountId && get().invocationId === invocationId) {
-      const conversationId = get().invocationConversationId ?? get().activeConversationId;
-      updateConversation(set, get, conversationId, (conversation) => ({
-        ...conversation,
-        messages: conversation.messages.map((message) =>
-          message.role === "assistant" &&
-          (message.state === "pending" || message.state === "streaming")
-            ? {
-                ...message,
-                state: "canceled",
-                activity: undefined,
-              }
-            : message,
-        ),
-      }));
-      set({
-        working: false,
-        invocationId: undefined,
-        invocationConversationId: undefined,
-      });
-      replaceActiveGlobalInvocationStream();
-    }
+    await pauseLocalExecution().catch(() => {});
+    if (invocationId && get().accountId === accountId)
+      await aiSurfaceApi.cancelInvocation(invocationId).catch(() => {});
   },
   steerResponse: async (text, conversationId = get().activeConversationId) => {
     const state = get();
@@ -749,21 +733,23 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
               get().invocationId !== created.invocationId
             )
               return;
-            patchConversationMessage(set, get, conversationId, assistantMessage.id, {
-              content:
-                get()
-                  .conversations.find((conversation) => conversation.id === conversationId)
-                  ?.messages.find((message) => message.id === assistantMessage.id)?.content ||
-                "Misty lost the response stream. Review the task before retrying.",
+            const current = get()
+              .conversations.find((conversation) => conversation.id === conversationId)
+              ?.messages.find((message) => message.id === assistantMessage.id);
+            // Never leave the spinner on for a stream that is gone. Reloading
+            // from the server re-attaches if the task is still running.
+            settleRun(set, get, {
               state: "failed",
-              retryable: false,
-              activity: "Connection lost; the task may still be running.",
-            });
-            set({
-              working: true,
+              conversationId,
               error: streamError.message,
+              patch: {
+                content:
+                  current?.content ||
+                  "Misty lost the response stream. Review the task before retrying.",
+              },
             });
             if (executionTaskId) void settleLocalExecution("paused", executionTaskId);
+            void get().loadConversations(true);
           },
         }),
       );
@@ -786,3 +772,5 @@ export const useMistyStore = create<GlobalSearchState>((set, get) => ({
 
 // Every change to a chat is saved on this device (docs/design/agent-chats-local/BRIEF.md).
 persistLocalChats((listener) => useMistyStore.subscribe(listener));
+
+startRunReconciler(useMistyStore);
