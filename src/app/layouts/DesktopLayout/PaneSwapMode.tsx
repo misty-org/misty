@@ -129,7 +129,9 @@ function PaneDragSurface({
     {
       id: pane.id,
       paneId: pane.id,
-      label: paneViewLabel(pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0]),
+      label: paneViewLabel(
+        pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0],
+      ),
       scope: "workspace-panes",
     },
     () => liftPanePresentation(root, pane.id),

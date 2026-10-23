@@ -14,9 +14,7 @@ const sitesText = (sites: string[]) => sites.join("\n");
  * vault, so it follows the Space to every device.
  */
 export function SpaceSiteLinks({ spaceId }: { spaceId: string }) {
-  const personal = useSpacesStore(
-    (state) => preferredDefaultSpace(state.spaces)?.id === spaceId,
-  );
+  const personal = useSpacesStore((state) => preferredDefaultSpace(state.spaces)?.id === spaceId);
   const available = hasTauriInternals() && !isIncognitoWindow();
   const [saved, setSaved] = useState<string[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -67,8 +65,8 @@ export function SpaceSiteLinks({ spaceId }: { spaceId: string }) {
         <CardTitle id="space-sites-heading">Open these sites in this Space</CardTitle>
         <p className="mb-0 mt-1 text-xs text-cream-muted">
           Links to these sites from other apps open in this Space's window, subdomains included.
-          Other links open in the Space you used last. The list is kept in this Space's
-          encrypted vault and follows it to your other devices.
+          Other links open in the Space you used last. The list is kept in this Space's encrypted
+          vault and follows it to your other devices.
         </p>
       </CardHeader>
       <CardContent>

@@ -20,13 +20,9 @@ export interface OmniboxInput {
 }
 
 type OmniboxTarget =
-  | { type: "navigate"; url: string }
-  | { type: "switch-tab"; tabId: string; url: string }
-  /** A place inside Misty, such as a note; `url` is its app route. */
-  | { type: "open-in-app"; url: string };
+  { type: "navigate"; url: string } | { type: "switch-tab"; tabId: string; url: string };
 
-type OmniboxMatchKind =
-  "url" | "history" | "bookmark" | "tab" | "search" | "suggestion" | "action" | "content";
+type OmniboxMatchKind = "url" | "history" | "bookmark" | "tab" | "search" | "suggestion";
 
 export interface OmniboxMatch {
   /** Stable across updates, so the highlighted row survives slower results arriving. */

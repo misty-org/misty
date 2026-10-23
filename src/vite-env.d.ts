@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_AGENT_TEAMMATES_V1?: string;
   readonly VITE_POSTHOG_PROJECT_TOKEN?: string;
   readonly VITE_POSTHOG_HOST?: string;
   readonly VITE_APP_ENVIRONMENT?: string;
@@ -14,15 +13,4 @@ interface ImportMetaEnv {
   readonly VITE_MISTY_PUBLIC_API_URL?: string;
   /** Public Misty website origin used for product, download, and roadmap links. */
   readonly VITE_MISTY_PUBLIC_URL?: string;
-  /** Legacy alias; accepts the same complete API-base semantics. */
-  readonly VITE_MISTY_SERVER_URL?: string;
-  /** Legacy alias; accepts the same complete API-base semantics. */
-  readonly VITE_API_BASE?: string;
-  readonly VITE_PRIVACY_POLICY_URL?: string;
-  readonly VITE_TERMS_URL?: string;
-  readonly VITE_DESKTOP_LICENSE_URL?: string;
-  readonly VITE_SUPPORT_URL?: string;
-  readonly VITE_SECURITY_URL?: string;
-  /** Optional loopback URL for an embedded Theia/OpenVSCode development workspace. */
-  readonly VITE_MISTY_DEVELOPER_WORKSPACE_URL?: string;
 }

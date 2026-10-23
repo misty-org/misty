@@ -1,6 +1,6 @@
 import { aiSurfaceApi } from "@/features/ai-surface/api";
 import type { AiProgressItem } from "@/features/ai-surface/types";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useEffect, useState } from "react";
 

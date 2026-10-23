@@ -3,7 +3,7 @@
 //! `flatten`). The frame trees of the tab and of those sessions say which frames are
 //! cross-origin to the top document and which session runs each, so the page layer can
 //! run in an isolated world of every one (browser_content_world.rs).
-use super::Frame;
+use super::browser_frames::Frame;
 use crate::infra::webview2::{cdp, cdp_in_session, owned_string};
 use serde_json::{json, Value};
 use std::{

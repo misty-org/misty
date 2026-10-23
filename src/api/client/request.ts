@@ -3,7 +3,7 @@ import { resolveApiBase } from "@/api/deployment/api";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { ApiRequestError, decodeApiError } from "./errors";
 import { httpRequest } from "./http";
-import { deleteApiCachePrefix, mutationScope } from "@/api/cache/apiCache";
+import { deleteApiCachePrefix, mutationScope } from "@/api/cache/api-cache";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,

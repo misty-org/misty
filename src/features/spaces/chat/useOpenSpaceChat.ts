@@ -25,7 +25,9 @@ export function useOpenSpaceChat() {
       const home = homeChatSpace(useSpacesStore.getState().spaces);
       if (!home) return;
       const request = workspaceSurfaceFromRoute(
-        conversationId ? spaceChatConversationPath(home.id, conversationId) : spaceChatPath(home.id),
+        conversationId
+          ? spaceChatConversationPath(home.id, conversationId)
+          : spaceChatPath(home.id),
       );
       if (!request) return;
       const tab = useWorkspaceStore.getState().addSurface(request);

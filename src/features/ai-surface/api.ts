@@ -1,128 +1,19 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
-import { readInvocationStream } from "./invocationStream";
 import { withDeviceRunGrants } from "./deviceRunGrants";
-import {
-  apiRequest,
-  apiRequestCredentials,
-  httpRequest,
-  readApiAuthToken,
-  resolveRequiredApiBase,
-} from "@/api/client";
-import type { BillingUsage } from "@/api/spaces/dto/agentUsageTypes";
-import type {
-  AiProgressItem,
-  AiArtifact,
-  AiInvocationCreated,
-  AiInvocationEvent,
-  AiInvocationRequest,
-  AiCitation,
-  AiContextReference,
-} from "./types";
+import { apiRequest } from "@/api/client";
+import type { AiProgressItem, AiArtifact, AiInvocationCreated, AiInvocationRequest } from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
-export type ScreenLocation = "separate" | "window" | "ask";
-export interface AiUserSettings {
-  enabled: boolean;
-  memory_enabled: boolean;
-  /** Agents pause before sending, sharing, deleting and paying. Off by default. */
-  app_actions_ask: boolean;
-  /** Agents pause before paying while they otherwise act on their own. */
-  payments_ask?: boolean;
-  /** Where agents open a screen when a task needs one. */
-  screen_location?: ScreenLocation;
-  /** Agents may read but not act on banking, crypto, payment and adult sites. */
-  agent_block_sensitive?: boolean;
-  /** More sites agents may read but not act on, as hosts such as example.com. */
-  agent_blocked_sites?: string[];
-  /** A computer stays awake while an agent works on it. */
-  keep_awake_for_agents?: boolean;
-  retention_days: number;
-  purge_state: "none" | "queued" | "working" | "verified" | "failed";
-  disabled_at?: string;
-  updated_at?: string;
-}
-
-export interface AiMemoryRecord {
-  id: string;
-  space_id?: string;
-  kind: "fact" | "preference" | "instruction";
-  content: string;
-  reason?: string;
-  last_used_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AiConversationMessageRecord {
-  id: string;
-  role: "user" | "assistant";
-  mode: string;
-  content: string;
-  createdAt: string;
-}
-
-export interface AiConversationRecord {
-  id: string;
-  title: string;
-  spaceId?: string;
-  kind: "misty";
-  originSurface?: string;
-  originHref?: string;
-  privacyBoundary?: string;
-  createdAt: string;
-  updatedAt: string;
-  messages: AiConversationMessageRecord[];
-}
-
-export interface AiSurfacePreferenceRecord {
-  surface_id: string;
-  proactive_enabled: boolean;
-  proactive_cooldown_minutes: number;
-  proactive_snoozed_until?: string;
-  proactive_last_shown_at?: string;
-  proactive_dismissed_at?: string;
-  saved_actions: AiSavedAction[];
-  updated_at?: string;
-}
-
-export interface AiSavedAction {
-  id: string;
-  label: string;
-  prompt: string;
-  requested_artifact_kind?: AiArtifact["kind"];
-}
-
-export interface AiRecapRecord {
-  surface_id: "global" | "activity";
-  enabled: boolean;
-  cadence: "daily" | "weekly";
-  local_time: string;
-  weekday: number;
-  timezone: string;
-  prompt: string;
-  state: "idle" | "running" | "failed";
-  next_run_at?: string;
-  last_invocation_id?: string;
-  last_result?: string;
-  last_citations: AiCitation[];
-  last_error?: string;
-  last_run_at?: string;
-  last_seen_at?: string;
-  updated_at: string;
-}
-
-export interface AiProviderStatus {
-  configured: boolean;
-  provider: string;
-  model: string;
-  model_name: string;
-}
-
-export type AiBillingUsage = BillingUsage;
-
+import { toServerInvocation } from "./serverInvocation";
+export * from "./aiSettingsTypes";
+export { subscribeToAiInvocation } from "./invocationSubscription";
+import type {
+  AiMemoryRecord,
+  AiRecapRecord,
+  AiSurfacePreferenceRecord,
+  AiUserSettings,
+  ScreenLocation,
+} from "./aiSettingsTypes";
 export const aiSurfaceApi = {
-  status: () => apiRequest<AiProviderStatus>("/ai/status"),
-  usage: () => cachedRequest<AiBillingUsage>("/billing/usage"),
   settings: () =>
     apiRequest<{ settings: AiUserSettings; preferences: AiSurfacePreferenceRecord[] }>(
       "/ai/settings",
@@ -146,6 +37,12 @@ export const aiSurfaceApi = {
       method: "PUT",
       body: JSON.stringify(change),
     }),
+  /** Whether agents stop to ask before paying or buying (`payments_ask`). */
+  updatePaymentsAsk: (paymentsAsk: boolean) =>
+    apiRequest<{ settings: AiUserSettings }>("/ai/settings/app-actions", {
+      method: "PUT",
+      body: JSON.stringify({ payments: paymentsAsk }),
+    }),
   updateKeepAwake: (keepAwake: boolean) =>
     apiRequest<{ settings: AiUserSettings }>("/ai/settings/keep-awake", {
       method: "PUT",
@@ -158,9 +55,6 @@ export const aiSurfaceApi = {
     apiRequest<{ entries: MistyActivityEntry[] }>(
       `/ai/activity?${new URLSearchParams({ space_id: spaceId, ...(agentId ? { agent_id: agentId } : {}) })}`,
     ),
-  conversations: () => apiRequest<{ conversations: AiConversationRecord[] }>("/ai/conversations"),
-  conversation: (conversationId: string) =>
-    apiRequest<AiConversationRecord>(`/ai/conversations/${encodeURIComponent(conversationId)}`),
   updatePreference: (
     surfaceId: string,
     input: Pick<AiSurfacePreferenceRecord, "proactive_enabled" | "saved_actions">,
@@ -241,135 +135,3 @@ export const aiSurfaceApi = {
       },
     ),
 };
-
-export function subscribeToAiInvocation(
-  eventsUrl: string,
-  handlers: {
-    onEvent: (event: AiInvocationEvent) => void;
-    onError: (error: Error) => void;
-  },
-): () => void {
-  const controller = new AbortController();
-  void streamAiInvocation(eventsUrl, controller.signal, handlers).catch((error: unknown) => {
-    if (controller.signal.aborted) return;
-    handlers.onError(
-      error instanceof Error ? error : new Error("The Misty response stream disconnected."),
-    );
-  });
-  return () => controller.abort();
-}
-
-async function streamAiInvocation(
-  eventsUrl: string,
-  signal: AbortSignal,
-  handlers: {
-    onEvent: (event: AiInvocationEvent) => void;
-    onError: (error: Error) => void;
-  },
-) {
-  const [base, token] = await Promise.all([resolveRequiredApiBase(), readApiAuthToken()]);
-  const headers = new Headers({ Accept: "text/event-stream" });
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  await readInvocationStream(
-    (lastEventId, connectionSignal) => {
-      if (lastEventId) headers.set("Last-Event-ID", lastEventId);
-      return httpRequest(`${base}${eventsUrl}`, {
-        method: "GET",
-        credentials: apiRequestCredentials(),
-        headers,
-        signal: connectionSignal,
-      });
-    },
-    signal,
-    handlers,
-  );
-}
-
-function toServerInvocation(input: AiInvocationRequest) {
-  return {
-    mode: input.mode,
-    surface_id: input.surfaceId,
-    trigger: input.trigger,
-    prompt: input.prompt,
-    context: input.context.map(toServerContextReference),
-    selection: input.selection,
-    companion_mode: input.companionMode,
-    method_version_id: input.methodVersionId,
-    method_inputs: input.methodInputs,
-    schedule_id: input.scheduleId,
-    schedule_claim: input.scheduleClaim,
-    skill_version_ids: input.skillVersionIds,
-    companion_model: input.companionModel,
-    model_override: input.modelOverride,
-    collaboration_mode: input.collaborationMode,
-    lesson: input.lesson,
-    lesson_index: input.lessonIndex,
-    media_context: input.mediaContext,
-    permission_mode: input.permissionMode,
-    coding_tool: input.codingTool,
-    display_captures: input.displayCaptures?.map((c) => ({
-      id: c.id,
-      name: c.name,
-      mime_type: c.mimeType,
-      data_url: c.dataUrl,
-      width: c.width,
-      height: c.height,
-      content_hash: c.contentHash,
-      screen: c.screen,
-      primary: c.primary,
-      captured_at: c.capturedAt,
-      display_id: c.display.id,
-      source: c.source,
-      controls: c.controls,
-    })),
-    capture: input.capture
-      ? {
-          id: input.capture.id,
-          name: input.capture.name,
-          mime_type: input.capture.mimeType,
-          data_url: input.capture.dataUrl,
-          width: input.capture.width,
-          height: input.capture.height,
-          content_hash: input.capture.contentHash,
-        }
-      : undefined,
-    attachment_ids: input.attachmentIds,
-    agent_id: input.agentId,
-    task_id: input.taskId,
-    execution_mode: input.executionMode,
-    window_label: input.windowLabel,
-    current_tab: input.currentTab,
-    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
-    device_contexts: input.deviceContexts?.map((context) => ({
-      device_id: context.deviceId,
-      kind: context.kind,
-      opaque_ref: context.opaqueRef,
-      display_name: context.displayName,
-      capabilities: context.capabilities,
-      metadata: context.metadata,
-      run_grant: context.runGrant,
-    })),
-    thinking_mode: input.thinkingMode,
-    model_id: input.modelId,
-    reasoning_effort: input.reasoningEffort,
-    requested_artifact_kind: input.requestedArtifactKind,
-    conversation_id: input.conversationId,
-    idempotency_key: input.idempotencyKey,
-    timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
-  };
-}
-
-function toServerContextReference(reference: AiContextReference) {
-  return {
-    kind: reference.kind,
-    id: reference.id,
-    title: reference.title,
-    privacy: reference.privacy,
-    space_id: reference.spaceId,
-    href: reference.href,
-    revision: reference.revision,
-    opaque_scope_id: reference.opaqueScopeId,
-    attached: reference.attached,
-    metadata: reference.metadata,
-  };
-}

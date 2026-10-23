@@ -9,7 +9,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
  * pauses an agent's page step natively and asks here; the control island shows
  * the question until the person answers or it times out.
  */
-export interface ActionQuestion {
+interface ActionQuestion {
   id: string;
   kind: "payment" | "send" | "delete" | "publish";
   control: string;

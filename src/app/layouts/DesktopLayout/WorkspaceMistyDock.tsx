@@ -1,12 +1,10 @@
 import {
   MistyPanelDock,
-  mistyPanelWidth,
   useMistyPanelSide,
   useMistyPanelStore,
   type MistyPanelView,
 } from "@/features/agents";
-import { panelGap } from "@/features/agents/panel/MistyPanelDock";
-import { SpaceChatPanel } from "@/features/spaces/chat/SpaceChatPanel";
+import { SpaceChatPanel } from "@/features/spaces";
 import { dockLeaves, spaceWorkspaceToolFromRoute, useWorkspaceStore } from "@/features/workspace";
 import { useMemo } from "react";
 
@@ -28,7 +26,11 @@ export function WorkspaceMistyDock() {
   return <MistyPanelDock views={views} side={side} chat={chat} />;
 }
 
-/** The panels shown beside the focused page, top first; none beside a full chat or agents tab. */
+/**
+ * The panels shown beside the focused page, top first. A full chat or agents tab already is that
+ * panel, so only its own panel is left out: Agents still opens beside the Chat page, and Chat
+ * beside the Agents page.
+ */
 function useMistyPanelViews(): MistyPanelView[] {
   const agentsOpen = useMistyPanelStore((s) => s.open);
   const chatOpen = useMistyPanelStore((s) => s.chatOpen);
@@ -44,19 +46,6 @@ function useMistyPanelViews(): MistyPanelView[] {
       : "";
   });
   const order: MistyPanelView[] = first === "chat" ? ["chat", "agents"] : ["agents", "chat"];
-  // A full chat or agents tab shows no panels; the panels stay open for the tabs that had them.
-  return order.filter((view) => (view === "agents" ? agentsOpen : chatOpen) && !page);
-}
-
-/**
- * The column the Misty panels take beside the pages, so the tab strip can end its tabs where
- * the pages end: its side, and its widest panel's width with the margin before the page (0
- * while closed).
- */
-export function useMistyPanelColumn() {
-  const views = useMistyPanelViews();
-  const width = useMistyPanelStore((s) =>
-    Math.max(0, ...views.map((view) => mistyPanelWidth(s, view))),
-  );
-  return { side: useMistyPanelSide(), width: views.length ? width + panelGap : 0 };
+  // The panels stay open for the tabs that had them; a tab hides only the one it already shows.
+  return order.filter((view) => (view === "agents" ? agentsOpen : chatOpen) && view !== page);
 }

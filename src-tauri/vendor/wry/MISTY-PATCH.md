@@ -10,10 +10,8 @@ This makes sync's website-storage helpers steal focus from the user's active app
 webview first responder or activating the application. Background helper views
 explicitly set `.focused(false)`. Focused window creation remains unchanged.
 
-Regression verification: run the SDK package probe with
-`MISTY_SDK_PROBE_SYNC_STORAGE=1`, `MISTY_SDK_PROBE_APP=browser`, and
-`MISTY_SDK_PROBE_ORIGIN=http://127.0.0.1:5178` against the local Vite server.
-It verifies native storage transfer and that the hidden test app stays inactive.
+Regression verification: with another app in front, unlock sync so it opens
+its hidden website-storage views; Misty must stay in the background.
 
 Remove this patch when the upstream macOS backend honors this focus attribute.
 
@@ -33,7 +31,7 @@ unaffected; on a page that both blocks that protocol and declares `ipc`, Kiri's
 page features report an error instead of the whole site failing.
 
 Regression verification: with the browser eval bridge running (see
-`server/apps/agent-runtime/evals/browser/README.md`), a new sheet at
+`server/apps/agent-runtime/evals/odysseys/README.md`), a new sheet at
 `https://docs.google.com/spreadsheets/create` gets its own address and enabled
 controls.
 

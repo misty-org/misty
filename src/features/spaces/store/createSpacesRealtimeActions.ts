@@ -1,14 +1,11 @@
 import { httpOutageRemainingMs } from "@/api/client/http";
+import { applyRealtimeEventSafely } from "./applyRealtimeEvent";
 import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
-import * as referenceMode from "./reference-mode";
-import * as accessErrors from "@/api/spaces/access-errors";
-import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/store/useSpaceMessageSpansStore";
+import { readRealtimeCursor } from "@/api/spaces/realtime-cursor";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "@/api/spaces/api";
-import type { SpaceEvent } from "@/api/spaces/dto/entities";
-import { readRealtimeCursor, writeRealtimeCursor } from "@/api/spaces/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
-import type { SpacesStore } from "../model/stores/spaces/useSpacesStore";
-import type { RealtimeEnvelope } from "../model/stores/spaces/useSpacesBackendStore";
+import type { SpacesStore } from "./spacesStoreTypes";
+import type { RealtimeEnvelope } from "./realtimeTypes";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;
@@ -29,6 +26,11 @@ let realtimeGeneration = 0;
 let currentViewingSpaceId = "";
 let readAccountGeneration = () => 0;
 let currentViewingActive = computeViewingActivity();
+// What a realtime event checks before it writes, so a late event never lands in another account.
+const realtimeScope = {
+  currentAccountId: () => realtimeAccountId,
+  accountGeneration: () => readAccountGeneration(),
+};
 
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
@@ -43,7 +45,6 @@ export function createSpacesRealtimeActions(
     connectRealtime: async (accountId) => {
       accountId = accountId.trim();
       if (!accountId) return;
-      referenceMode.setSpaceReferenceModeAccount(accountId);
       if (realtimeAccountId && realtimeAccountId !== accountId) stopRealtimeConnection();
       realtimeAccountId = accountId;
       realtimeWanted = true;
@@ -96,10 +97,7 @@ export function createSpacesRealtimeActions(
             }
             clearRealtimeOpenTimer();
             realtimeOpenedAt = Date.now();
-            set((state) => ({
-              realtimeConnected: true,
-              error: state.snapshotReady ? null : state.error,
-            }));
+            set((state) => ({ error: state.snapshotReady ? null : state.error }));
             if (!get().snapshotReady || get().referenceOnly)
               void get().load({ force: true, accountId });
             if (currentViewingSpaceId)
@@ -116,10 +114,10 @@ export function createSpacesRealtimeActions(
               const envelope = JSON.parse(String(message.data)) as RealtimeEnvelope;
               if (envelope.type === "replay") {
                 for (const event of envelope.events)
-                  applyRealtimeEventSafely(event, accountId, get, set);
+                  applyRealtimeEventSafely(event, accountId, get, set, realtimeScope);
                 if (envelope.resync_required) void resyncSpaces(get);
               } else if (envelope.type === "event") {
-                applyRealtimeEventSafely(envelope.event, accountId, get, set);
+                applyRealtimeEventSafely(envelope.event, accountId, get, set, realtimeScope);
               } else if (envelope.type === "presence") {
                 set((state) => ({
                   presenceBySpace: {
@@ -146,7 +144,6 @@ export function createSpacesRealtimeActions(
             if (realtimeOpenedAt && Date.now() - realtimeOpenedAt >= stableConnectionMs)
               reconnectAttempt = 0;
             realtimeOpenedAt = 0;
-            set({ realtimeConnected: false });
             scheduleReconnect(get, accountId, generation);
           };
           socket.onerror = () => {
@@ -161,7 +158,7 @@ export function createSpacesRealtimeActions(
           if (error instanceof SpaceRequestError && error.status === 429) {
             realtimeTicketCooldownUntil = Date.now() + realtimeTicketRateLimitCooldownMs;
           }
-          set({ realtimeConnected: false, error: errorText(error) });
+          set({ error: errorText(error) });
           scheduleReconnect(get, accountId, generation);
         } finally {
           if (generation === realtimeGeneration && realtimeAccountId === accountId)
@@ -178,7 +175,6 @@ export function createSpacesRealtimeActions(
 
     disconnectRealtime: () => {
       stopRealtimeConnection();
-      set({ realtimeConnected: false });
     },
 
     setViewingSpace: (spaceId) => {
@@ -199,81 +195,6 @@ export function resetSpacesRealtimeRuntime(): void {
   reconnectAttempt = 0;
   realtimeConnectPromise = null;
   realtimeTicketCooldownUntil = 0;
-}
-
-async function applyRealtimeEvent(
-  event: SpaceEvent,
-  accountId: string,
-  get: () => SpacesStore,
-  set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
-) {
-  if (accountId !== realtimeAccountId) return;
-  const generation = readAccountGeneration();
-  writeRealtimeCursor(accountId, event.id);
-  if (event.type === "apps.changed")
-    window.dispatchEvent(
-      new CustomEvent("misty:space-apps-changed", {
-        detail: { accountId, spaceId: event.space_id },
-      }),
-    );
-  if (event.type.startsWith("message.")) {
-    const includedMessage = messageFromSpaceEvent(event);
-    const conversationId =
-      typeof event.payload.conversation_id === "string" ? event.payload.conversation_id : "";
-    window.dispatchEvent(
-      new CustomEvent("misty:space-message-event", {
-        detail: { spaceId: event.space_id, conversationId, event },
-      }),
-    );
-    // Conversation threads load their own messages from the window event.
-    if (!conversationId && includedMessage)
-      set((state) => ({
-        messagesBySpace: {
-          ...state.messagesBySpace,
-          [event.space_id]: mergeSpaceMessages(state.messagesBySpace[event.space_id] ?? [], [
-            includedMessage,
-          ]),
-        },
-      }));
-    else if (!conversationId)
-      await coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id));
-  } else if (event.type.startsWith("conversation."))
-    window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
-  else if (event.type.startsWith("node."))
-    await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
-  else if (
-    event.type.startsWith("member.") ||
-    event.type.startsWith("owner.") ||
-    event.type.startsWith("space.")
-  ) {
-    await coalescedReload("spaces", () => get().load({ force: true }));
-    if (accountId !== realtimeAccountId || generation !== readAccountGeneration()) return;
-    if (!get().spaces.some((space) => space.id === event.space_id)) return;
-    try {
-      await coalescedReload(`members:${event.space_id}`, () => get().loadMembers(event.space_id));
-    } catch (error) {
-      if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
-    }
-  } else if (event.type.startsWith("library."))
-    window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
-  else if (event.type.startsWith("note."))
-    window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
-  else if (event.type.startsWith("drawing."))
-    window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
-  set({ realtimeConnected: true });
-}
-
-function applyRealtimeEventSafely(
-  event: SpaceEvent,
-  accountId: string,
-  get: () => SpacesStore,
-  set: (partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>)) => void,
-): void {
-  void applyRealtimeEvent(event, accountId, get, set).catch((error) => {
-    if (accessErrors.isInaccessibleSpaceError(error)) return;
-    if (accountId !== realtimeAccountId) return;
-    set({ error: errorText(error) });
-  });
 }
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {

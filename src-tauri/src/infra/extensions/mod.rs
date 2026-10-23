@@ -1,3 +1,5 @@
+pub mod popup;
+
 // SPDX-License-Identifier: MIT
 mod catalog;
 mod chrome_store;
@@ -29,7 +31,7 @@ use std::{
     path::{Path, PathBuf},
     sync::OnceLock,
 };
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize)]

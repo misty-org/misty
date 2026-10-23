@@ -1,6 +1,6 @@
 # Clipboard: approved direction
 
-Approved direction (October 7, 2026; revised October 12, 2026: clips travel through sync instead of a Cloudflare Worker, and devices no longer offer clips to each other over the LAN; see [docs/plans/drop-lan-clipboard-on-sync.md](../../plans/drop-lan-clipboard-on-sync.md)). This brief extends [docs/design/devices/BRIEF.md](../devices/BRIEF.md). It uses the sync vocabulary: account → vault → devices.
+Approved direction (October 7, 2026; revised October 12, 2026: clips travel through sync instead of a Cloudflare Worker, and devices no longer offer clips to each other over the LAN). This brief extends [docs/design/devices/BRIEF.md](../devices/BRIEF.md). It uses the sync vocabulary: account → vault → devices.
 
 ## Goal
 

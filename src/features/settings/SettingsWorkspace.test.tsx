@@ -173,9 +173,9 @@ describe("SettingsWorkspace", () => {
   });
   it("renders every block of a page together without expanding navigation", async () => {
     await render("general");
-    for (const id of ["general", "browser-links", "sync", "devices", "about"])
+    for (const id of ["general", "updates", "diagnostics", "about"])
       expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
-    expect(container.querySelector('[data-settings-nav-entry="browser-links"]')).toBeNull();
+    expect(container.querySelector('[data-settings-nav-entry="updates"]')).toBeNull();
     // Dropdown controls report aria-expanded; navigation never discloses entries.
     expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
@@ -190,9 +190,9 @@ describe("SettingsWorkspace", () => {
     expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
     expect(canonicalSettingsSection("profiles")).toBe("sync");
     expect(canonicalSettingsSection("browser")).toBe("search");
-    expect(canonicalSettingsSection("browser-privacy")).toBe("privacy");
+    expect(canonicalSettingsSection("browser-privacy")).toBe("sync");
     expect(canonicalSettingsSection("spaces-manage")).toBe("general");
-    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("general");
+    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");
     expect(settingsRegistry.find((e) => e.id === "browser-handoff")).toBeUndefined();
     expect(canonicalSettingsSection("browser-handoff")).toBe("sync");
   });
@@ -210,6 +210,6 @@ describe("SettingsWorkspace", () => {
     ) as HTMLButtonElement;
     expect(result.textContent).toContain("Homepage");
     await act(async () => result.click());
-    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-appearance");
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-tabs");
   });
 });

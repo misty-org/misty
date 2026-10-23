@@ -10,7 +10,9 @@ const runtime = vi.hoisted(() => ({
   presented: {} as Record<string, boolean>,
   listeners: new Set<() => void>(),
 }));
-vi.mock("./browserRuntime", () => ({
+// Other features the hook pulls in (the workspace store) keep the real runtime's other exports.
+vi.mock("@/features/webviews/browserRuntime", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   browserRuntimeResumeEvent: "misty:browser-runtime-resume",
   windowChromeChangedEvent: "misty:window-chrome-changed",
   syncBrowserWebview: runtime.sync,

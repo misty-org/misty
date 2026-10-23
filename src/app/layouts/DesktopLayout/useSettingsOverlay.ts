@@ -1,23 +1,20 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
 import { blockIfUnsaved, useSettingsStore, type SettingsSection } from "@/features/settings";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallback, useEffect, useState } from "react";
 
 /** Settings overlay open state, its window events and the account hand-off. */
 export function useSettingsOverlay(options: {
-  settingsLoad: () => Promise<unknown> | unknown;
   refreshUser: () => Promise<unknown>;
 }) {
-  const { settingsLoad, refreshUser } = options;
+  const { refreshUser } = options;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const refreshUserAfterSettings = useCallback(() => {
     void refreshUser().catch(() => undefined);
   }, [refreshUser]);
   const openSettingsOverlay = useCallback(() => {
     setSettingsOpen(true);
-    if (hasTauriInternals() && !useSettingsStore.getState().loaded) void settingsLoad();
-  }, [settingsLoad]);
+  }, []);
   const closeSettingsOverlay = useCallback(() => {
     // Unsaved changes keep settings open; the save bar says why.
     if (blockIfUnsaved()) return;

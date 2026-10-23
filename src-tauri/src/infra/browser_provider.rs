@@ -114,47 +114,6 @@ mod tests {
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct OAuthCallback {
     pub url: String,
-    pub state: String,
-}
-impl OAuthCallback {
-    pub fn allows(&self, url: &Url) -> bool {
-        let Ok(expected) = Url::parse(&self.url) else {
-            return false;
-        };
-        url.scheme() == "https"
-            && url.username().is_empty()
-            && url.password().is_none()
-            && url.origin() == expected.origin()
-            && url.path() == expected.path()
-            && url.fragment().is_none()
-            && url
-                .query_pairs()
-                .filter(|(key, _)| key == "state")
-                .map(|(_, value)| value.into_owned())
-                .collect::<Vec<_>>()
-                == [self.state.clone()]
-    }
-}
-
-#[cfg(test)]
-mod callback_tests {
-    use super::*;
-    #[test]
-    fn callback_requires_exact_origin_path_and_state() {
-        let callback = OAuthCallback {
-            url: "https://api.example/v1/oauth/connections/google/callback".into(),
-            state: "one-account-flow".into(),
-        };
-        assert!(callback.allows(&Url::parse("https://api.example/v1/oauth/connections/google/callback?state=one-account-flow&code=fixture").unwrap()));
-        assert!(callback.allows(&Url::parse("https://api.example/v1/oauth/connections/google/callback?state=one-account-flow&error=access_denied").unwrap()));
-        for value in [
-            "https://api.example/v1/oauth/connections/google/callback?state=another-account",
-            "https://api.example/v1/oauth/connections/google/callback?state=one-account-flow&state=other",
-            "https://api.example/elsewhere?state=one-account-flow",
-            "https://api.example.evil/v1/oauth/connections/google/callback?state=one-account-flow",
-            "http://api.example/v1/oauth/connections/google/callback?state=one-account-flow",
-        ] { assert!(!callback.allows(&Url::parse(value).unwrap())); }
-    }
 }
 
 #[cfg(test)]
@@ -318,57 +277,5 @@ mod authentication_tests {
                 &Url::parse(raw).unwrap()
             ));
         }
-    }
-}
-
-/// Unknown blank popups can be OAuth launchers populated after window.open.
-/// Keep those and known authentication endpoints attached to their opener.
-pub fn authentication_popup(provider: Option<&str>, url: &Url) -> bool {
-    if url.as_str() == "about:blank" || authentication_required(provider, url) {
-        return true;
-    }
-    let Some(provider) = provider else {
-        return false;
-    };
-    if !allows(provider, url) {
-        return false;
-    }
-    url.path()
-        .split('/')
-        .any(|part| matches!(part, "oauth" | "oauth2" | "authorize" | "signin" | "login"))
-}
-
-#[cfg(test)]
-mod popup_routing_tests {
-    use super::*;
-    #[test]
-    fn ordinary_service_and_external_popups_are_browser_tabs() {
-        for raw in [
-            "https://discord.com/channels/123/456",
-            "https://example.org/article",
-        ] {
-            assert!(!authentication_popup(
-                Some("discord"),
-                &Url::parse(raw).unwrap()
-            ));
-        }
-        for raw in [
-            "about:blank",
-            "https://discord.com/login",
-            "https://discord.com/oauth2/authorize",
-        ] {
-            assert!(authentication_popup(
-                Some("discord"),
-                &Url::parse(raw).unwrap()
-            ));
-        }
-        assert!(authentication_popup(
-            Some("google-drive"),
-            &Url::parse("https://accounts.google.com/ServiceLogin").unwrap()
-        ));
-        assert!(!authentication_popup(
-            Some("google-drive"),
-            &Url::parse("https://example.org/oauth2/authorize").unwrap()
-        ));
     }
 }

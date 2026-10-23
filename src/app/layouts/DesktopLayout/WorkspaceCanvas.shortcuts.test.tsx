@@ -23,6 +23,8 @@ vi.mock("./WorkspaceDockTree", () => ({
       </button>
     </div>
   ),
+}));
+vi.mock("./dockSplitFit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
 

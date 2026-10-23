@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import type { MouseEvent } from "react";
 import { Button } from "../../controls/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../display/Table";
 import { cn } from "../../utils";
@@ -68,6 +69,8 @@ export function CollectionItemsTable({
   stickyActions = false,
   sort,
   onSort,
+  selectedIds = [],
+  onSelect,
 }: {
   items: CollectionItem[];
   /** Visible columns, including the name column. */
@@ -78,6 +81,8 @@ export function CollectionItemsTable({
   stickyActions?: boolean;
   sort: CollectionSort | null;
   onSort: (sort: CollectionSort | null) => void;
+  selectedIds?: string[];
+  onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
   return (
     <div className="min-w-0 shrink-0 overflow-x-auto">
@@ -103,14 +108,16 @@ export function CollectionItemsTable({
           {items.map((item) => (
             <CollectionItemSurface key={item.id} item={item}>
               <TableRow
-                className={rowClass}
+                className={cn(rowClass, selectedIds.includes(item.id) && "bg-charcoal-active")}
                 onClick={(event) => {
                   if (
                     !(event.target as HTMLElement).closest(
                       "button, a, [role=menuitem], [data-collection-actions]",
                     )
-                  )
-                    item.onOpen();
+                  ) {
+                    if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+                    else item.onOpen();
+                  }
                 }}
               >
                 <TableCell>
@@ -123,7 +130,10 @@ export function CollectionItemsTable({
                       "min-h-8 w-full gap-3 whitespace-normal border-0 p-0 text-left font-normal",
                       "hover:bg-transparent focus-visible:ring-inset",
                     )}
-                    onClick={item.onOpen}
+                    onClick={(event) => {
+                      if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+                      else item.onOpen();
+                    }}
                   >
                     <span
                       className={cn(

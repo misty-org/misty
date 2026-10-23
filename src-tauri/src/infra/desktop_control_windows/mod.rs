@@ -22,7 +22,7 @@ use std::{
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use windows_sys::Win32::{
     Foundation::{LPARAM, LRESULT, POINT, WPARAM},
@@ -47,7 +47,7 @@ use super::desktop_overlays_windows::{self as overlays, Frame, Island};
 mod actions;
 mod guard;
 
-use crate::platform::windows::automation::{Automation, Element};
+use crate::platform::shared_windows::automation::{Automation, Element};
 pub use actions::action;
 use guard::{end_guard, start_guard};
 

@@ -24,7 +24,7 @@ typography:
 
 This document covers the dedicated Bookmarks page and bookmark editor, including their use from browser chrome. It extends Misty's incumbent charcoal and cream surfaces, application typography, and shared controls. The approved extension brief and built components are the authority; this is not a new product identity or speculative product brief.
 
-Bookmarks are saved links organized into a tree of folders under three roots, as in Chrome, Edge and Firefox: Bookmarks bar, Other bookmarks and Mobile bookmarks. Live tab groups belong to the visible workspace tab strip, documented in [DesktopLayout](../../app/layouts/DesktopLayout/DESIGN.md). The former Groups popup is retired.
+Bookmarks are saved links organized into a tree of folders under three roots, as in Chrome, Edge and Firefox: Bookmarks bar, Other bookmarks and Mobile bookmarks. Live tab groups belong to the tab sidebar, documented in [DesktopLayout](../../app/layouts/DesktopLayout/DESIGN.md). The former Groups popup is retired.
 
 Sources: [tree.ts](tree.ts), [library.ts](library.ts), [BookmarkEditor.tsx](BookmarkEditor.tsx), [BookmarkFolderDialog.tsx](BookmarkFolderDialog.tsx), [BookmarkRows.tsx](../browser/internal/BookmarkRows.tsx), [BookmarksPage.tsx](../browser/internal/BookmarksPage.tsx), [InternalPageFrame.tsx](../browser/internal/InternalPageFrame.tsx), and shared controls under `src/shared/ui`.
 
@@ -69,5 +69,3 @@ Retain shared rounded buttons, fields, list rows, menus, and dialogs. Folder fil
 - **Do** retain accessible labels, pressed states, action names, and inline errors.
 - **Don't** restore the saved-website Groups navigator, popup, or destructive folder-removal semantics.
 - **Don't** present local tab-group recovery as cross-device bookmark synchronization.
-
-This scoped record does not regenerate root tokens or a root `.impeccable/design.json` sidecar. The [DesktopLayout review record](../../app/layouts/DesktopLayout/DESIGN.md) identifies the synthetic component captures, reviewer scope, and validation boundary for this change. Those previews do not prove a native live signed-in session.

@@ -373,7 +373,7 @@ describe("desktop dock store", () => {
         expect.objectContaining({
           id: planner.id,
           groupKey: "space:one:library",
-          title: "Files",
+          title: "Library",
         }),
       ]),
     );

@@ -182,10 +182,16 @@ pub(super) fn stop_capture(
                 }
             });
             if camera {
-                view.setCameraCaptureState_completionHandler(WKMediaCaptureState::None, Some(&done));
+                view.setCameraCaptureState_completionHandler(
+                    WKMediaCaptureState::None,
+                    Some(&done),
+                );
             }
             if microphone {
-                view.setMicrophoneCaptureState_completionHandler(WKMediaCaptureState::None, Some(&done));
+                view.setMicrophoneCaptureState_completionHandler(
+                    WKMediaCaptureState::None,
+                    Some(&done),
+                );
             }
         })
         .map_err(|error| error.to_string())

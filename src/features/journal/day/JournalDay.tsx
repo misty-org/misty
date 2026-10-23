@@ -9,6 +9,7 @@ const kindLabel: Record<MemoryEvent["kind"], string> = {
   voice: "Said",
   recording: "Recorded",
   note: "Wrote",
+  screen: "Saw",
 };
 
 /** One day of Memory: what you read, said and recorded, and a summary on request. */

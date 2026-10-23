@@ -11,13 +11,13 @@
       "hash": "07c67054587410af"
     }
   ],
-  "src/features/library/library/SpaceLibraryViewer.tsx": [
+  "src/features/library/SpaceLibraryViewer.tsx": [
     {
       "length": 291,
       "hash": "03af4067d4776828"
     }
   ],
-  "src/features/library/library/SpaceLibraryViewerUtils.tsx": [
+  "src/features/library/SpaceLibraryViewerUtils.tsx": [
     {
       "length": 642,
       "hash": "54a785654ae45689"
@@ -33,24 +33,10 @@
       "hash": "2da9e6d54d271fbb"
     }
   ],
-  "src/shared/ui/feedback/Alert.tsx": [
-    {
-      "length": 318,
-      "hash": "99a36f81b1dcd188"
-    }
-  ],
   "src/shared/ui/display/Avatar.tsx": [
     {
       "length": 202,
       "hash": "ea35c9437cb52838"
-    },
-    {
-      "length": 169,
-      "hash": "c9c35b78676c2f0a"
-    },
-    {
-      "length": 359,
-      "hash": "b5d6686e3c7cf320"
     }
   ],
   "src/shared/ui/display/Badge.tsx": [
@@ -77,42 +63,12 @@
   ],
   "src/shared/ui/overlays/Command.tsx": [
     {
-      "length": 388,
-      "hash": "df5bb95f1e54869e"
-    },
-    {
       "length": 213,
       "hash": "1bebac7966783bf3"
     },
     {
       "length": 316,
       "hash": "101e6de7ba486f2f"
-    }
-  ],
-  "src/shared/ui/layout/DragLayer.tsx": [
-    {
-      "length": 161,
-      "hash": "22b5ca7c8234c876"
-    }
-  ],
-  "src/shared/ui/controls/RadioGroup.tsx": [
-    {
-      "length": 278,
-      "hash": "50ba02f7e7e3ffe3"
-    }
-  ],
-  "src/shared/ui/layout/Tabs.tsx": [
-    {
-      "length": 231,
-      "hash": "b27539ee55cd7744"
-    },
-    {
-      "length": 802,
-      "hash": "196850d7f2ebf13c"
-    },
-    {
-      "length": 189,
-      "hash": "4eb744700a98828a"
     }
   ],
   "src/shared/ui/controls/ToggleGroup.tsx": [

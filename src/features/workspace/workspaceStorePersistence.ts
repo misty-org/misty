@@ -2,7 +2,7 @@ import { initialTabGroups, migrateSavedLinkGroups, savableGroupTabs } from "./ta
 import {
   initialBookmarkNavigation,
   userBookmarkFolders,
-} from "@/features/browser-workspace/navigationDefaults";
+} from "@/features/browser-sync/navigationDefaults";
 import { layoutTabs, activateTab } from "./layoutTabs";
 import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
@@ -124,17 +124,12 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
   const activeScopeKey = state.activeScopeKey ?? windowSpaceScope();
   const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
-    const migrated = normalizeWorkspaceLayout(
-      migrateRetiredWorkspaceViews(layout, scopeKey),
-      scopeKey,
-    );
+    const migrated = normalizeWorkspaceLayout(migrateRetiredWorkspaceViews(layout), scopeKey);
     const history = (node: WorkspaceDockNode): WorkspaceDockNode => {
       if (node.type === "split")
         return { ...node, first: history(node.first), second: history(node.second) };
       if (!node.history?.entries?.length) return node;
-      const entries = node.history.entries.map((view) =>
-        migrateRetiredWorkspaceView(view, scopeKey),
-      );
+      const entries = node.history.entries.map((view) => migrateRetiredWorkspaceView(view));
       const index = Math.max(
         0,
         Math.min(Number.isFinite(node.history.index) ? node.history.index : 0, entries.length - 1),
@@ -158,7 +153,7 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
     layoutsByScope,
     closedItems: migrateClosedWorkspaceItems(state.closedItems).map((closed) => ({
       ...closed,
-      view: migrateRetiredWorkspaceView(closed.view, activeScopeKey),
+      view: migrateRetiredWorkspaceView(closed.view),
       ...(closed.tab
         ? {
             tab: layoutTabs(

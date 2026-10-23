@@ -391,3 +391,25 @@ So the upgrades land like this:
 - **screen.look continuing the run (unchanged).** It still ends the run, and the desktop
   continues it with the screen attached. Continuing in place needs a desktop round-trip
   inside a server run.
+
+## Revision 3: screen capture sessions and the memory tree (2026-10-21)
+
+Decision 1 stands: nothing records the screen on its own. A **capture session** is the
+other kind of "a capture you started": the person chooses **Start capture**, a button at the left of the
+memory tree (the Memory icon in the Space bar opens the tree), and Misty reads the words on the window in front until they choose
+**Stop capture**.
+
+- **Text only.** The window is captured in memory, read with the system's text recognition
+  (Apple Vision on macOS), and discarded. The text, the app and the window title are kept
+  as `screen` moments, redacted first, in the Space of the window that started the session.
+  Windows is not built yet.
+- **Always skipped.** Misty's own windows, password managers, private windows, sign-in
+  pages, secure text entry, and apps the person lists in Settings › Memory.
+- **Ends.** On Stop capture, after the idle time chosen in Settings (default 30 minutes),
+  or when the starting window closes. After an idle end, Misty asks once on return whether
+  to start again.
+- **Retention.** Screen moments older than the chosen days (default 30) are forgotten
+  whenever a session starts.
+- **Agents.** No tool starts or stops capture. Agents read the result like any moment.
+- **Memory tree.** The Space's memory is shown as a tree (Space section `memory`) with
+  per-node forgetting; agents read the same structure with `memory.tree.read`.

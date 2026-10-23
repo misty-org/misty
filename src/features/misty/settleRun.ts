@@ -1,10 +1,10 @@
 import {
   replaceActiveGlobalInvocationStream,
   settleConversationMessage,
-  type GlobalSearchGet,
-  type GlobalSearchSet,
-} from "@/features/global-search/globalSearchStoreHelpers";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+  type MistyGet,
+  type MistySet,
+} from "./mistyStoreHelpers";
+import type { GlobalAiMessage } from "./types";
 
 /**
  * The one way a run ends in the store. Whatever ends it (the person's stop, a
@@ -13,8 +13,8 @@ import type { GlobalAiMessage } from "@/features/global-search/types";
  * run ids and event stream clear together so nothing keeps animating.
  */
 export function settleRun(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   outcome: {
     state: "completed" | "failed" | "canceled";
     conversationId?: string;
@@ -28,7 +28,8 @@ export function settleRun(
     .conversations.find((conversation) => conversation.id === conversationId)
     ?.messages.filter(
       (message) =>
-        message.role === "assistant" && (message.state === "pending" || message.state === "streaming"),
+        message.role === "assistant" &&
+        (message.state === "pending" || message.state === "streaming"),
     );
   for (const message of open ?? [])
     settleConversationMessage(set, get, conversationId, message.id, {

@@ -1,0 +1,249 @@
+/* Approved Grok Bot geometry; Misty's shared controls own all interactive styling. */
+.agents-workspace {
+  container: agents / inline-size;
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-charcoal-workspace);
+  color: var(--color-cream);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.agents-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.agent-conversation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 54px;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+/* The buttons keep their size; a narrow header squeezes the title, never them. */
+.agent-heading-end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+.agent-heading-end > * {
+  flex-shrink: 0;
+}
+.agent-heading-identity {
+  gap: 6px;
+  flex: 0 0 auto;
+  max-width: 60%;
+  /* Sized to its content (avatar, name, chevron); only a long name truncates. */
+  min-width: 0;
+  font-size: 14px;
+}
+.agent-heading-avatar {
+  display: inline-flex;
+  flex: none;
+}
+.agent-heading-avatar .agent-avatar,
+.agent-heading-identity .agent-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+.agent-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+.agent-conversation-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.agent-empty-state {
+  display: grid;
+  height: 100%;
+  place-items: center;
+}
+.agent-compose-area {
+  width: 100%;
+  max-width: 836px;
+  margin-inline: auto;
+  padding: 12px 24px 16px;
+  flex-shrink: 0;
+}
+.agent-compose-error,
+.agents-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--color-cream);
+  background: var(--color-charcoal-card);
+  font-size: 12px;
+}
+.agent-compose-error p,
+.agents-notice p {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.agent-compose-error {
+  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+}
+.agent-compose-status,
+.agent-compose-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+/* Same column and gutters as .agent-compose-area, so bubbles line up with the composer. */
+.agent-conversation .agent-transcript {
+  max-width: 836px;
+  padding: 28px 24px;
+}
+.agent-conversation .agent-transcript > div {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.agent-conversation .agent-transcript > div > * {
+  margin-block: 0;
+}
+.agent-conversation .agent-message-assistant {
+  gap: 10px;
+  align-items: flex-start;
+}
+/* The avatar's center meets the reply's first line (5px inset + 22.4px line). */
+.agent-conversation .agent-message-assistant > :first-child {
+  margin-top: 0;
+  width: 32px;
+  height: 32px;
+  background: none;
+  box-shadow: none;
+}
+.agent-conversation .agent-message-assistant > :last-child {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+/* Only the user's messages are bubbles; replies sit on the canvas as plain text. */
+.agent-conversation .misty-markdown-message {
+  padding-top: 5px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.agent-conversation .misty-markdown-message p {
+  margin: 0 0 10px;
+}
+.agent-conversation .misty-markdown-message p:last-child {
+  margin-bottom: 0;
+}
+/* Status lines take the avatar's height to stay beside it. */
+.agent-message-status {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+}
+.agent-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  color: var(--color-cream-muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.agent-message-assistant .agent-message-actions {
+  margin-top: 4px;
+}
+.agent-message-actions[data-align="end"] {
+  justify-content: flex-end;
+}
+.agent-message-actions:focus-within,
+:is(.agent-message-assistant, .agent-message-user):hover .agent-message-actions {
+  opacity: 1;
+}
+.agent-message-actions button {
+  color: var(--color-cream-muted);
+}
+.agent-message-actions button:is(:hover, [aria-pressed="true"]) {
+  color: var(--color-cream);
+}
+.agent-message-time {
+  padding-inline: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agent-message-actions[data-align="end"] .agent-message-time {
+  order: -1;
+}
+@media (hover: none) {
+  .agent-message-actions {
+    opacity: 1;
+  }
+}
+/* A reply's quote inside the person's bubble, and the target above the composer. */
+.agent-message-quote {
+  display: -webkit-box;
+  margin: 0 0 8px;
+  padding-left: 10px;
+  overflow: hidden;
+  border-left: 2px solid var(--color-charcoal-border);
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.agent-reply-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-reply-target > svg {
+  flex-shrink: 0;
+}
+.agent-reply-target p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-reply-target p span {
+  color: var(--color-cream);
+}
+.agent-conversation .agent-message-user > div:not(.agent-message-actions) {
+  max-width: min(82%, 72ch);
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  /* One step above the card surface, which barely separates from the canvas. */
+  background: var(--color-charcoal-hover);
+  box-shadow: none;
+  font-size: 14px;
+  line-height: 1.6;
+}

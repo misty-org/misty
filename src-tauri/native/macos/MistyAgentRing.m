@@ -4,7 +4,7 @@
 #import "MistyAgentRing.h"
 
 // One mist view for the display, a page and a window. Two inner fogs: a bright
-// one close to the edge and a wide pale-gray one that still reads on white
+// one gray close to the edge and a wide darker-gray one that still reads on white
 // pages. Each is the shadow of a shape that lies entirely outside the bounds,
 // so only the shadow falls inward; the view clips to its own rounded corners.
 @interface MistyAgentMistView : NSView
@@ -53,8 +53,8 @@ static void breathe(CALayer *layer, NSString *key, id from, id to, CFTimeInterva
 - (void)build {
   self.wantsLayer = YES;
   self.layer.masksToBounds = YES;
-  self.near = fogLayer(1, 0.55, 18);
-  self.wide = fogLayer(0.62, 0.22, 46);
+  self.near = fogLayer(0.72, 0.6, 18);
+  self.wide = fogLayer(0.5, 0.26, 46);
   [self.layer addSublayer:self.wide];
   [self.layer addSublayer:self.near];
   if (!mists) mists = [NSHashTable weakObjectsHashTable];

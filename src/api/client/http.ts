@@ -1,6 +1,6 @@
 import type { AccountRequestInit } from "./native-account-fetch";
 import { cookieSessionFetch } from "./cookie-session";
-import { rateLimitResponse, recordRateLimit } from "./rateLimit";
+import { rateLimitResponse, recordRateLimit } from "./rate-limit";
 const TRANSIENT_NETWORK_PATTERNS = [
   "load failed",
   "failed to fetch",
@@ -9,13 +9,13 @@ const TRANSIENT_NETWORK_PATTERNS = [
   "connection was lost",
 ];
 
-export function isTransientNetworkError(error: unknown): boolean {
+function isTransientNetworkError(error: unknown): boolean {
   if (!error) return false;
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
   return TRANSIENT_NETWORK_PATTERNS.some((pattern) => msg.includes(pattern));
 }
 
-export function isAbortError(error: unknown): boolean {
+function isAbortError(error: unknown): boolean {
   if (error instanceof Error && error.name === "AbortError") return true;
   if (
     typeof error === "object" &&
@@ -156,7 +156,7 @@ export class HttpRequestError extends Error {
   }
 }
 
-export class HttpStatusError extends Error {
+class HttpStatusError extends Error {
   constructor(
     url: string,
     readonly status: number,

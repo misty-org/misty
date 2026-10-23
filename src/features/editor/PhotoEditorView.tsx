@@ -1,6 +1,6 @@
 // Type-only import: erased at build time so the (heavy, konva-backed) editor is
 // never pulled into the module graph until it is actually rendered.
-import type { PreviewErrorComponent } from "@/features/file-ui";
+import type { PreviewErrorComponent } from "@/features/resource-preview/previewTypes";
 import { IconButton, Skeleton, ViewportLayer } from "@/shared/ui";
 import { Copy, X } from "lucide-react";
 import {
@@ -11,21 +11,10 @@ import {
   type FunctionComponent,
   type ReactNode,
 } from "react";
-import type { FilerobotImageEditorConfig } from "react-filerobot-image-editor";
+import { filerobotTabs, filerobotTheme, TAB, TOOL } from "./filerobotTheme";
 import "./photoEditor.css";
 
 const FilerobotImageEditor = lazy(() => import("react-filerobot-image-editor"));
-
-// filerobot's TABS/TOOLS enums live in the same module we lazy-load, so mirror
-// the string values here to keep them out of the static import.
-const TAB = {
-  ADJUST: "Adjust",
-  FINETUNE: "Finetune",
-  FILTERS: "Filters",
-  ANNOTATE: "Annotate",
-  RESIZE: "Resize",
-} as const;
-const TOOL = { CROP: "Crop" } as const;
 
 /** Rendered image handed back by filerobot on save. */
 type RenderedImage = {
@@ -34,71 +23,6 @@ type RenderedImage = {
 };
 
 const CopyIcon: FunctionComponent = () => <Copy size={16} />;
-
-// Dark palette tuned to match the app's editor chrome. Cast because
-// @scaleflex/ui's ThemeOverride uses a fixed key set we only partly fill.
-const filerobotTheme = {
-  palette: {
-    "bg-grey": "#191919",
-    "bg-stateless": "#131313",
-    "bg-active": "#3E3E3E",
-    "bg-base-light": "#191919",
-    "bg-base-medium": "#2B2B2B",
-    "bg-primary": "#0F0F0F",
-    "bg-primary-light": "#161616",
-    "bg-primary-hover": "#2B2B2B",
-    "bg-primary-active": "#3E3E3E",
-    "bg-primary-0-5-opacity": "#0F0F0F",
-    "bg-primary-stateless": "#191919",
-    "bg-secondary": "#161616",
-    "bg-hover": "#2B2B2B",
-    "txt-primary": "#E0E0E0",
-    "txt-secondary": "#8C8C8C",
-    "txt-secondary-invert": "#131313",
-    "txt-placeholder": "#8C8C8C",
-    "accent-primary": "#A3BFAB",
-    "accent-primary-hover": "#E0E0E0",
-    "accent-primary-active": "#F1F1F1",
-    "accent-primary-disabled": "#3E3E3E",
-    "accent-secondary-disabled": "#2B2B2B",
-    "accent-stateless": "#A3BFAB",
-    "accent-stateless_0_4_opacity": "#52825A",
-    accent_0_5_opacity: "#28312B",
-    accent_1_2_opacity: "#28312B",
-    "icons-primary": "#E0E0E0",
-    "icons-secondary": "#8C8C8C",
-    "icons-placeholder": "#8C8C8C",
-    "icons-invert": "#131313",
-    "icons-muted": "#8C8C8C",
-    "icons-primary-hover": "#F1F1F1",
-    "icons-secondary-hover": "#E0E0E0",
-    "borders-primary": "#262626",
-    "borders-primary-hover": "#3E3E3E",
-    "borders-secondary": "#262626",
-    "borders-strong": "#3E3E3E",
-    "borders-disabled": "#262626",
-    "borders-button": "#3E3E3E",
-    "borders-item": "#262626",
-    "btn-primary-text": "#131313",
-    "btn-disabled-text": "#8C8C8C",
-    "btn-secondary-text": "#E0E0E0",
-    "link-primary": "#A3BFAB",
-    "link-stateless": "#A3BFAB",
-    "link-hover": "#E0E0E0",
-    "link-active": "#F1F1F1",
-    "link-pressed": "#F1F1F1",
-    "link-muted": "#8C8C8C",
-  },
-  typography: { fontFamily: "inherit" },
-} as FilerobotImageEditorConfig["theme"];
-
-const filerobotTabs = [
-  TAB.ADJUST,
-  TAB.FINETUNE,
-  TAB.FILTERS,
-  TAB.ANNOTATE,
-  TAB.RESIZE,
-] as FilerobotImageEditorConfig["tabsIds"];
 
 function savedImageType(mimeType: string): "png" | "jpeg" | "webp" {
   if (mimeType === "image/jpeg") return "jpeg";

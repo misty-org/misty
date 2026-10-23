@@ -248,7 +248,6 @@ pub(crate) async fn css_viewport(view: &Webview) -> Result<(f64, f64), CdpError>
 /// A mouse button for `Input.dispatchMouseEvent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MouseButton {
-    None,
     Left,
     Right,
 }
@@ -256,7 +255,6 @@ pub(crate) enum MouseButton {
 impl MouseButton {
     fn name(self) -> &'static str {
         match self {
-            Self::None => "none",
             Self::Left => "left",
             Self::Right => "right",
         }
@@ -265,7 +263,6 @@ impl MouseButton {
     /// The `buttons` bitmask while this button is held.
     fn held(self) -> u8 {
         match self {
-            Self::None => 0,
             Self::Left => 1,
             Self::Right => 2,
         }

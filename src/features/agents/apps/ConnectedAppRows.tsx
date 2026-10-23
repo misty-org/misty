@@ -11,7 +11,7 @@ export function AppLogo({ app, size = 24 }: { app: string; size?: number }) {
   );
 }
 
-export interface AppGroup {
+interface AppGroup {
   app: string;
   name: string;
   accounts: ConnectedApp[];
@@ -29,7 +29,7 @@ export function groupApps(apps: ConnectedApp[]): AppGroup[] {
 }
 
 /** Names each account by its alias, then who it signed in as, then when it was connected. */
-export function accountLabels(accounts: ConnectedApp[]) {
+function accountLabels(accounts: ConnectedApp[]) {
   const label = (item: ConnectedApp, withTime: boolean) =>
     item.alias ||
     item.account ||

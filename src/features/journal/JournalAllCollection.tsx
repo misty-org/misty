@@ -8,7 +8,7 @@ import { useSpacesStore } from "@/features/spaces/core";
 import { useSpaceOverview } from "@/features/spaces/useSpaceOverview";
 import { useSpaceOverviewActions } from "@/features/spaces/useSpaceOverviewActions";
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
-import { AccountCollectionFilters } from "@/features/settings/AccountCollectionFilters";
+import { OrderedCollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import {
   Button,
   CollectionPage,
@@ -19,7 +19,11 @@ import {
   CollectionSkeleton,
   useCollectionRefinement,
   itemTones,
+  CollectionSelectionBar,
 } from "@/shared/ui";
+import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
+import { confirmAction } from "@/shared/lib/confirmAction";
+import { closeDrawingCollaborationSession } from "@/features/journal";
 
 export const journalSections = [
   { value: "all", label: "All" },
@@ -46,10 +50,11 @@ export function JournalAllCollection(props: {
   const actions = useSpaceOverviewActions(user?.id ?? "", props.spaceId, journal, data.retry);
   const creator = useSpaceItemCreator(props.spaceId);
   const [view, setView] = useState<"list" | "grid">("list");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState("");
   const refinement = useCollectionRefinement(
-    journal.filter(
-      (item) =>
-        item.title.toLocaleLowerCase().includes(props.query.trim().toLocaleLowerCase()),
+    journal.filter((item) =>
+      item.title.toLocaleLowerCase().includes(props.query.trim().toLocaleLowerCase()),
     ),
     {
       label: "Filter journal",
@@ -67,6 +72,39 @@ export function JournalAllCollection(props: {
       },
     },
   );
+  const selectable = refinement.items.filter((item) => !props.readOnly && item.remove);
+  const selection = useRangeSelection(selectable.map((item) => item.id));
+  const deleteSelected = async () => {
+    if (bulkBusy || !selection.selectedIds.length) return;
+    const selected = selection.selectedIds
+      .map((id) => journal.find((item) => item.id === id))
+      .filter((item) => item?.remove);
+    if (!selected.length) return;
+    if (
+      !(await confirmAction(
+        `Permanently delete ${selected.length} selected ${selected.length === 1 ? "item" : "items"}?`,
+      ))
+    )
+      return;
+    setBulkBusy(true);
+    setBulkError("");
+    try {
+      for (const item of selected) {
+        await item!.remove!();
+        if (item!.kind === "drawing") closeDrawingCollaborationSession(props.spaceId, item!.id.slice(8));
+        window.dispatchEvent(
+          new CustomEvent(`misty:space-${item!.kind}-event`, { detail: { space_id: props.spaceId } }),
+        );
+      }
+      selection.clear();
+      data.retry();
+    } catch {
+      setBulkError("Some selected items couldn't be deleted. Refresh and try again.");
+      data.retry();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
   return (
     <CollectionPage>
       <CollectionHeading
@@ -89,7 +127,7 @@ export function JournalAllCollection(props: {
           </>
         }
       />
-      <AccountCollectionFilters
+      <OrderedCollectionFilters
         collectionId="journal"
         options={journalSections}
         value={props.section}
@@ -110,6 +148,13 @@ export function JournalAllCollection(props: {
           {actions.error}
         </p>
       )}
+      {bulkError && <p role="alert" className="text-sm text-cream-muted">{bulkError}</p>}
+      <CollectionSelectionBar
+        count={selection.selectedIds.length}
+        busy={bulkBusy}
+        onClear={selection.clear}
+        onDelete={() => void deleteSelected()}
+      />
       {actions.dialog}
       {data.loading ? (
         <CollectionSkeleton label="Loading journal" view={view} />
@@ -123,6 +168,7 @@ export function JournalAllCollection(props: {
           items={refinement.items.map((item) => ({
             ...item,
             ...actions.forItem(item),
+            selectable: !props.readOnly && Boolean(item.remove),
             icon: item.kind === "note" ? <FileText /> : <PencilRuler />,
             tone: item.kind === "note" ? itemTones.note : itemTones.drawing,
             category: item.kind === "note" ? "Note" : "Drawing",
@@ -141,6 +187,8 @@ export function JournalAllCollection(props: {
               : "—",
             onOpen: () => navigate(item.route),
           }))}
+          selectedIds={selection.selectedIds}
+          onSelect={selection.select}
         />
       )}
     </CollectionPage>

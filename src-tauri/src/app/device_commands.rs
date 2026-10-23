@@ -13,10 +13,10 @@ use tauri::{AppHandle, State};
 
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    device_admission::{self as admission, DeviceContext},
-    device_channel::{self, ChannelConfig, ChannelSnapshot},
-    device_records::{DevicePolicy, SharedFolder},
-    device_trust,
+    devices::admission::{self as admission, DeviceContext},
+    devices::channel::{self, ChannelConfig, ChannelSnapshot},
+    devices::records::{DevicePolicy, SharedFolder},
+    devices::trust,
 };
 
 static GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -28,10 +28,9 @@ pub(super) fn require_main(webview: &tauri::Webview) -> Result<(), String> {
     Ok(())
 }
 
-/// Main or an agent's own window may sign its device requests.
+/// Only a Space window may sign its device requests.
 pub(crate) fn require_device_window(webview: &tauri::Webview) -> Result<(), String> {
-    let label = webview.label();
-    if !crate::infra::space_windows::is_space_window(label) && !label.starts_with("misty-agent-") {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
         return Err("This window can't act for the device.".into());
     }
     Ok(())
@@ -98,15 +97,15 @@ pub struct DevicesView {
 
 pub(super) async fn view(account_id: &str) -> DevicesView {
     DevicesView {
-        server_device_id: device_trust::server_device_id(),
-        admitted: device_trust::self_admitted(),
+        server_device_id: trust::server_device_id(),
+        admitted: trust::self_admitted(),
         can_sign: crate::infra::browser_sync::device_admission_authority(account_id)
             .await
             .is_some(),
-        vault_pinned: device_trust::pinned_root().is_some(),
-        list_version: device_trust::list_version(),
-        channel: device_channel::snapshot(),
-        policy: device_trust::own_policy().map(|(policy, _)| policy),
+        vault_pinned: trust::pinned_root().is_some(),
+        list_version: trust::list_version(),
+        channel: channel::snapshot(),
+        policy: trust::own_policy().map(|(policy, _)| policy),
     }
 }
 
@@ -190,14 +189,14 @@ pub async fn devices_start(
     admission::register(&mut context, &name, &platform, &os_version, &app_version).await?;
     let _ = admission::refresh_trust(&context).await;
     // Unlocking sync on this device is the proof that adds it: add once.
-    if !device_trust::self_admitted()
+    if !trust::self_admitted()
         && crate::infra::browser_sync::device_admission_authority(&account_id)
             .await
             .is_some()
     {
         let _ = admission::admit_self(&context).await;
     }
-    if device_trust::own_policy().is_none() {
+    if trust::own_policy().is_none() {
         let first = DevicePolicy::first(shared_folders(&state).await);
         let _ = admission::publish_policy(
             &context,
@@ -221,7 +220,7 @@ pub async fn devices_start(
     let (event_base, event_account, event_local) =
         (api_base.clone(), account_id.clone(), local.clone());
     let refreshing = Arc::new(Mutex::new(false));
-    device_channel::start(ChannelConfig {
+    channel::start(ChannelConfig {
         app: Some(app.clone()),
         http: context.http.clone(),
         local_device_id: local.clone(),
@@ -262,8 +261,8 @@ pub async fn devices_stop(
     require_main(&webview)?;
     GENERATION.fetch_add(1, Ordering::SeqCst);
     state.cloud_clipboard.stop();
-    device_channel::stop();
-    device_trust::close();
+    channel::stop();
+    trust::close();
     Ok(())
 }
 

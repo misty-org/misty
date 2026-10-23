@@ -15,23 +15,49 @@ import {
 } from "./progressTimeline";
 
 /**
- * How a reply got its answer, in order: what Misty said while it worked, and
- * each run of tools folded into one line that opens to a table of its steps,
- * as Claude shows its work. The answer itself follows below.
+ * How a reply got its answer, kept quiet: the whole timeline folds into one line that opens to
+ * it in order (what Misty said while it worked, each run of tools as a table of its steps), as
+ * Claude shows its work. While the run is live the line names what it is doing now; afterwards it
+ * says how many steps it took. The answer itself follows below.
  */
 export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {
   if (!items.length) return null;
+  const groups = groupProgress(items);
+  const toolGroups = groups.filter((group) => group.type === "tools");
+  const steps = toolGroups.reduce((count, group) => count + stepsOf(group.tools).length, 0);
+  // The first thing Misty said is its plan, and stays in view above the folded work.
+  const plan = groups[0]?.type === "note" ? groups[0] : undefined;
+  const note = (group: { key: string; text: string }) => (
+    <div key={group.key} className="agent-progress-note misty-markdown-message">
+      <MistyMarkdown>{group.text}</MistyMarkdown>
+    </div>
+  );
+  const timeline = groups
+    .filter((group) => group !== plan)
+    .map((group) =>
+      group.type === "note" ? (
+        note(group)
+      ) : (
+        <ToolGroup key={group.key} tools={group.tools} live={live} />
+      ),
+    );
+  // Narration with no tools is just Misty talking: it stays in the transcript.
+  if (!steps) return <div className="agent-progress">{timeline}</div>;
+  const latest = toolGroups[toolGroups.length - 1]!;
   return (
     <div className="agent-progress">
-      {groupProgress(items).map((group) =>
-        group.type === "note" ? (
-          <div key={group.key} className="agent-progress-note misty-markdown-message">
-            <MistyMarkdown>{group.text}</MistyMarkdown>
-          </div>
-        ) : (
-          <ToolGroup key={group.key} tools={group.tools} live={live} />
-        ),
-      )}
+      {plan && note(plan)}
+      <WorkGroup
+        autoOpen={false}
+        running={live}
+        summary={
+          live
+            ? toolGroupSummary(latest.tools)
+            : `Worked through ${steps} ${steps === 1 ? "step" : "steps"}`
+        }
+      >
+        <div className="agent-progress-timeline">{timeline}</div>
+      </WorkGroup>
     </div>
   );
 }
@@ -41,6 +67,8 @@ function ToolGroup({ tools, live }: { tools: ProgressTool[]; live: boolean }) {
     <WorkGroup
       summary={toolGroupSummary(tools)}
       running={live && tools.some((tool) => tool.state === "running")}
+      // The line above already shimmers for the run: one moving thing at a time.
+      shimmer={false}
     >
       <ol className="agent-progress-table" aria-label="Steps">
         {stepsOf(tools).map((step) => (
@@ -54,8 +82,8 @@ function ToolGroup({ tools, live }: { tools: ProgressTool[]; live: boolean }) {
 function Step({ step }: { step: ProgressStep }) {
   const [open, setOpen] = useState(false);
   const outputId = useId();
-  const running = step.state === "running";
-  const { verb } = toolParts(step.name, running);
+  // One tense, "Used web fetch": a row never flips between "Using" and "Used".
+  const { verb } = toolParts(step.name, false);
   const meta = stepMeta(step);
   const output = stepOutput(step);
   const row = (

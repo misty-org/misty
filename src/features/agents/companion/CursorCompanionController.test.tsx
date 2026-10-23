@@ -1,13 +1,13 @@
 import "./CompanionController.testFixtures";
-import { effectiveValues } from "@/features/settings/profiles/model";
-import { useSettingsProfiles } from "@/features/settings/profiles/store";
+import { effectiveValues } from "@/features/settings/devicePreferences/model";
+import { useDevicePreferences } from "@/features/settings/devicePreferences/store";
 import { act, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { emit, mocks, mounted, presentations } from "./CompanionController.testFixtures";
 import { companionControl, useCompanionState } from "./companionState";
 import { CursorCompanionController } from "./CursorCompanionController";
 import type { DisplayCapture } from "./protocol";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+import type { MistyImageAttachment } from "@/features/misty/types";
 const attachment: MistyImageAttachment = {
   id: "fixture-file",
   name: "notes.txt",
@@ -80,7 +80,7 @@ describe("native companion lifecycle", () => {
     );
     expect(
       Object.fromEntries(
-        Object.entries(effectiveValues(useSettingsProfiles.getState().state!)).map(
+        Object.entries(effectiveValues(useDevicePreferences.getState().state!)).map(
           ([key, value]) => [key.replace("agents.companion.", ""), value],
         ),
       ),
@@ -195,7 +195,7 @@ describe("native companion lifecycle", () => {
     expect(stop).toBeLessThan(changed);
     expect(
       Object.fromEntries(
-        Object.entries(effectiveValues(useSettingsProfiles.getState().state!)).map(
+        Object.entries(effectiveValues(useDevicePreferences.getState().state!)).map(
           ([key, value]) => [key.replace("agents.companion.", ""), value],
         ),
       ),
@@ -470,7 +470,7 @@ it("sends and completes plain text while the realtime provider is unavailable", 
   view.unmount();
 });
 
-it.each(["user", "agent", "team"] as const)(
+it.each(["user", "agent"] as const)(
   "sends typed web work unchanged in user mode after a %s task",
   async (previous) => {
     mocks.state.executionMode = previous;

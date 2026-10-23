@@ -1,0 +1,173 @@
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  /* Tailwind v4 resolves an uncolored `border-*` utility to currentColor, which
+     paints bright text-coloured rules across this dark theme. Anchor the
+     default to the theme border so only a deliberate `border-<color>` stands
+     out. */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-charcoal-border);
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  html {
+    color-scheme: dark;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--misty-theme-bg);
+    color: var(--misty-theme-text);
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif;
+    font-size: 15px;
+  }
+
+  #root {
+    overflow: hidden;
+    background-color: var(--misty-theme-bg);
+  }
+
+  /* Keep the native Browser's transparent path stable while a page is on
+     screen. Toggling these full-window ancestors for every popup forced WebKit
+     to clear and repaint its backing store, which appeared as a dark flash, so
+     overlays never change it; it follows only whether some page is presented.
+     Hidden tabs keep their hosts mounted and, on Windows, their pages in place
+     beneath the renderer, so with no page presented (Home, Agents) the window
+     is opaque and covers them. Opaque tool surfaces and Browser chrome still
+     paint their own backgrounds normally.
+     The page hosts set `data-browser-page-presented` on the root themselves
+     (`usePresentedPageHost`). Reading it with `html:has(...)` restyled the
+     whole window every time it changed, which is every switch between a
+     browser tab and any other tab. Every selector below ends in an attribute
+     or id, so the change restyles only the elements they name. */
+  html[data-browser-page-presented],
+  html[data-browser-page-presented] body,
+  html[data-browser-page-presented] #root,
+  html[data-browser-page-presented] [data-misty-desktop-frame],
+  html[data-browser-page-presented] [data-misty-route-shell],
+  html[data-browser-page-presented] [data-workspace-panes],
+  html[data-browser-page-presented] [data-workspace-pane]:has([data-browser-page-host]),
+  html[data-browser-page-presented]
+    [data-workspace-pane]:has([data-browser-page-host])
+    > [data-pane-layer],
+  html[data-browser-page-presented] [data-misty-trusted-app]:has([data-browser-page-host]),
+  html[data-browser-page-presented] [data-misty-native-surface]:has([data-browser-page-host]),
+  html[data-browser-page-presented] [data-browser-page-container]:has([data-browser-page-host]),
+  html[data-browser-page-presented] [data-browser-workspace-tab],
+  html[data-browser-page-presented] [data-browser-page-stage],
+  html[data-browser-page-presented] [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* While a renderer overlay is open the native page sits beneath the
+     renderer. Keep the host transparent so the page remains visible. */
+  html[data-browser-overlay-active] [data-browser-page-host] {
+    background-color: transparent !important;
+  }
+
+  /* The renderer is transparent, so a host whose page is not on screen yet
+     (a new tab before its first paint, a switch in progress) would show
+     straight through the window. It paints the page's color until the page
+     is presented, then stays transparent through every overlay. */
+  html [data-browser-page-host][data-browser-page-awaiting] {
+    background-color: var(--browser-page-background, var(--misty-theme-bg)) !important;
+  }
+
+  /* While a panel above the page slides (the Space bar), the native page trails it by a frame.
+     The host fills with the chrome color so that gap never shows the window through it. Not the
+     page's color: the native page's rounded corners are cut out of it and show the renderer,
+     and a frame behind they land inside the host, where a page color shows as white pixels. */
+  html[data-browser-slide] [data-browser-page-host] {
+    background-color: var(--misty-window-chrome, var(--misty-theme-workspace)) !important;
+  }
+
+  /* Browser chrome is application UI, not selectable page content. Prevent a
+     stray drag or focus transfer elsewhere in Misty from painting selection
+     or tap-highlight layers behind the native child view. */
+  [data-browser-workspace-tab],
+  [data-browser-page-stage],
+  [data-browser-page-host] {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  [data-browser-workspace-tab] input,
+  [data-browser-workspace-tab] textarea,
+  [data-browser-workspace-tab] [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  [data-browser-page-stage]::selection,
+  [data-browser-page-host]::selection {
+    background: transparent;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  /* Misty uses fill and text tone for interaction state. Keep
+     browser/Tailwind focus halos from drawing a second bright box around the
+     active surface. */
+  *:focus,
+  *:focus-visible,
+  *:focus-within {
+    outline: none !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p {
+    margin: 0;
+  }
+
+  ::selection {
+    background-color: var(--misty-theme-active);
+    color: var(--misty-theme-text-bright);
+  }
+}

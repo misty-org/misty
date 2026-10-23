@@ -3,35 +3,33 @@ import "../agentsWorkspace.css";
 import "../workspace/agentWorkspaceFrame.css";
 import { MistyContextBar } from "@/features/misty/MistyContextBar";
 import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
-import { useAiVoiceRecorder } from "@/features/ai-surface/useAiVoiceRecorder";
-import { MistyComposer } from "@/features/global-search/MistyComposer";
-import { useGlobalMistyAttachments } from "@/features/global-search/useGlobalMistyAttachments";
+import { useGlobalMistyAttachments } from "@/features/misty/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button, IconButton, Spinner } from "@/shared/ui";
-import { Mic, Reply, Square, X } from "lucide-react";
-import { useEffect, useRef, useImperativeHandle, useState, type Ref, type ReactNode } from "react";
+import { Button } from "@/shared/ui";
+import { useEffect, useRef, useState, type Ref, type ReactNode } from "react";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useShallow } from "zustand/react/shallow";
 import { useCompanionState } from "../companion/companionState";
+import {
+  AgentComposeError,
+  AgentReplyTarget,
+  conversationInvocationIds,
+} from "./AgentComposeNotices";
+import { AgentConversationComposer } from "./AgentConversationComposer";
 import { AgentConversationView } from "./AgentConversationView";
+import { steerRunningTask, submitWorkspaceMessage } from "./conversationSend";
+import { useConversationTurnActions } from "./useConversationTurnActions";
+import { useConversationVoice, type AgentVoiceControl } from "./useConversationVoice";
+import { useDraftStatus } from "./useDraftStatus";
 import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
-import { AgentUsageControl } from "../workspace/AgentUsageControl";
-import { ComposerStrip } from "./ComposerStrip";
-import { AgentModeMenu } from "../collaboration/AgentModeToggle";
 import { usePermissionMode } from "../collaboration/permissionMode";
-import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
-import { AgentCodingToolMenu } from "../collaboration/AgentCodingToolMenu";
 import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
-import {
-  releasePendingWait,
-  WaitingForYouCard,
-} from "@/features/agent-interventions/WaitingForYouCard";
-import { continuationScreen } from "../executionHandoff";
+import { WaitingForYouCard } from "@/features/agent-interventions/WaitingForYouCard";
 import { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
-export type AgentVoiceControl = { toggle(): void };
+export type { AgentVoiceControl } from "./useConversationVoice";
 export function AgentWorkspaceConversation({
   agent,
   conversationId,
@@ -99,28 +97,17 @@ export function AgentWorkspaceConversation({
       error: error || null,
     });
   const companion = useCompanionState((s) => s.presentation);
-  const voice = useAiVoiceRecorder({
+  const voice = useConversationVoice({
     contextKey: `${accountId}:${agent?.id}:${conversation?.id ?? ""}`,
+    available: Boolean(agent?.enabled && accountId && !state.working),
     onTranscript: (text) => {
       setDraft((previous) => (previous ? `${previous} ${text}` : text));
       textareaRef.current?.focus();
     },
     onError: reportError,
+    controlRef: voiceControlRef,
+    onStateChange: onVoiceStateChange,
   });
-  useImperativeHandle(voiceControlRef, () => ({
-    toggle() {
-      if (!agent?.enabled || !accountId || state.working || voice.requesting || voice.transcribing)
-        return;
-      if (voice.recording) voice.stop();
-      else void voice.start();
-    },
-  }));
-  useEffect(() => {
-    onVoiceStateChange?.({
-      recording: voice.recording,
-      busy: voice.requesting || voice.transcribing,
-    });
-  }, [voice.recording, voice.requesting, voice.transcribing, onVoiceStateChange]);
   useEffect(() => {
     const store = useMistyStore.getState();
     store.setAccount(accountId);
@@ -149,32 +136,21 @@ export function AgentWorkspaceConversation({
     });
   const attachments = useGlobalMistyAttachments({
     sharedAccountId: accountId,
-    mode: "ask",
     activeConversationId: conversation?.id ?? "",
     newConversation: async () => {
       prepare();
       return useMistyStore.getState().newConversation(spaceId);
     },
-    setMode: () => {},
     onError: reportError,
   });
-  const hasDraft = Boolean(draft.trim() || attachments.attachments.length);
-  const composingBusy =
+  useDraftStatus(
+    Boolean(draft.trim() || attachments.attachments.length),
     voice.recording ||
-    voice.requesting ||
-    voice.transcribing ||
-    attachments.attachments.some((a) => a.state === "uploading");
-  useEffect(() => {
-    onDraftStateChange?.({
-      dirty: hasDraft,
-      busy: composingBusy,
-    });
-    return () =>
-      onDraftStateChange?.({
-        dirty: false,
-        busy: false,
-      });
-  }, [hasDraft, composingBusy, onDraftStateChange]);
+      voice.requesting ||
+      voice.transcribing ||
+      attachments.attachments.some((a) => a.state === "uploading"),
+    onDraftStateChange,
+  );
   const collaboration = useCollaborationComposer({
     accountId,
     conversationId: conversation?.id,
@@ -187,7 +163,7 @@ export function AgentWorkspaceConversation({
     clearDraft: () => setDraft(""),
     reportError,
   });
-  const { planning, questions, proposedPlan } = collaboration;
+  const { questions, proposedPlan } = collaboration;
   /** `resume`: an answer to a run that handed off, continued on that run's screen. */
   const send = async (
     typed = draft,
@@ -210,37 +186,14 @@ export function AgentWorkspaceConversation({
     )
       return;
     if (state.working) {
-      try {
-        // Writing to a run that waits for you means you are back: release the
-        // wait so the run continues and reads this message.
-        await releasePendingWait(accountId, state.invocationId);
-        await useMistyStore.getState().steerResponse?.(prompt, conversation?.id);
-      } catch (error) {
-        reportError(error instanceof Error ? error.message : String(error));
-      }
+      await steerRunningTask(accountId, state.invocationId, prompt, conversation?.id).catch(
+        (error: unknown) => reportError(error instanceof Error ? error.message : String(error)),
+      );
       return;
     }
     prepare();
-    const handoff = useMistyStore.getState().handoff;
     try {
-      // The cursor companion is a separate surface; typing here never goes through it.
-      await useMistyStore.getState().submitAnswer(
-        prompt,
-        attachments.attachments,
-        undefined,
-        "workspace",
-        [],
-        { conversationId: targetId, context: handoff?.context ?? [] },
-        {
-          executionMode: "user",
-          interactionMode: companion.mode,
-          model: companion.model,
-          ...(resume ? { ...continuationScreen(targetId), continuation: true } : {}),
-        },
-      );
-      // Folder work keeps its handoff for follow-ups; other context is sent once.
-      if (handoff && handoff.surfaceId !== "files" && useMistyStore.getState().handoff === handoff)
-        useMistyStore.setState({ handoff: undefined, browserRequest: undefined, context: [] });
+      await submitWorkspaceMessage(prompt, attachments.attachments, targetId, resume, companion);
     } catch (error) {
       reportError(error instanceof Error ? error.message : String(error));
       return;
@@ -251,8 +204,10 @@ export function AgentWorkspaceConversation({
       attachments.consume();
     }
   };
-  // Stable, so the memoized transcript skips re-rendering while the person types.
-  const retryPrompt = useStableCallback((prompt: string) => void send(prompt, ""));
+  const { retryPrompt, resumeLedger, changeLedger } = useConversationTurnActions(
+    conversation,
+    (prompt, resume) => void send(prompt, "", undefined, resume),
+  );
   const editPrompt = useStableCallback((text: string) => {
     setDraft(text);
     textareaRef.current?.focus();
@@ -274,6 +229,8 @@ export function AgentWorkspaceConversation({
               conversation={conversation}
               working={shownWorking}
               onRetry={retryPrompt}
+              onResume={resumeLedger}
+              onLedgerChange={changeLedger}
               onEdit={editPrompt}
               onReply={replyTo}
             />
@@ -300,23 +257,11 @@ export function AgentWorkspaceConversation({
         ) : null}
       </div>
       <div className="agent-compose-area">
-        {state.error && (
-          <div role="alert" className="agent-compose-error">
-            <p>{state.error}</p>
-            {state.working && state.invocationId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void useMistyStore.getState().loadConversations(true)}
-              >
-                Reconnect to task
-              </Button>
-            )}
-            <IconButton label="Dismiss error" onClick={() => reportError("")}>
-              <X size={16} />
-            </IconButton>
-          </div>
-        )}
+        <AgentComposeError
+          error={state.error}
+          reconnect={state.working && Boolean(state.invocationId)}
+          dismiss={() => reportError("")}
+        />
         {agent && !agent.enabled && (
           <p className="agent-compose-hint">
             This agent is disabled. Enable it in Settings to start a conversation.
@@ -333,14 +278,10 @@ export function AgentWorkspaceConversation({
         <WaitingForYouCard
           accountId={accountId}
           agentName={agent?.name || "Misty"}
-          invocationIds={[
-            ...(conversation?.messages.flatMap((message) =>
-              message.invocationId ? [message.invocationId] : [],
-            ) ?? []),
-            ...(state.invocationId && state.invocationConversationId === conversation?.id
-              ? [state.invocationId]
-              : []),
-          ]}
+          invocationIds={conversationInvocationIds(
+            conversation,
+            state.invocationConversationId === conversation?.id ? state.invocationId : undefined,
+          )}
           revision={`${state.working}:${state.invocationId ?? ""}`}
         />
         {questions && (
@@ -350,109 +291,28 @@ export function AgentWorkspaceConversation({
             onContinue={(prompt) => void send(prompt, "", undefined, true)}
           />
         )}
-        {reply && (
-          <div className="agent-reply-target">
-            <Reply size={14} aria-hidden="true" />
-            <p>
-              <span>Replying to {agent?.name || "Misty"}</span> {reply}
-            </p>
-            <IconButton size="xs" label="Cancel reply" onClick={() => setReply("")}>
-              <X />
-            </IconButton>
-          </div>
-        )}
-        <MistyComposer
-          hideUsageEstimate={showControlBar && Boolean(agent)}
+        <AgentReplyTarget
+          agentName={agent?.name || "Misty"}
+          reply={reply}
+          cancel={() => setReply("")}
+        />
+        <AgentConversationComposer
+          agent={agent}
+          accountId={accountId}
+          conversationId={conversation?.id}
           modelId={conversation?.modelId}
-          layout="inline"
-          value={draft}
-          onChange={setDraft}
-          mode="ask"
+          draft={draft}
+          setDraft={setDraft}
           textareaRef={textareaRef}
-          attachments={attachments.attachments}
-          maxAttachments={4}
-          onAddFiles={attachments.addFiles}
-          onRemoveAttachment={attachments.remove}
-          onSubmit={() => void send()}
-          onError={reportError}
-          onKeyDown={(e) => {
-            if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
-              // Shift+Tab turns Plan on or off, as in other agent tools.
-              e.preventDefault();
-              collaboration.toggleMode();
-              return;
-            }
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              if (!attachments.attachments.some((a) => a.state !== "ready")) void send();
-            }
-          }}
-          placeholder={
-            planning ? `Plan with ${agent?.name || "Misty"}…` : `Message ${agent?.name || "Misty"}…`
-          }
-          disabled={!agent?.enabled || !accountId}
-          busy={state.working && !draft.trim()}
-          voiceControl={
-            <>
-              <IconButton
-                label={voice.recording ? "Stop recording" : "Start voice input"}
-                disabled={
-                  !agent?.enabled ||
-                  !accountId ||
-                  state.working ||
-                  voice.requesting ||
-                  voice.transcribing
-                }
-                onClick={() => (voice.recording ? voice.stop() : void voice.start())}
-              >
-                {voice.requesting || voice.transcribing ? (
-                  <Spinner size="lg" label={false} />
-                ) : voice.recording ? (
-                  <Square size={16} />
-                ) : (
-                  <Mic size={18} />
-                )}
-              </IconButton>
-            </>
-          }
-          trailingControl={
-            state.working ? (
-              <IconButton
-                variant="outline"
-                className="text-cream-bright"
-                label="Stop response"
-                onClick={() => {
-                  void useMistyStore
-                    .getState()
-                    .cancelResponse?.()
-                    .catch((e) => reportError(String(e)));
-                }}
-              >
-                <Square className="size-3.5" fill="currentColor" />
-              </IconButton>
-            ) : undefined
-          }
+          attachments={attachments}
+          voice={voice}
+          collaboration={collaboration}
+          permission={permission}
+          working={state.working}
+          showControlBar={showControlBar}
+          send={() => void send()}
+          reportError={reportError}
         />
-        <ComposerStrip
-          project={<AgentProjectMenu conversationId={conversation?.id} />}
-          mode={
-            <AgentModeMenu
-              conversationId={conversation?.id}
-              mode={collaboration.mode}
-              permission={permission}
-            />
-          }
-          code={<AgentCodingToolMenu conversationId={conversation?.id} disabled={state.working} />}
-          usage={
-            showControlBar && agent ? <AgentUsageControl working={state.working} /> : undefined
-          }
-        />
-        {/* Working status belongs to the transcript, under the message that started it. */}
-        {(voice.recording || voice.transcribing) && (
-          <p className="agent-compose-status" role="status">
-            {voice.recording ? "Listening…" : "Transcribing…"}
-          </p>
-        )}
       </div>
     </section>
   );

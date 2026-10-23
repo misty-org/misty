@@ -35,9 +35,7 @@ impl Caller {
 
 fn is_loopback(url: &Url) -> bool {
     match url.host() {
-        Some(url::Host::Domain(domain)) => {
-            domain == "localhost" || domain.ends_with(".localhost")
-        }
+        Some(url::Host::Domain(domain)) => domain == "localhost" || domain.ends_with(".localhost"),
         Some(url::Host::Ipv4(address)) => address.is_loopback(),
         Some(url::Host::Ipv6(address)) => address.is_loopback(),
         None => false,
@@ -54,7 +52,9 @@ mod tests {
 
     #[test]
     fn origin_comes_from_the_committed_url() {
-        let caller = caller("https://accounts.google.com/signin/v2?continue=https%3A%2F%2Fevil.example").unwrap();
+        let caller =
+            caller("https://accounts.google.com/signin/v2?continue=https%3A%2F%2Fevil.example")
+                .unwrap();
         assert_eq!(caller.origin, "https://accounts.google.com");
         assert!(caller.secure);
     }
@@ -70,7 +70,12 @@ mod tests {
 
     #[test]
     fn non_web_pages_are_refused() {
-        for url in ["about:blank", "file:///etc/passwd", "data:text/html,hi", "tauri://localhost/"] {
+        for url in [
+            "about:blank",
+            "file:///etc/passwd",
+            "data:text/html,hi",
+            "tauri://localhost/",
+        ] {
             assert_eq!(caller(url).unwrap_err().name, "SecurityError", "{url}");
         }
     }

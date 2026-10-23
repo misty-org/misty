@@ -21,7 +21,11 @@ it("shows Plan, or the chat's Manual or Auto, on one trigger", () => {
 
 it("turns Plan on from the menu", async () => {
   render(<AgentModeMenu mode="act" permission="auto" />);
-  await act(async () => fireEvent.keyDown(screen.getByRole("button", { name: "Mode" }), { key: "ArrowDown" }));
-  await act(async () => fireEvent.click(await screen.findByRole("menuitemradio", { name: "Plan" })));
+  await act(async () =>
+    fireEvent.keyDown(screen.getByRole("button", { name: "Mode" }), { key: "ArrowDown" }),
+  );
+  await act(async () =>
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "Plan" })),
+  );
   expect(useCollaborationStore.getState().draftMode).toBe("plan");
 });

@@ -62,7 +62,7 @@ function loadCaptureImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-export function captureDataUrlByteLength(dataUrl: string): number {
+function captureDataUrlByteLength(dataUrl: string): number {
   const encoded = dataUrl.slice(dataUrl.indexOf(",") + 1);
   const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((encoded.length * 3) / 4) - padding);

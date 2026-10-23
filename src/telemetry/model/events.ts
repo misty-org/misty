@@ -32,17 +32,6 @@ interface SubscriptionProperties extends CommonServerProperties {
 }
 
 export interface AnalyticsEventProperties {
-  download_requested: {
-    platform: Platform;
-    architecture?: "x86_64" | "aarch64" | "universal";
-    package_format?:
-      "exe" | "msi" | "dmg" | "pkg" | "appimage" | "deb" | "rpm" | "app_store" | "play_store";
-    app_version?: string;
-    release_channel: ReleaseChannel;
-    distribution_channel: DistributionChannel;
-    source?: string;
-    campaign?: string;
-  };
   app_first_opened: CommonClientProperties & { install_id: string };
   app_session_started: CommonClientProperties & {
     session_id: string;
@@ -50,7 +39,6 @@ export interface AnalyticsEventProperties {
     authentication_state: "anonymous" | "authenticated";
     session_trigger: "process_launch" | "returned_after_inactivity";
   };
-  authenticated_session_started: CommonServerProperties & { session_id: string };
   user_registered: CommonServerProperties & {
     registration_method?: "email" | "google" | "apple" | "github" | "other";
     originating_platform?: Platform;
@@ -60,35 +48,9 @@ export interface AnalyticsEventProperties {
   subscription_started: SubscriptionProperties;
   subscription_renewed: SubscriptionProperties;
   subscription_canceled: SubscriptionProperties;
-  subscription_expired: SubscriptionProperties;
-  agent_dock_opened: {
-    surface: "files" | "space";
-    context_kind: "surface" | "selection" | "task";
-  };
-  agent_creation_completed: {
-    default_run_mode: "ask" | "auto" | "full";
-    avatar_kind: "preset" | "upload";
-  };
-  agent_work_outcome_observed: {
-    outcome: "completed" | "needs_approval" | "failed";
-    source_type: string;
-  };
-  agent_capability_denial_observed: {
-    surface: "files" | "space";
-    reason_code: string;
-  };
-  ai_companion_summoned: {
-    surface: string;
-    anchor_kind: "pointer" | "selection" | "object" | "element" | "focus";
-  };
   ai_companion_dismissed: {
     surface: string;
     had_task: boolean;
-  };
-  ai_companion_task_submitted: {
-    surface: string;
-    trigger: string;
-    refinement: boolean;
   };
   ai_companion_artifact_decided: {
     surface: string;
@@ -97,7 +59,6 @@ export interface AnalyticsEventProperties {
   };
   ai_companion_direct_effect: { surface: string; artifact_kind: string };
   ai_companion_undo: { surface: string };
-  ai_companion_reply_recalled: { surface: string };
 }
 
 export interface SafeUserProperties {

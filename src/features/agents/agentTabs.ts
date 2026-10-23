@@ -6,12 +6,13 @@ import {
   browserTabActed,
   finishTaskViews,
   removeBrowserTab,
-  setViewPicture,
   updateBrowserTab,
+  useAgentBrowser,
   viewOfTab,
   type AgentBrowserTab,
 } from "./agentBrowser/agentBrowserStore";
 import { followAgentPages } from "./agentBrowser/agentPageEvents";
+import { livePagesAllowed, pressureLevel, resetMemoryPressure } from "./agentTabPressure";
 
 /**
  * An agent's tabs in the person's window, which sleep (docs/design/agent-browser/BRIEF.md,
@@ -37,22 +38,42 @@ export interface AgentTab {
   lastUsed: number;
   /** Jobs running on it now; a tab in use never sleeps. */
   busy: number;
+  /** The person added it in the agent browser for the agent to use; the agent never closes it. */
+  byPerson?: boolean;
 }
 
-/** A tab the agent left this long ago sleeps, unless it is its task's most recent one. */
-export const SLEEP_AFTER_MS = 20_000;
 const CHECK_MS = 5_000;
 /** Sleeping tabs remembered, newest kept; each is a few hundred bytes. */
 const KEEP_ASLEEP = 500;
 
 const tabs = new Map<string, AgentTab>();
+
+// After a reload the store (agentBrowserStore.ts) brings its tabs back asleep; the records the
+// pages are opened from are rebuilt from them, so showing one opens its address again.
+for (const chat of Object.values(useAgentBrowser.getState().chats))
+  for (const view of chat.views)
+    for (const scopeId of view.tabs) {
+      const tab = useAgentBrowser.getState().tabs[scopeId];
+      if (tab)
+        tabs.set(scopeId, {
+          scopeId,
+          viewId: "",
+          taskId: view.taskId,
+          runId: "",
+          url: tab.url,
+          title: tab.title,
+          lastUsed: 0,
+          busy: 0,
+          ...(scopeId.startsWith("person-") ? { byPerson: true } : {}),
+        });
+    }
 /** One sleep or wake at a time per tab. */
 const pending = new Map<string, Promise<unknown>>();
 let timer: ReturnType<typeof setInterval> | undefined;
 /** The tab the person is looking at in the split, which never sleeps. */
 let shownScope: string | undefined;
 /**
- * Tabs a run kept as proof (browser_run's keep(), docs/plans/agent-harness-v3.md change 5): pages
+ * Tabs a run kept as proof (browser_run's keep(), docs/plans/agent-harness.md, Completion): pages
  * the person asked to leave open. They stay awake when idle and when the run ends, so they show
  * at the end; only memory pressure puts them to sleep.
  */
@@ -62,15 +83,13 @@ const kept = new Set<string>();
 export function keepAgentTab(scopeId: string) {
   if (tabs.has(scopeId)) kept.add(scopeId);
 }
-/** Live agent pages the system can spare now, by memory pressure. */
-const LIVE_UNDER_PRESSURE = { normal: Infinity, warning: 2, critical: 1 } as const;
-let pressure: { level: keyof typeof LIVE_UNDER_PRESSURE; at: number } = { level: "normal", at: 0 };
-const PICTURE_EVERY_MS = 2_000;
-const pictured = new Map<string, number>();
 
 const serial = <T>(scopeId: string, work: () => Promise<T>): Promise<T> => {
   const next = (pending.get(scopeId) ?? Promise.resolve()).then(work, work);
-  pending.set(scopeId, next.catch(() => undefined));
+  pending.set(
+    scopeId,
+    next.catch(() => undefined),
+  );
   return next;
 };
 
@@ -98,14 +117,23 @@ export function trackAgentTab(
   // The workspace's sweep hides, and a reload closes, any page no tab keeps (browserRuntime.ts).
   setBrowserRuntimeKeepLive(tab.viewId, true);
   if (conversationId)
-    addBrowserTab(conversationId, { ...(view ?? { id: tab.taskId, label: "Main" }), taskId: tab.taskId }, {
-      scopeId: tab.scopeId,
-      url: tab.url ?? "",
-      title: "",
-      viewId: tab.viewId,
-    });
+    addBrowserTab(
+      conversationId,
+      { ...(view ?? { id: tab.taskId, label: "Main" }), taskId: tab.taskId },
+      {
+        scopeId: tab.scopeId,
+        url: tab.url ?? "",
+        title: "",
+        viewId: tab.viewId,
+      },
+    );
   timer ??= setInterval(() => void sleepIdleAgentTabs(), CHECK_MS);
   followAgentPages(noteAgentPage);
+}
+
+/** Records a tab the agent browser knows of without a live page yet. */
+export function rememberAgentTab(tab: AgentTab) {
+  tabs.set(tab.scopeId, tab);
 }
 
 /** What an agent's live page reported (address, title, icon, loading), for its tab's row and
@@ -116,7 +144,9 @@ export function noteAgentPage(
 ) {
   const tab = agentTabOfView(viewId);
   if (!tab) return;
-  const reported = Object.fromEntries(Object.entries(change).filter(([, value]) => value !== undefined));
+  const reported = Object.fromEntries(
+    Object.entries(change).filter(([, value]) => value !== undefined),
+  );
   if (reported.url) tab.url = String(reported.url);
   if (reported.title) tab.title = String(reported.title);
   updateBrowserTab(tab.scopeId, reported);
@@ -129,18 +159,12 @@ export function setShownAgentTab(scopeId: string | undefined) {
   if (tab) tab.lastUsed = Date.now();
 }
 
-async function pressureLevel(): Promise<keyof typeof LIVE_UNDER_PRESSURE> {
-  if (Date.now() - pressure.at < 5_000) return pressure.level;
-  const level = await invoke<string>("system_memory_pressure").catch(() => "normal");
-  pressure = { level: level === "critical" || level === "warning" ? level : "normal", at: Date.now() };
-  return pressure.level;
-}
-
 export const agentTab = (scopeId: string) => tabs.get(scopeId);
 /** The tab whose live page this is. */
-export const agentTabOfView = (viewId: string) =>
+const agentTabOfView = (viewId: string) =>
   viewId ? [...tabs.values()].find((tab) => tab.viewId === viewId) : undefined;
-export const agentTabsForTask = (taskId: string) => [...tabs.values()].filter((tab) => tab.taskId === taskId);
+export const agentTabsForTask = (taskId: string) =>
+  [...tabs.values()].filter((tab) => tab.taskId === taskId);
 
 /** Marks a job starting or ending on a tab. */
 export function noteAgentTabJob(scopeId: string, runId: string, busy: boolean) {
@@ -150,18 +174,6 @@ export function noteAgentTabJob(scopeId: string, runId: string, busy: boolean) {
   tab.runId = runId || tab.runId;
   tab.busy = Math.max(0, tab.busy + (busy ? 1 : -1));
   if (busy) browserTabActed(scopeId);
-}
-
-/** A small picture of a tab after the agent's step, for its view's switcher and the PiP. */
-export async function pictureAgentTab(scopeId: string) {
-  const tab = tabs.get(scopeId);
-  const view = viewOfTab(scopeId)?.view;
-  if (!tab?.viewId || !view || Date.now() - (pictured.get(view.id) ?? 0) < PICTURE_EVERY_MS) return;
-  pictured.set(view.id, Date.now());
-  const picture = await invoke<{ dataUrl?: string }>("browser_webview_picture", { request: { id: tab.viewId } }).catch(
-    () => undefined,
-  );
-  if (picture?.dataUrl) setViewPicture(view.id, picture.dataUrl);
 }
 
 /** Closes a tab's page and keeps where it was. */
@@ -223,7 +235,7 @@ export function wakeAgentTab(scopeId: string): Promise<boolean> {
 
 /** Under memory pressure, the live page left longest sleeps before another wakes. */
 async function makeRoom(waking: string) {
-  const budget = LIVE_UNDER_PRESSURE[await pressureLevel()];
+  const budget = await livePagesAllowed();
   const live = [...tabs.values()].filter((tab) => tab.viewId && tab.scopeId !== waking);
   if (live.length < budget) return;
   const spare = live
@@ -234,33 +246,42 @@ async function makeRoom(waking: string) {
   await Promise.allSettled(spare.map((tab) => sleepAgentTab(tab.scopeId)));
 }
 
-/** Sleeps every tab its agent left a while ago, keeping each task's most recent one; under
- * memory pressure, every tab not in use or in view. */
-export async function sleepIdleAgentTabs(now = Date.now()) {
+/** Under memory pressure, sleeps every tab not in use or in view; otherwise all pages stay live. */
+export async function sleepIdleAgentTabs() {
   if ((await pressureLevel()) !== "normal") {
     await Promise.allSettled(
-      [...tabs.values()].filter((tab) => tab.viewId && !tab.busy).map((tab) => sleepAgentTab(tab.scopeId)),
+      [...tabs.values()]
+        .filter((tab) => tab.viewId && !tab.busy)
+        .map((tab) => sleepAgentTab(tab.scopeId)),
     );
-    return;
   }
-  const newest = new Map<string, AgentTab>();
-  for (const tab of tabs.values())
-    if (tab.viewId && (!newest.has(tab.taskId) || tab.lastUsed > newest.get(tab.taskId)!.lastUsed))
-      newest.set(tab.taskId, tab);
-  const idle = [...tabs.values()].filter(
-    (tab) =>
-      tab.viewId && !tab.busy && !kept.has(tab.scopeId) && now - tab.lastUsed >= SLEEP_AFTER_MS && newest.get(tab.taskId) !== tab,
-  );
-  await Promise.allSettled(idle.map((tab) => sleepAgentTab(tab.scopeId)));
+  // Otherwise every page stays live: WebKit stops a page that is closed, and the agent browser
+  // must keep painting whichever tab the agent returns to.
 }
 
-/** Sleeps all of a task's tabs: its run ended, and its tabs stay as proof. */
+/** Tabs a finished run leaves awake without keep(): what it left open is its answer. */
+const AWAKE_AT_END = 8;
+
+/**
+ * Sleeps a task's tabs when its run ended, and its tabs stay as proof. The tabs it used last stay
+ * awake (a run that leaves pages open does so for the person to see them, whether or not it
+ * marked each with keep()), so they show at the end; the rest sleep.
+ */
 export async function sleepTaskTabs(taskId: string) {
   finishTaskViews(taskId);
+  const mine = agentTabsForTask(taskId);
+  const recent = new Set(
+    [...mine]
+      .sort((a, b) => b.lastUsed - a.lastUsed)
+      .slice(0, AWAKE_AT_END)
+      .map((tab) => tab.scopeId),
+  );
   await Promise.allSettled(
-    agentTabsForTask(taskId).map((tab) => {
+    mine.map((tab) => {
       tab.busy = 0;
-      return kept.has(tab.scopeId) ? undefined : sleepAgentTab(tab.scopeId);
+      return kept.has(tab.scopeId) || recent.has(tab.scopeId)
+        ? undefined
+        : sleepAgentTab(tab.scopeId);
     }),
   );
   forgetOldest();
@@ -276,7 +297,9 @@ export async function closeAgentTab(scopeId: string) {
 }
 
 function forgetOldest() {
-  const asleep = [...tabs.values()].filter((tab) => !tab.viewId).sort((a, b) => b.lastUsed - a.lastUsed);
+  const asleep = [...tabs.values()]
+    .filter((tab) => !tab.viewId)
+    .sort((a, b) => b.lastUsed - a.lastUsed);
   for (const tab of asleep.slice(KEEP_ASLEEP)) tabs.delete(tab.scopeId);
   if (![...tabs.values()].some((tab) => tab.viewId) && timer) {
     clearInterval(timer);
@@ -289,9 +312,8 @@ export function resetAgentTabs() {
   tabs.clear();
   kept.clear();
   pending.clear();
-  pictured.clear();
   shownScope = undefined;
-  pressure = { level: "normal", at: 0 };
+  resetMemoryPressure();
   if (timer) clearInterval(timer);
   timer = undefined;
 }

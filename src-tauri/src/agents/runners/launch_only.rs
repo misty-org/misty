@@ -6,16 +6,7 @@ use serde_json::{json, Value};
 
 use super::{
     events::{PermissionRequest, RunnerEvent, Usage},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
-    Transport,
-};
-
-const LAUNCH_ONLY: Capabilities = Capabilities {
-    interactive_asks: false,
-    plan_mode: true,
-    todos: false,
-    rate_limits: false,
-    full_access_only: false,
+    CommandSpec, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
 };
 
 fn refuse_ask(launch: &Launch) -> Result<(), RunnerError> {
@@ -47,15 +38,6 @@ fn usage(value: &Value) -> Usage {
 pub struct AgyRunner;
 
 impl Runner for AgyRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Agy
-    }
-    fn transport(&self) -> Transport {
-        Transport::LaunchOnly
-    }
-    fn capabilities(&self) -> Capabilities {
-        LAUNCH_ONLY
-    }
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         refuse_ask(launch)?;
         let mode = if launch.mode == LaunchMode::Plan {
@@ -149,15 +131,6 @@ impl Protocol for AgyProtocol {
 pub struct PiRunner;
 
 impl Runner for PiRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Pi
-    }
-    fn transport(&self) -> Transport {
-        Transport::LaunchOnly
-    }
-    fn capabilities(&self) -> Capabilities {
-        LAUNCH_ONLY
-    }
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         refuse_ask(launch)?;
         let mut args: Vec<String> = vec!["--mode".into(), "rpc".into()];

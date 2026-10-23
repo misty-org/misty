@@ -1,7 +1,11 @@
 import { Pressable } from "@/shared/ui";
 import { showView, type AgentBrowserChat, type AgentViewStatus } from "./agentBrowserStore";
 
-export const statusWord: Record<AgentViewStatus, string> = { working: "Working", waiting: "Waiting", done: "Done" };
+export const statusWord: Record<AgentViewStatus, string> = {
+  working: "Working",
+  waiting: "Waiting",
+  done: "Done",
+};
 
 /** A chat's views as small pictures with their labels and status words; one shows at a time. */
 export function AgentViewSwitcher({ chat }: { chat: AgentBrowserChat }) {

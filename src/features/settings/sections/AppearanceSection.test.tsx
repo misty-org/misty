@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsControlsModule from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { SettingsPageScope } from "../profiles/SettingScope";
-import { useSettingsProfiles } from "../profiles/store";
+import { SettingsPageScope } from "../devicePreferences/SettingScope";
+import { useDevicePreferences } from "../devicePreferences/store";
 import { AppearanceSection } from "./AppearanceSection";
 
 const zoomMocks = vi.hoisted(() => ({
@@ -85,13 +85,13 @@ describe("AppearanceSection app zoom", () => {
 
   it("offers Reset only while zoom differs from its default, and resets the value", () => {
     const edit = vi.fn(async () => {});
-    useSettingsProfiles.setState({
+    useDevicePreferences.setState({
       ready: true,
       edit,
       state: { version: 3, values: { "app.zoom": 2 } },
     });
     const view = render(
-      <SettingsPageScope.Provider value={{ page: "appearance", owner: "account" }}>
+      <SettingsPageScope.Provider value={{ page: "appearance", owner: "device" }}>
         <AppearanceSection {...props} />
       </SettingsPageScope.Provider>,
     );

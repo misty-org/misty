@@ -22,7 +22,7 @@ try {
   }
   const app = prepareDevelopmentBundle(
     binary,
-    process.env.MISTY_DESKTOP_PROFILE ?? process.env.MISTY_PROFILE,
+    process.env.MISTY_PROFILE,
   );
   signDevelopmentBinary(app.bundle, identity);
   const environment = Object.fromEntries(

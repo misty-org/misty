@@ -11,19 +11,18 @@ const execute = promisify(execFile);
 
 test("profile builds isolate artifacts and intermediates with stable paths", () => {
   const root = resolve("fixture repository");
-  const first = developmentBuildEnvironment(["dev"], { MISTY_DESKTOP_PROFILE: "dev1" }, root);
-  const second = developmentBuildEnvironment(["dev"], { MISTY_DESKTOP_PROFILE: "dev2" }, root);
+  const first = developmentBuildEnvironment(["dev"], { MISTY_PROFILE: "dev1" }, root);
+  const second = developmentBuildEnvironment(["dev"], { MISTY_PROFILE: "dev2" }, root);
   assert.equal(first.CARGO_TARGET_DIR, join(root, "src-tauri/target/dev-profiles/dev1"));
   assert.equal(first.CARGO_BUILD_BUILD_DIR, first.CARGO_TARGET_DIR);
   assert.notEqual(first.CARGO_TARGET_DIR, second.CARGO_TARGET_DIR);
   assert.notEqual(first.CARGO_BUILD_BUILD_DIR, second.CARGO_BUILD_BUILD_DIR);
-  assert.deepEqual(first, developmentBuildEnvironment(["dev"], { MISTY_PROFILE: "dev1" }, root));
 });
 
 test("custom Cargo roots are still partitioned by profile", () => {
   const root = resolve("fixture repository");
   const environment = {
-    MISTY_DESKTOP_PROFILE: "dev2",
+    MISTY_PROFILE: "dev2",
     CARGO_TARGET_DIR: resolve("artifact cache"),
     CARGO_BUILD_TARGET_DIR: "unused",
     CARGO_BUILD_BUILD_DIR: "intermediates",
@@ -80,7 +79,7 @@ test(
         `
 use std::{env, fs, path::PathBuf, thread, time::{Duration, Instant}};
 fn main() {
-    let profile = env::var("MISTY_DESKTOP_PROFILE").unwrap();
+    let profile = env::var("MISTY_PROFILE").unwrap();
     let barrier = PathBuf::from(env::var_os("MISTY_TEST_BARRIER").unwrap());
     fs::write(barrier.join(&profile), "ready").unwrap();
     let other = if profile == "dev1" { "dev2" } else { "dev1" };
@@ -97,7 +96,7 @@ fn main() {
       await execute("cargo", ["generate-lockfile", "--offline"], { cwd: native, timeout: 10000 });
       const results = await Promise.allSettled(
         ["dev1", "dev2"].map(async (profile) => {
-          const environment: NodeJS.ProcessEnv = { ...process.env, MISTY_DESKTOP_PROFILE: profile };
+          const environment: NodeJS.ProcessEnv = { ...process.env, MISTY_PROFILE: profile };
           // Use private roots even if the developer has a global Cargo override.
           environment.CARGO_TARGET_DIR = join(root, "artifacts");
           environment.CARGO_BUILD_BUILD_DIR = join(root, "intermediates");

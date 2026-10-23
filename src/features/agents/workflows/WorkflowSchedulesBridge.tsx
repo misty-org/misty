@@ -1,4 +1,4 @@
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { useAuth } from "@/features/auth";
 import { useEffect } from "react";
 import { startWaitingScheduledRuns } from "./deviceScheduledRuns";

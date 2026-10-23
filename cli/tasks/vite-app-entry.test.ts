@@ -26,7 +26,7 @@ test("simultaneous desktop profiles do not rewrite each other's dependency cache
   const configuration = (profile, port) => JSON.parse(execFileSync(
     process.execPath,
     ["--input-type=module", "-e", script],
-    { encoding: "utf8", env: { ...process.env, MISTY_DESKTOP_PROFILE: profile, MISTY_DESKTOP_DEV_PORT: String(port) } },
+    { encoding: "utf8", env: { ...process.env, MISTY_PROFILE: profile, MISTY_DESKTOP_DEV_PORT: String(port) } },
   ));
   const first = configuration("dev1", 5173);
   const second = configuration("dev2", 5174);

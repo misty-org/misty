@@ -5,14 +5,13 @@ import * as accessErrors from "@/api/spaces/access-errors";
 import { SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import { create } from "zustand";
-import type { SpacesStore } from "../model/stores/spaces/useSpacesStore";
+import type { SpacesStore } from "./spacesStoreTypes";
 import { createSpaceContentActions } from "./createSpaceContentActions";
+import { createSpaceLifecycleActions } from "./createSpaceLifecycleActions";
 import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./createSpacesRealtimeActions";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { invoke } from "@tauri-apps/api/core";
 export { buildMessageSpans } from "../chat/store/useSpaceMessageSpansStore";
 
 const snapshotAutoMinIntervalMs = 1_500;
@@ -36,8 +35,6 @@ let spacesAccountGeneration = 0;
 export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
-  limits: null,
-  ownerStorage: null,
   membersBySpace: {},
   messagesBySpace: {},
   messageLoadingBySpace: {},
@@ -46,14 +43,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   presenceBySpace: {},
   snapshotReady: false,
   referenceOnly: false,
-  lastSyncedAt: null,
   loading: false,
   sending: false,
-  realtimeConnected: false,
   error: null,
 
   load: async (options) => {
-    if (options?.accountId) referenceMode.setSpaceReferenceModeAccount(options.accountId);
     const force = options?.force === true;
     const now = Date.now();
     if (snapshotLoadPromise) return snapshotLoadPromise;
@@ -78,8 +72,6 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
           set({
             spaces: saved.spaces,
             invitations: saved.invitations,
-            limits: saved.entitlements,
-            ownerStorage: saved.owner_storage,
             snapshotReady: true,
           });
         });
@@ -97,7 +89,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         if (error instanceof SpaceRequestError && error.status >= 500) {
           snapshotCooldownUntil = Date.now() + snapshotServerErrorCooldownMs;
         }
-        const fallback = await referenceMode.referenceSpaceSnapshotState(error, get());
+        const fallback = await referenceMode.referenceSpaceSnapshotState(error);
         if (generation !== spacesAccountGeneration) return;
         if (fallback) {
           set(fallback);
@@ -232,123 +224,11 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     }
   },
 
-  createSpace: async (request) => {
-    set({ error: null });
-    try {
-      const result = await spacesApi.create(request);
-      await get().load({ force: true });
-      return result;
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  renameSpace: async (spaceId, name) => {
-    set({ error: null });
-    try {
-      const space = await spacesApi.rename(spaceId, name);
-      set((state) => ({
-        spaces: state.spaces.map((item) => (item.id === spaceId ? space : item)),
-      }));
-      return space;
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  invite: async (spaceId, email) => {
-    set({ error: null });
-    try {
-      await spacesApi.invite(spaceId, email);
-      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  respondInvite: async (inviteId, accept) => {
-    set({ error: null });
-    try {
-      await spacesApi.respondInvite(inviteId, accept);
-      await get().load({ force: true });
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  removeMember: async (spaceId, userId) => {
-    set({ error: null });
-    try {
-      await spacesApi.removeMember(spaceId, userId);
-      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  leaveSpace: async (spaceId) => {
-    set({ error: null });
-    try {
-      await spacesApi.leave(spaceId);
-      removeSpaceFromDevice(spaceId);
-      set((state) => ({
-        spaces: state.spaces.filter((space) => space.id !== spaceId),
-      }));
-      await get().load({ force: true });
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  transferOwner: async (spaceId, userId) => {
-    set({ error: null });
-    try {
-      await spacesApi.transfer(spaceId, userId);
-      await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
-  deleteSpace: async (spaceId, confirmation) => {
-    set({ error: null });
-    try {
-      await spacesApi.delete(spaceId, confirmation);
-      removeSpaceFromDevice(spaceId);
-      set((state) => {
-        const spaces = state.spaces.filter((space) => space.id !== spaceId);
-        const messagesBySpace = { ...state.messagesBySpace };
-        delete messagesBySpace[spaceId];
-        const nodesBySpace = { ...state.nodesBySpace };
-        delete nodesBySpace[spaceId];
-        const membersBySpace = { ...state.membersBySpace };
-        delete membersBySpace[spaceId];
-        return { spaces, messagesBySpace, nodesBySpace, membersBySpace };
-      });
-      await get().load({ force: true });
-    } catch (error) {
-      set({ error: errorText(error) });
-      throw error;
-    }
-  },
-
+  ...createSpaceLifecycleActions(set, get),
   ...createSpaceContentActions(set, get),
   ...createSpacesRealtimeActions(set, get, () => spacesAccountGeneration),
   clearError: () => set({ error: null }),
 }));
-
-/** A Space this person left or deleted: its windows close and its website data goes. */
-function removeSpaceFromDevice(spaceId: string) {
-  if (!hasTauriInternals()) return;
-  void invoke("space_window_remove", { spaceId }).catch(() => undefined);
-}
 
 referenceMode.bindSpaceReferenceMode((state) => useSpacesStore.setState(state));
 
@@ -366,8 +246,6 @@ export function resetSpacesAccountState(): void {
   useSpacesStore.setState({
     spaces: [],
     invitations: [],
-    limits: null,
-    ownerStorage: null,
     membersBySpace: {},
     messagesBySpace: {},
     messageLoadingBySpace: {},
@@ -376,13 +254,11 @@ export function resetSpacesAccountState(): void {
     presenceBySpace: {},
     snapshotReady: false,
     referenceOnly: false,
-    lastSyncedAt: null,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"
     // view — the caller is expected to re-trigger a load for the new
     // account, and until that resolves there's nothing confirmed to show.
     loading: true,
     sending: false,
-    realtimeConnected: false,
     error: null,
   });
 }

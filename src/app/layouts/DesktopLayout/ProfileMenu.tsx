@@ -37,7 +37,7 @@ function Initials(props: { children: string }) {
 
 /** The profile menu's rows: this device's Settings, account actions, and a submenu to switch
  * saved accounts. */
-export function ProfileMenuItems(props: {
+function ProfileMenuItems(props: {
   onClose: () => void;
   onOpenAccountSettings: () => void;
   /** Opens Settings; the avatar holds it so the window's corner needs no gear of its own. */

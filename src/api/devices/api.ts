@@ -1,6 +1,6 @@
 import { managedAiRequest } from "@/api/ai/managed";
 
-export type SignedDeviceRequest = <T>(
+type SignedDeviceRequest = <T>(
   localDeviceId: string,
   path: string,
   init: RequestInit,
@@ -15,7 +15,6 @@ export const devicesApi = {
   list: <T>() => managedAiRequest<T>("/devices"),
   register: <T>(body: unknown, signal?: AbortSignal) =>
     managedAiRequest<T>("/devices", { method: "POST", body: JSON.stringify(body), signal }),
-  peerTicketKeys: <T>() => managedAiRequest<T>("/devices/peer-ticket-keys"),
   heartbeat: <T>(request: SignedDeviceRequest, localId: string, deviceId: string, body: unknown) =>
     signed<T>(request, localId, `${devicePath(deviceId)}/heartbeat`, "POST", body),
   /** With waitMs the server holds the claim until a job is queued (at most 25 s). */

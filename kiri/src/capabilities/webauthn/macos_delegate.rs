@@ -54,7 +54,10 @@ pub(super) fn class() -> Result<&'static Class, KiriError> {
             anchor as extern "C" fn(&Object, Sel, Id) -> Id,
         );
     }
-    for name in ["ASAuthorizationControllerDelegate", "ASAuthorizationControllerPresentationContextProviding"] {
+    for name in [
+        "ASAuthorizationControllerDelegate",
+        "ASAuthorizationControllerPresentationContextProviding",
+    ] {
         if let Some(protocol) = Protocol::get(name) {
             declaration.add_protocol(protocol);
         }
@@ -101,7 +104,9 @@ unsafe fn strings(list: Id) -> Vec<String> {
 
 unsafe fn read(credential: Id) -> Result<Outcome, KiriError> {
     if credential.is_null() {
-        return Err(KiriError::not_allowed("The authenticator returned no credential."));
+        return Err(KiriError::not_allowed(
+            "The authenticator returned no credential.",
+        ));
     }
     let security_key = (*credential).class().name().contains("SecurityKey");
     let attachment = if responds(credential, sel!(attachment)) {
@@ -151,7 +156,9 @@ unsafe fn read(credential: Id) -> Result<Outcome, KiriError> {
             attachment,
         }));
     }
-    Err(KiriError::not_allowed("The authenticator returned an unexpected credential."))
+    Err(KiriError::not_allowed(
+        "The authenticator returned an unexpected credential.",
+    ))
 }
 
 extern "C" fn completed(_delegate: &Object, _selector: Sel, _controller: Id, authorization: Id) {
@@ -167,10 +174,16 @@ extern "C" fn completed(_delegate: &Object, _selector: Sel, _controller: Id, aut
 
 extern "C" fn failed(_delegate: &Object, _selector: Sel, _controller: Id, error: Id) {
     unsafe {
-        let code: isize = if error.is_null() { 1000 } else { msg_send![error, code] };
+        let code: isize = if error.is_null() {
+            1000
+        } else {
+            msg_send![error, code]
+        };
         finish(Err(match code {
             // ASAuthorizationErrorMatchedExcludedCredential
-            1006 => KiriError::invalid_state("This authenticator already has a passkey for this account."),
+            1006 => KiriError::invalid_state(
+                "This authenticator already has a passkey for this account.",
+            ),
             _ => KiriError::not_allowed("The request was canceled or not allowed."),
         }));
     }

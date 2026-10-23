@@ -1,0 +1,75 @@
+.agent-conversation .agent-transcript :is(p, li, a, pre) {
+  overflow-wrap: anywhere;
+}
+.agent-conversation .agent-transcript pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.agents-workspace .agent-settings-panel {
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 420px;
+  max-width: 100%;
+  padding: 0;
+  background: var(--color-charcoal-sidebar);
+  box-shadow: none;
+  animation: none;
+}
+.agents-workspace:has(> .agent-settings-panel[data-state="open"]) .agents-main {
+  margin-right: 420px;
+}
+.agent-settings-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 54px;
+  padding: 0 12px 0 16px;
+  flex-shrink: 0;
+}
+.agent-settings-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 20px 24px;
+}
+.agent-advanced-settings {
+  padding-block: 4px;
+}
+.agent-advanced-settings summary {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-cream-muted);
+}
+.agent-advanced-settings > div {
+  display: grid;
+  gap: 16px;
+  padding-top: 16px;
+}
+.agent-profile-form {
+  display: grid;
+  gap: 20px;
+  padding: 4px;
+}
+.agent-profile-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.agent-profile-avatar,
+.agent-profile-avatar .agent-avatar {
+  width: 64px;
+  height: 64px;
+}
+.agent-profile-form .agent-cloud-image {
+  max-width: 100%;
+  height: 100%;
+}
+.agent-profile-form .agent-cloud-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

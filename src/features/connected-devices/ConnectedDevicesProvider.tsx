@@ -10,10 +10,6 @@ export function ConnectedDevicesProvider({ children }: PropsWithChildren) {
     <ConnectedDevicesContext.Provider value={value}>{children}</ConnectedDevicesContext.Provider>
   );
 }
-/** The devices controller, or null outside the provider (tests, web). */
-export function useOptionalConnectedDevices(): ConnectedDevicesController | null {
-  return useContext(ConnectedDevicesContext);
-}
 export function useConnectedDevices(): ConnectedDevicesController {
   const value = useContext(ConnectedDevicesContext);
   if (!value) throw new Error("useConnectedDevices must be used inside ConnectedDevicesProvider.");

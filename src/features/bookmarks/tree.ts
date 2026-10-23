@@ -1,11 +1,11 @@
-import type { SharedRecord } from "@/features/browser-workspace/model";
+import type { SharedRecord } from "@/features/browser-sync/model";
 
 /** The roots every major browser has. Other bookmarks keeps the ID and stored
  * label ("Bookmarks") of the former single default folder. */
 export const bookmarksBarId = "group:bookmarks-bar";
 export const otherBookmarksId = "group:bookmarks";
 export const mobileBookmarksId = "group:bookmarks-mobile";
-/** Sites shown in every virtual window's tab strip. Older versions read it as a
+/** Sites shown in every virtual window's tab sidebar. Older versions read it as a
  * folder in Other bookmarks, since it has no parent. */
 export const favoritesId = "group:favorites";
 /** Sites installed as apps; each opens in its own virtual window. */

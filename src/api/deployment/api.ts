@@ -28,8 +28,6 @@ export async function resolveApiBase(): Promise<string> {
 export function resolveHostedApiBase(): string {
   const base =
     normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL) ??
-    normalizeApiBaseUrl(import.meta.env.VITE_MISTY_SERVER_URL) ??
-    normalizeApiBaseUrl(import.meta.env.VITE_API_BASE) ??
     // compose.dev.yml publishes the Go API on loopback port 8081. Desktop
     // development should not depend on the public Cloudflare tunnel, which is
     // still used by remote callbacks and the collaboration Worker.

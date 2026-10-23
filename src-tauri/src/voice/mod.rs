@@ -4,9 +4,15 @@
 mod capture;
 pub mod dictation;
 pub mod insert;
+#[cfg(target_os = "macos")]
+mod insert_macos;
+#[cfg(windows)]
+mod insert_windows;
 #[cfg(any(target_os = "macos", windows))]
 mod pill;
 pub mod recording;
+#[cfg(target_os = "windows")]
+mod recording_windows;
 #[cfg(any(target_os = "macos", windows))]
 mod session;
 pub mod tab_tap;

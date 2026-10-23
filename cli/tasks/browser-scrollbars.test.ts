@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 
 const css = readFileSync(new URL("../../src/styles/scrollbars.css", import.meta.url), "utf8");
 const script = readFileSync(
-  new URL("../../src-tauri/src/infra/browser_scrollbars.js", import.meta.url),
+  new URL("../../src-tauri/src/infra/browser/scripts/scrollbars.js", import.meta.url),
   "utf8",
 ).replace("__MISTY_SCROLLBAR_CSS_PLACEHOLDER__", JSON.stringify(css));
 

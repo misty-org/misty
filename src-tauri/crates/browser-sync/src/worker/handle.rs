@@ -332,7 +332,8 @@ impl WorkerHandle {
 
     /// Whether this native collection has completed its initial pull.
     pub async fn records_ready(&self, collection: String) -> Result<bool> {
-        self.call(|reply| Command::RecordsReady(collection, reply)).await
+        self.call(|reply| Command::RecordsReady(collection, reply))
+            .await
     }
 
     /// Native-only: replaces whole records (`None` deletes); queued durably

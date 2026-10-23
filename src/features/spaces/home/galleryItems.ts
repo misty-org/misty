@@ -1,7 +1,7 @@
 import type { SpaceDrawing } from "@/api/drawings/types";
 import type { ServerSpaceNote } from "@/api/notes/api";
 import type { SpaceCodeProject } from "@/api/spaces/code-projects";
-import type { SpaceConversation } from "@/api/spaces/dto/conversationTypes";
+import type { SpaceConversation } from "@/api/spaces/dto/conversation-types";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import type { ItemVisibility, VisibilityItemKind } from "@/api/spaces/visibility";
 import { libraryItemMIME } from "@/features/library";
@@ -31,11 +31,12 @@ export interface GalleryItem {
   toggle?: { kind: VisibilityItemKind; id: string };
   /** Only the people in it can see it (a direct chat), whatever the Space's size. */
   private?: boolean;
+  /** Removal operation when the current person is allowed to remove this item. */
+  remove?: () => Promise<unknown>;
+  removeLabel?: string;
 }
 
 export type GalleryFilter = "all" | "chats" | "notes" | "drawings" | "images" | "files" | "code";
-export type GalleryMadeBy = "anyone" | "me" | "others";
-export type GallerySort = "edited" | "name";
 
 /** The Space home's tabs, in order. */
 export const galleryFilters: ReadonlyArray<{
@@ -77,25 +78,6 @@ export function chatItem(
     href: conversationPath(spaceId, conversation),
     people,
     private: conversation.kind === "direct",
-  };
-}
-
-/** A chat with one of your agents. Until agent chats move into Spaces, they show in your own Space. */
-export function agentChatItem(
-  conversation: { id: string; title?: string; agentId?: string; updatedAt: string },
-  agent: { id: string; name: string } | undefined,
-  me: string,
-): GalleryItem {
-  const params = new URLSearchParams({ conversation: conversation.id });
-  if (agent) params.set("agent", agent.id);
-  return {
-    key: `agent-chat:${conversation.id}`,
-    kind: "chat",
-    title: conversation.title?.trim() || "Untitled chat",
-    updatedAt: conversation.updatedAt,
-    creatorId: me,
-    href: `/agents?${params}`,
-    people: agent ? [agent.name] : [],
   };
 }
 
@@ -159,37 +141,6 @@ export function codeItem(spaceId: string, project: SpaceCodeProject): GalleryIte
     visibility: project.visibility,
     toggle: { kind: "code_project", id: project.id },
   };
-}
-
-/** What the current tab, maker and sort leave, newest first unless sorted by name. */
-export function visibleGallery(
-  items: GalleryItem[],
-  options: {
-    filter: GalleryFilter;
-    madeBy: GalleryMadeBy;
-    sort: GallerySort;
-    me: string;
-    query: string;
-  },
-): GalleryItem[] {
-  const kind = galleryFilters.find((filter) => filter.id === options.filter)?.kind;
-  const query = options.query.trim().toLowerCase();
-  const kept = items.filter(
-    (item) =>
-      (!kind || item.kind === kind) &&
-      (options.madeBy === "anyone" ||
-        (options.madeBy === "me"
-          ? item.creatorId === options.me
-          : item.creatorId !== options.me)) &&
-      (!query ||
-        item.title.toLowerCase().includes(query) ||
-        item.excerpt?.toLowerCase().includes(query)),
-  );
-  return kept.sort((a, b) =>
-    options.sort === "name"
-      ? a.title.localeCompare(b.title)
-      : Date.parse(b.updatedAt || "0") - Date.parse(a.updatedAt || "0"),
-  );
 }
 
 const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [

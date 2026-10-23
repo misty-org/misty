@@ -80,7 +80,13 @@ fn creation(rp_id: Option<&str>) -> Value {
 #[test]
 fn creation_runs_with_the_callers_origin_and_parsed_options() {
     let fake = Arc::new(Fake::default());
-    let reply = call(&fake, "https://accounts.example.com/signup", "create", creation(Some("example.com"))).unwrap();
+    let reply = call(
+        &fake,
+        "https://accounts.example.com/signup",
+        "create",
+        creation(Some("example.com")),
+    )
+    .unwrap();
     let request = fake.created.lock().unwrap().remove(0);
     assert_eq!(request.origin, "https://accounts.example.com");
     assert_eq!(request.rp_id, "example.com");
@@ -95,16 +101,35 @@ fn creation_runs_with_the_callers_origin_and_parsed_options() {
     assert_eq!(reply["authenticatorAttachment"], "platform");
     assert_eq!(reply["response"]["publicKeyAlgorithm"], -7);
     assert!(reply["response"]["publicKey"].as_str().is_some());
-    assert_eq!(reply["response"]["transports"], json!(["hybrid", "internal"]));
+    assert_eq!(
+        reply["response"]["transports"],
+        json!(["hybrid", "internal"])
+    );
 }
 
 #[test]
 fn rp_id_defaults_to_the_host_and_must_be_owned_and_registrable() {
     let fake = Arc::new(Fake::default());
-    call(&fake, "https://login.example.com/", "create", creation(None)).unwrap();
+    call(
+        &fake,
+        "https://login.example.com/",
+        "create",
+        creation(None),
+    )
+    .unwrap();
     assert_eq!(fake.created.lock().unwrap()[0].rp_id, "login.example.com");
-    for rp_id in ["other.com", "com", "co.uk", "ample.com", "deep.login.example.com"] {
-        let origin = if rp_id == "co.uk" { "https://shop.co.uk/" } else { "https://login.example.com/" };
+    for rp_id in [
+        "other.com",
+        "com",
+        "co.uk",
+        "ample.com",
+        "deep.login.example.com",
+    ] {
+        let origin = if rp_id == "co.uk" {
+            "https://shop.co.uk/"
+        } else {
+            "https://login.example.com/"
+        };
         let error = call(&fake, origin, "create", creation(Some(rp_id))).unwrap_err();
         assert_eq!(error.name, "SecurityError", "{rp_id}");
     }
@@ -116,13 +141,28 @@ fn malformed_options_are_type_errors() {
     let fake = Arc::new(Fake::default());
     let mut options = creation(None);
     options["user"]["id"] = json!("");
-    assert_eq!(call(&fake, "https://example.com/", "create", options).unwrap_err().name, "TypeError");
+    assert_eq!(
+        call(&fake, "https://example.com/", "create", options)
+            .unwrap_err()
+            .name,
+        "TypeError"
+    );
     let mut options = creation(None);
     options["challenge"] = json!("not base64!");
-    assert_eq!(call(&fake, "https://example.com/", "create", options).unwrap_err().name, "TypeError");
+    assert_eq!(
+        call(&fake, "https://example.com/", "create", options)
+            .unwrap_err()
+            .name,
+        "TypeError"
+    );
     let mut options = creation(None);
     options["pubKeyCredParams"] = json!([{ "type": "public-key", "alg": -999 }]);
-    assert_eq!(call(&fake, "https://example.com/", "create", options).unwrap_err().name, "NotSupportedError");
+    assert_eq!(
+        call(&fake, "https://example.com/", "create", options)
+            .unwrap_err()
+            .name,
+        "NotSupportedError"
+    );
     assert!(fake.created.lock().unwrap().is_empty());
 }
 

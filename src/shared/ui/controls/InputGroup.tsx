@@ -9,7 +9,9 @@ const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>
       ref={ref}
       data-slot="input-group"
       className={cn(
-        "flex w-full flex-col overflow-hidden rounded-lg border border-charcoal-border-strong bg-transparent shadow-xs transition-[color,box-shadow] bg-charcoal-card",
+        "flex w-full flex-col overflow-hidden rounded-lg border " +
+          "border-charcoal-border-strong bg-transparent shadow-xs " +
+          "transition-[color,box-shadow] bg-charcoal-card",
         className,
       )}
       {...props}
@@ -17,44 +19,6 @@ const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>
   ),
 );
 InputGroup.displayName = "InputGroup";
-
-const InputGroupTextarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"textarea">>(
-  ({ className, ...props }, ref) => (
-    <textarea
-      ref={ref}
-      data-slot="input-group-textarea"
-      className={cn(
-        "field-sizing-content max-h-40 min-h-20 min-w-0 max-w-full w-full resize-none",
-        "overflow-x-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-3 py-3",
-        "text-base outline-none placeholder:text-cream-muted disabled:cursor-not-allowed",
-        "disabled:opacity-50 md:text-sm bg-transparent",
-        className,
-      )}
-      {...props}
-    />
-  ),
-);
-InputGroupTextarea.displayName = "InputGroupTextarea";
-
-const InputGroupAddon = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    align?: "block-start" | "block-end";
-  }
->(({ align = "block-start", className, ...props }, ref) => (
-  <div
-    ref={ref}
-    data-slot="input-group-addon"
-    data-align={align}
-    className={cn(
-      "flex min-h-10 items-center gap-1 px-2 py-1.5",
-      align === "block-start" ? "order-first" : "order-last",
-      className,
-    )}
-    {...props}
-  />
-));
-InputGroupAddon.displayName = "InputGroupAddon";
 
 const InputGroupButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, ...props }, ref) => (
@@ -75,4 +39,4 @@ const InputGroupText = React.forwardRef<HTMLSpanElement, React.ComponentProps<"s
 );
 InputGroupText.displayName = "InputGroupText";
 
-export { InputGroup, InputGroupAddon, InputGroupButton, InputGroupText, InputGroupTextarea };
+export { InputGroup, InputGroupButton, InputGroupText };

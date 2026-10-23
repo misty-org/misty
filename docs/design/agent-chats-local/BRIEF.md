@@ -1,8 +1,8 @@
 # Agent chats live on your device
 
-Approved October 19, 2026. This brief supersedes
-[agents-on-devices/BRIEF.md](../agents-on-devices/BRIEF.md) and the cross-device agent work in
-[devices/BRIEF.md](../devices/BRIEF.md). It keeps the
+Approved October 19, 2026. This brief supersedes the agents-on-devices brief (since removed;
+its keep-awake rule moved to [devices/BRIEF.md](../devices/BRIEF.md)) and the cross-device agent
+work in [devices/BRIEF.md](../devices/BRIEF.md). It keeps the
 [agent architecture brief](../agent-architecture/BRIEF.md): the model loop stays on the
 server runtime, and every model call goes through its AI SDK on Misty's keys.
 

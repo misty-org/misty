@@ -1,11 +1,5 @@
-/* The media player beside the navigator rail (docs/design/media-controls).
+/* The media player in the tab sidebar (docs/design/media-controls).
    Monochrome; the only color is the page's own artwork. */
-.misty-now-playing {
-  display: grid;
-  width: 300px;
-  padding: 6px;
-  border-radius: 12px;
-}
 .misty-now-playing-card {
   display: grid;
   gap: 8px;

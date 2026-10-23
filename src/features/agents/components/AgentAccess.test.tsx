@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const appsList = vi.hoisted(() => vi.fn());
 vi.mock("../apps/api", () => ({ appsApi: { list: appsList } }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => false }));
-vi.mock("@/api/accountEvents", () => ({
+vi.mock("@/api/account-events", () => ({
   observeAccountChanges: (id: string, _topics: string[], refresh: () => Promise<void>) => {
     if (id) void refresh();
     return () => {};

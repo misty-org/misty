@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
+	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
 // Teach mode (docs/design/agents-at-cursor/BRIEF.md, revision 4): a lesson at the

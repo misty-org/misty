@@ -10,7 +10,7 @@ import releaseVariant from "@jitl/quickjs-wasmfile-release-sync";
 import wasmLocation from "@jitl/quickjs-wasmfile-release-sync/wasm?url";
 
 /**
- * A browser_run program's sandbox (docs/plans/agent-harness-v3.md, change 1): QuickJS compiled to
+ * A browser_run program's sandbox (docs/plans/agent-harness.md, browser_run): QuickJS compiled to
  * WebAssembly, a separate JavaScript engine that sees nothing of the app, the network or files.
  * Its only ways out are `__op(name, json)`, which the host answers with a promise of JSON, and
  * `__log(text)`. A program that spins is interrupted at its deadline.
@@ -18,21 +18,22 @@ import wasmLocation from "@jitl/quickjs-wasmfile-release-sync/wasm?url";
 
 let engine: Promise<QuickJSWASMModule> | undefined;
 let wasm = wasmLocation;
-const quickjs = () => (engine ??= newQuickJSWASMModuleFromVariant(newVariant(releaseVariant, { wasmLocation: wasm })));
+const quickjs = () =>
+  (engine ??= newQuickJSWASMModuleFromVariant(newVariant(releaseVariant, { wasmLocation: wasm })));
 
 /** Tests run outside the app, where the bundler's URL for the engine is not a file: they name the file. */
-export function useSandboxWasm(location: string) {
+export function setSandboxWasm(location: string) {
   wasm = location;
   engine = undefined;
 }
 
-export interface SandboxLimits {
+interface SandboxLimits {
   /** When the whole program must have finished. */
   deadline: number;
   memoryBytes?: number;
 }
 
-export interface SandboxResult {
+interface SandboxResult {
   ok: boolean;
   /** The program's return value, as JSON. */
   value?: unknown;
@@ -41,11 +42,16 @@ export interface SandboxResult {
 }
 
 /** Host calls: a name and its arguments, answered with JSON-able data or an error. */
-export type Host = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+type Host = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
 const MAX_LOGS = 200;
 
-export async function runInSandbox(prelude: string, code: string, host: Host, limits: SandboxLimits): Promise<SandboxResult> {
+export async function runInSandbox(
+  prelude: string,
+  code: string,
+  host: Host,
+  limits: SandboxLimits,
+): Promise<SandboxResult> {
   const module = await quickjs();
   const runtime = module.newRuntime();
   runtime.setMemoryLimit(limits.memoryBytes ?? 64 * 1024 * 1024);
@@ -77,25 +83,27 @@ export async function runInSandbox(prelude: string, code: string, host: Host, li
       }
       const deferred = vm.newPromise();
       pending++;
-      host(name, args).then(
-        (value) => {
-          if (!vm.alive) return;
-          const text = vm.newString(JSON.stringify(value ?? null));
-          deferred.resolve(text);
-          text.dispose();
-        },
-        (error: unknown) => {
-          if (!vm.alive) return;
-          const failure = vm.newError(error instanceof Error ? error.message : String(error));
-          deferred.reject(failure);
-          failure.dispose();
-        },
-      ).finally(() => {
-        pending--;
-        if (finished) {
-          if (!pending) release();
-        } else if (vm.alive) runtime.executePendingJobs();
-      });
+      host(name, args)
+        .then(
+          (value) => {
+            if (!vm.alive) return;
+            const text = vm.newString(JSON.stringify(value ?? null));
+            deferred.resolve(text);
+            text.dispose();
+          },
+          (error: unknown) => {
+            if (!vm.alive) return;
+            const failure = vm.newError(error instanceof Error ? error.message : String(error));
+            deferred.reject(failure);
+            failure.dispose();
+          },
+        )
+        .finally(() => {
+          pending--;
+          if (finished) {
+            if (!pending) release();
+          } else if (vm.alive) runtime.executePendingJobs();
+        });
       return deferred.handle;
     });
     vm.setProp(vm.global, "__op", op);
@@ -111,10 +119,16 @@ export async function runInSandbox(prelude: string, code: string, host: Host, li
     runtime.executePendingJobs();
     const outcome = await Promise.race([
       settled,
-      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), Math.max(0, limits.deadline - Date.now()))),
+      new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), Math.max(0, limits.deadline - Date.now())),
+      ),
     ]);
     if (outcome === "timeout")
-      return { ok: false, error: `The program ran past its time limit${pending ? ` with ${pending} page call(s) unfinished` : ""}. Split it into shorter programs.`, logs };
+      return {
+        ok: false,
+        error: `The program ran past its time limit${pending ? ` with ${pending} page call(s) unfinished` : ""}. Split it into shorter programs.`,
+        logs,
+      };
     if (outcome.error) return failed(vm, outcome.error, logs);
     const value = vm.dump(outcome.value);
     outcome.value.dispose();
@@ -132,6 +146,11 @@ function failed(vm: QuickJSContext, error: QuickJSHandle, logs: string[]): Sandb
   const text =
     typeof dumped === "string"
       ? dumped
-      : [`${dumped?.name ?? "Error"}: ${dumped?.message ?? ""}`, dumped?.stack?.split("\n").slice(0, 6).join("\n")].filter(Boolean).join("\n");
+      : [
+          `${dumped?.name ?? "Error"}: ${dumped?.message ?? ""}`,
+          dumped?.stack?.split("\n").slice(0, 6).join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n");
   return { ok: false, error: text.slice(0, 2_000), logs };
 }

@@ -9,8 +9,7 @@ use serde_json::{json, Value};
 use super::{
     bridge::classify_command,
     events::{ActionKind, PermissionRequest, RunnerEvent},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
-    Transport,
+    CommandSpec, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
 };
 
 mod notifications;
@@ -18,24 +17,6 @@ mod notifications;
 pub struct CodexRunner;
 
 impl Runner for CodexRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Codex
-    }
-
-    fn transport(&self) -> Transport {
-        Transport::AppServer
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            interactive_asks: true,
-            plan_mode: true,
-            todos: true,
-            rate_limits: true,
-            full_access_only: false,
-        }
-    }
-
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         if launch.task.trim().is_empty() {
             return Err(RunnerError::Invalid("the task is empty"));

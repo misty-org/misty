@@ -1,7 +1,8 @@
+//! The read-only folder listing behind Misty's file picker, and the file
+//! references the clipboard copies.
 use std::{
-    ffi::OsStr,
     fs,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
 
@@ -14,77 +15,6 @@ use crate::error::{ApiError, ApiResult};
 pub struct ListDirectoryRequest {
     pub path: Option<String>,
     pub show_hidden: Option<bool>,
-    #[serde(default)]
-    pub force_remote_refresh: Option<bool>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateItemRequest {
-    pub directory: String,
-    pub name: String,
-    pub kind: CreateItemKind,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CreateItemKind {
-    File,
-    Folder,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RenameItemRequest {
-    pub path: String,
-    pub new_name: String,
-    pub source_is_directory: Option<bool>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RenameItemsRequest {
-    pub items: Vec<RenameItemRequest>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeleteItemsRequest {
-    pub paths: Vec<String>,
-    #[serde(default = "default_delete_permanent")]
-    pub permanent: bool,
-}
-
-fn default_delete_permanent() -> bool {
-    true
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PasteItemsRequest {
-    pub sources: Vec<PasteItem>,
-    pub destination_directory: String,
-    pub operation: ClipboardOperation,
-    #[serde(default)]
-    pub target_name: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PasteTextRequest {
-    pub destination_directory: String,
-    pub text: String,
-    #[serde(default)]
-    pub preferred_name: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PasteBlobRequest {
-    pub destination_directory: String,
-    pub bytes: Vec<u8>,
-    #[serde(default)]
-    pub preferred_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -96,90 +26,6 @@ pub struct PasteItem {
     pub size_bytes: Option<i64>,
     #[serde(default)]
     pub remote_modified: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrepareOpenItemRequest {
-    pub path: String,
-    pub size_bytes: Option<i64>,
-    pub remote_modified: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrepareDragItemsRequest {
-    pub items: Vec<PrepareDragItemRequest>,
-    pub session_id: Option<String>,
-}
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrepareDragItemRequest {
-    pub path: String,
-    pub is_directory: bool,
-    pub size_bytes: Option<i64>,
-    pub remote_modified: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreparedOpenItem {
-    pub local_path: String,
-    pub cached: bool,
-    pub source_path: Option<String>,
-    pub cache_path: Option<String>,
-    pub cache_hit: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreparedDragItemsResult {
-    pub items: Vec<PreparedDragItem>,
-    pub skipped: Vec<PreparedDragSkippedItem>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreparedDragItem {
-    pub source_path: String,
-    pub local_path: String,
-    pub is_directory: bool,
-    pub cached: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreparedDragSkippedItem {
-    pub source_path: String,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExplorerPreviewPayload {
-    pub mime_type: String,
-    pub bytes: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneratedImageThumbnail {
-    pub path: String,
-    pub mime_type: String,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ClipboardOperation {
-    Copy,
-    Move,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExplorerOperationResult {
-    pub affected_paths: Vec<String>,
-    pub parent_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -236,31 +82,11 @@ pub struct ExplorerLocation {
 pub enum ExplorerLocationKind {
     #[default]
     Local,
-    RemoteProvider,
-    Remote,
-    PeerDevice,
 }
 
 impl ExplorerLocation {
     pub fn local() -> Self {
         Self::default()
-    }
-
-    pub fn peer_device(
-        device_id: String,
-        root_id: String,
-        relative_path: String,
-        writable: bool,
-    ) -> Self {
-        Self {
-            kind: ExplorerLocationKind::PeerDevice,
-            provider_type: None,
-            remote_name: None,
-            remote_path: Some(relative_path),
-            peer_device_id: Some(device_id),
-            peer_root_id: Some(root_id),
-            peer_writable: Some(writable),
-        }
     }
 }
 
@@ -341,96 +167,6 @@ pub fn list_directory(
     })
 }
 
-pub fn paste_items(request: PasteItemsRequest) -> ApiResult<ExplorerOperationResult> {
-    if request.sources.is_empty() {
-        return Err(ApiError::Message("Copy or cut an item first.".to_string()));
-    }
-
-    let destination_directory = normalize_existing_dir(&request.destination_directory)?;
-    let target_name = if request.sources.len() == 1 {
-        request
-            .target_name
-            .as_deref()
-            .map(validate_file_name)
-            .transpose()?
-    } else {
-        None
-    };
-    let mut affected_paths = Vec::new();
-
-    for raw_source in request.sources {
-        let source = PathBuf::from(&raw_source.path);
-        if !source.exists() {
-            return Err(ApiError::Message(format!(
-                "{} does not exist.",
-                source.display()
-            )));
-        }
-
-        let file_name = target_name
-            .map(OsStr::new)
-            .or_else(|| source.file_name())
-            .ok_or_else(|| ApiError::Message(format!("Cannot paste {}.", source.display())))?;
-        let destination = destination_directory.join(file_name);
-        if destination.exists() {
-            return Err(ApiError::Message(format!(
-                "{} already exists.",
-                display_path(&destination)
-            )));
-        }
-
-        if source.is_dir() && destination_directory.starts_with(&source) {
-            return Err(ApiError::Message(
-                "Cannot paste a folder into itself.".to_string(),
-            ));
-        }
-
-        match request.operation {
-            ClipboardOperation::Copy => copy_path(&source, &destination)?,
-            ClipboardOperation::Move => move_path(&source, &destination)?,
-        }
-
-        affected_paths.push(display_path(&destination));
-    }
-
-    Ok(ExplorerOperationResult {
-        affected_paths,
-        parent_path: Some(display_path(&destination_directory)),
-    })
-}
-
-fn normalize_existing_dir(path: &str) -> ApiResult<PathBuf> {
-    let path = PathBuf::from(path);
-    let canonical = path.canonicalize().map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to resolve directory {}: {err}",
-            path.display()
-        ))
-    })?;
-    if !canonical.is_dir() {
-        return Err(ApiError::Message(format!(
-            "{} is not a directory.",
-            canonical.display()
-        )));
-    }
-    Ok(canonical)
-}
-
-fn validate_file_name(name: &str) -> ApiResult<&str> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Err(ApiError::Message("Enter a name.".to_string()));
-    }
-    let path = Path::new(trimmed);
-    let mut components = path.components();
-    match (components.next(), components.next()) {
-        (Some(Component::Normal(_)), None) => Ok(trimmed),
-        _ => Err(ApiError::Message(
-            "Names cannot contain path separators.".to_string(),
-        )),
-    }
-}
-
 fn file_entry(path: PathBuf, name: String) -> Option<FileEntry> {
     let metadata = fs::symlink_metadata(&path).ok()?;
     let file_type = metadata.file_type();
@@ -471,76 +207,6 @@ fn file_entry(path: PathBuf, name: String) -> Option<FileEntry> {
         is_deleted: false,
         location: ExplorerLocation::local(),
     })
-}
-
-fn copy_path(source: &Path, destination: &Path) -> ApiResult<()> {
-    let metadata = fs::symlink_metadata(source).map_err(|err| {
-        ApiError::Message(format!("Failed to inspect {}: {err}", source.display()))
-    })?;
-    if metadata.is_dir() && !metadata.file_type().is_symlink() {
-        copy_directory(source, destination)
-    } else {
-        fs::copy(source, destination).map_err(|err| {
-            ApiError::Message(format!(
-                "Failed to copy {} to {}: {err}",
-                source.display(),
-                destination.display()
-            ))
-        })?;
-        Ok(())
-    }
-}
-
-fn copy_directory(source: &Path, destination: &Path) -> ApiResult<()> {
-    fs::create_dir(destination).map_err(|err| {
-        ApiError::Message(format!(
-            "Failed to create folder {}: {err}",
-            destination.display()
-        ))
-    })?;
-
-    for entry in fs::read_dir(source).map_err(|err| {
-        ApiError::Message(format!("Failed to read folder {}: {err}", source.display()))
-    })? {
-        let entry = entry.map_err(|err| {
-            ApiError::Message(format!("Failed to read folder {}: {err}", source.display()))
-        })?;
-        let child_source = entry.path();
-        let child_destination = destination.join(entry.file_name());
-        copy_path(&child_source, &child_destination)?;
-    }
-
-    Ok(())
-}
-
-fn move_path(source: &Path, destination: &Path) -> ApiResult<()> {
-    match fs::rename(source, destination) {
-        Ok(()) => Ok(()),
-        Err(rename_error) => {
-            copy_path(source, destination)?;
-            let metadata = fs::symlink_metadata(source).map_err(|err| {
-                ApiError::Message(format!("Failed to inspect {}: {err}", source.display()))
-            })?;
-            if metadata.is_dir() && !metadata.file_type().is_symlink() {
-                fs::remove_dir_all(source).map_err(|err| {
-                    ApiError::Message(format!(
-                        "Moved copy to {}, but failed to remove source {} after rename failed ({rename_error}): {err}",
-                        destination.display(),
-                        source.display()
-                    ))
-                })?;
-            } else {
-                fs::remove_file(source).map_err(|err| {
-                    ApiError::Message(format!(
-                        "Moved copy to {}, but failed to remove source {} after rename failed ({rename_error}): {err}",
-                        destination.display(),
-                        source.display()
-                    ))
-                })?;
-            }
-            Ok(())
-        }
-    }
 }
 
 fn system_time_ms(time: std::time::SystemTime) -> Option<i64> {

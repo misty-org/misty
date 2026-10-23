@@ -10,7 +10,9 @@ export function newTabOverride(): string | null {
   const { states, supported } = useExtensionsStore.getState();
   if (!supported) return null;
   const running = new Map(
-    states.filter((state) => state.status === "enabled" && state.newTab).map((s) => [s.id, s.newTab!]),
+    states
+      .filter((state) => state.status === "enabled" && state.newTab)
+      .map((s) => [s.id, s.newTab!]),
   );
   const winner = installations()
     .filter((item) => item.installed && item.enabled && running.has(item.id))

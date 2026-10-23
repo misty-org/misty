@@ -2,7 +2,7 @@ import { Button, IconButton, Input } from "@/shared/ui";
 import type { Editor } from "@tiptap/react";
 import { Minus } from "lucide-react";
 
-export function SearchReplacePanel(props: {
+export function NoteSearchReplacePanel(props: {
   editor: Editor;
   open: boolean;
   search: string;

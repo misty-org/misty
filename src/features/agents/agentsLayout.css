@@ -1,0 +1,55 @@
+/*
+ * Only the chat column (header and conversation) scrolls. The header sticks to its top
+ * and the composer to its bottom.
+ */
+.agents-body {
+  --agents-canvas: var(--color-charcoal-workspace);
+  container: agents-body / size;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.agents-chat {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 360px;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Rows keep their content height so the column overflows and scrolls instead of squeezing. */
+.agents-chat > * {
+  flex-shrink: 0;
+}
+/* The conversation fills the chat column. */
+.agents-chat > .agent-conversation {
+  flex: 1;
+  min-height: 0;
+}
+.agents-chat > .agent-conversation-heading {
+  background: var(--agents-canvas);
+}
+
+/* A new conversation's name while its separate title call runs, then a soft fade in. */
+.agent-title-skeleton {
+  display: inline-block;
+  width: min(9rem, 70%);
+  height: 0.75em;
+  vertical-align: middle;
+  border-radius: 999px;
+}
+.agent-title-reveal {
+  animation: agent-title-reveal 240ms ease-out;
+}
+@keyframes agent-title-reveal {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-title-reveal {
+    animation: none;
+  }
+}

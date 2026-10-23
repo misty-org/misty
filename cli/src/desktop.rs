@@ -49,9 +49,7 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
     if let Some(profile) = profile {
-        command = command
-            .env("MISTY_PROFILE", profile)
-            .env("MISTY_DESKTOP_PROFILE", profile);
+        command = command.env("MISTY_PROFILE", profile);
     }
     command.run(&workspace.misty)
 }
@@ -69,9 +67,6 @@ pub fn clean(workspace: &Workspace, apply: bool) -> Result<()> {
         "build",
         ".vite",
         "node_modules/.vite",
-        "design-qa",
-        "design-qa-output",
-        "artifacts/design-qa",
         "src-tauri/target",
     ]
     .into_iter()

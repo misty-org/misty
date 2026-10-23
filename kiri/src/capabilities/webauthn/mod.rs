@@ -172,7 +172,9 @@ impl<A: Authenticator> Capability for WebAuthn<A> {
                 authenticator.cancel(call.host);
                 ready(Ok(Value::Null))
             }
-            other => ready(Err(KiriError::not_supported(format!("webauthn.{other} does not exist.")))),
+            other => ready(Err(KiriError::not_supported(format!(
+                "webauthn.{other} does not exist."
+            )))),
         }
     }
 }

@@ -1,0 +1,217 @@
+/* Plan card in the transcript, and the editor that replaces it. */
+.agent-plan-card {
+  display: grid;
+  gap: 10px;
+}
+.agent-plan-card h3 {
+  margin: 0;
+  color: var(--color-cream-bright);
+  font-size: 15px;
+  font-weight: 600;
+}
+.agent-plan-summary {
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-plan-edit-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-step-detail {
+  margin-top: 6px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+.agent-plan-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-cream-muted);
+  font-size: 11px;
+}
+.agent-plan-list h4 {
+  margin: 0 0 4px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.agent-plan-list ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--color-cream);
+  font-size: 13px;
+  list-style: disc;
+}
+.agent-plan-list li[data-proven] {
+  list-style: none;
+  margin-left: -16px;
+}
+.agent-plan-list li small {
+  display: block;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.agent-plan-dismiss {
+  margin-left: auto;
+}
+.agent-plan-edit-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 140px 24px;
+  align-items: start;
+  gap: 6px;
+}
+.agent-plan-edit-fields {
+  display: grid;
+  gap: 4px;
+}
+
+/* The Goal dialog: the goal, then the live plan under a hairline. */
+.agent-goal-dialog {
+  display: grid;
+  gap: 20px;
+  max-height: min(80vh, 720px);
+  overflow-y: auto;
+}
+.agent-goal-dialog h3 {
+  margin-bottom: 2px;
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  font-weight: 600;
+}
+.agent-goal-dialog > section + section {
+  padding-top: 20px;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-goal-note {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-goal-section,
+.agent-plan-checklist {
+  display: grid;
+  gap: 8px;
+}
+.agent-goal-objective,
+.agent-plan-checklist-title {
+  margin: 0;
+  color: var(--color-cream-bright);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-goal-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-cream);
+  font-size: 13px;
+}
+.agent-goal-status small {
+  margin-left: auto;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-goal-budget {
+  display: grid;
+  gap: 4px;
+}
+.agent-goal-budget small,
+.agent-goal-report {
+  margin: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.agent-plan-checklist ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.agent-plan-checklist li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 13px;
+}
+.agent-plan-checklist li p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+}
+.agent-plan-checklist li small {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+.agent-plan-checklist li[data-status="done"] p > span:first-child,
+.agent-plan-checklist li[data-status="skipped"] p > span:first-child {
+  color: var(--color-cream-muted);
+}
+.agent-plan-check {
+  display: grid;
+  place-items: center;
+  height: 20px;
+  color: var(--color-cream-muted);
+}
+.agent-plan-checklist li[data-status="done"] .agent-plan-check {
+  color: var(--color-cream-bright);
+}
+
+/* Turns Misty started toward a goal read as a quiet label, not a bubble. */
+.agent-goal-continuation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+
+/* The proposed plan sits at the end of the transcript, on its column and gutters. */
+.agent-plan-slot {
+  max-width: 836px;
+  margin: 0 auto;
+  padding: 0 24px 20px;
+}
+
+/* Earlier versions of a plan, folded under it. */
+.agent-plan-history summary {
+  color: var(--color-cream-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.agent-plan-history ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.agent-plan-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--color-cream);
+}
+.agent-plan-history li small {
+  color: var(--color-cream-muted);
+}

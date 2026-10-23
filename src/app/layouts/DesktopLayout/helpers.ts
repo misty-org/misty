@@ -21,7 +21,7 @@ export function settingsFallbackRoute(previousRoute: string, rememberedRoute: st
   return (
     candidates.find((route) => {
       if (!route || route.startsWith("/settings")) return false;
-      if (route === "/account" || route.startsWith("/providers")) return false;
+      if (route === "/account") return false;
       return isRememberableAppRoute(route);
     }) ?? "/browser"
   );

@@ -10,8 +10,8 @@ pub fn browser_sync_generate_secret(webview: tauri::Webview) -> Result<String, S
 }
 
 pub(in crate::infra) fn account_api(api_base: &str, account_id: &str) -> Result<SyncApi, String> {
-    let url = super::super::auth_cookies::server(api_base)?;
-    let client = super::super::auth_cookies::current(&url)?;
+    let url = super::super::account::cookies::server(api_base)?;
+    let client = super::super::account::cookies::current(&url)?;
     client.require_account(&url, account_id)?;
     let refresh_client = client.clone();
     let refresh_url = url.clone();

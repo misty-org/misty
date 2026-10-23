@@ -5,7 +5,7 @@ import {
   uninstallSiteApp,
   useSiteApps,
 } from "@/features/bookmarks/siteApps";
-import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
 import { DropdownMenuSeparator, MenuItem, MenuSubmenu } from "@/shared/ui";
 
 function showActiveWindow() {

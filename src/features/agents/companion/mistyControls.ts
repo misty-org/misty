@@ -36,7 +36,7 @@ const maxScreenControls = 150;
 const maxLabelLength = 80;
 
 /** Where the main webview's CSS pixels land in display units (CG points on macOS, physical pixels on Windows). */
-export interface WebviewFrame {
+interface WebviewFrame {
   x: number;
   y: number;
   /** Display units per CSS pixel. */

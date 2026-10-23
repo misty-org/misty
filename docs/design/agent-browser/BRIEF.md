@@ -1,7 +1,8 @@
 # Agent browser: agents work inside your window
 
-Status: draft for approval (2026-10-19). Replaces "Taking over the app: the agent window" in
-[agents-at-cursor/BRIEF.md](../agents-at-cursor/BRIEF.md): no agent gets an OS window of its own.
+Status: approved and built 2026-10-19 (`src/features/agents/agentBrowser/`). It replaced the agent
+window, the dock and the carousel in [agents-at-cursor/BRIEF.md](../agents-at-cursor/BRIEF.md): no
+agent gets an OS window of its own.
 
 ## Why
 

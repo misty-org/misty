@@ -28,6 +28,12 @@ export function pushPaneView(
   };
 }
 
+/** Where a pane is in its own history: its position and how many entries it holds. */
+export function paneHistoryPosition(pane: WorkspacePane): { index: number; length: number } {
+  const { entries, index } = paneHistory(pane);
+  return { index, length: entries.length };
+}
+
 export function traversePaneHistory(pane: WorkspacePane, delta: number): WorkspacePane | null {
   const history = paneHistory(pane),
     index = history.index + delta;

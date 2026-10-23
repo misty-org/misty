@@ -1,35 +1,19 @@
-pub mod agent_dock;
-pub mod agent_projects;
-pub mod agent_workspace;
+pub mod account;
 pub mod agents;
 #[cfg(target_os = "macos")]
 pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
-#[cfg(desktop)]
-pub mod browser_agent_control;
-pub mod default_browser;
-pub mod extension_popup;
-pub mod link_preview;
-mod link_preview_meta;
-#[cfg(desktop)]
-pub mod power_keep_awake;
-#[cfg(desktop)]
-pub mod space_windows;
-pub mod system_memory;
-pub mod web_fetch;
-
-pub mod api_cache;
 #[cfg(all(desktop, any(target_os = "macos", windows)))]
 pub(crate) mod browser_content_world;
+#[cfg(target_os = "macos")]
+mod browser_frame_rate_macos;
 pub(crate) mod browser_frames;
-#[cfg(desktop)]
-pub mod browser_history;
+#[cfg(windows)]
+mod browser_frames_windows;
 #[cfg(desktop)]
 pub mod browser_import;
-#[cfg(desktop)]
-pub(crate) mod browser_kiri;
 #[cfg(desktop)]
 pub mod browser_library;
 #[cfg(desktop)]
@@ -37,150 +21,66 @@ pub(crate) mod browser_macos;
 #[cfg(target_os = "macos")]
 mod browser_pointer_guard_macos;
 pub mod browser_process_ended;
+mod browser_profile;
 pub(crate) mod browser_profile_view;
-#[cfg(desktop)]
-mod browser_scripts;
-pub mod browser_search_space;
-pub mod browser_search_suggest;
+pub mod browser_provider;
 pub mod browser_shortcuts;
-#[cfg(desktop)]
-mod browser_theme;
+pub mod browser_sync;
 pub mod clipboard_bridge;
 pub mod cloud_clipboard;
-pub mod command_defaults;
-pub mod commands;
 pub mod credential_store;
-pub mod credentials;
 #[cfg(desktop)]
-pub mod device_admission;
-#[cfg(desktop)]
-pub mod device_approval;
-#[cfg(desktop)]
-pub mod device_approval_approver;
-#[cfg(desktop)]
-pub mod device_channel;
-#[cfg(desktop)]
-pub mod device_http;
-#[cfg(desktop)]
-pub mod device_identity;
-#[cfg(desktop)]
-pub mod device_key;
-#[cfg(desktop)]
-pub mod device_records;
-#[cfg(all(test, desktop))]
-mod device_records_fixture;
-#[cfg(all(test, desktop))]
-mod device_server_e2e_tests;
-#[cfg(desktop)]
-pub mod device_trust;
-pub mod devices;
-#[cfg(windows)]
-mod devices_windows;
-pub mod document_intelligence;
-#[cfg(target_os = "macos")]
-pub(crate) mod document_worker_macos;
-#[cfg(windows)]
-pub(crate) mod document_worker_windows;
-pub mod environment;
-pub mod explorer;
-pub mod explorer_library;
-pub mod extensions;
-pub mod global_hotkey;
-pub mod kura;
-pub mod misty;
-pub mod misty_home;
-pub mod native_clipboard;
-pub mod paths;
-#[cfg(desktop)]
-mod plugin_routes;
-pub mod settings;
-mod settings_migration;
-#[cfg(desktop)]
-pub mod system_dependencies;
-#[cfg(desktop)]
-pub mod tray;
-#[cfg(windows)]
-pub(crate) mod webview2;
-
-mod browser_profile;
-
-#[cfg(desktop)]
-pub mod page_state;
-
-pub mod browser_provider;
-
-pub mod navigation_names;
-
-pub mod agent_chats;
-
-#[cfg(windows)]
-pub mod agent_dock_windows;
+pub mod cursor_companion;
+pub mod default_browser;
 #[cfg(windows)]
 pub mod desktop_control_windows;
 #[cfg(windows)]
 pub mod desktop_overlays_windows;
+pub mod devices;
+pub mod documents;
+pub mod drives;
+#[cfg(windows)]
+mod drives_windows;
+pub mod environment;
+pub mod explorer;
+pub mod extensions;
+pub mod global_hotkey;
+pub mod link_preview;
+pub mod misty;
 pub mod misty_context;
 #[cfg(windows)]
 pub mod misty_context_windows;
+pub mod misty_home;
+pub mod native_clipboard;
+pub mod navigation_names;
+pub mod paths;
+#[cfg(desktop)]
+mod plugin_routes;
+#[cfg(desktop)]
+pub mod power_keep_awake;
+pub mod screen_memory;
+pub mod search;
+pub mod settings;
+pub mod shortcuts;
+pub mod site_settings;
+#[cfg(desktop)]
+pub mod space_windows;
+pub mod store;
+pub mod system_memory;
+#[cfg(desktop)]
+pub mod tray;
+pub mod website_data;
+#[cfg(windows)]
+pub(crate) mod webview2;
 #[cfg(windows)]
 pub(crate) mod window_focus_windows;
 #[cfg(windows)]
 pub mod window_snap_target_windows;
 #[cfg(windows)]
 pub mod window_snap_windows;
+pub mod workspace_autopilot;
+#[cfg(target_os = "macos")]
+mod workspace_autopilot_macos;
 #[cfg(windows)]
 pub mod workspace_autopilot_windows;
-
-pub mod auth_cookies;
-
-pub mod auth_http;
-
-#[cfg(windows)]
-mod browser_capture_windows;
-
-pub mod workspace_autopilot;
-
-pub mod browser_sync;
 pub mod workspace_recovery;
-
-#[cfg(any(windows, test))]
-mod browser_cookie_cdp;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_cookie_restore;
-#[cfg(target_os = "macos")]
-pub(crate) mod browser_cookie_store;
-#[cfg(windows)]
-#[path = "browser_cookie_store_windows.rs"]
-pub(crate) mod browser_cookie_store;
-mod browser_data_budget;
-mod browser_data_coverage;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_session_storage;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_signin_scope;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_storage_restore;
-#[cfg(any(target_os = "macos", windows))]
-mod browser_website_capture;
-#[cfg(any(target_os = "macos", windows))]
-pub(crate) mod browser_website_storage;
-
-#[cfg(desktop)]
-pub mod cursor_companion;
-
-#[cfg(desktop)]
-pub mod browser_site_permissions;
-
-#[cfg(desktop)]
-pub mod browser_site_zoom;
-
-#[cfg(desktop)]
-pub mod browser_site_style;
-
-#[cfg(desktop)]
-pub mod browser_night_light;
-
-pub mod settings_profile_store;
-pub mod store;
-
-pub mod agent_files;

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { readApiCache, writeApiCache } from "@/api/cache/apiCache";
+import { readApiCache, writeApiCache } from "@/api/cache/api-cache";
 import { readApiAccountId } from "@/api/client/session";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 

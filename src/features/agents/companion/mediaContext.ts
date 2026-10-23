@@ -15,11 +15,11 @@ export interface MediaContext {
 }
 
 /** How long a turn waits for it after the screens are captured; it is never fetched then. */
-export const MEDIA_CONTEXT_BUDGET_MS = 300;
+const MEDIA_CONTEXT_BUDGET_MS = 300;
 
 /**
  * What the front Misty tab is playing, with the captions its page already holds
- * (browser_media_context in browser_media_session.rs). Nothing when no video plays
+ * (browser_media_context in browser/page_tools/media_tools/session.rs). Nothing when no video plays
  * there, the tab is private, or the page doesn't answer.
  */
 export async function frontMediaContext(): Promise<MediaContext | undefined> {

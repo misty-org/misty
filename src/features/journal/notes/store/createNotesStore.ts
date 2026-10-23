@@ -1,37 +1,27 @@
 import { create } from "zustand";
-import type { NotesConnectorRegistry } from "../connectors/NotesConnectorRegistry";
-import { nowIso } from "../connectorUtils";
-import type { CreateNoteInput } from "../model/connectors";
-import type { NoteBodyFormat, NotesLoadPhase, UnifiedNote } from "../model/types";
+import type { NativeNotesApi } from "../noteServices";
+import type { NotesLoadPhase, UnifiedNote } from "../model/types";
+import { mapServerNote } from "../serverNotes";
 
 export function createNotesStore(services: {
-  createRegistry: (
-    accountId?: string,
-    spaceId?: string,
-    spaceName?: string,
-  ) => NotesConnectorRegistry;
-  archive: (spaceId: string, noteId: string) => Promise<unknown>;
+  api: Pick<NativeNotesApi, "list" | "create" | "remove">;
   closeCollaboration: () => void;
 }) {
-  const createDefaultNotesRegistry = services.createRegistry;
-  const closeOpenNoteCollaborationSessions = services.closeCollaboration;
-  let registry = createDefaultNotesRegistry();
+  const { api, closeCollaboration } = services;
   let notesLoadGeneration = 0;
 
+  const listSpaceNotes = async (spaceId: string, spaceName: string) =>
+    (await api.list(spaceId)).notes.map((note) => mapServerNote(note, spaceName));
+
   const useNotesStore = create<NotesStore>((set, get) => ({
-    registry,
     phase: "idle",
     notes: [],
-    connectorErrors: {},
+    error: undefined,
     selectedNoteId: undefined,
-    editingNoteId: undefined,
     accountId: undefined,
     spaceId: undefined,
     spaceName: undefined,
     query: "",
-    syncing: false,
-    lastSyncedAt: undefined,
-    connectorRevision: 0,
 
     async load(accountId: string, spaceId: string, spaceName: string) {
       const state = get();
@@ -39,70 +29,44 @@ export function createNotesStore(services: {
       if (sameScope && state.phase === "ready") return;
 
       const generation = ++notesLoadGeneration;
-      registry = createDefaultNotesRegistry(accountId, spaceId, spaceName);
-      const activeRegistry = registry;
-      set((current) => ({
-        registry: activeRegistry,
+      set({
         phase: "loading",
         accountId,
         spaceId,
         spaceName,
         notes: [],
         selectedNoteId: undefined,
-        editingNoteId: undefined,
-        connectorErrors: {},
-        syncing: false,
-        connectorRevision: current.connectorRevision + 1,
-      }));
-      const { notes, errors } = await activeRegistry.listAllNotes();
-      if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
-      const scoped = scopeNotes(notes, spaceId, spaceName);
-      set({
-        phase: "ready",
-        notes: scoped,
-        connectorErrors: errors,
-        lastSyncedAt: nowIso(),
-        selectedNoteId: scoped.find((note) => note.spaceId === spaceId)?.id ?? scoped[0]?.id,
+        error: undefined,
       });
+      try {
+        const notes = await listSpaceNotes(spaceId, spaceName);
+        if (generation !== notesLoadGeneration) return;
+        set({ phase: "ready", notes, selectedNoteId: notes[0]?.id });
+      } catch (reason) {
+        if (generation !== notesLoadGeneration) return;
+        // A failed list keeps the section calm: no notes and an inline notice.
+        set({ phase: "ready", error: errorMessage(reason) });
+      }
     },
 
     async refresh() {
       const { spaceId, spaceName } = get();
+      if (!spaceId) return;
       const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const { notes, errors } = await activeRegistry.listAllNotes();
-      if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
-      set((state) => {
-        const scoped = spaceId ? scopeNotes(notes, spaceId, spaceName ?? "") : notes;
-        return {
-          notes: scoped,
-          connectorErrors: errors,
-          selectedNoteId: scoped.some((note) => note.id === state.selectedNoteId)
+      try {
+        const notes = await listSpaceNotes(spaceId, spaceName ?? "");
+        if (generation !== notesLoadGeneration) return;
+        set((state) => ({
+          notes,
+          error: undefined,
+          selectedNoteId: notes.some((note) => note.id === state.selectedNoteId)
             ? state.selectedNoteId
-            : scoped[0]?.id,
-        };
-      });
-    },
-
-    async syncAll() {
-      if (get().syncing) return;
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      set((state) => ({ syncing: true, connectorRevision: state.connectorRevision + 1 }));
-      const results = await activeRegistry.syncAll();
-      const errors: Record<string, string> = {};
-      for (const result of results) {
-        if (result.error) errors[result.connectorId] = result.error;
+            : notes[0]?.id,
+        }));
+      } catch (reason) {
+        if (generation !== notesLoadGeneration) return;
+        set({ error: errorMessage(reason) });
       }
-      const { notes } = await activeRegistry.listAllNotes();
-      if (generation !== notesLoadGeneration || registry !== activeRegistry) return;
-      set((state) => ({
-        syncing: false,
-        notes: state.spaceId ? scopeNotes(notes, state.spaceId, state.spaceName ?? "") : notes,
-        connectorErrors: errors,
-        lastSyncedAt: nowIso(),
-        connectorRevision: state.connectorRevision + 1,
-      }));
     },
 
     setQuery(query: string) {
@@ -113,53 +77,41 @@ export function createNotesStore(services: {
       set({ selectedNoteId });
     },
 
-    setEditingNoteId(editingNoteId) {
-      set({ editingNoteId });
-    },
-
-    async createNote(input: CreateNoteInput) {
+    async createNote(input) {
       const { spaceId, spaceName } = get();
       if (!spaceId || !spaceName) {
-        reportConnectorError(set, "notes:misty", new Error("Open a Space before creating a note."));
+        set({ error: "Open a Space before creating a note." });
         return undefined;
       }
       const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.forSource("misty");
       try {
-        const created = await connector?.createNote?.({
-          ...input,
-          spaceId,
+        const created = mapServerNote(
+          await api.create(spaceId, input.title.trim() || "Untitled note"),
           spaceName,
-        });
-        if (!created || !notesActionIsCurrent(generation, activeRegistry)) return undefined;
+        );
+        if (generation !== notesLoadGeneration) return undefined;
         set((state) => ({
           notes: [created, ...state.notes],
           selectedNoteId: created.id,
-          editingNoteId: connector?.capabilities.update ? created.id : undefined,
           query: "",
         }));
         return created;
       } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        reportConnectorError(set, connector?.id ?? "notes:misty", reason);
+        if (generation !== notesLoadGeneration) return undefined;
+        set({ error: errorMessage(reason) });
         return undefined;
       }
     },
 
     async deleteNote(noteId: string) {
-      const note = findNote(get().notes, noteId);
+      const note = get().notes.find((candidate) => candidate.id === noteId);
       if (!note) return;
+      if (!note.spaceId) throw new Error("Open the note's Space before deleting it.");
       const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.forSource(note.source);
-      if (!connector?.capabilities.delete || !connector.deleteNote) {
-        throw new Error("This note source does not support deletion.");
-      }
       try {
-        await connector.deleteNote(note.sourceId);
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        closeOpenNoteCollaborationSessions();
+        await api.remove(note.spaceId, note.sourceId);
+        if (generation !== notesLoadGeneration) return;
+        closeCollaboration();
         set((state) => {
           const deletedIndex = state.notes.findIndex((candidate) => candidate.id === noteId);
           const notes = state.notes.filter((candidate) => candidate.id !== noteId);
@@ -167,234 +119,59 @@ export function createNotesStore(services: {
             state.selectedNoteId === noteId
               ? (notes[deletedIndex] ?? notes[deletedIndex - 1] ?? notes[0])?.id
               : state.selectedNoteId;
-          return {
-            notes,
-            selectedNoteId: nextSelectedNoteId,
-            editingNoteId: state.editingNoteId === noteId ? undefined : state.editingNoteId,
-          };
+          return { notes, selectedNoteId: nextSelectedNoteId };
         });
       } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        reportConnectorError(set, connector.id, reason);
+        if (generation !== notesLoadGeneration) return;
+        set({ error: errorMessage(reason) });
         throw reason;
-      }
-    },
-
-    async archiveNote(noteId: string) {
-      const note = findNote(get().notes, noteId);
-      if (!note?.spaceId || note.source !== "misty" || !note.canDelete) {
-        throw new Error("This note cannot be archived.");
-      }
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      await services.archive(note.spaceId, note.sourceId);
-      if (!notesActionIsCurrent(generation, activeRegistry)) return;
-      closeOpenNoteCollaborationSessions();
-      set((state) => ({
-        notes: state.notes.filter((candidate) => candidate.id !== noteId),
-        selectedNoteId:
-          state.selectedNoteId === noteId
-            ? state.notes.find((candidate) => candidate.id !== noteId)?.id
-            : state.selectedNoteId,
-      }));
-    },
-
-    async updateNoteBody(noteId: string, body: string) {
-      await get().updateNoteContent(noteId, { body, bodyFormat: "markdown" });
-    },
-
-    async updateNoteContent(noteId: string, content) {
-      const note = findNote(get().notes, noteId);
-      if (!note) return;
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.forSource(note.source);
-      try {
-        const updated = await connector?.updateNote?.(note.sourceId, content);
-        if (!updated || !notesActionIsCurrent(generation, activeRegistry)) return;
-        replaceNote(set, noteId, updated);
-      } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        reportConnectorError(set, connector?.id ?? note.connectorId ?? "notes", reason);
-      }
-    },
-
-    async assignSpace(noteId: string, spaceId?: string, spaceName?: string) {
-      const note = findNote(get().notes, noteId);
-      if (!note) return;
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.forSource(note.source);
-      try {
-        const updated = await connector?.updateNote?.(note.sourceId, { spaceId, spaceName });
-        if (!updated || !notesActionIsCurrent(generation, activeRegistry)) return;
-        replaceNote(set, noteId, updated);
-      } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        reportConnectorError(set, connector?.id ?? note.connectorId ?? "notes", reason);
-      }
-    },
-
-    async connectConnector(connectorId: string) {
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.get(connectorId);
-      if (!connector) return;
-      set((state) => ({ syncing: true, connectorRevision: state.connectorRevision + 1 }));
-      try {
-        await connector.connect();
-        const { notes, errors } = await activeRegistry.listAllNotes();
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        set((state) => ({
-          syncing: false,
-          notes: state.spaceId ? scopeNotes(notes, state.spaceId, state.spaceName ?? "") : notes,
-          connectorErrors: errors,
-          lastSyncedAt: nowIso(),
-          connectorRevision: state.connectorRevision + 1,
-        }));
-      } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        set((state) => ({
-          syncing: false,
-          connectorErrors: { ...state.connectorErrors, [connector.id]: errorMessage(reason) },
-          connectorRevision: state.connectorRevision + 1,
-        }));
-      }
-    },
-
-    async disconnectConnector(connectorId: string) {
-      const generation = notesLoadGeneration;
-      const activeRegistry = registry;
-      const connector = activeRegistry.get(connectorId);
-      if (!connector) return;
-      try {
-        await connector.disconnect();
-        const { notes, errors } = await activeRegistry.listAllNotes();
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        set((state) => {
-          const scoped = state.spaceId
-            ? scopeNotes(notes, state.spaceId, state.spaceName ?? "")
-            : notes;
-          return {
-            notes: scoped,
-            connectorErrors: errors,
-            selectedNoteId: scoped.some((candidate) => candidate.id === state.selectedNoteId)
-              ? state.selectedNoteId
-              : scoped[0]?.id,
-            connectorRevision: state.connectorRevision + 1,
-          };
-        });
-      } catch (reason) {
-        if (!notesActionIsCurrent(generation, activeRegistry)) return;
-        reportConnectorError(set, connector.id, reason);
       }
     },
   }));
 
   function resetNotesAccountState(): void {
-    closeOpenNoteCollaborationSessions();
+    closeCollaboration();
     notesLoadGeneration += 1;
-    registry = createDefaultNotesRegistry();
     useNotesStore.setState({
-      registry,
       phase: "idle",
       notes: [],
-      connectorErrors: {},
+      error: undefined,
       selectedNoteId: undefined,
-      editingNoteId: undefined,
       accountId: undefined,
       spaceId: undefined,
       spaceName: undefined,
       query: "",
-      syncing: false,
-      lastSyncedAt: undefined,
-      connectorRevision: 0,
     });
   }
 
-  function notesActionIsCurrent(
-    generation: number,
-    activeRegistry: NotesConnectorRegistry,
-  ): boolean {
-    return generation === notesLoadGeneration && registry === activeRegistry;
-  }
   return { useStore: useNotesStore, reset: resetNotesAccountState };
-}
-
-function findNote(notes: UnifiedNote[], noteId: string): UnifiedNote | undefined {
-  return notes.find((note) => note.id === noteId);
-}
-
-function replaceNote(
-  set: (updater: (state: NotesStore) => Partial<NotesStore>) => void,
-  noteId: string,
-  replacement: UnifiedNote,
-) {
-  set((state) => ({
-    notes: state.notes.map((note) => (note.id === noteId ? replacement : note)),
-  }));
-}
-
-function scopeNotes(notes: UnifiedNote[], spaceId: string, spaceName: string): UnifiedNote[] {
-  void spaceName;
-  return notes.filter((note) => note.spaceId === spaceId);
-}
-
-function reportConnectorError(
-  set: (updater: (state: NotesStore) => Partial<NotesStore>) => void,
-  connectorId: string,
-  reason: unknown,
-): void {
-  set((state) => ({
-    connectorErrors: { ...state.connectorErrors, [connectorId]: errorMessage(reason) },
-  }));
 }
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : "Misty could not update this note.";
 }
 
-interface UpdateNoteContentInput {
-  body: string;
-  bodyFormat: NoteBodyFormat;
-  bodyMarkdown?: string;
-}
-
 interface NotesStoreState {
-  registry: NotesConnectorRegistry;
   phase: NotesLoadPhase;
   notes: UnifiedNote[];
-  /** Keyed by connector id; a present entry renders a calm inline notice. */
-  connectorErrors: Record<string, string>;
+  /** A present message renders a calm inline notice. */
+  error?: string;
   selectedNoteId?: string;
-  editingNoteId?: string;
-  /** Account owning the device-local note partition. */
+  /** Account whose notes are loaded. */
   accountId?: string;
-  /** The Space whose Notes section is mounted; new notes default into it. */
+  /** The Space whose Notes section is mounted; new notes go into it. */
   spaceId?: string;
   spaceName?: string;
   query: string;
-  syncing: boolean;
-  lastSyncedAt?: string;
-  /** Bumped whenever connector status changes so selectors recompute. */
-  connectorRevision: number;
 }
 
 interface NotesStoreActions {
   load: (accountId: string, spaceId: string, spaceName: string) => Promise<void>;
   refresh: () => Promise<void>;
-  syncAll: () => Promise<void>;
   setQuery: (query: string) => void;
   selectNote: (noteId: string | undefined) => void;
-  setEditingNoteId: (noteId: string | undefined) => void;
-  createNote: (input: CreateNoteInput) => Promise<UnifiedNote | undefined>;
+  createNote: (input: { title: string; body: string }) => Promise<UnifiedNote | undefined>;
   deleteNote: (noteId: string) => Promise<void>;
-  archiveNote: (noteId: string) => Promise<void>;
-  updateNoteBody: (noteId: string, body: string) => Promise<void>;
-  updateNoteContent: (noteId: string, content: UpdateNoteContentInput) => Promise<void>;
-  assignSpace: (noteId: string, spaceId?: string, spaceName?: string) => Promise<void>;
-  connectConnector: (connectorId: string) => Promise<void>;
-  disconnectConnector: (connectorId: string) => Promise<void>;
 }
 
 export type NotesStore = NotesStoreState & NotesStoreActions;

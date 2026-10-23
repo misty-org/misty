@@ -34,8 +34,7 @@ const firefoxRoots: Record<string, string> = {
   menu________: otherBookmarksId,
   mobile______: mobileBookmarksId,
 };
-const toApi = (id: string) =>
-  Object.entries(apiRoots).find(([, misty]) => misty === id)?.[0] ?? id;
+const toApi = (id: string) => Object.entries(apiRoots).find(([, misty]) => misty === id)?.[0] ?? id;
 const fromApi = (value: unknown) => {
   const id = String(value ?? "");
   return apiRoots[id] ?? firefoxRoots[id] ?? id;
@@ -63,7 +62,9 @@ function view(): View {
           folderId,
           (list = current
             .children(folderId)
-            .filter((node) => !skip.has(node.id) && (node.kind === "folder" || !skip.has(node.folderId)))),
+            .filter(
+              (node) => !skip.has(node.id) && (node.kind === "folder" || !skip.has(node.folderId)),
+            )),
         );
       return list;
     },
@@ -86,7 +87,12 @@ function apiNode(v: View, node: BookmarkNode, deep: boolean): ApiNode {
   const base = {
     id: toApi(node.id),
     parentId: parent ? toApi(parent) : rootId,
-    index: parent ? Math.max(0, v.children(parent).findIndex((item) => item.id === node.id)) : 0,
+    index: parent
+      ? Math.max(
+          0,
+          v.children(parent).findIndex((item) => item.id === node.id),
+        )
+      : 0,
     dateAdded: node.addedAt,
   };
   if (node.kind === "bookmark")

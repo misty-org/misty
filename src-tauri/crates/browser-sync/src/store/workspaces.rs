@@ -130,9 +130,6 @@ pub struct WorkspaceLocal {
     pub ready: Option<(String, String)>,
 }
 
-/// Retired desired states kept for recovery.
-const RETIRED_KEPT: i64 = 16;
-
 impl Store {
     pub(super) fn seal_workspace(
         &self,
@@ -313,37 +310,6 @@ impl Store {
             [serde_json::to_string(local)?],
         )?;
         Ok(())
-    }
-
-    /// Moves a workspace's unpublished desired state out of the publishing path,
-    /// sealed as before, so it is kept for recovery but never replayed.
-    pub fn retire_workspace_desired(
-        &mut self,
-        root: &VaultRoot,
-        workspace_id: &str,
-    ) -> Result<bool> {
-        let Some(desired) = self.workspace_desired(root, workspace_id)? else {
-            return Ok(false);
-        };
-        let sealed =
-            self.seal_workspace(root, &format!("tree-desired:{workspace_id}"), &desired)?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_millis() as i64);
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute(
-            "INSERT INTO sync_workspace_retired(workspace_id,retired_at,desired) VALUES(?1,?2,?3)",
-            params![workspace_id, now, sealed],
-        )?;
-        tx.execute("DELETE FROM sync_workspace_retired WHERE id NOT IN (SELECT id FROM sync_workspace_retired ORDER BY id DESC LIMIT ?1)", [RETIRED_KEPT])?;
-        tx.execute(
-            "DELETE FROM sync_workspace_desired WHERE workspace_id=?1",
-            [workspace_id],
-        )?;
-        tx.commit()?;
-        Ok(true)
     }
 
     /// How many set-aside desired states are kept for recovery.

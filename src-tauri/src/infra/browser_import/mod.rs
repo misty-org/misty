@@ -179,7 +179,7 @@ pub async fn browser_import_history(
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
-    let target = super::browser_history::profile_key(space_store(&webview)?);
+    let target = super::browser_library::history::profile_key(space_store(&webview)?);
     blocking(move || {
         let source = profile(&request.source)?;
         let visits = history::read(request.source.browser.family(), &source.path)?;
@@ -217,7 +217,10 @@ pub async fn browser_import_settings(
                 .iter()
                 .map(|p| (p.origin.clone(), p.kind, p.allow))
                 .collect();
-            super::browser_site_permissions::import_decisions(misty_profile.as_deref(), &decisions)?
+            super::site_settings::permissions::import_decisions(
+                misty_profile.as_deref(),
+                &decisions,
+            )?
         };
         Ok(ImportedSettingsResult {
             settings,

@@ -10,7 +10,7 @@ import type {
   AiSelectionSnapshot,
   AiSurfaceId,
 } from "@/features/ai-surface/types";
-import type { GlobalAiContextRef } from "@/features/global-search/types";
+import type { GlobalAiContextRef } from "./types";
 
 export interface MistyHandoff {
   agentId?: string;
@@ -49,7 +49,7 @@ export function openMistyConversationInNewTab() {
 }
 
 /** Misty's conversations live on the Agents page; open it on the current one. */
-export function showMistyConversation() {
+function showMistyConversation() {
   const route = currentConversationRoute();
   const surface = workspaceSurfaceFromRoute(route);
   if (!surface) return;
@@ -144,7 +144,6 @@ async function acceptMistyHandoff(input: MistyHandoff) {
   if (changesRequest) {
     const current = useMistyStore.getState();
     useMistyStore.setState({
-      mode: "ask",
       selectedSpaceId:
         input.spaceId ??
         input.context?.find((ref) => ref.spaceId)?.spaceId ??
@@ -153,7 +152,7 @@ async function acceptMistyHandoff(input: MistyHandoff) {
       context: input.context ?? current.context,
       handoff: input,
     });
-  } else useMistyStore.setState({ mode: "ask" });
+  }
   showMistyConversation();
 }
 export async function openMisty(input: MistyHandoff = {}) {

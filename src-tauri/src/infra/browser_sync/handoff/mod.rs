@@ -1,0 +1,470 @@
+//! Explicit native handoff. The task owns the account/profile write lifetime
+//! even when its renderer invocation is canceled during a profile switch.
+use super::*;
+use misty_browser_sync::{
+    document::{credentials::Area, CredentialRecord},
+    worker::Phase,
+};
+
+pub(super) fn supported() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        objc2_foundation::NSProcessInfo::processInfo()
+            .operatingSystemVersion()
+            .majorVersion
+            >= 14
+    }
+    #[cfg(windows)]
+    {
+        true
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        false
+    }
+}
+
+fn cookie_target(document: &Document, logical: &str) -> Result<Vec<CredentialRecord>, String> {
+    let target: Vec<_> = document
+        .credentials
+        .values()
+        .filter(|v| v.profile_id == logical)
+        .cloned()
+        .collect();
+    if target.is_empty() {
+        return Err("This workspace has no captured website sign-ins to restore yet.".into());
+    }
+    if !target
+        .iter()
+        .any(|record| matches!(record.area, Area::Cookies))
+    {
+        return Err("This workspace has no captured website cookies yet.".into());
+    }
+    // Cookies this device cannot store are left for the devices that can:
+    // the restore adapter skips them and reports them back unchanged.
+    serde_json::from_value::<Vec<misty_browser_sync::document::credentials::Cookie>>(
+        target
+            .iter()
+            .find(|record| matches!(record.area, Area::Cookies))
+            .ok_or("Missing cookies")?
+            .payload
+            .clone(),
+    )
+    .map_err(|_| "The received cookie data is invalid")?;
+    Ok(target)
+}
+
+/// An unmapped legacy profile may seed credentials, but has no trusted base for
+/// replacing them. Reading the pending projection makes a lost-response retry
+/// idempotent before the server acknowledgment arrives.
+#[cfg(test)]
+fn initial_capture(
+    document: &Document,
+    logical: &str,
+    payload: serde_json::Value,
+) -> Result<Option<Payload>, String> {
+    let records: Vec<_> = document
+        .credentials
+        .values()
+        .filter(|v| v.profile_id == logical)
+        .collect();
+    if !records.is_empty() {
+        if records.len() != 1
+            || !matches!(records[0].area, Area::Cookies)
+            || Area::Cookies
+                .canonical_payload(&records[0].payload)
+                .map_err(issue)?
+                != Area::Cookies.canonical_payload(&payload).map_err(issue)?
+        {
+            return Err("This workspace already contains different sign-in data. Restore it before capturing more changes; this device's existing data has been preserved.".into());
+        }
+        return Ok(None);
+    }
+    Ok(Some(Payload::Credentials {
+        version: 1,
+        batch: document::credentials::Batch {
+            profile_id: logical.into(),
+            updates: vec![document::credentials::AreaUpdate {
+                area: Area::Cookies,
+                base_sequence: 0,
+                payload,
+            }],
+        },
+    }))
+}
+
+fn initial_storage_capture(
+    document: &Document,
+    logical: &str,
+    observed: Vec<misty_browser_sync::store::BrowserObservation>,
+) -> Result<Option<Payload>, String> {
+    let mut updates = vec![];
+    for observation in observed {
+        let key = observation.area.key(logical).map_err(issue)?;
+        if let Some(existing) = document.credentials.get(&key) {
+            if observation
+                .area
+                .canonical_payload(&existing.payload)
+                .map_err(issue)?
+                != observation
+                    .area
+                    .canonical_payload(&observation.payload)
+                    .map_err(issue)?
+            {
+                return Err(
+                    "Receive the existing website sign-ins before publishing this device".into(),
+                );
+            }
+        } else {
+            updates.push(document::credentials::AreaUpdate {
+                area: observation.area,
+                base_sequence: 0,
+                payload: observation.payload,
+            });
+        }
+    }
+    Ok(if updates.is_empty() {
+        None
+    } else {
+        Some(Payload::Credentials {
+            version: 1,
+            batch: document::credentials::Batch {
+                profile_id: logical.into(),
+                updates,
+            },
+        })
+    })
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub(super) async fn capture_current(
+    app: &tauri::AppHandle,
+    active: &mut Session,
+) -> Result<(), String> {
+    account_api(&active.scope.deployment, &active.scope.account_id)?;
+    let committed: Document =
+        serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+            .map_err(|_| "Could not read the active device")?;
+    if !super::may_capture(&committed, active) {
+        return Err(issue(misty_browser_sync::Error::InactiveDevice));
+    }
+    // Workspace mode has no account-wide tenure: credentials are published bare.
+    let epoch = if committed.workspace_mode {
+        None
+    } else {
+        Some(
+            committed
+                .active_device
+                .as_ref()
+                .ok_or("Choose an active device first")?
+                .epoch
+                .clone(),
+        )
+    };
+    let status = active.handle.status.borrow().clone();
+    if !matches!(status.phase, Phase::CatchingUp | Phase::Ready)
+        || status.applied_sequence < status.head_sequence
+    {
+        return Err(
+            "Reconnect and receive the latest workspace before capturing website sign-ins.".into(),
+        );
+    }
+    let logical = default_profile_id(&active.scope)?;
+    let binding = active
+        .handle
+        .browser_profile_binding(logical.clone())
+        .await
+        .map_err(issue)?;
+    if binding.staged.is_some() {
+        return Err("Finish restoring the browser profile before capturing sign-ins.".into());
+    }
+    // Only the personal vault inherits the pre-sync store; a Space starts in its own.
+    let physical = binding
+        .active
+        .as_ref()
+        .map(|v| v.physical_id.clone())
+        .unwrap_or_else(|| {
+            active.space_id.as_ref().map_or_else(
+                super::super::browser_profile::legacy_profile_identity,
+                |_| logical.clone(),
+            )
+        });
+    let observer = capture::CaptureView::open(&app, &physical)?;
+    let journal = active
+        .handle
+        .browser_import_journal(logical.clone())
+        .await
+        .map_err(issue)?;
+    let previous = journal
+        .applied
+        .as_ref()
+        .map(|receipt| receipt.credentials.as_slice())
+        .unwrap_or(&[]);
+    let pending = active.handle.pending_snapshot().await.map_err(issue)?;
+    let document: Document =
+        serde_json::from_slice(&pending.snapshot).map_err(|_| "Could not read the workspace")?;
+    let origins = document
+        .workspace_view()
+        .map_err(issue)?
+        .records
+        .iter()
+        .filter_map(|record| record.fields.get("url").and_then(serde_json::Value::as_str))
+        .filter_map(|url| url::Url::parse(url).ok())
+        .filter(|url| matches!(url.scheme(), "http" | "https"))
+        .map(|url| url.origin().ascii_serialization())
+        .collect();
+    let collected = collect::collect(
+        app,
+        &observer.view,
+        &physical,
+        previous,
+        Some((observer.view.clone(), origins)),
+        super::super::website_data::budget::Limit::SingleEvent,
+    )
+    .await?;
+    active.website_data.insert(
+        active.device_id.clone(),
+        device_data::DeviceWebsiteData::new(
+            &active.device_id,
+            device_data::DeviceDataState::Synced,
+            collected.coverage.report(),
+        ),
+    );
+    active.held = collected.held;
+    let observations = collected.observations;
+    if let Some(generation) = binding.active {
+        let state = active
+            .handle
+            .observe_browser_profile(logical, generation.id, observations)
+            .await
+            .map_err(issue)?;
+        if state == misty_browser_sync::store::BrowserCaptureState::NeedsImport {
+            return Err(
+                "Newer sign-in changes must be restored before publishing this browser's cookies."
+                    .into(),
+            );
+        }
+    } else {
+        let pending = active.handle.pending_snapshot().await.map_err(issue)?;
+        let document: Document = serde_json::from_slice(&pending.snapshot)
+            .map_err(|_| "Could not read queued changes")?;
+        if let Some(payload) = initial_storage_capture(&document, &logical, observations)? {
+            // If another device seeds this area after our read, base=0 loses the
+            // reducer comparison. Never silently rebase legacy refresh tokens.
+            let bytes = Zeroizing::new(
+                serde_json::to_vec(&match epoch {
+                    Some(epoch) => payload.published(epoch),
+                    None => payload,
+                })
+                .map_err(|_| "Could not encode the captured cookies")?,
+            );
+            active.handle.enqueue(bytes).await.map_err(issue)?;
+        }
+    }
+    active
+        .handle
+        .invalidate_browser_readiness()
+        .await
+        .map_err(issue)?;
+    let _ = crate::infra::space_windows::emit(
+        &app,
+        "misty:browser-sync-changed",
+        &active.scope.vault_id,
+    );
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", windows))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RestoreMode {
+    Background,
+    Explicit,
+}
+
+/// Names which restore step failed, in fixed text only.
+#[cfg(any(target_os = "macos", windows))]
+fn restore_issue(action: &str, error: misty_browser_sync::restore::RestoreError) -> String {
+    use misty_browser_sync::restore::{EngineError, RestoreError};
+    let cause = match error {
+        RestoreError::Quarantined => {
+            "an interrupted earlier restore must be recovered first".into()
+        }
+        RestoreError::Engine(EngineError::Unsupported) => {
+            "this browser cannot store some of the received data".into()
+        }
+        RestoreError::Engine(EngineError::Unavailable) => {
+            "the browser's website storage was unavailable".into()
+        }
+        RestoreError::Engine(EngineError::Invalid) => {
+            "the browser did not read back what was written".into()
+        }
+        RestoreError::Engine(EngineError::Timeout) => "the browser took too long to respond".into(),
+        RestoreError::Journal(error) => issue(error).trim_end_matches('.').to_owned(),
+    };
+    format!("{action}: {cause}. Retrying automatically.")
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub(super) const RESTORE_DEFERRED: &str =
+    "Website sign-in sync is deferred while browser pages are open. Your local browsing is unchanged.";
+
+#[cfg(any(target_os = "macos", windows))]
+fn check_restore_mode<'a>(
+    mode: RestoreMode,
+    labels: impl Iterator<Item = &'a str>,
+) -> Result<(), String> {
+    // Hidden capture/storage helpers are not user pages. Include all other
+    // browser views, including popups and partially registered creations.
+    if mode == RestoreMode::Background
+        && labels.into_iter().any(|label| {
+            label.starts_with("misty-browser-")
+                && !label.starts_with("misty-browser-capture-")
+                && !label.starts_with("misty-browser-storage-")
+        })
+    {
+        return Err(RESTORE_DEFERRED.into());
+    }
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", windows))]
+pub(super) async fn restore_current(
+    app: &tauri::AppHandle,
+    active: &mut Session,
+    mode: RestoreMode,
+) -> Result<(), String> {
+    // The caller holds the lifecycle write lease, so no page can be created
+    // between this check and activation. Background recovery must never close
+    // or reload a page, even if the incoming restore would succeed.
+    let logical = default_profile_id(&active.scope)?;
+    let labels = super::super::browser::profile_view_labels(app, &logical)?;
+    check_restore_mode(mode, labels.iter().map(String::as_str))?;
+    account_api(&active.scope.deployment, &active.scope.account_id)?;
+    let status = active.handle.status.borrow().clone();
+    if !matches!(status.phase, Phase::CatchingUp | Phase::Ready)
+        || status.applied_sequence < status.head_sequence
+    {
+        return Err("Wait for the workspace to reconnect and receive its latest changes before restoring sign-ins.".into());
+    }
+    if status.pending_changes > 0 {
+        return Err(
+            "Wait for this device's changes to finish syncing before restoring sign-ins.".into(),
+        );
+    }
+    let document: Document =
+        serde_json::from_slice(&active.handle.snapshot().await.map_err(issue)?)
+            .map_err(|_| "Could not read the received workspace")?;
+    cookie_target(&document, &logical)?;
+    let binding = active
+        .handle
+        .browser_profile_binding(logical.clone())
+        .await
+        .map_err(issue)?;
+    let journal = active
+        .handle
+        .browser_import_journal(logical.clone())
+        .await
+        .map_err(issue)?;
+    if let Some(generation) = binding
+        .active
+        .as_ref()
+        .filter(|_| binding.staged.is_none() && journal.pending.is_none() && !journal.quarantined)
+    {
+        let observer = capture::CaptureView::open(app, &generation.physical_id)?;
+        // This live store keeps local data that could not sync.
+        let mut backend =
+            super::super::website_data::storage_restore::BrowserProfile::for_generation(
+                observer.view.clone(),
+                logical.clone(),
+                generation.physical_id.clone(),
+            )
+            .with_held(active.held.clone());
+        // Retain the existing engine store, including website databases. Close
+        // pages before refreshing cookies so capture cannot echo the old tokens.
+        super::super::agents::workspace::stop_account_tasks(app)?;
+        active.capture_view = None;
+        super::super::browser::close_profile_views_except(
+            app,
+            &logical,
+            Some(observer.view.label()),
+        )?;
+        let result = misty_browser_sync::restore::refresh_active_profile(
+            &active.handle,
+            &logical,
+            &mut backend,
+        )
+        .await;
+        if result.is_ok() {
+            let physical = generation.physical_id.clone();
+            set_selected_profile(
+                &active.scope.vault_id,
+                Some(SelectedProfile {
+                    logical: logical.clone(),
+                    physical,
+                }),
+            )?;
+        }
+        if mode == RestoreMode::Explicit {
+            let _ = crate::infra::space_windows::emit(
+                &app,
+                "misty:browser-profile-changed",
+                &active.id,
+            );
+        }
+        return result
+            .map(|_| ())
+            .map_err(|error| restore_issue("Could not refresh incoming website sign-ins", error));
+    }
+    // Every retry gets a new isolated store. Late native callbacks from an
+    // interrupted earlier attempt can never write into the replacement.
+    let generation = uuid::Uuid::new_v4().to_string();
+    let staged = active
+        .handle
+        .stage_browser_profile(logical.clone(), binding.revision, generation.clone())
+        .await
+        .map_err(issue)?;
+    let physical = staged
+        .staged
+        .as_ref()
+        .ok_or("The browser staging profile is unavailable")?
+        .physical_id
+        .clone();
+    let mut closed_live_views = false;
+    let result: Result<(), String> = async {
+        let staging = capture::CaptureView::open(&app, &physical)?;
+        let mut backend = super::super::website_data::storage_restore::BrowserProfile::for_generation(staging.view.clone(), logical.clone(), physical.clone());
+        misty_browser_sync::restore::restore_staged_profile(&active.handle, &logical, &generation, &mut backend).await
+            .map_err(|error| restore_issue("Could not restore the received website sign-ins; the previous browser profile has been preserved", error))?;
+        // Stop actions before closing their browser contexts; preserve the task
+        // tombstones so syncing/reopening never grants permission to rerun them.
+        super::super::agents::workspace::stop_account_tasks(&app)?;
+        active.capture_view = None;
+        closed_live_views = true;
+        super::super::browser::close_profile_views_except(&app, &logical, Some(staging.view.label()))?;
+        active.handle.activate_browser_profile(logical.clone(), staged.revision, generation).await.map_err(issue)?;
+        // Verification and activation are separate CAS boundaries; confirm the
+        // actual activated store against any changes that arrived meanwhile.
+        misty_browser_sync::restore::verify_active_profile(&active.handle, &logical, &mut backend).await
+            .map_err(|_| "Newer website sign-in changes arrived during restoration. Retry before continuing.")?;
+        set_selected_profile(&active.scope.vault_id, Some(SelectedProfile { logical: logical.clone(), physical }))?;
+        Ok(())
+    }.await;
+    if closed_live_views && mode == RestoreMode::Explicit {
+        // Reopen only after the write lease is released. The frontend discards
+        // old view handles and reconstructs visible panes from its workspace.
+        let _ =
+            crate::infra::space_windows::emit(&app, "misty:browser-profile-changed", &active.id);
+    }
+    active.credential_issue = result.as_ref().err().map(|error| error.clone().into());
+    note_issue(&active.scope.vault_id, active.credential_issue.clone());
+    let _ = crate::infra::space_windows::emit(
+        &app,
+        "misty:browser-sync-changed",
+        &active.scope.vault_id,
+    );
+    result?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;

@@ -1,4 +1,5 @@
 import { useAuth } from "@/features/auth";
+import { codeProjectsApi } from "@/api/spaces/code-projects";
 import {
   CodingUpgradeNote,
   ProjectReviewSheet,
@@ -6,8 +7,11 @@ import {
   useProjectReview,
 } from "@/features/agents";
 import { useWorkspaceViewTitle } from "@/features/workspace";
-import { openInNewBrowserTab } from "@/features/browser-workspace/searchTargets";
+import { openInNewBrowserTab } from "@/features/browser-sync/searchTargets";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { confirmAction } from "@/shared/lib/confirmAction";
+import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import {
   Button,
   CollectionHeading,
@@ -21,6 +25,7 @@ import {
   EmptyState,
   IconButton,
   itemTones,
+  CollectionSelectionBar,
 } from "@/shared/ui";
 import { FileCode2, FolderPlus, MoreHorizontal } from "lucide-react";
 import { useSpacesStore } from "../store/useSpacesStore";
@@ -42,6 +47,8 @@ export function SpaceCode({
   const navigate = useNavigate();
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const code = useSpaceCodeProjects(spaceId);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkError, setBulkError] = useState("");
   const openReview = useProjectReview((state) => state.open);
   // Linking a project is coding, which is Pro and above; seeing the Space's projects is not.
   const codingIncluded = useCodingIncluded();
@@ -79,6 +86,7 @@ export function SpaceCode({
         day: "numeric",
       }),
       onOpen: open,
+      selectable: mine || space?.role === "owner",
       actions:
         mine || space?.role === "owner" ? (
           <DropdownMenu>
@@ -106,6 +114,26 @@ export function SpaceCode({
         ) : undefined,
     };
   });
+  const selection = useRangeSelection(items.filter((item) => item.selectable).map((item) => item.id));
+  const deleteSelected = async () => {
+    if (bulkDeleting || !selection.selectedIds.length) return;
+    if (
+      !(await confirmAction(
+        `Unlink ${selection.selectedIds.length} selected ${selection.selectedIds.length === 1 ? "project" : "projects"} from this Space? Their files stay on their owners' computers.`,
+      ))
+    ) return;
+    setBulkDeleting(true);
+    setBulkError("");
+    try {
+      for (const id of selection.selectedIds) await codeProjectsApi.unlink(spaceId, id);
+      selection.clear();
+      code.reload();
+    } catch {
+      setBulkError("Some selected projects couldn't be unlinked. Try again.");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
   return (
     <CollectionPage>
       <CollectionHeading
@@ -139,6 +167,14 @@ export function SpaceCode({
           {code.error}
         </p>
       ) : null}
+      <CollectionSelectionBar
+        count={selection.selectedIds.length}
+        busy={bulkDeleting}
+        label="Unlink"
+        onClear={selection.clear}
+        onDelete={() => void deleteSelected()}
+      />
+      {bulkError && <p role="alert" className="text-sm text-cream-muted">{bulkError}</p>}
       {!code.projects ? (
         <CollectionSkeleton label="Projects" view="list" />
       ) : items.length ? (
@@ -149,6 +185,8 @@ export function SpaceCode({
           creatorLabel="Owner"
           view="list"
           items={items}
+          selectedIds={selection.selectedIds}
+          onSelect={selection.select}
         />
       ) : (
         <EmptyState

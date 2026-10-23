@@ -17,16 +17,16 @@ const conversation = (patch: Partial<SpaceConversation>) =>
   }) as SpaceConversation;
 
 describe("one chat system", () => {
-  it("opens a chat with an agent in the agent view and everything else in Space chat", () => {
+  it("opens every chat in Space chat", () => {
     expect(
       conversationPath("home", conversation({ id: "conversation_1", direct_agent_id: "agent_1" })),
-    ).toBe("/agents?agent=agent_1&conversation=conversation_1");
+    ).toBe("/spaces/home/social/misty?conversation=conversation_1");
     expect(conversationPath("home", conversation({ id: "c1" }))).toBe(
       "/spaces/home/social/misty?conversation=c1",
     );
   });
 
-  it("lists chats with agents as direct messages, titled by the chat", () => {
+  it("lists every chat together, newest first, titled by the chat", () => {
     const agentChat = conversation({
       id: "conversation_1",
       kind: "direct",
@@ -36,8 +36,7 @@ describe("one chat system", () => {
     });
     const groups = groupConversations([conversation({ id: "c1" }), agentChat]);
     expect(groups.map((group) => group.conversations.map((item) => item.id))).toEqual([
-      ["c1"],
-      ["conversation_1"],
+      ["conversation_1", "c1"],
     ]);
     expect(conversationName(agentChat, "me")).toBe("Trip plans");
   });

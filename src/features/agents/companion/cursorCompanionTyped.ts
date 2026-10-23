@@ -69,7 +69,7 @@ export class CursorCompanionTypedTurns {
     s.abort = controller;
     try {
       // Every request at the cursor carries every display, the cursor's first
-      // (docs/plans/agent-harness.md, phase 4); the model judges what matters.
+      // (docs/plans/agent-harness.md, Tool surface); the model judges what matters.
       // Without screen access the request still goes, with no screenshots.
       // The video in front, read alongside the screens; it never holds the turn up.
       const media = frontMediaContext();

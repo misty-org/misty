@@ -25,21 +25,35 @@ export function PendingApprovals() {
   useEffect(() => {
     if (!active || active.code || ["denied", "expired", "approved"].includes(active.state)) return;
     const timer = window.setTimeout(() => {
-      void controller.current.approveStatus(active.requestId).then(setActive, (cause: unknown) => {
+      void controller.current.approveStatus(active.requestId).then(setActive, () => {
         setActive(null);
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError("The approval status could not be checked. Try again.");
       });
     }, pollMs);
     return () => window.clearTimeout(timer);
   }, [active]);
 
   if (!devices.pending.length && !active) return null;
-  const fail = (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause));
+  const fail = () => setError("The device approval could not be completed. Try again.");
 
   return (
     <Section title="Waiting for approval">
       {!devices.view?.canSign ? (
-        <SettingsNote>Unlock sync on this device to approve another one.</SettingsNote>
+        <SettingsNote>
+          <span>Unlock sync on this device to approve another one.</span>{" "}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("misty:open-settings", { detail: { section: "sync" } }),
+              )
+            }
+          >
+            Unlock sync
+          </Button>
+        </SettingsNote>
       ) : null}
       {devices.pending.map((request) => {
         const current = active?.requestId === request.requestId ? active : null;
@@ -98,7 +112,7 @@ export function PendingApprovals() {
               )}
             </Row>
             {current?.code ? (
-              <div className="border-t border-charcoal-border py-3">
+              <div className="py-3">
                 <p className="font-mono text-2xl tracking-[0.3em] text-cream" aria-live="polite">
                   {current.code.slice(0, 3)} {current.code.slice(3)}
                 </p>
@@ -108,7 +122,7 @@ export function PendingApprovals() {
         );
       })}
       {error ? (
-        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
+        <p role="alert" className="py-2 text-sm text-cream-muted">
           {error}
         </p>
       ) : null}

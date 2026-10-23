@@ -14,7 +14,7 @@ export function seedDrawing(drawingId: string, elements: OrderedExcalidrawElemen
   seeds.set(drawingId, elements);
 }
 
-/** Places a new drawing's starting elements once, the way a Figma reference is placed. */
+/** Places a new drawing's starting elements once. */
 export function useDrawingSeed(
   props: CollaborativeDrawingCanvasProps,
   api: ExcalidrawImperativeAPI | null,

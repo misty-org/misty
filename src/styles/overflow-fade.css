@@ -24,8 +24,7 @@
   text-overflow: clip !important;
 }
 
-.pointer-pane-title,
-.misty-input-agent {
+.pointer-pane-title {
   --misty-overflow-fade: 1;
   text-overflow: clip;
 }

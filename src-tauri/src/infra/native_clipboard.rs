@@ -97,15 +97,6 @@ impl NativeClipboard for SystemClipboardAdapter {
         true
     }
 
-    fn stop(&self) {
-        self.running.store(false, Ordering::Release);
-        if let Ok(mut worker) = self.worker.lock() {
-            if let Some(worker) = worker.take() {
-                let _ = worker.join();
-            }
-        }
-    }
-
     fn read_payload(&self) -> Option<ClipboardPayload> {
         let mut clipboard = arboard::Clipboard::new().ok()?;
         if let Ok(paths) = clipboard.get().file_list() {
@@ -227,49 +218,6 @@ impl NativeClipboard for SystemClipboardAdapter {
 }
 
 #[cfg(target_os = "macos")]
-pub fn native_clipboard_file_refs() -> ApiResult<Vec<PasteItem>> {
-    use std::path::PathBuf;
-
-    use objc2::rc::autoreleasepool;
-    use objc2::ClassType;
-    use objc2_app_kit::{NSPasteboard, NSPasteboardURLReadingFileURLsOnlyKey};
-    use objc2_foundation::{NSArray, NSDictionary, NSNumber, NSURL};
-
-    Ok(autoreleasepool(|_| {
-        let pasteboard = NSPasteboard::generalPasteboard();
-        let class_array = NSArray::from_slice(&[NSURL::class()]);
-        let file_urls_only = NSNumber::new_bool(true);
-        let options = NSDictionary::from_slices(
-            &[unsafe { NSPasteboardURLReadingFileURLsOnlyKey }],
-            &[file_urls_only.as_ref()],
-        );
-        let objects =
-            unsafe { pasteboard.readObjectsForClasses_options(&class_array, Some(&options)) };
-
-        objects
-            .map(|array| {
-                array
-                    .iter()
-                    .filter_map(|object| {
-                        object.downcast::<NSURL>().ok().and_then(|url| {
-                            url.path().map(|path| {
-                                let path = PathBuf::from(path.to_string());
-                                PasteItem {
-                                    is_directory: path.is_dir(),
-                                    path: path.to_string_lossy().into_owned(),
-                                    size_bytes: None,
-                                    remote_modified: None,
-                                }
-                            })
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    }))
-}
-
-#[cfg(target_os = "macos")]
 pub fn write_native_clipboard_file_refs(items: &[PasteItem]) -> ApiResult<bool> {
     use std::path::Path;
 
@@ -301,26 +249,6 @@ pub fn write_native_clipboard_file_refs(items: &[PasteItem]) -> ApiResult<bool> 
             unsafe { url_array.cast_unchecked::<ProtocolObject<dyn NSPasteboardWriting>>() };
         pasteboard.writeObjects(pasteboard_items)
     }))
-}
-
-/// Files copied in File Explorer (CF_HDROP).
-#[cfg(not(target_os = "macos"))]
-pub fn native_clipboard_file_refs() -> ApiResult<Vec<PasteItem>> {
-    let Ok(mut clipboard) = arboard::Clipboard::new() else {
-        return Ok(Vec::new());
-    };
-    Ok(clipboard
-        .get()
-        .file_list()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|path| PasteItem {
-            is_directory: path.is_dir(),
-            path: path.to_string_lossy().into_owned(),
-            size_bytes: None,
-            remote_modified: None,
-        })
-        .collect())
 }
 
 /// Puts files on the clipboard so File Explorer can paste them (CF_HDROP).

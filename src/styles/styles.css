@@ -1,10 +1,9 @@
-@config "../../.config/tailwind.config.js";
 @import "tailwindcss" source("../../");
 @import "tw-animate-css";
 @import "./overflow-fade.css";
 @import "./scrollbars.css";
 @import "./theme.css";
+@import "./overlays.css";
+@import "./base.css";
 @import "./components.css";
-@import "./code-theme.css";
-@import "./code-workspace.css";
 @import "./layers.css";

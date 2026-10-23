@@ -15,6 +15,7 @@ import {
 } from "../components/DesktopSettingsUI";
 import { ChoiceControl, SwitchControl, TextAreaControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
+import { ScreenCaptureSettings } from "./ScreenCaptureSettings";
 
 type Forget = "hour" | "today" | "all";
 
@@ -32,15 +33,7 @@ export function MemorySection(props: SettingsContentProps) {
     if (!available || !memory.enabled) return;
     void memoryApi.status().then(setStatus, () => setStatus(null));
   }, [available, memory.enabled]);
-  if (!available)
-    return (
-      <SettingsSectionBlock
-        title="Memory"
-        description="Memory of what you read and say is being prepared for a future Misty release."
-      >
-        {null}
-      </SettingsSectionBlock>
-    );
+  if (!available) return null;
   const paused = memory.pausedUntil > Date.now();
   const pause = paused ? (memory.pausedUntil >= PAUSED_UNTIL_RESUMED ? "resume" : "hour") : "off";
   const forget = async (what: Forget) => {
@@ -141,6 +134,7 @@ export function MemorySection(props: SettingsContentProps) {
           </p>
         )}
       </SettingsSectionBlock>
+      <ScreenCaptureSettings {...props} />
       <SettingsSectionBlock
         title="Your Memory"
         description="Forgetting removes the pages and words, and what agents could find in them."

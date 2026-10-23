@@ -11,8 +11,7 @@ use super::{
     events::{PermissionRequest, RunnerEvent},
     lease::{Lease, LeaseMeter},
     session::{run_turn, BoxFuture, Outcome, SessionHost},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError,
-    Transport,
+    CommandSpec, Launch, LaunchMode, Protocol, Runner, RunnerError,
 };
 
 /// Claude's protocol, but the "tool" is a script that asks to push, prints
@@ -22,15 +21,6 @@ struct ScriptedClaude {
 }
 
 impl Runner for ScriptedClaude {
-    fn engine(&self) -> EngineId {
-        EngineId::Claude
-    }
-    fn transport(&self) -> Transport {
-        Transport::StreamJson
-    }
-    fn capabilities(&self) -> Capabilities {
-        ClaudeRunner.capabilities()
-    }
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         Ok(CommandSpec {
             program: "sh".into(),

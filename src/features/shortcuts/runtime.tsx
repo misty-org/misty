@@ -219,7 +219,7 @@ function orderedRegistrations(commandId: string): HandlerRegistration[] {
   );
 }
 
-export function effectiveShortcut(commandId: string): {
+function effectiveShortcut(commandId: string): {
   primary: string | null;
   alternate: string | null;
 } {
@@ -235,17 +235,6 @@ export function effectiveShortcut(commandId: string): {
 function useEffectiveShortcut(commandId: string) {
   useSettingsStore((state) => state.shortcuts);
   return effectiveShortcut(commandId);
-}
-
-export function useShortcutTitle(label: string, commandId: string): string {
-  const binding = useEffectiveShortcut(commandId);
-  const hintsEnabled = useSettingsStore((state) =>
-    settingsBoolean(state.settings?.document ?? {}, "shortcuts", "shortcut_hints_enabled", true),
-  );
-  const platform =
-    useSettingsStore((state) => state.shortcuts?.detectedPlatform) ?? detectShortcutPlatform();
-  const shortcutLabel = formatShortcutLabel(binding.primary, platform);
-  return hintsEnabled && shortcutLabel ? `${label} (${shortcutLabel})` : label;
 }
 
 /** A command's shortcut as plain text (such as "⇧⌘T"), for menus. */

@@ -59,7 +59,6 @@ it("uses versioned operations and preserves conversation participants when renam
   expect(api.renameDrawing).toHaveBeenCalledWith("personal", "d", "Sketch");
   expect(byKind("drawing").remove).toBeUndefined();
   await byKind("file").rename!("New file");
-  expect(byKind("file").toggleFavorite).toBeUndefined();
   await byKind("file").remove!();
   expect(api.updateLibraryItem).toHaveBeenCalledWith("personal", file, {
     display_name: "New file",
@@ -99,7 +98,6 @@ it("lets every member manage files but keeps note, drawing and chat roles", asyn
     expect(item.rename).toBeUndefined();
     expect(item.renameRoute).toBeUndefined();
     expect(item.remove).toBeUndefined();
-    expect(item.toggleFavorite).toBeUndefined();
   }
 });
 

@@ -53,7 +53,7 @@ vi.mock("@/features/misty/useMistyStore", () => ({
     setState: (next: object) => Object.assign(mocks.state, next),
   },
 }));
-vi.mock("@/features/global-search/globalSearchStoreHelpers", () => ({
+vi.mock("@/features/misty/mistyStoreHelpers", () => ({
   replaceActiveGlobalInvocationStream: mocks.stream,
 }));
 vi.mock("@/features/ai-surface/api", () => ({ aiSurfaceApi: { cancelInvocation: mocks.cancel } }));

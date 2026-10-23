@@ -1,6 +1,6 @@
 # Unified Sync — approved design
 
-Approved for implementation, revision 2 (September 29, 2026), with the user’s subsequent corrections: black, white and gray only; all preferences use the server account record. Keep the incumbent navbar without its Account footer and show cohesive sections under small headers. `mockup.html` is a historical illustrative review artifact. `live/` renders the actual implementation with isolated sample data; it never connects to a real account.
+Approved for implementation, revision 2 (September 29, 2026), with the user’s subsequent corrections: black, white and gray only. Its server-account settings model is superseded: settings are device-local and never sync (AGENTS.md). Keep the incumbent navbar without its Account footer and show cohesive sections under small headers. `mockup.html` is a historical illustrative review artifact.
 
 ## October 1 popup simplification
 
@@ -65,13 +65,13 @@ Implementation is authorized. The user confirmed that another chat owns Part A3.
 
 ## Review verification
 
-Revision 1 browser checks covered chevron navigation and in-popup re-enrollment; its `overview.png` and `popup-reenroll.png` are historical and superseded by revision 2. Revision 2 replaces hand-drawn sidebar approximations with the same Lucide icons used by the current registry, restores Search and the incumbent sidebar geometry, removes the sub-page launcher list, and exposes all Sync sections. Preview controls change sample state only. No production tests are claimed for this standalone mockup. Existing unrelated working-tree changes remain untouched.
+Revision 1 browser checks covered chevron navigation and in-popup re-enrollment; revision 2 supersedes them. Revision 2 replaces hand-drawn sidebar approximations with the same Lucide icons used by the current registry, restores Search and the incumbent sidebar geometry, removes the sub-page launcher list, and exposes all Sync sections. Preview controls change sample state only. No production tests are claimed for this standalone mockup. Existing unrelated working-tree changes remain untouched.
 
-Revision 2 checks: browser confirmed Search finds Switching devices and the section is exposed on the same page; turning off page restore disables agent restore. Desktop and narrow-pane layouts were inspected. The layout detector returned no findings in degraded regex mode (HTML parser dependencies unavailable), so this is not a complete accessibility audit. `revision-2-overview.png` is the current review capture.
+Revision 2 checks: browser confirmed Search finds Switching devices and the section is exposed on the same page; turning off page restore disables agent restore. Desktop and narrow-pane layouts were inspected. The layout detector returned no findings in degraded regex mode (HTML parser dependencies unavailable), so this is not a complete accessibility audit.
 
 ## Implementation handoff
 
-The implemented page and popup are shown in `implemented-overview-popup.png`. Browser review used the real React components with sample native/account data at desktop and narrow desktop widths, including the in-popup re-enrollment form. The account form uses one section, and rows respond to their container width.
+Browser review used the real React components with sample native/account data at desktop and narrow desktop widths, including the in-popup re-enrollment form. The account form uses one section, and rows respond to their container width.
 
 The settings/sidebar, coverage, recovery and status tests pass after updates, including generation cancellation, shared retry deduplication, settings-only versus workspace recovery, explicit lock during startup, server-confirmed device changes, and server-confirmed vault absence. TypeScript and targeted ESLint checks pass. The legacy sleep/seat/tree regressions remain in place for Part A3; they have not been removed prematurely. Seat-check recovery already uses the shared status/controller, and the old event-based retry path and standalone device-name section are removed.
 

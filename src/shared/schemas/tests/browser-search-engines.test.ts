@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import engines from "../browser-search-engines.json";
-import definitions from "@/features/settings/profiles/definitions.json";
+import definitions from "@/features/settings/devicePreferences/definitions.json";
 
 const setting = (definitions as { id: string; enum?: string[]; legacyValues?: string[] }[]).find(
   (definition) => definition.id === "browser.searchEngine",

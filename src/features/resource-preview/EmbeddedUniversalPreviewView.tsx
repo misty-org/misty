@@ -1,4 +1,4 @@
-import type { PreviewErrorComponent, PreviewResource } from "@/features/file-ui";
+import type { PreviewErrorComponent, PreviewResource } from "./previewTypes";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -63,7 +63,7 @@ export function EmbeddedUniversalPreviewView(props: {
         <PreviewMessage
           icon={<FileQuestion size={34} />}
           title="Preview needs attention"
-          detail="Open Activity for details."
+          detail="This file couldn't be previewed."
           action={props.fallbackAction}
         />
       </>
@@ -116,7 +116,7 @@ export function EmbeddedUniversalPreviewView(props: {
   if (resource?.kind === "markdown")
     return (
       <article className="prose prose-invert mx-auto h-full w-full max-w-4xl overflow-auto px-8 py-10">
-        <Suspense fallback={<span>Rendering Markdown…</span>}>
+        <Suspense fallback={<SkeletonDocument label="Preview" className="px-0 py-0" />}>
           <ReactMarkdown>{resource.text ?? ""}</ReactMarkdown>
         </Suspense>
       </article>
@@ -148,7 +148,7 @@ export function EmbeddedUniversalPreviewView(props: {
   );
 }
 
-export function useEmbeddedDocument(
+function useEmbeddedDocument(
   url: string,
   extension: string,
   mimeType: string,

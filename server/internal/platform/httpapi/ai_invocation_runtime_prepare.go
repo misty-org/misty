@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	serveragent "github.com/kannachi323/misty/server/internal/agent"
 	"github.com/kannachi323/misty/server/internal/agenttools"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
+	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
 type preparedAIInvocationRuntime struct {

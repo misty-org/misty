@@ -1,232 +1,37 @@
-import { useAppStore } from "@/features/app-shell";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Input } from "@/shared/ui";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useShallow } from "zustand/react/shallow";
-import { DesktopSettingsFrame, DesktopSettingsNotice } from "./components/DesktopSettingsUI";
-import type { DesktopSettingsNavGroup } from "./components/SettingsNavigation";
-import {
-  searchSettings,
-  SettingsSearchResults,
-  type SettingsSearchResult,
-} from "./components/SettingsSearchResults";
-import { SettingsPageScope } from "./profiles/SettingScope";
-import { blockIfUnsaved, setSettingsStaging, useSettingsProfiles } from "./profiles/store";
-import { SettingsSaveBar } from "./components/SettingsSaveBar";
-import { NativeAvailability } from "./sections/FeatureSections";
-import { settingsErrorMessage } from "./settingsErrors";
+import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
 import {
   canonicalSettingsSection,
-  settingsAreaEntry,
-  settingsAreas,
-  settingsGroups,
   settingsRegistry,
 } from "./settingsRegistry";
-import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
-import { useSettingsStore } from "./store/useSettingsStore";
-export { canonicalSettingsSection, settingsRegistry } from "./settingsRegistry";
+
+export { canonicalSettingsSection, settingsRegistry };
 export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
-const navGroups: DesktopSettingsNavGroup<SettingsSection>[] = settingsGroups.map((group) => ({
-  label: group.label,
-  items: group.areas.flatMap((area) => {
-    const info = settingsAreas[area];
-    const first = settingsAreaEntry(area);
-    const id = first?.id ?? (area as SettingsSection);
-    return [{ id, label: info.label, icon: info.icon }];
-  }),
-}));
-/** Scrolls to, focuses, and briefly highlights the row a search result pointed at. */
-function useFocusSettingRow(focus: { label: string; request: number }) {
-  const content = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!focus.label) return;
-    let clearFlash: ReturnType<typeof setTimeout> | undefined;
-    const timer = setTimeout(() => {
-      const find = (selector: string, attribute: string) =>
-        Array.from(content.current?.querySelectorAll<HTMLElement>(selector) ?? []).find(
-          (e) => e.getAttribute(attribute) === focus.label,
-        );
-      const element =
-        find("[data-setting-label]", "data-setting-label") ??
-        find("[aria-label]", "aria-label") ??
-        find("[data-settings-target]", "data-settings-target");
-      if (!element) return;
-      const wholePage = focus.label.startsWith("page:");
-      // Scroll only the page. scrollIntoView also scrolls the clipped frame around it, which
-      // slid the whole settings window up and hid its close button.
-      const scroller = element.closest<HTMLElement>("[data-settings-scroller]");
-      if (scroller) {
-        const offset = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-        scroller.scrollTop =
-          scroller.scrollTop +
-          offset -
-          (wholePage ? 0 : (scroller.clientHeight - element.offsetHeight) / 2);
-      }
-      const target = wholePage
-        ? element
-        : (element.querySelector<HTMLElement>(
-            "[data-setting-control] input:not(:disabled),[data-setting-control] button:not(:disabled),[data-setting-control] select:not(:disabled)",
-          ) ?? element);
-      target.focus({ preventScroll: true });
-      element.dataset.settingFlash = "true";
-      clearFlash = setTimeout(() => delete element.dataset.settingFlash, 900);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(clearFlash);
-    };
-  }, [focus]);
-  return content;
-}
-export const SettingsWorkspace = memo(function SettingsWorkspace(props: {
+
+export interface SettingsWorkspaceProps {
   presentation?: "page" | "overlay";
   onClose?: () => void;
-}) {
-  const store = useSettingsStore(
-    useShallow((state) => ({
-      activeSection: state.activeSection,
-      settings: state.settings,
-      launchOnLogin: state.launchOnLogin,
-      shortcuts: state.shortcuts,
-      working: state.working,
-      error: state.error,
-      setActiveSection: state.setActiveSection,
-      updateSetting: state.updateSetting,
-      load: state.load,
-      updateShortcut: state.updateShortcut,
-      reassignShortcut: state.reassignShortcut,
-      resetShortcuts: state.resetShortcuts,
-    })),
-  );
-  const navigate = useNavigate();
-  const app = useAppStore((state) => state.app);
-  const profile = useSettingsProfiles();
-  const [query, setQuery] = useState("");
-  const [focus, setFocus] = useState({ label: "", request: 0 });
-  const content = useFocusSettingRow(focus);
-  const { settings, load } = store;
-  const section = canonicalSettingsSection(store.activeSection);
-  const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
-  const results = useMemo(() => searchSettings(query), [query]);
-  useEffect(() => {
-    if (!settings) void load();
-  }, [settings, load]);
-  // While this page is open, edits wait for Save changes; closing it drops anything unsaved.
-  useEffect(() => {
-    setSettingsStaging(true);
-    return () => setSettingsStaging(false);
-  }, []);
-  const select = (id: SettingsSection, label = `page:${id}`) => {
-    store.setActiveSection(id);
-    setFocus((current) => ({ label, request: current.request + 1 }));
-    setQuery("");
-  };
-  const openResult = (result: SettingsSearchResult) =>
-    select(result.page, result.focus || `page:${result.page}`);
-  const areaEntries = settingsRegistry.filter((item) => item.area === entry.area);
-  const controls: SettingsContentProps = {
-    document: store.settings?.document ?? {},
-    launchOnLogin: store.launchOnLogin,
-    working: store.working || !profile.ready,
-    onSettingChange: store.updateSetting,
-    onLoad: store.load,
-    onOpenResource: (path) => {
-      if (blockIfUnsaved()) return;
-      props.onClose?.();
-      navigate(path);
-    },
-    onShortcutChange: store.updateShortcut,
-    onShortcutReassign: store.reassignShortcut,
-    onResetShortcuts: store.resetShortcuts,
-    shortcuts: store.shortcuts,
-    app,
-  };
+}
+
+export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   return (
     <DesktopSettingsFrame
-      activeId={areaEntries[0].id}
+      activeId="settings"
       ariaLabel="Settings"
-      groups={navGroups}
+      groups={[]}
       navigationLabel="Settings sections"
-      onClose={() => {
-        if (!blockIfUnsaved()) props.onClose?.();
-      }}
-      saveBar={<SettingsSaveBar />}
-      onSelect={(id) => select(id)}
+      onClose={props.onClose}
+      onSelect={() => {}}
       presentation={props.presentation}
-      title={settingsAreas[entry.area].label}
-      navigationHeader={
-        <Input
-          aria-label="Search settings"
-          placeholder="Search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && query) {
-              e.stopPropagation();
-              setQuery("");
-            }
-            if (e.key === "Enter" && results[0]) openResult(results[0]);
-          }}
-        />
-      }
-      navigationOverride={
-        query.trim() ? (
-          <SettingsSearchResults query={query} results={results} onSelect={openResult} />
-        ) : undefined
-      }
-      contentHeader={
-        <>
-          {(store.error || (entry.id !== "sync" && profile.error)) && (
-            <DesktopSettingsNotice
-              action={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    void (
-                      profile.ready
-                        ? profile.refresh()
-                        : store
-                            .load()
-                            .then(() => window.dispatchEvent(new Event("misty:retry-settings")))
-                    ).catch(() => {})
-                  }
-                >
-                  Retry
-                </Button>
-              }
-            >
-              {settingsErrorMessage(store.error || profile.error || "")}
-            </DesktopSettingsNotice>
-          )}
-        </>
-      }
+      title="Settings"
     >
-      <div ref={content}>
-        {areaEntries.map((item) => {
-          const Active = item.Component;
-          return (
-            <div
-              key={item.id}
-              data-settings-page={item.id}
-              data-settings-target={`page:${item.id}`}
-              tabIndex={-1}
-              className="mb-6 last:mb-0"
-            >
-              <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
-                {item.native && !hasTauriInternals() ? (
-                  <NativeAvailability feature={item.label} />
-                ) : (
-                  <Active {...controls} />
-                )}
-              </SettingsPageScope.Provider>
-            </div>
-          );
-        })}
+      <div className="flex min-h-[calc(100dvh-7rem)] items-center justify-center text-center">
+        <p className="text-[15px] leading-6 text-cream-muted">
+          settings development in progress
+        </p>
       </div>
     </DesktopSettingsFrame>
   );
-});
+}
+
 export default SettingsWorkspace;
-export type { SettingsSection, SettingValue } from "./settingsTypes";
+export type { SettingsSection } from "./settingsTypes";

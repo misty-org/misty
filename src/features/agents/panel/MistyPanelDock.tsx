@@ -8,17 +8,13 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { cn } from "@/shared/ui";
 import { MistyPanel, type MistyPanelSide } from "./MistyPanel";
 import {
-  MISTY_PANEL_MAX_SPLIT,
   MISTY_PANEL_MAX_WIDTH,
-  MISTY_PANEL_MIN_SPLIT,
   MISTY_PANEL_MIN_WIDTH,
-  MISTY_PANEL_SPLIT,
   MISTY_PANEL_WIDTH,
   useMistyPanelStore,
   type MistyPanelView,
@@ -29,7 +25,7 @@ const slideMs = 240;
 
 /** The margin of window chrome between the page and the panels, and between two panels: each
  * is its own rounded card, as the page is. */
-export const panelGap = 6;
+const panelGap = 6;
 
 /** How far past its narrowest the pointer must pull a panel for it to close, in pixels. */
 const closeDistance = 70;
@@ -94,7 +90,6 @@ export function MistyPanelDock({
   const open = views.length > 0;
   const agentsWidth = useMistyPanelStore((s) => s.width);
   const chatWidth = useMistyPanelStore((s) => s.chatWidth);
-  const split = useMistyPanelStore((s) => s.split);
   // While the dock slides shut it keeps showing what it last showed.
   const [shown, setShown] = useState(views);
   const key = views.join(",");
@@ -106,7 +101,6 @@ export function MistyPanelDock({
   const [expanded, setExpanded] = useState(open);
   // Only opening and closing animate; a resize follows the pointer exactly.
   const [sliding, setSliding] = useState(false);
-  const stack = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setSliding(true);
     const settled = window.setTimeout(() => setSliding(false), slideMs);
@@ -139,7 +133,7 @@ export function MistyPanelDock({
   if (!mounted) return null;
   const list = open ? views : shown;
   const widthOf = (view: MistyPanelView) => (view === "chat" ? chatWidth : agentsWidth);
-  // The column is as wide as its widest card; a narrower one hugs the window's edge.
+  // Every card is as wide as the column, so stacked panels always line up edge to edge.
   const column = Math.max(0, ...list.map(widthOf));
   return (
     <div
@@ -165,20 +159,13 @@ export function MistyPanelDock({
         style={side === "left" ? { paddingRight: panelGap } : { paddingLeft: panelGap }}
       >
         <div
-          ref={stack}
           className="flex h-full min-h-0 shrink-0 flex-col"
           style={{ width: column }}
           data-misty-panel-stack
         >
           {list.map((view, index) => (
             <Fragment key={view}>
-              {index > 0 ? (
-                open ? (
-                  <MistyPanelSplitter stack={stack} split={split} />
-                ) : (
-                  <div className="shrink-0" style={{ height: panelGap }} />
-                )
-              ) : null}
+              {index > 0 ? <div className="shrink-0" style={{ height: panelGap }} /> : null}
               <div
                 className={cn(
                   "relative flex min-h-0 basis-0",
@@ -186,16 +173,15 @@ export function MistyPanelDock({
                 )}
                 style={
                   {
-                    flexGrow: list.length > 1 ? (index === 0 ? split : 1 - split) : 1,
-                    "--misty-panel-width": `${widthOf(view)}px`,
+                    // Stacked panels share the column's height equally.
+                    flexGrow: 1,
+                    "--misty-panel-width": `${column}px`,
                   } as CSSProperties
                 }
                 data-misty-panel-card={view}
               >
                 {view === "chat" ? chat : agents}
-                {open ? (
-                  <MistyPanelResizer side={side} view={view} width={widthOf(view)} />
-                ) : null}
+                {open ? <MistyPanelResizer side={side} view={view} width={column} /> : null}
               </div>
             </Fragment>
           ))}
@@ -219,7 +205,7 @@ function MistyPanelResizer({
   width: number;
 }) {
   const { dragging, start } = useEdgeDrag("misty-panel-resize");
-  const setWidth = (next: number) => useMistyPanelStore.getState().setWidth(next, view);
+  const setWidth = (next: number) => useMistyPanelStore.getState().setWidth(next);
   // Toward the page widens the panel: leftward for a panel on the right.
   const direction = side === "right" ? -1 : 1;
   // The window follows the drag, not the hairline: the edge moves under the pointer.
@@ -263,58 +249,6 @@ function MistyPanelResizer({
       onPointerDown={down}
       onDoubleClick={() => {
         setWidth(MISTY_PANEL_WIDTH);
-        geometryChanged();
-      }}
-      onKeyDown={key}
-    />
-  );
-}
-
-/**
- * The gap between two stacked cards. Drag it to share the column's height differently, arrow
- * keys step it, and a double-click splits it evenly again.
- */
-function MistyPanelSplitter({
-  stack,
-  split,
-}: {
-  stack: RefObject<HTMLDivElement | null>;
-  split: number;
-}) {
-  const { dragging, start } = useEdgeDrag("misty-panel-split");
-  const setSplit = (next: number) => useMistyPanelStore.getState().setSplit(next);
-  const down = (event: PointerEvent<HTMLDivElement>) => {
-    // The cards share the column's height less the gap between them.
-    const height = (stack.current?.getBoundingClientRect().height ?? 0) - panelGap;
-    if (height <= 0) return;
-    const origin = { y: event.clientY, split };
-    start(event, (next) => setSplit(origin.split + (next.clientY - origin.y) / height));
-  };
-  const key = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 0.1 : 0.025;
-    if (event.key === "ArrowUp") setSplit(split - step);
-    else if (event.key === "ArrowDown") setSplit(split + step);
-    else if (event.key === "Home") setSplit(MISTY_PANEL_MIN_SPLIT);
-    else if (event.key === "End") setSplit(MISTY_PANEL_MAX_SPLIT);
-    else return;
-    event.preventDefault();
-    geometryChanged();
-  };
-  return (
-    <div
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize panels"
-      aria-valuenow={Math.round(split * 100)}
-      aria-valuemin={MISTY_PANEL_MIN_SPLIT * 100}
-      aria-valuemax={MISTY_PANEL_MAX_SPLIT * 100}
-      tabIndex={0}
-      className="misty-panel-splitter"
-      style={{ height: panelGap }}
-      data-dragging={dragging || undefined}
-      onPointerDown={down}
-      onDoubleClick={() => {
-        setSplit(MISTY_PANEL_SPLIT);
         geometryChanged();
       }}
       onKeyDown={key}

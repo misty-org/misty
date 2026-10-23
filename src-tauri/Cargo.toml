@@ -4,6 +4,7 @@ version = "0.1.0-beta.1"
 description = "Misty native application shell"
 authors = ["Misty Contributors"]
 edition = "2021"
+license = "MIT"
 default-run = "misty-desktop"
 
 [lib]
@@ -84,7 +85,6 @@ zstd = { version = "0.13", default-features = false }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 percent-encoding = "2"
-notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 # Microphone, system and per-process capture (github.com/kannachi323/audeeo,

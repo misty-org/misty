@@ -34,7 +34,11 @@ export function openBrowserTabs(): OpenBrowserTab[] {
 }
 
 /** The focused browser tab's profile and privacy, or none when another surface is focused. */
-export function activeBrowserTabContext(): { tabId: string; profileId?: string; private: boolean } | null {
+export function activeBrowserTabContext(): {
+  tabId: string;
+  profileId?: string;
+  private: boolean;
+} | null {
   const view = activeLayoutView(useWorkspaceStore.getState().layout);
   if (view?.surfaceId !== "browser") return null;
   const state = parseBrowserViewState(view.state);

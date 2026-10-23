@@ -9,8 +9,6 @@ export function createAgentsApi(
         body: JSON.stringify({ device_id: deviceId }),
       }),
     run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
-    cancelRun: <T>(runId: string) =>
-      apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" }),
     transcribeVoice: async (audio: Blob, durationMs: number, signal?: AbortSignal) =>
       apiRequest<{ transcript: string; detected_language: string; duration_ms: number }>(
         "/agent-voice/transcriptions",

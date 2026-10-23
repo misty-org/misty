@@ -131,7 +131,10 @@ it("slides the bar at a steady pace in whole pixels, holding the page its full s
   expect(slid.length).toBeGreaterThan(2);
   expect(slid.every((height) => Number.isInteger(height))).toBe(true);
   // Steady: no step is more than twice another.
-  const steps = slid.slice(1).map((height, index) => height - slid[index]!).filter((step) => step);
+  const steps = slid
+    .slice(1)
+    .map((height, index) => height - slid[index]!)
+    .filter((step) => step);
   expect(Math.max(...steps)).toBeLessThanOrEqual(Math.min(...steps) * 2);
   advance(300);
   expect(browserSlideExtra()).toBe(0);

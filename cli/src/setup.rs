@@ -1,8 +1,9 @@
 use crate::{
     environment::{self, Target},
+    process::{npm, CommandSpec},
     workspace::Workspace,
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::{Args, ValueEnum};
 #[derive(Debug, Clone, Copy, ValueEnum)]
 pub enum Component {
@@ -66,7 +67,24 @@ pub fn desktop(workspace: &Workspace) -> Result<()> {
         )?;
         println!("Created desktop API configuration in .env");
     }
-    crate::development::setup(workspace)
+    install_desktop_dependencies(workspace)
+}
+
+fn install_desktop_dependencies(workspace: &Workspace) -> Result<()> {
+    workspace.validate()?;
+    let version = CommandSpec::new("node")
+        .args(["--version"])
+        .capture(&workspace.misty)?;
+    let version = version.trim().trim_start_matches('v');
+    let mut parts = version
+        .split('.')
+        .filter_map(|part| part.parse::<u32>().ok());
+    let major = parts.next().unwrap_or(0);
+    let minor = parts.next().unwrap_or(0);
+    if major < 24 || (major == 24 && minor < 12) {
+        bail!("Misty requires Node.js 24.12 or newer; found {version}");
+    }
+    CommandSpec::new(npm()).args(["ci"]).run(&workspace.misty)
 }
 
 #[cfg(test)]

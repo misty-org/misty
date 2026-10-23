@@ -170,7 +170,6 @@ pub async fn extensions_commit(
     app: tauri::AppHandle,
     token: String,
     generation: Option<String>,
-    private_access: Option<bool>,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
         let space = native::caller_space(&caller)?;
@@ -202,6 +201,7 @@ pub async fn extensions_commit(
                         name: review.entry.name.clone(),
                         installed: true,
                         enabled: true,
+                        // The package's own manifest decides, never the caller.
                         private_access: review.private_allowed,
                         agent_access: true,
                         permissions: review.permissions.clone(),

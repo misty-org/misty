@@ -7,7 +7,6 @@ import {
   menuItemClass,
   menuLabelClass,
   menuSeparatorClass,
-  menuShortcutClass,
   menuWidthClass,
   type MenuWidth,
 } from "./popupStyles";
@@ -21,10 +20,6 @@ import { cn } from "../utils";
 const ContextMenu = ContextMenuPrimitive.Root;
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
-
-const ContextMenuGroup = ContextMenuPrimitive.Group;
-
-const ContextMenuPortal = ContextMenuPrimitive.Portal;
 
 const ContextMenuSub = ContextMenuPrimitive.Sub;
 
@@ -98,27 +93,6 @@ const ContextMenuItem = React.forwardRef<
 ));
 ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName;
 
-const ContextMenuCheckboxItem = React.forwardRef<
-  React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
-  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
->(({ className, children, checked, ...props }, ref) => (
-  <ContextMenuPrimitive.CheckboxItem
-    ref={ref}
-    data-slot="context-menu-checkbox-item"
-    className={cn(menuIndicatorItemClass, className)}
-    checked={checked}
-    {...props}
-  >
-    <span className={menuIndicatorClass}>
-      <ContextMenuPrimitive.ItemIndicator>
-        <Check />
-      </ContextMenuPrimitive.ItemIndicator>
-    </span>
-    {children}
-  </ContextMenuPrimitive.CheckboxItem>
-));
-ContextMenuCheckboxItem.displayName = ContextMenuPrimitive.CheckboxItem.displayName;
-
 const ContextMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.RadioItem>
@@ -168,29 +142,14 @@ const ContextMenuSeparator = React.forwardRef<
 ));
 ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
 
-const ContextMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      data-slot="context-menu-shortcut"
-      className={cn(menuShortcutClass, className)}
-      {...props}
-    />
-  );
-};
-ContextMenuShortcut.displayName = "ContextMenuShortcut";
-
 export {
   ContextMenu,
-  ContextMenuCheckboxItem,
   ContextMenuContent,
-  ContextMenuGroup,
   ContextMenuItem,
   ContextMenuLabel,
-  ContextMenuPortal,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
-  ContextMenuShortcut,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,

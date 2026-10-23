@@ -37,7 +37,7 @@ components:
 
 **Creative North Star: "The Quiet Operating Desk"**
 
-This scoped guide records the shared folder-work extension to the Agents workspace and floating Misty panel. It inherits the established monochrome theme and shared controls from [Agents](../agents/DESIGN.md) and the [overlay](../global-search/DESIGN.md). The folder action stays subordinate to conversation, while proposals and receipts make consequential changes inspectable.
+This scoped guide records the shared folder-work extension to the Agents workspace and floating Misty panel. It inherits the established monochrome theme and shared controls from [Agents](../agents/DESIGN.md). The folder action stays subordinate to conversation, while proposals and receipts make consequential changes inspectable.
 
 The visual language is compact, plain and operational: quiet controls, readable relative paths, explicit decisions and text-based results. It introduces no new sidebar, display typography, status palette or decorative card system.
 
@@ -48,9 +48,9 @@ The visual language is compact, plain and operational: quiet controls, readable 
 - Recovery guidance and disabled approval when the original grant is unavailable.
 - Verified effects and undone effects have explicit text and counts.
 
-Source authority: [MistyFolderWork.tsx](MistyFolderWork.tsx), [MistyContextBar.tsx](MistyContextBar.tsx), [folderWork.css](folderWork.css), [shared Button](../../shared/ui/controls/Button.tsx), and the placement in [GlobalMisty.tsx](../global-search/GlobalMisty.tsx) and [AgentWorkspaceConversation.tsx](../agents/components/AgentWorkspaceConversation.tsx).
+Source authority: [MistyFolderWork.tsx](MistyFolderWork.tsx), [MistyContextBar.tsx](MistyContextBar.tsx), [folderWork.css](folderWork.css), [shared Button](../../shared/ui/controls/Button.tsx), and the placement in [AgentWorkspaceConversation.tsx](../agents/components/AgentWorkspaceConversation.tsx).
 
-This record covers the added surfaces. Current native macOS evidence is `desktop.png`, `floating.png` and `recovery.png` in [agent-phases review](../../../.impeccable/review/agent-phases/), each captured at 1280×820. Reviewer approval covers the two scoped fixes—recovery readability and historical documentation clarification—not whole-app acceptance. [Implementation evidence and limits](../../../docs/design/agent-workflows/IMPLEMENTATION.md) remains authoritative: shared lifecycle and bounded native execution are implemented; catalogs remain UI-only; live microphone/speaker acceptance is pending.
+This record covers the added surfaces. Shared lifecycle and bounded native execution are implemented; catalogs remain UI-only; live microphone/speaker acceptance is pending.
 
 ## Colors
 

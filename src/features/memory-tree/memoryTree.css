@@ -1,0 +1,53 @@
+.memory-flow {
+  --xy-background-color: transparent;
+  --xy-node-background-color: transparent;
+  --xy-node-border: none;
+  --xy-edge-stroke: var(--misty-theme-border-strong);
+  background: transparent;
+}
+.memory-flow .react-flow__attribution {
+  display: none;
+}
+.memory-flow .react-flow__node {
+  cursor: default;
+}
+.memory-edge {
+  stroke: var(--misty-theme-border-strong);
+  stroke-width: 1.25px;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  animation: memory-edge-draw 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes memory-edge-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.memory-flow .react-flow__controls {
+  border: 1px solid var(--misty-theme-border);
+  border-radius: 10px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.memory-flow .react-flow__controls-button {
+  background: var(--misty-theme-card);
+  border-bottom: 1px solid var(--misty-theme-border);
+  color: var(--misty-theme-text-muted);
+  width: 28px;
+  height: 28px;
+}
+.memory-flow .react-flow__controls-button:hover {
+  background: var(--misty-theme-hover);
+  color: var(--misty-theme-text);
+}
+.memory-flow .react-flow__controls-button svg {
+  fill: currentColor;
+}
+@media (prefers-reduced-motion: reduce) {
+  .memory-edge {
+    animation: none;
+  }
+}

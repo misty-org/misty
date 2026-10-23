@@ -8,10 +8,10 @@ export interface ScreenFrame {
   image: { dataUrl: string; width: number; height: number };
 }
 
-export type ScreenExecute = <T>(operation: string, input: Record<string, unknown>) => Promise<T>;
+type ScreenExecute = <T>(operation: string, input: Record<string, unknown>) => Promise<T>;
 
 /** Why the device ended the goal itself, rather than the planner. */
-export interface ScreenStop {
+interface ScreenStop {
   status: "needs_confirmation" | "incomplete";
   summary: string;
 }

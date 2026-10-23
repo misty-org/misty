@@ -15,12 +15,6 @@ pub const MAX_AGENT_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
 pub const MAX_AGENT_DOCUMENT_PAGES: usize = 200;
 const MAX_AGENT_DOCUMENT_TEXT_BYTES: usize = 384 * 1024;
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrepareAgentDocumentRequest {
-    pub path: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreparedAgentDocument {

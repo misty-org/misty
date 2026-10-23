@@ -1,4 +1,4 @@
-import { definitionById } from "./profiles/registry";
+import { definitionById } from "./devicePreferences/registry";
 
 /** Plain-language page notice for a settings failure; raw server and setting keys never reach the UI. */
 export function settingsErrorMessage(error: string): string {

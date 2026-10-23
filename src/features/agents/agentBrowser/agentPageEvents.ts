@@ -25,7 +25,9 @@ export function followAgentPages(note: (viewId: string, change: PageChange) => v
         else note(payload.id, { url });
       },
     ),
-    listen<{ id: string }>("misty://browser-stopped", ({ payload }) => note(payload.id, { loading: false })),
+    listen<{ id: string }>("misty://browser-stopped", ({ payload }) =>
+      note(payload.id, { loading: false }),
+    ),
     listen<{ id: string; title: string }>("misty://browser-title", ({ payload }) => {
       if (payload.title.trim()) note(payload.id, { title: payload.title.trim() });
     }),

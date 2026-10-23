@@ -10,7 +10,6 @@ const lifecycle = vi.hoisted(() => ({ mount: vi.fn(), unmount: vi.fn() }));
 vi.mock("./WorkspaceDockTree", async () => {
   const { useEffect } = await import("react");
   return {
-    minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
     WorkspaceDockTree: () => {
       useEffect(() => {
         lifecycle.mount();
@@ -22,6 +21,9 @@ vi.mock("./WorkspaceDockTree", async () => {
     },
   };
 });
+vi.mock("./dockSplitFit", () => ({
+  minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
+}));
 vi.mock("./WorkspaceTabStrip", () => ({ WorkspaceTabStrip: () => null }));
 afterEach(cleanup);
 it("moves the tab sidebar without remounting open work or rewriting the pane layout", () => {

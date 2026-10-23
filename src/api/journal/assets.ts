@@ -3,9 +3,9 @@ import { spaceRequest } from "@/api/spaces/api";
 
 export const MAX_JOURNAL_ASSET_BYTES = 15 * 1024 * 1024;
 
-export type JournalAssetKind = "note" | "drawing";
+type JournalAssetKind = "note" | "drawing";
 
-export interface JournalAssetRecord {
+interface JournalAssetRecord {
   id: string;
   mime_type?: string;
   byte_size?: number;

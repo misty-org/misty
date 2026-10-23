@@ -1,19 +1,22 @@
 import { Button, cn, ColorSwatch, IconButton, Input, Toolbar } from "@/shared/ui";
 import { Circle, Eraser, Minus, Pencil, Redo2, Square, Trash2, Type, Undo2, X } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import {
+  AnnotationShape,
+  markNearPoint,
+  type AnnotationMark,
+  type AnnotationTool,
+  type DrawingMark,
+  type Point,
+} from "./AnnotationShape";
 
-type AnnotationTool = "pen" | "line" | "rectangle" | "ellipse" | "text" | "eraser";
-type Point = { x: number; y: number };
-type DrawingMark = {
-  id: string;
-  tool: Exclude<AnnotationTool, "eraser" | "text">;
-  color: string;
-  points: Point[];
-};
-type TextMark = { id: string; tool: "text"; color: string; point: Point; text: string };
-type AnnotationMark = DrawingMark | TextMark;
-
-const colors = ["#ef4444", "#3b82f6", "#22c55e", "#f8fafc", "#18181b"];
+const colors = ["#18181b", "#52525b", "#a1a1aa", "#f8fafc"];
 
 export function BrowserAnnotationLayerView(props: {
   active: boolean;
@@ -32,37 +35,29 @@ export function BrowserAnnotationLayerView(props: {
   const [textDraft, setTextDraft] = useState<{ point: Point; value: string } | null>(null);
   const layerRef = useRef<SVGSVGElement | null>(null);
   const { registerCommand, active } = props;
+  const undoLast = useCallback(() => {
+    setMarks((current) => {
+      const last = current[current.length - 1];
+      if (!last) return current;
+      setRedo((redoMarks) => [...redoMarks, last]);
+      return current.slice(0, -1);
+    });
+  }, []);
+  const redoLast = useCallback(() => {
+    setRedo((current) => {
+      const last = current[current.length - 1];
+      if (!last) return current;
+      setMarks((drawing) => [...drawing, last]);
+      return current.slice(0, -1);
+    });
+  }, []);
   useEffect(
-    () =>
-      registerCommand(
-        "browser.annotation_undo",
-        () => {
-          setMarks((current) => {
-            const last = current[current.length - 1];
-            if (!last) return current;
-            setRedo((redo) => [...redo, last]);
-            return current.slice(0, -1);
-          });
-        },
-        () => active && marks.length > 0,
-      ),
-    [registerCommand, active, marks.length],
+    () => registerCommand("browser.annotation_undo", undoLast, () => active && marks.length > 0),
+    [registerCommand, undoLast, active, marks.length],
   );
   useEffect(
-    () =>
-      registerCommand(
-        "browser.annotation_redo",
-        () => {
-          setRedo((current) => {
-            const last = current[current.length - 1];
-            if (!last) return current;
-            setMarks((marks) => [...marks, last]);
-            return current.slice(0, -1);
-          });
-        },
-        () => active && redo.length > 0,
-      ),
-    [registerCommand, active, redo.length],
+    () => registerCommand("browser.annotation_redo", redoLast, () => active && redo.length > 0),
+    [registerCommand, redoLast, active, redo.length],
   );
 
   useEffect(() => {
@@ -82,24 +77,6 @@ export function BrowserAnnotationLayerView(props: {
       x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
       y: Math.max(0, Math.min(rect.height, event.clientY - rect.top)),
     };
-  };
-
-  const undoLast = () => {
-    setMarks((current) => {
-      const last = current[current.length - 1];
-      if (!last) return current;
-      setRedo((redoMarks) => [...redoMarks, last]);
-      return current.slice(0, -1);
-    });
-  };
-
-  const redoLast = () => {
-    setRedo((current) => {
-      const last = current[current.length - 1];
-      if (!last) return current;
-      setMarks((drawing) => [...drawing, last]);
-      return current.slice(0, -1);
-    });
   };
 
   const begin = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -289,53 +266,5 @@ function ToolButton(props: {
     >
       {props.children}
     </IconButton>
-  );
-}
-
-function AnnotationShape({ mark }: { mark: AnnotationMark }) {
-  if (mark.tool === "text") {
-    return (
-      <text x={mark.point.x} y={mark.point.y} fill={mark.color} fontSize="20" fontWeight="600">
-        {mark.text}
-      </text>
-    );
-  }
-  const first = mark.points[0];
-  const last = mark.points[mark.points.length - 1] ?? first;
-  const shared = {
-    fill: "none",
-    stroke: mark.color,
-    strokeWidth: 4,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  if (mark.tool === "pen") {
-    return <path d={pathData(mark.points)} {...shared} />;
-  }
-  if (mark.tool === "line") {
-    return <line x1={first.x} y1={first.y} x2={last.x} y2={last.y} {...shared} />;
-  }
-  const x = Math.min(first.x, last.x);
-  const y = Math.min(first.y, last.y);
-  const width = Math.abs(last.x - first.x);
-  const height = Math.abs(last.y - first.y);
-  if (mark.tool === "rectangle")
-    return <rect x={x} y={y} width={width} height={height} {...shared} />;
-  return (
-    <ellipse cx={x + width / 2} cy={y + height / 2} rx={width / 2} ry={height / 2} {...shared} />
-  );
-}
-
-export function pathData(points: Point[]): string {
-  if (!points.length) return "";
-  return points.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
-}
-
-function markNearPoint(mark: AnnotationMark, point: Point): boolean {
-  if (mark.tool === "text") {
-    return Math.hypot(mark.point.x - point.x, mark.point.y - point.y) < 36;
-  }
-  return mark.points.some(
-    (candidate) => Math.hypot(candidate.x - point.x, candidate.y - point.y) < 18,
   );
 }

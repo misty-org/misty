@@ -6,6 +6,6 @@ pub mod asset_protocol;
 #[cfg(desktop)]
 pub mod navigation_guard;
 pub mod plugins;
-pub mod synced_paths;
 #[cfg(windows)]
-pub mod windows;
+pub mod shared_windows;
+pub mod synced_paths;

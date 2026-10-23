@@ -1,5 +1,5 @@
 import { MistyBrandIcon } from "@/features/workspace";
-import { IconButton } from "@/shared/ui";
+import { IconButton, Pressable } from "@/shared/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { IconType } from "react-icons";
 import { FaDiscord, FaGithub, FaInstagram, FaXTwitter, FaYoutube } from "react-icons/fa6";
@@ -24,17 +24,16 @@ export function WelcomeNav({ onBack }: { onBack?: () => void }) {
   return (
     <nav
       aria-label="Misty"
-      className="absolute inset-x-4 top-3 z-10 mx-auto flex h-14 max-w-5xl items-center gap-2 rounded-2xl border border-charcoal-border px-4 sm:inset-x-8"
+      className="absolute inset-x-4 top-10 z-10 mx-auto flex h-14 max-w-5xl items-center gap-2 rounded-2xl border border-charcoal-border px-4 sm:inset-x-8"
     >
       {onBack ? (
-        <button
-          type="button"
+        <Pressable
           aria-label="Back"
           className="flex items-center gap-2.5 rounded-lg px-1.5 py-1"
           onClick={onBack}
         >
           {brand}
-        </button>
+        </Pressable>
       ) : (
         <span className="flex items-center gap-2.5 px-1.5">{brand}</span>
       )}

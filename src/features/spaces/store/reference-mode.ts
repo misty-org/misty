@@ -1,53 +1,32 @@
-import type { SpacesStore } from "../model/stores/spaces/useSpacesStore";
+import type { SpacesStore } from "./spacesStoreTypes";
 import { SpaceRequestError } from "@/api/spaces/api";
 import { setSpaceReferenceOnly, subscribeSpaceReferenceOnly } from "@/api/spaces/connectivity";
 import type { SpacesSnapshot } from "@/api/spaces/dto/entities";
-import { removeSpaceReferenceCache } from "./reference-cache";
-
-let clearedReferenceCacheAccount = "";
-
-export function setSpaceReferenceModeAccount(accountId: string): void {
-  const normalizedAccountId = accountId.trim();
-  // Saved-copy mode has been retired. Remove any encrypted reference cache
-  // left by an earlier build so it cannot become a fallback again.
-  if (normalizedAccountId && normalizedAccountId !== clearedReferenceCacheAccount) {
-    clearedReferenceCacheAccount = normalizedAccountId;
-    void removeSpaceReferenceCache(normalizedAccountId);
-  }
-}
 
 export function liveSpaceSnapshotState(snapshot: SpacesSnapshot): Partial<SpacesStore> {
-  const lastSyncedAt = new Date().toISOString();
   setSpaceReferenceOnly(false);
   return {
     spaces: snapshot.spaces,
     invitations: snapshot.invitations,
-    limits: snapshot.entitlements,
-    ownerStorage: snapshot.owner_storage,
     snapshotReady: true,
     referenceOnly: false,
-    lastSyncedAt,
     loading: false,
   };
 }
 
 export async function referenceSpaceSnapshotState(
   error: unknown,
-  _current: SpacesStore,
 ): Promise<Partial<SpacesStore> | null> {
   if (!canUseSpaceReferenceFallback(error)) return null;
   setSpaceReferenceOnly(true);
   return {
     spaces: [],
     invitations: [],
-    limits: null,
-    ownerStorage: null,
     membersBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
     snapshotReady: false,
     referenceOnly: true,
-    lastSyncedAt: null,
     loading: false,
     error: null,
   };
@@ -60,7 +39,6 @@ function canUseSpaceReferenceFallback(error: unknown): boolean {
 
 export function resetSpaceReferenceMode(): void {
   setSpaceReferenceOnly(false);
-  clearedReferenceCacheAccount = "";
 }
 
 export function bindSpaceReferenceMode(

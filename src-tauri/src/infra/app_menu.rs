@@ -3,11 +3,11 @@ use super::space_windows;
 #[cfg(target_os = "macos")]
 use tauri::{
     menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
-    App, AppHandle, Emitter, Manager, Runtime,
+    App, AppHandle, Manager, Runtime,
 };
 
 #[cfg(target_os = "macos")]
-use super::commands::ShortcutsSnapshot;
+use super::shortcuts::ShortcutsSnapshot;
 
 pub const SHORTCUT_MENU_PREFIX: &str = "shortcut.";
 pub const SHORTCUT_MENU_EVENT: &str = "misty://shortcut-command";
@@ -61,7 +61,7 @@ fn spaces_menu<R: Runtime>(app: &AppHandle<R>, title: &str) -> tauri::Result<Sub
 }
 
 #[cfg(target_os = "macos")]
-fn refresh_dock<R: Runtime>(app: &AppHandle<R>) {
+fn refresh_dock() {
     let spaces: Vec<_> = space_windows::listed_spaces()
         .into_iter()
         .map(|space| {
@@ -85,7 +85,7 @@ pub fn refresh_spaces<R: Runtime>(app: &AppHandle<R>) {
     if let Ok(menu) = build_menu(app, snapshot.as_ref()) {
         let _ = app.set_menu(menu);
     }
-    refresh_dock(app);
+    refresh_dock();
 }
 
 /// Shows the Spaces menu at the pointer in `window` (⌘⇧N).
@@ -106,7 +106,7 @@ pub fn setup(app: &App) -> tauri::Result<()> {
     app.set_menu(build_menu(app.handle(), None)?)?;
     let _ = DOCK_APP.set(app.handle().clone());
     unsafe { misty_space_dock_install(dock_choice) };
-    refresh_dock(app.handle());
+    refresh_dock();
     Ok(())
 }
 

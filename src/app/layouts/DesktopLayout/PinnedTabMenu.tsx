@@ -11,8 +11,8 @@ import {
 import { dockTreeViews } from "@/features/workspace/dockTree";
 import { activeLayoutView } from "@/features/workspace/layoutTabs";
 import { useUserStore } from "@/features/auth/core";
-import { pinnedTabsBlockedReason } from "@/features/browser-workspace/pinnedTabsGate";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
+import { pinnedTabsBlockedReason } from "@/features/browser-sync/pinnedTabsGate";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import { parseBrowserViewState, type WorkspaceTab } from "@/features/workspace/model";
 import { pinnableTabUrl } from "@/features/workspace/pinnedTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";

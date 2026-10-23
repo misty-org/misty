@@ -1,6 +1,6 @@
 import { MessageCirclePlus } from "lucide-react";
 import { MenuItem } from "@/shared/ui";
-import type { BrowserMistyPage } from "./browserRuntime";
+import type { BrowserMistyPage } from "@/features/webviews/browserRuntime";
 
 /** Attaches the page's text to the next message to Misty; a row of the browser menu. */
 export function BrowserAgentAccessMenu(props: {

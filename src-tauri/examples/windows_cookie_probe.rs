@@ -1,23 +1,21 @@
 //! Disposable WebView2 acceptance probe. Run on Windows with an installed
 //! WebView2 runtime: cargo run --example windows_cookie_probe
 //! No network navigation, live provider accounts, or existing browser profiles.
+// Mirrors `infra::website_data`, so the modules' `super::` paths resolve here too.
 #[cfg(windows)]
-#[path = "../src/infra/browser_cookie_cdp.rs"]
-mod browser_cookie_cdp;
-#[cfg(windows)]
-#[path = "../src/infra/browser_cookie_restore.rs"]
-mod browser_cookie_restore;
-#[cfg(windows)]
-#[allow(dead_code, reason = "the probe exercises only cookie reads and writes")]
-#[path = "../src/infra/browser_cookie_store_windows.rs"]
-mod browser_cookie_store;
-#[cfg(windows)]
-#[allow(
-    dead_code,
-    reason = "the cookie modules use only part of the coverage helpers"
-)]
-#[path = "../src/infra/browser_data_coverage.rs"]
-mod browser_data_coverage;
+#[path = "../src/infra/website_data"]
+mod website_data {
+    pub(super) mod cookie_cdp;
+    pub(super) mod cookie_restore;
+    #[allow(dead_code, reason = "the probe exercises only cookie reads and writes")]
+    #[path = "cookie_store_windows.rs"]
+    pub(super) mod cookie_store;
+    #[allow(
+        dead_code,
+        reason = "the cookie modules use only part of the coverage helpers"
+    )]
+    pub(super) mod coverage;
+}
 #[cfg(windows)]
 #[allow(dead_code, reason = "the probe needs only the profile folder name")]
 #[path = "../src/infra/browser_profile.rs"]
@@ -48,7 +46,8 @@ mod browser {
 #[cfg(windows)]
 mod probe {
     use super::{
-        browser, browser_cookie_restore::StagedCookieProfile, browser_cookie_store as cookies,
+        browser,
+        website_data::{cookie_restore::StagedCookieProfile, cookie_store as cookies},
     };
     use misty_browser_sync::{
         document::{

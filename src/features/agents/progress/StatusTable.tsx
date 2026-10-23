@@ -9,14 +9,7 @@ import "./statusTable.css";
  * (amber), "failed" (red) and "done"; the word always says it too.
  */
 export type StatusState =
-  | "done"
-  | "running"
-  | "next"
-  | "failed"
-  | "waiting"
-  | "stopped"
-  | "skipped"
-  | "plain";
+  "done" | "running" | "next" | "failed" | "waiting" | "stopped" | "skipped" | "plain";
 
 const icons = {
   done: Check,

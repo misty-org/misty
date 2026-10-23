@@ -47,6 +47,7 @@ export function useSpaceCodeProjects(spaceId: string) {
     /** Projects on this computer, for linking. */
     local,
     error,
+    reload: () => setRevision((value) => value + 1),
     link: (scope: AgentScope) =>
       run(async () => {
         const remote = await projectRemote(scope.id);

@@ -88,11 +88,15 @@ pub(super) const FILES: &[FileSpec] = &[
             "AI_GATEWAY_API_KEY",
             "AI_GATEWAY_BASE_URL",
             "MISTY_SERPER_API_KEY",
+            "MISTY_RECALL",
+            "MISTY_RECALL_BACKLOG_CAP",
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "CLAUDE_API_KEY",
             "NVIDIA_API_KEY",
             "NVIDIA_BASE_URL",
+            "GEMINI_API_KEY",
+            "GEMINI_BASE_URL",
             "ELEVENLABS_API_KEY",
             "MISTY_VOICE_ID",
             "MISTY_VOICE_TTS_MODEL",
@@ -100,12 +104,8 @@ pub(super) const FILES: &[FileSpec] = &[
             "MEDIA_SEARCH_TRANSCRIPTION_MODEL",
             "MEDIA_SEARCH_TRANSCRIPTION_FALLBACK_MODEL",
             "SMART_LIBRARY_EMBEDDING_MODEL",
-            "SMART_LIBRARY_PRIMARY_MODEL",
-            "SMART_LIBRARY_FALLBACK_MODEL",
             "SMART_LIBRARY_SEARCH_DAILY_LIMIT",
             "MISTY_AI_LOW_MODEL",
-            "MISTY_AI_MED_MODEL",
-            "MISTY_AI_HIGH_MODEL",
             "MISTY_AI_MODEL_CATALOG_JSON",
             "MISTY_AGENT_MODEL",
             "MISTY_AI_MAX_TOKENS_PER_DAY",
@@ -126,7 +126,6 @@ pub(super) const FILES: &[FileSpec] = &[
             "MISTY_DEV_ALLOWED_ORIGINS",
             "MISTY_DEV_API_ORIGIN",
             "MISTY_DEV_API_TUNNEL_HOSTNAME",
-            "MISTY_DEV_TUNNEL_HOSTNAME",
             "PARTYKIT_HOST",
         ],
     },
@@ -220,41 +219,6 @@ pub(super) const FILES: &[FileSpec] = &[
             "MISTY_AUTH_SIGNING_KEY_PREVIOUS",
         ],
     },
-];
-
-// Accepted only when reading older environments; retired switches and settings
-// must not block startup or become active configuration again.
-pub(super) const DEPRECATED_NAMES: &[&str] = &[
-    "AI_GATEWAY_EMBEDDING_BASE_URL",
-    "MISTY_LOCAL_WEBSITE_ORIGIN",
-    "MISTY_CLOUDFLARE_TUNNEL_ID",
-    "MISTY_CONNECTED_DEVICES_ENABLED",
-    "MISTY_SDK_PROVIDERS_ENABLED",
-    "WAITLIST_NOTIFY_EMAIL",
-    "MISTY_OPERATOR_USER_ID",
-    "DOCUMENT_KEY_ID",
-    "DOCUMENT_PRIVATE_KEY_B64",
-    "NOTION_CLIENT_ID",
-    "NOTION_CLIENT_SECRET",
-    "NOTION_WEBHOOK_LOG_VERIFICATION_TOKEN",
-    "NOTION_WEBHOOK_VERIFICATION_TOKEN",
-    "SLACK_CLIENT_ID",
-    "SLACK_CLIENT_SECRET",
-    "SLACK_SIGNING_SECRET",
-    "MISTY_DEPLOYMENT_MODE",
-    "MISTY_COLLAB_IMAGE",
-    "MISTY_COLLAB_PUBLIC_URL",
-    "MISTY_COLLAB_INTERNAL_SECRET",
-    // Composio Cloud sessions replaced the calendar-only adapter.
-    "MISTY_COMPOSIO_URL",
-    "MISTY_COMPOSIO_CALENDAR_AUTH_CONFIG",
-    "MISTY_COMPOSIO_CALENDAR_TOOL_VERSION",
-];
-
-pub(super) const DEPRECATED_CLI_NAMES: &[&str] = &[
-    "MISTY_SOURCE_DIR",
-    "MISTY_PROXY_SOURCE_DIR",
-    "MISTY_HUB_SOURCE_DIR",
 ];
 
 pub(super) const PROD_REQUIRED: &[&str] = &[

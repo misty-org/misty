@@ -263,7 +263,7 @@ fn detects_hidden_nodes_rollbacks_and_forged_changes() {
     assert!(state.clone().apply_own(&v, &forged).is_err());
 }
 
-/// Shared with `server/internal/sync/workspace_vectors_test.go`: both encoders
+/// Shared with `server/internal/browsersync/workspace_vectors_test.go`: both encoders
 /// must produce these exact bytes.
 #[test]
 fn signing_bytes_match_the_shared_fixture() {

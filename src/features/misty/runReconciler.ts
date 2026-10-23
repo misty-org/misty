@@ -4,10 +4,11 @@ import { settleRun } from "./settleRun";
 import type { useMistyStore } from "./useMistyStore";
 
 const TERMINAL = ["completed", "failed", "canceled"] as const;
-const CHECK_EVERY_MS = 10_000;
+const CHECK_EVERY_MS = 2_000;
 
 type Terminal = (typeof TERMINAL)[number];
-const isTerminal = (state: string): state is Terminal => (TERMINAL as readonly string[]).includes(state);
+const isTerminal = (state: string): state is Terminal =>
+  (TERMINAL as readonly string[]).includes(state);
 
 /**
  * Events are the fast path, but a missed event, a stop from another surface or

@@ -1,12 +1,7 @@
 import type { SpaceChatStarter } from "./ChatMessages";
 
 /** The opening screen of an empty conversation. */
-export function SpaceChatStarters({
-  onStarter,
-}: {
-  spaceName?: string;
-  onStarter?: (starter: SpaceChatStarter) => void;
-}) {
+export function ChatStarters({ onStarter }: { onStarter?: (starter: SpaceChatStarter) => void }) {
   return (
     <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-center text-sm text-cream-muted">
       {onStarter ? (

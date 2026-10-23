@@ -45,7 +45,7 @@ const hostNoteEditorRuntime: NoteEditorRuntime = {
   renderAiSelection: (adapter, selection) => (
     <NoteAiSelectionMenu adapter={adapter} selection={selection} />
   ),
-  renderError: (error, spaceId, noteId) => (
+  renderError: (error, _spaceId, noteId) => (
     <SystemErrorNotice
       error={error}
       scope={`notes:collaboration:${noteId}`}

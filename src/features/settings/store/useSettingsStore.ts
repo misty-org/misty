@@ -10,10 +10,10 @@ import {
   validPreference,
   projectPreferences,
   type PreferenceValues,
-} from "../profiles/registry";
-import { writeProfilePreference } from "../profiles/bridge";
+} from "../devicePreferences/registry";
+import { writeDevicePreference } from "../devicePreferences/bridge";
 import { configureTabHistoryBudget } from "@/features/webviews/tabHistory";
-import { configurePageRestore } from "@/features/browser-workspace/pageRestoreSettings";
+import { configurePageRestore } from "@/features/browser-sync/pageRestoreSettings";
 import {
   hydrateShortcutsSnapshot,
   settingsApplyLaunchOnLogin,
@@ -120,7 +120,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setActiveSection: (activeSection) => set({ activeSection }),
 
   // In-memory only, so controls and runtime behavior change on the same frame as the edit.
-  previewProfileValues: (values) => {
+  previewPreferenceValues: (values) => {
     const current = get().settings;
     if (!current) return;
     const document = projectPreferences(current.document, values);
@@ -135,7 +135,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 
-  applyProfileValues: async (values, valid = () => true) => {
+  applyPreferenceValues: async (values, valid = () => true) => {
     const apply = async () => {
       if (!valid()) return;
       const current = get().settings;
@@ -176,7 +176,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         set({ error: `Invalid value for ${definition.label}` });
         return;
       }
-      void writeProfilePreference(definition.id, converted, { stage: true }).catch((error) =>
+      void writeDevicePreference(definition.id, converted, { stage: true }).catch((error) =>
         set({ error: errorText(error) }),
       );
       return;
@@ -190,7 +190,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     if (entry) entry[request.slot] = request.value;
     else overrides.push({ commandId: request.commandId, [request.slot]: request.value });
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+      await writeDevicePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
         stage: true,
       });
     } catch (error) {
@@ -208,7 +208,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       else overrides.push({ commandId, [slot]: value });
     }
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+      await writeDevicePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
         stage: true,
       });
     } catch (error) {
@@ -223,7 +223,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         )
       : [];
     try {
-      await writeProfilePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
+      await writeDevicePreference("app.shortcuts.bindings", JSON.stringify(overrides), {
         stage: true,
       });
     } catch (error) {
@@ -295,7 +295,7 @@ function applySettingsSideEffects(
   );
   configureTabArchive(settingsNumber(document, "general", "browser_auto_archive_hours", 0));
   configureHiddenTabSleep(
-    settingsNumber(document, "general", "browser_hidden_tab_sleep_seconds", 60),
+    settingsNumber(document, "general", "browser_hidden_tab_sleep_seconds", 0),
   );
   configureExternalLinks(settingsString(document, "general", "browser_external_links", "tab"));
   configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
@@ -328,8 +328,8 @@ export interface SettingsStore {
   message: string | null;
   setActiveSection: (section: SettingsSection) => void;
   load: () => Promise<void>;
-  previewProfileValues: (values: PreferenceValues) => void;
-  applyProfileValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
+  previewPreferenceValues: (values: PreferenceValues) => void;
+  applyPreferenceValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;
   updateSetting: (section: string, key: string, value: SettingValue) => void;
   updateShortcut: (request: UpdateShortcutRequest) => Promise<void>;
   reassignShortcut: (request: ReassignShortcutRequest) => Promise<void>;

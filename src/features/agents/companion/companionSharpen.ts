@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { PointFrame, PresentedPoint } from "./protocol";
 
 /** A point as the model placed it, before Accessibility or a crop sharpen it. */
-export type ModelPoint = Pick<PresentedPoint, "x" | "y" | "displayId" | "label">;
+type ModelPoint = Pick<PresentedPoint, "x" | "y" | "displayId" | "label">;
 export type SharpenedPoint = ModelPoint & { frame?: PointFrame };
 
 interface SnappedElement {

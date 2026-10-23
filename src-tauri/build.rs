@@ -41,15 +41,14 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentDock.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDefaultBrowser.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDictationInsert.m");
         println!("cargo:rerun-if-changed=native/macos/MistyScreenRecorder.m");
         println!("cargo:rerun-if-changed=native/macos/MistySpaceDock.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyScreenMemory.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
@@ -65,13 +64,12 @@ fn main() {
             .file("native/macos/MistyDesktopControl.m")
             .file("native/macos/MistyAgentPointer.m")
             .file("native/macos/MistyAgentRing.m")
-            .file("native/macos/MistyAgentDock.m")
             .file("native/macos/MistyDesktopCapture.m")
-            .file("native/macos/MistyFolderBookmarks.m")
             .file("native/macos/MistyDefaultBrowser.m")
             .file("native/macos/MistyDictationInsert.m")
             .file("native/macos/MistyScreenRecorder.m")
             .file("native/macos/MistySpaceDock.m")
+            .file("native/macos/MistyScreenMemory.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");
@@ -91,6 +89,7 @@ fn main() {
             "CoreVideo",
             "NaturalLanguage",
             "UserNotifications",
+            "Vision",
         ] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
@@ -136,8 +135,6 @@ fn expose_public_app_configuration() {
         "POSTHOG_PROJECT_TOKEN",
         "POSTHOG_HOST",
         "MISTY_RELEASE_CHANNEL",
-        "MISTY_DEVICE_RELAY_URL",
-        "MISTY_DEVICE_TICKET_PUBLIC_KEYS",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)
@@ -182,7 +179,7 @@ fn build_builtin_workers() {
     let profile = env::var("PROFILE").expect("Cargo profile");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
-    for (service, protocol) in [("document-processing", 5)] {
+    for (service, protocol) in [("document-processing", 6)] {
         let directory = root.join(service);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());

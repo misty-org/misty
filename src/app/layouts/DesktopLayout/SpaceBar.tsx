@@ -238,7 +238,10 @@ export function SpaceBar(props: { gridColumn: number }) {
       <div className="flex h-full flex-col justify-end overflow-hidden">
         <div
           ref={bar}
-          className="mx-[var(--pane-frame,6px)] mt-[var(--pane-frame,6px)] shrink-0 overflow-hidden rounded-lg border border-charcoal-border bg-[var(--workspace-tab-surface)]"
+          className={
+            "mx-[var(--pane-frame,6px)] mt-[var(--pane-frame,6px)] shrink-0 overflow-hidden " +
+            "rounded-lg border border-charcoal-border bg-[var(--workspace-tab-surface)]"
+          }
           style={{ height: barHeight }}
           inert={open ? undefined : true}
           aria-hidden={open ? undefined : true}

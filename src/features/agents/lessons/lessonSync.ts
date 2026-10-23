@@ -1,4 +1,4 @@
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useCollaborationStore } from "../collaboration/store";
 import { companionReply } from "../companion/companionReply";
@@ -94,7 +94,7 @@ async function settleLessonReply(conversationId: string, reply: GlobalAiMessage)
  * Moves the turn that produced `runId` (the person's message and the reply) from one
  * chat to another and shows the other chat. A chat left with nothing in it is removed.
  */
-export function moveTurn(fromId: string, toId: string, runId: string) {
+function moveTurn(fromId: string, toId: string, runId: string) {
   const state = useMistyStore.getState();
   const from = state.conversations.find((c) => c.id === fromId);
   const to = state.conversations.find((c) => c.id === toId);

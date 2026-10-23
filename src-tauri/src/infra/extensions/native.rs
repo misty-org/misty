@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 use serde_json::Value;
+#[cfg(target_os = "macos")]
 use std::ffi::{c_char, c_void, CStr, CString};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 #[cfg(target_os = "macos")]
 extern "C" {

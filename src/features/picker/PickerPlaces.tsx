@@ -1,23 +1,11 @@
 import type { MountedDevice } from "@/native/ipc";
-import { Download, FileText, Folder, HardDrive, Home, Monitor } from "lucide-react";
+import { Download, FileText, HardDrive, Home, Monitor } from "lucide-react";
 import { useMemo } from "react";
 
-import {
-  buildDeviceEntries,
-  dedupePinnedPathsForQuickAccess,
-  joinPath,
-  loadDeviceCustomization,
-  loadHiddenQuickAccessPaths,
-  pathIsInside,
-  pinnedPathLabel,
-  quickAccessPathHidden,
-} from "@/features/file-ui";
-import { cn, Pressable, SkeletonList } from "@/shared/ui";
+import { joinExplorerPath } from "@/shared/lib/pathNormalization";
+import { cn, Pressable } from "@/shared/ui";
 
-/**
- * The picker's locations rail: the explorer sidebar reduced to navigation only — no workspace
- * switcher, collapsible sections, capacity meters, or per-device customization.
- */
+/** The picker's locations rail: Places and mounted devices, for navigation only. */
 
 const quickAccessItems = [
   { label: "Home", icon: Home, suffix: "" },
@@ -27,28 +15,13 @@ const quickAccessItems = [
 ] as const;
 
 export function PickerPlaces(props: PickerPlacesProps) {
-  const hiddenQuickAccessPaths = useMemo(loadHiddenQuickAccessPaths, []);
   const quickAccess = useMemo(
     () =>
-      quickAccessItems
-        .map((item) => ({
-          ...item,
-          path: item.suffix ? joinPath(props.homePath, item.suffix) : props.homePath,
-        }))
-        .filter((item) => !quickAccessPathHidden(item.path, hiddenQuickAccessPaths)),
-    [hiddenQuickAccessPaths, props.homePath],
-  );
-  const pinned = useMemo(
-    () =>
-      dedupePinnedPathsForQuickAccess(
-        props.pinnedPaths,
-        quickAccess.map((item) => item.path),
-      ),
-    [props.pinnedPaths, quickAccess],
-  );
-  const devices = useMemo(
-    () => buildDeviceEntries(props.devices, loadDeviceCustomization()),
-    [props.devices],
+      quickAccessItems.map((item) => ({
+        ...item,
+        path: item.suffix ? joinExplorerPath(props.homePath, item.suffix) : props.homePath,
+      })),
+    [props.homePath],
   );
 
   return (
@@ -63,32 +36,19 @@ export function PickerPlaces(props: PickerPlacesProps) {
             onSelect={() => props.onNavigate(item.path)}
           />
         ))}
-        {pinned.map((path) => (
-          <PlaceRow
-            key={path}
-            active={props.activePath === path}
-            icon={<Folder size={16} />}
-            label={pinnedPathLabel(path)}
-            onSelect={() => props.onNavigate(path)}
-          />
-        ))}
       </PlacesSection>
 
-      {devices.length > 0 || props.devicesLoading ? (
+      {props.devices.length > 0 ? (
         <PlacesSection label="Devices">
-          {devices.length === 0 ? (
-            <SkeletonList label="Devices" rows={2} leading="icon" lines={1} rowClassName="px-2" />
-          ) : (
-            devices.map((device) => (
-              <PlaceRow
-                key={device.id}
-                active={pathIsInside(props.activePath, device.mountPath)}
-                icon={<HardDrive size={16} />}
-                label={device.name}
-                onSelect={() => props.onNavigate(device.mountPath)}
-              />
-            ))
-          )}
+          {props.devices.map((device) => (
+            <PlaceRow
+              key={device.id}
+              active={pathIsInside(props.activePath, device.mountPath)}
+              icon={<HardDrive size={16} />}
+              label={device.name}
+              onSelect={() => props.onNavigate(device.mountPath)}
+            />
+          ))}
         </PlacesSection>
       ) : null}
     </nav>
@@ -127,12 +87,16 @@ function PlaceRow({
   );
 }
 
+function pathIsInside(path: string, root: string): boolean {
+  const normalizedRoot = root.replace(/\/+$/, "") || "/";
+  if (path === normalizedRoot) return true;
+  if (normalizedRoot === "/") return false;
+  return path.startsWith(`${normalizedRoot}/`);
+}
+
 export interface PickerPlacesProps {
   homePath: string;
   activePath: string;
-  mountRoot: string;
   devices: MountedDevice[];
-  devicesLoading: boolean;
-  pinnedPaths: string[];
   onNavigate: (path: string) => void;
 }

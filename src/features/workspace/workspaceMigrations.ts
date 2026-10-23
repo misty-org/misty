@@ -1,11 +1,9 @@
 import { mapLayoutViews } from "./layoutTabs";
-import { windowSpaceScope } from "./spaceWindow";
 import {
   browserViewTitle,
   createBrowserViewState,
   parseBrowserViewState,
   type WorkspaceLayout,
-  type WorkspaceScopeKey,
   type WorkspaceView,
 } from "./model";
 /** Saved views synced from records without a route; restore them at their tool's root. */
@@ -42,12 +40,9 @@ export function collectUnrestoredViews<T>(restore: () => T): {
 
 /** Never throws: one damaged view becomes an empty placeholder in its place
  * instead of stopping the rest of the workspace from restoring. */
-export function migrateRetiredWorkspaceView(
-  view: WorkspaceView,
-  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
-): WorkspaceView {
+export function migrateRetiredWorkspaceView(view: WorkspaceView): WorkspaceView {
   try {
-    return migrateView(view, scopeKey);
+    return migrateView(view);
   } catch (error) {
     const id = typeof view?.id === "string" && view.id ? view.id : crypto.randomUUID();
     const title = typeof view?.title === "string" ? view.title : "";
@@ -67,7 +62,7 @@ export function migrateRetiredWorkspaceView(
     };
   }
 }
-function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): WorkspaceView {
+function migrateView(view: WorkspaceView): WorkspaceView {
   const tab =
     typeof view.route === "string"
       ? view
@@ -114,9 +109,6 @@ function migrateView(view: WorkspaceView, _scopeKey: WorkspaceScopeKey): Workspa
     title: wasBrowser && tab.title ? tab.title : browserViewTitle(state.url),
   };
 }
-export function migrateRetiredWorkspaceViews(
-  layout: WorkspaceLayout,
-  scopeKey: WorkspaceScopeKey = windowSpaceScope(),
-): WorkspaceLayout {
-  return mapLayoutViews(layout, (tab) => migrateRetiredWorkspaceView(tab, scopeKey));
+export function migrateRetiredWorkspaceViews(layout: WorkspaceLayout): WorkspaceLayout {
+  return mapLayoutViews(layout, migrateRetiredWorkspaceView);
 }

@@ -1,11 +1,11 @@
-import { resolveSetting, useSettingsProfiles } from "@/features/settings";
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
+import { resolveSetting, useDevicePreferences } from "@/features/settings";
+import type { GlobalAiConversation, GlobalAiMessage } from "./types";
 
 export { awaitConversationTitle } from "./conversationTitles";
 
 /** Plan mode thinks deeply when the account asks for it. */
 export const planDeepThinking = () => {
-  const profile = useSettingsProfiles.getState().state;
+  const profile = useDevicePreferences.getState().state;
   return Boolean(profile && resolveSetting(profile, "agents.plan_deep_thinking").value);
 };
 

@@ -28,7 +28,7 @@ export function parseHiddenToolbarButtons(raw: string): Set<ToolbarButtonId> {
   }
 }
 
-/** The buttons hidden from the browser toolbar, as an account setting. */
+/** The buttons hidden from the browser toolbar, as a device setting. */
 export function useHiddenToolbarButtons(): Set<ToolbarButtonId> {
   const raw = useSettingsStore((state) =>
     settingsString(state.settings?.document ?? {}, "general", toolbarHiddenKey, "[]"),

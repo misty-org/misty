@@ -3,7 +3,7 @@ import type { CSSProperties, RefObject } from "react";
 import { normalizeCompanionSize } from "./companionSize";
 import type { Presentation } from "./protocol";
 
-export type CursorOverlayMarkupProps = {
+type CursorOverlayMarkupProps = {
   presentation: Presentation;
   marker: RefObject<HTMLDivElement | null>;
   focus: RefObject<HTMLDivElement | null>;

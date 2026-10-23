@@ -29,7 +29,6 @@ const execution = (state: Execution["state"] = "running"): Execution => ({
   accountId: "account-1",
   agentId: "agent-1",
   spaceId: "",
-  mode: "agent",
   state,
   views: ["agent-parent"],
   context: [],

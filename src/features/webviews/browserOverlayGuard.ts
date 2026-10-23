@@ -4,7 +4,7 @@
  * the page for as long as the overlay stays open. This development check names the culprits
  * each time the overlay rises, so a stray fill is caught where it is introduced.
  */
-export function findOpaqueBrowserPageAncestors(root: ParentNode = document): HTMLElement[] {
+function findOpaqueBrowserPageAncestors(root: ParentNode = document): HTMLElement[] {
   const found = new Set<HTMLElement>();
   for (const host of root.querySelectorAll<HTMLElement>("[data-browser-page-host]")) {
     const rect = host.getBoundingClientRect();

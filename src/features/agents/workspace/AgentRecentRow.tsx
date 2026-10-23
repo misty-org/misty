@@ -18,6 +18,8 @@ export function AgentRecentRow({
   active,
   selected,
   selecting,
+  selectedCount,
+  onDeleteSelected,
   disabled,
   onClick,
   onMove,
@@ -30,6 +32,9 @@ export function AgentRecentRow({
   active: boolean;
   selected: boolean;
   selecting: boolean;
+  /** The size of the selection this row belongs to; 0 when it is not selected. */
+  selectedCount: number;
+  onDeleteSelected(): void;
   disabled: boolean;
   onClick(event: MouseEvent): void;
   onMove(direction: -1 | 1): void;
@@ -46,7 +51,12 @@ export function AgentRecentRow({
     label: dragIds.length > 1 ? `${dragIds.length} conversations` : name,
     scope,
   });
-  const actions = useConversationActions({ conversation, disabled });
+  const actions = useConversationActions({
+    conversation,
+    disabled,
+    selectedCount,
+    onDeleteSelected,
+  });
   const keyDown = (event: KeyboardEvent) => {
     if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return;
     const direction = event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;

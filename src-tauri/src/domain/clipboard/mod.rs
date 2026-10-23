@@ -1,6 +1,3 @@
-mod cache;
-#[cfg(test)]
-pub(crate) use cache::ClipboardCache;
 mod service;
 mod types;
 

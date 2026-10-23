@@ -3,7 +3,7 @@ import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { SpacePageLoadingPlaceholder } from "./components/SpacesLoadingPlaceholder";
+import { SpacePageLoadingPlaceholder } from "./components/SpacePageLoadingPlaceholder";
 import { useSpacesStore } from "./store/useSpacesStore";
 
 const Notes = lazy(() =>
@@ -12,29 +12,21 @@ const Notes = lazy(() =>
 const Drawings = lazy(() =>
   import("@/features/journal/drawings/SpaceDrawings").then((m) => ({ default: m.SpaceDrawings })),
 );
-// Configure host services before React renders the built-in tools.
-// Their runtime hooks deliberately fail if an entry point skips this setup.
 async function loadLibrary() {
-  const { initializeHostLibraryRuntime } =
-    await import("@/features/library/library/hostLibraryRuntime");
-  initializeHostLibraryRuntime();
-  const { SpaceLibrary } = await import("@/features/library/library/SpaceLibrary");
+  const { SpaceLibrary } = await import("@/features/library/SpaceLibrary");
   return { default: SpaceLibrary };
 }
 const Library = lazy(loadLibrary);
 async function loadChat() {
-  const { initializeHostSocialRuntime } = await import("./chat/hostSocialRuntime");
-  initializeHostSocialRuntime();
   const { SpaceChatEntry } = await import("./chat/SpaceChatEntry");
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
+const MemoryTree = lazy(() =>
+  import("@/features/memory-tree").then((m) => ({ default: m.MemoryTreePage })),
+);
 const Code = lazy(() => import("./code/SpaceCode").then((m) => ({ default: m.SpaceCode })));
 async function loadHome() {
-  // File previews on the home page use the Library's runtime.
-  const { initializeHostLibraryRuntime } =
-    await import("@/features/library/library/hostLibraryRuntime");
-  initializeHostLibraryRuntime();
   const { SpaceHome } = await import("./home/SpaceHome");
   return { default: SpaceHome };
 }
@@ -60,6 +52,9 @@ export async function preloadSpaceSection(section: string) {
       break;
     case "code":
       await import("./code/SpaceCode");
+      break;
+    case "memory":
+      await import("@/features/memory-tree");
       break;
   }
 }
@@ -166,6 +161,8 @@ export function SpaceSectionView(props: {
           />
         ) : section === "library" ? (
           <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "memory" ? (
+          <MemoryTree spaceId={spaceId} spaceName={space.name} />
         ) : section === "code" ? (
           <Code spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "social" || section === "chat" ? (

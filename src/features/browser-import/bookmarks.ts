@@ -10,7 +10,7 @@ import {
   otherBookmarksId,
   type BookmarkTree,
 } from "@/features/bookmarks/library";
-import type { SharedRecord } from "@/features/browser-workspace/model";
+import type { SharedRecord } from "@/features/browser-sync/model";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { browserImport, type ImportedBookmarkNode, type ImportedBookmarkRoots } from "./native";
 

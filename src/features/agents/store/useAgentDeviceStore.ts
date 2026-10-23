@@ -9,7 +9,7 @@ import { useUserStore } from "@/features/auth/core";
 import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/types";
-import { ManagedAiRequestError } from "./useAiServerStore";
+import { ManagedAiRequestError } from "@/api/ai/managed";
 import { isSpaceWindowLabel } from "@/features/workspace/spaceWindow";
 
 // One device identity (docs/design/devices/BRIEF.md). The device key lives in
@@ -82,11 +82,6 @@ export async function ensureServerAgentDevice(
   if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
   lastHeartbeatByServerId.set(view.serverDeviceId, Date.now());
   return { id: view.serverDeviceId, name: local.displayName };
-}
-
-/** Records liveness the server confirmed another way (the device channel). */
-export function noteServerAgentDeviceSeen(deviceId: string): void {
-  lastHeartbeatByServerId.set(deviceId, Date.now());
 }
 
 export function serverAgentDeviceSeenWithin(deviceId: string, ms: number): boolean {
@@ -185,7 +180,7 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export interface ServerTrustedDevice {
+interface ServerTrustedDevice {
   id: string;
   name: string;
   publicKey?: string;

@@ -19,6 +19,8 @@ const LAYOUT_JSON: &str = include_str!("../../misty-home-layout.json");
 struct Layout {
     layout_version: u32,
     directories: Vec<String>,
+    /// Owner-only files; Windows keeps the whole home private instead.
+    #[cfg(unix)]
     private_files: Vec<String>,
     retired: Vec<String>,
 }
@@ -128,6 +130,8 @@ fn retire(
 
 /// Where retired paths go, so the person can still recover them.
 enum Trash {
+    // Windows retires to the Recycle Bin; its tests still use a folder.
+    #[cfg_attr(all(windows, not(test)), allow(dead_code))]
     Folder(PathBuf),
     #[cfg(windows)]
     RecycleBin,

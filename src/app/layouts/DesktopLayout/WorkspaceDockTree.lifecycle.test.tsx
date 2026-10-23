@@ -1,8 +1,4 @@
-import {
-  createDockLeaf,
-  insertDockSplit,
-  type WorkspaceView,
-} from "@/features/workspace";
+import { createDockLeaf, insertDockSplit, type WorkspaceView } from "@/features/workspace";
 import { act, cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,12 +71,7 @@ describe("WorkspaceDockTree tab lifecycle", () => {
 
     const nextPane = { ...pane, views: [planner, journal], activeViewId: planner.id };
     act(() => {
-      view.rerender(
-        <WorkspaceDockTree
-          {...props}
-          node={nextPane}
-        />,
-      );
+      view.rerender(<WorkspaceDockTree {...props} node={nextPane} />);
     });
 
     expect(view.container.querySelectorAll("[data-workspace-surface]")).toHaveLength(2);

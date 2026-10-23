@@ -7,6 +7,7 @@ import {
   toolbarIconProps,
   TooltipHint,
 } from "@/shared/ui";
+import { preloadSettingsWorkspace } from "@/features/settings";
 import { ProfileNavButton } from "./NavRail";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -54,6 +55,8 @@ export function AccountIsland(props: {
       <IconButton
         label="Settings"
         aria-pressed={props.settingsOpen}
+        onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
+        onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}
         onClick={props.onSettingsClick}
       >
         {/* A round glyph: the sidebar draws it a size down so it reads like the line icons. */}

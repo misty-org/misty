@@ -1,6 +1,6 @@
 import type { AgentProfile } from "@/shared/schemas";
 
-export interface AgentHomeGroup {
+interface AgentHomeGroup {
   id: string;
   name: string;
   agents: AgentProfile[];

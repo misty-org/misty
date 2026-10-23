@@ -54,29 +54,31 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
             {/* The agent browser shrunk to a picture; clicking it opens the split again. */}
             <AgentBrowserPip
               conversationId={activeConversationId ?? undefined}
-              onExpand={() => activeConversationId && setBrowserExpanded(activeConversationId, true)}
+              onExpand={() =>
+                activeConversationId && setBrowserExpanded(activeConversationId, true)
+              }
             />
-              <AgentWorkspaceConversation
-                key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
-                agent={profile}
-                spaceId={conversationSpaceId}
-                accountId={user?.id ?? ""}
-                showControlBar
-                initialDraft={
-                  !activeConversationId && draftSeed.agentId === profile?.id ? draftSeed.text : ""
-                }
-                voiceControlRef={voiceRef}
-                onVoiceStateChange={setVoiceState}
-                onDraftStateChange={guard.setConversationStatus}
-                emptyContent={
-                  profile ? (
-                    <div className="agent-studio-welcome">
-                      <h1>What can I do for you?</h1>
-                    </div>
-                  ) : undefined
-                }
-                onCreate={create}
-              />
+            <AgentWorkspaceConversation
+              key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
+              agent={profile}
+              spaceId={conversationSpaceId}
+              accountId={user?.id ?? ""}
+              showControlBar
+              initialDraft={
+                !activeConversationId && draftSeed.agentId === profile?.id ? draftSeed.text : ""
+              }
+              voiceControlRef={voiceRef}
+              onVoiceStateChange={setVoiceState}
+              onDraftStateChange={guard.setConversationStatus}
+              emptyContent={
+                profile ? (
+                  <div className="agent-studio-welcome">
+                    <h1>What can I do for you?</h1>
+                  </div>
+                ) : undefined
+              }
+              onCreate={create}
+            />
           </div>
           {/* The agent's own browser beside the chat (docs/design/agent-browser/BRIEF.md). */}
           <AgentBrowser

@@ -1,4 +1,4 @@
-import { ManagedAiRequestError } from "@/features/agents/devices";
+import { ManagedAiRequestError } from "@/api/ai/managed";
 import type { ChannelSnapshot, DevicePolicy } from "@/native/devices";
 
 /** One of the account's devices, as the server lists it. Addresses are never

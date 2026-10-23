@@ -1,5 +1,5 @@
-//! Cross-origin frames for the agent page layer (docs/plans/agentic-architecture-review.md,
-//! K1). Embedded widgets such as class schedules, booking calendars and forms often live
+//! Cross-origin frames for the agent page layer (docs/plans/agent-harness.md,
+//! Page layer). Embedded widgets such as class schedules, booking calendars and forms often live
 //! in a frame from another origin, which the page layer's script in the top document can
 //! neither read nor reach. Every frame of a tab announces itself from a private content
 //! world, so pages cannot forge or see it, and Misty keeps each cross-origin frame's
@@ -226,8 +226,7 @@ mod macos {
 pub(crate) use macos::{forget, info};
 
 #[cfg(windows)]
-#[path = "browser_frames_windows.rs"]
-mod cdp_frames;
+use super::browser_frames_windows as cdp_frames;
 #[cfg(windows)]
 pub(crate) use cdp_frames::{forget, target};
 

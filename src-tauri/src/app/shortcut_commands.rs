@@ -1,15 +1,15 @@
 use tauri::{AppHandle, Emitter, State};
 
 use crate::app::runtime::MistyRuntime;
-use crate::error::{ApiError, ApiResult};
-use crate::infra::commands::{ShortcutOverride, ShortcutsSnapshot};
+use crate::error::ApiResult;
+use crate::infra::shortcuts::{ShortcutOverride, ShortcutsSnapshot};
 
 #[tauri::command]
 pub async fn shortcuts_snapshot(
     state: State<'_, MistyRuntime>,
     app: AppHandle,
 ) -> ApiResult<ShortcutsSnapshot> {
-    let snapshot = state.commands.snapshot().await?;
+    let snapshot = state.shortcuts.snapshot().await?;
     refresh_native_menu(&app, &snapshot)?;
     Ok(snapshot)
 }
@@ -22,8 +22,11 @@ fn publish(app: AppHandle, snapshot: ShortcutsSnapshot) -> ApiResult<ShortcutsSn
 
 fn refresh_native_menu(app: &AppHandle, snapshot: &ShortcutsSnapshot) -> ApiResult<()> {
     #[cfg(target_os = "macos")]
-    crate::infra::app_menu::refresh(&app, &snapshot)
-        .map_err(|err| ApiError::Message(format!("Failed to refresh app menu: {err}")))?;
+    crate::infra::app_menu::refresh(app, snapshot).map_err(|err| {
+        crate::error::ApiError::Message(format!("Failed to refresh app menu: {err}"))
+    })?;
+    #[cfg(not(target_os = "macos"))]
+    let _ = (app, snapshot);
     Ok(())
 }
 
@@ -33,5 +36,5 @@ pub async fn shortcuts_replace(
     state: State<'_, MistyRuntime>,
     app: AppHandle,
 ) -> ApiResult<ShortcutsSnapshot> {
-    publish(app, state.commands.replace(overrides).await?)
+    publish(app, state.shortcuts.replace(overrides).await?)
 }

@@ -1,11 +1,10 @@
 import { Navigate } from "react-router-dom";
+import { Button } from "@/shared/ui";
 import type { BrowserInternalPage as InternalPage } from "@/features/workspace";
 import { BookmarksPage } from "./BookmarksPage";
-import { BrowserSettingsPage } from "./BrowserSettingsPage";
 import { DownloadsPage } from "./DownloadsPage";
-import { ExtensionsPage } from "./ExtensionsPage";
 import { HistoryPage } from "./HistoryPage";
-import { PasswordsPage } from "./PasswordsPage";
+import { SettingsRedirectPage } from "./SettingsRedirectPage";
 import type { BrowserInternalPageProps } from "./types";
 
 /** Draws a misty:// page in place of the tab's native web page. */
@@ -19,13 +18,22 @@ export function BrowserInternalPage(props: BrowserInternalPageProps & { page: In
     case "downloads":
       return <DownloadsPage {...pageProps} />;
     case "passwords":
-      return <PasswordsPage />;
+      return <SettingsRedirectPage page="passwords" />;
     case "bookmarks":
       return <BookmarksPage {...pageProps} />;
     case "extensions":
-      return <ExtensionsPage />;
+      return <SettingsRedirectPage page="extensions" />;
     case "settings":
-      return <BrowserSettingsPage {...pageProps} />;
+      return (
+        <SettingsRedirectPage
+          page="settings"
+          actions={
+            <Button variant="outline" onClick={pageProps.clearBrowsingData}>
+              Clear browsing data…
+            </Button>
+          }
+        />
+      );
   }
 }
 

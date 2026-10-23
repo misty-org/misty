@@ -4,10 +4,9 @@ import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { paneViewLabel } from "@/features/workspace/layoutTabs";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
-vi.mock("./WorkspaceDockTree", () => ({
+vi.mock("./dockSplitFit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
-vi.mock("./WorkspaceWindowMenu", () => ({ WorkspaceWindowMenu: () => null }));
 beforeEach(() => {
   useWorkspaceStore.getState().reset();
   vi.stubGlobal("CSS", { escape: (value: string) => value });

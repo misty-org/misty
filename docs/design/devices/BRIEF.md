@@ -1,6 +1,6 @@
 # Devices — approved direction
 
-Approved direction (October 5, 2026; amended October 12, 2026: devices no longer connect to each other directly, see [docs/plans/drop-lan-clipboard-on-sync.md](../../plans/drop-lan-clipboard-on-sync.md)). The implementation plan is [docs/plans/devices-unification.md](../../plans/devices-unification.md). This brief extends the sync vocabulary in [docs/design/sync/BRIEF.md](../sync/BRIEF.md): account → vault → devices.
+Approved direction (October 5, 2026; amended October 12, 2026: devices no longer connect to each other directly, and the LAN data plane, iroh and device-list gossip were removed). Built. This brief extends the sync vocabulary in [docs/design/sync/BRIEF.md](../sync/BRIEF.md): account → vault → devices.
 
 ## Goal
 
@@ -65,7 +65,7 @@ What Misty does not claim: hardware attestation that the machine is uncompromise
   - **Agents:** which surfaces may be used (shared folders, Misty browser, terminal)
 - The device enforces its own local copy. The server stores and forwards the record for display, but cannot change it.
 - A device's permissions can be changed only on that device. Other devices show them read-only, with "Change this on <device name>".
-- These are account records about a device, not device-only overrides of account settings, so they fit the server-account settings model.
+- These are account records about a device, not settings. Settings stay on the device.
 
 ### Cross-device agent work
 
@@ -81,6 +81,10 @@ When you asked from device A for work on device B:
 - **What the server can't do.** The runtime can request less than the grant, never more, and the server cannot forge a grant.
 - **High-risk capabilities** (terminal, deletes, git push, writes outside shared folders) are off by default in every device's policy.
 - **Moving files.** "Send F" saves the file from B's shared folder to the conversation's Space Library, where every device can open it.
+
+### Keep awake for agents
+
+Computers stay awake for agents. A setting, on by default (Settings › Agents › Screens): while an agent is working on a computer, Misty keeps it from idling to sleep. The display may still turn off, and closing a laptop lid still sleeps it. Each kind of agent work holds a reason, and the computer is held while any reason remains; it is released as soon as the work ends. Keep-awake applies only while an agent is working there, so it doesn't drain a laptop, and the setting turns it off.
 
 ## Device management
 

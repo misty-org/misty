@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { JSDOM } from 'jsdom';
 
-const source = (name) => readFileSync(new URL(`../../src-tauri/src/infra/browser_inspection_${name}.js`, import.meta.url), 'utf8');
+const source = (name) => readFileSync(new URL(`../../src-tauri/src/infra/browser/scripts/inspection_${name}.js`, import.meta.url), 'utf8');
 function page(html) {
   const dom = new JSDOM(html, { url: 'https://example.com', runScripts: 'outside-only' });
   return {
@@ -89,7 +89,7 @@ test('draft preparation retains text without submitting and rejects replaced/pas
 });
 
 test('provider GET requests reject origin escapes and bound output without returning response headers', async () => {
-  const body = readFileSync(new URL('../../src-tauri/src/infra/browser_provider_request.js', import.meta.url), 'utf8');
+  const body = readFileSync(new URL('../../src-tauri/src/infra/browser/scripts/provider_request.js', import.meta.url), 'utf8');
   const run = new (Object.getPrototypeOf(async function(){}).constructor)('origin', 'path', 'location', 'fetch', body);
   const location = { origin: 'https://www.instagram.com', href: 'https://www.instagram.com/direct/inbox/' };
   let options;

@@ -6,7 +6,6 @@ export * from "./MistyBrandIcon";
 export * from "./model";
 export * from "./paneNavigation";
 export * from "./routeSurface";
-export * from "./workspaceTools";
 export * from "./useWorkspaceStore";
 export * from "./useWorkspaceViewTitle";
 export * from "./WorkspaceAppIcon";

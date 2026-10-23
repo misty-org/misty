@@ -44,7 +44,6 @@ async function handleContextRequest(request: Omit<Request, "id">): Promise<unkno
       store.getState,
       request.accountId,
       registration.paneId,
-      registration.adapter,
       request.event,
     );
   if (request.decision) {

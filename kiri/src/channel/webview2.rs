@@ -20,7 +20,9 @@ fn installed() -> &'static Mutex<HashSet<usize>> {
 }
 
 // Frees native strings even when the call fails after allocating them.
-unsafe fn take_string(read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>) -> Option<String> {
+unsafe fn take_string(
+    read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
+) -> Option<String> {
     let mut pointer = PWSTR::null();
     let status = read(&mut pointer);
     let value = if status.is_ok() && !pointer.is_null() {
@@ -54,7 +56,10 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
                 };
                 let text = take_string(|pointer| args.TryGetWebMessageAsString(pointer));
                 // Only top-level documents reach this event.
-                if let Some(body) = text.as_deref().and_then(|text| text.strip_prefix(WIRE_PREFIX)) {
+                if let Some(body) = text
+                    .as_deref()
+                    .and_then(|text| text.strip_prefix(WIRE_PREFIX))
+                {
                     deliver(&label, true, body);
                 }
                 Ok(())

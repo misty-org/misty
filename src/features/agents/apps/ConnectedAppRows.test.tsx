@@ -15,7 +15,10 @@ const gmail = (id: string, account: string): ConnectedApp => ({
 });
 
 it("shows each account of the app without per-Space choices", () => {
-  const [group] = groupApps([gmail("ca_work", "me@work.example"), gmail("ca_home", "me@home.example")]);
+  const [group] = groupApps([
+    gmail("ca_work", "me@work.example"),
+    gmail("ca_home", "me@home.example"),
+  ]);
   render(
     <AppAccountsCard
       group={group}

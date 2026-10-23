@@ -18,7 +18,7 @@ const states: Record<string, { state: StatusState; verb: string }> = {
 };
 
 /** Run step names are internal ("model:1", "mcp:catalog"); say them plainly. */
-export function stepLabel(name: string) {
+function stepLabel(name: string) {
   const [kind, detail = ""] = name.split(":");
   if (kind === "model") return detail && detail !== "1" ? `Thinking (step ${detail})` : "Thinking";
   if (kind === "mcp" && detail === "catalog") return "Looking up available tools";
@@ -65,7 +65,11 @@ export function AgentTranscriptCard({ requestId }: { requestId: string }) {
   return (
     <aside
       aria-label="Transcript"
-      className="absolute bottom-20 right-3 top-14 z-20 flex w-[min(380px,calc(100%-24px))] flex-col overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card"
+      className={
+        "absolute bottom-20 right-3 top-14 z-20 flex w-[min(380px,calc(100%-24px))] " +
+        "flex-col overflow-hidden rounded-xl border border-charcoal-border " +
+        "bg-charcoal-card"
+      }
     >
       <header className="flex items-center gap-2 border-b border-charcoal-border px-3 py-2">
         <h2 className="m-0 min-w-0 flex-1 text-sm font-medium text-cream-bright">Transcript</h2>

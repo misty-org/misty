@@ -1,14 +1,14 @@
 import { Button, cn } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { useSettingsProfiles } from "../profiles/store";
+import { useDevicePreferences } from "../devicePreferences/store";
 
 /**
  * Appears at the bottom right while settings have unsaved changes. Trying to leave with
  * changes pending makes it nudge and say so, rather than closing.
  */
 export function SettingsSaveBar() {
-  const dirty = useSettingsProfiles((s) => s.dirty);
-  const attention = useSettingsProfiles((s) => s.attention);
+  const dirty = useDevicePreferences((s) => s.dirty);
+  const attention = useDevicePreferences((s) => s.attention);
   const [saving, setSaving] = useState(false);
   const [nudge, setNudge] = useState(0);
   useEffect(() => {
@@ -41,7 +41,7 @@ export function SettingsSaveBar() {
           variant="ghost"
           disabled={saving}
           onClick={() =>
-            void useSettingsProfiles
+            void useDevicePreferences
               .getState()
               .discardStaged()
               .catch(() => {})
@@ -54,7 +54,7 @@ export function SettingsSaveBar() {
           disabled={saving}
           onClick={() => {
             setSaving(true);
-            void useSettingsProfiles
+            void useDevicePreferences
               .getState()
               .saveStaged()
               .catch(() => {})

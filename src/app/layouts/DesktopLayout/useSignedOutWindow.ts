@@ -4,7 +4,7 @@ import { getAllWindows, getCurrentWindow, type Window } from "@tauri-apps/api/wi
 import { useEffect } from "react";
 
 /** Signed-out pages sit in one small window that holds Welcome, Sign in and Create account. */
-export const SIGNED_OUT_WINDOW_SIZE = { width: 760, height: 640 };
+const SIGNED_OUT_WINDOW_SIZE = { width: 760, height: 640 };
 
 let locked = false;
 

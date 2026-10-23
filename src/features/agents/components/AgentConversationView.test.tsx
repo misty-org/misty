@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
 import { AgentConversationView } from "./AgentConversationView";
 
 afterEach(cleanup);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, Circle, CircleCheck } from "lucide-react";
 import { Pressable } from "@/shared/ui";
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { onboardingApi, type OnboardingStep } from "@/api/assistant/onboarding";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { browserHomeUrl } from "@/features/workspace/browserHome";

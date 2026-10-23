@@ -16,8 +16,6 @@ function deps(overrides: Partial<OmniboxDeps> = {}): OmniboxDeps {
     historySuggestions: async () => [],
     recentVisits: async () => [],
     bookmarks: () => [],
-    mistyContent: () => [],
-    places: () => [],
     clipboardUrl: async () => null,
     openTabs: () => [],
     ...overrides,
@@ -235,20 +233,7 @@ describe("search suggestions", () => {
   });
 });
 
-describe("Misty content and copied links", () => {
-  it("never includes internal misty content in suggestions", async () => {
-    const matches = await suggest(
-      "trip",
-      deps({
-        mistyContent: () => [
-          { id: "note:1", title: "Trip plan", detail: "note", route: "/spaces/s1/journal" },
-        ],
-      }),
-    );
-    expect(matches.some((match) => match.kind === "content")).toBe(false);
-    expect(matches.some((match) => match.target.type === "open-in-app")).toBe(false);
-  });
-
+describe("copied links", () => {
   it("offers a copied web link before typing, but not in private tabs", async () => {
     const withClipboard = deps({ clipboardUrl: async () => "https://copied.example/page" });
     const matches = await suggest("", withClipboard);
@@ -262,33 +247,5 @@ describe("Misty content and copied links", () => {
   it("ignores clipboard text that is not a web address", async () => {
     const matches = await suggest("", deps({ clipboardUrl: async () => "just some words" }));
     expect(matches.some((match) => match.title === "Link you copied")).toBe(false);
-  });
-});
-
-describe("places", () => {
-  const places = deps({
-    places: () => [
-      { id: "s1", title: "Launch team", detail: "Space", route: "/spaces/s1/chat" },
-      { id: "s1:notes", title: "Launch team · Notes", detail: "Space", route: "/spaces/s1/notes" },
-      { id: "agent:a1", title: "Researcher", detail: "Agent", route: "/agents?agent=a1" },
-    ],
-  });
-
-  it("searches plain text for place names instead of navigating internally", async () => {
-    const [first] = await suggest("launch team", places);
-    expect(first.kind).toBe("search");
-    expect(first.allowedToBeDefault).toBe(true);
-    expect(first.target).toEqual({
-      type: "navigate",
-      url: "https://www.google.com/search?q=launch%20team",
-    });
-  });
-
-  it("does not list internal sections or agents", async () => {
-    const matches = await suggest("notes", places);
-    expect(matches.some((match) => match.title === "Launch team · Notes")).toBe(false);
-    expect((await suggest("resea", places)).some((match) => match.title === "Researcher")).toBe(
-      false,
-    );
   });
 });

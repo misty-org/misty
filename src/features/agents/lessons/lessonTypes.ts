@@ -3,7 +3,7 @@
  * one Teach-mode conversation's progress, kept on this device beside its chat. Its id
  * is the conversation's id.
  */
-export type LessonObjectiveStatus = "pending" | "in_progress" | "done" | "skipped";
+type LessonObjectiveStatus = "pending" | "in_progress" | "done" | "skipped";
 
 export interface LessonObjective {
   id: string;
@@ -13,7 +13,7 @@ export interface LessonObjective {
   status: LessonObjectiveStatus;
 }
 
-export type LessonStatus = "active" | "paused" | "finished";
+type LessonStatus = "active" | "paused" | "finished";
 
 export interface Lesson {
   id: string;

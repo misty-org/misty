@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Laptop, Monitor, MonitorSmartphone } from "lucide-react";
-import { SyncModeControl, useSyncModeLabel } from "@/features/browser-workspace/SyncModeControl";
+import { SyncModeControl, useSyncModeLabel } from "@/features/browser-sync/SyncModeControl";
 import {
   deviceStatusLabel,
   useConnectedDevices,
@@ -8,10 +8,7 @@ import {
 } from "@/features/connected-devices";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button } from "@/shared/ui";
-import {
-  DesktopSettingsRow as Row,
-  DesktopSettingsSection as Section,
-} from "../../components/DesktopSettingsUI";
+import { DesktopSettingsRow as Row } from "../../components/DesktopSettingsUI";
 import { SwitchControl, TextControl } from "../../SettingsControls";
 
 const readdNote =
@@ -54,7 +51,7 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
     setBusy(true);
     setError("");
     void action()
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
+      .catch(() => setError("The device could not be updated. Try again."))
       .finally(() => setBusy(false));
   };
   const setPolicy = (change: { clipboard: boolean }) => {
@@ -76,14 +73,15 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
     : "Not added yet";
 
   return (
-    <Section title={peer.name}>
+    <div className="py-2">
+      <h3 className="pt-5 text-[15px] font-semibold leading-6 text-cream-bright">{peer.name}</h3>
       <Row label="Status" description={`${added} · Last seen ${lastSeen(peer)}`}>
         <span className="flex items-center gap-2 text-sm text-cream">
           <PlatformIcon platform={peer.platform} />
           {deviceStatusLabel(peer.status)}
         </span>
       </Row>
-      <Row label="Name">
+      <Row label="Name" description="Shown for this device across Misty.">
         <TextControl
           value={peer.name}
           disabled={busy || (!devices.view?.admitted && !peer.isSelf)}
@@ -139,10 +137,10 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
         </Button>
       </Row>
       {error ? (
-        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
+        <p role="alert" className="py-2 text-sm text-cream-muted">
           {error}
         </p>
       ) : null}
-    </Section>
+    </div>
   );
 }

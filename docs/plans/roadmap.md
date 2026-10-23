@@ -1,10 +1,9 @@
 # Misty roadmap
 
 The one place for where Misty is going and what's being built. Decided
-2026-10-11. Reference data lives in two linked docs:
-[pricing-v2.md](pricing-v2.md) (plans and meters) and
-[ai-browser-comparison.md](ai-browser-comparison.md) (competitor facts and parity
-IDs C1–C15). Everything else here supersedes earlier direction notes.
+2026-10-11. Pricing (plans and meters) lives in the billing repo
+(`misty-billing`, `docs/pricing-v2.md`). Competitor facts and parity IDs C1–C15
+are in [ai-browser-comparison.md](ai-browser-comparison.md). Everything else here supersedes earlier direction notes.
 
 ## Where Misty stands
 Claude, Codex, Meta Muse, OpenAI Dots and xAI Grok Bot all automate work, so
@@ -25,7 +24,7 @@ major model built in.
 
 ## Decisions
 - **Consumer only.** No team plans, no enterprise (SOC 2, SSO, SCIM, MDM).
-- **Pricing as in pricing-v2:** Basic free, Pro $12, Max $20, Ultra $100,
+- **Pricing as in pricing-v2 (billing repo):** Basic free, Pro $12, Max $20, Ultra $100,
   Ultra+ $200. No top-ups.
 - **No bring-your-own-AI.** Every model runs on Misty's keys through the
   runtime's AI SDK.
@@ -235,8 +234,8 @@ Phases, each behind a flag:
 4. Memory: the recorder and its privacy rules, `memory_events`, the retrieval
    kinds, `recall.*` and `recall.read`, the Journal day, and the backlog.
 5. Capture sessions (screen recording).
-6. Cursor agent upgrades, and Windows parity rows in
-   [windows-parity-ledger.md](windows-parity-ledger.md).
+6. Cursor agent upgrades, and the Windows checks in
+   [windows-limits.md](windows-limits.md).
 
 ---
 

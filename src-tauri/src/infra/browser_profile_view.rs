@@ -1,7 +1,7 @@
 //! A hidden, off-screen page in one website profile. Native code uses it to
 //! reach a profile's engine store (cookies, cached data) when no tab of that
 //! profile is open.
-use tauri::{Manager, Webview};
+use tauri::Webview;
 
 /// Opens a hidden `about:blank` page in `profile` (the default profile when
 /// `None`). The caller closes it; [`ProfileView`] does so on drop.
@@ -36,15 +36,18 @@ pub(crate) fn open_hidden_profile_view(
     Ok(view)
 }
 
-/// A hidden profile page that closes when dropped.
+/// A hidden profile page that closes when dropped (Windows reaches profile data through one).
+#[cfg(windows)]
 pub(crate) struct ProfileView(Webview);
 
+#[cfg(windows)]
 impl ProfileView {
     pub(crate) fn open(app: &tauri::AppHandle, profile: Option<&str>) -> Result<Self, String> {
         open_hidden_profile_view(app, profile).map(Self)
     }
 }
 
+#[cfg(windows)]
 impl std::ops::Deref for ProfileView {
     type Target = Webview;
 
@@ -53,6 +56,7 @@ impl std::ops::Deref for ProfileView {
     }
 }
 
+#[cfg(windows)]
 impl Drop for ProfileView {
     fn drop(&mut self) {
         let _ = self.0.close();

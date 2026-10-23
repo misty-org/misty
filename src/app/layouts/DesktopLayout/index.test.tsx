@@ -26,10 +26,7 @@ vi.mock("@/features/workspace", () => ({
     }),
   workspaceSurfaceFromRoute: () => null,
   findDockLeaf: () => null,
-}));
-
-vi.mock("./GlobalNavigator", () => ({
-  GlobalNavigator: () => <div data-testid="global-navigator">Global Navigator</div>,
+  MistyBrandIcon: () => <span />,
 }));
 
 vi.mock("./AccountIsland", () => ({ AccountIsland: () => null, AccountTab: () => null }));
@@ -81,7 +78,6 @@ vi.mock("./useDesktopFrameStyle", () => ({
 }));
 
 vi.mock("@/features/shortcuts", () => ({
-  useShortcutTitle: (label: string) => label,
   useShortcutHandler: vi.fn(),
   registerShortcutHandler: vi.fn(() => () => undefined),
 }));
@@ -111,15 +107,12 @@ vi.mock("@/features/setup", () => ({
 vi.mock("./ProfileMenu", () => ({ ProfileMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
-vi.mock("@/features/global-search", () => ({
-  GlobalMisty: () => null,
-}));
 vi.mock("@/features/browser/workspace", () => ({
   BrowserRuntimeBridge: () => null,
   setBrowserWebviewsSuspended: vi.fn(),
 }));
 vi.mock("@/features/webviews/BrowserRuntimeBridge", () => ({ BrowserRuntimeBridge: () => null }));
-vi.mock("@/features/browser-workspace/BrowserSearchDialog", () => ({
+vi.mock("@/features/browser-sync/BrowserSearchDialog", () => ({
   BrowserSearchDialog: () => null,
 }));
 vi.mock("@/features/webviews/browserRuntime", () => ({
@@ -129,10 +122,9 @@ vi.mock("@/features/webviews/browserRuntime", () => ({
   onBrowserRuntimeClose: vi.fn(() => () => {}),
   windowChromeChangedEvent: "misty:window-chrome-changed",
 }));
-vi.mock("@/features/global-search/BrowserContextMenuBridge", () => ({
+vi.mock("@/features/misty/BrowserContextMenuBridge", () => ({
   BrowserContextMenuBridge: () => null,
 }));
-vi.mock("@/features/files/workspace/explorer", () => ({ MediaSearchViewer: () => null }));
 vi.mock("@/features/agents/workflows/WorkflowSchedulesBridge", () => ({
   WorkflowSchedulesBridge: () => null,
 }));
@@ -211,7 +203,8 @@ describe("DesktopLayout on Auth Routes", () => {
     });
     expect(container.textContent).toContain("Signing in…");
     await act(async () => rejectResume(error));
-    expect(container.textContent).toContain(message);
+    // Errors show as a notification, which renders in the page-level viewport.
+    expect(document.body.textContent).toContain(message);
     if (error instanceof SavedAccountSessionUnavailableError) {
       expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(
         "test@example.test",
@@ -281,7 +274,6 @@ describe("DesktopLayout on Auth Routes", () => {
     );
     const frame = container.querySelector<HTMLElement>("[data-misty-desktop-frame]")!;
     expect(frame.style.gridTemplateColumns).toBe("0px minmax(0, 1fr) 0px");
-    expect(container.querySelector(".misty-docking-nav")).toBeNull();
   });
 
   it("suppresses the sidebar navigator and renders Outlet directly on /signin", async () => {
@@ -298,8 +290,6 @@ describe("DesktopLayout on Auth Routes", () => {
     });
 
     expect(container.querySelector('[data-testid="auth-outlet"]')).not.toBeNull();
-    // Sidebar navigator must be suppressed completely
-    expect(container.querySelector('[data-testid="global-navigator"]')).toBeNull();
     // Workspace canvas must be suppressed
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBeNull();
     // No history back/forward buttons
@@ -324,7 +314,6 @@ describe("DesktopLayout on Auth Routes", () => {
     });
 
     expect(container.querySelector('[data-testid="auth-outlet"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="global-navigator"]')).toBeNull();
     expect(container.querySelector('[data-testid="workspace-canvas"]')).toBeNull();
   });
 });

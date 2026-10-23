@@ -9,8 +9,8 @@ use tauri::State;
 use crate::app::device_commands::{context, require_device_window};
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    device_admission as admission, device_identity::canonical_request,
-    device_records::SignedRecord, device_trust,
+    devices::admission, devices::identity::canonical_request, devices::records::SignedRecord,
+    devices::trust,
 };
 
 /// The largest file a `folder.send` job hands to the Space's Library, the
@@ -111,7 +111,7 @@ pub async fn device_verify_job(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    device_trust::verify_job_grant(&grant, &scope_id, &operation)
+    trust::verify_job_grant(&grant, &scope_id, &operation)
         .map(|_| ())
         .map_err(|_| "device_grant_invalid".to_owned())
 }
@@ -130,7 +130,7 @@ pub async fn device_read_shared_file(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    device_trust::verify_job_grant(&grant, &scope_id, "folder.send")
+    trust::verify_job_grant(&grant, &scope_id, "folder.send")
         .map_err(|_| "device_grant_invalid".to_owned())?;
     if input["scopeId"].as_str() != Some(scope_id.as_str()) {
         return Err("invalid_scope".into());

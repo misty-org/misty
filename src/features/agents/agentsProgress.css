@@ -1,0 +1,197 @@
+/* Interim replies fold into one quiet disclosure above the turn's answer. */
+/* Progress: what Misty said while working, and each run of tools as one quiet
+   line that opens to a table of its steps (docs/design/agent-chat).
+   State is shown with motion, a word and an icon; color only for waiting and failed. */
+.agent-progress {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.agent-progress-timeline {
+  display: grid;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+.agent-progress-note {
+  width: 100%;
+  color: var(--color-cream);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.agent-progress-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 0;
+  color: var(--color-cream-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+}
+.agent-progress-toggle:hover {
+  color: var(--color-cream);
+}
+.agent-progress-toggle > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A gray highlight sweeps across whatever is running right now. */
+.agent-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-cream-muted) 40%,
+    var(--color-cream-bright) 50%,
+    var(--color-cream-muted) 60%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: agent-progress-sweep 2s linear infinite;
+}
+@keyframes agent-progress-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+.agent-progress-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 200ms ease;
+}
+[data-open] > .agent-progress-toggle .agent-progress-chevron,
+[data-open] > .agent-progress-row .agent-progress-chevron {
+  transform: translate(0, -2px) rotate(45deg);
+}
+.agent-progress-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 220ms ease;
+}
+.agent-progress-fold[data-open] {
+  grid-template-rows: 1fr;
+}
+.agent-progress-fold > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.agent-progress-table {
+  margin: 6px 0 2px;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+}
+.agent-progress-step + .agent-progress-step {
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  color: var(--color-cream-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+button.agent-progress-row:hover {
+  background: var(--color-charcoal-hover);
+  color: var(--color-cream);
+}
+.agent-progress-verb {
+  flex: none;
+}
+.agent-progress-step[data-state="failed"] .agent-progress-verb {
+  text-decoration: line-through;
+}
+.agent-progress-target {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-cream);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-progress-meta {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--color-cream-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.agent-progress-target + .agent-progress-chevron,
+.agent-progress-target + .sr-only + .agent-progress-chevron {
+  margin-left: auto;
+}
+.agent-progress-output {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.agent-progress-why {
+  margin: 0;
+  color: var(--color-cream-muted);
+}
+.agent-progress-rows {
+  width: 100%;
+  border-collapse: collapse;
+}
+.agent-progress-rows td {
+  padding: 5px 0;
+  vertical-align: top;
+  border-top: 1px solid var(--color-charcoal-border);
+}
+.agent-progress-rows tr:first-child td {
+  border-top: 0;
+}
+.agent-progress-rows td:first-child {
+  padding-right: 12px;
+  color: var(--color-cream);
+}
+.agent-progress-rows td:last-child {
+  color: var(--color-cream-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+.agent-progress-pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 8px;
+  background: var(--color-charcoal-bg);
+  color: var(--color-cream);
+  font:
+    12px/1.55 ui-monospace,
+    "SF Mono",
+    Menlo,
+    monospace;
+  white-space: pre-wrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-progress-shimmer {
+    animation: none;
+    background: none;
+    color: var(--color-cream);
+  }
+  .agent-progress-chevron,
+  .agent-progress-fold {
+    transition: none;
+  }
+}

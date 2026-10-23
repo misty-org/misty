@@ -118,9 +118,7 @@ pub(crate) fn private_directory(path: &Path) -> io::Result<()> {
 
 /// The profile that scopes a secret: the development profile, else "default".
 pub(crate) fn profile() -> String {
-    std::env::var("MISTY_PROFILE")
-        .or_else(|_| std::env::var("MISTY_DESKTOP_PROFILE"))
-        .unwrap_or_else(|_| "default".to_owned())
+    std::env::var("MISTY_PROFILE").unwrap_or_else(|_| "default".to_owned())
 }
 
 const LAYOUT_TABLE: &str =
@@ -133,7 +131,9 @@ fn layout_connection(home: &Path) -> io::Result<rusqlite::Connection> {
     connection
         .busy_timeout(std::time::Duration::from_secs(5))
         .map_err(io::Error::other)?;
-    connection.execute_batch(LAYOUT_TABLE).map_err(io::Error::other)?;
+    connection
+        .execute_batch(LAYOUT_TABLE)
+        .map_err(io::Error::other)?;
     Ok(connection)
 }
 

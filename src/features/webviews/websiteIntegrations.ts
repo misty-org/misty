@@ -70,4 +70,3 @@ export const websiteIntegrations = {
     description: "Your team's Jira issues, projects, and boards.",
   },
 } as const;
-export type WebsiteIntegrationId = keyof typeof websiteIntegrations;

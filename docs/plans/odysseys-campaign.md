@@ -1,8 +1,8 @@
 # Odysseys campaign
 
 The goal, rules and loop for improving Misty's agent against Odysseys, the long-horizon web
-benchmark other AI browsers report on. Written October 17, 2026. Background and the failures that
-are already known: [agentic-architecture-review.md](agentic-architecture-review.md).
+benchmark other AI browsers report on. Written October 17, 2026. The harness it measures is
+[agent-harness.md](agent-harness.md).
 
 ## Goal
 
@@ -322,8 +322,8 @@ they report whether the person's session is the one they expect. Spend: $0.07.
 
 Many fixes landed in agent windows along the way: background sign-out, cross-talk between windows,
 request races, duplicate tabs, held claims, model stream stalls and per-run screenshots. Speed
-and reliability improved; accuracy did not. The analysis of all 116 graded runs and the plan that
-followed are in [agent-harness-v2.md](agent-harness-v2.md). No more batches until those changes
+and reliability improved; accuracy did not. The plan that followed the analysis of all 116 graded runs
+is now part of [agent-harness.md](agent-harness.md). No more batches until those changes
 are in.
 
 ### Comparison pass A (October 19): harness v2, first half

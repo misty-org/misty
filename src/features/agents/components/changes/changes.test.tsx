@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import type { DiffSet } from "./diffTypes";
 const store = vi.hoisted(() => ({
   agentsDeviceSnapshot: vi.fn(),

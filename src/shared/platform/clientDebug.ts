@@ -52,7 +52,7 @@ export function readClientDebugEvents(): ClientDebugEvent[] {
   }
 }
 
-export function clientDebugPanelEnabled(): boolean {
+function clientDebugPanelEnabled(): boolean {
   return import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1";
 }
 

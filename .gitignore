@@ -22,7 +22,6 @@
 !template.env
 
 **/.venv
-cli/tasks/.signing.env
 .windows-test/
 
 **/.cache/
@@ -54,13 +53,10 @@ artifacts/
 # Images and large binary artifacts
 *.png
 !src/assets/branding/*.png
-!src/assets/bots/cloud-folder/*.png
-!server/apps/agent-runtime/evals/workflows/fixtures/*.png
 *.jpg
 *.jpeg
 *.gif
 *.webp
-!src/shared/assets/mail-providers/*.webp
 !src/shared/assets/misty-cloud-expression-cycle.webp
 *.avif
 *.ico
@@ -71,8 +67,6 @@ artifacts/
 *.heic
 *.heif
 *.svg
-!src/assets/icons/*.svg
-!src/shared/assets/mail-providers/*.svg
 !src/shared/ui/icons/brand-icons/*.svg
 *.psd
 *.ai
@@ -154,21 +148,9 @@ artifacts/
 *.parquet
 *.arrow
 
-.ds-sync/
-ds-bundle/
-.design-sync/.cache/
-.design-sync/learnings/
-.design-sync/node_modules
-node_modules/@misty/desktop
-
-# Screenshots used by the Discover app cards.
-!src/assets/discover/journal.png
-!src/assets/discover/library.webp
-
 # Consolidated workspace build products
 **/.build/
 **/*.tsbuildinfo
-!examples/**/*.svg
 
 # Agent avatars and reduced-motion posters are source assets.
 !src/shared/assets/agents/*.webp
@@ -181,12 +163,11 @@ node_modules/@misty/desktop
 # Server CLI local diagnostic output
 /server/.misty/
 
-# Built-in tool source assets and native build outputs.
+# Feature source assets and native service build outputs.
 !src/features/**/*.svg
 !src/features/**/*.png
 !src/features/**/*.webp
-!src/shared/toolAssets/**/*.svg
-!src/shared/toolAssets/**/*.png
-!src/shared/toolAssets/**/*.webp
 /src-tauri/services/*/target/
-/src-tauri/.build/
+
+# Midscene run logs.
+midscene_run/

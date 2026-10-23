@@ -17,7 +17,7 @@ use crate::{
     },
     app::runtime::MistyRuntime,
     error::{ApiError, ApiResult},
-    infra::agent_projects::LegacyProjectFlags,
+    infra::agents::projects::LegacyProjectFlags,
 };
 
 fn require_main(webview: &tauri::Webview) -> ApiResult<()> {

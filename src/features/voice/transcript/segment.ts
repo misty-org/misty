@@ -42,10 +42,6 @@ export type Segment<L extends string = Language> = {
   sessionStartedAt?: string;
 };
 
-/** Optional per-segment presentation hook (for example script conversion). */
-export type SegmentFormat<L extends string = Language> = (segment: Segment<L>) => Segment<L>;
-export const identityFormat = <L extends string>(segment: Segment<L>) => segment;
-
 /** A stable label for a speaker: the mic is always the local person. */
 export function speakerKey(segment: { channel?: Channel; speaker?: string }) {
   if (segment.channel === "mic") return segment.speaker ? `you:${segment.speaker}` : "you";

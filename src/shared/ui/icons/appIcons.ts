@@ -1,4 +1,5 @@
 import {
+  Brain,
   Package,
   Images,
   Bot,
@@ -22,6 +23,7 @@ export const appIcons = {
   home: House,
   social: MessagesSquare,
   journal: Notebook,
+  memory: Brain,
   files: FolderOpen,
   agents: Bot,
   scheduled: CalendarClock,

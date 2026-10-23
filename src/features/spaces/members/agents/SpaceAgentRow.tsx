@@ -1,7 +1,7 @@
 import type { SpaceAgent } from "@/api/spaces/space-agents";
 import type { ItemVisibility } from "@/api/spaces/visibility";
 import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
-import { AgentAvatar } from "@/features/agents/AgentAvatar";
+import { AgentAvatar } from "@/features/agents";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, cn } from "@/shared/ui";
 import { X } from "lucide-react";
@@ -27,7 +27,7 @@ export function SpaceAgentRow({
         compact ? "min-h-9 gap-2.5 rounded-md py-1 pl-6 pr-1.5" : "min-h-12 gap-3 py-2 pl-14 pr-4",
       )}
     >
-      <span className={cn("inline-flex shrink-0", compact ? "size-6" : "size-8")}>
+      <span className={cn("inline-flex shrink-0", compact ? "size-7" : "size-8")}>
         <AgentAvatar
           agent={
             {
@@ -37,6 +37,7 @@ export function SpaceAgentRow({
               system_managed: agent.system_managed,
             } as AgentProfile
           }
+          compact={compact}
         />
       </span>
       <div className="min-w-0 flex-1">

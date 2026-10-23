@@ -2,9 +2,20 @@ import type { AgentProfile } from "@/shared/schemas";
 import "./AgentAvatar.css";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
 
-export function AgentAvatar({ agent, large = false }: { agent?: AgentProfile; large?: boolean }) {
+export function AgentAvatar({
+  agent,
+  large = false,
+  compact = false,
+}: {
+  agent?: AgentProfile;
+  large?: boolean;
+  compact?: boolean;
+}) {
   return (
-    <span className={`agent-avatar${large ? " agent-avatar--large" : ""}`} aria-hidden="true">
+    <span
+      className={`agent-avatar${large ? " agent-avatar--large" : ""}${compact ? " agent-avatar--compact" : ""}`}
+      aria-hidden="true"
+    >
       {typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji ? (
         agent.avatar.emoji
       ) : (

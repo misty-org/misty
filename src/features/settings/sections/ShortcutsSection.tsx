@@ -186,7 +186,9 @@ export function ShortcutsSection(props: SettingsContentProps) {
 
   return (
     <>
-      <SettingsSectionBlock title="Shortcut behavior">
+      <SettingsSectionBlock
+        title={query.trim() ? "Matching commands" : shownCategory || "Commands"}
+      >
         <SettingsRow
           label="Show shortcut hints"
           description="Display current shortcuts in buttons, menus, tooltips, and command results."
@@ -199,11 +201,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
             }
           />
         </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock
-        title={query.trim() ? "Matching commands" : shownCategory || "Commands"}
-      >
         <div className="flex flex-wrap items-center gap-2 pb-3">
           <label className="relative min-w-[200px] flex-1">
             <Search
@@ -265,7 +262,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
         {!snapshot ? (
           <SkeletonList label="Shortcuts" rows={8} leading="none" lines={1} trailing />
         ) : shown.length === 0 ? (
-          <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
+          <p className="py-2 text-sm text-cream-muted">
             No matching commands.
           </p>
         ) : (

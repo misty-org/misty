@@ -3,7 +3,7 @@ import { AgentSettingsModal } from "./components/AgentSettingsModal";
 import { AgentSetup } from "./components/AgentSetup";
 import { AgentSwitcher } from "./components/AgentSwitcher";
 import { ProjectReviewSheet } from "./components/changes/ProjectReviewSheet";
-import { AgentProfileSection } from "./page/AgentProfileSection";
+import { AgentEditor } from "./components/AgentEditor";
 import { AgentDiscardDialog } from "./page/AgentDiscardDialog";
 import { AgentWorkspaceFrame } from "./workspace/AgentWorkspaceFrame";
 import { AgentsTaskContent } from "./AgentsTaskContent";
@@ -57,7 +57,7 @@ function AgentsWorkspacePage() {
   const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
   const profileSection = (onDone: () => void) =>
     profile && (
-      <AgentProfileSection
+      <AgentEditor
         key={`${user?.id}:${profile.id}:${spaceId}`}
         profile={profile}
         onStatusChange={setEditorStatus}

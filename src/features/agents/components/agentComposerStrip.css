@@ -19,7 +19,9 @@
 /* With attachments above, the strip is the box's top and the row its bottom. */
 .agent-studio
   .agent-conversation
-  [data-slot="message-composer"][data-composer-layout="inline"]:has(> div:first-child:not(:has(textarea)))
+  [data-slot="message-composer"][data-composer-layout="inline"]:has(
+    > div:first-child:not(:has(textarea))
+  )
   > div:has(textarea) {
   border-top: 0;
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);

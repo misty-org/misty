@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter};
 use crate::domain::clipboard::{
     ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
 };
-use crate::infra::device_trust;
+use crate::infra::devices::trust;
 use clip::Clip;
 
 /// Clips older than this are never shown or pasted.
@@ -198,7 +198,7 @@ impl SharedClipboardClient for CloudClipboard {
         let Some(session) = self.inner.session() else {
             return false;
         };
-        if !device_trust::effective_policy().clipboard {
+        if !trust::effective_policy().clipboard {
             return false;
         }
         let inner = self.inner.clone();

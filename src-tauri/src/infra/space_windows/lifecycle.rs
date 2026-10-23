@@ -134,6 +134,7 @@ pub fn switch_space(app: &AppHandle, label: &str, key: &str) -> Result<SpaceEntr
 
 /// Switches the window used last to a Space (the Window menu and ⌘⇧N), or opens a
 /// window for it when none is open.
+#[cfg(target_os = "macos")]
 pub fn switch_focused(app: &AppHandle, key: &str) -> Result<(), String> {
     let Some(window) = focused(app) else {
         return open_space(app, key);

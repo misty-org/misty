@@ -5,16 +5,11 @@
  * only after its complete user journey has passed launch QA.
  */
 const publicBetaAvailability = {
-  connectedDevices: false,
-  desktopMistyPanel: false,
-  extensions: false,
-  mcpConnections: true,
   recurringBriefings: false,
-  smartLibraryAnalysis: false,
   // Voice, notes and memory (docs/design/voice-memory/BRIEF.md), by phase.
   voiceDictation: false,
   voiceNotes: false,
-  recall: false,
+  recall: true,
   captureSessions: false,
 } as const;
 

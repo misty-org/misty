@@ -38,10 +38,6 @@ impl LeaseMeter {
         }
     }
 
-    pub fn lease(&self) -> Option<&Lease> {
-        self.lease.as_ref()
-    }
-
     /// Valid when there is a lease, it has not expired and budget is left.
     pub fn valid(&self, now: i64) -> bool {
         self.lease
@@ -53,15 +49,5 @@ impl LeaseMeter {
     pub fn record(&mut self, usage: &Usage, now: i64) -> bool {
         self.spent = self.spent.saturating_add(usage.total());
         self.valid(now)
-    }
-
-    pub fn spent(&self) -> u64 {
-        self.spent
-    }
-
-    /// Replaces a spent lease with a new one from the server.
-    pub fn renew(&mut self, lease: Lease) {
-        self.lease = Some(lease);
-        self.spent = 0;
     }
 }

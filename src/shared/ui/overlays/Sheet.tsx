@@ -6,10 +6,6 @@ import * as React from "react";
 
 const Sheet = SheetPrimitive.Root;
 
-const SheetTrigger = SheetPrimitive.Trigger;
-
-const SheetClose = SheetPrimitive.Close;
-
 const SheetPortal = SheetPrimitive.Portal;
 
 const SheetOverlay = React.forwardRef<
@@ -41,10 +37,16 @@ const sheetVariants = cva(
   {
     variants: {
       side: {
-        top: "inset-x-0 top-[var(--misty-modal-inset-top,0px)] border-b border-charcoal-border data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        top:
+          "inset-x-0 top-[var(--misty-modal-inset-top,0px)] border-b " +
+          "border-charcoal-border data-[state=closed]:slide-out-to-top " +
+          "data-[state=open]:slide-in-from-top",
         bottom:
           "inset-x-0 bottom-0 border-t border-charcoal-border data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "bottom-0 top-[var(--misty-modal-inset-top,0px)] left-0 w-3/4 border-r border-charcoal-border data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+        left:
+          "bottom-0 top-[var(--misty-modal-inset-top,0px)] left-0 w-3/4 border-r " +
+          "border-charcoal-border data-[state=closed]:slide-out-to-left " +
+          "data-[state=open]:slide-in-from-left sm:max-w-sm",
         right:
           "inset-y-0 right-0 w-3/4 border-l border-charcoal-border data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
       },
@@ -110,24 +112,6 @@ const SheetContent = React.forwardRef<
 );
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
-const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    data-slot="sheet-header"
-    className={cn("flex flex-col space-y-2 text-center sm:text-left", className)}
-    {...props}
-  />
-);
-SheetHeader.displayName = "SheetHeader";
-
-const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    data-slot="sheet-footer"
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
-    {...props}
-  />
-);
-SheetFooter.displayName = "SheetFooter";
-
 const SheetTitle = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
@@ -154,19 +138,7 @@ const SheetDescription = React.forwardRef<
 ));
 SheetDescription.displayName = SheetPrimitive.Description.displayName;
 
-export {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetOverlay,
-  SheetPortal,
-  SheetTitle,
-  SheetTrigger,
-  sheetVariants,
-};
+export { Sheet, SheetContent, SheetDescription, SheetTitle };
 
 export interface SheetContentProps
   extends

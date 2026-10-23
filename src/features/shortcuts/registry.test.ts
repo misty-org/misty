@@ -56,9 +56,9 @@ describe("shortcut platform defaults", () => {
     expect(shortcutCommandsById.get("workspace.open_space")?.defaults.macos.primary).toBe(
       "Cmd+Shift+N",
     );
-    expect(
-      shortcutCommandsById.get("workspace.new_incognito_window")?.defaults.macos.primary,
-    ).toBe("Cmd+Option+N");
+    expect(shortcutCommandsById.get("workspace.new_incognito_window")?.defaults.macos.primary).toBe(
+      "Cmd+Option+N",
+    );
     expect(shortcutCommandsById.get("workspace.close_window")?.defaults.windows.primary).toBe(
       "Ctrl+Shift+W",
     );

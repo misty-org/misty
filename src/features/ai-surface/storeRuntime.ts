@@ -1,7 +1,7 @@
 import type { StoreApi } from "zustand";
 import { aiPaneSession, aiMessage, aiSessionKey } from "./storeHelpers";
 import type { AiPaneSession, AiSurfaceState } from "./store";
-import type { AiArtifact, AiInvocationEvent, AiSurfaceAdapter, MistySpeech } from "./types";
+import type { AiArtifact, AiInvocationEvent, MistySpeech } from "./types";
 
 type SetState = StoreApi<AiSurfaceState>["setState"];
 type GetState = StoreApi<AiSurfaceState>["getState"];
@@ -29,7 +29,6 @@ export function consumeInvocationEvent(
   get: GetState,
   accountId: string,
   paneId: string,
-  adapter: AiSurfaceAdapter,
   event: AiInvocationEvent,
 ) {
   if (event.type === "invocation.started") {

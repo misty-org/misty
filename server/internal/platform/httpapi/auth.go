@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/kannachi323/misty/server/internal/accounts"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
+	"github.com/kannachi323/misty/server/internal/platform/db"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 	"github.com/kannachi323/misty/server/internal/platform/telemetry"
 	"golang.org/x/crypto/bcrypt"
@@ -164,7 +164,7 @@ func writeAuthSession(
 // credentialed requests directly to the API origin, so the session should
 // never be exposed to sibling subdomains.
 func writeSessionCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	writeAuthCookie(w, r, TestingSessionCookieName, token, ttl)
+	writeAuthCookie(w, r, SessionCookieName, token, ttl)
 }
 
 func Logout(database *db.Database) http.HandlerFunc {
@@ -174,7 +174,7 @@ func Logout(database *db.Database) http.HandlerFunc {
 			http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		for _, item := range []struct{ name, kind string }{{RefreshCookieName, "refresh"}, {TestingSessionCookieName, "access"}} {
+		for _, item := range []struct{ name, kind string }{{RefreshCookieName, "refresh"}, {SessionCookieName, "access"}} {
 			cookie, err := r.Cookie(item.name)
 			if err != nil {
 				continue
@@ -194,11 +194,11 @@ func Logout(database *db.Database) http.HandlerFunc {
 	}
 }
 
-func TestingIsSecureRequest(r *http.Request) bool {
+func IsSecureRequest(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
-func TestingSessionCookieSameSite(r *http.Request, secure bool) http.SameSite {
+func SessionCookieSameSite(r *http.Request, secure bool) http.SameSite {
 	if secure && r.Header.Get("Origin") != "" {
 		return http.SameSiteNoneMode
 	}

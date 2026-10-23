@@ -1,7 +1,5 @@
 import { diag } from "./diagnostics";
-import { subscribeAccountEvents } from "@/api/accountEvents";
-import { devicesNative } from "@/native/devices";
-import { mistyDeviceJobsEnabled } from "./flags";
+import { subscribeAccountEvents } from "@/api/account-events";
 import { devicesApi } from "@/api/devices/api";
 import type { AgentDevice } from "./model/types";
 import {
@@ -10,26 +8,19 @@ import {
   serverAgentDeviceSeenWithin,
   signedAgentDeviceRequest,
 } from "./store/useAgentDeviceStore";
-import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAgentsStore";
-import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
-import { invoke } from "@tauri-apps/api/core";
+import { agentsDeviceSnapshot } from "./store/useAgentsStore";
 import {
   browserFailureIsCertain,
   browserUncertainErrorCode,
-  deviceContentReference,
   deviceWorkflowErrorCode,
 } from "./workerDeviceJobs";
 
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { HeldClaims } from "./workerHeldClaim";
-import { browserExecutionControl, executeBrowserJob } from "./browserJobRun";
-
-export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
-export { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
-export type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
+import { claimNextWorkflowNodeJob, deviceExecutionRemaining, renewJobLease } from "./workerClaims";
+import { abortable, executeWorkflowNodeOnDevice } from "./workerExecute";
 
 const leaseHeartbeatMs = 20_000;
-const nodeExecutionTimeoutMs = 5 * 60_000;
 // Realtime notifications drop while the socket reconnects (every 15 to 60 s on the dev stack), and
 // a run's first page then waited up to 90 s: reconcile on every presence tick instead.
 const jobReconciliationMs = 25_000;
@@ -51,7 +42,7 @@ export class DesktopAgentJobWorker {
   private held = new HeldClaims();
 
   start(accountId: string): void {
-    if (this.running || !mistyDeviceJobsEnabled()) return;
+    if (this.running) return;
     this.running = true;
     this.generation++;
     this.unsubscribe = subscribeAccountEvents(accountId, (event) => {
@@ -120,7 +111,13 @@ export class DesktopAgentJobWorker {
           // run gave up 30 s later (a run's first page never opened). Put it back instead.
           if (claim)
             void devicesApi
-              .releaseWorkflowJob(signedAgentDeviceRequest, localDevice.id, serverDevice.id, claim.job.id, claim.leaseToken)
+              .releaseWorkflowJob(
+                signedAgentDeviceRequest,
+                localDevice.id,
+                serverDevice.id,
+                claim.job.id,
+                claim.leaseToken,
+              )
               .catch(() => undefined);
           return;
         }
@@ -198,44 +195,10 @@ export class DesktopAgentJobWorker {
       heartbeat = setInterval(() => {
         if (renewing || controller.signal.aborted) return;
         renewing = true;
-        void (async () => {
-          try {
-            const renewed = await devicesApi.renewWorkflowJobLease<ClaimedWorkflowNodeJob["job"]>(
-              signedAgentDeviceRequest,
-              localDeviceId,
-              deviceId,
-              job.id,
-              claim.leaseToken,
-            );
-            if (controller.signal.aborted) return;
-            if (
-              renewed.id !== job.id ||
-              renewed.deadlineAt !== job.deadlineAt ||
-              renewed.cancelRequestedAt
-            )
-              throw new Error("device_execution_stopped");
-            leaseExpiresAt = renewed.leaseExpiresAt;
-            arm();
-            // A program has no native execution of its own: each page call registers one under
-            // its own id and reads the current lease when it starts (programs/pageHost.ts).
-            if (job.operation.startsWith("browser.") && job.operation !== "browser.run")
-              await invoke("browser_agent_execution_renew", {
-                request: browserExecutionControl(job, leaseExpiresAt),
-              });
-            await heartbeatServerAgentDevice(deviceId, localDeviceId);
-          } catch (error) {
-            const status =
-              error && typeof error === "object" && "status" in error ? Number(error.status) : 0;
-            if (
-              [401, 403, 409, 410, 422].includes(status) ||
-              String(error).includes("device_execution")
-            )
-              controller.abort(error);
-            // A lost renewal response never extends the last acknowledged lease.
-          } finally {
-            renewing = false;
-          }
-        })();
+        void renewJobLease(job, claim.leaseToken, localDeviceId, deviceId, controller, (next) => {
+          leaseExpiresAt = next;
+          arm();
+        }).finally(() => (renewing = false));
       }, leaseHeartbeatMs);
       const output = await abortable(
         executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt, deviceId),
@@ -289,117 +252,6 @@ export class DesktopAgentJobWorker {
   }
 }
 
-export function deviceExecutionRemaining(
-  job: ClaimedWorkflowNodeJob["job"],
-  leaseExpiresAt: string | null | undefined,
-): number {
-  if (job.controlVersion !== 2 || job.cancelRequestedAt)
-    throw new Error("device_execution_stopped");
-  const deadline = Date.parse(job.deadlineAt ?? "");
-  const lease = Date.parse(leaseExpiresAt ?? "");
-  const remaining = Math.min(deadline, lease) - Date.now();
-  if (!Number.isFinite(remaining) || remaining <= 0 || remaining > nodeExecutionTimeoutMs)
-    throw new Error("device_execution_expired");
-  return remaining;
-}
-
-async function claimNextWorkflowNodeJob(
-  deviceId: string,
-  localDeviceId: string,
-  held: HeldClaims,
-): Promise<ClaimedWorkflowNodeJob | null> {
-  const hold = held.next();
-  try {
-    const claim = await devicesApi.claimWorkflowJob<ClaimedWorkflowNodeJob | undefined>(
-      signedAgentDeviceRequest,
-      localDeviceId,
-      deviceId,
-      hold,
-    );
-    return claim ?? null;
-  } catch (error) {
-    if (hold && held.refused(error)) return claimNextWorkflowNodeJob(deviceId, localDeviceId, held);
-    throw error;
-  }
-}
-
-async function executeWorkflowNodeOnDevice(
-  job: ClaimedWorkflowNodeJob["job"],
-  signal: AbortSignal,
-  lease: () => string | null | undefined,
-  deviceId: string,
-): Promise<Record<string, unknown>> {
-  signal.throwIfAborted();
-  // Every job carries the run grant the asking device signed. This device
-  // checks it natively before acting; the server only carried it, and cannot
-  // widen it (docs/design/devices/BRIEF.md).
-  try {
-    await devicesNative.verifyJob(job.operation, job.scopeId, job.config);
-  } catch {
-    throw new DeviceOperationNotAttempted(new Error("device_grant_invalid"));
-  }
-  signal.throwIfAborted();
-  if (job.operation === "browser.session") {
-    // The agent's own browser session on this computer, for a run sent from here.
-    return (await import("./hostedSessions")).startHostedSession(job, signal);
-  }
-  if (job.operation === "browser.spawn_tabs") {
-    // Tabs and signed grants for this task's sub-agents.
-    return (await import("./spawnChildTabs")).spawnChildTabs(job, signal);
-  }
-  if (job.operation === "browser.act") {
-    // One goal runs as a local loop: Midscene plans, Misty's native input acts.
-    return (await import("./screenAct/screenActJob")).runScreenAct(job, signal);
-  }
-  if (job.operation === "browser.run") {
-    // A program the agent wrote, run in a sandbox against its own tabs (programs/runProgram.ts).
-    return (await import("./programs/runProgram")).runProgram(job, signal, lease);
-  }
-  if (job.operation.startsWith("browser.")) return executeBrowserJob(job, signal, lease());
-  if (deviceAgentOperations.has(job.operation)) {
-    return runDeviceAgentOperation(job, signal);
-  }
-  if (job.operation === "code.delegate") {
-    // Coding through the person's own tool; the run reports on its own.
-    return (await import("./coding/codingRun")).startCodingRun(job, deviceId);
-  }
-  if (job.operation !== "read_content") {
-    throw new Error(`unsupported_device_operation:${job.operation}`);
-  }
-  const ref = deviceContentReference(job.input, job.scopeId);
-  const document = await agentsPrepareScopedDocument(
-    { scopeId: ref.scopeId, relativePath: ref.relativePath },
-    signal,
-  );
-  const content = {
-    sourceKind: ref.sourceKind || "local_file",
-    providerId: ref.providerId || "device",
-    resourceId: ref.resourceId || `${ref.scopeId}:${ref.relativePath}`,
-    version: ref.version || "",
-    fingerprint: ref.fingerprint || "",
-    mimeType: document.mimeType,
-    displayName: document.displayName,
-    locator: ref.relativePath,
-    permissionScope: ref.scopeId,
-  };
-  return {
-    content,
-    sections: document.sections.map((section) => ({
-      kind: section.kind,
-      locator: section.locator,
-      text: section.text,
-    })),
-    citations: document.sections.map((section) => ({
-      content,
-      kind: section.kind,
-      locator: section.locator,
-      excerpt: section.text.slice(0, 240),
-    })),
-    truncated: document.truncated,
-    sourceChanged: false,
-  };
-}
-
 async function loadLocalAgentDevice(): Promise<AgentDevice> {
   const snapshot = await agentsDeviceSnapshot();
   if (!snapshot.device || snapshot.device.status === "revoked") {
@@ -410,13 +262,4 @@ async function loadLocalAgentDevice(): Promise<AgentDevice> {
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-}
-
-function abortable<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const abort = () => reject(signal.reason ?? new Error("device_execution_stopped"));
-    signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) abort();
-    operation.then(resolve, reject).finally(() => signal.removeEventListener("abort", abort));
-  });
 }

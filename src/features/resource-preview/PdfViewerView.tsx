@@ -1,4 +1,4 @@
-import type { PreviewErrorComponent } from "@/features/file-ui";
+import type { PreviewErrorComponent } from "./previewTypes";
 import { IconButton, Skeleton } from "@/shared/ui";
 import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";

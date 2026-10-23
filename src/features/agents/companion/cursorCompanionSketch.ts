@@ -3,7 +3,7 @@ import { mapSketch, parseSketch, type Sketch } from "./companionSketch";
 import type { CursorCompanionSession } from "./cursorCompanionSession";
 
 /** How long a finished drawing stays once it has been read. */
-export const SKETCH_HOLD_MS = 30_000;
+const SKETCH_HOLD_MS = 30_000;
 /** A drawing whose reply is never read aloud stays this long after it finishes. */
 const SKETCH_UNREAD_HOLD_MS = 60_000;
 

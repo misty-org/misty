@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
+import { globalMistyError } from "@/features/misty/globalMistyActions";
 import {
   Button,
   Dialog,

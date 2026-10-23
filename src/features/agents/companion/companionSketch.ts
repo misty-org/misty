@@ -4,16 +4,16 @@
  * drawing renders while it streams. "board" is a whiteboard beside the cursor; "screen"
  * marks what the person is looking at, in that screenshot's pixels.
  */
-export type SketchSurface = "board" | "screen";
+type SketchSurface = "board" | "screen";
 
-export interface SketchHeader {
+interface SketchHeader {
   surface: SketchSurface;
   title?: string;
   /** For screen marks: the screenshot the coordinates belong to. */
   screen?: string;
 }
 
-export type SketchElementType = "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line";
+type SketchElementType = "rectangle" | "ellipse" | "diamond" | "text" | "arrow" | "line";
 
 export interface SketchElement {
   id: string;

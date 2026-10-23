@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export type SetupStep = "spaces" | "theme" | "import";
+export type SetupStep = "import" | "tabs";
 
 const guestAccountKey = "guest";
 export const setupStorageKey = "misty-first-run-setup";
@@ -44,17 +44,17 @@ export const useSetupStore = create<SetupState>()(
   persist(
     (set) => ({
       isOpen: false,
-      step: "spaces",
+      step: "import",
       completedAccounts: {},
-      startSetup: () => set({ isOpen: true, step: "spaces" }),
+      startSetup: () => set({ isOpen: true, step: "import" }),
       setStep: (step) => set({ step }),
       finishSetup: (accountId) =>
         set((state) => ({
           isOpen: false,
-          step: "spaces",
+          step: "import",
           completedAccounts: { ...state.completedAccounts, [accountKey(accountId)]: true },
         })),
-      reopenSetup: () => set({ isOpen: true, step: "spaces" }),
+      reopenSetup: () => set({ isOpen: true, step: "import" }),
     }),
     {
       name: setupStorageKey,

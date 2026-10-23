@@ -1,414 +1,54 @@
----
-name: "Misty Agents"
-description: "Agents opens straight into the selected agent's New task conversation, with catalogs, Integrations and pull-tab side panels."
-colors:
-  workspace: "var(--color-charcoal-workspace)"
-  background: "var(--color-charcoal-bg)"
-  sidebar: "var(--color-charcoal-sidebar)"
-  card: "var(--color-charcoal-card)"
-  border: "var(--color-charcoal-border)"
-  hover: "var(--color-charcoal-hover)"
-  active: "var(--color-charcoal-active)"
-  text: "var(--color-cream)"
-  bright: "var(--color-cream-bright)"
-  muted: "var(--color-cream-muted)"
-typography:
-  workspace-launch:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "32px"
-    fontWeight: 400
-    lineHeight: 1.2
-    letterSpacing: "-0.025em"
-  workspace-launch-narrow:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "26px"
-    fontWeight: 400
-    lineHeight: 1.2
-    letterSpacing: "-0.025em"
-  workspace-tag:
-    fontSize: "10px"
-    lineHeight: "16px"
-  workspace-skill-action:
-    fontSize: "11px"
-  welcome:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "24px"
-    fontWeight: 500
-    lineHeight: 1.3
-  setup-heading:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "20px"
-    fontWeight: 500
-  overview-title:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "16px"
-    fontWeight: 600
-  body:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: 1.5
-  message:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: 1.6
-  composer:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: "22px"
-  metadata:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "13px"
-    fontWeight: 400
-  control:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "14px"
-    fontWeight: 500
-  compact-metadata:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "12px"
-    fontWeight: 400
-  shortcut:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "16px"
-  avatar-emoji:
-    fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    fontSize: "18px"
-    fontWeight: 500
-rounded:
-  md: "var(--radius-md)"
-  lg: "var(--radius-lg)"
-  xl: "var(--radius-xl)"
-spacing:
-  xs: "4px"
-  sm: "8px"
-  md: "12px"
-  lg: "16px"
-  panel: "20px"
-  xl: "24px"
-  roomy: "32px"
-components:
-  toolbar-button:
-    backgroundColor: "transparent"
-    textColor: "{colors.muted}"
-    rounded: "{rounded.md}"
-    size: "30px"
-  primary-button:
-    backgroundColor: "{colors.bright}"
-    textColor: "{colors.background}"
-    rounded: "{rounded.md}"
-    size: "30px"
-  outline-button:
-    backgroundColor: "transparent"
-    textColor: "{colors.text}"
-    typography: "{typography.control}"
-    rounded: "{rounded.md}"
-    height: "32px"
-    padding: "0 10px"
-  field:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.md}"
-    height: "36px"
-    padding: "4px 10px"
-  message-bubble:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    typography: "{typography.message}"
-    rounded: "{rounded.xl}"
-    padding: "10px 14px"
-  conversation-composer:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    typography: "{typography.composer}"
-    rounded: "{rounded.xl}"
-    padding: "6px"
-  recipient-list:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.lg}"
-    padding: "4px"
-    width: "min(320px, calc(100% - 40px))"
-  navigation-island:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.lg}"
-    padding: "3px"
-  navigation-dropdown:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.lg}"
-    padding: "12px"
-    width: "432px"
-  companion-setting-row:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    typography: "{typography.body}"
-    padding: "16px"
-  overview-card:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.xl}"
-    padding: "20px"
-  settings-panel:
-    backgroundColor: "{colors.sidebar}"
-    textColor: "{colors.text}"
-    width: "420px"
----
+# Design: Misty Agents
 
-
-# Design System: Misty Agents
-
-## Overview
-
-**Current scope — October 2:** retain the root directory and add the approved Polar-like workspace for one selected agent. Its primary navigation, secondary catalog navigation and restrained content canvases use Misty's semantic monochrome palette. The existing conversation remains mounted while browsing catalogs. No mockup palette overrides or new raster artwork are introduced.
-
-The current workspace paragraphs below supersede earlier selected-agent geometry, welcome size and fixed-width/no-breakpoint guidance in this document. Earlier detail is retained as history and as the contract for existing account, profile, conversation and companion behavior. Current sources are `AgentsPage.tsx`, `components/AgentWorkspaceConversation.tsx`, `workspace/AgentWorkspaceFrame.tsx`, `workspace/AgentWorkspaceCatalog.tsx`, `workspace/AgentControlBar.tsx` and the two workspace stylesheets. The root collection is unchanged by this pass.
-
-**Creative North Star: "Journal entry, Misty conversation"**
-
-The Agents root is a Journal-style collection with Agents, Conversations, and Activity sections, search, specific creation actions, and shared list/grid controls. Selecting an agent or conversation opens the existing conversation and its optional overview. Misty's shared monochrome controls, restrained text-control corners, utility capsules, and existing cloud identity assets remain authoritative.
-
-This scoped refresh supersedes the former roster-first entry while retaining conversation, profile, setup, account-access, and companion rules below. Source authority is `AgentsPage.tsx`, `workspace/AgentWorkspaceFrame.tsx`, `agentsWorkspace.css`, the existing conversation components, and shared `CollectionWorkspace`, `Button`, and `NavIsland`. See [Journal entry pages](../../../docs/design/journal-entry-pages/DESIGN.md) for the shared entry system and current evidence; `PRODUCT.md` and `companion/DESIGN.md` retain their relevant product and companion constraints.
-
-**Key Characteristics:**
-
-- The root collection leads into existing conversations and recorded activity.
-- Standard text controls retain modest shared corners; collection icon utilities use shared capsules.
-- UI chrome and status are monochrome; existing cloud artwork retains its identity colors.
-- Desktop conversation and overview geometry stays consistent at every window width.
-- Account access, actual execution state, and explicit outputs remain truthful.
+Agents opens straight into the selected agent's New task conversation. Conversations themselves follow [docs/design/agent-chat](../../../docs/design/agent-chat/); the companion has its own [DESIGN.md](companion/DESIGN.md). This file covers the Agents page around them.
 
 ## Colors
 
-Use Misty's semantic charcoal/cream tokens through the active theme. Preserve the frontmatter's CSS variable bindings; their names describe roles across dark and light themes.
+Use Misty's semantic charcoal/cream tokens. Status uses text, icons and contrast: no colored status dots (except the Recents dots AGENTS.md allows), tinted selections or accent-colored focus rings. Cloud avatar colors are identity artwork, not status. Connected apps and coding tools show their official `BrandIcon` logos; everything around them stays monochrome.
 
-### Primary
+## Entry
 
-The bright text token supplies the filled primary/send action, paired with the background token for its glyph. Primary emphasis comes from neutral contrast.
+`/agents` opens the selected agent's New task conversation: the agent in the URL, else the last-used agent, else Misty, else the first agent. There is no directory page and no Back control.
 
-### Neutral
+- **Sidebar:** the agent switcher, then New task, Workflows, Mentions and Integrations, then Projects and Recents. No footer.
+- **Switcher:** agents with a checkmark on the current one, conversations only while searching, then New agent and the selected agent's settings. Selecting another agent goes through the draft and profile guards and is disabled while recording, uploading, saving or running.
+- **Empty composer:** the launch prompt and the composer with its strip, and nothing else: no suggestions, pills or recent work. The folder control appears above the composer only while a folder is in progress.
+- **Header:** the conversation title only. A quiet Working status ends the title bar while a task runs. Rename and Delete live on the Recents row's ⋯ menu.
+- **No side panel:** the conversation has no Details, Task, Sources or Files panel and no Activity page. Goal sits under the composer's mode menu and opens a dialog with the goal and the approved plan's live checklist.
 
-Workspace is the open conversation canvas. Sidebar tone separates the companion/setup sheet. Card supports the overview, navigation islands, popovers, fields, message bubbles, composer, and recipient results. Border supplies hairline boundaries; muted text supports secondary metadata, section labels, and inactive controls. Hover and active tokens supply shared neutral interaction states.
+## Sidebar rows
 
-**The Monochrome Chrome Rule.** Status uses text, icons, and contrast. Do not introduce colored status dots, tinted selections, or accent-colored focus rings. Existing cloud avatar colors are identity artwork rather than status signals.
+Recents rows have no repeated chat glyph; their overflow menu appears on hover, on focus, on the current conversation or while open, and right-click opens the same actions. Projects (stored as conversation folders) sit above Recents under quiet muted labels; their conversations hang off them with `TreeBranch`. Conversations move between projects and Recents by dragging (Alt+Shift+Up/Down from the keyboard), never from a menu. Long titles fade at the trailing edge. The sidebar's trailing edge resizes it (200–420px, remembered per device; double-click resets). A Get started card sits at the foot of the sidebar, ticks steps off from what the account has done, collapses per device and goes away once every step is done.
 
-## Typography
+Rename uses a focused shared dialog; Delete asks for confirmation and explains that deletion is permanent and drops the draft. Failures keep the dialog open for retry. A running response must stop before its conversation is deleted.
 
-The selected-agent launch heading now uses 32px, weight 400, line-height 1.2 and -0.025em tracking; it becomes 26px below the 760px workspace container breakpoint. Catalog headings use 20px/600 with 30px line-height, ordinary content 14px, and compact schedule/detail tags and skill actions 10–11px. These are scoped, approved additions, recorded in frontmatter; five detector advisories for this type scale were reviewed without requiring changes. The following 24px welcome specification describes the earlier conversation presentation, not the new launch surface.
+## Composer
 
-Use the inherited system UI stack. The welcome heading is 24px, weight 500, line-height 1.3; it introduces a fresh conversation without becoming a promotional hero. Setup headings use 20px at weight 500. The overview agent name uses 16px at weight 600. Body, composer, collection names, navigation, profile fields, and ordinary activity content use the 14px scale. Message prose uses line-height 1.6; the composer uses 22px.
+The message box is one row (attach, text, voice, send; `MistyComposer layout="inline"`), with its controls in one quiet strip beneath it (`components/ComposerStrip.tsx`). Chips are labeled, have no chevrons, and brighten on hover or while their menu is open. Menus carry no helper copy.
 
-Muted section labels and compact overview metadata use 12px. History dates and full activity metadata use 13px. The compact desktop overview activity titles use 13px and their metadata 12px. Collection names follow shared row/card treatment; messages, errors, results, and form content wrap. User bubbles are bounded by 82% of the transcript and replies span it; welcome supporting copy by 36ch. Avatar emoji sizing is separate from the prose hierarchy.
+- **Order:** Project, Mode and Code on the left, the usage ring at the far end. There is no model or thinking choice.
+- **Project:** projects on this computer only. Coding is independent of it.
+- **Mode:** Manual, Auto, Plan and Teach as checkmarked choices, then Goal. Shift+Tab switches modes. Plan gives the composer a dashed frame and a "Plan with…" placeholder.
+- **Code:** the conversation's coding tool, with or without a project: Settings default, then each tool with its logo (`CodingToolIcon`). Tools not installed or signed in are listed but can't be picked, with the reason in words. "Manage tools" opens Settings › Coding tools.
+- **Narrow (the Misty panel, a container narrower than 560px):** every chip shows only its icon; names stay in tooltips and for assistive technology.
+- **Control bar:** sits on top of the composer as a tab behind its top edge and holds folder work. Screens open on demand, so there is no work-location choice.
 
-## Layout
+Enter submits; Shift+Enter inserts a line break; composition events never submit early.
 
-**Current selected-agent workspace:** the primary sidebar is 240px; catalog pages have no secondary navigation and switch areas with chip tabs under the page heading. Workflow/template content is bounded at 960px, connectors at 1088px, instructions at 768px, and the empty-conversation launch composer at 672px. The launch prompt and composer sit together in the upper central canvas; an active full conversation retains its bottom composer and optional right details. The sidebar includes New task, Workflows, Templates, Integrations and Recents. Agent settings open from the switcher; rename and delete live on each Recents row's ⋯ menu.
+## Answers and progress
 
-At a workspace container width of 1100px or less, navigation becomes 190px/170px and catalogs use two columns. At 760px or less, primary navigation becomes a 58px icon rail, secondary navigation moves above content, cards use one column, skills stack and the overview is hidden. These defensive narrow layouts supersede earlier no-breakpoint rules; they do not add an overview Sheet.
+Each prompt's replies form one turn. The last visible reply renders as the answer with its citations and actions; above it the turn shows its work: what Misty said while working as ordinary prose, and each run of consecutive tools folded into one muted row ("Used 3 tools (1 failed)", or the single tool's own words) that opens to its steps. Working text shimmers. Replies loaded from history fetch their timeline once from `GET /ai/invocations/{id}/progress`. Source: `progress/` and `components/conversationTurns.ts`.
 
-The root fills the desktop workspace with the shared collection page. Its heading and search/action row precede section tabs, utility capsules, and rows or cards. The Agents table exposes actual status and last activity; Conversations shows the owning agent; Activity retains recorded work. The old persistent roster is not rendered. Selecting a row opens the flexible conversation with a 340px overview rail when requested. The rail scrolls independently, has 16px outer padding except at its left edge, and contains a single shared Card with 20px padding. Conversation headers are 54px tall.
+Answers offer Copy, Reply, Good/Bad response and Read aloud, plus Try again on a retryable failure; prompts offer Copy, Edit as new message and Ask again. Ratings fill their glyph rather than adding color. Replies render through the shared `MistyMarkdown`; raw HTML never renders and people's own messages stay plain text.
 
-The centered header identity and right-side panel control toggle the overview. The desktop overview is initially visible for a selected agent; opening setup/companion hides it. Conversations, Activity, and Profile live inside the overview as text-only popover triggers. They no longer form a centered strip above the transcript. The action island above them contains Talk and Companion with monochrome icons.
+## Plans, questions and goals
 
-The shell is desktop-only. It has no viewport-triggered overview Sheet, roster replacement, or narrow-screen switching. Back navigation returns to the entry collection through existing draft guards.
-
-The transcript and composer share an 836px maximum region. Transcript padding is 28px 24px, matching the composer's gutters so bubbles and composer share edges, with 18px between messages. Only the user's messages are bubbles; replies are plain text on the canvas, inset 5px so the 32px avatar's center meets their first line, and status lines take a 32px row for the same alignment. Composer outer padding is 12px 24px 16px; its textarea grows from 38px to 160px. The welcome centers an 80px cloud, heading, short description or fallback question, and Customize agent action within the empty transcript, while the composer stays at the bottom.
-
-Conversations' New chat starts with the current agent.
-
-Profile/history/activity popovers remain workspace-bounded: 432px preferred width, a maximum of the viewport minus 24px and Radix's available width, 12px padding, and maximum height `min(580px, available height)`. They open with a 10px offset and 12px collision padding and scroll without resizing the conversation.
-
-Creation and Companion reuse the existing 420px in-place Sheet with a 54px header and scrolling content. The conversation reserves its width while open; no breakpoint changes its presentation. This is an explicit editor/settings surface.
-
-## Elevation & Depth
-
-Catalog cards stay flat with semantic surfaces and hairline borders.
-
-Tonal surfaces and hairline borders separate persistent chrome. The overview Card, composer, and message bubbles have no decorative shadow. The in-place companion/setup Sheet has no shadow or entrance animation. Navigation popovers inherit their shared overlay behavior, depth, and motion. Keep these treatments in the shared primitives rather than creating an Agents-only overlay system.
-
-## Shapes
-
-Use the shared radius scale: `--radius-md` (6px) for controls and fields, `--radius-lg` (8px) for islands, popovers, and recipient results, and `--radius-xl` (12px) for the shared overview Card, message bubbles, and composer. Conversation icon controls retain shared shapes; the collection filter and view utilities intentionally use round controls inside capsule islands. Shared switches retain their pill shape.
-
-Cloud artwork retains its own silhouette. Collection agent avatars are 24px; header, transcript, and recipient avatars are 32px; desktop overview and profile avatars are 64px; the welcome and existing companion preview use 80px. The preview size is distinct from saved desktop companion scale. Preserve existing cloud animation and reduced-motion poster behavior.
-
-## Components
-
-### Current workspace and UI-only catalogs
-
-New task selects an empty conversation for the current agent; Recents opens its exact history. Catalog navigation hides rather than unmounts the conversation. Agent settings opens the existing profile editor. The Agents-only work-location control identifies the current conversation; separate-window and window-control options are disabled and labeled Coming soon. Scheduled does not opt into this control.
-
-Templates support browsing, search, categories and detail dialogs. Use template seeds an unsent draft through the existing discard guard. Workflow, schedule, instruction and skill inputs are React drafts only. New save, import, scheduling and connector-connect actions are disabled with explicit availability copy; they do not persist, call new APIs or imply new execution. Existing account connections and conversation/voice actions retain their original behavior.
-
-Use shared monochrome controls, checkmarks for menu selections and the existing semantic color tokens. Preserve shared item-type glyph tones where applicable; chrome, focus and status remain monochrome. Do not add a collection filter duplicating visible section tabs.
-
-The production `AgentsPage` fixture harness has 14 reviewed captures covering 1304px, 1920px, 900px and 390px widths. Fidelity and UI-scope review concluded SHIP without material fixes. This pass reports 41 tests across five suites, full TypeScript, scoped ESLint and desktop Vite build passing; build chunk-size warnings remain. All 14 screenshot rasters passed provenance scanning. These are fixture/component checks, not live account, backend execution or native-capability verification. See [implementation evidence](../../../docs/design/agent-workflows/IMPLEMENTATION.md).
-
-### Shared controls and navigation
-
-Use shared `Button`, `IconButton`, `Input`, `Textarea`, `Toggle`, `Card`, `NavIsland`, `Popover`, `Sheet`, and companion settings controls. Standard icon actions are 30px with accessible labels. Conversations, Activity, and Profile triggers stay text-only. Only one navigation popover opens at a time; the identity communicates overview visibility with `aria-expanded` and `aria-controls`.
-
-Preserve disabled states, keyboard operation, dismissal guards, and focus restoration through the existing shared primitives. The shared components remain the authority for focus treatment; this documentation does not establish a new feature-specific ring or claim a full accessibility audit.
-
-### Overview and current state
-
-The overview order is identity and status, Talk/Companion actions, section navigation, Context, Computer, Recent activity, and Outputs. Use small muted section headings and ordinary rows rather than nested cards or colored badges.
-
-The headline derives from actual profile, recording, conversation, and activity state. Disabled takes priority, followed by Listening, Needs your input, Working, Waiting for device, Queued, Loading activity, Activity unavailable, and Ready. The activity callback reports loading, unavailable, needs input, working, waiting for device, queued, or idle across the fetched entries, even when only three entries are shown. Approval or intervention requests must not be presented as Ready. Loading and fetch failures must remain explicit.
-
-Talk uses the conversation's existing recorder and places the transcript in the draft for review. It changes to Stop recording while listening. It is unavailable for disabled agents, active conversation work, recorder setup/transcription, or a missing account. Companion opens the existing voice/computer controls; it does not imply provisioning a new computer or starting a realtime call.
-
-### Account context and computer
-
-Context describes the current Misty account and explicitly ties Space access to account permissions. Connections come from the account connection API; revoked connections are excluded. Active, unchecked, and other retained states read Connected, Not checked, and Needs attention. Preserve loading, empty, error, and retry states. Manage connections opens the existing connection manager. Setup does not silently grant new permissions or introduce per-agent app access.
-
-Computer displays the local native device name and Online, Offline, Access revoked, or Device unavailable when those states are known. Without a native snapshot it explains availability in the desktop app. This is device availability, separate from account preferences or an agent-owned cloud computer. Account changes refresh the access data; stale requests must not cross account boundaries.
-
-### Conversations, welcome, and composer
-
-Conversations offers search, New chat, and saved rows with title, date, and latest-message preview. Reopening a historical conversation preserves its saved scope; new conversations remain personal. A fresh conversation shows the welcome and Customize agent, which opens Profile. If there is no agent, retain the direct creation action.
-
-Use `MistyComposer` with `layout="conversation"` as the feature adapter over shared `MessageComposer` and `MessageComposerSend`. The same frame, growing textarea, action slots, and ArrowUp send affordance serve Spaces chat, Global Misty, and execution follow-ups; Agents-only composer CSS overrides are removed. Follow the [shared usage contract](../../shared/ui/patterns/MessageComposer.md). Input text is 14px on desktop and 16px below the shared medium breakpoint. Enter submits; Shift+Enter inserts a line break; composition events prevent premature submission. Keep recording, transcription, working, disabled-agent, and error feedback, along with attachments, citations, approval, cancellation, retry, and copy behavior. Misty's replies, step updates and the Global Misty panel render through one shared `MistyMarkdown` (`features/ai-surface`): GitHub-flavored Markdown (tables, task lists, strikethrough, autolinks, footnotes), headings, rules, images, KaTeX math (`$…$`, `$$…$$`), GitHub-style callouts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`) with an icon and label, and code blocks with a language label, Copy, and monochrome highlighting (weight, brightness and italics, never hue). Wide tables and equations scroll inside the bubble. Raw HTML is never rendered. People's own messages stay plain text. Each message carries a quiet action row with its time, shown only on hover or focus. Answers, finished or failed, offer Copy, Reply, Good/Bad response (the invocation feedback endpoint) and Read aloud, plus Try again on a retryable failure. Reply quotes the answer, or the part the person highlighted, above the composer; the message is sent as a Markdown quote followed by their words, and their bubble shows the quote muted above it. Prompts offer Copy, Edit as new message (loads the text into the composer) and Ask again (resends it when it has no attachments or private context). Ratings fill their glyph rather than adding color. Preserve unsent-message guards during agent changes and result navigation.
-
-### Activity and outputs
-
-Recent activity initially shows three task entries with an option to view all. The Activity popover exposes the full activity surface. Both use the existing dashboard and keep title, textual state, timestamp, and monochrome status icon. Expanding a task reveals instruction, result, tool events, pending approvals, and cancellation where applicable. Parent-task context remains available. Activity is recorded work, separate from conversation history.
-
-Outputs are explicit `resultHref` values on completed assistant actions in the selected agent's conversations. They are ordered from recent conversations/messages, deduplicated by destination, and restricted to safe internal `/spaces/` or `/files/` paths. Attachments and citations are not inferred to be outputs. Show three initially, View all outputs when needed, and No outputs yet when empty. Opening a result uses existing navigation and unsaved-change guards.
-
-### Profile and setup
-
-Profile retains avatar, name, description, instructions/memory disclosure, save/delete behavior, and existing conversation model selection. Dirty profile changes use the shared unsaved-change dialog before navigation or dismissal. Keep editing restores focus within the current editing context; Discard and switch continues the requested action.
-
-Create new agent uses three steps inside the existing creation Sheet. Identity includes an existing cloud preview/picker, required name, purpose, and optional instructions disclosure. Context reviews account access and opens Manage connections; it does not request new agent-specific permissions. Start offers Chat in Misty or, on supported native macOS/Windows hosts, opening Desktop companion controls after creation. Unsupported hosts explain the limitation and disable that option. Selection uses neutral outlines and a check icon. Step headings receive focus after navigation; busy creation disables editing and navigation. The existing server save persists the profile, and a retry after a post-save refresh failure reuses the created ID rather than creating a duplicate.
-
-### Companion and verification
-
-Companion retains the existing `DesktopSettingsSection`/`DesktopSettingsRow` composition, cloud preview, behavior switches, size control, voice/model controls, and live status/error/retry handlers. Its in-place nonmodal Sheet has no portal or backdrop, initially focuses Close, restores its trigger when available, and honors unsaved-form and busy guards.
-
-The redesign reuses the existing cloud variants and reduced-motion posters; custom emoji support remains in existing profile editing. Preserve raster provenance sidecars. No new raster artwork was generated for this implementation.
-
-Earlier production-component entry captures at `.impeccable/review/journal-entry-implementation/` use deterministic fixture data at desktop width. That earlier implementation pass reported 96 focused tests across 13 suites plus desktop build, typecheck, and scoped lint passing. These fixtures and mocked API tests do not establish native voice, cursor control, live account integration, or backend execution end to end.
-
-## Do's and Don'ts
-
-For the current workspace, preserve the directory, mounted conversation, guarded unsent template draft and disabled future capabilities. Apply the responsive layout and launch typography specified above. Earlier fixed-width and 24px welcome guidance below is retained for historical context and does not override this scoped implementation.
-
-### Do:
-
-- Do use the collection as the root entry and retain the existing conversation and optional overview after selection.
-- Do keep the shell desktop-only without breakpoint-triggered navigation or overview Sheets.
-- Do keep the 24px welcome heading and standard shared modest text-control radii, preserving the latest shared collection utility capsules.
-- Do convey status through accurate words and monochrome icons.
-- Do preserve account permissions, server persistence, historical scope, draft guards, and focus restoration.
-- Do reuse the existing cloud assets and their provenance records.
-
-### Don't:
-
-- Don't restore the old centered navigation strip as the default selected-agent layout.
-- Don't introduce colored status chrome, tinted selections, or an Agents-only control palette.
-- Don't turn Talk into a claim of realtime calling or Computer into a claim of cloud provisioning.
-- Don't infer outputs from attachments or citations, or invent per-agent connection permissions.
-- Don't add a nested roster chat tree, bottom account footer, or persistent companion strip inside the conversation.
-- Don't promote illustrative fixture data or mocked API coverage into live/native verification claims.
-- Don't apply this feature's composition or avatar sizing as product-wide rules.
-
-## September 30 follow-up
-
-The collection explicitly grows to fill the horizontal Agents workspace. Validate the real `AgentsPage` parent, not an isolated collection. Entry sections are Agents, Conversations, Activity, and Scheduled. Scheduled reuses the account schedule store and task editor; selecting a schedule opens the existing conversation/details workspace within Agents. Returning to the collection retains the unsent-message guard. Legacy `/scheduled` links and persisted tabs migrate with their task selection intact.
-
-Button groups are now unboxed. Shared `NavIsland` and selected-agent navigation retain semantic grouping and individual selected/focus states but no outer background or border. This supersedes capsule/island container styling described above. Content panels and popovers remain unchanged.
-
-### Agent switcher follow-up
-
-The conversation header’s agent name now opens a desktop Popover using shared Command search, matching the Chat switcher pattern. Show account agents; conversations join the list only while searching, since the sidebar lists recents. Mark the current agent and conversation with monochrome check icons. New agent and the selected agent's settings remain at the end.
-
-Opening or dismissing the switcher leaves the composer mounted. Selecting the current agent or conversation is a no-op. Selecting another goes through the existing draft/profile guard and is disabled during recording, uploads, saves or a running response. Accepted navigation updates the agent/conversation route and loads the selected history. Keep keyboard search, arrow/Enter selection, Escape dismissal and focus restoration. Use the existing shared controls and desktop interaction model.
-
-
-### October 1 collection simplification
-
-Agents opens on **All**, followed by Agents, Conversations, Activity, and Scheduled. All combines those four sources by last activity in the shared collection, with a Type column and each item opening its existing destination. No additional summary cards or section-launcher tiles are added. Activity opens the selected run's details; scheduled items open the scheduled task workspace. Explicit section URLs remain available.
-
-Idle empty collections retain their table/grid surface without extra “No activity yet” or onboarding blocks. Loading, recoverable errors, and user-opened details remain functional. The same quiet empty-collection treatment applies to the related Spaces, Journal, Planner, Chat, Scheduled, and Library entry pages.
-
-## Phase 1–2 folder work and shared run controls
-
-The current functional extension is described in PRODUCT.md. Historical UI-only restrictions still apply to catalog editors, integrations and future window modes; they do not prohibit the newly implemented shared lifecycle and bounded native folder executor.
-
-Use the same small monochrome folder-work row in the workspace and floating composer. Keep folder selection below the popup's identity and message input. A collapsed receipt exposes verified counts; its disclosure shows source → destination and text status, with Stop changes, Resume verified plan and Undo verified changes only where applicable. An undone receipt counts undone operations. Folder proposal review uses readable paths rather than JSON, including when access is restoring or unavailable. Existing shared Button/IconButton styling and the simple sidebar remain authoritative.
-
-## Phase 4 catalog behavior — October 3
-
-The approved sidebar and catalog columns remain unchanged. Saved methods use quiet rows with their version, enabled state, work location and direct actions. The protected-focus editor uses shared Dialog, Input, Textarea, Checkbox and OptionSelect controls; all selections and states remain monochrome. Required questions retain unanswered state, including yes/no questions, until the user answers them. Saving reports conflicts without discarding the draft. Templates open an unsent draft through the workspace's existing navigation guard. Scheduled workflows visibly retain their version and lead to the existing schedule editor; pinned instructions are read-only there.
-
-
-### Connected account summary — October 3, 2026
-
-The Context rows list the account's connected apps. Connected apps belong to the account and every agent can use them, so rows show only the app, its account alias and whether it is connected, waiting for sign-in or needs attention. Manage connections opens Apps. Retry and empty states remain distinct, and account changes immediately hide the prior account's rows. Shared Button, Cable icon, typography, geometry and monochrome tokens are unchanged.
-
-## Conversation management — October 3
-
-Conversation collection rows, workspace recents, history rows and the open conversation header expose Rename and Delete through the shared monochrome overflow menu. Rename uses a focused shared dialog; Delete requires confirmation and explains permanent deletion and draft removal. Both use the existing account conversation endpoints. Pending requests disable submission, failures keep the dialog and conversation available for retry, and successful deletion clears the open conversation route without switching agents. Active responses must stop before deletion.
-
-## One owner per control — October 3
-
-Each workspace control appears once. The sidebar header holds the agent switcher (the workspace's only agent identity); it replaces the static avatar and name. Inside the workspace, the conversation header shows only the open conversation's title; Back, the switcher and New chat are not repeated there, since the sidebar carries them and New task. Outside the workspace (the cross-agent New chat chooser), the full header is unchanged.
-
-The details panel starts with Status and no longer repeats the avatar and name, Talk (the composer's microphone does this) or Companion (the Computer row opens it). Its Conversations/Activity/Profile island is not shown inside the workspace: Recents and the switcher cover history, Recent activity has View all activity, and Agent settings opens the profile editor in the existing in-place sheet, titled Agent settings. In the panel, Context omits its explanatory line (available as the row's title), and activity titles clamp to two lines.
-
-Recents rows have no repeated chat glyph; their overflow menu appears on hover, on focus, on the current conversation or while open. The sidebar lists Projects (stored as conversation folders) above Recents under quiet muted section labels; a project row shows only its open or closed folder glyph and name, and its conversations sit one icon column in. Conversations move between projects and Recents by dragging (Alt+Shift+Up/Down from the keyboard), never from a menu. Long titles fade at the trailing edge rather than ending in an ellipsis, the overflow button floats over that fade, and right-click opens the same actions as the overflow menu. The sidebar's trailing edge resizes it (200–420px, remembered per device; double-click resets). Recents dots pulse while a run is queued or working; a settled run's dot is filled until the conversation is read on any device and hollow afterwards, and opening a conversation reads it once its run settles. A Get started card sits at the foot of the sidebar (Run your first task, Ask Misty on any page, Connect an app, Run a workflow), ticking steps off from what the account has done (the server records the first ask with a web page in front and the first workflow run, manual or scheduled), collapsible per device, and gone once every step is done. Folder work joins the work-location row under the composer, with its controls at the end of the row and any receipt spanning the full width below. A fully undone receipt is no longer shown.
-
-**Pull-tab panels (October 5, supersedes the panel toggle and rail above):** only the chat column (header and conversation) scrolls, with its scrollbar at the chat's right edge, so the scrollbar never overlays or shifts the panel column; the header sticks to the top of the chat column, the transcript grows, the composer sticks to the bottom, and the panel column runs the full height beside them, with the first drawer's title level with the conversation title. Each panel — Task, Activity, Reach and Files — is a drawer living past the window's right edge, with a pull tab on its leading edge; closed, only the tab shows: a 32×40px icon-only pull tab flush against the right wall, square and borderless on the wall side. Tabs carry no text (vertical labels are hard to read, especially with dyslexia); the panel's name is the tab's tooltip and accessible label and heads the open drawer. Clicking a tab toggles its drawer; dragging the tab pulls the drawer out (or pushes it back) under the pointer, and on release it settles open past a quarter of its width (closed below three quarters when pushing). Opening widens the drawer's window from the right edge so its leading edge appears first and the tab travels left with it, ending up sticking out of the drawer's top-left corner; the row grows at the same time, so the tabs below move down. Pulled out, a tab and its drawer float 18px off the wall; the offset follows the pull, so the tab peels off the wall as the drawer opens (the column is not itself a scroll container, so nothing clips their right edges); the drawer has a 12px radius except its top-left corner, which the open tab covers (hairline border, card surface) and the open tab shares its surface with no seam; tab and drawer cast one `drop-shadow(0 12px 24px)`. Open cards share a width (340px default, 260–640px). A 12px handle beside the column trades width with the conversation by drag or arrow keys (Shift for larger steps), keeping at least 360px for the conversation; the conversation is pushed, never covered. Cards cap at 70% of the body's height and scroll inside. The column never scrolls to reach a drawer: when open drawers would overflow it, they give up height in proportion to their size (never below their tab) and their bodies scroll instead; only a window too short for the closed tabs alone lets them run past the bottom, into the page scroll. Each open drawer's bottom edge is a resize handle (drag, or Up/Down with Shift for larger steps; double-click, Enter or Home returns it to fitting its content). The set height is the drawer's preference, at least 120px and its tab, at most the column; when open drawers would still overflow, they shrink as above. A short grip appears on hover, focus and drag. Dragging a tab mostly up or down instead of sideways reorders the drawers (a closed tab or a whole open drawer) with the shared pointer-reorder motion used by workspace tabs: the row lifts, neighbors slide out of its way over 180ms, and it settles into place on release; Alt+Shift+Up/Down moves the focused tab. The column is a stack: open drawers sit together at the top and closed tabs below, each group in its saved order, so a closed tab never sits between two open drawers; rows that change places when a drawer opens or closes slide there over 260ms. Reordering stays within a group. The order lasts while the Agents page stays open. Rows and cards animate over 260ms (`cubic-bezier(0.2, 0.8, 0.2, 1)`); reduced motion switches instantly. A card mounts on first opening and stays mounted, inert and hidden while closed. Open panels stay open across conversations. The tabs hide while agent settings are open, for the new-chat chooser and below a 760px workspace. Source: `page/AgentSidePanels.tsx`, `page/AgentPullTabRow.tsx`, `page/agentPanels.tsx`, `page/AgentPanelContents.tsx`.
-
-Tool activity inside an expanded task is a quiet 12px disclosure reading "N steps" (plus "· N failed" when any step errored) with a wrench and a rotating chevron, not a native summary marker. It opens a bounded (260px) timeline: one row per tool call, with its start, progress and end events merged, a humanized tool name (`browser_navigate` → Browser navigate), and the latest text or error clamped to three lines. A hairline joins the step icons. Errors use the alert icon and stay monochrome. Source: `components/ToolActivity.tsx`.
-
-## Answers and progress — October 10
-
-Each prompt's replies form one turn. The last visible reply renders as the answer, with its citations, actions and copy/retry controls. Above it, in order, the turn shows its work the way Claude does: what Misty said while working (earlier replies such as "Got it, starting…", and text the model wrote before calling a tool) as ordinary prose, and each run of consecutive tools folded into one 13px muted row, "Used 3 tools (1 failed)" or the single tool's own words ("Listed tabs"), with a chevron that opens a list on a left hairline. Each listed tool shows a check or an x and a "failed" word, never color. While a tool runs, its row reads "Listing tabs" followed by three dots that fill in turn; Misty never shows a spinner for working text. Live replies build this timeline from tool events; replies loaded from history fetch it once from `GET /ai/invocations/{id}/progress`, rebuilt from the stored events. Source: `progress/` and `conversationTurns` in `AgentConversationView.tsx`.
-
-## Composer control bar — October 3
-
-This supersedes the work-location row under the composer. A control bar now sits on top of the composer as a tab behind its top edge: 14px inset, 1px border without a bottom edge, top corners at `--radius-xl`, and the card surface at 55%. Its 28px controls use 12px muted text that brightens on hover or while open. Folder work starts on the left; while a task works in a separate window, Show agent window joins it. There is no work-location choice: screens open on demand (see docs/design/agent-architecture/BRIEF.md, Phase 3). Usage sits at the end: a 36px monochrome meter, the weekly percentage and, while drafting, "· ≈N% this message" (hidden below the 760px container width). The usage popover opens upward with Weekly AI usage (used of limit, reserved, reset date) and This message (billing's estimate, ceiling and explanation). Folder receipts, errors and window notices span the full width below the controls. The Agents composer omits its footer estimate (`hideUsageEstimate`); other composers keep it. Sources: `workspace/AgentControlBar.tsx`, `workspace/AgentUsageControl.tsx` and `useCommandUsageEstimate` in `global-search/CommandUsageEstimate.tsx`.
-
-## Conversation-first entry (2026-10-05)
-
-Supersedes the Agents collection. `/agents` opens the selected agent's New task conversation: the agent in the URL, else the last-used agent, else Misty, else the first agent. There is no directory page and no Back control.
-
-- **Sidebar:** the agent switcher, then New task, Workflows, Integrations and Recents. No footer.
-- **Switcher:** agents with a checkmark on the current one, conversations only while searching, then New agent and the selected agent's settings.
-- **Empty composer:** the launch prompt, the one-row composer with its strip (see Composer strip below), and nothing else: no suggestions, pills or recent work (Recents live in the sidebar, templates on the Templates page; suggestions were tried and removed October 15, 2026); the folder control appears above the composer only while a folder is in progress. What the agent can reach (this computer, shared folders, connected apps) lives in the Reach drawer, not on the landing.
-- **Usage:** an 18px monochrome ring beside the mic that opens the usage popover.
-- **Model:** a chip in the composer strip. Default follows the account's Thinking choice in Settings › Agents › Models; picking a model pins it to this conversation only. The menu is searchable, grouped by provider, and marks the current choice with a checkmark.
-- **Header:** the conversation title only. Rename and Delete live on the Recents row's ⋯ menu. Status never appears in the header.
-- **No side panel (October 9, 2026):** the conversation has no Details, Task, Sources or Files panel and no Activity page. A quiet Working status ends the title bar while a task runs; run status lives on the Recents rows. Goal sits under Act and Plan in the composer's mode menu and opens a dialog with the goal and the approved plan's live checklist.
-- **Workflows:** one list with All · Scheduled chip tabs. A workflow owns at most one schedule: any number of rules (specific dates, every N hours within a window, days, weeks on chosen weekdays, months on days or "the first Monday", years in chosen months) in one timezone, plus skipped dates, scheduled-run inputs and an on/off switch. Scheduled runs always use the workflow's latest version. Rows show the schedule in words and the next run; Run now, Edit, Turn off and Schedule act directly. `?view=workflows` and the retired `?view=scheduled`, `?view=automations` and `/scheduled` links open it; the retired `?view=activity` opens the task.
-- **Workflows (October 15, 2026):** one page for Workflows; templates are workflows too. It lists the saved ones (a template saved earlier appears among them and still opens a draft to review), then a "Start from an example" gallery of starter workflows with category chips. Replaces the separate Workflows and Templates pages and the short-lived Catalog; old ?view links open it. Integrations lists apps as tiles: connected apps lead the grid, and clicking one opens a popup card with that app's accounts (Reconnect, Disconnect, Add account); there is no separate connected-accounts list.
-- **Integrations:** page heading and intro, then chip tabs: Apps, Skills and Projects (Projects desktop only; it opens with this computer's companion status and a Companion settings button). Skills live only here. Apps holds Connected apps and Add an app. Connected apps show one row per app; an app with several accounts heads a group with each account beneath it, labeled by alias or connection date, plus Add account. Brand logos use the shared `BrandIcon` artwork; everything around them stays monochrome.
-
-### Plan mode, questions and goals (October 6, 2026)
-
-- **Plan:** a choice in the strip's Mode menu beside Manual and Auto; Shift+Tab also switches. Plan mode gives the composer a dashed frame and a "Plan with…" placeholder. The next message uses the new mode; a running turn keeps its own.
-- **Question card:** sits above the composer. It shows one question at a time with a header chip and "n of m". Options are rows with a checkmark (radio, or checkbox for multi-select) plus an Other field. Number keys pick, Enter advances or submits, and Esc collapses it to a strip. Typing a message instead supersedes the questions. Answers given while the run waited appear under that run's reply as "You answered"; answers after a hand-off are a visible user turn.
-- **Proposed plan:** a card at the end of the transcript shows numbered steps, with risk as an icon and a word, never color. Details expand; assumptions and "Done when" follow, then earlier versions. The actions are Run plan (primary), Edit, Keep planning and Dismiss. Edit makes steps renamable, describable, reorderable (shared pointer reorder or Alt+Shift+Up/Down), addable and removable, and saves as a new version authored by you.
-- **Task drawer:** opens with Goal, then Plan.
-  - Goal shows the objective, its status as an icon and words, the continuation count, a token budget bar, "Done when" with proof under each proven criterion, and the latest report. Its actions are Pause, Resume, Double budget and resume, Clear goal, and New goal. Status reads "Paused while planning" in Plan mode and "Waiting for your answer" while questions are open.
-  - Plan is a live checklist ticked by the agent. An approved plan can become a goal.
-- **Goal continuations:** turns Misty started toward a goal read as a quiet "Continued toward the goal" label rather than a bubble.
+- **Question card:** above the composer, one question at a time with "n of m". Options are rows with a checkmark plus an Other field. Number keys pick, Enter advances or submits, Esc collapses it. Typing a message instead supersedes the questions.
+- **Proposed plan:** a card at the end of the transcript with numbered steps; risk is an icon and a word, never color. Actions: Run plan (primary), Edit, Keep planning and Dismiss. Edited plans save as a new version.
+- **Goal:** the objective, its status in words, the continuation count, a budget bar, "Done when" with proof, and the latest report, with Pause, Resume, Double budget and resume, Clear goal and New goal. Turns Misty starts toward a goal read as a quiet "Continued toward the goal" label.
 - **Commands:** `/plan [message]` switches to Plan mode; `/goal <objective>` sets a goal and starts it.
 
-## Composer strip — October 15, 2026
+## Workflows and Integrations
 
-Supersedes the sliders popover and the two-row composer. The message box is one row (attach, text, voice, send, `MistyComposer layout="inline"`), and the controls sit in one quiet strip beneath it (`components/ComposerStrip.tsx`). Chips are labeled, have no chevrons, and brighten on hover or while their menu is open.
-
-- **Order:** Device, Project, Mode, Code on the left; then Model and the usage ring at the far end. There is no Thinking control: tasks run at Normal.
-- **Device:** this computer, or another device whose own policy lets agents in. Offline devices are listed with their state in words and can't be picked. "Add a device" opens Settings › Devices. With another device picked, the Project chip steps aside, since that device's shared folders apply.
-- **Project:** projects on this computer only. Coding is independent of it.
-- **Mode:** Manual, Auto or Plan as checkmarked choices, then Goal. Manual is the old Ask.
-- **Code:** the conversation's coding tool, with or without a project. Settings default, then each tool with its official logo (`CodingToolIcon`, shared `BrandIcon`; tools without artwork get a plain terminal mark). Tools not installed or signed in are listed but can't be picked, with the reason in words. "Manage tools" opens Settings › Coding tools.
-- **Narrow (the Misty panel, a container narrower than 560px):** every chip shows only its icon; names stay in tooltips and for assistive technology.
-- **Panel header:** the agent's avatar (the Misty sprite for Misty) opens the agent switcher; beside it a text-only conversation picker (search, recent conversations with the state in words when a run didn't finish well, View all). The panel has no sidebar, so the picker is its Recents; it shows no landing content.
-- **Menus carry no helper copy.** Names and short states only.
+- **Workflows:** one page. Saved workflows (templates included) list first, then a "Start from an example" gallery with category chips. A workflow owns at most one schedule: any number of rules in one timezone, plus skipped dates, inputs and an on/off switch; scheduled runs use the latest version. Rows show the schedule in words and the next run. A workflow works with connected apps or in this Misty window.
+- **Integrations:** chip tabs for Apps, Skills and Projects (Projects on desktop only). Apps are tiles with connected apps first; a tile opens a popup card with that app's accounts (Reconnect, Disconnect, Add account).

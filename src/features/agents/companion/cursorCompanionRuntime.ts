@@ -1,7 +1,7 @@
 import { assistantApi } from "@/api/assistant/api";
 import { currentLessonConversation } from "../lessons/lessonEntry";
 import { frontMediaContext } from "./mediaContext";
-import { useSettingsProfiles } from "@/features/settings/sync";
+import { useDevicePreferences } from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -23,7 +23,7 @@ export function startCursorCompanion(accountId: string) {
   const voice = new CursorCompanionVoice(s);
   const typed = new CursorCompanionTypedTurns(s, voice);
   s.pointer.onStep = (step) => void typed.continueGuide(step).catch((e) => s.fail(s.turn, e));
-  const stopPreferences = useSettingsProfiles.subscribe(s.applyPreferences);
+  const stopPreferences = useDevicePreferences.subscribe(s.applyPreferences);
   s.applyPreferences();
   const unsubscribe = useMistyStore.subscribe(() => {
     if (s.conversationScope && !s.creatingConversation && !s.originIsCurrent(s.conversationScope))

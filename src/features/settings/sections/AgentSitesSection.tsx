@@ -24,8 +24,8 @@ export function AgentSitesSection() {
     setError("");
     try {
       setSettings((await aiSurfaceApi.updateAgentSites(change)).settings);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "This setting couldn’t be saved.");
+    } catch {
+      setError("Site access could not be saved. Try again.");
     } finally {
       setWorking(false);
     }

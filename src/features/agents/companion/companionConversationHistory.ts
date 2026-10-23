@@ -1,4 +1,4 @@
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiConversation, GlobalAiMessage } from "@/features/misty/types";
 import type { SavedVoiceTurn } from "./companionConversation";
 
 /** Keep a voice turn in its original position while a delegated task progresses. */

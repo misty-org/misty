@@ -1,8 +1,7 @@
 use tauri::Webview;
 
 #[cfg(target_os = "macos")]
-#[path = "browser_frame_rate_macos.rs"]
-mod frame_rate;
+use super::browser_frame_rate_macos as frame_rate;
 
 pub(super) fn configure_browser_frame_rate(webview: &Webview) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -153,7 +152,7 @@ pub(super) fn configure_browser_webview(
     webview: &Webview,
     native_live_resize: bool,
 ) -> Result<(), String> {
-    super::browser_site_permissions::install(webview)?;
+    super::site_settings::permissions::install(webview)?;
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSViewLayerContentsRedrawPolicy};
     webview
         .with_webview(move |platform_webview| unsafe {
@@ -274,16 +273,11 @@ pub(super) fn native_macos_safari_user_agent() -> Option<String> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(super) fn configure_main_webview_pointer_guard(_webview: &Webview) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(not(target_os = "macos"))]
 pub(super) fn configure_browser_webview(
     webview: &Webview,
     _native_live_resize: bool,
 ) -> Result<(), String> {
-    super::browser_site_permissions::install(webview)
+    super::site_settings::permissions::install(webview)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -451,14 +445,6 @@ pub(super) async fn clear_browser_website_data(
         .await
         .map_err(|_| "Clearing website data timed out.".to_owned())?
         .map_err(|_| "Clearing website data was cancelled.".to_owned())
-}
-
-#[cfg(not(target_os = "macos"))]
-pub(super) async fn remove_browser_data_store(
-    _: &tauri::AppHandle,
-    _: [u8; 16],
-) -> Result<(), String> {
-    Err("Website accounts require Misty on a Mac.".into())
 }
 
 /// WebKit owns rasterization; the shell does not need a second DOM renderer.

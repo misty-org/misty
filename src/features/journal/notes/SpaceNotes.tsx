@@ -1,19 +1,13 @@
 import { useAuth } from "@/features/auth";
 import { useSpacesStore } from "@/features/spaces";
-import { useWorkspaceViewTitle } from "@/features/workspace";
 import { useMemo } from "react";
 import { NewNoteDialog } from "./components/NewNoteDialog";
 import { NotePreview } from "./components/NotePreview";
 import { NoteReadingPane } from "./components/NoteReadingPane";
-import type { SpaceNotesProps } from "./model/SpaceNotes";
-import { SpaceNotesView, type NotesViewRuntime } from "./SpaceNotesView";
-import { useNotesStore } from "./store";
-export type { SpaceNotesProps } from "./model/SpaceNotes";
+import { SpaceNotesView, type NotesViewRuntime, type SpaceNotesProps } from "./SpaceNotesView";
+import { useNotesStore } from "./store/useNotesStore";
+export type { SpaceNotesProps } from "./SpaceNotesView";
 const emptyMembers: never[] = [];
-function Integration(props: Parameters<NotesViewRuntime["renderIntegration"]>[0]) {
-  useWorkspaceViewTitle(props.workspaceTabId, props.title);
-  return null;
-}
 export function SpaceNotes(props: SpaceNotesProps) {
   const { user } = useAuth();
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);
@@ -50,7 +44,6 @@ export function SpaceNotes(props: SpaceNotesProps) {
           }),
         );
       },
-      renderIntegration: (input) => <Integration {...input} />,
     }),
     [user, referenceOnly, members, props.spaceId],
   );

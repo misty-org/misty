@@ -9,7 +9,7 @@ export function developmentBuildEnvironment(
   root = repository,
 ): NodeJS.ProcessEnv {
   if (args[0] !== "dev" || args.includes("--help") || args.includes("-h")) return {};
-  const profile = environment.MISTY_DESKTOP_PROFILE ?? environment.MISTY_PROFILE;
+  const profile = environment.MISTY_PROFILE;
   if (profile === undefined) return {};
   if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(profile)) {
     throw new Error("Invalid desktop development profile name.");

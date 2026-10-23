@@ -7,22 +7,21 @@ import {
 import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button } from "@/shared/ui";
+import { Button, SkeletonList } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "../components/DesktopSettingsUI";
-import { definitionById, fromLegacy } from "../profiles/registry";
-import { useSettingsProfiles } from "../profiles/store";
+import { definitionById, fromLegacy } from "../devicePreferences/registry";
+import { useDevicePreferences } from "../devicePreferences/store";
 import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { DevicesSettings } from "./devices/DevicesSettings";
-import type { SettingsContentProps } from "../settingsTypes";
 import { useSettingsStore } from "../store/useSettingsStore";
 import { AgentGrantsSection } from "./AgentGrantsSection";
-import { AppActionsSection } from "./AppActionsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { InboundTasksSection } from "./InboundTasksSection";
+import { PaymentsAskSection } from "./PaymentsAskSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "./PreferenceRow";
 export function AgentDefaultsSection() {
@@ -38,20 +37,27 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
       </Section>
-      <Section title="Chat panel">
+      <Section
+        title="Chat panel"
+        description="Choose which side of the current window hosts the agent panel."
+      >
         <PanelSideRow />
       </Section>
+      <ScreenLocationSection />
     </>
   );
 }
 function PanelSideRow() {
   const d = definitionById.get("agents.panel_side")!;
   const store = useSettingsStore();
-  const ready = useSettingsProfiles((s) => s.ready);
+  const ready = useDevicePreferences((s) => s.ready);
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "right");
   return (
-    <Row label={d.label}>
+    <Row
+      label={d.label}
+      description="Sets the default for new chats; change it any time with Shift+Tab."
+    >
       <ChoiceControl
         disabled={store.working || !ready}
         value={value}
@@ -67,11 +73,14 @@ function PanelSideRow() {
 function CollaborationModeRow() {
   const d = definitionById.get("agents.collaboration_mode")!;
   const store = useSettingsStore();
-  const ready = useSettingsProfiles((s) => s.ready);
+  const ready = useDevicePreferences((s) => s.ready);
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "act");
   return (
-    <Row label={d.label} description="New chats research and propose before changing anything.">
+    <Row
+      label={d.label}
+      description="Sets the default for new chats; change it any time with Shift+Tab."
+    >
       <SwitchControl
         disabled={store.working || !ready}
         checked={value === "plan"}
@@ -80,40 +89,21 @@ function CollaborationModeRow() {
     </Row>
   );
 }
-export function NativeAvailability({ feature }: { feature: string }) {
-  return (
-    <Section title={feature}>
-      <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-        Open Misty on a supported device to configure {feature.toLowerCase()}. Your settings remain
-        available here.
-      </p>
-    </Section>
-  );
-}
 export function AgentConnectionsSection() {
-  return (
-    <>
-      <AppActionsSection />
-      <InboundTasksSection />
-      <ScreenLocationSection />
-    </>
-  );
+  return <InboundTasksSection />;
 }
 export function CompanionSection() {
-  return hasTauriInternals() ? (
-    <CompanionAppearanceSettings />
-  ) : (
-    <NativeAvailability feature="Cursor" />
-  );
+  return hasTauriInternals() ? <CompanionAppearanceSettings /> : null;
 }
 export function DevicesSection() {
-  return hasTauriInternals() ? <DevicesSettings /> : <NativeAvailability feature="Devices" />;
+  return hasTauriInternals() ? <DevicesSettings /> : null;
 }
 /** What agents may do: remembered approvals (server-owned), project folders on a desktop, and
  * sites they only read. */
 export function AgentPermissionsSection() {
   return (
     <>
+      <PaymentsAskSection />
       <AgentGrantsSection />
       {hasTauriInternals() ? <AgentScopeList /> : null}
       <AgentSitesSection />
@@ -122,14 +112,42 @@ export function AgentPermissionsSection() {
 }
 function AgentScopeList() {
   const [scopes, setScopes] = useState<AgentScope[]>([]),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true);
   const refresh = () =>
     agentsDeviceSnapshot()
-      .then((s) => setScopes(s.scopes))
-      .catch((e) => setError(String(e)));
+      .then((s) => {
+        setScopes(s.scopes);
+        setError("");
+      })
+      .catch(() => setError("Project folders could not be loaded. Try again."))
+      .finally(() => setLoading(false));
   useEffect(() => {
     void refresh();
   }, []);
+  if (loading)
+    return (
+      <Section title="Projects">
+        <SkeletonList label="Projects" rows={2} leading="none" trailing />
+      </Section>
+    );
+  if (!scopes.length)
+    return error ? (
+      <Section title="Projects">
+        <p role="alert" className="text-sm text-cream-muted">
+          Project folders could not be loaded.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          onClick={() => void refresh()}
+        >
+          Try again
+        </Button>
+      </Section>
+    ) : null;
   return (
     <Section
       title="Projects"
@@ -159,8 +177,8 @@ function AgentScopeList() {
                 try {
                   await removeProject(s.id);
                   await refresh();
-                } catch (e) {
-                  setError(String(e));
+                } catch {
+                  setError("Project access could not be removed. Try again.");
                 }
               })()
             }
@@ -169,30 +187,28 @@ function AgentScopeList() {
           </Button>
         </Row>
       ))}
-      {!scopes.length && (
-        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No projects yet. Add one from a chat’s Project menu.
-        </p>
-      )}
       {error && (
-        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
+        <p role="alert" className="py-2 text-sm text-cream-muted">
           {error}
+          <Button
+            type="button"
+            variant="link"
+            className="ml-2 h-auto p-0"
+            onClick={() => void refresh()}
+          >
+            Try again
+          </Button>
         </p>
       )}
     </Section>
   );
 }
-/** The version, and the way to the account on the website, which owns billing and account data. */
-export function AboutSection(props: SettingsContentProps) {
+/** The way to the account on the website, which owns billing and account data. */
+export function AboutSection() {
   return (
-    <Section title="About">
-      <Row label="Version">
-        <span className="text-[15px] text-cream-muted">
-          {props.app?.version ?? "Available in the installed app"}
-        </span>
-      </Row>
+    <Section title="Account">
       <Row
-        label="Account"
+        label="Plan and billing"
         description="Your plan, billing, invites and account data are managed on the Misty website."
       >
         <Button variant="outline" size="sm" onClick={() => void openAccountSettingsInBrowser()}>

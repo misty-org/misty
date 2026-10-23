@@ -2,19 +2,19 @@
 //! stores, no renderer IPC, and no network pages or existing Misty profiles.
 //! Run: cargo run --manifest-path src-tauri/Cargo.toml --example cookie_store_probe
 
+// Mirrors `infra::website_data`, so the modules' `super::` paths resolve here too.
 #[cfg(target_os = "macos")]
-#[path = "../src/infra/browser_cookie_restore.rs"]
-mod browser_cookie_restore;
-#[cfg(target_os = "macos")]
-#[path = "../src/infra/browser_cookie_store.rs"]
-mod browser_cookie_store;
-#[cfg(target_os = "macos")]
-#[allow(
-    dead_code,
-    reason = "the cookie modules use only part of the coverage helpers"
-)]
-#[path = "../src/infra/browser_data_coverage.rs"]
-mod browser_data_coverage;
+#[path = "../src/infra/website_data"]
+mod website_data {
+    pub(super) mod cookie_restore;
+    #[path = "cookie_store_macos.rs"]
+    pub(super) mod cookie_store;
+    #[allow(
+        dead_code,
+        reason = "the cookie modules use only part of the coverage helpers"
+    )]
+    pub(super) mod coverage;
+}
 #[cfg(target_os = "macos")]
 // This macOS probe only needs WebKit identifiers; folder helpers belong to the host.
 #[expect(
@@ -26,7 +26,7 @@ mod browser_profile;
 
 #[cfg(target_os = "macos")]
 mod probe {
-    use super::{browser_cookie_store as cookies, browser_profile};
+    use super::{browser_profile, website_data::cookie_store as cookies};
     use block2::RcBlock;
     use misty_browser_sync::document::credentials::{Cookie, SameSite};
     use objc2_foundation::{NSError, NSUUID};
@@ -172,7 +172,7 @@ mod probe {
     }
 
     async fn staged_restore(a: &Webview, b: &Webview, a_id: &str, b_id: &str) -> Result<()> {
-        use super::browser_cookie_restore::StagedCookieProfile;
+        use super::website_data::cookie_restore::StagedCookieProfile;
         use misty_browser_sync::{
             crypto::{generate_sync_secret, DeviceKey, VaultRoot, VaultScope},
             document::{self, credentials::Area, Document},

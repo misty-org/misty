@@ -16,7 +16,7 @@ import {
 } from "@/shared/ui";
 import { useBrowserDownloadsStore } from "../library/downloadsStore";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
-import { useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 
 const ranges = [

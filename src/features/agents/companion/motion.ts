@@ -1,4 +1,4 @@
-// Ported from vendor/clicky/leanring-buddy/OverlayWindow.swift.
+// Ported from Clicky (https://github.com/farzaa/clicky), leanring-buddy/OverlayWindow.swift.
 export interface Point {
   x: number;
   y: number;

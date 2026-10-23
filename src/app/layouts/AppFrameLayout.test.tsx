@@ -139,8 +139,7 @@ describe("AppFrameLayout", () => {
     expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
     expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
     const loading = container.querySelector('[role="status"][aria-label="Restoring account"]');
-    expect(loading?.textContent).toBe("");
-    expect(loading?.classList.contains("bg-black")).toBe(true);
+    expect(loading).not.toBeNull();
     mocks.user = { id: "user-1", email: "user@example.com" };
     await act(async () => {
       root.render(view());

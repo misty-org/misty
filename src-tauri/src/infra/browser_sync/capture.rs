@@ -1,6 +1,6 @@
 //! Native-only cookie observations. The read lease spans the engine callback and
 //! durable acceptance, so an account switch cannot publish into its successor.
-use super::super::browser_data_budget::Limit;
+use super::super::website_data::budget::Limit;
 use super::*;
 use misty_browser_sync::store::BrowserCaptureState;
 

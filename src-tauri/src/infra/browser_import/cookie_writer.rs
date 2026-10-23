@@ -33,7 +33,9 @@ pub async fn write(
             let cookie_store = store.httpCookieStore();
             let natives: Vec<_> = cookies
                 .iter()
-                .filter_map(|cookie| super::super::browser_cookie_store::import_cookie(cookie).ok())
+                .filter_map(|cookie| {
+                    super::super::website_data::cookie_store::import_cookie(cookie).ok()
+                })
                 .collect();
             let total = natives.len();
             if total == 0 {
@@ -74,7 +76,7 @@ pub async fn write(
     profile: Option<&str>,
     cookies: Vec<Cookie>,
 ) -> Result<usize, String> {
-    use super::super::{browser_cookie_store as store, browser_profile_view::ProfileView};
+    use super::super::{browser_profile_view::ProfileView, website_data::cookie_store as store};
     let identity = profile
         .map(str::to_owned)
         .unwrap_or_else(super::super::browser_profile::legacy_profile_identity);

@@ -2,7 +2,6 @@ import { useCallback, type ComponentProps } from "react";
 import { registerShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceViewFocused } from "@/features/workspace";
 import { BrowserAnnotationLayerView } from "./BrowserAnnotationLayerView";
-export * from "./BrowserAnnotationLayerView";
 export function BrowserAnnotationLayer(
   props: Omit<ComponentProps<typeof BrowserAnnotationLayerView>, "registerCommand">,
 ) {

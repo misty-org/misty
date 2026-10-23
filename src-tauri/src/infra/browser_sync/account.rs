@@ -60,7 +60,7 @@ pub(in crate::infra) async fn change_account_if<T>(
     stop_all().await;
     #[cfg(desktop)]
     if let Some(app) = app {
-        super::super::agent_workspace::stop_account_tasks(app)?;
+        super::super::agents::workspace::stop_account_tasks(app)?;
         super::super::browser::close_account_views(app)?;
     }
     #[cfg(not(desktop))]

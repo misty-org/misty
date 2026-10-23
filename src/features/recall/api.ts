@@ -1,7 +1,7 @@
 import { apiRequest } from "@/api/client";
 import { windowSpaceId } from "./windowSpace";
 
-export type MemoryKind = "page" | "voice" | "recording" | "note";
+export type MemoryKind = "page" | "voice" | "recording" | "note" | "screen";
 
 export interface MemoryEvent {
   id: string;
@@ -14,6 +14,10 @@ export interface MemoryEvent {
   same_as?: string;
   dwell_ms: number;
   occurred_at: string;
+  /** What was in front, and the capture session that read it (screen moments). */
+  app?: string;
+  window_title?: string;
+  session_id?: string;
 }
 
 export interface MemoryStatus {
@@ -41,6 +45,9 @@ export const memoryApi = {
     dwell_ms?: number;
     occurred_at?: string;
     ref_id?: string;
+    app?: string;
+    window_title?: string;
+    session_id?: string;
     /** The Space of the window the page was in; incognito windows record nothing. */
     space_id?: string;
   }) =>

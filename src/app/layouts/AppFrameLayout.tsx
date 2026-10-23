@@ -1,15 +1,15 @@
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceRecoveryRetry";
-import { BrowserSyncStartup } from "@/features/browser-workspace/BrowserSyncStartup";
-import { BrowserSyncSleepOverlay } from "@/features/browser-workspace/BrowserSyncSleepOverlay";
-import { BrowserSyncBridge } from "@/features/browser-workspace/BrowserSyncBridge";
-import { PageStateBridge } from "@/features/browser-workspace/PageStateBridge";
+import { BrowserSyncStartup } from "@/features/browser-sync/BrowserSyncStartup";
+import { BrowserSyncSleepOverlay } from "@/features/browser-sync/BrowserSyncSleepOverlay";
+import { BrowserSyncBridge } from "@/features/browser-sync/BrowserSyncBridge";
+import { PageStateBridge } from "@/features/browser-sync/PageStateBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import { isAuthPath } from "@/features/app-shell";
@@ -19,12 +19,29 @@ import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
 import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
 
-const DesktopLayout = lazy(() =>
-  import("@/app/layouts/DesktopLayout").then(({ DesktopLayout }) => ({ default: DesktopLayout })),
-);
+// Let the initial Misty flight finish before revealing the app, even when its
+// code is already cached. Load the layout alongside account/workspace restore so
+// they can share one stable loading scene instead of swapping Suspense fallbacks.
+const initialFlight = new Promise<void>((resolve) => setTimeout(resolve, 2_000));
+const desktopLayoutPromise = Promise.all([
+  import("@/app/layouts/DesktopLayout"),
+  initialFlight,
+]).then(([layout]) => ({ default: layout.DesktopLayout }));
+const DesktopLayout = lazy(() => desktopLayoutPromise);
 
 export function AppFrameLayout() {
   const { user, transitioning } = useAuth();
+  const [layoutReady, setLayoutReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void desktopLayoutPromise.then(
+      () => active && setLayoutReady(true),
+      () => active && setLayoutReady(true),
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
   const recovery = useWorkspaceRecoveryState();
   const location = useLocation();
   const isAuthRoute = isAuthPath(location.pathname);
@@ -57,9 +74,11 @@ export function AppFrameLayout() {
     return <LoadingScreen fullScreen label="Restoring workspace" />;
   }
 
+  if (!layoutReady) return <LoadingScreen fullScreen label="Opening Misty" />;
+
   if (isAuthRoute) {
     return (
-      <Suspense fallback={<LoadingScreen fullScreen />}>
+      <Suspense fallback={null}>
         <DesktopLayout getRouteId={desktopRouteIdFromPath} />
       </Suspense>
     );
@@ -71,7 +90,7 @@ export function AppFrameLayout() {
         key={`sync-startup:${user?.id ?? "anonymous"}`}
         accountId={syncAllowed ? (user?.id ?? "") : ""}
       >
-        <Suspense fallback={<LoadingScreen fullScreen />}>
+        <Suspense fallback={null}>
           <ConnectedDevicesProvider>
             <DesktopLayout getRouteId={desktopRouteIdFromPath} />
           </ConnectedDevicesProvider>

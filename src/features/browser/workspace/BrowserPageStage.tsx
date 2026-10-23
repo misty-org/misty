@@ -1,7 +1,6 @@
-import { AgentTabAway } from "@/features/agents";
 import type { browserInternalPage } from "@/features/workspace";
 import { blankBrowserUrl, type WorkspaceView } from "@/features/workspace";
-import { useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { cn } from "@/shared/ui";
 import { useLayoutEffect, type RefObject } from "react";
@@ -12,7 +11,7 @@ import { BrowserMistyRow } from "./BrowserMistyPanel";
 import { BrowserNativeRuntimeRequired } from "./BrowserNativeRuntimeRequired";
 import { BrowserOfflinePage } from "./BrowserOfflinePage";
 import { ReaderView } from "./ReaderView";
-import { browserViewportFrameStyle, browserViewportStageStyle } from "./BrowserViewportMenu";
+import { browserViewportFrameStyle, browserViewportStageStyle } from "./browserViewport";
 import type { ReaderArticle } from "./readerArticle";
 import type { useBrowserPageCommands } from "./useBrowserPageCommands";
 
@@ -29,7 +28,6 @@ export function BrowserPageStage({
   internalPage,
   profileId,
   isOffline,
-  away,
   nativeRuntime,
   commands,
   navigate,
@@ -48,7 +46,6 @@ export function BrowserPageStage({
   internalPage: ReturnType<typeof browserInternalPage>;
   profileId: string | undefined;
   isOffline: boolean;
-  away: boolean;
   nativeRuntime: boolean;
   commands: ReturnType<typeof useBrowserPageCommands>["commands"];
   navigate: (address: string) => void;
@@ -58,7 +55,7 @@ export function BrowserPageStage({
 }) {
   // Until the native page is on screen here, nothing sits behind the transparent renderer.
   const pagePresented = useBrowserRuntimeStore((state) => Boolean(state.presented[tab.id]));
-  const awaitingPage = nativeRuntime && !pagePresented && !internalPage && !away && !isOffline;
+  const awaitingPage = nativeRuntime && !pagePresented && !internalPage && !isOffline;
   usePresentedPageHost(tab.id, nativeRuntime && pagePresented);
   return (
     <BrowserMistyRow tabId={tab.id}>
@@ -97,9 +94,7 @@ export function BrowserPageStage({
           data-browser-page-presented={nativeRuntime && pagePresented ? "" : undefined}
           data-browser-viewport={viewport}
         >
-          {away ? (
-            <AgentTabAway />
-          ) : internalPage ? (
+          {internalPage ? (
             <BrowserInternalPage
               page={internalPage}
               profileId={profileId}
@@ -136,7 +131,7 @@ const presentedHosts = new Set<string>();
  * Marks the root while any mounted page host has its page on screen, which turns the window's
  * transparent path on (`theme.css`). It changes in the same commit as the host's own attribute.
  */
-function usePresentedPageHost(tabId: string, presented: boolean): void {
+export function usePresentedPageHost(tabId: string, presented: boolean): void {
   useLayoutEffect(() => {
     if (!presented) return;
     presentedHosts.add(tabId);

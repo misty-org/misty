@@ -83,8 +83,6 @@ const mocks = vi.hoisted(() => {
     resetSpacesAccountState: vi.fn(),
     resetAgentAccountState: vi.fn(),
     resetNotesAccountState: vi.fn(),
-    resetSearchAccountState: vi.fn(),
-    explorerSetState: vi.fn(),
   };
 });
 vi.mock("./store/useAccountStore", () => ({
@@ -148,14 +146,6 @@ vi.mock("@/features/app-shell", () => {
     }),
   };
 });
-vi.mock("@/features/files/workspace/explorer", () => ({
-  useExplorerStore: {
-    setState: mocks.explorerSetState,
-  },
-}));
-vi.mock("@/features/files/workspace/search", () => ({
-  resetSearchAccountState: mocks.resetSearchAccountState,
-}));
 vi.mock("@/features/spaces", () => ({
   resetSpacesAccountState: mocks.resetSpacesAccountState,
   useSpacesStore: mocks.useSpacesStore,
@@ -234,8 +224,6 @@ describe("AuthProvider account switching", () => {
     mocks.resetSpacesAccountState.mockClear();
     mocks.resetAgentAccountState.mockClear();
     mocks.resetNotesAccountState.mockClear();
-    mocks.resetSearchAccountState.mockClear();
-    mocks.explorerSetState.mockClear();
     auth = null;
     container = document.createElement("div");
     document.body.append(container);
@@ -708,6 +696,7 @@ describe("AuthProvider account switching", () => {
     });
     expect(mocks.accountLogout).toHaveBeenCalledWith(mocks.accountA.id);
     expect(mocks.deactivateActiveAccount).toHaveBeenCalled();
+    expect(mocks.removeSavedAccountSession).toHaveBeenCalledWith(mocks.accountA.id);
     expect(mocks.activateAccountSession).not.toHaveBeenCalled();
     expect(auth?.user).toBeNull();
     expect(auth?.transitioning).toBe(false);

@@ -1,5 +1,7 @@
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import { Button } from "@/shared/ui";
+import { LedgerTable } from "../checkpoints/LedgerTable";
+import type { LedgerRow } from "../checkpoints/ledger";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 import type { UnfinishedItem } from "../progress/unfinished";
 
@@ -13,20 +15,46 @@ export function AgentRunOutcome({
   remaining,
   failure,
   retryPrompt,
+  retryFrom,
   working,
   onRetry,
+  ledger = [],
+  conversationId,
+  onResume,
+  onLedgerChange,
 }: {
   message: GlobalAiMessage;
   remaining: UnfinishedItem[];
   /** The failure's own words, when the run failed without an answer. */
   failure: string;
   retryPrompt?: string;
+  retryFrom?: string;
   working: boolean;
-  onRetry: (prompt: string) => void;
+  onRetry: (prompt: string, fromMessageId?: string) => void;
+  /** The rows the run kept (src/features/agents/checkpoints/ledger.ts). */
+  ledger?: LedgerRow[];
+  conversationId?: string;
+  onResume?: (rows: LedgerRow[], only?: string[]) => void;
+  onLedgerChange?: (rows: LedgerRow[]) => void;
 }) {
+  if (ledger.length && onResume && onLedgerChange && message.state !== "canceled")
+    return (
+      <LedgerTable
+        rows={ledger}
+        conversationId={conversationId}
+        working={working}
+        onResume={onResume}
+        onChange={onLedgerChange}
+      />
+    );
   const retry =
     retryPrompt && message.retryable !== false ? (
-      <Button variant="primary" size="sm" disabled={working} onClick={() => onRetry(retryPrompt)}>
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={working}
+        onClick={() => onRetry(retryPrompt, retryFrom)}
+      >
         Try again
       </Button>
     ) : undefined;

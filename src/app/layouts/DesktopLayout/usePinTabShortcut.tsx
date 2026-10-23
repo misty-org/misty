@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useUserStore } from "@/features/auth/core";
-import { pinnedTabsBlockedReason } from "@/features/browser-workspace/pinnedTabsGate";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
+import { pinnedTabsBlockedReason } from "@/features/browser-sync/pinnedTabsGate";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace";
 import { dockTreeViews } from "@/features/workspace/dockTree";

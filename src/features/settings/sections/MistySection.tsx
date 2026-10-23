@@ -46,11 +46,7 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
           Object.fromEntries(result.preferences.map((item) => [item.surface_id, item])),
         );
       })
-      .catch(
-        (reason: unknown) =>
-          active &&
-          setError(reason instanceof Error ? reason.message : "Misty settings could not load."),
-      );
+      .catch(() => active && setError("Misty settings could not load."));
     void aiSurfaceApi
       .memories()
       .then((result) => active && setMemories(result.memories))
@@ -97,8 +93,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
       const result = await aiSurfaceApi.updateSettings(enabled, retentionDays, memoryEnabled);
       setSettings(result.settings);
       if (!enabled && user?.id) useAiSurfaceStore.getState().clearAccount(user.id);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Misty settings could not be saved.");
+    } catch {
+      setError("Misty settings could not be saved. Try again.");
     } finally {
       setWorking(false);
     }
@@ -111,8 +107,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
     try {
       await aiSurfaceApi.forgetMemory(memoryId);
       setMemories((items) => items.filter((item) => item.id !== memoryId));
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "That memory could not be forgotten.");
+    } catch {
+      setError("That memory could not be forgotten. Try again.");
     } finally {
       setWorking(false);
     }
@@ -135,10 +131,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
       });
       setPreferences((values) => ({ ...values, [surfaceId]: result.preference }));
       window.dispatchEvent(new Event("misty:ai-preferences-changed"));
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "The surface preference could not be saved.",
-      );
+    } catch {
+      setError("The surface preference could not be saved. Try again.");
     } finally {
       setWorking(false);
     }
@@ -158,10 +152,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
         prompt: recapDraft.prompt,
       });
       setRecaps((values) => ({ ...values, [recapSurface]: result.recap }));
-    } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "The recurring briefing could not be saved.",
-      );
+    } catch {
+      setError("The recurring briefing could not be saved. Try again.");
     } finally {
       setWorking(false);
     }
@@ -184,34 +176,34 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
               onChange={(value) => void updateSettings(value)}
             />
           </SettingsRow>
+          <SettingsRow
+            label="Conversation retention"
+            description="Accepted work and required security audits follow their domain retention rules."
+            muted={!settings || !settings.enabled}
+          >
+            <ChoiceControl
+              value={String(settings?.retention_days ?? 30)}
+              disabled={!settings || working || !settings.enabled}
+              onValueChange={(value) => void updateSettings(true, Number(value))}
+              options={[7, 30, 90, 365].map((days) => ({
+                value: String(days),
+                label: `${days} days`,
+              }))}
+            />
+          </SettingsRow>
         </SettingsSectionBlock>
       )}
 
       {memoryPage && (
         <>
           <SettingsSectionBlock
-            title="Memory"
+            title="Remembered details"
             description={
-              "Misty starts with what you're looking at and the context you attach, and can search the Spaces " +
-              "you can access. Content from pages, mail, files, chat and extensions is treated as untrusted " +
-              "data and can't grant capabilities."
+              "Misty starts with what you're looking at and the context you attach. Content from pages, mail, " +
+              "files, chat and extensions is treated as untrusted data and can't grant capabilities. " +
+              "Forgetting a detail removes it from future conversations."
             }
           >
-            <SettingsRow
-              label="Conversation retention"
-              description="Accepted work and required security audits follow their domain retention rules."
-              muted={!settings || !settings.enabled}
-            >
-              <ChoiceControl
-                value={String(settings?.retention_days ?? 30)}
-                disabled={!settings || working || !settings.enabled}
-                onValueChange={(value) => void updateSettings(true, Number(value))}
-                options={[7, 30, 90, 365].map((days) => ({
-                  value: String(days),
-                  label: `${days} days`,
-                }))}
-              />
-            </SettingsRow>
             <SettingsRow
               label="Remembered context"
               description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
@@ -225,14 +217,8 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
                 }
               />
             </SettingsRow>
-          </SettingsSectionBlock>
-
-          <SettingsSectionBlock
-            title="Remembered details"
-            description="Review exactly what Misty can recall. Forgetting a detail removes it from future conversations."
-          >
             {memories.length === 0 ? (
-              <p className="border-t border-charcoal-border py-3 text-[13px] text-cream-muted">
+              <p className="py-2 text-[13px] text-cream-muted">
                 Misty remembers a detail only when you ask it to.
               </p>
             ) : (

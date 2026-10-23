@@ -2,6 +2,7 @@
 name = "kiri"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 description = "Misty's native web platform layer: web APIs the OS webviews leave out, supplied from Rust."
 publish = false
 # Tauri derives the plugin's ACL identifier from this; it must match the package name.
@@ -53,6 +54,8 @@ windows = { version = "0.61", optional = true, features = ["Win32_System_Com"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", optional = true }
+# Not used directly: pins the JavaScriptCore binding and feature that wry
+# selects for webkit2gtk, so both crates resolve to the same build.
 javascriptcore-rs = { version = "=1.1.2", optional = true, features = ["v2_28"] }
 webkit2gtk = { version = "=2.0", optional = true, features = ["v2_40"] }
 

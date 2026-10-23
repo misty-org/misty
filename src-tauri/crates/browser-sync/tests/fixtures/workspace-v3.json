@@ -1,5 +1,5 @@
 {
-  "_comment": "Public workspace-protocol v3 signing vectors. Keep identical in src-tauri/crates/browser-sync/tests/fixtures/workspace-v3.json and server/internal/sync/testdata/browser-sync-workspace-v3.json. Signing labels keep their v2 names: they are hashed into existing signatures.",
+  "_comment": "Public workspace-protocol v3 signing vectors. Keep identical in src-tauri/crates/browser-sync/tests/fixtures/workspace-v3.json and server/internal/browsersync/testdata/browser-sync-workspace-v3.json. Signing labels keep their v2 names: they are hashed into existing signatures.",
   "vault_id": "01951d32-40ac-7000-8000-000000000001",
   "workspace_id": "01951d32-40ac-7000-8000-000000000002",
   "operation_id": "01951d32-40ac-7000-8000-000000000003",

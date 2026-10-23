@@ -1,13 +1,13 @@
 import { Copy, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth";
-import { SyncUnlockForm } from "@/features/browser-workspace/SyncAccountSettings";
-import { useSyncController } from "@/features/browser-workspace/useSyncController";
+import { useSyncController } from "@/features/browser-sync/useSyncController";
 import { PasswordEditor } from "@/features/passwords/PasswordEditor";
 import { passwordsApi, siteLabel, type SavedLogin } from "@/features/passwords/api";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button, IconButton, Input, SkeletonList } from "@/shared/ui";
 import {
+  DesktopSettingsNotice,
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
@@ -27,8 +27,8 @@ export function PasswordsSettings() {
     try {
       setLogins(await passwordsApi.list());
       setError(null);
-    } catch (reason) {
-      setError(String(reason));
+    } catch {
+      setError("Saved logins could not be loaded. Try again.");
     }
   }, []);
   useEffect(() => {
@@ -46,20 +46,30 @@ export function PasswordsSettings() {
   if (!unlocked)
     return (
       <SettingsSectionBlock
-        title="Saved passwords"
+        title="Logins"
         description="Passwords are encrypted with your sync vault, which belongs to your account."
       >
-        {sync.accountId ? (
-          <SyncUnlockForm controller={sync} sectionTitle="Unlock your sync vault" />
-        ) : (
-          <SettingsNote>Sign in to Misty to save and fill passwords.</SettingsNote>
-        )}
+        <SettingsRow
+          label="Unlock your sync vault"
+          description="Open the Sync wizard to connect this device before managing saved passwords."
+        >
+          <Button
+            variant="outline"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent("misty:open-settings", { detail: { section: "sync" } }),
+              )
+            }
+          >
+            Open Sync
+          </Button>
+        </SettingsRow>
       </SettingsSectionBlock>
     );
 
   return (
     <SettingsSectionBlock
-      title="Saved passwords"
+      title="Logins"
       description="Misty asks before saving a sign-in and offers it again on the site it belongs to."
     >
       <div className="flex items-center gap-2 pb-3">
@@ -83,9 +93,19 @@ export function PasswordsSettings() {
           }}
         />
       ) : null}
-      {error ? <SettingsNote>{error}</SettingsNote> : null}
+      {error ? (
+        <DesktopSettingsNotice
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+              Try again
+            </Button>
+          }
+        >
+          {error}
+        </DesktopSettingsNotice>
+      ) : null}
       {logins === null && !error ? (
-        <SkeletonList label="Saved passwords" rows={4} leading="none" trailing />
+        <SkeletonList label="Logins" rows={4} leading="none" trailing />
       ) : null}
       {logins !== null && !visible.length ? (
         <SettingsNote>{query ? "No passwords match." : "No saved passwords yet."}</SettingsNote>
@@ -114,8 +134,8 @@ function PasswordRow(props: {
   const attempt = async (action: () => Promise<void>) => {
     try {
       await action();
-    } catch (reason) {
-      props.onError(String(reason));
+    } catch {
+      props.onError("That password action could not be completed. Try again.");
     }
   };
   const site = siteLabel(login.origin);

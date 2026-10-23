@@ -6,7 +6,7 @@ import {
   browserScopeId,
   type BrowserInspection,
   type BrowserMistyPage,
-} from "./browserRuntime";
+} from "@/features/webviews/browserRuntime";
 
 /**
  * Reads the open page for Misty through a two-minute, inspect-only grant that is

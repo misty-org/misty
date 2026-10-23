@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isAgentWorkerWindow, useLocalExecution } from "./localExecution";
+import { useLocalExecution } from "./localExecution";
 
 /**
  * A follow-up to a run that handed off (its question or app card was answered
@@ -8,7 +8,7 @@ import { isAgentWorkerWindow, useLocalExecution } from "./localExecution";
  */
 export function continuationScreen(
   conversationId: string,
-): { executionMode: "agent" | "team"; openScreen?: { tabId: string } } | undefined {
+): { executionMode: "agent"; openScreen?: { tabId: string } } | undefined {
   const execution = useLocalExecution.getState().execution;
   if (
     !conversationId ||
@@ -20,11 +20,9 @@ export function continuationScreen(
     return undefined;
   if (execution.normalTabs) {
     const tabId = execution.context.find((ref) => ref.kind === "browser-tab")?.id;
-    return tabId ? { executionMode: execution.mode, openScreen: { tabId } } : undefined;
+    return tabId ? { executionMode: "agent", openScreen: { tabId } } : undefined;
   }
   if (execution.desktopControl) return { executionMode: "agent" };
-  // The agent window keeps its own browser views for the next run.
-  if (isAgentWorkerWindow()) return { executionMode: execution.mode };
   return undefined;
 }
 

@@ -1,4 +1,4 @@
-import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
+import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import { useState, type ComponentProps } from "react";
 import { JournalAllCollection, journalSections } from "../../JournalAllCollection";
 import { JournalDay } from "../../day/JournalDay";
@@ -20,7 +20,9 @@ import {
   IconButton,
   CollectionSkeleton,
   itemTones,
+  CollectionSelectionBar,
 } from "@/shared/ui";
+import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import type { UnifiedNote } from "../model/types";
 import { useSpaceItemCreator } from "@/features/spaces/useSpaceItemCreator";
 
@@ -37,14 +39,15 @@ export function JournalCollection(props: {
   onOpen: (note: UnifiedNote) => void;
   onRename: (note: UnifiedNote) => void;
   onDelete: (note: UnifiedNote) => void;
+  onDeleteMany?: (ids: string[]) => void;
+  bulkError?: string;
 }) {
   const navigate = useNavigate();
   const creatorName = useSpaceItemCreator(props.spaceId);
   const [params, setParams] = useSearchParams();
   const section = params.get("section");
   const filter =
-    section === "notes" ||
-    (section === "day" && journalSections.some((s) => s.value === "day"))
+    section === "notes" || (section === "day" && journalSections.some((s) => s.value === "day"))
       ? section
       : "all";
   const selectSection = (value: string) => {
@@ -59,24 +62,25 @@ export function JournalCollection(props: {
     }
   };
   const [view, setView] = useState<"list" | "grid">("list");
-  const refinement = useCollectionRefinement(
-    props.notes,
-    {
-      label: "Filter notes",
-      title: (note) => note.title || "Untitled note",
-      date: (note) => note.updatedAt,
-      facet: {
-        label: "Access",
-        options: [
-          { value: "all", label: "All notes" },
-          { value: "editable", label: "Can edit" },
-          { value: "viewer", label: "View only" },
-        ],
-        value: (note) => (props.readOnly || note.role === "viewer" ? "viewer" : "editable"),
-      },
+  const refinement = useCollectionRefinement(props.notes, {
+    label: "Filter notes",
+    title: (note) => note.title || "Untitled note",
+    date: (note) => note.updatedAt,
+    facet: {
+      label: "Access",
+      options: [
+        { value: "all", label: "All notes" },
+        { value: "editable", label: "Can edit" },
+        { value: "viewer", label: "View only" },
+      ],
+      value: (note) => (props.readOnly || note.role === "viewer" ? "viewer" : "editable"),
     },
-  );
+  });
   const notes = refinement.items;
+  const selectableIds = notes
+    .filter((note) => !props.readOnly && note.canDelete)
+    .map((note) => note.id);
+  const selection = useRangeSelection(selectableIds);
   if (filter === "day")
     return (
       <JournalDay
@@ -121,6 +125,12 @@ export function JournalCollection(props: {
         filterControl={refinement.control}
         actions={<CollectionViewToggle value={view} onChange={setView} disabled={!notes.length} />}
       />
+      <CollectionSelectionBar
+        count={selection.selectedIds.length}
+        onClear={selection.clear}
+        onDelete={() => props.onDeleteMany?.(selection.selectedIds)}
+      />
+      {props.bulkError && <p role="alert" className="text-sm text-cream-muted">{props.bulkError}</p>}
       {props.error && (
         <div className="flex items-center gap-3 text-sm text-cream-muted" role="alert">
           Notes couldn’t load.
@@ -158,6 +168,7 @@ export function JournalCollection(props: {
               day: "numeric",
             }),
             onOpen: () => props.onOpen(note),
+            selectable: !props.readOnly && note.canDelete,
             contextMenu: <NoteActions note={note} props={props} context />,
             actions: (
               <DropdownMenu>
@@ -172,6 +183,8 @@ export function JournalCollection(props: {
               </DropdownMenu>
             ),
           }))}
+          selectedIds={selection.selectedIds}
+          onSelect={selection.select}
         />
       )}
     </CollectionPage>

@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "@/api/client";
 

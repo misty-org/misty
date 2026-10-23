@@ -172,7 +172,7 @@ fn pending_saves_replay_when_the_store_reopens() {
     assert!(store.write("workspace", 1, "waiting").unwrap().pending);
     drop(store);
     failing_inserts(&path, false);
-    let mut store = RecoveryStore::open(&path, scope(), reopen()).unwrap();
+    let store = RecoveryStore::open(&path, scope(), reopen()).unwrap();
     let read = store.read("workspace").unwrap().unwrap();
     assert_eq!(
         (read.revision, read.value.as_str(), read.pending),

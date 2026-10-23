@@ -57,26 +57,52 @@ impl Capability for Media {
             "state" => serde_json::from_value::<State>(call.args)
                 .map_err(|_| KiriError::type_error("media.state expects { audible: boolean }."))
                 .map(|state| {
-                    call.host.signal(&call.caller, Signal::MediaAudible(state.audible));
+                    call.host
+                        .signal(&call.caller, Signal::MediaAudible(state.audible));
                     Value::Null
                 }),
             "audio" => serde_json::from_value::<Audio>(call.args)
                 .ok()
-                .filter(|audio| audio.pcm.len() <= MAX_CHUNK_BASE64 && audio.pcm.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'='))
-                .ok_or_else(|| KiriError::type_error("media.audio expects { session: number, pcm: base64 }."))
+                .filter(|audio| {
+                    audio.pcm.len() <= MAX_CHUNK_BASE64
+                        && audio.pcm.bytes().all(|b| {
+                            b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'='
+                        })
+                })
+                .ok_or_else(|| {
+                    KiriError::type_error("media.audio expects { session: number, pcm: base64 }.")
+                })
                 .map(|audio| {
-                    call.host.signal(&call.caller, Signal::MediaAudio { session: audio.session, pcm: audio.pcm });
+                    call.host.signal(
+                        &call.caller,
+                        Signal::MediaAudio {
+                            session: audio.session,
+                            pcm: audio.pcm,
+                        },
+                    );
                     Value::Null
                 }),
             "notice" => serde_json::from_value::<Notice>(call.args)
                 .ok()
                 .filter(|notice| notice.notice.len() <= 200)
-                .ok_or_else(|| KiriError::type_error("media.notice expects { session: number, notice: string }."))
+                .ok_or_else(|| {
+                    KiriError::type_error(
+                        "media.notice expects { session: number, notice: string }.",
+                    )
+                })
                 .map(|notice| {
-                    call.host.signal(&call.caller, Signal::MediaTapNotice { session: notice.session, notice: notice.notice });
+                    call.host.signal(
+                        &call.caller,
+                        Signal::MediaTapNotice {
+                            session: notice.session,
+                            notice: notice.notice,
+                        },
+                    );
                     Value::Null
                 }),
-            other => Err(KiriError::not_supported(format!("media.{other} does not exist."))),
+            other => Err(KiriError::not_supported(format!(
+                "media.{other} does not exist."
+            ))),
         })
     }
 }

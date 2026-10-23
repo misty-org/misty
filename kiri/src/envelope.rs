@@ -2,11 +2,11 @@ use crate::KiriError;
 use serde::Deserialize;
 use serde_json::Value;
 
-pub const PROTOCOL_VERSION: u8 = 1;
+pub(crate) const PROTOCOL_VERSION: u8 = 1;
 
 /// Largest serialized `args` a page may send. Capabilities that move bulk
 /// data (files, media) will need their own channel rather than a bigger limit.
-pub const MAX_ARGS_BYTES: usize = 16 * 1024;
+pub(crate) const MAX_ARGS_BYTES: usize = 16 * 1024;
 
 const MAX_NAME_LEN: usize = 64;
 
@@ -61,7 +61,10 @@ mod tests {
 
     #[test]
     fn accepts_a_well_formed_call() {
-        let call = request(json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } })).unwrap();
+        let call = request(
+            json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } }),
+        )
+        .unwrap();
         assert!(call.validate().is_ok());
     }
 
@@ -73,7 +76,10 @@ mod tests {
 
     #[test]
     fn rejects_unknown_fields_and_malformed_envelopes() {
-        assert!(request(json!({ "v": 1, "cap": "media", "method": "state", "origin": "https://bank.example" })).is_err());
+        assert!(request(
+            json!({ "v": 1, "cap": "media", "method": "state", "origin": "https://bank.example" })
+        )
+        .is_err());
         assert!(request(json!({ "v": 1, "cap": 7, "method": "state" })).is_err());
         assert!(request(json!({ "cap": "media", "method": "state" })).is_err());
     }
@@ -81,10 +87,22 @@ mod tests {
     #[test]
     fn rejects_other_versions_and_odd_names() {
         let wrong_version = request(json!({ "v": 2, "cap": "media", "method": "state" })).unwrap();
-        assert_eq!(wrong_version.validate().unwrap_err().name, "NotSupportedError");
-        for (cap, method) in [("", "state"), ("Media", "state"), ("media", "__proto__"), ("media/../x", "state")] {
+        assert_eq!(
+            wrong_version.validate().unwrap_err().name,
+            "NotSupportedError"
+        );
+        for (cap, method) in [
+            ("", "state"),
+            ("Media", "state"),
+            ("media", "__proto__"),
+            ("media/../x", "state"),
+        ] {
             let call = request(json!({ "v": 1, "cap": cap, "method": method })).unwrap();
-            assert_eq!(call.validate().unwrap_err().name, "TypeError", "{cap}.{method}");
+            assert_eq!(
+                call.validate().unwrap_err().name,
+                "TypeError",
+                "{cap}.{method}"
+            );
         }
         let long = "a".repeat(MAX_NAME_LEN + 1);
         let call = request(json!({ "v": 1, "cap": long, "method": "state" })).unwrap();

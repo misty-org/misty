@@ -1,37 +1,36 @@
 import { forgetAccountCookies, restoreAccountCookies } from "@/api/client/cookie-session";
-import { clearApiCache } from "@/api/cache/apiCache";
+import { clearApiCache } from "@/api/cache/api-cache";
 import { configureApiSession } from "@/api/client/session";
-import {
-  deploymentStorageKey,
-  readDeploymentScope,
-  readDeploymentStorageItem,
-  resolveApiBase,
-} from "@/api/deployment/api";
+import { readDeploymentStorageItem, resolveApiBase } from "@/api/deployment/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { remove, retrieve, store } from "@impierce/tauri-plugin-keystore";
-import type {
-  SavedAccountSession,
-  SecureAccountSession,
-  SecureAccountVault,
-} from "../model/stores/account/useAuthTokenStore";
+import { store } from "@impierce/tauri-plugin-keystore";
+import {
+  activeHostedAccountId,
+  hostedScope,
+  hostedSessions,
+  isPresent,
+  isHostedSession,
+  savedAccountSession,
+  vaultAccountId,
+  type SavedAccountSession,
+  type SecureAccountSession,
+  type SecureAccountVault,
+} from "./accountVault";
+import { errorDetail, recordRemoveError, recordTokenDebugEvent } from "./authTokenDebug";
+import {
+  accountIndexKey,
+  loadSecureVault,
+  persistSecureVault,
+  readActiveAccountId,
+  writeAccountIndex,
+  writeTokenStoredMarker,
+} from "./vaultKeystore";
 import { SavedAccountSessionUnavailableError } from "../sessionErrors";
-export type { SavedAccountSession } from "../model/stores/account/useAuthTokenStore";
-const desktopTokenService = "com.impierce.identity-wallet";
-const desktopTokenUser = "tester";
-const tokenStoredMarkerKey = "misty:account-auth-token:file-present";
-const accountIndexKey = "misty:account-sessions";
-const activeAccountKey = "misty:active-account-id";
-const legacyUserKey = "misty_user";
+export type { SavedAccountSession } from "./accountVault";
 let cachedToken: string | null | undefined;
-let cachedVault: SecureAccountVault | undefined;
-let vaultReadPromise: Promise<SecureAccountVault> | undefined;
 // A cold start can fan out several authenticated requests before the first
 // secure-store read finishes. Share one retrieval across concurrent callers.
 let tokenReadPromise: Promise<string | null> | undefined;
-// The most recent payload written to the native credential store. The app persists the vault on nearly every
-// auth state change (login, /me refresh, effect re-runs), so we skip redundant
-// writes whose serialized content is identical to what is already stored.
-let lastPersistedPayload: string | undefined;
 let accountSessionTransitioning = false;
 let accountSessionGeneration = 0;
 export function setAccountSessionTransitioning(transitioning: boolean): void {
@@ -62,12 +61,12 @@ export async function saveAccountAuthToken(
       lastUsedAt: new Date().toISOString(),
     };
     const sessions = vault.sessions.filter(
-      (item) => !isCurrentDeploymentSession(item) || item.account.id !== saved.id,
+      (item) => !isHostedSession(item) || item.account.id !== saved.id,
     );
     sessions.push({
       account: saved,
       token,
-      deploymentScope: readDeploymentScope(),
+      deploymentScope: hostedScope,
     });
     await persistSecureVault({
       version: 1,
@@ -158,7 +157,7 @@ export async function updateSavedAccountSession(
   if (!hasTauriInternals()) return;
   const vault = await loadSecureVault();
   const session = vault.sessions.find(
-    (item) => isCurrentDeploymentSession(item) && item.account.id === account.id,
+    (item) => isHostedSession(item) && item.account.id === account.id,
   );
   if (!session) return;
   session.account = {
@@ -173,16 +172,16 @@ export async function activateAccountSession(accountId: string): Promise<SavedAc
   }
   const vault = await loadSecureVault();
   const session = vault.sessions.find(
-    (item) => isCurrentDeploymentSession(item) && item.account.id === accountId,
+    (item) => isHostedSession(item) && item.account.id === accountId,
   );
   if (!session) {
-    const activeAccountId = currentDeploymentSessions(vault).some(
+    const activeAccountId = hostedSessions(vault).some(
       (item) => item.account.id === readActiveAccountId(),
     )
       ? readActiveAccountId()
-      : activeAccountIdForCurrentDeployment(vault);
+      : activeHostedAccountId(vault);
     writeAccountIndex(
-      currentDeploymentSessions(vault).map((item) => item.account),
+      hostedSessions(vault).map((item) => item.account),
       activeAccountId,
     );
     throw new SavedAccountSessionUnavailableError(
@@ -214,10 +213,10 @@ export async function clearAccountAuthToken(): Promise<SavedAccountSession | nul
     if (activeId) await clearApiCache(activeId);
     if (activeId) await forgetAccountCookies(await resolveApiBase(), activeId);
     vault.sessions = vault.sessions.filter(
-      (item) => !isCurrentDeploymentSession(item) || item.account.id !== activeId,
+      (item) => !isHostedSession(item) || item.account.id !== activeId,
     );
     const next =
-      currentDeploymentSessions(vault).sort((left, right) =>
+      hostedSessions(vault).sort((left, right) =>
         right.account.lastUsedAt.localeCompare(left.account.lastUsedAt),
       )[0] ?? null;
     vault.activeAccountId = next ? vaultAccountId(next.account.id) : "";
@@ -270,7 +269,7 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     await clearApiCache(accountId);
     await forgetAccountCookies(await resolveApiBase(), accountId);
     const sessions = vault.sessions.filter(
-      (item) => !isCurrentDeploymentSession(item) || item.account.id !== accountId,
+      (item) => !isHostedSession(item) || item.account.id !== accountId,
     );
     if (sessions.length === vault.sessions.length) return true;
     vault.sessions = sessions;
@@ -280,108 +279,6 @@ export async function removeSavedAccountSession(accountId: string): Promise<bool
     recordRemoveError(error);
     return false;
   }
-}
-async function loadSecureVault(): Promise<SecureAccountVault> {
-  if (cachedVault) return cachedVault;
-  if (vaultReadPromise) return vaultReadPromise;
-  vaultReadPromise = readSecureVault().finally(() => {
-    vaultReadPromise = undefined;
-  });
-  return vaultReadPromise;
-}
-async function readSecureVault(): Promise<SecureAccountVault> {
-  let raw: string | null = null;
-  try {
-    raw = await retrieve(desktopTokenService, desktopTokenUser);
-  } catch {
-    // A missing credential file is a normal signed-out state.
-  }
-  const parsed = parseSecureVault(raw);
-  cachedVault = parsed.vault;
-  if (parsed.migrated && parsed.vault.sessions.length > 0) {
-    await persistSecureVault(parsed.vault);
-  } else if (parsed.vault.sessions.length > 0) {
-    // Record what the keystore already holds so an unchanged re-persist on the
-    // common cold-start path is skipped.
-    lastPersistedPayload = JSON.stringify(parsed.vault);
-  }
-  return parsed.vault;
-}
-function parseSecureVault(raw: string | null): {
-  vault: SecureAccountVault;
-  migrated: boolean;
-} {
-  if (raw) {
-    try {
-      const value = JSON.parse(raw) as Partial<SecureAccountVault>;
-      if (value.version === 1 && Array.isArray(value.sessions)) {
-        const sessions = value.sessions
-          .map(secureAccountSession)
-          .filter(isPresent)
-          .filter((session) => session.token.startsWith("cookie-session:"));
-        return {
-          vault: {
-            version: 1,
-            activeAccountId: String(value.activeAccountId ?? ""),
-            sessions,
-          },
-          migrated: false,
-        };
-      }
-    } catch {
-      // Existing releases stored the active token directly; migrate it below.
-    }
-  }
-  const legacyAccount = readLegacyAccount();
-  if (raw?.startsWith("cookie-session:") && legacyAccount) {
-    const account = {
-      ...legacyAccount,
-      lastUsedAt: new Date().toISOString(),
-    };
-    return {
-      vault: {
-        version: 1,
-        activeAccountId: `hosted:${account.id}`,
-        sessions: [
-          {
-            account,
-            token: raw,
-            deploymentScope: "hosted",
-          },
-        ],
-      },
-      migrated: true,
-    };
-  }
-  return {
-    vault: emptyVault(),
-    migrated: false,
-  };
-}
-async function persistSecureVault(vault: SecureAccountVault): Promise<void> {
-  cachedVault = vault;
-  if (vault.sessions.length === 0) {
-    try {
-      await remove(desktopTokenService, desktopTokenUser);
-    } catch {
-      // Removing a missing item is equivalent to the desired state.
-    }
-    lastPersistedPayload = undefined;
-    writeAccountIndex([], "");
-    writeTokenStoredMarker(false);
-    return;
-  }
-  const payload = JSON.stringify(vault);
-  // Avoid redundant atomic file writes when the account metadata is unchanged.
-  if (payload !== lastPersistedPayload) {
-    await store(payload);
-    lastPersistedPayload = payload;
-  }
-  writeAccountIndex(
-    currentDeploymentSessions(vault).map((item) => item.account),
-    activeAccountIdForCurrentDeployment(vault),
-  );
-  writeTokenStoredMarker(true);
 }
 async function persistRawToken(token: string): Promise<void> {
   try {
@@ -398,8 +295,8 @@ async function persistRawToken(token: string): Promise<void> {
   await syncManagedAiToken(token);
 }
 function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | null {
-  const preferredId = readActiveAccountId() || activeAccountIdForCurrentDeployment(vault);
-  const sessions = currentDeploymentSessions(vault);
+  const preferredId = readActiveAccountId() || activeHostedAccountId(vault);
+  const sessions = hostedSessions(vault);
   if (!preferredId && vault.activeAccountId === "") return null;
   return (
     sessions.find((item) => item.account.id === preferredId) ??
@@ -408,105 +305,6 @@ function selectActiveSession(vault: SecureAccountVault): SecureAccountSession | 
     )[0] ??
     null
   );
-}
-function writeAccountIndex(accounts: SavedAccountSession[], activeAccountId: string): void {
-  try {
-    const indexKey = deploymentStorageKey(accountIndexKey);
-    const activeKey = deploymentStorageKey(activeAccountKey);
-    if (accounts.length > 0) localStorage.setItem(indexKey, JSON.stringify(accounts));
-    else localStorage.removeItem(indexKey);
-    if (activeAccountId) localStorage.setItem(activeKey, activeAccountId);
-    else localStorage.removeItem(activeKey);
-  } catch {
-    // Account display metadata is best-effort; tokens remain in the native credential store.
-  }
-}
-function readActiveAccountId(): string {
-  try {
-    return readDeploymentStorageItem(activeAccountKey) ?? "";
-  } catch {
-    return "";
-  }
-}
-function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
-  try {
-    const raw = localStorage.getItem(legacyUserKey);
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<SavedAccountSession>;
-    if (!value.id || !value.email) return null;
-    return {
-      id: value.id,
-      username: value.username || usernameFromEmail(value.email),
-      email: value.email,
-      accountCreatedAt: value.accountCreatedAt,
-      currentPlan: value.currentPlan,
-    };
-  } catch {
-    return null;
-  }
-}
-function usernameFromEmail(email: string): string {
-  return email.split("@")[0] ?? email;
-}
-const isPresent = <T>(value: T | null): value is T => value !== null;
-/** Accounts saved before usernames replaced display names carry a `name` and no username. */
-function savedAccountSession(value: unknown): SavedAccountSession | null {
-  if (!value || typeof value !== "object") return null;
-  const { name: _name, ...item } = value as Partial<SavedAccountSession> & { name?: unknown };
-  if (!item.id || !item.email || !item.lastUsedAt) return null;
-  return {
-    ...item,
-    username: item.username || usernameFromEmail(item.email),
-  } as SavedAccountSession;
-}
-function secureAccountSession(value: unknown): SecureAccountSession | null {
-  if (!value || typeof value !== "object") return null;
-  const item = value as Partial<SecureAccountSession>;
-  const account = savedAccountSession(item.account);
-  if (
-    typeof item.token !== "string" ||
-    item.token.length === 0 ||
-    !account ||
-    (item.deploymentScope !== undefined && typeof item.deploymentScope !== "string")
-  )
-    return null;
-  return { ...item, account } as SecureAccountSession;
-}
-function sessionDeploymentScope(session: SecureAccountSession): string {
-  return session.deploymentScope || "hosted";
-}
-function isCurrentDeploymentSession(session: SecureAccountSession): boolean {
-  return sessionDeploymentScope(session) === readDeploymentScope();
-}
-function currentDeploymentSessions(vault: SecureAccountVault): SecureAccountSession[] {
-  return vault.sessions.filter(isCurrentDeploymentSession);
-}
-function vaultAccountId(accountId: string): string {
-  return `${readDeploymentScope()}:${accountId}`;
-}
-function activeAccountIdForCurrentDeployment(vault: SecureAccountVault): string {
-  const prefix = `${readDeploymentScope()}:`;
-  if (vault.activeAccountId.startsWith(prefix)) return vault.activeAccountId.slice(prefix.length);
-  // Vaults written before deployment namespacing contain a bare Hosted id.
-  if (readDeploymentScope() === "hosted" && !vault.activeAccountId.includes(":")) {
-    return vault.activeAccountId;
-  }
-  return "";
-}
-function emptyVault(): SecureAccountVault {
-  return {
-    version: 1,
-    activeAccountId: "",
-    sessions: [],
-  };
-}
-function recordRemoveError(error: unknown): void {
-  recordTokenDebugEvent({
-    level: "error",
-    scope: "account-auth-token",
-    message: "Could not remove the active Misty session from the device keystore.",
-    detail: errorDetail(error),
-  });
 }
 
 // The saved "token" is now a non-secret account handle. Actual JWT cookies
@@ -518,37 +316,6 @@ async function syncManagedAiToken(token: string): Promise<void> {
     : null;
   const restored = await restoreAccountCookies(await resolveApiBase(), accountId);
   if (accountId && !restored) throw new SavedAccountSessionUnavailableError();
-}
-function writeTokenStoredMarker(value: boolean): void {
-  try {
-    if (value) localStorage.setItem(tokenStoredMarkerKey, "1");
-    else localStorage.removeItem(tokenStoredMarkerKey);
-  } catch {
-    // The marker is non-secret. If storage is unavailable, keep the in-memory cache only.
-  }
-}
-function errorDetail(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return "";
-  }
-}
-function recordTokenDebugEvent(event: {
-  level: "info" | "warn" | "error";
-  scope: string;
-  message: string;
-  detail?: string;
-}): void {
-  if (!tokenDebugEnabled()) return;
-  void import("@/shared/platform/clientDebug").then(({ recordClientDebugEvent }) => {
-    recordClientDebugEvent(event);
-  });
-}
-function tokenDebugEnabled(): boolean {
-  return import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1";
 }
 configureApiSession({
   isTransitioning: isAccountSessionTransitioning,

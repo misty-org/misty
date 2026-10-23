@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
-import type { NativeSyncView } from "@/features/browser-workspace/native";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
+import type { NativeSyncView } from "@/features/browser-sync/native";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { dockTreeViews } from "./dockTree";
 import { allLayoutViews } from "./layoutTabs";

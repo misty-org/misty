@@ -1,13 +1,14 @@
 import { CursorCompanionController } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
 import { RecallRecorderMount } from "@/features/recall";
+import { ScreenMemoryMount } from "@/features/screen-memory";
 import { type AppTab } from "@/features/app-shell";
 import { useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
 import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
-import { BrowserSyncBadge, SyncMenuItem } from "@/features/browser-workspace/BrowserSyncBadge";
+import { BrowserSyncBadge, SyncMenuItem } from "@/features/browser-sync/BrowserSyncBadge";
 import { NavigationNamesBoundary } from "@/features/navigation-names/NavigationNamesBoundary";
 import { blockIfUnsaved, useSettingsStore } from "@/features/settings";
 import {
@@ -24,6 +25,7 @@ import { Outlet } from "react-router-dom";
 import "./docking.css";
 import { isTopEdgeDragPress } from "./windowChromeHelpers";
 import { useDockingTransition } from "./useDockingTransition";
+import { DeferUntilIdle } from "./DeferUntilIdle";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
 import { AccountIsland } from "./AccountIsland";
@@ -60,7 +62,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useExtensionsRuntime();
   useStrayBrowserPages();
   const { user, refreshUser, transitioning } = useAuth();
-  const { location, navigate, settingsLoad, lastAppRoute, lastNonSettingsRouteRef, routeId } =
+  const { location, navigate, lastAppRoute, lastNonSettingsRouteRef, routeId } =
     useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
     shouldShowWindowsTitlebarControls,
@@ -87,7 +89,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     openSettingsOverlay,
     closeSettingsOverlay,
     openAccountSettings,
-  } = useSettingsOverlay({ settingsLoad, refreshUser });
+  } = useSettingsOverlay({ refreshUser });
   useDesktopRouteEffects({
     userId: user?.id,
     transitioning,
@@ -188,6 +190,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         ref={shellRef}
         className={cn(
           "misty-docking-frame",
+          "misty-app-reveal",
           "transition-[grid-template-columns,grid-template-rows]",
           styles.navigatorMotionClass,
         )}
@@ -219,6 +222,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         >
           {shouldShowWindowsControls && (captionSlot || floatingCaption) ? (
             <WindowsTitlebarControls
+              standard={isAuthRoute}
               slot={captionSlot}
               controlsRef={windowsTitlebarControlsRef}
               scale={titlebarNavigationGeometry.scale}
@@ -261,12 +265,13 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
               />
             )}
             {!isAuthRoute && user?.id ? (
-              <>
+              <DeferUntilIdle>
                 <CursorCompanionController key={user.id} accountId={user.id} />
                 <DictationController key={`dictation-${user.id}`} />
                 <CapturePanel key={`capture-${user.id}`} />
                 <RecallRecorderMount key={`recall-${user.id}`} />
-              </>
+                <ScreenMemoryMount key={`screen-memory-${user.id}`} />
+              </DeferUntilIdle>
             ) : null}
           </>
         </section>

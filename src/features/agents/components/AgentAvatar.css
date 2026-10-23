@@ -25,6 +25,11 @@
   height: 64px;
   font-size: 28px;
 }
+.agent-avatar--compact {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
 
 .agent-cloud-image {
   display: block;

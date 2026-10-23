@@ -40,7 +40,7 @@ and the approval policy below.
 
 ## Architecture
 
-Revised October 20, 2026 with harness v3 ([agent-harness-v3.md](../../plans/agent-harness-v3.md)):
+Revised October 20, 2026 with harness v3 ([agent-harness.md](../../plans/agent-harness.md)):
 browser work is programs against the agent's own tabs, and a run starts with a small set of tools.
 
 ```
@@ -364,7 +364,7 @@ the runtime so it works for every provider behind the Gateway.
   model's `context_window_tokens` from the Gateway catalog (128,000 when
   unknown). The runtime estimates the next call as the model's last reported
   input tokens plus what the transcript grew by.
-- **Inside a run** (`src/context-compaction.ts`): past 60% of the window, tool
+- **Inside a run** (`src/context/context-compaction.ts`): past 60% of the window, tool
   results older than the last four are replaced with a placeholder (calls stay
   paired; errors are kept, shortened). Past 80%, the older steps are rendered
   as text and summarized into structured notes (task, done so far with every
@@ -581,8 +581,8 @@ The first live run on October 4, 2026 found and fixed:
 
 ### Text-first browser, skills, sub-agents and the notebook (October 10, 2026)
 
-Approved by the owner on October 10, 2026, in [the agentic browser plan](../../plans/agentic-browser.md);
-measured in [its results](../../plans/agentic-browser-results.md). It reverses the October 4 choice that
+Approved by the owner on October 10, 2026; the harness as built is in
+[agent-harness.md](../../plans/agent-harness.md). It reverses the October 4 choice that
 routed every Misty-window action through `browser_act`: pages are read and acted on as text first, and
 Midscene stays for visual work.
 

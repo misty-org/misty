@@ -1,7 +1,8 @@
+import { pendingServerDeletes } from "./pendingServerDeletes";
 import { ApiRequestError } from "@/api/client";
-import { globalMistyApi } from "@/features/global-search/globalMistyApi";
-import { normalizeConversation } from "@/features/global-search/globalSearchStoreHelpers";
-import type { GlobalAiConversation } from "@/features/global-search/types";
+import { globalMistyApi } from "./globalMistyApi";
+import { normalizeConversation } from "./mistyStoreHelpers";
+import type { GlobalAiConversation } from "./types";
 import { isStoredChat, localChats, mergeConversation } from "./localChats";
 
 /** This computer's id on the account, or null outside the desktop app. */
@@ -13,11 +14,22 @@ export async function thisDeviceId(): Promise<string | null> {
 /** How long a reply may show as running before a missing run counts as gone. */
 const staleAfterMs = 10 * 60_000;
 
-/** Marks replies still shown as running, whose run is gone, as not finished. */
-function settleStaleReplies(conversation: GlobalAiConversation): GlobalAiConversation {
+/** True until this launch's first sync: a run never outlives the app, so any reply saved as
+ * running before it started has no run behind it. */
+let firstSyncOfLaunch = true;
+
+/** Marks replies still shown as running, whose run is gone, as not finished. The run this app is
+ * running now stays. */
+function settleStaleReplies(
+  conversation: GlobalAiConversation,
+  running: string | undefined,
+  startup: boolean,
+): GlobalAiConversation {
   const stale = (message: GlobalAiConversation["messages"][number]) =>
+    message.role === "assistant" &&
     (message.state === "pending" || message.state === "streaming") &&
-    Date.now() - Date.parse(message.createdAt) > staleAfterMs;
+    message.invocationId !== running &&
+    (startup || Date.now() - Date.parse(message.createdAt) > staleAfterMs);
   if (!conversation.messages.some(stale)) return conversation;
   return {
     ...conversation,
@@ -68,6 +80,7 @@ export async function keepChatOnThisDevice(conversationId: string): Promise<stri
 export async function syncLocalChats(
   accountId: string,
   local: GlobalAiConversation[],
+  runningInvocation: () => string | undefined = () => undefined,
 ): Promise<GlobalAiConversation[]> {
   const byId = new Map(local.map((conversation) => [conversation.id, conversation]));
   const changed = new Map<string, GlobalAiConversation>();
@@ -89,7 +102,10 @@ export async function syncLocalChats(
   const deviceId = await thisDeviceId();
   if (deviceId) {
     const fresh = await globalMistyApi.conversationsInScope("device", deviceId).catch(() => null);
-    for (const server of (fresh?.conversations ?? []).map(normalizeConversation)) {
+    void pendingServerDeletes.retry();
+    for (const server of (fresh?.conversations ?? [])
+      .map(normalizeConversation)
+      .filter((conversation) => !pendingServerDeletes.has(conversation.id))) {
       if (!server.keptOnDeviceId && !(await keep(server.id, deviceId))) {
         // Another device took it first: it is that device's chat.
         if (byId.delete(server.id)) await localChats.deleteConversation(accountId, server.id);
@@ -102,17 +118,15 @@ export async function syncLocalChats(
       byId.set(server.id, merged);
       changed.set(server.id, merged);
     }
-    if (fresh) {
-      // A reply saved mid-run whose run the server no longer holds will never finish.
-      const live = new Set(fresh.conversations.map((conversation) => conversation.id));
-      for (const conversation of byId.values()) {
-        if (live.has(conversation.id)) continue;
-        const settled = settleStaleReplies(conversation);
-        if (settled === conversation) continue;
-        byId.set(conversation.id, settled);
-        changed.set(conversation.id, settled);
-      }
-    }
+  }
+  // A reply saved mid-run whose run is gone would show as working forever.
+  const startup = firstSyncOfLaunch;
+  firstSyncOfLaunch = false;
+  for (const conversation of [...byId.values()]) {
+    const settled = settleStaleReplies(conversation, runningInvocation(), startup);
+    if (settled === conversation) continue;
+    byId.set(conversation.id, settled);
+    changed.set(conversation.id, settled);
   }
   await Promise.all(
     [...changed.values()].map((conversation) =>

@@ -30,12 +30,12 @@ vi.mock("@/features/webviews/browserRuntime", () => ({
   setBrowserStatusBubbleEnabled: vi.fn(),
 }));
 vi.mock("@/telemetry/lifecycle", () => ({ telemetryPreferencesChanged: vi.fn() }));
-import { registerProfileWriter } from "../profiles/bridge";
+import { registerPreferenceWriter } from "../devicePreferences/bridge";
 import { useSettingsStore as store } from "./useSettingsStore";
 import { useDockingLayoutStore } from "@/features/app-shell/dockingLayout";
 beforeEach(() => {
   vi.clearAllMocks();
-  registerProfileWriter(native.writer);
+  registerPreferenceWriter(native.writer);
   store.setState({
     settings: { path: "cache", document: {} },
     shortcuts: null,
@@ -56,7 +56,7 @@ describe("server preference runtime projection", () => {
   it("applies received launch, shortcut, preset and Open With preferences", async () => {
     const shortcuts = [{ commandId: "workspace.new_tab", primary: null, alternate: "Ctrl+N" }];
     const layouts = [{ id: "one", name: "Writing", navigation: "right", tabs: "top" }];
-    await store.getState().applyProfileValues({
+    await store.getState().applyPreferenceValues({
       "app.startup.login": true,
       "app.shortcuts.bindings": JSON.stringify(shortcuts),
       "app.layout.presets": JSON.stringify(layouts),
@@ -107,7 +107,7 @@ describe("server preference runtime projection", () => {
     );
   });
   it("ignores a projection for a superseded account", async () => {
-    await store.getState().applyProfileValues({ "app.zoom": 2 }, () => false);
+    await store.getState().applyPreferenceValues({ "app.zoom": 2 }, () => false);
     expect(native.save).not.toHaveBeenCalled();
     expect(native.login).not.toHaveBeenCalled();
   });

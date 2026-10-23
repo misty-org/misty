@@ -6,7 +6,7 @@ Controls that are the server's own resources (a conversation's retention, whethe
 
 ## Declaring and resolving a setting
 
-`src/features/settings/profiles/definitions.json` declares stable keys, value types, defaults, validation constraints, desktop availability, and search labels. `registry.ts` adapts values for runtime consumers. A setting resolves to the value this device saved, else its built-in default. There are no profile selectors and no per-account copies.
+`src/features/settings/devicePreferences/definitions.json` declares stable keys, value types, defaults, validation constraints, desktop availability, and search labels. `registry.ts` adapts values for runtime consumers. A setting resolves to the value this device saved, else its built-in default. There are no profile selectors and no per-account copies.
 
 ## Persistence
 

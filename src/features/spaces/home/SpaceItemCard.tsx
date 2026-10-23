@@ -4,6 +4,7 @@ import type { ItemVisibility } from "@/api/spaces/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { editedLabel, type GalleryItem } from "./galleryItems";
 import { GalleryPreview, kindIcon } from "./galleryPreview";
+import type { MouseEvent } from "react";
 
 /**
  * One thing in a Space as a card: a live preview, the kind's glyph sitting on its
@@ -18,6 +19,8 @@ export function SpaceItemCard(props: {
   onOpen(): void;
   /** Set when the viewer owns the item and may make it private or public. */
   onVisibilityChange?(visibility: ItemVisibility): void;
+  selected?: boolean;
+  onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
   const { item } = props;
   const { Icon, tone, label } = kindIcon[item.kind];
@@ -32,11 +35,15 @@ export function SpaceItemCard(props: {
     <div
       className={cn(
         "group/card relative min-w-0 overflow-hidden rounded-xl border border-charcoal-border",
+        props.selected && "border-cream-muted bg-charcoal-active",
         "bg-charcoal-card hover:border-cream-muted/40 focus-within:border-cream-muted/40",
       )}
     >
       <Pressable
-        onClick={props.onOpen}
+        onClick={(event) => {
+          if (item.remove && props.onSelect) props.onSelect(event, item.key, props.onOpen);
+          else props.onOpen();
+        }}
         aria-label={`${label}: ${item.title}`}
         className="flex w-full min-w-0 flex-col text-left"
       >

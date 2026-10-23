@@ -1,0 +1,127 @@
+.agent-studio-recent-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: var(--radius-md);
+}
+.agent-studio-recent-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+/* One surface per row: the title and its overflow menu highlight together. */
+.agent-studio-recent-row:hover,
+.agent-studio-recent-row[data-state="open"],
+.agent-studio-recent-row:has(> [data-state="open"]) {
+  background: var(--color-charcoal-hover);
+}
+/* The row says it is current itself (`data-current`). Matching its button's aria-current with
+   :has() made the browser restyle the whole window whenever any aria-current changed, as every
+   tab switch does. */
+.agent-studio-recent-row[data-current] {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row > button,
+.agent-studio-recent-row > button:hover,
+.agent-studio-recent-row > button[aria-current="page"],
+.agent-studio-recent-row > button[data-state="open"] {
+  background: transparent;
+}
+.agent-studio-recent-row[data-current] > button:first-child {
+  color: var(--color-cream-bright);
+}
+/* The overflow button floats over the title's faded end instead of reserving its width. */
+.agent-studio-recent-row > :not(:first-child) {
+  position: absolute;
+  right: 4px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recent-row > button:not(:first-child):is(:hover, [data-state="open"]) {
+  color: var(--color-cream-bright);
+}
+
+/* The row's own overflow menu appears with intent, not on every recent. */
+.agent-studio-recent-row > :not(:first-child) {
+  opacity: 0;
+}
+.agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) > :not(:first-child),
+.agent-studio-recent-row[data-current] > :not(:first-child),
+.agent-studio-recent-row > [aria-expanded="true"],
+.agent-studio-recent-row > [data-state="open"] {
+  opacity: 1;
+}
+
+/* The workspace header names only the open conversation; the sidebar owns identity. */
+.agent-conversation-heading[data-workspace] {
+  padding: 0 16px 0 24px;
+}
+.agent-heading-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* A quiet Working status ends the bar while a task runs. */
+.agent-heading-details {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+
+/* Folder work joins the bar's controls; its receipt and errors span the row below. */
+.agent-control-bar .misty-folder-work {
+  display: contents;
+}
+.agent-control-bar .misty-folder-work__controls {
+  gap: 2px;
+}
+.agent-control-bar .misty-folder-work__controls > span {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+}
+.agent-control-bar .misty-folder-work__receipt,
+.agent-control-bar .misty-folder-work > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+  font-size: 12px;
+  color: var(--color-cream-muted);
+}
+
+/* Multi-selected recents share the open conversation's monochrome surface. */
+.agent-studio-recent-row[data-selected] {
+  background: var(--color-charcoal-active);
+}
+.agent-studio-recent-row[data-selected] > button:first-child {
+  color: var(--color-cream-bright);
+}
+
+/* Lessons (Teach mode): rows hang off the section header with the shared tree branch. */
+.agent-lesson-row {
+  position: relative;
+  padding-left: 18px;
+}
+.agent-lesson-row > button:first-child {
+  gap: 8px;
+}
+.agent-lesson-detail {
+  flex-shrink: 0;
+  color: var(--color-cream-muted);
+  font-size: 12px;
+}
+/* A course's lessons hang one level further in. */
+.agent-lesson-row[data-depth="1"] {
+  padding-left: 30px;
+}

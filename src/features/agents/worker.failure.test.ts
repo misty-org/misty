@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   fail: vi.fn(),
   invoke: vi.fn(),
 }));
-vi.mock("@/api/accountEvents", () => ({ subscribeAccountEvents: () => () => {} }));
+vi.mock("@/api/account-events", () => ({ subscribeAccountEvents: () => () => {} }));
 vi.mock("@/api/devices/api", () => ({
   devicesApi: {
     claimWorkflowJob: mocks.claim,
@@ -102,7 +102,13 @@ it("reports a native rejection after begin as uncertain without repeating the op
 });
 
 it("treats a failed read, or a script that never reached the page, as certain", () => {
-  expect(browserFailureIsCertain("browser.snapshot", "Browser page returned invalid data: x")).toBe(true);
-  expect(browserFailureIsCertain("browser.steps", "failed to send message to the webview")).toBe(true);
-  expect(browserFailureIsCertain("browser.steps", "Browser page returned invalid data: x")).toBe(false);
+  expect(browserFailureIsCertain("browser.snapshot", "Browser page returned invalid data: x")).toBe(
+    true,
+  );
+  expect(browserFailureIsCertain("browser.steps", "failed to send message to the webview")).toBe(
+    true,
+  );
+  expect(browserFailureIsCertain("browser.steps", "Browser page returned invalid data: x")).toBe(
+    false,
+  );
 });

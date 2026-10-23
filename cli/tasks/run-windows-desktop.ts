@@ -33,7 +33,7 @@ if (process.argv[1] && basename(process.argv[1]) === "run-windows-desktop.ts") {
     }
     const copy = prepareDevelopmentCopy(
       binary,
-      process.env.MISTY_DESKTOP_PROFILE ?? process.env.MISTY_PROFILE,
+      process.env.MISTY_PROFILE,
     );
     const child = spawn(copy, args, { stdio: "inherit" });
     // Windows cannot exec in place, so end the copy with this wrapper when

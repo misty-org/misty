@@ -52,7 +52,7 @@ Caveats:
   The reasoning effort is not sent, and screenshots in tool results move to a user message right
   after them, since chat completions only carry text in tool results. Without the key, the id goes to
   the AI Gateway, which doesn't know it.
-- **Server** (`server/internal/agents/house_route.go`, `FreeEvalModel`): a development stack with
+- **Server** (`server/internal/agent/house_route.go`, `FreeEvalModel`): a development stack with
   `MISTY_ALLOW_MODEL_OVERRIDE=1` accepts `nim/` ids that aren't in the Gateway catalog. Production
   never does.
 - **Billing** (`misty-billing/compose.dev.yml`): the dev billing service prices the models in the

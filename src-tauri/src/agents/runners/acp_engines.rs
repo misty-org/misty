@@ -7,8 +7,7 @@ use serde_json::{json, Value};
 
 use super::{
     acp::{AcpProtocol, Setup},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError,
-    Transport,
+    CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError,
 };
 
 pub struct AcpRunner {
@@ -82,28 +81,6 @@ pub(crate) fn push_guard_env(grants: &[String]) -> Result<Vec<(String, String)>,
 }
 
 impl Runner for AcpRunner {
-    fn engine(&self) -> EngineId {
-        self.engine
-    }
-
-    fn transport(&self) -> Transport {
-        Transport::Acp
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        let interactive = matches!(
-            self.engine,
-            EngineId::Minimax | EngineId::Kimi | EngineId::Omp
-        );
-        Capabilities {
-            interactive_asks: interactive,
-            plan_mode: self.plan_mode().is_some(),
-            todos: interactive,
-            rate_limits: false,
-            full_access_only: self.engine == EngineId::Grok,
-        }
-    }
-
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         if launch.task.trim().is_empty() {
             return Err(RunnerError::Invalid("the task is empty"));

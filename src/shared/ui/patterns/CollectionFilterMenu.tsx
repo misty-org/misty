@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ListFilter } from "lucide-react";
 import { IconButton } from "../controls/IconButton";
 import { Badge } from "../display/Badge";
@@ -156,6 +156,8 @@ export function useCollectionRefinement<T>(
     dateLabel?: string;
     dateWindow?: boolean;
     defaultOrderLabel?: string;
+    /** A facet value to show now, such as one a link asked for; each new value is applied once. */
+    requestedFacet?: string;
     facet?: {
       label: string;
       options: { value: string; label: string }[];
@@ -163,7 +165,14 @@ export function useCollectionRefinement<T>(
     };
   },
 ) {
-  const [state, setState] = useState(defaultCollectionRefinement);
+  const [state, setState] = useState(() => ({
+    ...defaultCollectionRefinement,
+    facet: options.requestedFacet ?? defaultCollectionRefinement.facet,
+  }));
+  const requestedFacet = options.requestedFacet;
+  useEffect(() => {
+    if (requestedFacet) setState((old) => ({ ...old, facet: requestedFacet }));
+  }, [requestedFacet]);
   const active = Object.keys(state).some(
     (key) =>
       state[key as keyof CollectionRefinement] !==

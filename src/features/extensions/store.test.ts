@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   commit: vi.fn(),
 }));
 vi.mock("@/features/settings", () => ({
-  useSettingsProfiles: {
+  useDevicePreferences: {
     getState: () => ({ state: {}, accountId: mocks.account, edit: mocks.edit }),
   },
   resolveSetting: (_state: unknown, key: string) => ({ value: mocks.values[key] }),

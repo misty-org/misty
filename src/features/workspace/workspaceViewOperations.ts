@@ -1,12 +1,7 @@
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { workspaceViewHasUnsavedChanges } from "@/features/workspace/unsavedChanges";
-import type {
-  WorkspaceDockNode,
-  WorkspaceLayout,
-  WorkspaceScopeKey,
-  WorkspaceView,
-} from "./model";
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceScopeKey, WorkspaceView } from "./model";
 
 export function removeDockView(
   node: WorkspaceDockNode,

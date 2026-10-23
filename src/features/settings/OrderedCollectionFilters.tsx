@@ -1,0 +1,72 @@
+import { useState, type ComponentProps } from "react";
+import { CollectionFilters } from "@/shared/ui";
+import { useDevicePreferences } from "./devicePreferences/store";
+import { resolveSetting } from "./devicePreferences/model";
+
+export type CollectionTabs = "space" | "journal" | "library";
+
+/** Append new tabs, ignore unavailable ones, and never duplicate a saved tab. */
+export function orderedTabs<T extends { value: string }>(options: T[], raw: string): T[] {
+  const ids = savedTabIds(raw);
+  return [...new Set([...ids, ...options.map((option) => option.value)])].flatMap(
+    (id) => options.find((option) => option.value === id) ?? [],
+  );
+}
+
+function savedTabIds(raw: string): string[] {
+  let saved: unknown;
+  try {
+    saved = JSON.parse(raw);
+  } catch {
+    saved = [];
+  }
+  return Array.isArray(saved)
+    ? [...new Set(saved.filter((id): id is string => typeof id === "string"))]
+    : [];
+}
+
+export function mergeTabOrder(raw: string, ids: string[]) {
+  const previous = savedTabIds(raw);
+  const visible = new Set(ids);
+  let index = 0;
+  const merged = previous.map((value) => (visible.has(value) ? ids[index++] : value));
+  return [...merged, ...ids.slice(index)];
+}
+
+export function OrderedCollectionFilters({
+  collectionId,
+  ...props
+}: Omit<ComponentProps<typeof CollectionFilters>, "onReorder"> & { collectionId: CollectionTabs }) {
+  const id = `collections.tabs.${collectionId}`;
+  const raw = useDevicePreferences((store) =>
+    store.state ? String(resolveSetting(store.state, id).value) : "[]",
+  );
+  const ready = useDevicePreferences((store) => store.ready);
+  const edit = useDevicePreferences((store) => store.edit);
+  const [failure, setFailure] = useState<string>();
+  return (
+    <>
+      <CollectionFilters
+        {...props}
+        options={orderedTabs(props.options, raw)}
+        onReorder={
+          ready
+            ? (ids) => {
+                // Retain temporarily hidden sections when another section is moved.
+                const merged = mergeTabOrder(raw, ids);
+                setFailure(undefined);
+                void edit(id, JSON.stringify(merged)).catch(() =>
+                  setFailure("Tab order couldn’t be saved. Try moving the tab again."),
+                );
+              }
+            : undefined
+        }
+      />
+      {failure && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {failure}
+        </p>
+      )}
+    </>
+  );
+}

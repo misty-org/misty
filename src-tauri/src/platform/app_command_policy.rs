@@ -4,14 +4,12 @@ use crate::infra::space_windows;
 
 /// What an incognito window may never reach: account data, sync, recovery, history,
 /// memory and agents. Incognito is entirely local and Misty does nothing with it.
-const ACCOUNT_DATA: [&str; 12] = [
+const ACCOUNT_DATA: [&str; 10] = [
     "agent",
     "browser_history",
     "browser_library",
     "cursor_companion_",
     "misty_screen",
-    "clipboard_publish",
-    "clipboard_apply_shared",
     "browser_passwords",
     "browser_site_data",
     "voice_",
@@ -46,16 +44,6 @@ pub fn allows(label: &str, command: &str) -> bool {
             .is_some() =>
         {
             command == "cursor_companion_snapshot"
-        }
-        _ if label.starts_with("misty-agent-") && uuid::Uuid::parse_str(&label[12..]).is_ok() => {
-            true
-        }
-        // A detached tab's window: its bar can dock it, bring the tab back or stop.
-        _ if label
-            .strip_prefix("misty-dock-")
-            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok()) =>
-        {
-            command == "agent_dock_host_action"
         }
         _ => false,
     }
@@ -95,20 +83,6 @@ mod tests {
     }
 
     #[test]
-    fn dock_hosts_can_only_press_their_own_bar() {
-        let host = "misty-dock-01951d32-40ac-7000-8000-000000000001";
-        assert!(allows(host, "agent_dock_host_action"));
-        for command in [
-            "agent_tab_detach",
-            "agent_dock_status",
-            "browser_webview_create",
-        ] {
-            assert!(!allows(host, command), "{command}");
-        }
-        assert!(!allows("misty-dock-spoof", "agent_dock_host_action"));
-    }
-
-    #[test]
     fn vault_commands_are_main_workspace_only() {
         for command in [
             "agent_files_choose",
@@ -120,8 +94,6 @@ mod tests {
             "extensions_action",
             "extensions_reconcile",
             "browser_sync_availability",
-            "browser_sync_restore_credentials",
-            "browser_sync_capture_credentials",
             "browser_sync_generate_secret",
             "browser_sync_setup",
             "browser_sync_connect",
@@ -160,7 +132,6 @@ mod tests {
     fn capabilities_never_reach_website_views() {
         let capabilities = [
             include_str!("../../capabilities/default.json"),
-            include_str!("../../capabilities/bot.json"),
             include_str!("../../capabilities/cursor-companion.json"),
         ];
         let website_labels = [
@@ -216,6 +187,9 @@ mod tests {
                 assert!(!allows(label, command), "{label}: {command}");
             }
         }
-        assert!(!allows("misty-bot-pet", "app_snapshot"));
+        assert!(!allows(
+            "misty-agent-01951d32-40ac-7000-8000-000000000001",
+            "app_snapshot"
+        ));
     }
 }

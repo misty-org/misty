@@ -1,0 +1,42 @@
+import { expect, it, vi } from "vitest";
+import type { MistyState } from "./mistyState";
+import { conversationForGlobalPrompt } from "./globalMistyConversationScope";
+vi.mock("@/features/agents/personalAgentsStore", () => ({
+  usePersonalAgentsStore: { getState: () => ({ agents: [] }) },
+}));
+function fixture() {
+  const newConversation = vi.fn(async () => "new");
+  const state = {
+    activeConversationId: "",
+    conversations: [],
+    context: [],
+    newConversation,
+  } as unknown as MistyState;
+  return { state, newConversation };
+}
+it("starts personal work regardless of Space names mentioned in the prompt", async () => {
+  const f = fixture();
+  await conversationForGlobalPrompt(() => f.state, "Work in Family Space");
+  expect(f.newConversation).toHaveBeenCalledExactlyOnceWith();
+});
+it("preserves an explicitly reopened historical conversation without retargeting it", async () => {
+  const f = fixture();
+  f.state.activeConversationId = "old";
+  f.state.conversations = [
+    { id: "old", spaceId: "history", agentId: "agent" },
+  ] as MistyState["conversations"];
+  expect(await conversationForGlobalPrompt(() => f.state, "Switch to Work Space")).toBe("old");
+  expect(f.newConversation).not.toHaveBeenCalled();
+  f.state.selectedAgentId = "another-agent";
+  expect(await conversationForGlobalPrompt(() => f.state, "Continue")).toBe("new");
+});
+it("keeps the same conversation when content destinations change", async () => {
+  const f = fixture();
+  f.state.activeConversationId = "old";
+  f.state.conversations = [{ id: "old", spaceId: "history" }] as MistyState["conversations"];
+  f.state.context = [
+    { id: "doc", kind: "note", title: "Note", source: "current", spaceId: "other" },
+  ];
+  await expect(conversationForGlobalPrompt(() => f.state, "Summarize")).resolves.toBe("old");
+  expect(f.newConversation).not.toHaveBeenCalled();
+});

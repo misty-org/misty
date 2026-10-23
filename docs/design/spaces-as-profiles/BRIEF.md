@@ -1,6 +1,7 @@
 # Spaces as profiles: design brief
 
-Status: decided 2026-10-16; not built. The build plan is
+Status: decided 2026-10-16; built in part (the build plan's status line says which phases). A
+window switches its Space in place rather than opening an OS window per Space. The build plan is
 [docs/plans/spaces-as-profiles.md](../../plans/spaces-as-profiles.md). It builds
 on [Spaces, simplified](../spaces-simplified/BRIEF.md), which is built and in `main`, and
 changes its agent model.
@@ -131,7 +132,7 @@ search vectors, as it keeps memory today.
 Every plan gets as many Spaces as it wants. Plans limit cloud storage and AI usage, not
 Spaces: ten small Spaces cost less than five gigabytes of files. A Space's vault, gallery
 and chat count toward its owner's storage like everything else
-(`docs/plans/pricing-v2.md`).
+(pricing lives in the billing repo).
 
 ## Smaller decisions
 
@@ -160,7 +161,7 @@ Nothing blocks the build. Answered since the brief was written:
   `WKWebsiteDataStore` through Tauri's `data_store_identifier`, with no wry or Tauri
   fork. Cookies, sign-ins, localStorage, IndexedDB and Cache Storage stay apart and
   survive a restart, and two extension controllers run side by side, one per Space
-  ([spike findings](../../plans/spikes/space-web-data.md)). The work left is Misty's own:
+  (checked by the probe in `src-tauri/tests/webextensions/space-probe.m`). The work left is Misty's own:
   sync per vault, one extension host per Space and window labels per Space.
 - **Minimum macOS: 14.0, raised with the Spaces build.** Named stores need macOS 14; on
   12 and 13 every Space would forget its sign-ins at quit. Extensions still need macOS

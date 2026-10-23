@@ -1,10 +1,5 @@
 import * as React from "react";
-import {
-  ContextMenuItem,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-} from "./ContextMenu";
+import { ContextMenuItem } from "./ContextMenu";
 import {
   DropdownMenuItem,
   DropdownMenuSub,
@@ -75,22 +70,4 @@ const ContextMenuAction = React.forwardRef<
 ));
 ContextMenuAction.displayName = "ContextMenuAction";
 
-function ContextMenuSubmenu({
-  icon,
-  label,
-  children,
-  width = "md",
-  disabled,
-  title,
-}: SubmenuProps) {
-  return (
-    <ContextMenuSub>
-      <ContextMenuSubTrigger disabled={disabled} title={title}>
-        <RowBody icon={icon} label={label} />
-      </ContextMenuSubTrigger>
-      <ContextMenuSubContent className={menuWidthClass[width]}>{children}</ContextMenuSubContent>
-    </ContextMenuSub>
-  );
-}
-
-export { ContextMenuAction, ContextMenuSubmenu, MenuItem, MenuSubmenu };
+export { ContextMenuAction, MenuItem, MenuSubmenu };

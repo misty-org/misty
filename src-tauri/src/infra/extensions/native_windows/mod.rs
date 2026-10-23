@@ -27,7 +27,7 @@ use std::{
 };
 
 use serde_json::{json, Value};
-use tauri::{Emitter, Manager, Webview};
+use tauri::{Manager, Webview};
 use tokio::sync::Mutex;
 
 use package::{

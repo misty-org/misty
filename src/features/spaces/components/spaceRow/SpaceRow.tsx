@@ -1,15 +1,12 @@
 import {
   Bot,
-  Folder,
   House,
+  Library,
   MessagesSquare,
-  NotebookPen,
-  PencilRuler,
   UsersRound,
 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { useMistyPanelStore } from "@/features/agents";
-import { showAgentsPanel } from "@/features/browser/workspace/BrowserMistyPanel";
+import { showAgentsPanel, useMistyPanelStore } from "@/features/agents";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
   appIcon,
@@ -30,7 +27,9 @@ import { spaceNavigationName } from "../../defaultSpace";
 import { SpaceMembersPopover } from "../../members";
 import { SpaceAvatar } from "../SpaceAvatar";
 import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
+import { MemoryButton } from "./MemoryButton";
 import { SpaceMenuItems } from "./SpaceMenuItems";
+import { SpaceCreateMenu } from "./SpaceCreateMenu";
 import { useWindowSpace } from "./useWindowSpace";
 
 const AgentsIcon = appIcon("agents") ?? Bot;
@@ -102,23 +101,11 @@ export function SpaceRow({
           <MessagesSquare {...toolbarIconProps} className="size-4" />
         </IconButton>
         <AgentsPanelButton />
-        {pageButton("notes", "Notes", NotebookPen)}
-        {pageButton("drawings", "Drawings", PencilRuler)}
-        {pageButton("library", "Files", Folder)}
+        {pageButton("library", "Library", Library)}
+        <MemoryButton onOpen={() => openSpaceRoute(`${base}/memory`)} />
       </div>
       <span className="mx-2.5 h-5 w-px shrink-0 self-center bg-white/[0.17]" aria-hidden="true" />
-      <div className="flex items-center" data-browser-toolbar data-sidebar>
-        <SpaceMembersPopover
-          space={space}
-          side="bottom"
-          onManage={(invite) => setDialog(invite ? "invite" : "members")}
-          trigger={
-            <IconButton label="People">
-              <UsersRound {...toolbarIconProps} className="size-4" />
-            </IconButton>
-          }
-        />
-      </div>
+      <SpaceCreateMenu spaceId={space.id} onError={setError} />
     </>
   );
   return (
@@ -140,7 +127,10 @@ export function SpaceRow({
                 <DropdownMenuTrigger asChild>
                   <Pressable
                     aria-label={`${name}, Space menu`}
-                    className="flex h-8 max-w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-sm text-cream-bright hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover"
+                    className={
+                      "flex h-8 max-w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-sm " +
+                      "text-cream-bright hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover"
+                    }
                   >
                     <SpaceAvatar
                       space={space}
@@ -166,10 +156,25 @@ export function SpaceRow({
               </DropdownMenu>
             )}
           </GlobalCreateSpaceDialog>
+          <SpaceMembersPopover
+            space={space}
+            side="bottom"
+            align="start"
+            onManage={(invite) => setDialog(invite ? "invite" : "members")}
+            trigger={
+              <IconButton label="People">
+                <UsersRound {...toolbarIconProps} className="size-4" />
+              </IconButton>
+            }
+          />
           {error && (
             <p
               role="alert"
-              className="absolute inset-y-0 left-1/2 z-10 m-0 flex max-w-[60%] -translate-x-1/2 items-center truncate bg-[var(--workspace-tab-surface)] px-2 text-xs text-cream-muted"
+              className={
+                "absolute inset-y-0 inset-x-0 z-10 mx-auto my-0 flex w-fit max-w-[60%] " +
+                "items-center truncate bg-[var(--workspace-tab-surface)] px-2 text-xs " +
+                "text-cream-muted"
+              }
               title={error}
             >
               {error}

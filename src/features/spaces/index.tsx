@@ -1,14 +1,11 @@
 export { AccountUsagePanel } from "./components/AccountUsagePanel";
-export { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
-export { SpaceViewModeToggle } from "./components/SpaceViewModeToggle";
+export { useSpaceRoute } from "./spaceRoute";
 export { spaceChatPath } from "./chat/chatRoute";
-export type * from "./model/stores/spaces/useSpacesStore";
-export type * from "./model/stores/spaces/useSpacesBackendStore";
-export * from "./store/reference-cache";
+export type * from "./store/spacesStoreTypes";
+export type * from "./store/realtimeTypes";
 export * from "./store/reference-mode";
 export * from "./store/useSpacesStore";
-export * from "./store/useSpacesTabsStore";
 export { SpaceInvitationRedemption } from "./components/SpaceInvitationRedemption";
-export { SocialPicker } from "./chat/SocialRuntime";
 
 export { SpaceRow } from "./components/spaceRow/SpaceRow";
+export { SpaceChatPanel } from "./chat/SpaceChatPanel";

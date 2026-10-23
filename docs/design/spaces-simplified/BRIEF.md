@@ -1,17 +1,18 @@
 # Spaces, simplified: design brief
 
-Status: decided and built 2026-10-16 on `worktree-spaces-simplified` (phases 1–6).
-It supersedes the Planner, roadmap, agenda, template and permission parts of
-`docs/design/spaces-chat/` and `docs/design/space-creation/`, the Space rail
-brief, and the earlier version of this brief (Pages, Tasks).
+Status: decided and built 2026-10-16 (phases 1–6), in `main`. It supersedes the
+Planner, roadmap, agenda, template and permission parts of the earlier Spaces chat
+and Space creation briefs (since removed), the Space rail brief, and the earlier
+version of this brief (Pages, Tasks). Navigation has moved on since: see
+[Spaces as profiles](../spaces-as-profiles/BRIEF.md) and AGENTS.md.
 
 ## Why
 
 A Space is an organized, shareable place where people and their agents make
 things together. It holds only true primitives, chat is the one way to talk to
 anyone, person or agent, and anyone in the Space can work with anyone else's
-agents. Misty is mostly a browser, so the tab strip is the only bar and ⌘T is
-the way in.
+agents. Misty is mostly a browser, so tabs and the Space bar are the only chrome
+and ⌘T is the way in.
 
 ## What a Space holds
 
@@ -65,9 +66,10 @@ Space rail or tool strip.
 
 ## Navigation
 
-- The tab strip is the only bar. The navigator rail, the Spaces and Agents
-  pills and the app launcher are gone, and nothing replaces them: Spaces,
-  Agents, Bookmarks and Settings are pages that open in tabs and can be pinned.
+- Tabs sit in the tab sidebar, and the Space bar above the pages carries the
+  Space row (AGENTS.md). The navigator rail, the Spaces and Agents pills and the
+  app launcher are gone: Spaces, Agents, Bookmarks and Settings are pages that
+  open in tabs.
 - ⌘T opens a new tab whose page is the panel; ⌘L or a click on the address bar
   opens the same panel over the current tab. The address bar is only a doorway:
   all typing happens in the panel.

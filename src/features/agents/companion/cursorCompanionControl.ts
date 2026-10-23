@@ -1,4 +1,4 @@
-import { writeProfilePreference } from "@/features/settings/sync";
+import { writeDevicePreference } from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
 import { lessonConversation } from "../lessons/lessonEntry";
@@ -13,24 +13,24 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
   return async (control: CompanionControl) => {
     if (s.disposed || useMistyStore.getState().accountId !== s.accountId) return;
     if (control.kind === "visibility") {
-      await writeProfilePreference("agents.companion.visible", control.visible);
+      await writeDevicePreference("agents.companion.visible", control.visible);
       s.show = control.visible;
       s.change({
         visible: s.show || s.state.phase !== "idle" || s.pointPending,
       });
     } else if (control.kind === "size") {
-      await writeProfilePreference("agents.companion.size", normalizeCompanionSize(control.size));
+      await writeDevicePreference("agents.companion.size", normalizeCompanionSize(control.size));
       s.change({
         size: normalizeCompanionSize(control.size),
       });
     } else if (control.kind === "ask") {
       // End existing ownership before changing the next takeover's policy.
       if (await s.interruptNative()) {
-        await writeProfilePreference("agents.companion.ask", control.ask);
+        await writeDevicePreference("agents.companion.ask", control.ask);
         s.change({ ask: control.ask });
       }
     } else if (control.kind === "teach") {
-      await writeProfilePreference("agents.companion.teach", control.teach);
+      await writeDevicePreference("agents.companion.teach", control.teach);
       s.change({ teach: control.teach });
       // Spoken turns cannot wait for a new chat, so the lesson chat is ready up front.
       if (control.teach) await lessonConversation();
@@ -39,7 +39,7 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       (control.model === "" || s.state.models?.some((m) => m.id === control.model))
     ) {
       if (await s.interruptNative()) {
-        await writeProfilePreference("agents.companion.model", control.model);
+        await writeDevicePreference("agents.companion.model", control.model);
         s.change({ model: control.model });
       }
     } else if (control.kind === "stop_audio") {

@@ -4,10 +4,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./mcp/McpConnectionsSheet", () => ({
-  McpConnectionsSheet: () => null,
-}));
-
 // Agents opens straight into an agent's workspace, so the store needs one.
 vi.mock("./personalAgentsStore", () => ({
   usePersonalAgentsStore: () => ({

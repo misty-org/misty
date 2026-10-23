@@ -33,15 +33,12 @@
       ],
       "@tauri-apps/api/event": ["./node_modules/@tauri-apps/api/event.d.ts"],
       "zustand/middleware": ["./node_modules/zustand/esm/middleware.d.mts"],
-      "@codemirror/lint": ["./node_modules/@codemirror/lint/dist/index.d.ts"],
       "cmdk": ["./node_modules/cmdk/dist/index.d.ts"],
       "react-resizable-panels": [
         "./node_modules/react-resizable-panels/dist/react-resizable-panels.cjs.d.mts"
       ],
       "qrcode.react": ["./node_modules/qrcode.react/lib/index.d.mts"],
       "react-pdf": ["./node_modules/react-pdf/dist/esm/index.d.ts"],
-      "konva": ["./node_modules/konva/lib/index-types.d.ts"],
-      "react-konva": ["./node_modules/react-konva/ReactKonvaCore.d.ts"],
       "@tauri-apps/plugin-dialog": ["./node_modules/@tauri-apps/plugin-dialog/dist-js/index.d.ts"],
       "@tauri-apps/plugin-opener": ["./node_modules/@tauri-apps/plugin-opener/dist-js/index.d.ts"],
       "@excalidraw/excalidraw/element/types": [
@@ -89,7 +86,6 @@
       "@tiptap/starter-kit": ["./node_modules/@tiptap/starter-kit/dist/index.d.ts"],
       "y-protocols/awareness": ["./node_modules/y-protocols/awareness.d.ts"],
       "@tiptap/core": ["./node_modules/@tiptap/core/dist/index.d.ts"],
-      "@uiw/react-md-editor": ["./node_modules/@uiw/react-md-editor/esm/index.d.ts"],
       "mammoth": ["./node_modules/mammoth/lib/index.d.ts"],
       "jszip": ["./node_modules/jszip/index.d.ts"],
       "@tauri-apps/api/webview": ["./node_modules/@tauri-apps/api/webview.d.ts"],

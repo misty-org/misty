@@ -1,4 +1,4 @@
-import { usageLimitText } from "./usageLimits";
+import { usageLimitText } from "./usage-limits";
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -12,7 +12,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-export function apiErrorMessage(code: string | undefined, fallback: string): string {
+function apiErrorMessage(code: string | undefined, fallback: string): string {
   const messages: Record<string, string> = {
     not_authenticated: "Your Misty session is unavailable. Sign out, then sign in again.",
     forbidden: "You do not have permission to perform that action.",

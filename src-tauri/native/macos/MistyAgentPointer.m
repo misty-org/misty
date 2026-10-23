@@ -16,7 +16,7 @@
 - (BOOL)isFlipped { return YES; }
 - (void)drawRect:(NSRect)rect {
   (void)rect;
-  // The same arrow as the in-page agent cursor (browser_agent_cursor.js), with
+  // The same arrow as the in-page agent cursor (browser/scripts/agent_cursor.js), with
   // its tip at this view's corner.
   NSBezierPath *path = [NSBezierPath bezierPath];
   [path moveToPoint:NSMakePoint(1, 1)]; [path lineToPoint:NSMakePoint(21, 16)];

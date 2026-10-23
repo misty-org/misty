@@ -22,7 +22,7 @@ pub mod permissions;
 mod plugin;
 
 pub use capabilities::{Call, Capability, Reply};
-pub use envelope::{Request, MAX_ARGS_BYTES, PROTOCOL_VERSION};
+pub use envelope::Request;
 pub use error::KiriError;
 pub use gate::Caller;
 pub use host::{Host, Signal};
@@ -55,7 +55,8 @@ impl Kiri {
 
     /// Adds (or replaces) a capability, for embedder-specific APIs.
     pub fn with(mut self, capability: impl Capability) -> Self {
-        self.capabilities.insert(capability.name(), Box::new(capability));
+        self.capabilities
+            .insert(capability.name(), Box::new(capability));
         self
     }
 
@@ -72,10 +73,9 @@ impl Kiri {
             return Err(KiriError::security("Kiri does not serve this view."));
         }
         let caller = Caller::from_page(webview, page_url)?;
-        let capability = self
-            .capabilities
-            .get(request.cap.as_str())
-            .ok_or_else(|| KiriError::not_supported(format!("{} is not available.", request.cap)))?;
+        let capability = self.capabilities.get(request.cap.as_str()).ok_or_else(|| {
+            KiriError::not_supported(format!("{} is not available.", request.cap))
+        })?;
         if capability.secure_context_only() && !caller.secure {
             return Err(KiriError::security(format!(
                 "{} requires a secure context.",
@@ -102,7 +102,8 @@ impl Kiri {
 /// The page-side script: the transport plus every capability's shim. Inject
 /// it into top-level documents before site scripts run.
 pub fn page_script() -> String {
-    include_str!("page/transport.js").replace("__KIRI_CAPABILITIES__", &capabilities::shims().join("\n"))
+    include_str!("page/transport.js")
+        .replace("__KIRI_CAPABILITIES__", &capabilities::shims().join("\n"))
 }
 
 #[cfg(test)]

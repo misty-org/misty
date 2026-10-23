@@ -1,5 +1,5 @@
 import { journalSections } from "../../JournalAllCollection";
-import { AccountCollectionFilters as CollectionFilters } from "@/features/settings/AccountCollectionFilters";
+import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import { useState, type ComponentProps } from "react";
 import { useNavigate } from "react-router-dom";
 import type { SpaceDrawing } from "../types";
@@ -19,7 +19,9 @@ import {
   ContextMenuAction,
   IconButton,
   itemTones,
+  CollectionSelectionBar,
 } from "@/shared/ui";
+import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { MoreHorizontal, Pencil, PencilRuler, Plus, Trash2 } from "lucide-react";
 
 export function DrawingCollection(props: {
@@ -32,6 +34,9 @@ export function DrawingCollection(props: {
   onCreate: () => void;
   onRename: (drawing: SpaceDrawing) => void;
   onDelete: (drawing: SpaceDrawing) => void;
+  onDeleteMany: (ids: string[]) => void;
+  bulkBusy?: boolean;
+  bulkError?: string;
 }) {
   const navigate = useNavigate();
   const creatorName = useSpaceItemCreator(props.spaceId);
@@ -52,6 +57,9 @@ export function DrawingCollection(props: {
     },
   });
   const drawings = refinement.items;
+  const selection = useRangeSelection(
+    drawings.filter((drawing) => !props.readOnly && drawing.can_delete).map((drawing) => drawing.id),
+  );
   return (
     <CollectionPage>
       <CollectionHeading
@@ -86,6 +94,13 @@ export function DrawingCollection(props: {
           <CollectionViewToggle value={view} onChange={setView} disabled={!drawings.length} />
         }
       />
+      <CollectionSelectionBar
+        count={selection.selectedIds.length}
+        busy={props.bulkBusy}
+        onClear={selection.clear}
+        onDelete={() => props.onDeleteMany(selection.selectedIds)}
+      />
+      {props.bulkError && <p role="alert" className="text-sm text-cream-muted">{props.bulkError}</p>}
       {
         <CollectionItems
           columnSetId="drawings"
@@ -111,6 +126,7 @@ export function DrawingCollection(props: {
               day: "numeric",
             }),
             onOpen: () => props.onOpen(d),
+            selectable: !props.readOnly && d.can_delete,
             contextMenu: <DrawingActions drawing={d} props={props} context />,
             actions: (
               <DropdownMenu modal={false}>
@@ -125,6 +141,8 @@ export function DrawingCollection(props: {
               </DropdownMenu>
             ),
           }))}
+          selectedIds={selection.selectedIds}
+          onSelect={selection.select}
         />
       }
     </CollectionPage>

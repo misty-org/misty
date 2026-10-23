@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { socialApi as spacesApi } from "../SocialRuntime";
+import { spacesApi } from "@/api/spaces/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
 
 export interface DirectRecipient {
@@ -13,7 +13,7 @@ export interface DirectRecipient {
  * recipient's name, and a line marking the start of the history — the way a
  * one-on-one thread announces itself before anyone has spoken.
  */
-export function SpaceDirectMessageIntro({
+export function DirectMessageIntro({
   spaceId,
   recipient,
 }: {

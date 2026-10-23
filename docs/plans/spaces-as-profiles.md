@@ -1,7 +1,12 @@
 # Spaces as profiles: build plan
 
-Status: planned 2026-10-16; nothing built. Design: [Spaces as profiles](../design/spaces-as-profiles/BRIEF.md).
-Engine findings: [spike: separate website data per Space](spikes/space-web-data.md). It builds on
+Status: planned 2026-10-16; built in part since. Built: vaults per Space on the server (Phase 1),
+switching a window's Space in place with the Space row (Phase 3b, which replaced Phase 3's OS
+window per Space), the memory tree per Space (Phase 7), and private and public layers with each
+agent's home Space (Phase 9). Per-Space integration picks (Phase 8) were built and then dropped.
+"Where the code stands" describes the code before this work. Design:
+[Spaces as profiles](../design/spaces-as-profiles/BRIEF.md). The engine probe for separate
+website data per Space is `src-tauri/tests/webextensions/space-probe.m`. It builds on
 [Spaces, simplified](../design/spaces-simplified/BRIEF.md), which is in `main`.
 
 A Space becomes a browser profile: one encrypted vault per person per Space, its own website data
@@ -15,16 +20,16 @@ These are the single-Space assumptions the plan removes, with where they live to
 
 | Area | Today | File |
 | --- | --- | --- |
-| Server vault | One vault per user: `browser_sync_vaults` has `PRIMARY KEY (user_id)`; `BrowserSyncVault(userID)` reads it | `server/internal/sync/store.go`, baseline migration |
-| Desktop sync | One `Session` per process (`static SESSION`) | `src-tauri/src/infra/browser_sync.rs` |
+| Server vault | One vault per user: `browser_sync_vaults` has `PRIMARY KEY (user_id)`; `BrowserSyncVault(userID)` reads it | `server/internal/browsersync/store.go`, baseline migration |
+| Desktop sync | One `Session` per process (`static SESSION`) | `src-tauri/src/infra/browser_sync/mod.rs` |
 | Store choice | One `SELECTED_PROFILE`; switching errors until every view closes | `src-tauri/src/infra/browser_sync/profile.rs` |
 | Store identity | `default_profile_id(scope)` hashes deployment, account and `vault_id` into the logical profile; the encrypted registry binds it to a physical store | `browser_sync/profile.rs`, `infra/browser_profile.rs`, `browser_create.rs` |
 | Windows | One app window labelled `main`, about 155 `"main"` uses under `src-tauri/src`; virtual windows inside it | `src/features/workspace/windows.ts`, `windowColors.ts`, `DesktopLayout/WorkspaceWindowMenu.tsx` |
-| Device profiles | `profile:<id>` scopes, each with a random store and its own virtual windows | `src/features/workspace/browserProfiles.ts`, `DesktopLayout/BrowserProfileMenu.tsx`, `infra/browser_profile_cleanup.rs` |
+| Device profiles | `profile:<id>` scopes, each with a random store and its own virtual windows | `src/features/workspace/browserProfiles.ts`, `DesktopLayout/BrowserProfileMenu.tsx`, `infra/browser/profile_cleanup.rs` |
 | Extensions | One `static MistyExtensionHost *host`; `configureStore:` rebuilds the controller on store change; packages under `extensions/<account>` | `src-tauri/native/macos/MistyExtensions.m`, `infra/extensions/mod.rs` |
-| Collections | `bookmarks`, `tab_groups`, `history`, `extension_sync`, `passwords` | `src-tauri/crates/browser-sync/src/collections.rs`, `server/internal/sync/store_records.go` (`syncRecordCollections`) |
+| Collections | `bookmarks`, `tab_groups`, `history`, `extension_sync`, `passwords` | `src-tauri/crates/browser-sync/src/collections.rs`, `server/internal/browsersync/store_records.go` (`syncRecordCollections`) |
 | Device-local data | Site permissions (per store, in `misty.db`), downloads and history (`misty.db`), search engine and custom bangs (settings store) | `browser_site_permissions_db.rs`, `browser_library.rs`, `workspace/browserSearchEngine.ts`, `settings/store/useSettingsStore.ts` |
-| Memory | `memory_events`, `memory_backlog`, `misty_memories`, `agent_methods`, `agent_method_versions`, `agent_method_lessons`, `ai_recaps`; tools `memory.pref.*`, `memory.history.*`, `memory.workflow.*` run on the server | `server/internal/platform/postgres/{memory_events,misty_memories,agent_methods,agent_method_lessons,ai_recaps}.go`, `httpapi/{agent_memory_tools,recall_agent_tools,agent_method_tools}.go` |
+| Memory | `memory_events`, `memory_backlog`, `misty_memories`, `agent_methods`, `agent_method_versions`, `agent_method_lessons`, `ai_recaps`; tools `memory.pref.*`, `memory.history.*`, `memory.workflow.*` run on the server | `server/internal/platform/db/{memory_events,misty_memories,agent_methods,agent_method_lessons,ai_recaps}.go`, `httpapi/{agent_memory_tools,recall_agent_tools,agent_method_tools}.go` |
 | Device jobs | `workflow_device_node_jobs`, claimed by the device; runs wait on a deadline | `httpapi/device_job_wait.go`, `device_job_claim_wait.go`, `device_agent_tools.go` |
 | Integrations | Composio holds every account; one `composio_sessions` row per user; no per-Space choice | `server/internal/integrations/composio/`, migration `20271004050000_composio_sessions.sql` |
 | Agents | `misty_ask_identities` with `space_agents(space_id, agent_id, owner_user_id)` membership; no home Space | migration `20271024000000_space_agents.sql` |
@@ -57,7 +62,7 @@ Space vault's bytes count toward its owner's storage through `cloudusage`, as th
 today.
 
 Every phase follows the repo's rules: goose migrations under
-`server/internal/platform/postgres/migrations/` dated after `20271027000000`, server DB tests through
+`server/internal/platform/db/migrations/` dated after `20271027000000`, server DB tests through
 `server/test.sh`, contract gates in `src/tests/contracts`, CRLF kept in the files that use it, and the
 check in the Tauri shell rather than the bare Vite port. There are no users, so nothing is migrated
 for people: local data becomes the personal Space and the rest is dropped.
@@ -91,7 +96,7 @@ and extensions still turn off below 15.4.
 deployment target) and `browser_requires_ephemeral_store`, with every branch that used it and the
 unregistered `browser_profile_persistence` command, is gone. Left for a cleanup pass: `@available`
 checks for macOS 14.0 and below in `src-tauri/native/macos/` (now always true) and the xcap screenshot
-fallback for 12–13 in `cursor_companion/platform.rs`.
+fallback for 12–13 in `cursor_companion/host/platform/`.
 
 **Risks.** Small. Anyone on 12–13 loses the app, which is acceptable with no users. Check that the
 updater refuses to offer the 14-only build to older Macs rather than installing a broken one.
@@ -116,13 +121,13 @@ password, without the server learning anything new.
   per vault, so revoking a device revokes it in every vault in one transaction.
 
 **Touches.**
-- `server/internal/sync/store.go`: `BrowserSyncVault(userID)` becomes `BrowserSyncVaults(userID)` and
+- `server/internal/browsersync/store.go`: `BrowserSyncVault(userID)` becomes `BrowserSyncVaults(userID)` and
   `BrowserSyncVaultForSpace(userID, spaceID)`; `CreateBrowserSyncVault` takes the Space and either a
   password envelope (personal) or a Space envelope (other Spaces); revoke spans vaults.
-- `server/internal/sync/http.go` and handlers: `GET /sync/vaults`, `POST /sync/vaults` (create for a
+- `server/internal/browsersync/http.go` and handlers: `GET /sync/vaults`, `POST /sync/vaults` (create for a
   Space the caller is a member of), the existing per-vault routes keep taking `vault_id`.
-- `server/internal/platform/postgres/devices_unified.go`, `devices_lists.go`: device lists span vaults.
-- `server/internal/platform/postgres/spaces_create.go` and Space delete/leave: deleting a Space or
+- `server/internal/platform/db/devices_unified.go`, `devices_lists.go`: device lists span vaults.
+- `server/internal/platform/db/spaces_create.go` and Space delete/leave: deleting a Space or
   leaving it deletes that member's vault rows (ciphertext only) through the existing object deletion
   jobs.
 - `src-tauri/crates/browser-sync/src/crypto.rs`: `VaultRoot::seal_space_root` /
@@ -167,7 +172,7 @@ accepts `space_key_envelope`.
 unlock.
 
 **Touches.**
-- `src-tauri/src/infra/browser_sync.rs`: `SESSION` becomes `HashMap<VaultId, Session>`.
+- `src-tauri/src/infra/browser_sync/mod.rs`: `SESSION` becomes `HashMap<VaultId, Session>`.
   Functions that read "the" session (`device_admission_authority`, `extension_sync_handle`,
   `is_account_browser_profile`, the views) take a `vault_id` or the personal vault. Device admission
   keeps using the personal root.
@@ -185,13 +190,13 @@ unlock.
 - `browser_sync/account.rs`: lock, stop and change account close every session.
 - **Clipboard:** one ring per account. `CLIPBOARD` stays in the personal vault only; every Space
   window reads and writes it through the personal session (`src-tauri/src/infra/cloud_clipboard/`).
-- Frontend: `src/features/browser-workspace/` sync status (`BrowserSyncBadge`, `BrowserSyncSettings`)
+- Frontend: `src/features/browser-sync/` sync status (`BrowserSyncBadge`, `BrowserSyncSettings`)
   shows one state for the account and names a Space only when it is the one with a problem.
 
 **Migrations.** Local only: the existing local database is renamed to the personal vault's path on
 first launch. No server change.
 
-**Tests.** `browser_sync/tests.rs` with two vaults: both open on one unlock, a lock closes both,
+**Tests.** `browser_sync/tests/` with two vaults: both open on one unlock, a lock closes both,
 capture in Space A never reads Space B's store (`CookieStoreError::Profile`), sessions survive one
 vault failing. Crate tests unchanged. A live check on the isolated stack: two Spaces, sign in to a
 site in one, see it restored on a second device in that Space only.
@@ -237,10 +242,10 @@ Spaces, a sign-in restored on a second device in one Space only) hasn't run.
 the Space's color. Virtual windows go away.
 
 **Touches.**
-- **Window labels.** A new helper module (`src-tauri/src/infra/space_windows.rs`) owns labels of the
+- **Window labels.** A new helper module (`src-tauri/src/infra/space_windows/`) owns labels of the
   form `space-<vault short id>` and answers `space_for_window(label)` and `windows_for_space(id)`.
   Every `"main"` under `src-tauri/src` (about 155: `browser.rs`, `browser_create.rs`,
-  `browser_profile_view.rs`, `extensions/native.rs` `trusted`, `browser_sync/*`, `agent_dock*`,
+  `browser_profile_view.rs`, `extensions/native.rs` `trusted`, `browser_sync/*`,
   `cursor_companion/*`, `tray.rs`, `app_menu.rs`, `device_channel.rs`, `web_fetch.rs`,
   `page_state/`, `lib.rs`) moves to it: events go to the Space's windows (`emit_to` per window or
   `emit_filter`), and trust checks accept any Space window.
@@ -284,7 +289,7 @@ incognito window in Work starts signed out, stays apart from Personal's incognit
 forgets everything when the last one closes.
 
 **Built 2026-10-17 (unverified in the Tauri shell).**
-- **Labels.** `infra/space_windows.rs` (with `space_windows/{registry,lifecycle,commands}.rs`)
+- **Labels.** `infra/space_windows/` (with `space_windows/{registry,lifecycle,commands}.rs`)
   owns `space-<key>` and `incognito-<key>-<n>`. The key is `personal` for the personal Space and the
   Space id's 32 hex digits otherwise, not the vault id: a window must open before sync is set up,
   when a Space has no vault yet. No `"main"` literal remains under `src-tauri/src` (contract gate
@@ -350,7 +355,7 @@ page goes away.
 - `browser_sync/view.rs` and the edit commands: a window's sync view and edits use its current
   Space's vault, not always the personal one.
 - `src/features/workspace/spaceWindow.ts`: the window's Space becomes state that changes on switch.
-  `windows.ts` and `browser-workspace/source.ts` keep one layout and one sync-tree window id per
+  `windows.ts` and `browser-sync/source.ts` keep one layout and one sync-tree window id per
   Space scope (`layoutsByScope`), so switching shows that Space's tabs and back restores them.
 - Pages of the Space switched away from stay alive briefly, then suspend, as background tabs do.
 - The Space row in the sidebar (`DesktopLayout`), its ⌄ menu (Spaces with checkmarks, Open in new
@@ -408,7 +413,7 @@ requests never carry one Space's cookies into another.
 - `src-tauri/src/infra/extensions/native_windows/`: WebView2 extensions are already per profile
   (`AddBrowserExtension` on the view's profile); point them at the Space's folder.
 - Toolbar and Settings management (`src/features/extensions/`) act on the current window's Space.
-- `extensions/sync.rs`, `sync_exchange.rs`: synced extension settings go to the Space's vault
+- `extensions/sync/`, `sync_exchange.rs`: synced extension settings go to the Space's vault
   (`extension_sync_handle` takes the vault).
 
 **Migrations.** Local: today's installed packages move under the personal Space.
@@ -434,10 +439,10 @@ Space) shows up only at runtime; route every callback through the host that rais
   microphone, notifications, pop-ups), `SEARCH` (default engine, custom engines, custom bangs) and
   `DOWNLOADS` (url, file name, size, finished time, device that holds the file). All sealed like the
   others; extensions and site permissions native-only, never projected to a renderer.
-- `server/internal/sync/store_records.go`: add the names to `syncRecordCollections`.
+- `server/internal/browsersync/store_records.go`: add the names to `syncRecordCollections`.
 - `src-tauri/src/infra/browser_site_permissions*.rs`: read and write through the Space's collection;
   `misty.db` keeps a cache keyed by store (it already keys by `profile_key`).
-- `src-tauri/src/infra/browser_library.rs`, `browser_downloads.rs`: record finished downloads into
+- `src-tauri/src/infra/browser_library/`, `browser_downloads.rs`: record finished downloads into
   the Space's collection; the file stays where it is; other devices show "On <device>".
 - `src/features/workspace/browserSearchEngine.ts`, `settings/store/useSettingsStore.ts`: search
   engine and custom bangs leave the settings store and become Space data. The Settings rows stay
@@ -486,7 +491,7 @@ vault is open.
   `externalLinks.ts` and `default_browser.rs`.
 - **Unclaimed links** open in the last-focused Space's window; with no window open, the last Space
   used opens.
-- `src-tauri/src/infra/browser_profile_cleanup.rs` becomes Space store cleanup (phase 3 uses it).
+- `src-tauri/src/infra/browser/profile_cleanup.rs` becomes Space store cleanup (phase 3 uses it).
 - `browser_sync.rs` `is_account_browser_profile` and the device-profile guards go.
 - Browser import (`src/features/browser-import/`): importing a Chrome profile can create a Space
   for it instead of a device profile.

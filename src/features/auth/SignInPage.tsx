@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, Button, IconButton } from "@/shared/ui";
+import { Avatar, AvatarFallback, Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -13,7 +13,7 @@ import AuthShell from "./components/AuthShell";
 import AuthSubmitButton from "./components/AuthSubmitButton";
 import ForgotPasswordForm from "./components/ForgotPasswordForm";
 import GoogleSignInButton from "./components/GoogleSignInButton";
-import type { SavedAccountSession } from "./model/stores/account/useAuthTokenStore";
+import type { SavedAccountSession } from "./store/accountVault";
 import { accountSignIn } from "./store/useAccountStore";
 
 export default function SignIn() {
@@ -114,12 +114,13 @@ export default function SignIn() {
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="group flex items-center gap-1 rounded-lg border border-charcoal-border p-1 transition-colors hover:bg-white/5 focus-within:bg-white/5"
+                className={
+                  "group flex items-center gap-1 rounded-lg border border-charcoal-border p-1 " +
+                  "transition-colors hover:bg-white/5 focus-within:bg-white/5"
+                }
               >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto min-w-0 flex-1 justify-start gap-3 p-1.5 text-left font-normal hover:bg-transparent"
+                <Pressable
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1.5"
                   onClick={() => void handleSelect(account)}
                   disabled={Boolean(busyAccountId) || transitioning}
                 >
@@ -137,7 +138,7 @@ export default function SignIn() {
                   {busyAccountId === account.id ? (
                     <span className="shrink-0 pr-1 text-xs text-cream-muted">Signing in…</span>
                   ) : null}
-                </Button>
+                </Pressable>
                 <IconButton
                   label={`Remove ${account.email}`}
                   title="Remove from this device"

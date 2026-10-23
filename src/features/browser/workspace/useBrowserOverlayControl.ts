@@ -1,4 +1,7 @@
-import { browserOverlayReady, setBrowserWebviewsSuspended } from "./browserRuntime";
+import {
+  browserOverlayReady,
+  setBrowserWebviewsSuspended,
+} from "@/features/webviews/browserRuntime";
 import { useBrowserOverlay } from "./useBrowserOverlay";
 const setOverlay = async (reason: string, active: boolean) => {
   setBrowserWebviewsSuspended(active, reason);

@@ -357,7 +357,9 @@ describe("SignInPage", () => {
     });
 
     expect(container.textContent).toContain("Sign in again");
-    expect(document.body.textContent).toContain("Your saved sign-in for alice@example.com has expired");
+    expect(document.body.textContent).toContain(
+      "Your saved sign-in for alice@example.com has expired",
+    );
     expect(container.querySelector<HTMLInputElement>('input[type="email"]')!.value).toBe(
       "alice@example.com",
     );

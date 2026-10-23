@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	browsersync "github.com/kannachi323/misty/server/internal/sync"
+	"github.com/kannachi323/misty/server/internal/browsersync"
 )
 
 func syncVaultTestEnvelope() browsersync.SyncEnvelope {

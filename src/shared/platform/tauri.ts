@@ -1,4 +1,4 @@
-export function getTauriInternals(): TauriInternals | null {
+function getTauriInternals(): TauriInternals | null {
   if (typeof window === "undefined") return null;
   return (
     (window as typeof window & { __TAURI_INTERNALS__?: TauriInternals }).__TAURI_INTERNALS__ ?? null

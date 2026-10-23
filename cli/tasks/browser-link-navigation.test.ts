@@ -3,7 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const source = readFileSync(new URL('../../src-tauri/src/infra/browser_scripts.rs', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../../src-tauri/src/infra/browser/scripts/mod.rs', import.meta.url), 'utf8');
 const handler = source.slice(source.indexOf('  const handleLinkClick ='), source.indexOf("  document.addEventListener('pointerover'"));
 
 function click(overrides = {}, target = '_blank', href = '/channels/server/thread') {

@@ -17,9 +17,6 @@ const mocks = vi.hoisted(() => ({
     disconnectRealtime: vi.fn(),
     clearError: vi.fn(),
   },
-  explorer: {
-    recordActivity: vi.fn(),
-  },
 }));
 
 vi.mock("@/features/auth", () => ({
@@ -31,11 +28,6 @@ vi.mock("./store/useSpacesStore", () => ({
     (selector: (state: typeof mocks.spaces) => unknown) => selector(mocks.spaces),
     { getState: () => mocks.spaces },
   ),
-}));
-
-vi.mock("@/features/files/workspace/explorer", () => ({
-  useExplorerStore: (selector: (state: typeof mocks.explorer) => unknown) =>
-    selector(mocks.explorer),
 }));
 
 describe("SpacesRealtimeBridge", () => {
@@ -53,7 +45,6 @@ describe("SpacesRealtimeBridge", () => {
     mocks.spaces.connectRealtime.mockClear();
     mocks.spaces.disconnectRealtime.mockClear();
     mocks.spaces.clearError.mockClear();
-    mocks.explorer.recordActivity.mockClear();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -84,8 +75,6 @@ describe("SpacesRealtimeBridge", () => {
       root.render(<SpacesRealtimeBridge />);
     });
     expect(mocks.spaces.clearError).toHaveBeenCalled();
-    await act(async () => vi.advanceTimersByTime(2_000));
-    expect(mocks.explorer.recordActivity).not.toHaveBeenCalled();
   });
 
   it("does not reconnect when auth returns a new object for the same account", async () => {
@@ -124,7 +113,5 @@ describe("SpacesRealtimeBridge", () => {
     });
 
     expect(mocks.spaces.clearError).toHaveBeenCalled();
-    await act(async () => vi.advanceTimersByTime(2_000));
-    expect(mocks.explorer.recordActivity).not.toHaveBeenCalled();
   });
 });

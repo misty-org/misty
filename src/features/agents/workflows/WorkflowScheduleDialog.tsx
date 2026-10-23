@@ -17,8 +17,10 @@ import {
   OptionSelect,
   Switch,
 } from "@/shared/ui";
-import { AgentMethodInputFields, methodError } from "../workspace/AgentMethodEditor";
-import { ruleFor, ScheduleRuleEditor } from "./ScheduleRuleEditor";
+import { methodError } from "../workspace/agentMethodDefinition";
+import { AgentMethodInputFields } from "../workspace/AgentMethodInputFields";
+import { ScheduleRuleEditor } from "./ScheduleRuleEditor";
+import { ruleFor } from "./scheduleRules";
 import { ScheduleComputerField } from "./ScheduleComputerField";
 import { describeSchedule } from "./scheduleSummary";
 

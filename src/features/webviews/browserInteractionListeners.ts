@@ -1,7 +1,7 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { listen } from "@tauri-apps/api/event";
 import type { NavigateFunction } from "react-router-dom";
-import type { BrowserAskSnapshot } from "@/features/global-search/browserAskContext";
+import type { BrowserAskSnapshot } from "@/features/misty/browserAskContext";
 import { useBrowserDownloadsStore } from "@/features/browser/library";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
@@ -126,7 +126,7 @@ export function listenBrowserInteractionEvents({
     listen<BrowserAskSnapshot>("misty://browser-ask-context", ({ payload }) => {
       if (isDisposed()) return;
       focusBrowserRuntimeTab(payload.id);
-      void import("@/features/global-search/browserAskContext")
+      void import("@/features/misty/browserAskContext")
         .then(({ openBrowserAsk }) => openBrowserAsk(payload))
         .catch((error: unknown) => {
           const tabId = browserTabIdForRuntime(payload.id);

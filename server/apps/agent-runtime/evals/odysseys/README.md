@@ -47,6 +47,7 @@ Without paid credit, the agent and the judge run on NVIDIA's free hosted models 
 | `MISTY_ODYSSEYS_JUDGE_LANES` | Rubrics judged at once on a free (`nim/`) judge (5) |
 | `MISTY_ODYSSEYS_REGRADE` | A task folder to judge again from its saved steps and pictures, without running it |
 | `MISTY_ODYSSEYS_RESUME` | A task folder from an earlier pass (`reports/<time>/<task>`): the task continues in that run's conversation from where it stopped, and is graded on both runs' steps |
+| `MISTY_ODYSSEYS_RESUME_FAILED` | An earlier pass folder (`reports/<time>`): only its tasks that did not pass go on, each from its own checkpoint with the parts that passed kept (the agent's ledger); passed tasks count as carried. For iterating on fixes: when all pass, `GATE:` prints and `reports/gate.json` is written, then run the full batch once for the score that counts, and now and then after |
 | `MISTY_ODYSSEYS_EARLY_STOP` | `1` (default) stops when 4 of the first 6 tasks fail |
 | `MISTY_ODYSSEYS_CAP` | The campaign's spend cap in dollars (50), kept across passes in `reports/ledger.json` |
 

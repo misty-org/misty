@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { TabGroupEditor, TabGroupHeader } from "./MistyTabGroups";
+import { TabGroupHeader } from "./MistyTabGroups";
+import { TabGroupEditor } from "./TabGroupEditor";
 import type { TabSide } from "@/features/app-shell/dockingLayout";
 import { Pressable, OverlaySideProvider, inwardSide } from "@/shared/ui";
 import { Plus } from "lucide-react";

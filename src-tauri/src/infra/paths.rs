@@ -9,8 +9,7 @@ pub fn misty_home_dir() -> Option<PathBuf> {
 }
 
 fn resolve_desktop_home_dir() -> Option<PathBuf> {
-    env::var_os("MISTY_DESKTOP_DATA_ROOT")
-        .or_else(|| env::var_os("MISTY_DATA_ROOT"))
+    env::var_os("MISTY_DATA_ROOT")
         .or_else(|| env::var_os("HOME"))
         .or_else(|| env::var_os("USERPROFILE"))
         .map(PathBuf::from)

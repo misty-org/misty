@@ -1,6 +1,6 @@
 /**
  * Readable text from a fetched page, for `web.fetch` (docs/plans/agent-harness.md,
- * phase 1). The HTML is parsed into an inert document: nothing in it runs or
+ * Reading without a screen). The HTML is parsed into an inert document: nothing in it runs or
  * loads. Navigation, scripts and page chrome are dropped; every other visible
  * text becomes one plain line per block (headings and list items keep their
  * Markdown marks, table rows join their cells with "|"), so prices that sit in
@@ -61,7 +61,13 @@ export function billingNote(text: string): string | undefined {
     !/\b(annual(ly)?|yearly|per year|billed monthly|month-to-month|monthly)\b/i.test(text)
   )
     return undefined;
-  return "Prices here show the billing period the page opens on (often yearly) and the page's monthly/yearly toggle cannot be switched by a fetch. State which period each price is for. To read the other period, call screen_open with this page's url, which opens your own tab in the background and keeps this run going, then switch the toggle with browser_steps.";
+  return (
+    "Prices here show the billing period the page opens on (often yearly) and the " +
+    "page's monthly/yearly toggle cannot be switched by a fetch. State which period " +
+    "each price is for. To read the other period, call screen_open with this page's " +
+    "url, which opens your own tab in the background and keeps this run going, then " +
+    "switch the toggle with browser_steps."
+  );
 }
 
 /**
@@ -69,12 +75,19 @@ export function billingNote(text: string): string | undefined {
  * text. The agent's own browser tab can (docs/plans/odysseys-campaign.md).
  */
 export function browserNote(status: number, text: string): string | undefined {
-  const shell = /enable javascript|javascript is (required|disabled)|requires javascript|please turn on javascript/i;
-  if (status < 400 && text.replace(/\s+/g, " ").length >= 600 && !shell.test(text)) return undefined;
-  return "This page did not give its content to a fetch (it needs a browser, an account or is blocked). To read or use it, call screen_open with this url: it opens your own browser tab in the background and this run keeps going with browser tools.";
+  const shell =
+    /enable javascript|javascript is (required|disabled)|requires javascript|please turn on javascript/i;
+  if (status < 400 && text.replace(/\s+/g, " ").length >= 600 && !shell.test(text))
+    return undefined;
+  return (
+    "This page did not give its content to a fetch (it needs a browser, an account " +
+    "or is blocked). To read or use it, call screen_open with this url: it opens " +
+    "your own browser tab in the background and this run keeps going with browser " +
+    "tools."
+  );
 }
 
-export interface ReadablePage {
+interface ReadablePage {
   title: string;
   text: string;
   /** Text was left out: the page was longer than the limit. */

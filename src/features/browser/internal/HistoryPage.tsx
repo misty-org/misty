@@ -11,7 +11,11 @@ import {
   WorkspaceSectionLabel,
   SkeletonList,
 } from "@/shared/ui";
-import { browserHistoryClearedEvent, browserLibrary, type BrowserHistoryVisit } from "../library/native";
+import {
+  browserHistoryClearedEvent,
+  browserLibrary,
+  type BrowserHistoryVisit,
+} from "../library/native";
 import { InternalPageEmpty, InternalPageFrame, SiteIcon } from "./InternalPageFrame";
 import type { BrowserInternalPageProps } from "./types";
 import { historySectionRange, historySections, type HistorySection } from "./historySections";

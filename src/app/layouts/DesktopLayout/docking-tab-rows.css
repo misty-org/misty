@@ -1,0 +1,78 @@
+/* Vertical tab rows: the close button, speaker and pane chips inside each row. */
+.misty-workspace-tabs .misty-workspace-tab:not(:hover, :focus-within) .misty-workspace-tab-close {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* A vertical tab's speaker sits right after the favicon rather than at the row's end. The real
+   button floats over the row; a gap of its width keeps the favicon, speaker and title evenly
+   spaced, and exists only while the speaker is there. */
+.misty-workspace-tabs .misty-workspace-tab {
+  position: relative;
+}
+.misty-tab-audio-slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Row padding (8) + favicon (16) + flex gap (6) + gap margin (2), less the button's own 6. */
+  left: 26px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+.misty-tab-audio-gap {
+  display: none;
+  width: 12px;
+  margin-inline: 2px;
+  flex-shrink: 0;
+}
+.misty-workspace-tab:has(.misty-tab-audio-slot:not(:empty)) .misty-tab-audio-gap {
+  display: block;
+}
+
+/* Vertical tabs reserve no room for the close button: it appears at the row's right edge on
+   hover, and the title fades out before it instead of being cut short all the time. Anything
+   else at the row's end, such as the pane chips, rests at the edge and steps aside, clear of the
+   button's whole slot (6px in, 20px wide, and a gap), exactly when the button shows. */
+.misty-workspace-tabs .misty-tab-pane-chips {
+  margin-right: 6px;
+  transition: margin-right 120ms ease-out;
+}
+.misty-workspace-tabs .misty-workspace-tab:is(:hover, :focus-within) .misty-tab-pane-chips {
+  margin-right: 32px;
+}
+@media (pointer: coarse) {
+  .misty-workspace-tabs .misty-tab-pane-chips {
+    margin-right: 32px;
+  }
+}
+.misty-workspace-tabs .misty-workspace-tab .misty-workspace-tab-close {
+  position: absolute;
+  /* Centered with inset and auto margins: a translate would land it on a half pixel. */
+  inset-block: 0;
+  right: 6px;
+  margin: auto 0;
+  border-radius: 6px;
+}
+.misty-workspace-tabs
+  .misty-workspace-tab:not([data-pinned], .misty-tab-has-chips):is(:hover, :focus-within)
+  .misty-workspace-tab-title {
+  /* The title makes way for the close button whenever the button shows, also when the title
+     fits its row but still runs under the button: it fades out and is gone before the button,
+     so the button needs no backing of its own and nothing shows through it. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black calc(100% - 54px),
+    transparent calc(100% - 26px)
+  );
+  mask-image: linear-gradient(to right, black calc(100% - 54px), transparent calc(100% - 26px));
+}
+/* With the pane chips the title already ends before them, and they step clear of the close
+   button themselves, so the title keeps only a short fade at its own edge, and only when it
+   really is too long to fit. */
+.misty-workspace-tabs
+  .misty-workspace-tab.misty-tab-has-chips:is(:hover, :focus-within)
+  [data-text-overflowing="true"] {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
+}

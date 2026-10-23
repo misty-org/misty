@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
-import { AgentMethodEditor, AgentMethodInputFields, blankDefinition } from "./AgentMethodEditor";
+import { AgentMethodEditor } from "./AgentMethodEditor";
+import { blankDefinition } from "./agentMethodDefinition";
+import { AgentMethodInputFields } from "./AgentMethodInputFields";
 import type { AgentMethod, AgentMethodInputs } from "@/api/ai/agent-methods";
 
 const method: AgentMethod = {

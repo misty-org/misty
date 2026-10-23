@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 
 /** A remembered approval: this agent may take this action on this one resource in Auto. */

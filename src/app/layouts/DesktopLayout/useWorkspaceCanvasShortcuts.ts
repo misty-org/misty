@@ -13,7 +13,7 @@ import {
 } from "@/features/workspace";
 import { usePaneSwapMode } from "@/features/workspace/paneSwapMode";
 import type { DockSplitDirection } from "@/features/workspace/model";
-import { minimumForWorkspaceViews } from "./WorkspaceDockTree";
+import { minimumForWorkspaceViews } from "./dockSplitFit";
 import {
   closeSpaceWindow,
   openIncognitoWindow,

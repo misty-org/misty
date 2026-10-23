@@ -1,7 +1,4 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { defaultBrowserHomeUrl, normalizeBrowserHomeUrl } from "@/features/workspace";
-import { browserSearchEngine } from "@/features/workspace/browserSearchEngine";
-import { useSpaceSearchStore } from "@/features/workspace/spaceSearch";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -10,35 +7,16 @@ import {
   booleanSetting,
   ChoiceControl,
   FilePathControl,
-  numberSetting,
   stringSetting,
   SwitchControl,
-  TextControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
-import { parseSiteZoomLevels } from "@/features/webviews/siteZoom";
-import { parseSiteStyles } from "@/features/webviews/siteStyles";
 
 type BrowserSettingsProps = Pick<SettingsContentProps, "document" | "working" | "onSettingChange">;
 
-const archiveOptions = [
-  { value: "0", label: "Never" },
-  { value: "12", label: "After 12 hours" },
-  { value: "24", label: "After 1 day" },
-  { value: "168", label: "After 1 week" },
-  { value: "720", label: "After 30 days" },
-];
-
-const sleepOptions = [
-  { value: "60", label: "1 minute" },
-  { value: "300", label: "5 minutes" },
-  { value: "1800", label: "30 minutes" },
-  { value: "0", label: "Never" },
-];
-
-/** General › Links: how links reach Misty and what pages show around them. */
+/** Browsing › Links: how links reach Misty and what pages show around them. */
 export function BrowserLinksSettings(props: BrowserSettingsProps) {
   return (
     <SettingsSectionBlock title="Links">
@@ -98,17 +76,8 @@ export function BrowserLinksSettings(props: BrowserSettingsProps) {
 
 /** Search: where typed searches go and what the address bar suggests. */
 export function SearchSettings(props: BrowserSettingsProps) {
-  const space = useSpaceSearchStore((state) => state.space);
-  const engine = space?.engines.find((item) => item.id === space.engine) ?? browserSearchEngine();
-  const shortcuts = space?.bangs.length ?? 0;
   return (
     <SettingsSectionBlock title="Search">
-      <SettingsRow
-        label="Search engine"
-        description="Searches typed in the address bar go here. Start with a shortcut like !w to search another site instead."
-      >
-        <span className="text-[15px] text-cream">{engine.name}</span>
-      </SettingsRow>
       <SettingsRow
         label="Show search suggestions"
         description="Send what you type in the address bar to your search engine to suggest searches and sites."
@@ -121,19 +90,11 @@ export function SearchSettings(props: BrowserSettingsProps) {
           }
         />
       </SettingsRow>
-      <SettingsRow
-        label="Search shortcuts"
-        description="Shortcuts your Space added, like !gh for GitHub. They follow the Space to every device."
-      >
-        <span className="text-[15px] text-cream-muted">
-          {shortcuts === 0 ? "None" : shortcuts === 1 ? "1 shortcut" : `${shortcuts} shortcuts`}
-        </span>
-      </SettingsRow>
     </SettingsSectionBlock>
   );
 }
 
-/** Downloads: where files from websites are saved. */
+/** Browsing › Downloads: where files from websites are saved. */
 export function DownloadsSettings(props: BrowserSettingsProps) {
   return (
     <SettingsSectionBlock title="Downloads">
@@ -170,106 +131,7 @@ export function DownloadsSettings(props: BrowserSettingsProps) {
   );
 }
 
-/** Performance: what tabs you aren't looking at cost. */
-export function PerformanceSettings(props: BrowserSettingsProps) {
-  return (
-    <SettingsSectionBlock title="Tabs">
-      <SettingsRow
-        label="Sleep hidden tabs"
-        description={
-          "A tab you switched away from stops drawing and running scripts after this long, and " +
-          "wakes the moment you return. Tabs playing sound, sharing your screen, downloading or " +
-          "used by an agent keep running."
-        }
-      >
-        <ChoiceControl
-          value={String(
-            numberSetting(props.document, "general", "browser_hidden_tab_sleep_seconds", 60),
-          )}
-          options={sleepOptions}
-          disabled={props.working}
-          onValueChange={(value) =>
-            props.onSettingChange("general", "browser_hidden_tab_sleep_seconds", Number(value))
-          }
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Archive idle tabs"
-        description="Close tabs you haven't looked at for a while. Pinned, grouped and playing tabs stay. Find them in History under Archived."
-      >
-        <ChoiceControl
-          value={String(numberSetting(props.document, "general", "browser_auto_archive_hours", 0))}
-          options={archiveOptions}
-          disabled={props.working}
-          onValueChange={(value) =>
-            props.onSettingChange("general", "browser_auto_archive_hours", Number(value))
-          }
-        />
-      </SettingsRow>
-    </SettingsSectionBlock>
-  );
-}
-
-/** Appearance › Browser: the start page, what sites look like, and the toolbar. */
-export function BrowserLookSettings(props: BrowserSettingsProps) {
-  return (
-    <>
-      <SettingsSectionBlock title="Browser">
-        <SettingsRow
-          label="Homepage"
-          description={`Where new browser tabs open. Leave empty for ${defaultBrowserHomeUrl}.`}
-        >
-          <TextControl
-            value={stringSetting(props.document, "general", "browser_homepage", "")}
-            placeholder={defaultBrowserHomeUrl}
-            disabled={props.working}
-            onCommit={(value) =>
-              props.onSettingChange(
-                "general",
-                "browser_homepage",
-                value.trim() ? normalizeBrowserHomeUrl(value) : "",
-              )
-            }
-          />
-        </SettingsRow>
-        <SiteZoomRow document={props.document} />
-        <CustomizedSitesRow document={props.document} />
-      </SettingsSectionBlock>
-      <BrowserToolbarSettings {...props} />
-    </>
-  );
-}
-
-/** Sites remember their own page zoom; Reset clears every saved level. */
-function SiteZoomRow(props: { document: SettingsContentProps["document"] }) {
-  const count = Object.keys(
-    parseSiteZoomLevels(stringSetting(props.document, "general", "browser_site_zoom_json", "[]")),
-  ).length;
-  return (
-    <SettingsRow
-      label="Zoom by site"
-      description="Each website opens at the zoom level you last chose for it."
-    >
-      <span className="text-sm text-cream-muted">
-        {count === 0 ? "No sites zoomed" : count === 1 ? "1 site" : `${count} sites`}
-      </span>
-    </SettingsRow>
-  );
-}
-
-/** Sites with their own CSS, hidden elements or dark mode; Reset clears them all. */
-function CustomizedSitesRow(props: { document: SettingsContentProps["document"] }) {
-  const sites = parseSiteStyles(
-    stringSetting(props.document, "general", "browser_site_styles_json", "[]"),
-  );
-  return (
-    <SettingsRow
-      label="Customized sites"
-      description="Change a site's look from its site information beside the address."
-    >
-      <span className="text-sm text-cream-muted">
-        {sites.length === 0 ? "None" : sites.length === 1 ? "1 site" : `${sites.length} sites`}
-      </span>
-    </SettingsRow>
-  );
+/** Browsing › Sites: how websites look and zoom, then the browser toolbar. */
+export function BrowserSitesSettings(props: BrowserSettingsProps) {
+  return <BrowserToolbarSettings {...props} />;
 }

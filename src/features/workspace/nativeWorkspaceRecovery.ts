@@ -7,7 +7,7 @@ import {
   registerRecoveryFlush,
   type NativeRecoveryStorage,
   type RecoverySaveStatus,
-} from "@/features/browser-workspace/recovery";
+} from "@/features/browser-sync/recovery";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { browserWorkspaceStoreVersion, workspaceRecoveryKey } from "./workspaceRecoveryStorage";

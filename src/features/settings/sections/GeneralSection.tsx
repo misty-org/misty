@@ -1,10 +1,4 @@
 import {
-  workspaceDefaultViewIndex,
-  workspaceDefaultViewOption,
-  workspaceDefaultViewOptions,
-  workspaceDefaultViewStoredIndex,
-} from "@/features/workspace/workspaceDefaultView";
-import {
   startupViewOption,
   startupViewOptions,
   startupViewStoredIndex,
@@ -63,33 +57,6 @@ export function GeneralSection(props: SettingsContentProps) {
             disabled={props.working || reopenLastSession}
             onChange={(value) =>
               props.onSettingChange("general", "startup_view_index", startupViewStoredIndex(value))
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Behavior">
-        <SettingsRow
-          label="New tabs and splits"
-          description="Choose the starting page. Selecting a navbar destination fills an unused tab or pane."
-        >
-          <SelectControl
-            value={workspaceDefaultViewOption(
-              numberSetting(
-                props.document,
-                "general",
-                "workspace_default_tab_index",
-                workspaceDefaultViewIndex,
-              ),
-            )}
-            options={[...workspaceDefaultViewOptions]}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange(
-                "general",
-                "workspace_default_tab_index",
-                workspaceDefaultViewStoredIndex(value),
-              )
             }
           />
         </SettingsRow>

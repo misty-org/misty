@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { IconButton } from "@/shared/ui";
+import { IconButton, Textarea } from "@/shared/ui";
 import { formatChatMessageTime } from "./ChatDisplay";
 import { threadRootOf } from "./messageHelpers";
 import { useChatSidePanel } from "../store/chatSidePanelStore";
@@ -83,7 +83,7 @@ export function ChatThreadColumn({
       </ol>
       {canWrite && root ? (
         <form onSubmit={submit} className="border-t border-charcoal-border p-3">
-          <textarea
+          <Textarea
             aria-label="Reply"
             rows={2}
             value={text}
@@ -95,7 +95,7 @@ export function ChatThreadColumn({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            className="w-full resize-none rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-sm text-cream outline-none"
+            className="min-h-0 resize-none"
           />
         </form>
       ) : null}

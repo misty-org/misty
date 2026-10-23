@@ -1,14 +1,11 @@
-import type { AppTab } from "../types";
 import { appSnapshot } from "@/native";
 import type { AppSnapshot } from "@/native/ipc";
 import { create } from "zustand";
 
 export const useAppStore = create<AppStore>((set) => ({
   app: null,
-  activeTab: "providers",
   error: null,
   message: null,
-  setActiveTab: (activeTab) => set({ activeTab }),
   setError: (error) => set({ error }),
   setMessage: (message) => set({ message }),
   clearNotice: () => set({ error: null, message: null }),
@@ -23,10 +20,8 @@ export const useAppStore = create<AppStore>((set) => ({
 
 export interface AppStore {
   app: AppSnapshot | null;
-  activeTab: AppTab;
   error: string | null;
   message: string | null;
-  setActiveTab: (tab: AppTab) => void;
   setError: (error: string | null) => void;
   setMessage: (message: string | null) => void;
   clearNotice: () => void;

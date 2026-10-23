@@ -7,7 +7,6 @@ use misty_browser_sync::{
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::sync::{Mutex, OnceLock};
-use tauri::Manager;
 
 struct Client {
     id: String,

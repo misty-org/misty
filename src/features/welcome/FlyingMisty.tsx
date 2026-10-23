@@ -1,7 +1,11 @@
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import "./flyingMisty.css";
 
-/** Misty drifting around its box (the welcome screen, an empty pane): two out-of-step sweeps (across, then up and down, around the middle) trace a wandering path. Fills the nearest positioned parent. */
+/**
+ * Misty drifting around its box (the welcome screen, an empty pane): two out-of-step sweeps
+ * (across, then up and down, around the middle) trace a wandering path. Fills the nearest
+ * positioned parent.
+ */
 export function FlyingMisty() {
   return (
     <div

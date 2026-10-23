@@ -5,7 +5,7 @@
  * instead of waiting for a large transfer to be rejected. The server enforces
  * the same limits independently and is the only authority.
  */
-export type UploadPurpose = "library" | "attachment" | "note_attachment";
+type UploadPurpose = "library" | "attachment" | "note_attachment";
 
 export const UPLOAD_LIMIT_BYTES: Record<UploadPurpose, number> = {
   library: 100 * 1024 * 1024,

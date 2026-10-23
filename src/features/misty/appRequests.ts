@@ -1,11 +1,7 @@
 import type { AppRequest } from "@/features/agents";
 import { continuationScreen } from "@/features/agents/executionHandoff";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
-import {
-  patchConversationMessage,
-  type GlobalSearchGet,
-  type GlobalSearchSet,
-} from "@/features/global-search/globalSearchStoreHelpers";
+import { globalMistyError } from "./globalMistyActions";
+import { patchConversationMessage, type MistyGet, type MistySet } from "./mistyStoreHelpers";
 
 // Each answered card continues its conversation at most once.
 const continued = new Set<string>();
@@ -22,8 +18,8 @@ function continuationPrompt(request: AppRequest) {
  * Misty continues the same conversation, as it does after opening a screen.
  */
 export async function continueAfterAppRequest(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   conversationId: string,
   messageId: string,
   request: AppRequest,

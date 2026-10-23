@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useAgentFoldersStore } from "./agentFoldersStore";
 

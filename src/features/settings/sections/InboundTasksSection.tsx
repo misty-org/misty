@@ -41,8 +41,8 @@ export function InboundTasksSection() {
           current?.map((c) => (c.channel === kind ? { ...c, enabled: false } : c)),
         );
       }
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "This setting couldn’t be saved.");
+    } catch {
+      setError("The connection could not be updated. Try again.");
     } finally {
       setWorking("");
     }
@@ -50,7 +50,9 @@ export function InboundTasksSection() {
   const gmail = find("gmail");
   const slack = find("slack");
   const note = (channel: InboundChannel | undefined, fallback: string) =>
-    channel?.enabled && channel.last_error ? channel.last_error : fallback;
+    channel?.enabled && channel.last_error
+      ? "This connection needs attention. Reconnect it in Agents › Integrations."
+      : fallback;
   return (
     <DesktopSettingsSection
       title="Tasks by email and Slack"

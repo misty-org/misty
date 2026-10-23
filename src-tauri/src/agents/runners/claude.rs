@@ -8,31 +8,12 @@ use serde_json::{json, Value};
 use super::{
     bridge::classify_command,
     events::{todo_status, ActionKind, PermissionRequest, RunnerEvent, TodoItem, Usage},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
-    Transport,
+    CommandSpec, Launch, LaunchMode, Protocol, Runner, RunnerError, Step,
 };
 
 pub struct ClaudeRunner;
 
 impl Runner for ClaudeRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Claude
-    }
-
-    fn transport(&self) -> Transport {
-        Transport::StreamJson
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            interactive_asks: true,
-            plan_mode: true,
-            todos: true,
-            rate_limits: false,
-            full_access_only: false,
-        }
-    }
-
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         if launch.task.trim().is_empty() {
             return Err(RunnerError::Invalid("the task is empty"));

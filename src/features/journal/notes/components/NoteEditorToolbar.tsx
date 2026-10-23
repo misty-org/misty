@@ -23,7 +23,7 @@ import {
  * https://tiptap.dev/docs/ui-components/templates/simple-editor
  */
 
-export function SimpleEditorToolbar(props: {
+export function NoteEditorToolbar(props: {
   editor: Editor;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;

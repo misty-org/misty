@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { browserCustomBangs } from "./browserSearchEngine";
-import {
-  configureDeviceBangs,
-  refreshSpaceSearch,
-  saveSpaceBangs,
-  useSpaceSearchStore,
-} from "./spaceSearch";
+import { configureDeviceBangs, refreshSpaceSearch, useSpaceSearchStore } from "./spaceSearch";
 
 const invoke = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
@@ -45,17 +40,5 @@ describe("search settings as Space data", () => {
     });
     await refreshSpaceSearch();
     expect(browserCustomBangs()).toEqual([jira]);
-  });
-
-  it("saves bangs to the Space and reads them back", async () => {
-    invoke.mockResolvedValueOnce({ spaceId: null, engine: "google", engines: [], bangs: [wiki] });
-    await saveSpaceBangs([wiki]);
-    expect(invoke).toHaveBeenCalledWith("browser_space_search", { bangs: [wiki] });
-    expect(browserCustomBangs()).toEqual([wiki]);
-  });
-
-  it("refuses to save when the Space's vault is not open", async () => {
-    invoke.mockResolvedValueOnce(null);
-    await expect(saveSpaceBangs([wiki])).rejects.toThrow("Turn on sync");
   });
 });

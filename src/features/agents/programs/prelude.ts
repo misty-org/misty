@@ -1,5 +1,5 @@
 /**
- * The page API a browser_run program sees (docs/plans/agent-harness-v3.md, change 1), defined
+ * The page API a browser_run program sees (docs/plans/agent-harness.md, browser_run), defined
  * inside the sandbox over its one host call. Targets are a ref from a read ("e12"), a locator
  * ({ role, name, index }), or words describing the control ("Search button"); the host keeps
  * each tab's document, so a program never copies ids.
@@ -35,6 +35,8 @@ class Tab {
   hover(target) { return this.__act("hover", target); }
   press(key, target) { return this.__act("key", target, { key }); }
   scroll(direction, amount) { return this.__act("scroll", undefined, { direction: direction || "down", amount }); }
+  /** Brings the first visible text matching these words into view, so the page shows it as proof. */
+  scrollTo(text) { return this.__act("scroll", undefined, { text: String(text) }); }
   /**
    * Waits for { text } to appear, { textGone } to go, or { urlIncludes }; timeoutMs up to 20000.
    * text may be a RegExp, matched against the page's text; a plain string also works alone.
@@ -62,12 +64,25 @@ class Tab {
 // Names a program is unlikely to reuse for its own variables: "const tabs = await tabs()" put
 // the function in its own temporal dead zone in the first live run.
 /** Opens a new tab of the agent's own at url and waits for it to load. */
-const openTab = async (url) => new Tab(await __call("open", { url }));
+const __tabMethods = [
+  "read", "text", "find", "goto", "click", "type", "fill", "select", "check", "uncheck", "hover",
+  "press", "scroll", "scrollTo", "waitFor", "keep",
+];
+// A tab that was not awaited ("getTab(id).text()") works as if it had been: its methods wait for
+// the tab first. A small model forgets the await, and "not a function" tells it nothing.
+const __tabPromise = (promise) => new Proxy(promise, {
+  get: (target, key) => {
+    if (key === "then" || key === "catch" || key === "finally") return target[key].bind(target);
+    if (__tabMethods.includes(key)) return (...args) => target.then((tab) => tab[key](...args));
+    return undefined;
+  },
+});
+const openTab = (url) => __tabPromise((async () => new Tab(await __call("open", { url })))());
 const open = openTab;
 /** The agent's own tabs in this run. */
 const listTabs = async () => (await __call("tabs")).map((info) => new Tab(info));
 /** A tab of the agent's own by id or a part of its address. */
-const getTab = async (which) => new Tab(await __call("tab", { which }));
+const getTab = (which) => __tabPromise((async () => new Tab(await __call("tab", { which })))());
 /** Records a finding (any object) in the run's results; returned with the program's answer. */
 const note = (row) => __call("note", { row });
 const sleep = (ms) => __call("sleep", { ms });

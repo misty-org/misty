@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
+import { dockLeaves, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { BrowserOmniboxView } from "./BrowserOmniboxView";
-import { useBrowserSearchStore } from "@/features/browser-workspace/search";
-export * from "./BrowserOmniboxView";
+import { useBrowserSearchStore } from "@/features/browser-sync/search";
 
 /** The address bar, wired to the shared search panel. What is chosen there opens through `onNavigate`. */
 export function BrowserOmnibox(
@@ -9,9 +9,20 @@ export function BrowserOmnibox(
     onNavigate: (value: string) => void;
   },
 ) {
+  const currentUrl = useWorkspaceStore((state) => {
+    if (!props.hostOnly) return props.currentUrl;
+    const pane = dockLeaves(state.layout.root).find(
+      (candidate) => candidate.id === state.layout.focusedPaneId,
+    );
+    const view = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
+    return view?.surfaceId === "browser"
+      ? parseBrowserViewState(view.state).url
+      : props.currentUrl;
+  });
+
   return (
     <BrowserOmniboxView
-      currentUrl={props.currentUrl}
+      currentUrl={currentUrl}
       focusRequest={props.focusRequest}
       trailing={props.trailing}
       leading={props.leading}

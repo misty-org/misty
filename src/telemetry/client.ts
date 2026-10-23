@@ -9,7 +9,7 @@ import posthog, { type PostHog } from "posthog-js";
 import { clientMetadata } from "./metadata";
 import { redactRecord, redactedError } from "./redaction";
 
-export const TELEMETRY_DEFAULTS = Object.freeze({
+const TELEMETRY_DEFAULTS = Object.freeze({
   analyticsEnabled: false,
   errorReportingEnabled: false,
 });
@@ -170,7 +170,7 @@ export class NoopTelemetryClient implements TelemetryClient {
   async flush(): Promise<void> {}
 }
 
-export class DevelopmentTelemetryClient extends NoopTelemetryClient {
+class DevelopmentTelemetryClient extends NoopTelemetryClient {
   private analyticsEnabled = false;
   private errorEnabled = false;
   override setAnalyticsEnabled(value: boolean): void {

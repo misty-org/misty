@@ -5,7 +5,7 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -15,9 +15,7 @@ import { createSpaceConversationsApi } from "@/api/spaces/conversations";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
-  ProviderConnectionAvailability,
   Space,
-  SpaceIntegration,
   SpaceInvitationPreview,
   SpaceNode,
   SpacePerson,
@@ -27,7 +25,7 @@ import { createSpaceMembersApi } from "@/api/spaces/members";
 import { createSpaceChatApi } from "./chat";
 import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
-import { fetchProtectedBlob } from "./library-upload";
+import { fetchProtectedBlob } from "./protected-download";
 import type { SpaceRequestInit } from "./types";
 
 export class SpaceRequestError extends ApiRequestError {
@@ -187,24 +185,6 @@ export const spacesApi = {
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
-  integrations: (spaceId: string) =>
-    spaceRequest<{
-      integrations: SpaceIntegration[];
-      providers?: ProviderConnectionAvailability[];
-    }>(`/spaces/${encodeURIComponent(spaceId)}/integrations`),
-  bindAccountConnection: (
-    spaceId: string,
-    provider: string,
-    connectionId: string,
-    capability: "calendar_read" | "calendar_write",
-  ) =>
-    spaceRequest<{ integration: SpaceIntegration; connection_id: string; capability: string }>(
-      `/spaces/${encodeURIComponent(spaceId)}/integrations/${encodeURIComponent(provider)}/bind`,
-      {
-        method: "POST",
-        body: JSON.stringify({ connection_id: connectionId, capability }),
-      },
-    ),
   nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {
       onCached,

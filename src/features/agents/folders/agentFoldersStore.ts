@@ -2,7 +2,7 @@ import { create } from "zustand";
 import {
   conversationFoldersApi,
   type AgentConversationFolder,
-} from "@/api/assistant/conversationFolders";
+} from "@/api/assistant/conversation-folders";
 import { localChats } from "@/features/misty/localChats";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 

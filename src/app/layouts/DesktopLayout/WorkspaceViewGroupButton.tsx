@@ -121,13 +121,3 @@ export function ViewIcon({
     />
   );
 }
-export function workspaceTabDropIndex(
-  paneTabs: WorkspaceView[],
-  movingTabId: string,
-  targetTabId: string,
-): number {
-  const targetIndex = paneTabs.findIndex((tab) => tab.id === targetTabId);
-  if (targetIndex < 0) return paneTabs.length;
-  const sourceIndex = paneTabs.findIndex((tab) => tab.id === movingTabId);
-  return sourceIndex >= 0 && sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
-}

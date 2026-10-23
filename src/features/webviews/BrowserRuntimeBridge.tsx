@@ -1,10 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useBrowserNativeEvents } from "./useBrowserNativeEvents";
-import {
-  useBrowserOverlaySuspension,
-  useBrowserPointerSuspension,
-  useEmbeddedBrowserSuspension,
-} from "./useBrowserSuspension";
+import { useBrowserOverlaySuspension, useBrowserPointerSuspension } from "./useBrowserSuspension";
 import { useBrowserRuntimeServices } from "./useBrowserRuntimeServices";
 import {
   useBrowserFocusReturn,
@@ -21,7 +17,6 @@ export function BrowserRuntimeBridge() {
   useInstantBrowserSwitch();
   useBrowserFocusReturn();
   useBrowserSurfaceParking();
-  useEmbeddedBrowserSuspension();
   useClosedBrowserTabCleanup();
   useBrowserPointerSuspension();
   useBrowserOverlaySuspension();

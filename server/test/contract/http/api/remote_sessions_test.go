@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	serveragent "github.com/kannachi323/misty/server/internal/agent"
+	"github.com/kannachi323/misty/server/internal/platform/db"
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
 )
 
 // The agent's own browser session (docs/plans/odysseys-campaign.md): when a run

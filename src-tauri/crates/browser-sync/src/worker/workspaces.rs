@@ -295,8 +295,14 @@ where
         if self.records_failed(request, code, retry_after) || self.clipboard.failed(request) {
             return Ok(());
         }
-        self.workspaces
-            .on_error(&mut self.store, &self.root, request, operation, code, retry_after)?;
+        self.workspaces.on_error(
+            &mut self.store,
+            &self.root,
+            request,
+            operation,
+            code,
+            retry_after,
+        )?;
         self.publish_sync_state()
     }
 

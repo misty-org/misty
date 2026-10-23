@@ -11,7 +11,7 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Emitter, State, Webview};
+use tauri::{AppHandle, State, Webview};
 
 /// Keep recording briefly after release so the last word isn't clipped.
 const TAIL: Duration = Duration::from_millis(180);

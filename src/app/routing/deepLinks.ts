@@ -12,7 +12,7 @@ const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
 export function installMistyDeepLinkHandler(
   navigate: (route: string) => void,
   isRouteAllowed: (route: string) => boolean,
-  resolveAuthRoute: (target: AuthDeepLinkTarget) => string,
+  resolveAuthRoute: () => string,
 ): () => void {
   let active = true;
   let unlisten: UnlistenFn | null = null;
@@ -88,7 +88,7 @@ export function installMistyDeepLinkHandler(
 export function routeForMistyDeepLink(
   rawUrl: string,
   isRouteAllowed: (route: string) => boolean,
-  resolveAuthRoute: (target: AuthDeepLinkTarget) => string,
+  resolveAuthRoute: () => string,
 ): string | null {
   const url = parseMistyDeepLink(rawUrl);
   if (!url) return null;
@@ -104,9 +104,7 @@ export function routeForMistyDeepLink(
     return null;
   }
   if (first === "auth") {
-    return resolveAuthRoute(
-      rest[0] === "providers" || rest[0] === "provider" ? "providers" : "account",
-    );
+    return resolveAuthRoute();
   }
   return normalizeDeepLinkRoute(parts, url.search, isRouteAllowed);
 }
@@ -142,4 +140,3 @@ function normalizeDeepLinkRoute(
   }
   return `${route}${search}`;
 }
-export type AuthDeepLinkTarget = "account" | "providers";

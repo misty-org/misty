@@ -1,13 +1,11 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { AppRequest } from "@/features/agents";
-import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
+import type { MistyState } from "./mistyState";
 import { continueAfterAppRequest } from "./appRequests";
 
-let state: GlobalSearchState;
+let state: MistyState;
 const get = () => state;
-const set = (
-  patch: Partial<GlobalSearchState> | ((s: GlobalSearchState) => Partial<GlobalSearchState>),
-) => {
+const set = (patch: Partial<MistyState> | ((s: MistyState) => Partial<MistyState>)) => {
   state = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
 };
 const submitAnswer = vi.fn(async (..._args: unknown[]) => {});
@@ -46,7 +44,7 @@ function withCard(request: AppRequest, extra: object[] = []) {
         ],
       },
     ],
-  } as unknown as GlobalSearchState;
+  } as unknown as MistyState;
 }
 beforeEach(() => submitAnswer.mockClear());
 

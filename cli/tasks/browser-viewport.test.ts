@@ -6,11 +6,11 @@ import { JSDOM } from "jsdom";
 // Exercise the real initialization script: no separate viewport helper may
 // change website scrolling, even when the user zooms the native WebView.
 const rust = readFileSync(
-  new URL("../../src-tauri/src/infra/browser_scripts.rs", import.meta.url),
+  new URL("../../src-tauri/src/infra/browser/scripts/mod.rs", import.meta.url),
   "utf8",
 );
 const context = readFileSync(
-  new URL("../../src-tauri/src/infra/browser_context_menu.js", import.meta.url),
+  new URL("../../src-tauri/src/infra/browser/scripts/context_menu.js", import.meta.url),
   "utf8",
 );
 // Kiri's host channel sender as WebKit renders it (kiri/src/channel/macos.rs).

@@ -32,11 +32,13 @@ export function SpaceMembersPopover({
   space,
   trigger,
   side,
+  align,
   onManage,
 }: {
   space: Space;
   trigger?: ReactElement;
   side?: "bottom" | "right";
+  align?: "start" | "center" | "end";
   /** Opens the People window: to invite someone, or to manage who is in the Space. */
   onManage: (invite: boolean) => void;
 }) {
@@ -95,7 +97,12 @@ export function SpaceMembersPopover({
         )}
       </PopoverTrigger>
 
-      <PopoverContent side={side} sideOffset={8} className="w-72 overflow-hidden p-0">
+      <PopoverContent
+        side={side}
+        align={align}
+        sideOffset={8}
+        className="w-80 max-w-[calc(100vw-16px)] overflow-hidden p-0"
+      >
         <div className="flex items-center justify-between border-b border-charcoal-border/60 px-2 py-2.5">
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
@@ -160,7 +167,7 @@ function TeamRows({ members, agents }: { members: PresentMember[]; agents?: Spac
     <div className="grid gap-0.5">
       {members.map((member) => (
         <div key={`person:${member.user_id}`}>
-          <div className="flex min-h-10 items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-charcoal-hover">
+          <div className="flex min-h-9 items-center gap-2.5 rounded-md px-1.5 py-1 hover:bg-charcoal-hover">
             <span className="relative inline-flex shrink-0">
               <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
                 <AvatarFallback
@@ -192,8 +199,8 @@ function PresenceDot({ status }: { status: PresenceStatus }) {
     <span
       className={cn(
         "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-charcoal-border",
-        status === "online" && "bg-status-green",
-        status === "idle" && "bg-sage-bg",
+        status === "online" && "bg-cream-bright",
+        status === "idle" && "bg-cream-muted",
         status === "offline" && "bg-charcoal-hover",
       )}
       aria-hidden="true"

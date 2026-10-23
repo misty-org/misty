@@ -16,7 +16,7 @@ const gitBranchFixtures = new Set([
 ]);
 
 describe("Space window labels contract", () => {
-  it("names no window \"main\" outside the Space windows helper", () => {
+  it('names no window "main" outside the Space windows helper', () => {
     const failures = walk("src-tauri/src", new Set([".rs"]))
       .map((path) => [repositoryPath(path), readFileSync(path, "utf8")] as const)
       .filter(([path]) => !helper.test(path) && !gitBranchFixtures.has(path))
@@ -30,11 +30,11 @@ describe("Space window labels contract", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("gives app windows Space labels in the capabilities, never main", () => {
+  it("gives app windows window labels in the capabilities, never main", () => {
     const capability = JSON.parse(readFileSync("src-tauri/capabilities/default.json", "utf8")) as {
       webviews: string[];
     };
-    expect(capability.webviews).toContain("space-*");
+    expect(capability.webviews).toContain("window-*");
     expect(capability.webviews).toContain("incognito-*");
     expect(capability.webviews).not.toContain("main");
   });

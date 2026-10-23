@@ -124,7 +124,7 @@ export class AnalyticsLifecycleManager {
   }
 }
 
-export function shouldStartNewSession(lastActivity: number, now: number): boolean {
+function shouldStartNewSession(lastActivity: number, now: number): boolean {
   return now - lastActivity >= ANALYTICS_SESSION_TIMEOUT_MS;
 }
 

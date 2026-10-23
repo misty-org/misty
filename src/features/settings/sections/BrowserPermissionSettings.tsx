@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { DesktopSettingsSection } from "../components/DesktopSettingsUI";
+import {
+  DesktopSettingsNotice,
+  DesktopSettingsRow,
+  DesktopSettingsSection,
+} from "../components/DesktopSettingsUI";
 import { Button, SkeletonList } from "@/shared/ui";
 import {
   permissionLabels,
   supportsSitePermissions,
   type SavedSitePermission,
-} from "@/features/browser-workspace/sitePermissions";
+} from "@/features/browser-sync/sitePermissions";
 
 export function BrowserPermissionSettings() {
   const [entries, setEntries] = useState<SavedSitePermission[]>([]);
@@ -19,8 +23,8 @@ export function BrowserPermissionSettings() {
     setError(null);
     try {
       setEntries(await invoke<SavedSitePermission[]>("browser_site_permissions_list"));
-    } catch (reason) {
-      setError(String(reason));
+    } catch {
+      setError("Site permissions could not be loaded. Try again.");
     } finally {
       setLoading(false);
     }
@@ -29,6 +33,7 @@ export function BrowserPermissionSettings() {
     if (supported) void load();
   }, [supported, load]);
   if (!supported) return null;
+  if (!loading && !error && entries.length === 0) return null;
   const reset = async (entry: SavedSitePermission) => {
     setBusy(true);
     setError(null);
@@ -38,10 +43,10 @@ export function BrowserPermissionSettings() {
         origin: entry.origin,
       });
       await load();
-    } catch (reason) {
+    } catch {
       // Reset may have persisted before native capture shutdown failed.
       await load();
-      setError(String(reason));
+      setError("Site permissions could not be reset. Try again.");
     } finally {
       setBusy(false);
     }
@@ -61,57 +66,54 @@ export function BrowserPermissionSettings() {
           rows={3}
           leading="none"
           trailing
-          className="gap-0 divide-y divide-charcoal-border"
-          rowClassName="border-t border-charcoal-border py-3"
+          className="gap-4"
+          rowClassName="py-3"
         />
-      ) : !error && entries.length === 0 ? (
-        <p className="border-t border-charcoal-border py-3 text-sm text-cream-muted">
-          No saved choices in the Spaces open now. Websites use the default Ask setting.
-        </p>
       ) : (
-        <ul className="divide-y divide-charcoal-border">
+        <ul className="grid">
           {entries.map((entry) => (
-            <li
-              key={`${entry.profile}:${entry.origin}`}
-              className="flex items-center gap-4 border-t border-charcoal-border py-3"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="break-all text-sm">{entry.origin}</p>
-                <p className="mt-1 text-xs text-cream-muted">
-                  Camera: {permissionLabels[entry.permissions.camera]} · Microphone:{" "}
-                  {permissionLabels[entry.permissions.microphone]}
-                </p>
-                {new Set(entries.map((other) => other.space)).size > 1 ? (
-                  <p className="mt-1 text-xs text-cream-muted">{entry.space}</p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0 px-3 text-xs"
-                disabled={busy}
-                aria-label={`Reset permissions for ${entry.origin}`}
-                onClick={() => void reset(entry)}
+            <li key={`${entry.profile}:${entry.origin}`}>
+              <DesktopSettingsRow
+                label={entry.origin}
+                description={
+                  <>
+                    Camera: {permissionLabels[entry.permissions.camera]} · Microphone:{" "}
+                    {permissionLabels[entry.permissions.microphone]}
+                    {new Set(entries.map((other) => other.space)).size > 1 ? ` · ${entry.space}` : ""}
+                  </>
+                }
               >
-                Reset
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  aria-label={`Reset permissions for ${entry.origin}`}
+                  onClick={() => void reset(entry)}
+                >
+                  Reset
+                </Button>
+              </DesktopSettingsRow>
             </li>
           ))}
         </ul>
       )}
       {error ? (
-        <div role="alert" className="border-t border-charcoal-border py-3 text-sm">
-          <p>{error}</p>
-          <Button
-            type="button"
-            className="mt-2 underline"
-            disabled={busy}
-            onClick={() => void load()}
-          >
-            Try again
-          </Button>
-        </div>
+        <DesktopSettingsNotice
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => void load()}
+            >
+              Try again
+            </Button>
+          }
+        >
+          {error}
+        </DesktopSettingsNotice>
       ) : null}
     </DesktopSettingsSection>
   );

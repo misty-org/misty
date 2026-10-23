@@ -39,26 +39,6 @@
   scrollbar-gutter: stable;
 }
 
-/* Keep the navigation width and icon rasterization stable as hover/scroll
-   feedback appears. Expansion chevrons retain their own state transition. */
-.app-pages-root [data-navigator-section-scroll] {
-  scrollbar-gutter: stable;
-}
-
-.app-pages-root [data-tour-target="navigation"] .misty-navigator-row-target {
-  transition: none;
-}
-
-/* One glyph size for every navbar icon: primary rows, utility actions, the
-   Misty logo, and the Space rail. Avatars are identity tiles, sized a touch
-   larger so a filled square reads at the same weight as a stroked glyph.
-   Portaled menus retain their own sizing. */
-.misty-navigation-icons {
-  --misty-navigation-icon-size: 16px;
-  --misty-navigation-avatar-size: 28px;
-  --navigation-primary-icon-size: var(--misty-navigation-icon-size);
-}
-
 /* Shared sidebar metrics. The Agents and Space sidebars both read these so their rows,
    labels and icons stay in step. */
 :root {
@@ -76,47 +56,6 @@
   --misty-status-done: color-mix(in srgb, #4ade80 70%, var(--misty-theme-text));
 }
 
-/* The global rail uses square 34px tiles around 18px glyphs and 28px avatars. */
-.misty-global-navigator {
-  --misty-navigation-icon-size: 18px;
-  --misty-navigation-tile-size: 34px;
-  --misty-navigation-identity-size: var(--misty-navigation-avatar-size);
-}
-
-.misty-navigation-icons :is(svg, img:not([data-slot="avatar-image"])) {
-  width: var(--misty-navigation-icon-size) !important;
-  height: var(--misty-navigation-icon-size) !important;
-  flex-shrink: 0;
-}
-
-.misty-navigation-icons [data-slot="avatar"] {
-  width: var(--misty-navigation-avatar-size) !important;
-  height: var(--misty-navigation-avatar-size) !important;
-  flex-shrink: 0;
-}
-
-.misty-navigation-icons svg {
-  stroke-width: 2;
-}
-
-/* Every navbar row and action shares one rounded highlight shape and one
-   horizontal inset, so fills line up down the whole rail. */
-.misty-global-navigator :is(.misty-navigator-row-target, .misty-navigator-icon-target),
-.misty-global-navigator [data-tree-row-surface],
-:is(.misty-space-rail-control, .misty-navigator-tray-item) {
-  border-radius: 8px;
-}
-
-.misty-global-navigator .misty-navigator-row-target:not(:has(> [data-tree-row-surface])) {
-  padding-inline: 10px;
-}
-
-/* Navigation highlights respond immediately to hover and focus. */
-.misty-global-navigator :is(a, button, [data-tree-row-surface]),
-:is(.misty-space-rail-control, .misty-navigator-tray-item) {
-  transition: none !important;
-}
-
 /* Keep UI glyphs on a stable compositing layer in WebKit. At fractional page
    zoom, repainting a shared layer for an unrelated hover or popup can snap SVG
    strokes differently even though their layout rectangles have not moved.
@@ -128,86 +67,6 @@
     translate: 0 0 0;
     backface-visibility: hidden;
   }
-}
-
-/* Row icon slots match the glyph exactly so every row icon, the Misty logo
-   included, starts on the same x. Square actions and Space rail tiles share
-   one 32px box, matching the row height. */
-.misty-navigation-icons {
-  --navigation-primary-icon-slot: var(--misty-navigation-icon-size);
-}
-
-/* Space and profile avatars share the same identity footprint within their tiles. */
-.misty-navigation-icons
-  :is(.misty-space-rail-avatar, [data-navigator-profile-bar])
-  :is([data-slot="avatar"], [data-slot="avatar"] img) {
-  width: var(--misty-navigation-identity-size, 28px) !important;
-  height: var(--misty-navigation-identity-size, 28px) !important;
-}
-
-:is(.misty-space-rail-control, .misty-navigator-tray-item) {
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px;
-}
-
-.misty-global-navigator
-  :is(.misty-navigator-icon-target, :is(.misty-space-rail-control, .misty-navigator-tray-item)) {
-  width: var(--misty-navigation-tile-size) !important;
-  height: var(--misty-navigation-tile-size) !important;
-  min-width: var(--misty-navigation-tile-size);
-}
-
-/* Navigation feedback fills the row or action behind the brightened label
-   and icon, matching every other button in the app. */
-.misty-global-navigator
-  :is(.misty-navigator-row-target, .misty-navigator-icon-target):not(
-    :has(> [data-tree-row-surface])
-  ):is(
-    :hover,
-    :focus-visible,
-    [aria-current="page"],
-    [data-active="true"],
-    [data-state="open"],
-    :active
-  ),
-.misty-global-navigator
-  .misty-navigator-row-target:is(:hover, :focus-visible, [aria-current="page"], :active)
-  > [data-tree-row-surface] {
-  background-color: var(--misty-theme-hover);
-  color: var(--misty-theme-text-bright);
-}
-
-.misty-space-rail-control:is(
-  :hover,
-  :focus-visible,
-  [aria-current="page"],
-  [data-state="open"],
-  :active
-) {
-  background-color: var(--misty-theme-hover);
-  color: var(--misty-theme-text-bright);
-}
-
-/* The sidebar lives outside app-pages-root. Reveal each disclosure only when
-   its own button is hovered or keyboard-focused; reserve its slot to avoid
-   label movement. Touch devices keep the disclosure cue visible. */
-@media (hover: hover) and (pointer: fine) {
-  [data-tour-target="navigation"] button [data-chevron-placement="inline"] {
-    opacity: 0;
-  }
-
-  [data-tour-target="navigation"] button:hover [data-chevron-placement="inline"],
-  [data-tour-target="navigation"] button:focus-visible [data-chevron-placement="inline"] {
-    opacity: 1;
-  }
-}
-
-html[data-pointer-dragging="true"],
-html[data-pointer-dragging="true"] * {
-  cursor: grabbing !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
 }
 
 [draggable="true"] {

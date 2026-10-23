@@ -16,9 +16,9 @@ misty tool gitleaks detect
 
 A missing configuration or unknown tool is an error; tools do not silently fall back to default settings. Config paths belong in the registry rather than individual npm scripts. Explicit config overrides are rejected by the shared runner. Install a tool's npm package before using it; Gitleaks is a separate executable on PATH.
 
-Prettier's package.json field and Tailwind's CSS `@config` directive are discovery bridges to this directory. The runner supplies `.config/prettierignore` and the root `.gitignore` to Prettier; patterns in `prettierignore` are relative to `.config/`. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`, and set the editor's Prettier ignore path (VS Code/Cursor: `prettier.ignorePath`) to `.config/prettierignore`. Server applications retain their own project configuration.
+Prettier's package.json field is the discovery bridge to this directory. The runner supplies `.config/prettierignore` and the root `.gitignore` to Prettier; patterns in `prettierignore` are relative to `.config/`. External editor integrations do not use the Misty runner: configure ESLint integrations with `.config/eslint.config.js`, and set the editor's Prettier ignore path (VS Code/Cursor: `prettier.ignorePath`) to `.config/prettierignore`. Server applications retain their own project configuration.
 
-The main and cursor companion HTML entry points live in `src/app/`, Vite's app root. Development and packaged URLs remain `/index.html` and `/companion.html`; public assets and build output remain in the repository's `public/` and `dist/` directories.
+The main and cursor companion HTML entry points live in `src/app/`, Vite's app root. Development and packaged URLs remain `/index.html` and `/companion.html`; build output goes to the repository's `dist/` directory.
 
 Some files still have required root discovery roles: npm manifests, TypeScript configuration, Rust and Node version pins, shadcn's `components.json`, and Git rules. There is no GitHub CI: `.githooks/` runs the checks locally on every commit and push. Personal agent directories such as `.agents`, `.codex`, `.claude`, `.cursor`, and `.impeccable` are ignored; they are optional local tools, not build dependencies.
 

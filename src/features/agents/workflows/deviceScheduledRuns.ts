@@ -106,7 +106,7 @@ async function pickUp(accountId: string) {
           [],
           { conversationId: claim.conversation_id, context: [] },
           {
-            executionMode: target === "separate_window" ? "team" : "agent",
+            executionMode: "agent",
             methodVersionId: claim.method_version_id,
             methodInputs: claim.inputs,
             idempotencyKey: claim.idempotency_key,

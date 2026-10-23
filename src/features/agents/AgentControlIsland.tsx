@@ -7,7 +7,6 @@ import { AgentControlComposer } from "./AgentControlComposer";
 import { AgentControlQuestions } from "./AgentControlQuestions";
 import { AgentControlTaskControls } from "./AgentControlTaskControls";
 import { listenForActionQuestions, useActionQuestions } from "./actionQuestions";
-import { useAgentDockSync } from "./dock/agentDock";
 import { useLocalExecution } from "./localExecution";
 import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { islandClass, liveStep, settled, statusText, liveReply } from "./agentControlStatus";
@@ -19,10 +18,8 @@ import { useAgentControlDesktop } from "./useAgentControlDesktop";
  * The control island (docs/design/agents-at-cursor/BRIEF.md): the one place to
  * see and steer what an agent is doing, at the bottom of the window. It shows
  * the task's status and sub-agents, takes a message that steers the task or
- * queues a new one, and holds Take over, Resume, Stop and Done, and the dock's
- * Detach, Show, Bring back and Dock. With no task here it lists agents working in
- * background tabs where agent windows can't dock (docs/design/agents-at-cursor/BRIEF.md). During
- * desktop control the native island outside Misty mirrors it and sends its
+ * queues a new one, and holds Take over, Resume, Stop and Done. With no task
+ * here it shows only agents' questions. During desktop control the native island outside Misty mirrors it and sends its
  * presses back here.
  */
 export function AgentControlIsland() {
@@ -69,8 +66,6 @@ export function AgentControlIsland() {
   useEffect(() => {
     if (error) useMistyStore.setState({ error });
   }, [error]);
-  // A docked window shows this status, and its Stop is this Stop.
-  useAgentDockSync(execution, status, execution?.state === "waiting", () => stop());
   useAgentControlDesktop(execution, status, meta, questions, { resume, takeOver, send });
 
   if (!execution) {
@@ -108,7 +103,6 @@ export function AgentControlIsland() {
       )}
       <AgentControlTaskControls
         execution={execution}
-        name={name}
         running={running}
         pending={pending}
         stopped={stopped}

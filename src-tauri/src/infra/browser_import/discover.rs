@@ -64,6 +64,7 @@ impl Browser {
     }
 
     /// The Keychain item (macOS) that holds this browser's cookie key.
+    #[cfg(target_os = "macos")]
     pub fn safe_storage(self) -> Option<(&'static str, &'static str)> {
         Some(match self {
             Browser::Chrome => ("Chrome Safe Storage", "Chrome"),
@@ -80,9 +81,9 @@ impl Browser {
     /// Where the browser keeps its profiles (Chromium's "User Data" folder,
     /// Firefox's folder holding profiles.ini, Safari's library folder).
     fn data_dir(self) -> Option<PathBuf> {
-        let home = dirs::home_dir()?;
         #[cfg(target_os = "macos")]
         {
+            let home = dirs::home_dir()?;
             let support = home.join("Library/Application Support");
             return Some(match self {
                 Browser::Chrome => support.join("Google/Chrome"),

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+import type { MistyImageAttachment } from "./types";
 
 const empty: MistyImageAttachment[] = [];
 /** Unsent uploads belong to the conversation, not the panel that attached them. */

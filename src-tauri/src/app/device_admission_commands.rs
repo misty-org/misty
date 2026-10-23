@@ -7,9 +7,9 @@ use tauri::{AppHandle, State};
 use crate::app::device_commands::{context, require_main, shared_folders, view, DevicesView};
 use crate::app::runtime::MistyRuntime;
 use crate::infra::{
-    device_admission as admission, device_approval, device_approval::AdmissionView,
-    device_approval_approver as approver, device_approval_approver::PendingRequestView,
-    device_channel, device_records::DevicePolicy, device_trust,
+    devices::admission, devices::approval, devices::approval::AdmissionView,
+    devices::approval_approver as approver, devices::approval_approver::PendingRequestView,
+    devices::records::DevicePolicy, devices::trust,
 };
 
 #[tauri::command]
@@ -34,7 +34,7 @@ pub async fn devices_request_approval(
 ) -> Result<AdmissionView, String> {
     require_main(&webview)?;
     let context = context(&state, &api_base, &account_id).await?;
-    device_approval::start_request(&context).await
+    approval::start_request(&context).await
 }
 
 #[tauri::command]
@@ -48,7 +48,7 @@ pub async fn devices_approval_status(
 ) -> Result<AdmissionView, String> {
     require_main(&webview)?;
     let context = context(&state, &api_base, &account_id).await?;
-    device_approval::poll_request(&context, app, &api_base, &request_id).await
+    approval::poll_request(&context, app, &api_base, &request_id).await
 }
 
 #[tauri::command]
@@ -169,9 +169,9 @@ pub async fn devices_publish_folders(
     account_id: String,
 ) -> Result<(), String> {
     let context = context(&state, &api_base, &account_id).await?;
-    let current = device_trust::effective_policy();
+    let current = trust::effective_policy();
     let folders = shared_folders(&state).await;
-    if device_trust::own_policy().is_some_and(|(policy, _)| policy.shared_folders == folders) {
+    if trust::own_policy().is_some_and(|(policy, _)| policy.shared_folders == folders) {
         return Ok(());
     }
     admission::publish_policy(

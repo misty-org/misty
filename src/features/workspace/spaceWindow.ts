@@ -42,7 +42,7 @@ function validKey(key: unknown): key is string {
 }
 
 /** A window label's kind; window labels never name a Space. */
-export function isIncognitoWindowLabel(label: string | null): boolean {
+function isIncognitoWindowLabel(label: string | null): boolean {
   return Boolean(label && /^incognito-[1-9][0-9]*$/.test(label));
 }
 
@@ -52,7 +52,7 @@ export function isSpaceWindowLabel(label: string): boolean {
 }
 
 /** The identity of a window showing a Space. */
-export function spaceWindowIdentity(key: string, incognito: boolean): SpaceWindowIdentity {
+function spaceWindowIdentity(key: string, incognito: boolean): SpaceWindowIdentity {
   const valid = validKey(key) ? key : personalSpaceKey;
   return {
     key: valid,

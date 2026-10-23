@@ -1,7 +1,6 @@
 //! Coding tools as runners. Each engine adapter knows how to start its tool,
 //! read what it prints and answer its permission questions; everything around
-//! that (the process registry, permission bridge, budget lease and mirror to
-//! the server) is shared.
+//! that (the process registry, permission bridge and budget lease) is shared.
 pub mod acp;
 pub mod acp_engines;
 pub mod bridge;
@@ -12,7 +11,6 @@ pub mod events;
 pub mod http_host;
 pub mod launch_only;
 pub mod lease;
-pub mod mirror;
 pub mod registry;
 pub mod route;
 pub mod session;
@@ -96,36 +94,6 @@ pub enum LaunchMode {
     AutoEdit,
 }
 
-/// How the adapter talks to its tool.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Transport {
-    /// A child per turn printing JSON lines, with a JSON control channel on stdin.
-    StreamJson,
-    /// JSON-RPC over stdio: the Codex app-server protocol.
-    AppServer,
-    /// JSON-RPC over stdio: the Agent Client Protocol.
-    Acp,
-    /// A child per turn with no way to ask mid-turn.
-    LaunchOnly,
-    /// A local HTTP server per turn (see [`http_host`]).
-    HttpHost,
-}
-
-/// What an engine can do, which decides the work it may be given.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Capabilities {
-    /// It asks before acting mid-turn, so Ask and Auto both work fully.
-    pub interactive_asks: bool,
-    /// It has a read-only or plan launch.
-    pub plan_mode: bool,
-    /// It reports a todo list or plan while it works.
-    pub todos: bool,
-    /// It reports how much of its own usage limit is used.
-    pub rate_limits: bool,
-    /// It can only run with full access (no asks, no read-only mode).
-    pub full_access_only: bool,
-}
-
 /// One turn's launch.
 #[derive(Debug, Clone)]
 pub struct Launch {
@@ -186,9 +154,6 @@ pub trait Protocol: Send {
 
 /// A coding tool's adapter.
 pub trait Runner: Send + Sync {
-    fn engine(&self) -> EngineId;
-    fn transport(&self) -> Transport;
-    fn capabilities(&self) -> Capabilities;
     /// The command for a launch. Refuses a mode the engine cannot honor.
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError>;
     /// A fresh protocol session for a launch.
@@ -221,6 +186,7 @@ pub fn supported(engine: EngineId) -> bool {
 
 /// Flags and settings that remove the tool's own permission checks. Routed
 /// work never passes them; a test pins every adapter against this list.
+#[cfg(test)]
 pub const BYPASS_MARKERS: [&str; 10] = [
     "--dangerously-skip-permissions",
     "--dangerously-bypass-approvals-and-sandbox",

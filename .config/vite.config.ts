@@ -49,7 +49,7 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     root: resolve(process.cwd(), "src/app"),
-    publicDir: resolve(process.cwd(), "public"),
+    publicDir: false,
     envDir: false,
     plugins: [
       appEnvironmentUpdates(process.cwd()),
@@ -64,8 +64,7 @@ export default defineConfig(({ command, mode }) => {
               sourcemaps: {
                 enabled: true,
                 releaseName: "misty-desktop",
-                releaseVersion:
-                  process.env.GITHUB_SHA ?? process.env.MISTY_RELEASE_VERSION ?? "0.1.0",
+                releaseVersion: process.env.MISTY_RELEASE_VERSION ?? "0.1.0",
                 deleteAfterUpload: true,
               },
             }),

@@ -5,7 +5,7 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/workspace";
-import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
 import { DropdownMenuLabel, DropdownMenuSeparator, MenuItem, MenuSubmenu } from "@/shared/ui";
 import { ShortcutText } from "@/features/shortcuts";
 

@@ -13,7 +13,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};

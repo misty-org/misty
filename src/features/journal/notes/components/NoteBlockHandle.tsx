@@ -18,7 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-export function BlockHandle(props: {
+export function NoteBlockHandle(props: {
   editor: Editor;
   block: {
     pos: number;

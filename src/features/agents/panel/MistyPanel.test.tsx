@@ -12,7 +12,7 @@ vi.mock("@/features/auth", () => ({
   useAuth: vi.fn(() => ({ user: { id: "test-user-id" } })),
 }));
 
-vi.mock("@/api/accountEvents", () => ({
+vi.mock("@/api/account-events", () => ({
   observeAccountChanges: vi.fn((_id, _topics, callback) => {
     void callback();
     return () => {};

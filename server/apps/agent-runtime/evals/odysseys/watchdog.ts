@@ -28,7 +28,9 @@ export class ProgressWatch {
 
   constructor(
     private readonly label: string,
-    private readonly stallChecks = 2,
+    // A provider outage is waited out for up to 7.5 minutes with no events (workflows/space-task-agent.ts):
+    // four quiet looks, not two, so a run in that wait is not stopped for a provider's outage.
+    private readonly stallChecks = 4,
     private readonly loopChecks = 2,
   ) {}
 

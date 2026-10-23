@@ -1,4 +1,4 @@
-import { conversationForGlobalPrompt } from "@/features/global-search/globalMistyConversationScope";
+import { conversationForGlobalPrompt } from "@/features/misty/globalMistyConversationScope";
 import { useCollaborationStore } from "../collaboration/store";
 import { frontMediaContext, withinBudget } from "./mediaContext";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -72,7 +72,7 @@ export class CursorCompanionVoice {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
       // Every spoken request carries every display, the cursor's first; the
-      // run decides what matters (docs/plans/agent-harness.md, phase 4).
+      // run decides what matters (docs/plans/agent-harness.md, Tool surface).
       s.captures = [];
       // Looked up when the shortcut went down; a turn without one reads it now.
       const media =

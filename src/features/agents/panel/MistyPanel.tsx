@@ -1,4 +1,4 @@
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { useAuth } from "@/features/auth";
 import { openMistyConversationInNewTab } from "@/features/misty/handoff";
 import { useMistyStore } from "@/features/misty/useMistyStore";

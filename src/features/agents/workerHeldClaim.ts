@@ -1,6 +1,6 @@
 // Right after browser work, the agent's next browser step usually follows
 // within seconds. The worker then holds its next claim open on the server
-// (docs/plans/agentic-browser.md, Phase 2: faster device hop) so the job is
+// (docs/plans/agent-harness.md, Device jobs) so the job is
 // handed over the moment it is queued, instead of after a notification
 // reaches this device and it asks again. Notifications stay the fallback.
 export const heldClaimWaitMs = 25_000;
@@ -25,8 +25,7 @@ export class HeldClaims {
 
   /** The hold for the next claim, or undefined to claim without waiting. */
   next(): { waitMs: number; signal: AbortSignal } | undefined {
-    if (this.unsupported || Date.now() - this.lastJobAt > holdAfterJobMs)
-      return undefined;
+    if (this.unsupported || Date.now() - this.lastJobAt > holdAfterJobMs) return undefined;
     this.controller = new AbortController();
     return { waitMs: heldClaimWaitMs, signal: this.controller.signal };
   }

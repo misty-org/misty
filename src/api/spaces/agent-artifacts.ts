@@ -1,7 +1,7 @@
 import { spaceRequest } from "./api";
 
 /** A Library item an agent saved to the Space it lives in. */
-export interface SpaceAgentArtifact {
+interface SpaceAgentArtifact {
   item_id: string;
   space_id: string;
   display_name: string;

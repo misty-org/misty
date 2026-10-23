@@ -9,10 +9,10 @@ Store.
 
 ## Adding an extension
 
-On an extension's store page, Misty's page script (`browser_extension_store.js`)
+On an extension's store page, Misty's page script (`browser/scripts/extension_store.js`)
 shows a monochrome "Add to Misty" button in a closed shadow root. It reacts only to
 trusted clicks and sends a tokened host message that names no extension. Misty reads
-the extension from the tab's real address (`browser_extension_store.rs`), downloads
+the extension from the tab's real address (`browser/host_messages/extension_store.rs`), downloads
 it from the store itself and opens the install review in Misty's own window
 (`ExtensionInstallRequest`). The most a page can do is ask Misty to review the
 extension it shows. The button sits in place of the store's own install button,
@@ -44,18 +44,19 @@ Two places, nothing else:
 - The browser toolbar's Extensions menu lists installed extensions. Each row runs the
   extension's action and has its on/off switch. The menu also opens either store and
   "Manage extensions".
-- Settings › Browser › Extensions has rows that open each store, the account-wide
+- Settings › Browser › Extensions has rows that open each store, the device-wide
   agent access switch, and one plain section per extension: Enabled, Review access
   (only when a version asks for more), Allow in private tabs, Allow agents, its own
   settings, each granted access with Remove access, its store page and Remove.
 
-Account intent and actual local runtime state are distinct. The Enabled switch is the
-account's intent; its helper line says what this device is doing. A failed or
-unsupported runtime is never represented as running. Extension artwork keeps its
-official colors. All preferences use the device settings system.
+Intent and actual local runtime state are distinct. The Enabled switch is the person's
+intent; its helper line says what this device is doing. A failed or unsupported runtime
+is never represented as running. Extension artwork keeps its official colors. All
+preferences use the device settings system.
 
-Installed extensions sync as `extensions.installations`. Firefox IDs are stored as
-numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32
+Installed extensions are saved on this device in the `extensions.installations` setting
+(other Spaces' lists in `extensions.space_installations`); they never sync. Firefox IDs
+are stored as numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32
 letters a–p and are their own identity (`guid == id`). A Firefox identity never looks
 like a Chrome ID, so approvals and extension origins cannot collide.
 
@@ -104,7 +105,7 @@ used.
 
 Packages installed under an older layer get the current scripts the next time they
 load. Calls that need Misty's data go through the hidden host page; the native host
-checks the account's granted permission per namespace, and `compat/` in this folder
+checks the extension's granted permission per namespace, and `compat/` in this folder
 answers them. Install review blocks only `debugger` and `proxy`; partially covered
 permissions are listed as findings, never presented as fully working.
 

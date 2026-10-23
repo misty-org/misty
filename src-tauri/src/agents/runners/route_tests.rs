@@ -18,7 +18,6 @@ fn need(mode: LaunchMode, permission: &str) -> RouteNeed {
     RouteNeed {
         mode,
         permission: permission.into(),
-        grants: vec![],
     }
 }
 

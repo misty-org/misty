@@ -2,7 +2,6 @@
   "vite": {
     "package": "vite",
     "config": "vite.config.ts",
-    "requires": ["tailwind.config.js"],
     "shortConfig": "-c"
   },
   "vitest": { "package": "vitest", "config": "vitest.config.ts", "shortConfig": "-c" },

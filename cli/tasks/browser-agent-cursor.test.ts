@@ -3,20 +3,20 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 
-const read = (name: string) => readFileSync(new URL(`../../src-tauri/src/infra/${name}.js`, import.meta.url), "utf8");
+const read = (name: string) => readFileSync(new URL(`../../src-tauri/src/infra/browser/scripts/${name}.js`, import.meta.url), "utf8");
 
 test("cursor follows dispatched actions, never stale targets, and does not intercept input", () => {
   const dom = new JSDOM('<button>Generate</button>', { url: "https://example.test", runScripts: "outside-only" });
   try {
     const w = dom.window;
-    w.eval(read("browser_agent_cursor"));
+    w.eval(read("agent_cursor"));
     assert.equal(w.document.querySelector("misty-agent-cursor"), null);
     const button = w.document.querySelector("button")!;
     button.getBoundingClientRect = () => ({ left: 100, top: 200, width: 40, height: 20 } as DOMRect);
     let clicks = 0;
     button.addEventListener("click", () => clicks++);
-    const inspect = () => w.eval(`(${read("browser_inspection_snapshot")})`)("nonce", 1000, 100);
-    const click = (target: string) => w.eval(`(${read("browser_inspection_click")})`)(target);
+    const inspect = () => w.eval(`(${read("inspection_snapshot")})`)("nonce", 1000, 100);
+    const click = (target: string) => w.eval(`(${read("inspection_click")})`)(target);
     const stale = inspect().interactive[0].target;
     button.textContent = "Different";
     assert.equal(click(stale).ok, false);
@@ -37,7 +37,7 @@ test("cursor respects reduced motion and ignores invalid coordinates", () => {
   try {
     const w = dom.window;
     w.matchMedia = () => ({ matches: true }) as MediaQueryList;
-    w.eval(read("browser_agent_cursor"));
+    w.eval(read("agent_cursor"));
     const cursor = w[Symbol.for("misty.browser.agent.cursor")];
     cursor.move(NaN, 2);
     assert.equal(w.document.querySelector("misty-agent-cursor"), null);

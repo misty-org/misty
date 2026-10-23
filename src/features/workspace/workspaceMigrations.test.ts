@@ -28,7 +28,7 @@ describe("browser workspace migration", () => {
     "replaces retired %s views without changing tab identity",
     (surfaceId) => {
       const tab = legacyTab({ surfaceId, state: { savedDocument: "recovery-data" } });
-      expect(migrateRetiredWorkspaceView(tab, "space:family")).toMatchObject({
+      expect(migrateRetiredWorkspaceView(tab)).toMatchObject({
         id: tab.id,
         surfaceId: "browser",
         route: "/browser",

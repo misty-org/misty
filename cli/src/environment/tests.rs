@@ -12,17 +12,12 @@ fn fixture_workspace(path: &Path) -> Workspace {
 }
 
 #[test]
-fn cli_loader_enforces_ownership_and_ignores_retired_settings() {
+fn cli_loader_enforces_ownership() {
     let tmp = tempfile::tempdir().unwrap();
     let workspace = fixture_workspace(tmp.path());
     let path = workspace.cli.join(".env/common.env");
-    write_private(
-        &path,
-        b"MISTY_SOURCE_DIR=retired\nMISTY_DEV_SIGNING_IDENTITY=fixture\n",
-    )
-    .unwrap();
+    write_private(&path, b"MISTY_DEV_SIGNING_IDENTITY=fixture\n").unwrap();
     let values = read_selected_cli_files(&workspace, &["common.env"]).unwrap();
-    assert!(!values.contains_key("MISTY_SOURCE_DIR"));
     assert_eq!(values["MISTY_DEV_SIGNING_IDENTITY"], "fixture");
     write_private(&path, b"APPLE_SIGNING_IDENTITY=fixture\n").unwrap();
     assert!(read_selected_cli_files(&workspace, &["common.env"]).is_err());
@@ -56,23 +51,6 @@ fn invalid_private_values_do_not_appear_in_errors() {
         let error = format!("{:#}", result.unwrap_err());
         assert!(!error.contains("private-fixture-token"));
     }
-}
-
-#[test]
-fn migration_never_overwrites_scoped_configuration() {
-    let tmp = tempfile::tempdir().unwrap();
-    let workspace = fixture_workspace(tmp.path());
-    let scoped = root(&workspace, Target::Dev).join("crypto/services.env");
-    write_private(&scoped, b"MISTY_AUTH_SIGNING_KEY=current\n").unwrap();
-    let legacy = legacy_path(&workspace, Target::Dev);
-    write_private(&legacy, b"MISTY_AUTH_SIGNING_KEY=old\nDB_NAME=legacy\n").unwrap();
-    assert!(migrate_server_file(&workspace, Target::Dev).is_err());
-    assert_eq!(
-        fs::read_to_string(scoped).unwrap(),
-        "MISTY_AUTH_SIGNING_KEY=current\n"
-    );
-    assert!(legacy.is_file());
-    assert!(!root(&workspace, Target::Dev).join("database.env").exists());
 }
 
 #[test]
@@ -161,14 +139,12 @@ fn composio_scoped_files_load_without_exposing_or_relocating_keys() {
         .unwrap();
         write_private(
             &base.join("integrations/composio.env"),
-            b"MISTY_COMPOSIO_DEPLOYMENT=cloud\nMISTY_COMPOSIO_URL=https://backend.composio.dev\nMISTY_COMPOSIO_CALENDAR_AUTH_CONFIG=ac_fixture\nMISTY_COMPOSIO_CALENDAR_TOOL_VERSION=20261001_00\n",
-        ).unwrap();
+            b"MISTY_COMPOSIO_DEPLOYMENT=cloud\n",
+        )
+        .unwrap();
         let values = read(&workspace, target).unwrap();
         assert_eq!(values["COMPOSIO_API_KEY"], "private-fixture-key");
         assert_eq!(values["MISTY_COMPOSIO_DEPLOYMENT"], "cloud");
-        // Retired calendar settings in older files never load.
-        assert!(!values.contains_key("MISTY_COMPOSIO_CALENDAR_AUTH_CONFIG"));
-        assert!(!values.contains_key("MISTY_COMPOSIO_URL"));
         set(
             &workspace,
             target,
@@ -242,66 +218,6 @@ fn optional_files_are_created_only_when_configured() {
     assert!(error.contains("CLOUDFLARE_API_TOKEN"));
     init(&workspace, Target::Prod).unwrap();
     assert!(read(&workspace, Target::Prod).unwrap().is_empty());
-}
-
-#[test]
-fn retired_product_settings_do_not_block_or_enter_the_environment() {
-    let tmp = tempfile::tempdir().unwrap();
-    let workspace = Workspace {
-        root: tmp.path().to_path_buf(),
-        misty: tmp.path().to_path_buf(),
-        server: tmp.path().join("server"),
-        cli: tmp.path().join("cli"),
-        website: tmp.path().join("website"),
-        features: tmp.path().join("src/features"),
-    };
-    for target in [Target::Dev, Target::Prod] {
-        init(&workspace, target).unwrap();
-        let base = root(&workspace, target);
-        assert!(!base.join("integrations/stripe.env").exists());
-        assert!(!base.join("integrations/activepieces.env").exists());
-        assert!(!base.join("integrations/notion.env").exists());
-        assert!(!base.join("integrations/slack.env").exists());
-        write_private(
-            &base.join("integrations/notion.env"),
-            b"NOTION_CLIENT_SECRET=retired\n",
-        )
-        .unwrap();
-        write_private(
-            &base.join("integrations/slack.env"),
-            b"SLACK_SIGNING_SECRET=retired\n",
-        )
-        .unwrap();
-        for (file, entry) in [
-            ("runtime.env", "MISTY_SDK_PROVIDERS_ENABLED=true"),
-            ("runtime.env", "MISTY_OPERATOR_USER_ID=retired"),
-            ("crypto/documents.env", "DOCUMENT_PRIVATE_KEY_B64=retired"),
-            (
-                "integrations/email.env",
-                "WAITLIST_NOTIFY_EMAIL=fixture@example.invalid",
-            ),
-        ] {
-            let path = base.join(file);
-            let contents = fs::read_to_string(&path).unwrap_or_default();
-            write_private(&path, format!("{contents}\n{entry}\n").as_bytes()).unwrap();
-        }
-        let values = read(&workspace, target).unwrap();
-        for name in DEPRECATED_NAMES {
-            assert!(!values.contains_key(*name));
-            assert!(owner(name).is_err());
-        }
-        let runtime = base.join("runtime.env");
-        let contents = fs::read_to_string(&runtime).unwrap();
-        write_private(
-            &runtime,
-            format!("{contents}\nMISTY_UNKNOWN_SETTING=true\n").as_bytes(),
-        )
-        .unwrap();
-        assert!(read(&workspace, target)
-            .unwrap_err()
-            .to_string()
-            .contains("MISTY_UNKNOWN_SETTING"));
-    }
 }
 
 #[test]

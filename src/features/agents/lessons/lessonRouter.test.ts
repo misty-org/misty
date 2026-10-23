@@ -21,7 +21,9 @@ const lesson = (id: string, patch: Partial<Lesson> = {}): Lesson => ({
 describe("lesson replies", () => {
   it("reads the route, focus and lesson tags and never shows them", () => {
     const reply = companionReply(
-      '[ROUTE:new:two sum]\nfirst, make an empty dictionary inside twoSum.\n[FOCUS:120,180,860,520:screen1]\n[LESSON:{"title":"two sum","objectives":[{"id":"o1","title":"dict","status":"in_progress"}],"current":"o1"}]',
+      "[ROUTE:new:two sum]\nfirst, make an empty dictionary inside " +
+        'twoSum.\n[FOCUS:120,180,860,520:screen1]\n[LESSON:{"title":"two ' +
+        'sum","objectives":[{"id":"o1","title":"dict","status":"in_progress"}],"current":"o1"}]',
     );
     expect(reply.text).toBe("first, make an empty dictionary inside twoSum.");
     expect(reply.route).toEqual({ kind: "new", title: "two sum" });

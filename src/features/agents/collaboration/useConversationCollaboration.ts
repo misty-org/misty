@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { resolveSetting, useSettingsProfiles } from "@/features/settings";
+import { resolveSetting, useDevicePreferences } from "@/features/settings";
 import { useCollaborationStore } from "./store";
 import type { ConversationCollaboration, ConversationMode } from "./types";
 
@@ -13,7 +13,7 @@ export function useConversationCollaboration(accountId: string, conversationId?:
     useCollaborationStore.getState().setAccount(accountId);
   }, [accountId]);
   // New conversations start in the account's chosen mode.
-  const profile = useSettingsProfiles((s) => s.state);
+  const profile = useDevicePreferences((s) => s.state);
   const defaultMode =
     profile && resolveSetting(profile, "agents.collaboration_mode").value === "plan"
       ? "plan"

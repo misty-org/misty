@@ -39,4 +39,4 @@ function Badge({ className, variant = "default", asChild = false, ...props }: Ba
   );
 }
 
-export { Badge, badgeVariants };
+export { Badge };

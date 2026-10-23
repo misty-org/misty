@@ -1,9 +1,8 @@
 import { cn } from "@/shared/ui";
 import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/auth";
-import { PointerDragProvider } from "@/features/dnd";
 import { useNativeSessionStore } from "@/features/native-session";
-import { SettingsProfilesBridge, useDocumentAppAppearance } from "@/features/settings";
+import { DevicePreferencesBridge, useDocumentAppAppearance } from "@/features/settings";
 import { ShortcutRuntime, useShortcutHandler } from "@/features/shortcuts";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -14,7 +13,7 @@ import { useShallow } from "zustand/react/shallow";
 import { installMistyDeepLinkHandler } from "../routing/deepLinks";
 export function RootLayout(props: {
   isDeepLinkRouteAllowed: (route: string) => boolean;
-  resolveAuthDeepLinkRoute: (target: "account" | "providers") => string;
+  resolveAuthDeepLinkRoute: () => string;
 }) {
   const navigate = useNavigate();
   const appZoom = useAppZoom();
@@ -54,12 +53,10 @@ export function RootLayout(props: {
   return (
     <>
       <AuthProvider>
-        <SettingsProfilesBridge />
+        <DevicePreferencesBridge />
         <ShortcutRuntime />
         <RenderErrorBoundary>
-          <PointerDragProvider>
-            <AuthenticatedTreeOutlet />
-          </PointerDragProvider>
+          <AuthenticatedTreeOutlet />
         </RenderErrorBoundary>
       </AuthProvider>
       <AppZoomIndicator visible={appZoom.indicatorVisible} percent={appZoom.zoomPercent} />

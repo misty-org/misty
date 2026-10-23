@@ -1,4 +1,4 @@
-import type { AppSnapshot, ClipboardPayload, ClipboardSnapshot, PasteItem } from "@/native/ipc";
+import type { AppSnapshot } from "@/native/ipc";
 
 import { invoke } from "./invoke";
 export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<void> {
@@ -14,9 +14,9 @@ export function revealMainWindow(): Promise<void> {
  * current value, so the order the shell and the sidebar mount in never undoes it. */
 export type TrafficLightOffset = { x: number; y: number };
 /** Where the vertical sidebar's content starts, from the window's left edge: the strip's 8pt
- * padding, the panel's 1pt border and its 10pt padding (docking.css). The window buttons start
+ * padding, the panel's 1pt border and its 10pt padding (docking-drawers.css). The window buttons start
  * here too, so the red one lines up with the address bar. */
-export const sidebarContentLeft = 19;
+const sidebarContentLeft = 19;
 const trafficLightRestX = 20;
 export const trafficLightRestY = 19;
 export const sideTabTrafficLightNudgeX = 2;
@@ -50,43 +50,6 @@ export function setTrafficLightsVisible(
 
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
-}
-
-export function clipboardSnapshot(): Promise<ClipboardSnapshot> {
-  return invoke("clipboard_snapshot");
-}
-
-export function clipboardSetLocal(payload: ClipboardPayload): Promise<ClipboardPayload> {
-  return invoke("clipboard_set_local", { payload });
-}
-
-export function clipboardPublishShared(): Promise<boolean> {
-  return invoke("clipboard_publish_shared");
-}
-
-export function clipboardPublishImageBytes(request: {
-  bytes: number[];
-  width: number;
-  height: number;
-  mimeType?: string;
-}): Promise<boolean> {
-  return invoke("clipboard_publish_image_bytes", request);
-}
-
-export function clipboardApplyShared(): Promise<ClipboardPayload> {
-  return invoke("clipboard_apply_shared");
-}
-
-export function clipboardSharedImageBytes(blobId: string): Promise<number[]> {
-  return invoke("clipboard_shared_image_bytes", { blobId });
-}
-
-export function clipboardNativeFileRefs(): Promise<PasteItem[]> {
-  return invoke("clipboard_native_file_refs");
-}
-
-export function clipboardWriteFileRefs(items: PasteItem[]): Promise<boolean> {
-  return invoke("clipboard_write_file_refs", { items });
 }
 
 export function clipboardWriteFileBytes(

@@ -83,13 +83,13 @@ fn vault_store_keys() -> Vec<(String, String, Slot, Option<String>)> {
     for (vault, slot, space_id, personal) in entries {
         if let Ok(Some(selected)) = selected_profile(&vault) {
             if let Ok(key) =
-                crate::infra::browser_site_permissions::profile_key(Some(&selected.physical))
+                crate::infra::site_settings::permissions::profile_key(Some(&selected.physical))
             {
                 keys.push((vault.clone(), key, slot.clone(), space_id.clone()));
             }
         }
         if personal {
-            if let Ok(key) = crate::infra::browser_site_permissions::profile_key(None) {
+            if let Ok(key) = crate::infra::site_settings::permissions::profile_key(None) {
                 keys.push((vault, key, slot, space_id));
             }
         }
@@ -100,7 +100,7 @@ fn vault_store_keys() -> Vec<(String, String, Slot, Option<String>)> {
 /// The store key a vault's pages use, once its profile is selected.
 fn store_key_of(vault: &str) -> Option<String> {
     let selected = selected_profile(vault).ok()??;
-    crate::infra::browser_site_permissions::profile_key(Some(&selected.physical)).ok()
+    crate::infra::site_settings::permissions::profile_key(Some(&selected.physical)).ok()
 }
 
 /// A device's name in a Space, for "On <device>".
@@ -162,7 +162,7 @@ async fn changed(
     match collection {
         SITE_PERMISSIONS => {
             if let Some(store_key) = vault_id.and_then(store_key_of) {
-                crate::infra::browser_site_permissions::space_changed(
+                crate::infra::site_settings::permissions::space_changed(
                     app, vault, store_key, opened,
                 )
                 .await;
@@ -195,7 +195,7 @@ async fn seed_personal_space(vault: &SpaceVault, vault_id: &str) {
     let name = format!("space-collections:{vault_id}");
     let seed = tokio::task::spawn_blocking(move || {
         let mut seed = None;
-        let legacy = crate::infra::browser_site_permissions::profile_key(None).ok();
+        let legacy = crate::infra::site_settings::permissions::profile_key(None).ok();
         let result = store.import_once(&name, |connection| -> rusqlite::Result<()> {
             seed = Some(Seed::read(
                 connection,
@@ -235,11 +235,11 @@ impl Seed {
         device_id: &str,
     ) -> Self {
         Self {
-            sites: crate::infra::browser_site_permissions::seed_records(
+            sites: crate::infra::site_settings::permissions::seed_records(
                 connection, store_key, legacy_key,
             ),
             downloads: crate::infra::browser_library::seed_download_records(connection, device_id),
-            search: crate::infra::browser_search_space::seed_records(connection),
+            search: crate::infra::search::space::seed_records(connection),
         }
     }
 

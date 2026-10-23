@@ -8,7 +8,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { openPeek } from "@/features/workspace/peek";
-import { browserRuntimeId } from "./browserRuntime";
+import { browserRuntimeId } from "@/features/webviews/browserRuntime";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
 
 /** Page commands the native context menu hands back to the browser that owns the page. */

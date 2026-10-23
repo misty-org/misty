@@ -1,0 +1,252 @@
+//! Local development stack: startup, shutdown, logs and its private secrets.
+
+use super::*;
+
+pub fn up(workspace: &Workspace, build: bool, verbose: bool) -> Result<()> {
+    environment::check(workspace, Target::Dev)?;
+    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    if ensure_connected_devices_development_config(&devices)? {
+        println!("Configured Connected Devices for local development.");
+    }
+    validate_development_secrets(workspace)?;
+    ports(workspace)?;
+    // The API meters every model turn through billing, so billing comes up first:
+    // its database, migrations and a rebuilt API, healthy before the server starts.
+    crate::billing::up(workspace, &workspace.server.join(".misty/logs/billing.log"))?;
+    println!("Starting server containers…");
+    let command = development_up_command(build);
+    let log = workspace.server.join(".misty/logs/startup.log");
+    let result = command.run_logged(&workspace.server, &log, &diagnostic_secrets(workspace)?);
+    if verbose && log.exists() {
+        eprintln!("{}", fs::read_to_string(&log)?);
+    }
+    result?;
+    let started = Instant::now();
+    while health(workspace).is_err() {
+        if started.elapsed() > Duration::from_secs(120) {
+            status(workspace)?;
+            bail!(
+                "server was not ready within 120 seconds; run misty server logs SERVICE --tail 100"
+            );
+        }
+        thread::sleep(Duration::from_secs(2));
+    }
+    status(workspace)?;
+    println!("API: {}", development_api_url());
+    println!("Worker deployment: misty server deploy");
+    Ok(())
+}
+
+pub fn initialize_development_secrets(workspace: &Workspace) -> Result<()> {
+    let devices = environment::root(workspace, Target::Dev).join("crypto/devices.env");
+    if ensure_connected_devices_development_config(&devices)? {
+        println!("Configured Connected Devices for local development.");
+    }
+    let worker = workspace.server.join("apps/journal-collab");
+    let dev_vars = worker.join(".dev.vars");
+    let server_env = worker.join(".secrets/server.env");
+    match (dev_vars.is_file(), server_env.is_file()) {
+        (false, false) => generate_worker_secrets(workspace),
+        (false, true) => restore_development_worker_secrets(&server_env, &dev_vars),
+        (true, true) => Ok(()),
+        (true, false) => bail!(
+            "development Worker secrets are partially configured; restore {} from backup before continuing (existing Worker keys were preserved)",
+            server_env.display()
+        ),
+    }
+}
+
+pub(crate) fn ensure_connected_devices_development_config(path: &Path) -> Result<bool> {
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(error) => {
+            return Err(error).with_context(|| format!("could not read {}", path.display()))
+        }
+    };
+    let private_keys = environment_values(&contents, DEVICE_TICKET_PRIVATE_KEY);
+    let peppers = environment_values(&contents, DEVICE_PAIRING_PEPPER);
+    if private_keys.len() > 1 || peppers.len() > 1 {
+        bail!(
+            "Connected Devices secrets are defined more than once in {}",
+            path.display()
+        );
+    }
+    if let Some(encoded) = private_keys.first() {
+        let raw = STANDARD.decode(encoded).with_context(|| {
+            format!(
+                "{DEVICE_TICKET_PRIVATE_KEY} in {} is not valid base64",
+                path.display()
+            )
+        })?;
+        SigningKey::from_pkcs8_der(&raw).with_context(|| {
+            format!(
+                "{DEVICE_TICKET_PRIVATE_KEY} in {} is not Ed25519 PKCS#8",
+                path.display()
+            )
+        })?;
+    }
+    if let Some(encoded) = peppers.first() {
+        let raw = STANDARD.decode(encoded).with_context(|| {
+            format!(
+                "{DEVICE_PAIRING_PEPPER} in {} is not valid base64",
+                path.display()
+            )
+        })?;
+        if raw.len() < 32 {
+            bail!(
+                "{DEVICE_PAIRING_PEPPER} in {} must contain at least 32 bytes",
+                path.display()
+            );
+        }
+    }
+
+    let mut additions = Vec::new();
+    let mut random = OsRng;
+    if private_keys.is_empty() {
+        let signing = SigningKey::generate(&mut random);
+        verify_pair(&signing)?;
+        additions.push(format!(
+            "{DEVICE_TICKET_PRIVATE_KEY}={}",
+            STANDARD.encode(signing.to_pkcs8_der()?.as_bytes())
+        ));
+    }
+    if peppers.is_empty() {
+        additions.push(format!(
+            "{DEVICE_PAIRING_PEPPER}={}",
+            random_secret(&mut random)
+        ));
+    }
+    if additions.is_empty() {
+        return Ok(false);
+    }
+
+    let mut updated = contents;
+    if !updated.is_empty() && !updated.ends_with('\n') {
+        updated.push('\n');
+    }
+    updated.push_str("\n# Generated by `misty server up` for local Connected Devices.\n");
+    updated.push_str(&additions.join("\n"));
+    updated.push('\n');
+    write_private(path, updated.as_bytes())?;
+    Ok(true)
+}
+
+pub fn down(workspace: &Workspace, volumes: bool) -> Result<()> {
+    development_down_command(volumes).run(&workspace.server)?;
+    // --volumes clears only the server's data; billing's database is kept.
+    crate::billing::down(workspace)
+}
+
+pub(super) fn development_up_command(build: bool) -> CommandSpec {
+    let mut command = development_compose().arg("up");
+    if build {
+        command = command.arg("--build");
+    }
+    // Compose already recreates services whose image or configuration changed.
+    // Avoid forcing the stable Cloudflare connector down during every API
+    // rebuild: doing so leaves the named hostname with no connector and turns
+    // one backend restart into a burst of misleading 530/CORS failures.
+    command.args(["--remove-orphans", "--detach"])
+}
+
+pub(super) fn development_down_command(volumes: bool) -> CommandSpec {
+    let mut command = development_compose().arg("down");
+    if volumes {
+        command = command.arg("--volumes");
+    }
+    command.arg("--remove-orphans")
+}
+
+pub fn logs(workspace: &Workspace, service: Option<&str>, follow: bool, tail: u32) -> Result<()> {
+    let mut command = development_compose().args(["logs", "--tail", &tail.to_string()]);
+    if follow {
+        command = command.arg("--follow");
+    }
+    if let Some(service) = service {
+        if service.starts_with('-') {
+            bail!("invalid service name");
+        }
+        command = command.arg(if service == "api" {
+            "misty-api"
+        } else {
+            service
+        });
+    }
+    command.run(&workspace.server)
+}
+
+pub fn validate_development_secrets(workspace: &Workspace) -> Result<()> {
+    let values = environment::read(workspace, Target::Dev)?;
+    let key = required_map_value(&values, DEVICE_TICKET_PRIVATE_KEY)?;
+    SigningKey::from_pkcs8_der(&STANDARD.decode(key)?).context("invalid device signing key")?;
+    let pepper = STANDARD.decode(required_map_value(&values, DEVICE_PAIRING_PEPPER)?)?;
+    if pepper.len() < 32 {
+        bail!("device pairing pepper must contain at least 32 bytes");
+    }
+    let server_path = workspace
+        .server
+        .join("apps/journal-collab/.secrets/server.env");
+    let worker_path = workspace.server.join("apps/journal-collab/.dev.vars");
+    require_private_file(&server_path)?;
+    require_private_file(&worker_path)?;
+    let mut server = read_environment(&server_path)?;
+    for name in [TICKET_PRIVATE_KEY, CONTROL_SECRET, PROJECTION_SECRET] {
+        if let Some(value) = values.get(name).filter(|value| !value.is_empty()) {
+            server.insert(name.into(), value.clone());
+        }
+    }
+    let worker = read_environment(&worker_path)?;
+    let signing = SigningKey::from_pkcs8_der(
+        &STANDARD.decode(required_map_value(&server, TICKET_PRIVATE_KEY)?)?,
+    )?;
+    if STANDARD.encode(VerifyingKey::from(&signing).to_bytes())
+        != required_map_value(&worker, TICKET_PUBLIC_KEY)?
+    {
+        bail!("server and Worker ticket keys do not match; restore the matching bundle");
+    }
+    for name in [CONTROL_SECRET, PROJECTION_SECRET] {
+        if required_map_value(&server, name)? != required_map_value(&worker, name)? {
+            bail!("server and Worker {name} do not match");
+        }
+    }
+    let salt = STANDARD.decode(required_map_value(&values, ROOM_SALT)?)?;
+    if salt.len() < 32 {
+        bail!("room salt must contain at least 32 bytes");
+    }
+    Ok(())
+}
+
+pub(super) fn diagnostic_secrets(workspace: &Workspace) -> Result<Vec<String>> {
+    let mut secrets: Vec<String> = environment::effective(workspace, Target::Dev)?
+        .into_iter()
+        .filter(|(name, _)| {
+            ["TOKEN", "SECRET", "KEY", "PASSWORD", "PEPPER", "SALT"]
+                .iter()
+                .any(|part| name.contains(part))
+        })
+        .map(|(_, value)| value)
+        .collect();
+    for relative in [
+        "apps/journal-collab/.dev.vars",
+        "apps/journal-collab/.secrets/server.env",
+    ] {
+        let path = workspace.server.join(relative);
+        if path.exists() {
+            secrets.extend(read_environment(&path)?.into_values());
+        }
+    }
+    Ok(secrets)
+}
+
+pub fn deploy_development(workspace: &Workspace) -> Result<()> {
+    environment::check(workspace, Target::Dev)?;
+    println!("Deploying development collaboration Worker…");
+    development_compose()
+        .args(["run", "--rm", "--no-deps", "--build", "setup", "deploy"])
+        .run_logged(
+            &workspace.server,
+            &workspace.server.join(".misty/logs/deploy.log"),
+            &diagnostic_secrets(workspace)?,
+        )
+}

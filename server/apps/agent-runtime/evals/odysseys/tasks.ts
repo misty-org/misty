@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export type Level = "easy" | "medium" | "hard";
+type Level = "easy" | "medium" | "hard";
 export type Split = "dev" | "holdout" | "rest";
 
 export interface Rubric {

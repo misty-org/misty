@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from "react";
 
 /** Fades a tab list's edges while more tabs are scrolled out of view (sideways, or up and down). */
 export function useTabStripFade(
@@ -30,23 +30,4 @@ export function useTabStripFade(
       list.removeEventListener("scroll", updateFade);
     };
   }, [listRef, enabled, count, axis]);
-}
-
-/** The rendered size of a dock pane, so split controls only offer splits that fit. */
-export function usePaneBounds(paneId: string, root: unknown) {
-  const [bounds, setBounds] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const paneSelector = typeof CSS !== "undefined" && CSS?.escape ? CSS.escape(paneId) : paneId;
-    const element = document.querySelector<HTMLElement>(`[data-workspace-pane="${paneSelector}"]`);
-    if (!element) return;
-    const update = () => {
-      const rect = element.getBoundingClientRect();
-      setBounds({ width: rect.width, height: rect.height });
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    update();
-    return () => observer.disconnect();
-  }, [paneId, root]);
-  return bounds;
 }

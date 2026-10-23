@@ -2,7 +2,7 @@ import type { AiInvocationEvent, AiProgressItem } from "@/features/ai-surface/ty
 import { companionReply } from "../companion/companionReply";
 
 export type ProgressTool = Extract<AiProgressItem, { type: "tool" }>;
-export type ProgressGroup =
+type ProgressGroup =
   | { type: "note"; key: string; text: string }
   | { type: "tools"; key: string; tools: ProgressTool[] };
 
@@ -49,8 +49,7 @@ export function withAnswer(
 ): { content: string; progress?: AiProgressItem[] } {
   const progress = message.progress ?? [];
   let index = progress.length - 1;
-  while (index >= 0 && progress[index].type === "tool" && isFinishTool(progress[index]))
-    index -= 1;
+  while (index >= 0 && progress[index].type === "tool" && isFinishTool(progress[index])) index -= 1;
   const note = progress[index];
   const answer = text.trim();
   const repeated =
@@ -160,7 +159,7 @@ const codePhrases: Record<string, [running: string, done: string, subject: strin
   preview: ["Opening", "Opened", "a preview"],
 };
 
-/** Git tools in a project (docs/plans/agent-git-projects.md). */
+/** Git tools in a project. */
 const gitPhrases: Record<string, [running: string, done: string, subject: string]> = {
   status: ["Checking", "Checked", "Git status"],
   diff: ["Reviewing", "Reviewed", "changes"],
@@ -270,7 +269,7 @@ function duration(ms: number): string {
 export function toolGroupSummary(tools: ProgressTool[]): string {
   const running = [...tools].reverse().find((tool) => tool.state === "running");
   if (running) {
-    const { verb } = toolParts(running.name, true);
+    const { verb } = toolParts(running.name, false);
     return `${verb} ${stepTarget(running)}`.trim();
   }
   const labels = [...new Set(tools.map((tool) => toolLabel(tool.name, false)))];

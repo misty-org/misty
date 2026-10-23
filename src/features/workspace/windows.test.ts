@@ -141,7 +141,9 @@ describe("a window showing one Space at a time", () => {
 });
 
 describe("switching a window's Space", () => {
-  const workKey = "01951d3240ac70008000000000000001";
+  // A Space's window key is its id, and its scope is `space:<id>`.
+  const workKey = "space_01951d32-40ac-7000-8000-000000000001";
+  const work = `space:${workKey}` as const;
   // The bridge does this when the native side switches the window.
   const show = (
     key: string,
@@ -157,7 +159,6 @@ describe("switching a window's Space", () => {
   });
 
   it("shows the other Space's own tabs and window, and restores both on the way back", () => {
-    const work = "space:01951d32-40ac-7000-8000-000000000001" as const;
     const personalTab = useWorkspaceStore
       .getState()
       .openBrowserView({ url: "https://personal.example" });
@@ -185,7 +186,6 @@ describe("switching a window's Space", () => {
   });
 
   it("keeps every Space's layout through a save and restore", () => {
-    const work = "space:01951d32-40ac-7000-8000-000000000001" as const;
     show(workKey, work);
     const workTab = useWorkspaceStore.getState().openBrowserView({ url: "https://work.example" });
     show("personal", "space:personal");

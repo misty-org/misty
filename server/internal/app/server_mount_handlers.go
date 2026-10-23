@@ -2,9 +2,8 @@ package app
 
 import (
 	"context"
-	serveragent "github.com/kannachi323/misty/server/internal/agents"
+	"github.com/kannachi323/misty/server/internal/browsersync"
 	"github.com/kannachi323/misty/server/internal/platform/security"
-	browsersync "github.com/kannachi323/misty/server/internal/sync"
 	"net/http"
 
 	api "github.com/kannachi323/misty/server/internal/platform/httpapi"
@@ -60,7 +59,7 @@ func (s *Server) MountHandlers() error {
 // mountRequestMiddleware installs the router-wide middleware stack.
 func (s *Server) mountRequestMiddleware() {
 	s.Router.Use(cors.Handler(cors.Options{
-		AllowOriginFunc:  func(_ *http.Request, origin string) bool { return TestingIsAllowedCORSOrigin(origin) },
+		AllowOriginFunc:  func(_ *http.Request, origin string) bool { return IsAllowedCORSOrigin(origin) },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   allowedCORSRequestHeaders,
 		AllowCredentials: true,
@@ -70,19 +69,20 @@ func (s *Server) mountRequestMiddleware() {
 		ExposedHeaders: []string{"X-Misty-Signed-Download", "X-Request-ID", "Retry-After", "X-Misty-RateLimit-Scope"},
 		MaxAge:         300,
 	}))
-	s.Router.Use(api.CookieCSRFProtection(TestingIsAllowedCORSOrigin))
-	s.Router.Use(TestingRequestObservabilityMiddleware)
+	s.Router.Use(api.CookieCSRFProtection(IsAllowedCORSOrigin))
+	s.Router.Use(RequestObservabilityMiddleware)
 	s.Router.Use(middleware.Recoverer)
 	// The abuse guard runs first: a blocked caller is rejected before any
-	// routing or handler work, and repeated per-route rejections escalate
-	// into a block through the shared guard.
+	// routing or handler work. The API rate limiter separately throttles each
+	// route, and only requests that exceed the overall ceiling escalate to a
+	// persisted caller block.
 	// Blocks are persisted so a restart or a second instance still honours
 	// them; the per-request counters stay in memory for speed.
 	abuseGuard := api.NewAbuseGuard(api.DefaultAbusePolicy()).
 		WithStore(context.Background(), s.Database)
 	s.AbuseGuard = abuseGuard
 	s.Router.Use(abuseGuard.Middleware)
-	s.Router.Use(api.NewAPIRateLimiter().WithAbuseGuard(abuseGuard).Middleware)
+	s.Router.Use(api.NewAPIRateLimiter().Middleware)
 	s.Metrics = metrics.New()
 	s.registerDomainGauges(s.Metrics)
 	s.Router.Use(s.Metrics.Middleware)
@@ -183,7 +183,7 @@ func (s *Server) wireBrowserSync(deps *mountDeps) {
 	deps.browserSync = browserSync
 	if s.AIAgent != nil {
 		browserSync.SetRestoreCompleter(func(ctx context.Context, userID, prompt string) (string, error) {
-			text, _, err := s.AIAgent.CompleteWithTierContext(ctx, userID, prompt, "assistant_ai", serveragent.TierLow)
+			text, _, err := s.AIAgent.CompleteContext(ctx, userID, prompt, "assistant_ai")
 			return text, err
 		})
 	}

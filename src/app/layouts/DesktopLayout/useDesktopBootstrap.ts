@@ -1,6 +1,5 @@
 import type { AppTab } from "@/features/app-shell";
 import { isRememberableAppRoute, useAppRouteMemoryStore, useAppStore } from "@/features/app-shell";
-import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -11,13 +10,10 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
   const navigate = useNavigate();
   const app = useAppStore((state) => state.app);
   const loadApp = useAppStore((state) => state.loadApp);
-  const settings = useSettingsStore((state) => state.settings);
-  const settingsLoad = useSettingsStore((state) => state.load);
   const rememberAppRoute = useAppRouteMemoryStore((state) => state.rememberAppRoute);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
 
   const appLoadStarted = useRef(false);
-  const loadedRoutes = useRef(new Set<AppTab>());
   const lastNonSettingsRouteRef = useRef(settingsFallbackRoute("/browser", lastAppRoute));
   const routeId = params.getRouteId(location.pathname);
 
@@ -26,31 +22,18 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     appLoadStarted.current = true;
     if (!hasTauriInternals()) return;
     void loadApp();
-    void settingsLoad();
-  }, [loadApp, settingsLoad]);
-
-  useEffect(() => {
-    if (loadedRoutes.current.has(routeId)) return;
-    loadedRoutes.current.add(routeId);
-    if (!hasTauriInternals()) return;
-    if (routeId === "settings" && !settings) void settingsLoad();
-  }, [routeId, settings, settingsLoad]);
+  }, [loadApp]);
 
   useEffect(() => {
     const route = `${location.pathname}${location.search}`;
-    if (location.pathname === "/account" || location.pathname.startsWith("/providers")) return;
+    if (location.pathname === "/account") return;
     if (isRememberableAppRoute(route)) {
       rememberAppRoute(route);
     }
   }, [location.pathname, location.search, rememberAppRoute]);
 
   useEffect(() => {
-    if (
-      location.pathname.startsWith("/settings") ||
-      location.pathname === "/account" ||
-      location.pathname.startsWith("/providers")
-    )
-      return;
+    if (location.pathname.startsWith("/settings") || location.pathname === "/account") return;
     lastNonSettingsRouteRef.current = `${location.pathname}${location.search}`;
   }, [location.pathname, location.search]);
 
@@ -58,7 +41,6 @@ export function useDesktopBootstrap(params: { getRouteId: (pathname: string) => 
     location,
     navigate,
     app,
-    settingsLoad,
     lastAppRoute,
     lastNonSettingsRouteRef,
     routeId,

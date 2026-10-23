@@ -30,7 +30,7 @@ it("shows a skeleton first, then grants by agent, and revokes one", async () => 
   expect(screen.queryByText(/Loading/)).toBeNull();
   await act(async () => resolve({ grants: [push] }));
   expect(screen.getByText("Push to misty-org/misty")).toBeTruthy();
-  expect(screen.getByText("Not used yet")).toBeTruthy();
+  expect(screen.getByText(/Builder · Not used yet/)).toBeTruthy();
   mocks.revoke.mockResolvedValueOnce(undefined);
   mocks.list.mockResolvedValueOnce({ grants: [] });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Revoke" })));
@@ -39,7 +39,9 @@ it("shows a skeleton first, then grants by agent, and revokes one", async () => 
 });
 
 it("revokes every grant for an agent", async () => {
-  mocks.list.mockResolvedValueOnce({ grants: [push] }).mockResolvedValueOnce({ grants: [] });
+  mocks.list
+    .mockResolvedValueOnce({ grants: [push, { ...push, id: "grant_2", label: "Merge it" }] })
+    .mockResolvedValueOnce({ grants: [] });
   mocks.revokeAll.mockResolvedValueOnce({ revoked: 1 });
   render(<AgentGrantsSection />);
   await act(async () => {});

@@ -2,7 +2,7 @@ import { useMistyPanelStore } from "@/features/agents";
 import type { AiSelectionSnapshot } from "@/features/ai-surface/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { WorkspaceView } from "@/features/workspace";
-import { browserContentHash, browserScopeId } from "./browserRuntime";
+import { browserContentHash, browserScopeId } from "@/features/webviews/browserRuntime";
 import { inspectBrowserPage } from "./browserPageInspection";
 
 /** The person's language by name, such as "English", from the app's locale. */

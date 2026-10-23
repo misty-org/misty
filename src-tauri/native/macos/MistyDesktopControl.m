@@ -400,17 +400,3 @@ char *misty_desktop_action(const char *json) {
     return DesktopJSON(output);
   }
 }
-
-// The controlled display's recent audio for the task that holds control.
-char *misty_desktop_audio(const char *taskID, double seconds) {
-  @autoreleasepool {
-    NSString *expected = [NSString stringWithUTF8String:taskID];
-    __block BOOL valid;
-    onMain(^{ valid = !stopped && controlling && [task isEqualToString:expected]; });
-    if (!valid) return DesktopJSON(@{@"error": @"Desktop control is not running for this task."});
-    NSData *wav = MistyDesktopRecentAudio(MIN(30, MAX(1, seconds)));
-    if (!wav) return DesktopJSON(@{@"error": @"No desktop audio has been captured yet."});
-    return DesktopJSON(@{@"dataUrl": [@"data:audio/wav;base64," stringByAppendingString:[wav base64EncodedStringWithOptions:0]],
-      @"seconds": @((wav.length - 44) / 2 / 16000.0), @"sampleRate": @16000});
-  }
-}

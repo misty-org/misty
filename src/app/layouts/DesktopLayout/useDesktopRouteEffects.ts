@@ -1,5 +1,4 @@
 import { routes } from "@/features/app-shell";
-import { useSettingsStore } from "@/features/settings";
 import { isSetupCompletedForAccount, useSetupStore } from "@/features/setup";
 import {
   activeLayoutView,
@@ -39,22 +38,12 @@ export function useDesktopRouteEffects(options: {
   }, [userId, transitioning]);
 
   useEffect(() => {
-    // Extensions are managed in Settings; old /extensions links open them there.
-    const extensions = /^\/extensions(?:\/|$)/.test(location.pathname);
-    if (!location.pathname.startsWith("/settings") && !extensions) return;
-    if (extensions) useSettingsStore.getState().setActiveSection("browser-extensions");
+    if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openSettingsOverlay]);
-
-  useEffect(() => {
-    if (!location.pathname.startsWith("/providers")) return;
-    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
-      replace: true,
-    });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate]);
 
   useEffect(() => {
     const currentRoute = `${location.pathname}${location.search}${location.hash}`;

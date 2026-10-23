@@ -66,8 +66,6 @@ const Dialog = ({
   return <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} {...props} />;
 };
 
-const DialogTrigger = DialogPrimitive.Trigger;
-
 const DialogPortal = DialogPrimitive.Portal;
 
 const DialogClose = DialogPrimitive.Close;
@@ -99,66 +97,75 @@ const DialogContent = React.forwardRef<
     placement?: "center" | "top";
     /** Leaves the page undimmed, for panels that open over one control. */
     backdrop?: boolean;
+    /** Omits the corner close button, for dialogs that only their own buttons may dismiss. */
+    hideClose?: boolean;
   }
->(({ className, children, container, placement = "center", backdrop = true, ...props }, ref) => {
-  React.useEffect(() => {
-    return () => {
-      cleanupPointerEvents();
-      window.setTimeout(cleanupPointerEvents, 50);
-      window.setTimeout(cleanupPointerEvents, 200);
-      window.setTimeout(cleanupPointerEvents, 350);
-    };
-  }, []);
+>(
+  (
+    { className, children, container, placement = "center", backdrop = true, hideClose, ...props },
+    ref,
+  ) => {
+    React.useEffect(() => {
+      return () => {
+        cleanupPointerEvents();
+        window.setTimeout(cleanupPointerEvents, 50);
+        window.setTimeout(cleanupPointerEvents, 200);
+        window.setTimeout(cleanupPointerEvents, 350);
+      };
+    }, []);
 
-  return (
-    <DialogPortal container={container}>
-      {backdrop ? <DialogOverlay className={container ? "absolute inset-0" : undefined} /> : null}
-      {/* Flex layout centers the panel on whole pixels; a 50% translate would land odd
+    return (
+      <DialogPortal container={container}>
+        {backdrop ? <DialogOverlay className={container ? "absolute inset-0" : undefined} /> : null}
+        {/* Flex layout centers the panel on whole pixels; a 50% translate would land odd
           sizes on a half pixel and blur their text on 1x displays. */}
-      <div
-        data-slot="dialog-positioner"
-        className={cn(
-          container ? "absolute" : "fixed",
-          "inset-0 layer-dialog pointer-events-none flex justify-center",
-          placement === "top" ? "items-start" : "items-center",
-          !container && placement !== "top" && "pt-[var(--misty-modal-inset-top,0px)]",
-          placement === "top" &&
-            backdrop &&
-            (container ? "pt-[12vh]" : "pt-[max(12vh,var(--misty-modal-inset-top,0px))]"),
-          !backdrop && "justify-start",
-        )}
-      >
-        <DialogPrimitive.Content
-          ref={ref}
-          data-slot="dialog-content"
+        <div
+          data-slot="dialog-positioner"
           className={cn(
-            "pointer-events-auto relative grid",
-            "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)] max-w-lg",
-            "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
-            "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
-            "data-[state=closed]:pointer-events-none",
-            className,
+            container ? "absolute" : "fixed",
+            "inset-0 layer-dialog pointer-events-none flex justify-center",
+            placement === "top" ? "items-start" : "items-center",
+            !container && placement !== "top" && "pt-[var(--misty-modal-inset-top,0px)]",
+            placement === "top" &&
+              backdrop &&
+              (container ? "pt-[12vh]" : "pt-[max(12vh,var(--misty-modal-inset-top,0px))]"),
+            !backdrop && "justify-start",
           )}
-          {...props}
         >
-          {children}
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
+          <DialogPrimitive.Content
+            ref={ref}
+            data-slot="dialog-content"
             className={cn(
-              "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
-              "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
-              "hover:text-cream focus-visible:ring-[3px]",
-              "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
+              "pointer-events-auto relative grid",
+              "max-h-[calc(100dvh-4rem-var(--misty-modal-inset-top,0px))] w-[calc(100%-2rem)] max-w-lg",
+              "gap-4 overflow-y-auto rounded-xl bg-charcoal-card p-6",
+              "text-cream shadow-xl ring-1 ring-cream/10 misty-dialog-motion",
+              "data-[state=closed]:pointer-events-none",
+              className,
             )}
+            {...props}
           >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        </DialogPrimitive.Content>
-      </div>
-    </DialogPortal>
-  );
-});
+            {children}
+            {hideClose ? null : (
+              <DialogPrimitive.Close
+                data-slot="dialog-close"
+                className={cn(
+                  "absolute right-4 top-4 grid size-8 place-items-center rounded-md",
+                  "text-cream-muted outline-none transition-colors hover:bg-charcoal-card",
+                  "hover:text-cream focus-visible:ring-[3px]",
+                  "focus-visible:ring-charcoal-active/40 disabled:pointer-events-none",
+                )}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </DialogPrimitive.Close>
+            )}
+          </DialogPrimitive.Content>
+        </div>
+      </DialogPortal>
+    );
+  },
+);
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -212,8 +219,5 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogOverlay,
-  DialogPortal,
   DialogTitle,
-  DialogTrigger,
 };

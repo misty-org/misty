@@ -1,0 +1,165 @@
+/*
+ * Every Agents composer has two rows: the text in its own box on top, and one toolbar
+ * beneath the box with Attach and the mode on the left, the model, usage, voice and send
+ * on the right. Only the text (and any attachments) sits inside the box.
+ */
+.agent-studio .agent-conversation [data-slot="message-composer"] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] > div:has(textarea) {
+  display: grid;
+  /* Zero minimums let both groups shrink, so the row never overflows a narrow composer. */
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, auto);
+  align-items: end;
+  row-gap: 8px;
+  padding: 0;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] > div > div:has(> textarea) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  padding: 10px;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-charcoal-card);
+}
+/* Attachments share the box with the text: the strip is its top, the text its bottom. */
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:first-child:not(:has(textarea)) {
+  border: 1px solid var(--color-charcoal-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-charcoal-card);
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]:has(> div:first-child:not(:has(textarea)))
+  > div
+  > div:has(> textarea) {
+  border-top: 0;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-dragging="true"]
+  > div
+  > div:has(> textarea),
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"][data-dragging="true"]
+  > div:first-child:not(:has(textarea)) {
+  border-color: var(--color-cream-muted);
+  background: var(--color-charcoal-hover);
+}
+/* Text starts where the + glyph starts: 10px box padding + 8px inset inside the 32px button. */
+.agent-studio .agent-conversation [data-slot="message-composer"] textarea {
+  padding-inline: 8px;
+}
+/* Send (or Stop) sits in the box's bottom-right corner; the text wraps short of it. */
+.agent-studio .agent-conversation [data-slot="message-composer"] .misty-composer-send {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.agent-studio .agent-conversation [data-slot="message-composer"] textarea {
+  padding-right: 44px;
+}
+/* A new task's composer is roomier: a taller field in larger type. */
+.agent-studio .agent-conversation[data-empty="true"] [data-slot="message-composer"] textarea {
+  min-height: 64px;
+  padding: 8px 44px 8px 8px;
+  font-size: 16px;
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:first-child {
+  grid-row: 2;
+  /* The shared lift centers the buttons on a one-line input; here they have their own row. */
+  margin-bottom: 0;
+  /* Inset like the box's padding, so the + glyph lines up with the text above it. */
+  padding-left: 10px;
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:last-child {
+  grid-column: 3;
+  grid-row: 2;
+  margin-bottom: 0;
+  padding-right: 10px;
+}
+.agent-studio
+  .agent-conversation
+  [data-slot="message-composer"]
+  > div:has(textarea)
+  > div:first-child {
+  min-width: 0;
+}
+/* In a narrow composer (the Misty panel) the model and thinking pickers show only their
+   icons; each keeps its name for assistive technology and in its menu. */
+@container agent-studio (max-width: 520px) {
+  .agent-studio
+    .agent-conversation
+    [data-slot="message-composer"]
+    > div
+    > div:last-child
+    button
+    > span.truncate {
+    display: none;
+  }
+}
+/*
+ * Control bar: a tab tucked behind the composer's top edge for active folder work and
+ * the agent window. Usage lives in the composer as a ring. Receipts and notices span below.
+ */
+.agent-control-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  margin-inline: 14px;
+  padding: 3px 4px;
+  border: 1px solid var(--color-charcoal-border);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: color-mix(in srgb, var(--color-charcoal-card) 55%, transparent);
+}
+/* Folder work and the agent window appear only while active; an idle bar takes no space. */
+.agent-control-bar:empty {
+  display: none;
+}
+.agent-control-bar button {
+  height: 28px;
+  gap: 6px;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.agent-control-bar button:is(:hover, [data-state="open"]) {
+  color: var(--color-cream);
+}
+.agent-control-bar > p {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  padding: 2px 8px 6px;
+}
+/* The usage ring sits beside the mic; exact numbers live in the popover. */
+.agent-usage-ring circle:first-child {
+  stroke: color-mix(in srgb, var(--color-cream) 18%, transparent);
+}
+.agent-usage-ring circle:last-child {
+  stroke: var(--color-cream);
+}

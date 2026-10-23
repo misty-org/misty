@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	db "github.com/kannachi323/misty/server/internal/platform/postgres"
+	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
 // Every device context an agent chat attaches carries a run grant signed by

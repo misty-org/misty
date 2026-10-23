@@ -5,7 +5,7 @@
 
 type Bridge = { url: string; token: string };
 
-export interface PageProcesses {
+interface PageProcesses {
   /** Every WebKit page process on this computer. */
   all: number[];
   /** The ones Misty's open web views use. */

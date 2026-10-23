@@ -1,5 +1,4 @@
 import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
-import { initializeHostLibraryRuntime } from "@/features/library/library";
 import {
   configureMistyBrowserLinkOpener,
   installExternalLinkRouting,
@@ -21,7 +20,6 @@ configureMistyBrowserLinkOpener(async (url) => {
     throw new Error("Misty Browser could not open this link.");
 });
 installExternalLinkRouting();
-initializeHostLibraryRuntime();
 initializeHostAgentsRuntime();
 if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
   void import("@/shared/platform/clientDebug").then(({ installClientDebugging }) => {
@@ -31,30 +29,6 @@ if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 export const startup = bootstrap();
 async function bootstrap() {
-  if (new URLSearchParams(location.search).has("agent_dock_host") && hasTauriInternals()) {
-    const [{ AgentDockHostRoot }] = await Promise.all([
-      import("@/features/agents/dock/AgentDockHostRoot"),
-      import("@/styles/styles.css"),
-    ]);
-    root.render(
-      <TelemetryErrorBoundary>
-        <AgentDockHostRoot />
-      </TelemetryErrorBoundary>,
-    );
-    return;
-  }
-  if (new URLSearchParams(location.search).has("agent_worker") && hasTauriInternals()) {
-    const [{ AgentWorkerRoot }] = await Promise.all([
-      import("@/features/agents/AgentWorkerRoot"),
-      import("@/styles/styles.css"),
-    ]);
-    root.render(
-      <TelemetryErrorBoundary>
-        <AgentWorkerRoot />
-      </TelemetryErrorBoundary>,
-    );
-    return;
-  }
   // The app and its styles load while the session is prepared, not after it. The shell
   // loads beside them too, instead of when the first route renders.
   const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);

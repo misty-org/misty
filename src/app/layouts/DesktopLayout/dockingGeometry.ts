@@ -53,4 +53,3 @@ export function dockingGeometry({
   const railFlush = navigation === "right";
   return { frame, content, railFlush };
 }
-export type DockingGeometry = ReturnType<typeof dockingGeometry>;

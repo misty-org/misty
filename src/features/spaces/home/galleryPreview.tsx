@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { LibraryItemThumbnail } from "@/features/library";
-import { cn, itemToneClass, itemTones, type ItemTone } from "@/shared/ui";
+import { itemTones, type ItemTone } from "@/shared/ui";
 import type { GalleryItem, GalleryKind } from "./galleryItems";
 
 type KindIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
@@ -20,12 +20,6 @@ export const kindIcon: Record<GalleryKind, { Icon: KindIcon; tone: ItemTone; lab
   file: { Icon: FileText, tone: itemTones.document, label: "File" },
   code: { Icon: Code2, tone: itemTones.code, label: "Code" },
 };
-
-/** The item's kind as a toned glyph; the tile around it stays monochrome. */
-export function GalleryKindIcon({ kind, className }: { kind: GalleryKind; className?: string }) {
-  const { Icon, tone } = kindIcon[kind];
-  return <Icon aria-hidden className={cn("size-4", itemToneClass(tone), className)} />;
-}
 
 /** What a card shows instead of an icon: the item itself, as far as it can be drawn. */
 export function GalleryPreview({

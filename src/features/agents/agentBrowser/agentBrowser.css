@@ -1,6 +1,6 @@
 /* The agent browser (docs/design/agent-browser/BRIEF.md): the split beside the chat and its PiP.
-   The split is a small copy of Misty's browser: the window's sidebar card (head, address, tab
-   rows, foot; docking-*.css) beside a rounded page. Monochrome; status is a word. */
+   The split is a small copy of Misty's browser: a horizontal tab strip, a toolbar row (travel,
+   address, actions) and a rounded page. Monochrome; status is a word. */
 
 .agent-browser {
   /* The sidebar card's head starts after the window buttons; here it is far from them. */
@@ -22,14 +22,81 @@
 .agent-browser-body {
   display: flex;
   flex: 1;
+  flex-direction: column;
   gap: 8px;
   min-width: 0;
   min-height: 0;
 }
 
-.agent-browser-sidebar {
-  flex: 0 0 auto;
-  width: clamp(160px, 30%, 220px);
+.agent-browser-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* A tab and its close button: the wrapper takes the strip's sizing, the button sits over the
+   tab's right edge and shows on hover, focus and for the shown tab. */
+.agent-browser-tab-wrap {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 104px;
+  max-width: 200px;
+}
+
+.agent-browser-tab {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--color-cream-muted);
+  font-size: 13px;
+}
+
+.agent-browser-tab-close {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  opacity: 0;
+}
+
+.agent-browser-tab-close svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-browser-tab-wrap:hover .agent-browser-tab-close,
+.agent-browser-tab-wrap:focus-within .agent-browser-tab-close,
+.agent-browser-tab-wrap[data-active] .agent-browser-tab-close {
+  opacity: 1;
+}
+
+.agent-browser-tab:hover {
+  background: var(--color-charcoal-hover);
+}
+
+.agent-browser-tab[aria-selected="true"] {
+  background: var(--color-charcoal-card);
+  color: var(--color-cream-bright);
+}
+
+.agent-browser-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 /* The page is a rounded pane like a tab's, its outline just outside where the native page
@@ -48,6 +115,13 @@
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+/* While the page is on screen, nothing opaque sits over it: under a popup the native page is
+   beneath the renderer and shows through (the browser's own page host does the same, theme.css). */
+.agent-browser-page:has([data-browser-page-presented]),
+html[data-browser-overlay-active] .agent-browser-page {
+  background: transparent;
 }
 
 /* Until the page is on screen the host paints the page's color, never the window through it
@@ -133,6 +207,7 @@
 }
 
 .agent-browser-pip {
+  width: min(calc(100% - 24px), 400px);
   margin: 8px 12px 4px;
   border: 1px solid var(--color-charcoal-border);
   border-radius: var(--radius-lg);
@@ -143,8 +218,25 @@
 .agent-browser-pip-picture {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 16 / 10;
   background: var(--color-charcoal-card);
+}
+
+.agent-browser-pip-live {
+  display: flex;
+}
+
+.agent-browser-pip-live .agent-browser-page {
+  border: 0;
+  border-radius: 0;
+}
+
+.agent-browser-pip-expand {
+  margin-left: auto;
+}
+
+.agent-browser-pip-expand + .agent-browser-pip-flip {
+  margin-left: 0;
 }
 
 .agent-browser-pip-picture img,

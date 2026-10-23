@@ -1,4 +1,4 @@
-// Unterdrücke Warnings von veralteten Cocoa APIs
+// The cocoa crate's AppKit bindings are deprecated in favor of objc2.
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
 
@@ -6,19 +6,12 @@ use tauri::{AppHandle, Runtime, Webview};
 
 #[cfg(target_os = "macos")]
 use cocoa::{
-    appkit::{
-        NSColor, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
-        NSWindowTitleVisibility,
-    },
+    appkit::{NSWindow, NSWindowCollectionBehavior, NSWindowTitleVisibility},
     base::{id, nil},
-    foundation::NSString,
 };
 
 #[cfg(target_os = "macos")]
-use objc::{class, msg_send, sel, sel_impl};
-
-#[cfg(target_os = "macos")]
-use std::ffi::c_void;
+use objc::{msg_send, sel, sel_impl};
 
 #[cfg(target_os = "macos")]
 use super::mac_traffic_lights::position_traffic_lights;
@@ -26,74 +19,6 @@ use super::mac_traffic_lights::position_traffic_lights;
 #[cfg(target_os = "macos")]
 #[link(name = "QuartzCore", kind = "framework")]
 unsafe extern "C" {}
-
-/// Configuration for Traffic Lights positioning
-pub struct TrafficLightsConfig {
-    /// Offset in pixels from default position (positive = right, negative = left)
-    pub offset_x: f64,
-    /// Offset in pixels from default position (positive = down, negative = up)
-    pub offset_y: f64,
-}
-
-impl Default for TrafficLightsConfig {
-    fn default() -> Self {
-        Self {
-            offset_x: 0.0,
-            offset_y: 0.0,
-        }
-    }
-}
-
-/// Enables rounded corners for the window (macOS only)
-/// Uses only public APIs - App Store compatible
-#[tauri::command]
-pub fn enable_rounded_corners<R: Runtime>(
-    _app: AppHandle<R>,
-    window: Webview<R>,
-    offset_x: Option<f64>,
-    offset_y: Option<f64>,
-) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        let config = TrafficLightsConfig {
-            offset_x: offset_x.unwrap_or(0.0),
-            offset_y: offset_y.unwrap_or(0.0),
-        };
-
-        window
-            .with_webview(move |webview| {
-                #[cfg(target_os = "macos")]
-                unsafe {
-                    let ns_window = webview.ns_window() as id;
-
-                    let mut style_mask = ns_window.styleMask();
-
-                    // Add necessary styles for rounded corners
-                    style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
-                    style_mask |= NSWindowStyleMask::NSTitledWindowMask;
-                    style_mask |= NSWindowStyleMask::NSClosableWindowMask;
-                    style_mask |= NSWindowStyleMask::NSMiniaturizableWindowMask;
-                    style_mask |= NSWindowStyleMask::NSResizableWindowMask;
-
-                    ns_window.setStyleMask_(style_mask);
-                    ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
-
-                    let content_view = ns_window.contentView();
-                    content_view.setWantsLayer(cocoa::base::YES);
-
-                    position_traffic_lights(ns_window, config.offset_x, config.offset_y);
-                }
-            })
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        Ok(())
-    }
-}
 
 /// Enables native traffic lights with a transparent titlebar.
 #[tauri::command]
@@ -296,99 +221,5 @@ fn apply_windows_rounded_corners<R: Runtime>(window: &Webview<R>) {
                 core::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
             );
         }
-    }
-}
-
-/// Enables native shadow for a fully custom titlebar.
-/// Unlike `enable_modern_window_style`, this does not add the native macOS traffic lights.
-#[tauri::command]
-pub fn enable_custom_titlebar_window_style<R: Runtime>(
-    _app: AppHandle<R>,
-    window: Webview<R>,
-    corner_radius: Option<f64>,
-) -> Result<(), String> {
-    let radius = corner_radius.unwrap_or(10.0);
-    #[cfg(not(target_os = "macos"))]
-    let _ = radius;
-
-    #[cfg(target_os = "macos")]
-    {
-        window
-            .with_webview(move |webview| {
-                #[cfg(target_os = "macos")]
-                unsafe {
-                    let ns_window = webview.ns_window() as id;
-
-                    ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
-                    ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
-                    ns_window.setHasShadow_(cocoa::base::YES);
-                    ns_window.setOpaque_(cocoa::base::NO);
-                    ns_window.setBackgroundColor_(NSColor::clearColor(nil));
-                    apply_continuous_corner_mask(ns_window, radius);
-                }
-            })
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        Ok(())
-    }
-}
-
-/// Repositions Traffic Lights only (useful after fullscreen toggle)
-#[tauri::command]
-pub fn reposition_traffic_lights<R: Runtime>(
-    _app: AppHandle<R>,
-    window: Webview<R>,
-    offset_x: Option<f64>,
-    offset_y: Option<f64>,
-) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        let config = TrafficLightsConfig {
-            offset_x: offset_x.unwrap_or(0.0),
-            offset_y: offset_y.unwrap_or(0.0),
-        };
-
-        window
-            .with_webview(move |webview| {
-                #[cfg(target_os = "macos")]
-                unsafe {
-                    let ns_window = webview.ns_window() as id;
-                    position_traffic_lights(ns_window, config.offset_x, config.offset_y);
-                }
-            })
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    {
-        Ok(())
-    }
-}
-
-#[cfg(target_os = "macos")]
-unsafe fn apply_continuous_corner_mask(ns_window: id, radius: f64) {
-    let content_view = ns_window.contentView();
-    content_view.setWantsLayer(cocoa::base::YES);
-
-    let layer: id = msg_send![content_view, layer];
-    if layer.is_null() {
-        return;
-    }
-
-    let _: () = msg_send![layer, setCornerRadius: radius];
-    let _: () = msg_send![layer, setMasksToBounds: cocoa::base::YES];
-
-    let supports_continuous_corners: bool =
-        msg_send![layer, respondsToSelector: sel!(setCornerCurve:)];
-    if supports_continuous_corners {
-        let continuous = NSString::alloc(nil).init_str("continuous");
-        let _: () = msg_send![layer, setCornerCurve: continuous];
     }
 }

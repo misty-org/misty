@@ -2,29 +2,13 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, stringSetting, SwitchControl, TextAreaControl } from "../SettingsControls";
+import { booleanSetting, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
 import { ClearBrowsingDataRow } from "./ClearBrowsingDataRow";
 
 export function PrivacySection(props: SettingsContentProps) {
   return (
     <>
-      <SettingsSectionBlock title="Page capture exclusions">
-        <SettingsRow
-          label="Don't capture page state on these sites"
-          description="One site per line. Subdomains are included. Only the address and scroll position are kept."
-          stacked
-        >
-          <TextAreaControl
-            value={stringSetting(props.document, "privacy", "page_state_excluded_sites", "")}
-            rows={5}
-            disabled={props.working}
-            onCommit={(value) =>
-              props.onSettingChange("privacy", "page_state_excluded_sites", value)
-            }
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
       <SettingsSectionBlock title="Browsing data">
         <ClearBrowsingDataRow />
       </SettingsSectionBlock>

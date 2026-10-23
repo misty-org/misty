@@ -1,6 +1,7 @@
+import { splitLedger } from "@/features/agents/checkpointLedger";
 import { invoke } from "@tauri-apps/api/core";
-import type { AgentConversationFolder } from "@/api/assistant/conversationFolders";
-import type { GlobalAiConversation, GlobalAiMessage } from "@/features/global-search/types";
+import type { AgentConversationFolder } from "@/api/assistant/conversation-folders";
+import type { GlobalAiConversation, GlobalAiMessage } from "./types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
@@ -159,7 +160,7 @@ export function historyTurns(
     turns.push({
       invocation_id: reply?.invocationId,
       prompt: message.content,
-      reply: reply?.content || undefined,
+      reply: (reply && splitLedger(reply.content).text) || undefined,
       created_at: message.createdAt,
     });
   }

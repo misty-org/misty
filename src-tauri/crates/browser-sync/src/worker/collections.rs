@@ -289,13 +289,7 @@ where
             if !answer.applied {
                 self.collections.changed_elsewhere(collection);
             }
-            state.answered(
-                &answer.key,
-                record,
-                answer.applied,
-                answer.version,
-                current,
-            );
+            state.answered(&answer.key, record, answer.applied, answer.version, current);
         }
         // Writes that lost a race retry on the server's copy without
         // waiting for another batch.

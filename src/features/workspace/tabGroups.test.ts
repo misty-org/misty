@@ -5,7 +5,7 @@ import { activeLayoutView, allLayoutViews, layoutTabs } from "./layoutTabs";
 import { migrateSavedLinkGroups } from "./tabGroups";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
-import { retainDeviceState } from "@/features/browser-workspace/deviceState";
+import { retainDeviceState } from "@/features/browser-sync/deviceState";
 import { currentWindows } from "./windows";
 const state = () => useWorkspaceStore.getState();
 const tabs = () => layoutTabs(state().layout);

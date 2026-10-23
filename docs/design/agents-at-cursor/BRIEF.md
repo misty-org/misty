@@ -1,12 +1,14 @@
 # Agents at your cursor — approved direction
 
-Revision 3, approved October 10, 2026; amended October 15, 2026 to capture every display (decision 2), following Clicky. Revision 2 ("companion as orchestrator") was approved; the
-owner then dropped the companion as a separate idea, and this revision follows that direction. It builds on the [agent architecture brief](../agent-architecture/BRIEF.md)
-(one durable loop for every entry point), the
-[agents-on-devices brief](../agents-on-devices/BRIEF.md) and Phase 4 of
-[docs/plans/agentic-browser.md](../../plans/agentic-browser.md). The mockup is
-[mockup.html](mockup.html). The agent window (take over, detach, dock) is in
-[agent-window-mockup.html](agent-window-mockup.html).
+Revision 4, approved October 19, 2026: Teach mode is a conversation mode again (see
+[Teach mode](#teach-mode-revision-4-october-19-2026)). Revision 3 was approved October 10, 2026
+and amended October 15 to capture every display (decision 2), following Clicky. Revision 2
+("companion as orchestrator") was approved; the owner then dropped the companion as a separate
+idea, and revisions 3 and 4 follow that direction. It builds on the
+[agent architecture brief](../agent-architecture/BRIEF.md) (one durable loop for every entry
+point), [agent-chats-local](../agent-chats-local/BRIEF.md) (a run works on the device it was sent
+from) and [docs/plans/agent-harness.md](../../plans/agent-harness.md). The mockup is
+[mockup.html](mockup.html).
 
 ## Goal
 
@@ -178,117 +180,27 @@ while any agent controls something you can see:
 - **Send / New task:** one field. Send routes the message as before (`routeLocalFollowup`):
   it steers the running task, or queues it when it is a separate request. New task always queues
   it after this one (`queueLocalFollowup`) and leaves the task running. Push-to-talk works too.
-- **Detach / Dock** (see the next section): Detach sends the agent's tab to its own docked
-  window, with Show and Bring back while it's away; Dock shrinks an opened agent window back to its
-  corner.
 - **Take over / Resume** (`pauseLocalExecution`, resume), **Stop** and Escape (⌘⇧Esc in Misty's
   window, Esc during desktop control). Stop ends the task; a task with its own tabs pauses
   instead, so its result stays open until **Done** closes it.
 - **Waiting:** says exactly what's needed (the intervention's label and target) and offers Done,
   which resumes the run.
-- **No task here:** a quiet line for each agent working on this computer for another of your
-  devices, with Stop.
 
 Agent input can't reach it: desktop clicks refuse Misty's own windows, and typed text and keys go
 only to the other app.
 
-## Taking over the app: the agent window
+## Where the agent works
 
-Approved October 10 from [agent-window-mockup.html](agent-window-mockup.html); built October 11
-(uncommitted, not yet run in a live task).
-
-**When.** The agent picks the cheapest route that works, and the setting never forces one:
+The agent picks the cheapest route that works:
 
 1. Connected apps (Composio) through their APIs. No window. "Create a Google Doc" stops here.
-2. Structured page work in a Misty tab through the page layer. The tab is yours if you started
-   from the browser panel, otherwise one the agent opens for itself, hidden.
-3. **Takeover**: the agent drives a whole Misty window like a person, with tabs, canvases,
-   pasting, dragging between apps (`browser.workspace.visual` / `.interact` and Midscene). Only
-   when 1 and 2 can't do the task, such as drawing in Excalidraw or pasting an image.
+2. Page work in tabs of the agent's own through the page layer and `browser_run`. Agents never
+   act in your tabs.
+3. Desktop control of another app, only when 1 and 2 can't do the task.
 
-**Where.** The existing Settings › Agents › **Where Misty opens new screens** is this choice; no
-second setting. *New tab* works in your window; *Separate window* gives the agent its own window
-(`agent_window_open`), which docks the moment it opens, so the window you're in never changes.
-
-**Detach.** Misty has one app window, so Detach moves the agent's tab rather than the window: the
-page leaves your window, live and unreloaded, for a window of its own (`misty-dock-<uuid>`) that
-docks in the corner. The task keeps running in your window, so its lease, scopes and grants don't
-change. Your tab shows a short notice with **Show** and **Bring back**; the tab comes home when
-the task ends, when you press Bring back, or when you close the agent's window. While it is away,
-your window never hides, moves or resizes it (`browser.rs` checks the caller's window).
-
-**The docked window.** Like a video in picture in picture on iPhone:
-
-- Small (288 points wide, the content's own aspect) in a corner of Misty's window, which it moves
-  with; it never floats over other apps (owner's choice, October 11, like Codex). It is the whole window drawn small, so the
-  agent's pages show their own ring there; the dock adds no mist of its own (owner's call, October 18). A
-  small pill floating 8 points in from the bottom and side edges says what it's doing, or what it needs, with an icon, never a
-  color. Hover puts Open and Stop inside the pill, before the count.
-- Drag it anywhere; it snaps to the nearest corner. Drop it by a side edge and it floats there,
-  whole and on screen, a few points in. It is never tucked off-screen.
-- Click it to open the agent's window at full size in front; **Dock** on the island (or the bar
-  of a detached tab's window) shrinks it back. Hover shows Open and Stop; Stop ends the task like
-  the island's Stop.
-- **Several takeovers** overlap into one stack, each offset inward and slightly smaller, with a
-  count. Up to five fan out fully; more compress the fan so every window keeps a strip showing.
-  An agent that starts waiting for you moves to the front.
-- **Carousel.** Clicking the stack fans it out: the chosen window in the middle, the others
-  smaller and dimmed to either side, animated. Scroll, the arrows or the arrow keys move between
-  agents; the label under it follows the chosen agent's step live. Clicking the middle window
-  opens it; Escape or a click elsewhere folds the stack back with the chosen one in front. Reduce
-  motion turns the animation into a cut. Real windows can't tilt, so the mockup's 3D turn is a
-  flat slide.
-
-**Never stop WebKit.** The docked window is the agent's real window, a child of Misty's window.
-Its content view keeps its bounds at the full size the page was laid out for while its frame
-shrinks (`MistyAgentDock.m`), so pages never relayout and the agent's snapshots
-(`takeSnapshotWithConfiguration`) stay full resolution. A covered window would normally make
-WebKit stop painting and slow timers to one a second (measured October 11), so:
-
-- Pages in an agent's window turn off WebKit's covered-window detection (the private
-  `_setWindowOcclusionDetectionEnabled:`) from docking until the tab returns to your window.
-- When Misty hides or its window minimizes, docked windows stay on screen, transparent and
-  click-through, and come back with Misty. Nothing pulls Misty in front of other apps.
-- `agent_dock_visibility` reports each docked window's state for checks.
-
-What it can't prevent: a locked screen or a display that turns off. If a future macOS drops the
-private setting, covered pages throttle again rather than break.
-
-**Checked October 11** through the eval bridge's `/dock` route (debug builds): Excalidraw and a
-Google Doc docked alone, at the front, middle and back of a stack of three, at the middle and
-sides of the carousel, opened and docked again, with Misty covered by another window, hidden and
-minimized, and opened full size while covered. In every state the page kept its 1280 × 860 layout,
-`visibilityState` stayed `visible`, animation frames ran at 60 per second, timers ran as in the
-Misty window, snapshots stayed full resolution and macOS reported every docked window visible.
-While docked, a native drag drew a rectangle in Excalidraw, a pasted image landed on its canvas,
-and native typing in the doc was saved (read back through Docs' export).
-
-**Agent windows.** Approved October 18, superseding *Separate window* above for agents that
-work on the web or in Misty. A working agent gets its own Misty window (`agent-<n>`, bound to its
-chat in `space_windows/agents.rs`): the same app window as yours, opened on your Space and docked
-the moment it opens.
-
-- **Its tabs and its chat.** The agent's tabs are real tabs in that window's strip, kept painting
-  when not shown. The Agents panel sits beside them, pinned to the run's chat, so you read its
-  context and steer it there.
-- **Dock and close.** The panel's PiP button and the window's close button send it back to the
-  dock. It closes only with its task: Stop ends the run and closes it; a run that finishes stays
-  for review until Done.
-- **Your input.** While the agent acts, the window takes no input from you outside the panel:
-  its tabs are locked natively under the pulsing mist, and a cover holds the rest of the app.
-- **Take over.** Pauses the run (`/pause`); it waits at its next step without model turns and the
-  window is yours. Resume (`/resume`) hands it back, and the agent reads its tabs again before
-  acting.
-- **Everything in Misty.** `app.window` opens Misty's own pages as tabs, switches and closes tabs
-  and moves the window to another Space. The window's own pages are a screen for the page tools,
-  with the same gates as websites. The side panel is never in the agent's view, and Settings
-  pages don't open as its tabs.
-- **Where it can't dock** (no dock on the platform), agents keep hidden background tabs, listed
-  on the island.
-
-**App commands.** Under takeover, opening and switching tabs and windows are one structured tool
-over the app's own commands (new tab, new window, switch tab, close tab, as
-`useBrowserMenuCommands` dispatches them), not clicks on the tab strip.
+The agent's tabs live in the agent browser beside its chat (`src/features/agents/agentBrowser/`,
+[agent browser brief](../agent-browser/BRIEF.md)). It replaced the agent window, the dock, the
+carousel and the *Separate window* screen location on October 19, 2026.
 
 ## Rules
 
@@ -317,7 +229,7 @@ over the app's own commands (new tab, new window, switch tab, close tab, as
 
 ## Plan
 
-1. **Mist and island** on macOS. Built October 10, uncommitted: the mist in
+1. **Mist and island** on macOS. Built October 10: the mist in
    `MistyAgentRing.m` (display, page and window, with `misty_agent_mist_waiting`), the island in
    `AgentControlIsland.tsx` and its native view in `MistyDesktopControl.m`. Not yet seen in a live
    agent run.
@@ -332,9 +244,6 @@ over the app's own commands (new tab, new window, switch tab, close tab, as
 6. **Measure.** Pointing by element against pointing by coordinates (`evals/pointing`), and
    `npm run trace` timing before and after. Baseline, October 10: 30/30 hits on 30 web-page
    fixtures with coordinates (`openai/gpt-6-luna`); native-app fixtures still to capture.
-7. **Agent window.** Built October 11, uncommitted: the dock (`MistyAgentDock.m`,
-   `agent_dock.rs`), Detach, Show, Bring back and Dock on the island, the detached tab's window
-   and notice. The Excalidraw and Google Docs check passed October 11. Still to do: the app-command tool.
 
 ## Windows parity guide
 
@@ -364,6 +273,4 @@ neither appears for hidden tabs or other devices. Screenshots taken while the mi
 contain it. Agent input never reaches the island. A turn at the cursor captures only the cursor's
 display and sends no secure-field values. `screen.look` returns into the same run. `[POINT:ref]`
 lands on the element's frame within a few points. The agent at the cursor carries only the grants
-the device signed for that turn. Detach keeps the run's lease and scopes on the agent's window and
-the run continues uninterrupted; a docked window's page keeps its full-size layout and its
-snapshots stay full resolution; tasks that connected apps can finish never take over a window.
+the device signed for that turn. Tasks that connected apps can finish never open a page.

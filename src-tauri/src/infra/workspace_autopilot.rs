@@ -5,7 +5,7 @@ use std::{
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
-use tauri::{AppHandle, Emitter, Manager, Webview};
+use tauri::{AppHandle, Manager, Webview};
 
 #[derive(Default)]
 struct Session {
@@ -19,15 +19,12 @@ struct Snapshot {
     geometry: Value,
 }
 static SESSION: OnceLock<Mutex<Session>> = OnceLock::new();
-static DESKTOP_APP: OnceLock<AppHandle> = OnceLock::new();
+pub(super) static DESKTOP_APP: OnceLock<AppHandle> = OnceLock::new();
 fn session() -> &'static Mutex<Session> {
     SESSION.get_or_init(Mutex::default)
 }
 #[cfg(target_os = "macos")]
-#[path = "workspace_autopilot_macos.rs"]
-mod macos;
-#[cfg(target_os = "macos")]
-use macos::*;
+use super::workspace_autopilot_macos::*;
 pub fn renew(task: &str) {
     #[cfg(target_os = "macos")]
     if let Ok(task) = std::ffi::CString::new(task) {
@@ -58,7 +55,7 @@ pub fn agent_workspace_context(
     {
         return Err("Invalid workspace context".into());
     }
-    super::agent_workspace::authorize_window_task(
+    super::agents::workspace::authorize_window_task(
         &app,
         &task_id,
         context["accountId"].as_str().unwrap_or(""),
@@ -104,43 +101,6 @@ pub fn agent_workspace_context(
         state.context = context;
     }
     Ok(())
-}
-/// The controlled display's recent audio (up to 30 seconds of WAV), for the task
-/// that holds desktop control. It lives only in memory while control runs.
-#[tauri::command]
-pub async fn agent_desktop_recent_audio(
-    webview: Webview,
-    task_id: String,
-    seconds: f64,
-) -> Result<Value, String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("Invalid desktop audio request".into());
-    }
-    {
-        let state = session().lock().map_err(|_| "workspace_unavailable")?;
-        if state.task != task_id || state.context["desktopControl"] != true {
-            return Err("agent_task_paused".into());
-        }
-    }
-    let seconds = if seconds.is_finite() {
-        seconds.clamp(1.0, 30.0)
-    } else {
-        10.0
-    };
-    #[cfg(target_os = "macos")]
-    {
-        let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
-        tauri::async_runtime::spawn_blocking(move || unsafe {
-            decode(misty_desktop_audio(task.as_ptr(), seconds))
-        })
-        .await
-        .map_err(|e| e.to_string())?
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = seconds;
-        Err("Desktop audio isn't available on this system yet".into())
-    }
 }
 /// The task waits for the person (a sign-in, a challenge, a review): give back
 /// the window or desktop, its control ring and Misty's cursor, but keep the
@@ -248,14 +208,14 @@ fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Va
     if task.is_empty() || state.task != task {
         return Err("Start or resume the task to allow desktop control".into());
     }
-    super::agent_workspace::authorize_window_task(
+    super::agents::workspace::authorize_window_task(
         app,
         task,
         state.context["accountId"].as_str().unwrap_or(""),
         state.context["spaceId"].as_str().unwrap_or(""),
     )?;
-    super::agent_workspace::authorize_scope(app, &request.scope_id, &request.agent_id, task)?;
-    let window = super::agent_workspace::task_window(app, task)
+    super::agents::workspace::authorize_scope(app, &request.scope_id, &request.agent_id, task)?;
+    let window = super::agents::workspace::task_window(app, task)
         .and_then(|label| app.get_window(&label))
         .or_else(|| crate::infra::space_windows::primary(app))
         .ok_or("Misty window closed")?;

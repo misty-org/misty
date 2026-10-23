@@ -159,7 +159,12 @@ export async function companionBrowserContext(
         opaqueRef: scopeId,
         displayName: tab.title || "Current browser tab",
         capabilities: browserTabAgentFileCapabilities,
-        metadata: { app_id: "browser", window_label: currentWindowLabel(), normal_tab: true, tab_id: tab.id },
+        metadata: {
+          app_id: "browser",
+          window_label: currentWindowLabel(),
+          normal_tab: true,
+          tab_id: tab.id,
+        },
       },
     ],
   };

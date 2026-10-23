@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { agentMethodsApi, type AgentMethod, type AgentMethodInputs } from "@/api/ai/agent-methods";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
-import { AgentMethodInputFields, methodError, methodTargets } from "./AgentMethodEditor";
+import { methodError, methodTargetLabel } from "./agentMethodDefinition";
+import { AgentMethodInputFields } from "./AgentMethodInputFields";
 
 /** Runs a workflow now, or opens a template as a draft. */
 export function AgentMethodRunDialog({
@@ -66,12 +67,7 @@ export function AgentMethodRunDialog({
         [],
         { conversationId, context: [] },
         {
-          executionMode:
-            method.definition.target === "cloud"
-              ? "user"
-              : method.definition.target === "separate_window"
-                ? "team"
-                : "agent",
+          executionMode: method.definition.target === "cloud" ? "user" : "agent",
           methodVersionId: method.version_id,
           methodInputs: inputs,
           idempotencyKey: attempt.current.key,
@@ -98,8 +94,7 @@ export function AgentMethodRunDialog({
           {method.kind === "template" ? "Use" : "Run"} {method.definition.title}
         </DialogTitle>
         <DialogDescription>
-          Version {method.version} ·{" "}
-          {methodTargets.find((t) => t.value === method.definition.target)?.label}.{" "}
+          Version {method.version} · {methodTargetLabel(method.definition)}.{" "}
           {method.kind === "template"
             ? "This opens an unsent draft."
             : "The task uses your agent’s existing access and approvals."}

@@ -43,14 +43,12 @@ use windows_sys::{
             HANDLE, UNICODE_STRING,
         },
         Storage::FileSystem::{
-            FileAttributeTagInfo, FileBasicInfo, FileFullDirectoryInfo,
-            FileFullDirectoryRestartInfo, FileIdInfo, GetFileInformationByHandle,
-            GetFileInformationByHandleEx, SetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION,
+            FileAttributeTagInfo, FileFullDirectoryInfo, FileFullDirectoryRestartInfo, FileIdInfo,
+            GetFileInformationByHandle, GetFileInformationByHandleEx, BY_HANDLE_FILE_INFORMATION,
             DELETE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_READONLY,
-            FILE_ATTRIBUTE_REPARSE_POINT, FILE_ATTRIBUTE_TAG_INFO, FILE_BASIC_INFO,
-            FILE_FLAG_BACKUP_SEMANTICS, FILE_FULL_DIR_INFO, FILE_ID_INFO, FILE_LIST_DIRECTORY,
-            FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-            FILE_TRAVERSE, SYNCHRONIZE,
+            FILE_ATTRIBUTE_REPARSE_POINT, FILE_ATTRIBUTE_TAG_INFO, FILE_FLAG_BACKUP_SEMANTICS,
+            FILE_FULL_DIR_INFO, FILE_ID_INFO, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES,
+            FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE, SYNCHRONIZE,
         },
         System::{Kernel::OBJ_CASE_INSENSITIVE, IO::IO_STATUS_BLOCK},
     },
@@ -93,16 +91,6 @@ pub enum Expect {
     Anything,
     File,
     Folder,
-}
-
-/// Whether `error` is the refusal to follow a link.
-pub fn is_link_refusal(error: &io::Error) -> bool {
-    error.raw_os_error() == Some(ERROR_STOPPED_ON_SYMLINK as i32)
-}
-
-/// Whether `error` means part of a path was not a folder.
-pub fn is_not_folder(error: &io::Error) -> bool {
-    error.raw_os_error() == Some(ERROR_DIRECTORY as i32)
 }
 
 pub fn link_refused() -> io::Error {
@@ -340,27 +328,6 @@ pub fn identity(file: &File) -> io::Result<(u64, [u8; 16])> {
         return Err(io::Error::last_os_error());
     }
     Ok((info.VolumeSerialNumber, info.FileId.Identifier))
-}
-
-/// Makes the open file read-only.
-pub fn set_read_only(file: &File) -> io::Result<()> {
-    // SAFETY: zeroed input; zero times mean "leave unchanged".
-    let mut info: FILE_BASIC_INFO = unsafe { mem::zeroed() };
-    info.FileAttributes = FILE_ATTRIBUTE_READONLY;
-    // SAFETY: a live handle opened with FILE_WRITE_ATTRIBUTES.
-    let ok = unsafe {
-        SetFileInformationByHandle(
-            file.as_raw_handle() as HANDLE,
-            FileBasicInfo,
-            ptr::addr_of!(info).cast(),
-            mem::size_of::<FILE_BASIC_INFO>() as u32,
-        )
-    } != 0;
-    if ok {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
 }
 
 /// STATUS_INVALID_PARAMETER, STATUS_NOT_SUPPORTED or

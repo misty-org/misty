@@ -7,17 +7,13 @@ import {
   type AgentMethodKind,
   type SaveAgentMethod,
 } from "@/api/ai/agent-methods";
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { Button, Input, SkeletonList } from "@/shared/ui";
 import { describeNextRun, describeSchedule } from "../workflows/scheduleSummary";
 import { WorkflowScheduleDialog } from "../workflows/WorkflowScheduleDialog";
-import {
-  AgentMethodEditor,
-  blankDefinition,
-  methodError,
-  methodTargets,
-} from "./AgentMethodEditor";
+import { AgentMethodEditor } from "./AgentMethodEditor";
+import { blankDefinition, methodError, methodTargetLabel } from "./agentMethodDefinition";
 import { AgentMethodRunDialog } from "./AgentMethodRunDialog";
 import "./agentMethods.css";
 
@@ -206,7 +202,7 @@ export function AgentMethodsCatalog({
                 )}
                 <span>
                   Version {method.version} · {method.enabled ? "On" : "Off"} ·{" "}
-                  {methodTargets.find((t) => t.value === method.definition.target)?.label}
+                  {methodTargetLabel(method.definition)}
                 </span>
                 {method.schedule?.state === "failed" && method.schedule.last_error && (
                   <p role="status">Last scheduled run failed: {method.schedule.last_error}</p>

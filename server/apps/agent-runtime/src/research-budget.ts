@@ -1,7 +1,7 @@
 import type { ModelMessage } from "ai";
 import { ledgerHeading } from "./requirements-review.js";
 
-// Research budget (docs/plans/agent-harness.md). Prompts say "be economical"; this layer makes
+// Research budget (docs/plans/agent-harness.md, Completion). Prompts say "be economical"; this layer makes
 // it true. It reads the run's own transcript before every model call, so a replayed run agrees,
 // and moves through three stages: open, wrap-up (the model is told what it has spent and must
 // name the fact still missing) and closed (search and fetch leave the tool list, so the next
@@ -10,9 +10,9 @@ import { ledgerHeading } from "./requirements-review.js";
 
 export const researchLimits = { wrapUp: 6, close: 12 } as const;
 
-export type ResearchStage = "open" | "wrap-up" | "closed";
+type ResearchStage = "open" | "wrap-up" | "closed";
 
-export interface ResearchUse {
+interface ResearchUse {
   searches: number;
   fetches: number;
   repeats: number;

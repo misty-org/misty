@@ -10,10 +10,10 @@ import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace, windowSpace } from "./defaultSpace";
 import { openSpaceWindow } from "@/features/workspace/spaceWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { defaultSpaceRoute } from "./store/useSpacesTabsStore";
+import { defaultSpaceRoute } from "./defaultSpaceRoute";
 import { useSpacesStore } from "./store/useSpacesStore";
-import { useSpacePanelRoute } from "./components/spacePanel/spacePanelRoute";
-import { SpacePageHeader } from "./components/SpacePageHeader";
+import { useSpaceRoute } from "./spaceRoute";
+import { SpacePageShortcuts } from "./components/SpacePageShortcuts";
 import { SpaceInvitationsNotice } from "./spacesShell/SpaceInvitationsNotice";
 /** Each Space pane owns its navigation and content. */
 export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
@@ -21,7 +21,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const navigate = useNavigate();
   const location = useLocation();
   const setViewingSpace = useSpacesStore((state) => state.setViewingSpace);
-  const route = useSpacePanelRoute();
+  const route = useSpaceRoute();
   const spaces = useSpacesStore((state) => state.spaces);
   const ready = useSpacesStore((state) => state.snapshotReady);
   const error = useSpacesStore((state) => state.error);
@@ -126,7 +126,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       >
         {/* The Space row in the sidebar carries the Space's controls; the page has no bar. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <SpacePageHeader space={space} section={route.section} />
+          <SpacePageShortcuts space={space} />
           <div className="min-h-0 flex-1 overflow-hidden">
             <SpaceSectionView
               spaceId={route.activeSpaceId}

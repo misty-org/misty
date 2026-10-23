@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 

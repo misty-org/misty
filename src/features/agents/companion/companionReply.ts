@@ -16,7 +16,7 @@ const courseTags = /\[COURSE:([^\r\n]*)\]/g;
 const openTag = /\[[A-Z]{0,6}(?::[^\]\r\n]*)?$|\[(?:LESSON|COURSE):[^\r\n]*$/;
 
 /** A region to look at, in one screenshot's pixels: [FOCUS:x1,y1,x2,y2:screenN]. */
-export interface CompanionFocus {
+interface CompanionFocus {
   x1: number;
   y1: number;
   x2: number;

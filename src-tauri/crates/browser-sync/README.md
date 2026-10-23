@@ -76,7 +76,7 @@ cargo test --manifest-path src-tauri/crates/browser-sync/Cargo.toml secure_store
 
 `tests/fixtures/protocol-v1.json` contains public, fake test credentials and an
 encrypted fixture. The identical file is kept by the server under
-`internal/platform/postgres/testdata/browser-sync-protocol-v1.json`. Go tests
+`internal/browsersync/testdata/browser-sync-protocol-v1.json`. Go tests
 independently check native signing bytes and Ed25519 signatures. The fixture
 generator is a development example, not a production enrollment path.
 
@@ -119,7 +119,7 @@ to webviews: use `Document::workspace_view`, which excludes credential data.
 
 
 A macOS WKHTTPCookieStore adapter now lives in the native host's
-`infra/browser_cookie_store.rs`. Five Foundation/profile-validation tests pass,
+`infra/website_data/cookie_store_macos.rs`. Five Foundation/profile-validation tests pass,
 including rejection of lossy expiry conversion and native partition/port metadata.
 The `cookie_store_probe` example also passes 40 live WebKit-store round trips,
 same-profile visibility, callback completion and cross-profile rejection. The

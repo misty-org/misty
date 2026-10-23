@@ -5,7 +5,7 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection,
   resolveSetting,
-  useSettingsProfiles,
+  useDevicePreferences,
 } from "@/features/settings";
 import { PreferenceRow } from "@/features/settings";
 import { UninstallDialog } from "./ExtensionDialogs";
@@ -32,7 +32,7 @@ const stores: { store: ExtensionStore; description: string }[] = [
  * access and removes them.
  */
 export function ExtensionsSettings() {
-  const profile = useSettingsProfiles((s) => s.state);
+  const profile = useDevicePreferences((s) => s.state);
   const runtime = useExtensionsStore();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -48,8 +48,8 @@ export function ExtensionsSettings() {
     setFailure("");
     try {
       await action();
-    } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error));
+    } catch {
+      setFailure("The extension could not be updated. Try again.");
     } finally {
       setBusy(false);
     }
@@ -62,11 +62,11 @@ export function ExtensionsSettings() {
         </DesktopSettingsNotice>
       )}
       {(failure || runtime.error) && (
-        <DesktopSettingsNotice>{failure || runtime.error}</DesktopSettingsNotice>
+        <DesktopSettingsNotice>{failure || "Extensions could not be loaded. Try again."}</DesktopSettingsNotice>
       )}
       <DesktopSettingsSection
         title="Extensions"
-        description="Open an extension's page on its store and choose Add to Misty. Extensions stay on this device."
+        description="Open a store, then choose Add to Misty on an extension's page. Extensions stay on this device."
       >
         {stores.map(({ store, description }) => (
           <DesktopSettingsRow key={store} label={storeNames[store]} description={description}>

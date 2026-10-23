@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 
 /** Email or Slack, watched for tasks the person writes to Misty (roadmap C8). */

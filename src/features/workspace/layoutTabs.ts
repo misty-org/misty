@@ -1,11 +1,6 @@
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { createDockLeaf, dockLeaves, dockTreeViews, mapDockTreeViews } from "./dockTree";
-import type {
-  WorkspaceDockNode,
-  WorkspaceLayout,
-  WorkspaceTab,
-  WorkspaceView,
-} from "./model";
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceTab, WorkspaceView } from "./model";
 
 export function layoutTabs(layout: WorkspaceLayout): WorkspaceTab[] {
   if (layout.tabs?.length) return layout.tabs;

@@ -1,4 +1,4 @@
-import { clearApiCache } from "@/api/cache/apiCache";
+import { clearApiCache } from "@/api/cache/api-cache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";

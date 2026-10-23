@@ -1,5 +1,5 @@
 //! Workspace-protocol (v2) wire types. Field names and signing-byte order must
-//! match `server/internal/sync/workspace_types.go` exactly; the shared fixture
+//! match `server/internal/browsersync/workspace_types.go` exactly; the shared fixture
 //! `tests/fixtures/workspace-v3.json` pins both implementations.
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};

@@ -1,21 +1,13 @@
-import { readApiSessionGeneration } from "@/api/client/session";
-import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { type AiArtifact, type AiSurfaceAdapter } from "@/features/ai-surface/AiPaneHost";
 import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
 import type { MistyPickerSource } from "@/features/picker";
-import {
-  socialApi as spacesApi,
-  useSocialAi as useAiSurfaceAdapter,
-  useSocialAuth as useAuth,
-  useSocialSetup as useNativeSessionStore,
-  useSocialDraft as useSpaceChatDraft,
-  useSocialTitle as useWorkspaceViewTitle,
-} from "./SocialRuntime";
+import { useAuth } from "@/features/auth";
+import { useNativeSessionStore } from "@/features/native-session";
+import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
+import { useWorkspaceViewTitle } from "@/features/workspace";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
-import { Button, EmptyState, ErrorState, LoadingState } from "@/shared/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { conversationName } from "./sidebar/conversationGroups";
 import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
@@ -24,17 +16,24 @@ import { SpaceChatThread } from "./components/SpaceChatThread";
 import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
 import { useComposerInput } from "./hooks/useComposerInput";
+import { useMessageDeleteTarget } from "./hooks/useMessageDeleteTarget";
 import { useMessageEditing } from "./hooks/useMessageEditing";
 import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
-import { spaceChatSuggestedActions } from "./spaceChatAiActions";
+import { useSpaceChatAiAdapter } from "./hooks/useSpaceChatAiAdapter";
+import { useChatReadReceipts } from "./hooks/useChatReadReceipts";
+import {
+  ChatTitleBar,
+  ConversationLoadState,
+  ConversationUnavailable,
+} from "./components/ConversationStates";
 import { useSpaceAgentMembers } from "../members/agents/useSpaceAgentMembers";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
 import { AgentTranscriptCard } from "./components/AgentTranscriptButton";
 import { useChatSidePanel } from "./store/chatSidePanelStore";
-export function SpaceSocial({
+export function SpaceChat({
   spaceId,
   spaceName,
   workspaceTabId,
@@ -64,7 +63,6 @@ export function SpaceSocial({
   // Panels belong to the chat they were opened in.
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
   const endRef = useRef<HTMLDivElement | null>(null);
-  const lastReadReceiptRef = useRef("");
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(spaceId, conversationId);
   const scope = useSpaceChatScope({
@@ -92,16 +90,9 @@ export function SpaceSocial({
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
-  const deleteScope = JSON.stringify([
-    readApiSessionGeneration(),
-    user?.id,
-    spaceId,
-    conversationId,
-  ]);
-  const [deleteTarget, setDeleteTarget] = useState<{ scope: string; message: SpaceMessage } | null>(
-    null,
-  );
-  const messageToDelete = deleteTarget?.scope === deleteScope ? deleteTarget.message : null;
+  const deleting = useMessageDeleteTarget([user?.id, spaceId, conversationId]);
+  const messageToDelete = deleting.message;
+  const clearDeleteTarget = deleting.clear;
   const resetEditing = editing.reset;
   const closeSuggestions = suggestions.setOpen;
   const clearSpacesError = store.clearSpacesError;
@@ -128,12 +119,7 @@ export function SpaceSocial({
   const actions = useSpaceChatMessageActions({
     spaceId,
     conversationId,
-    currentUser: user
-      ? {
-          id: user.id,
-          name: user.username,
-        }
-      : undefined,
+    currentUser: user ? { id: user.id, name: user.username } : undefined,
     activeConversation: scope.activeConversation,
     members: scope.members,
     agents,
@@ -153,78 +139,15 @@ export function SpaceSocial({
     ? conversationChat.error
     : (store.messageErrorsBySpace[spaceId] ?? "");
   const conversationAvailable = !conversationId || Boolean(scope.activeConversation);
-  const draftText = draft.text;
-  const setDraftText = draft.setText;
-  const setDraftReplyToMessageId = draft.setReplyToMessageId;
-  const aiAdapter = useMemo<AiSurfaceAdapter | null>(() => {
-    if (!conversationAvailable) return null;
-    const scopeId = conversationId || "everyone";
-    const messageDraft = (artifact: AiArtifact) => {
-      if (artifact.kind !== "message_draft" || !access.canWriteMessages || draftText.trim()) {
-        return null;
-      }
-      const operations = artifact.operations as {
-        conversation_id?: string;
-        text?: string;
-        reply_to_message_id?: string;
-      };
-      if (
-        operations.conversation_id !== scopeId ||
-        typeof operations.text !== "string" ||
-        !operations.text.trim() ||
-        operations.text.length > 20_000
-      ) {
-        return null;
-      }
-      if (
-        operations.reply_to_message_id &&
-        !scope.messages.some((message) => message.id === operations.reply_to_message_id)
-      ) {
-        return null;
-      }
-      return operations;
-    };
-    return {
-      surfaceId: "space.chat",
-      label: scope.activeConversation?.title || "Everyone chat",
-      getContext: () => [
-        {
-          kind: "space.chat",
-          id: scopeId,
-          title: scope.activeConversation?.title || "Everyone chat",
-          privacy: "shared",
-          spaceId,
-          href: conversationId
-            ? spaceChatConversationPath(spaceId, conversationId)
-            : spaceChatPath(spaceId),
-          revision: scope.messages[scope.messages.length - 1]?.seq ?? 0,
-        },
-      ],
-      getSuggestedActions: () => spaceChatSuggestedActions,
-      canApply: (artifact) => Boolean(messageDraft(artifact)),
-      applyArtifact: async (artifact) => {
-        const operations = messageDraft(artifact);
-        if (!operations) {
-          throw new Error(
-            "The conversation or composer changed. Ask your agent to regenerate this draft.",
-          );
-        }
-        setDraftText(operations.text!.trim());
-        setDraftReplyToMessageId(operations.reply_to_message_id ?? "");
-      },
-    };
-  }, [
-    access.canWriteMessages,
-    conversationAvailable,
-    conversationId,
-    draftText,
-    scope.activeConversation?.title,
-    scope.messages,
-    setDraftReplyToMessageId,
-    setDraftText,
+  useSpaceChatAiAdapter({
     spaceId,
-  ]);
-  useAiSurfaceAdapter(aiAdapter);
+    conversationId,
+    available: conversationAvailable,
+    canWrite: access.canWriteMessages,
+    title: scope.activeConversation?.title,
+    messages: scope.messages,
+    draft,
+  });
   const chatScroll = useChatScrollRestoration({
     viewerId: user?.id,
     spaceId,
@@ -239,11 +162,12 @@ export function SpaceSocial({
   // Transient menus close on navigation; drafts remain scoped to their conversation.
   useEffect(() => {
     resetEditing();
-    setDeleteTarget(null);
+    clearDeleteTarget();
     closeSuggestions(false);
     setPickerOpen(false);
     clearSpacesError();
   }, [
+    clearDeleteTarget,
     clearSpacesError,
     closeSuggestions,
     resetEditing,
@@ -252,74 +176,27 @@ export function SpaceSocial({
     store.referenceOnly,
     user?.id,
   ]);
-  useEffect(() => {
-    if (!conversationAvailable) return;
-    const last = scope.messages[scope.messages.length - 1];
-    if (!last || store.referenceOnly) return;
-    const receiptKey = `${spaceId}:${conversationId || "everyone"}:${last.seq}`;
-    if (lastReadReceiptRef.current === receiptKey) return;
-    lastReadReceiptRef.current = receiptKey;
-    const request = conversationId
-      ? spacesApi.markConversationRead(spaceId, conversationId, last.seq)
-      : markRead(spaceId, last.seq);
-    void request.catch(() => {
-      if (lastReadReceiptRef.current === receiptKey) lastReadReceiptRef.current = "";
-    });
-  }, [
-    conversationAvailable,
-    conversationId,
-    markRead,
-    scope.messages,
+  useChatReadReceipts({
     spaceId,
-    store.referenceOnly,
-  ]);
-  if (conversationId && conversationChat.error && !scope.activeConversation) {
+    conversationId,
+    enabled: conversationAvailable && !store.referenceOnly,
+    messages: scope.messages,
+    markSpaceRead: markRead,
+  });
+  if (
+    conversationId &&
+    !scope.activeConversation &&
+    (conversationChat.error || conversationChat.loading)
+  )
     return (
-      <ErrorState
-        className="h-full bg-charcoal-bg"
-        title="Conversation couldn’t load"
-        description={conversationChat.error}
-        action={
-          <Button type="button" variant="outline" onClick={conversationChat.reload}>
-            Try again
-          </Button>
-        }
+      <ConversationLoadState error={conversationChat.error} onRetry={conversationChat.reload} />
+    );
+  if (!conversationAvailable)
+    return (
+      <ConversationUnavailable
+        onBack={() => (onBack ? onBack() : navigate(spaceChatPath(spaceId), { replace: true }))}
       />
     );
-  }
-  if (conversationId && conversationChat.loading && !scope.activeConversation) {
-    return (
-      <LoadingState
-        className="h-full bg-charcoal-bg"
-        label="Opening conversation"
-        title="Opening conversation"
-      />
-    );
-  }
-  if (!conversationAvailable) {
-    return (
-      <EmptyState
-        className="h-full bg-charcoal-bg"
-        title="Conversation isn’t available"
-        description="Choose another conversation from Chat."
-        action={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              onBack
-                ? onBack()
-                : navigate(spaceChatPath(spaceId), {
-                    replace: true,
-                  })
-            }
-          >
-            Back to Chat
-          </Button>
-        }
-      />
-    );
-  }
   return (
     <div
       ref={chatRootRef}
@@ -327,14 +204,13 @@ export function SpaceSocial({
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {panel ? null : (
-          <header className="flex min-h-11 shrink-0 items-center gap-2 bg-charcoal-bg px-3 py-1.5">
-            {/* The chat sidebar switches chats; the header just names this one. */}
-            <h1 className="m-0 min-w-0 flex-1 truncate px-1 text-sm font-medium text-cream-bright">
-              {scope.activeConversation
+          <ChatTitleBar
+            title={
+              scope.activeConversation
                 ? conversationName(scope.activeConversation, user?.id)
-                : "Everyone"}
-            </h1>
-          </header>
+                : "Everyone"
+            }
+          />
         )}
 
         {!conversationId ? (
@@ -367,7 +243,7 @@ export function SpaceSocial({
             draft.setReplyToMessageId(id);
             requestAnimationFrame(() => chatRootRef.current?.querySelector("textarea")?.focus());
           }}
-          onDelete={(message) => setDeleteTarget({ scope: deleteScope, message })}
+          onDelete={deleting.request}
           onReload={() => {
             if (conversationId) conversationChat.reload();
             else void store.loadMessages(spaceId);
@@ -411,12 +287,12 @@ export function SpaceSocial({
         <DeleteMessageDialog
           open={Boolean(messageToDelete)}
           onOpenChange={(open) => {
-            if (!open) setDeleteTarget(null);
+            if (!open) deleting.clear();
           }}
           onConfirm={() => {
             if (!messageToDelete) return;
             void actions.remove(messageToDelete).then((removed) => {
-              if (removed) setDeleteTarget(null);
+              if (removed) deleting.clear();
             });
           }}
         />

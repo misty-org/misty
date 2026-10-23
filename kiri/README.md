@@ -7,8 +7,7 @@ rendering engine but not the browser layer that Chromium and Gecko build on top 
 permission prompts, WebAuthn, device APIs, extension APIs. Kiri supplies that layer from
 Rust, one capability at a time. It does not render anything and never replaces the engine.
 
-Status and open items, including the Windows run that is still to do, are tracked in
-[`docs/plans/kiri.md`](../docs/plans/kiri.md).
+Status and open items are at the end of this file.
 
 ## Four ways in
 
@@ -135,7 +134,7 @@ To exercise every layer inside the running app (macOS debug builds):
 MISTY_KIRI_PROBE=1 npm run tauri -- dev
 ```
 
-The probe (`src-tauri/src/infra/browser_kiri_probe.rs`) opens a tab on a loopback page,
+The probe (`src-tauri/src/infra/browser/kiri_probe.rs`) opens a tab on a loopback page,
 checks the page bridge and its ACL, the host channel, the context menu's copy, site
 permissions and the macOS passkey path, prints `KIRI PROBE` lines and quits. On a Mac that
 has never answered "use passkeys in Misty?", macOS asks once.
@@ -161,3 +160,27 @@ On a machine without a camera, the Windows probe skips the camera check and says
 Kiri's native code must use the same `webview2-com`, `windows` and `webkit2gtk` as the wry
 Tauri resolves to, so its Tauri requirement is pinned to Misty's (`>=2.11.3, <2.12`). Bump
 them together.
+
+## Status
+
+| Phase | Scope | macOS | Linux | Windows |
+| --- | --- | --- | --- | --- |
+| 1 | Page bridge (`plugin:kiri\|call`), tab audio state | Ran in app | Ran in probe | Ran in probe |
+| 2 | Camera and microphone permissions on every engine | Ran in app | Ran in probe | Ran in probe |
+| 3 | Passkeys (WebAuthn) for any site | Runs up to Apple's entitlement | Not available | WebView2's own |
+| 4 | Host channel, context menu everywhere, extension transport | Ran in app | Ran in probe | Ran in probe |
+
+The Windows runtime probe last passed on 2026-10-12 (Windows 11, WebView2 runtime current).
+
+Open items:
+
+- **Passkey entitlement.** Request `com.apple.developer.web-browser.public-key-credential`
+  with Apple's "Request the macOS Web Browser Public Key Credential Entitlement" form
+  (Account Holder only). It needs a public download page, a notarized Developer ID build and
+  an evaluation account. After approval: enable the capability on the `com.misty.desktop` App
+  ID, regenerate the "Misty Developer ID" and "Misty Development" profiles, add the
+  entitlement to `src-tauri/Entitlements.plist`, and embed the profiles in dev and release
+  builds.
+- Passkey autofill (`mediation: "conditional"`) is rejected for now.
+- On Linux, a saved "Allow" still asks each time, because WebKitGTK does not report which
+  frame asked.

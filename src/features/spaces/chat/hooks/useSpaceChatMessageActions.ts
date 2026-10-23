@@ -1,7 +1,6 @@
 import type { SpaceConversation, SpaceMember, SpaceMessage } from "@/api/spaces/dto/entities";
 import type { SpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
-import "../SocialRuntime";
-import { socialApi as spacesApi } from "../SocialRuntime";
+import { spacesApi } from "@/api/spaces/api";
 import { buildMessageSpans, type MentionableAgent } from "../store/useSpaceMessageSpansStore";
 import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";

@@ -9,11 +9,9 @@ use crate::infra::global_hotkey::Modifiers;
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "macos")]
-#[path = "insert_macos.rs"]
-mod platform;
+use super::insert_macos as platform;
 #[cfg(windows)]
-#[path = "insert_windows.rs"]
-mod platform;
+use super::insert_windows as platform;
 
 /// How long Misty waits for held modifiers before giving up on pasting.
 pub const RELEASE_TIMEOUT: Duration = Duration::from_millis(1500);

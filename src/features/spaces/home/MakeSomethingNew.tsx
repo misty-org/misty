@@ -1,15 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { drawingsApi } from "@/api/drawings/api";
-import { notesApi } from "@/api/notes/api";
 import { spacesApi } from "@/api/spaces/api";
 import { useCodingIncluded } from "@/features/agents";
-import { Pressable, cn } from "@/shared/ui";
-import { spaceChatPath } from "../chat/chatRoute";
-import { preloadSpaceSection } from "../SpaceSectionView";
+import { FileInput, Pressable, cn } from "@/shared/ui";
+import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
 import { MakeArt } from "./makeArt";
 
-type Tile = { id: "chat" | "note" | "drawing" | "file" | "code"; label: string };
+type Tile = { id: SpaceCreateKind; label: string };
 
 const tiles: Tile[] = [
   { id: "chat", label: "Chat" },
@@ -34,7 +31,6 @@ export function MakeSomethingNew({
   const coding = useCodingIncluded();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const base = `/spaces/${encodeURIComponent(spaceId)}`;
   const picker = useRef<HTMLInputElement>(null);
 
   // File uploads right here, into the Space, without leaving the home page.
@@ -61,25 +57,13 @@ export function MakeSomethingNew({
     setError("");
     setBusy(tile.id);
     try {
-      if (tile.id === "note") {
-        await preloadSpaceSection("notes");
-        const note = await notesApi.create(spaceId, "Untitled note");
-        onCreated();
-        navigate(`${base}/notes?note=${encodeURIComponent(note.id)}`);
-      } else if (tile.id === "drawing") {
-        await preloadSpaceSection("drawings");
-        const drawing = await drawingsApi.create(spaceId, "Untitled drawing");
-        onCreated();
-        navigate(`${base}/drawings/${encodeURIComponent(drawing.id)}`);
-      } else if (tile.id === "chat") {
-        await preloadSpaceSection("social");
-        navigate(spaceChatPath(spaceId));
-      } else if (tile.id === "file") {
-        picker.current?.click();
-      } else {
-        await preloadSpaceSection("code");
-        navigate(`${base}/code`);
-      }
+      await createSpaceItem(
+        spaceId,
+        tile.id,
+        navigate,
+        () => picker.current?.click(),
+        onCreated,
+      );
     } catch {
       setError(`Couldn't make a new ${tile.label.toLowerCase()}. Try again.`);
     } finally {
@@ -90,11 +74,9 @@ export function MakeSomethingNew({
   return (
     <section aria-label="Create" className="flex flex-col gap-3">
       <h2 className="m-0 text-sm font-normal text-cream-muted">Create</h2>
-      <input
+      <FileInput
         ref={picker}
-        type="file"
         multiple
-        hidden
         aria-hidden
         tabIndex={-1}
         onChange={(event) => void upload(Array.from(event.target.files ?? []))}

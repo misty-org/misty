@@ -1,4 +1,3 @@
-import { inheritProviderBrowser } from "./browserProviders";
 import { MistyBrowserUrlSchema } from "@/shared/schemas";
 import { allLayoutPanes } from "@/features/workspace/layoutTabs";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
@@ -20,9 +19,7 @@ export function openBrowserPopup(payload: {
     .find((tab) => tab.id === sourceTabId);
   if (!source) return null;
   // A live, registered browser owns this popup regardless of its App's type.
-  // Adopt the original native window to retain its opener and account profile.
+  // Adopt the original native window to retain its opener.
   if (url.data === "about:blank" && !payload.popupInstanceKey) return null;
-  const tab = store.openBrowserView({ url: url.data, sourceViewId: sourceTabId });
-  if (tab) inheritProviderBrowser(tab.id, payload.sourceId, url.data, payload.popupInstanceKey);
-  return tab;
+  return store.openBrowserView({ url: url.data, sourceViewId: sourceTabId });
 }

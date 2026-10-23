@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
+import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
 
 interface HeldQuit {
   unsaved: number;

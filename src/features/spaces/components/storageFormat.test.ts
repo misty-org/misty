@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatStorageBytes } from "../components/spacePanel/storageFormat";
+import { formatStorageBytes } from "./storageFormat";
 
 describe("formatStorageBytes", () => {
   it("formats storage in the decimal units the plan quotas are defined in", () => {
