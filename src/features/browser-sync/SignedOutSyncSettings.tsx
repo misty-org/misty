@@ -6,7 +6,7 @@ import {
 } from "@/features/settings/desktop";
 
 /** Sync while nobody is signed in: what it would do, a way in, and where things are kept now
- * (docs/design/no-account-browsing/BRIEF.md). */
+ * (docs/browser/no-account.md). */
 export function SignedOutSyncSettings() {
   return (
     <>

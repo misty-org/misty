@@ -23,7 +23,7 @@ const (
 )
 
 // Layer is the permission layer a tool touches
-// (docs/design/spaces-as-profiles/BRIEF.md#private-and-public). Public tools
+// (docs/spaces/as-profiles.md#private-and-public). Public tools
 // read and change the Space's shared items, which the database still filters
 // to "public, or owned by the viewer". Private tools reach a person's own
 // trees: memory, devices, connected apps, private chats and agent settings.

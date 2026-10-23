@@ -1,6 +1,9 @@
 # Agent browser actions: a catalog, obstacles and a vision fallback
 
-October 21, 2026. Draft for approval. Builds on [agent-harness.md](agent-harness.md)
+Status: draft for approval (2026-10-21)
+Graduates to: docs/agents/
+
+October 21, 2026. Draft for approval. Builds on [agent-harness.md](../agents/harness.md)
 (`browser_run`, the page API and the page layer). It absorbs the October 19 draft on what an agent
 can do on a page (real input and the cursor, below).
 

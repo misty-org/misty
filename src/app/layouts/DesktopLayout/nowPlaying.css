@@ -1,4 +1,4 @@
-/* The media player in the tab sidebar (docs/design/media-controls).
+/* The media player in the tab sidebar (docs/browser/media-controls.md).
    Monochrome; the only color is the page's own artwork. */
 .misty-now-playing-card {
   display: grid;

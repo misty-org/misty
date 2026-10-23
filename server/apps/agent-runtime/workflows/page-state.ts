@@ -6,7 +6,7 @@ import type { AgentRun } from "./agent-run.js";
 /**
  * Pushed page state (src/opened-pages.ts): the pages this turn opened, shown before the
  * next turn, so the agent acts on them instead of spending a turn asking for each. A run
- * with browser_run reads pages in its programs instead (docs/plans/agent-harness.md, browser_run).
+ * with browser_run reads pages in its programs instead (docs/agents/harness.md, browser_run).
  */
 export async function pushOpenedPages(run: AgentRun, toolResults: unknown, messages: ModelMessage[]) {
   const { catalog } = run.tools;

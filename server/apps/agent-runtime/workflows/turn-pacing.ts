@@ -78,7 +78,7 @@ export function logToolChange(run: AgentRun, lastToolKey: string): string {
   return toolKey;
 }
 
-/** What the first turn carries (docs/plans/agent-harness.md, Context): the fixed cost of every turn. */
+/** What the first turn carries (docs/agents/harness.md, Context): the fixed cost of every turn. */
 export function logContextBreakdown(run: AgentRun, messages: ModelMessage[]) {
   const { catalog, instructions } = run.tools;
   // The tools this turn sends, not the whole catalog: the rest wait behind agent_tool_use and loads.

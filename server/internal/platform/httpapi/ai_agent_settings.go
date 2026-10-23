@@ -85,7 +85,7 @@ func (s *AIService) AgentSitesSetting() http.HandlerFunc {
 }
 
 // KeepAwakeSetting changes whether a computer stays awake while an agent works
-// on it (docs/design/devices/BRIEF.md).
+// on it (docs/sync/devices.md).
 func (s *AIService) KeepAwakeSetting() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)

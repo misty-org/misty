@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Steps an agent learned from running a saved workflow (docs/plans/agent-harness.md,
+// Steps an agent learned from running a saved workflow (docs/agents/harness.md,
 // Workflows as memory). They belong to the agent, apart from the person's request, and are kept as
 // versions so a worse version can be set aside without losing the one before.
 

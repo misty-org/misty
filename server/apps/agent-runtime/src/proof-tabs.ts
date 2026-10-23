@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai";
 
-// Proof tabs (docs/plans/agent-harness.md, Completion). Odysseys asks for pages "kept open"
+// Proof tabs (docs/agents/harness.md, Completion). Odysseys asks for pages "kept open"
 // as proof in most of its tasks, and those items failed most often: the agent read the page with
 // a fetch, closed the tab, or left it on a generic page or behind a dialog. When the request asks
 // for pages left open, the first finish goes back once, unless the agent has just listed its
@@ -50,7 +50,7 @@ const errorPage = /\b404\b|page not found|not found|can.?t (find|locate)|no long
 
 /**
  * Kept tabs (browser_run's keep()) that end on an error or empty page, from the run's latest
- * program results (docs/plans/agent-harness.md, Completion): the proof the person asked to see
+ * program results (docs/agents/harness.md, Completion): the proof the person asked to see
  * must show the page, not "We Can't Find That Page".
  */
 export function brokenProofTabs(messages: ModelMessage[]): string[] {

@@ -1,7 +1,7 @@
 /**
  * What an agent may do in an attached browser tab: read it as an
  * accessibility tree, act on it by ref, wait without acting, and fall back to
- * browser_act's screen agent for visual work (docs/plans/agent-harness.md, Page layer).
+ * browser_act's screen agent for visual work (docs/agents/harness.md, Page layer).
  */
 export const browserTabAgentCapabilities = [
   "browser.inspect",

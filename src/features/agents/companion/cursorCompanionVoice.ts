@@ -72,7 +72,7 @@ export class CursorCompanionVoice {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
       // Every spoken request carries every display, the cursor's first; the
-      // run decides what matters (docs/plans/agent-harness.md, Tool surface).
+      // run decides what matters (docs/agents/harness.md, Tool surface).
       s.captures = [];
       // Looked up when the shortcut went down; a turn without one reads it now.
       const media =

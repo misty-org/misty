@@ -8,7 +8,7 @@
 //!   Space's incognito windows share one temporary session, erased when the last closes.
 //!
 //! Agents have no windows of their own; their tabs live in the person's window
-//! (docs/design/agent-browser/BRIEF.md, "What goes away").
+//! (docs/agents/browser.md, "What goes away").
 //!
 //! The current Space is kept here, natively, and changes only through
 //! [`switch_space`]; it is never taken from anything a renderer sends. Which Spaces exist,

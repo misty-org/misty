@@ -8,7 +8,7 @@ import { useLessonStore } from "./lessonStore";
 /**
  * Keeps lessons in step with their chats: each finished Teach reply updates its
  * lesson, and a reply that starts or resumes a different lesson moves its turn
- * into that lesson's chat (docs/design/agents-at-cursor/BRIEF.md, revision 4).
+ * into that lesson's chat (docs/agents/cursor-companion.md, revision 4).
  */
 export function followLessons(accountId: string): () => void {
   void useLessonStore.getState().load(accountId);

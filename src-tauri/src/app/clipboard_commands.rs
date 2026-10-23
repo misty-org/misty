@@ -1,5 +1,5 @@
 //! The shared clipboard as the browser's popover shows it
-//! (docs/design/clipboard/BRIEF.md). Clips are opened natively; the webview
+//! (docs/sync/clipboard.md). Clips are opened natively; the webview
 //! only sees what this device could already paste. Library items are copied to
 //! the system clipboard as files.
 #![cfg(desktop)]

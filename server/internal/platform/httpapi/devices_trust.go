@@ -11,7 +11,7 @@ import (
 )
 
 // Devices: admission, signed list, policies, names and removal
-// (docs/design/devices/BRIEF.md). Every change that affects trust carries a
+// (docs/sync/devices.md). Every change that affects trust carries a
 // signature the server checks but cannot produce.
 
 // DeviceTrust returns what clients verify against: the vault root public key

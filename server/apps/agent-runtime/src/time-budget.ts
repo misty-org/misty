@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai";
 
-// The person's time (docs/plans/odysseys-campaign.md). A run that is right but slow still fails
+// The person's time (docs/agents/evals/odysseys.md). A run that is right but slow still fails
 // the person waiting on it, and how slow is too slow depends on the task: a quick lookup should
 // take a few minutes, deep research much longer. The agent says how long the task should take
 // with its first checklist (`minutes`); the budget follows that estimate, ten minutes when it

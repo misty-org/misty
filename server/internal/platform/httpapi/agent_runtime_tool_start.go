@@ -15,7 +15,7 @@ import (
 )
 
 // The runtime sends no "running" checkpoint for a read-only call
-// (docs/plans/agent-harness.md, Device jobs). The call is
+// (docs/agents/harness.md, Device jobs). The call is
 // announced here when it arrives instead, which saves the runtime a durable
 // step and a round trip per read. Writes keep their own start checkpoint.
 //

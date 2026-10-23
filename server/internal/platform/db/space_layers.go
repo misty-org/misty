@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Private and public layers (docs/design/spaces-as-profiles/BRIEF.md#private-and-public).
+// Private and public layers (docs/spaces/as-profiles.md#private-and-public).
 // A Space item is public or private. A private item opens only for its owner,
 // and for the owner's own agents on runs the owner asked for. The RLS policies
 // say "public, or owned by the viewer"; queries that run as the service say

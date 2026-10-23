@@ -23,7 +23,7 @@ export function openSignOutSheet() {
  * Signing out keeps browsing: sync, Spaces and agents stop on this device, and the window
  * goes on with the personal Space's tabs, bookmarks, passwords and history, which belong to
  * no account again. Removing them is a choice, off by default
- * (docs/design/no-account-browsing/BRIEF.md, decision 2).
+ * (docs/browser/no-account.md, decision 2).
  */
 export function SignOutSheet() {
   const open = useSignOutSheetStore((state) => state.open);

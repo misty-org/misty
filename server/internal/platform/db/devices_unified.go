@@ -12,7 +12,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// Unified devices (docs/design/devices/BRIEF.md). Signatures are verified by the
+// Unified devices (docs/sync/devices.md). Signatures are verified by the
 // HTTP layer before any of these run; these functions keep the account's
 // device records, signed list, policies and admission requests consistent.
 

@@ -1,6 +1,6 @@
 // Right after browser work, the agent's next browser step usually follows
 // within seconds. The worker then holds its next claim open on the server
-// (docs/plans/agent-harness.md, Device jobs) so the job is
+// (docs/agents/harness.md, Device jobs) so the job is
 // handed over the moment it is queued, instead of after a notification
 // reaches this device and it asks again. Notifications stay the fallback.
 export const heldClaimWaitMs = 25_000;

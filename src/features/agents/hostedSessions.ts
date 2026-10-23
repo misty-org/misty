@@ -122,7 +122,7 @@ export async function startHostedSession(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
 ): Promise<Record<string, unknown>> {
-  // An agent's tabs live in the person's window (docs/design/agent-browser/BRIEF.md).
+  // An agent's tabs live in the person's window (docs/agents/browser.md).
   const config = (job.config ?? {}) as { agentId?: unknown };
   const input = (job.input ?? {}) as {
     url?: unknown;

@@ -1,4 +1,4 @@
-/* The agent browser (docs/design/agent-browser/BRIEF.md): the split beside the chat and its PiP.
+/* The agent browser (docs/agents/browser.md): the split beside the chat and its PiP.
    The split is a small copy of Misty's browser: a horizontal tab strip, a toolbar row (travel,
    address, actions) and a rounded page. Monochrome; status is a word. */
 

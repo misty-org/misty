@@ -21,7 +21,7 @@ import (
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
-// Unified devices (docs/design/devices/BRIEF.md): admission needs a session AND
+// Unified devices (docs/sync/devices.md): admission needs a session AND
 // a vault-root signature; trust records are signed by keys the server never holds.
 
 type deviceFixture struct {

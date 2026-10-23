@@ -143,7 +143,7 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 }
 
 // remoteSessionScopeTx reports whether a scope is a tab of the agent's own that
-// this device opened for a run (docs/plans/odysseys-campaign.md): returned
+// this device opened for a run (docs/agents/evals/odysseys.md): returned
 // by a completed browser.session job on this device, or by a sub-agent's
 // browser.spawn_tabs job whose parent was such a tab. The proof is the job's
 // stored output, never anything the request says about the tab.

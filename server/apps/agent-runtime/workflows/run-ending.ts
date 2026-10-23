@@ -35,7 +35,7 @@ export async function endRun<T>(
   // answered directly) is a reply, with nothing to confirm. Any run that acted
   // must still confirm its outcome with agent_finish.
   const acted = result.steps.some((step) => step.content.some((part) => part.type.startsWith("tool-")));
-  // How runs end (docs/plans/agent-harness.md, Completion): most Odysseys runs ended as partial or unreported.
+  // How runs end (docs/agents/harness.md, Completion): most Odysseys runs ended as partial or unreported.
   console.log(`[misty-agent-runtime] run_finish ${JSON.stringify({ run: run.identity.mistyRunId, turns: run.modelTurn, reported: Boolean(taskReport), outcome: taskReport?.outcome, remaining: taskReport?.remaining.map((item) => item.requirement.slice(0, 120)), acted, plainText: !taskReport && Boolean(text) })}`);
   if (!taskReport && !acted && text) return await finish({ status: "success", text });
   const outcome = taskCompletionOutcome(taskReport);

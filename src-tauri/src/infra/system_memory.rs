@@ -1,4 +1,4 @@
-//! How short the computer is of memory, for agents' live pages (docs/design/agent-browser/BRIEF.md,
+//! How short the computer is of memory, for agents' live pages (docs/agents/browser.md,
 //! "Memory"): Misty keeps as many agent pages rendered as the system can spare, and under pressure
 //! views take turns instead of failing or meeting a limit.
 

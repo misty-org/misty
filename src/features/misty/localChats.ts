@@ -6,7 +6,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
  * Agent chats live on this device, like Claude Code and Codex
- * (docs/design/agent-chats-local/BRIEF.md): each conversation, with its messages and
+ * (docs/agents/chats-local.md): each conversation, with its messages and
  * timelines, is one document in misty.db, and so is each folder. The server only runs
  * a chat's turns, so this device sends each turn the history it keeps.
  */

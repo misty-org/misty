@@ -140,7 +140,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
       for (const message of steering.messages) messages.push({ role: "user", content: message.text });
       if (steering.paused) messages = await waitOutTakeover(run, messages, pacing);
       messages = await condense(messages, { inputTokens: lastInputTokens, sentBytes: lastSentBytes, window }, condensers);
-      // Where a long run's context goes (docs/plans/agent-harness.md, "Context"): the largest parts, every 5 turns.
+      // Where a long run's context goes (docs/agents/harness.md, "Context"): the largest parts, every 5 turns.
       if (modelTurn % 5 === 4) console.log(`[misty-agent-runtime] context_parts ${JSON.stringify({ run: identity.mistyRunId, turn: modelTurn, ...contextParts(messages) })}`);
       const observed = toolState(messages, run.tools.toolsets.initial);
       if (observed.seen || !toolsetState.seen) toolsetState = observed;

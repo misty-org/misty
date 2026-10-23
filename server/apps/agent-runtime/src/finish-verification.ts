@@ -8,7 +8,7 @@ import { researchUse, type ResearchTools } from "./research-budget.js";
 import { ledgerIssue, type LedgerRow } from "./ledger.js";
 import type { TaskCompletion } from "./task-completion.js";
 
-// One verification turn before a finish stands (docs/plans/agent-harness.md, Completion). Until October 20
+// One verification turn before a finish stands (docs/agents/harness.md, Completion). Until October 20
 // each guard sent a finish back on its own: unread citations, unbacked claims, proof tabs, the
 // requirements review, a plain answer that skipped the last refusal, and early give-ups up to
 // eight times. Stacked, they kept short questions working after their answer was written: an
@@ -56,7 +56,7 @@ export function finishFindings(check: FinishCheck): { issues: string[]; gaveUp: 
   if (unbacked) issues.push(unbacked);
   const proof = check.tabList || check.program ? proofTabsRefusal(check.request, check.messages, check.tabList, check.program) : undefined;
   if (proof) issues.push(proof);
-  // Checked on evidence, without a model call (docs/plans/agent-harness.md, Completion).
+  // Checked on evidence, without a model call (docs/agents/harness.md, Completion).
   const broken = brokenProofTabs(check.messages);
   if (broken.length)
     issues.push(`Pages you kept as proof show an error or nothing: ${broken.join("; ")}. Open each page again from a search or the site's own links, keep() the working page, and close or replace the broken one.`);

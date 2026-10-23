@@ -21,7 +21,7 @@ const maxChildTabs = 4;
 
 /**
  * browser.spawn_tabs: opens one browser tab per sub-agent for the running task
- * (docs/plans/agent-harness.md, Sub-agents and the notebook). Each tab is bound to the task's
+ * (docs/agents/harness.md, Sub-agents and the notebook). Each tab is bound to the task's
  * lease, so Stop and takeover end the sub-agents too, and this device signs
  * each sub-agent's grant itself: the server only carries it.
  */

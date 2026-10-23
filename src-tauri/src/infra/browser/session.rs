@@ -45,7 +45,7 @@ impl Default for BrowserSessionState {
 pub(super) struct BrowserSession {
     pub(super) agent_input_locked: bool,
     // An agent's tab while its run goes on: the ring stays even when the person has taken it
-    // over and the lock is off (docs/design/agent-browser/BRIEF.md).
+    // over and the lock is off (docs/agents/browser.md).
     pub(super) agent_ring: bool,
     pub(super) workspace_tab_id: Option<String>,
     // Native auxiliary windows stay attached to this live integration view.
@@ -68,7 +68,7 @@ pub(super) struct BrowserSession {
     /// Private tabs keep no download list and share one throwaway data store.
     pub(super) private: bool,
     /// The agent run a tab works for, when an agent opened it in the person's window
-    /// (docs/design/agent-browser/BRIEF.md): the benchmark pictures each run's own tabs.
+    /// (docs/agents/browser.md): the benchmark pictures each run's own tabs.
     pub(super) agent_run_id: Option<String>,
 }
 

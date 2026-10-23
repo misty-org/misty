@@ -58,7 +58,7 @@ func nativeAgentInvocationPolicy(ctx context.Context, database *db.Database, inv
 	}
 	// browser.run opens and works the agent's own tabs, so it needs the computer the run was sent
 	// from, not a tab already attached: offered from the first turn, the model starts with it
-	// instead of reaching for the step tools (docs/plans/agent-harness.md, Tool surface).
+	// instead of reaching for the step tools (docs/agents/harness.md, Tool surface).
 	if descriptor.Name == browserRunTool {
 		contexts, err := database.AIInvocationContexts(ctx, record.UserID, record.ID)
 		if err != nil {

@@ -1,4 +1,4 @@
-//! The agent hotkeys while nobody is signed in (docs/design/no-account-browsing/BRIEF.md):
+//! The agent hotkeys while nobody is signed in (docs/browser/no-account.md):
 //! the companion chord and the dictation key open the sign-in sheet instead of an agent.
 //! They are armed only when Input Monitoring is already granted, so browsing without an
 //! account never brings up a permission prompt.

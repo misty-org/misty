@@ -10,7 +10,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// Saved workflows (memory.workflow, docs/plans/agent-harness.md, Workflows as memory) are owned
+// Saved workflows (memory.workflow, docs/agents/harness.md, Workflows as memory) are owned
 // by one agent and stored as methods. The agent reads a workflow's rendered
 // instructions and follows them in its current run, so a workflow never starts a
 // second run or grants a tool. Each has two owners: the person's request, which

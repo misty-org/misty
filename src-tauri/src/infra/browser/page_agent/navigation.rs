@@ -44,7 +44,7 @@ pub(in crate::infra::browser) async fn mark_document(app: &AppHandle, id: &str) 
 
 /// The page a navigation lands on, once its document has loaded and gone quiet, as the
 /// model reads it: the agent sees the new page in the same step instead of guessing its
-/// next look (docs/plans/odysseys-campaign.md). None when the page never answered.
+/// next look (docs/agents/evals/odysseys.md). None when the page never answered.
 ///
 /// With the old document's `mark`, a page counts as landed only when another document
 /// replaced it, or the same one moved to the target (a fragment). A bot check that passes

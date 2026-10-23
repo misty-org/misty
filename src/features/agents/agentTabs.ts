@@ -17,7 +17,7 @@ import { agentPageBounds, restoredAgentTabs, type AgentTab } from "./agentTabRec
 export { agentPageBounds, type AgentTab };
 
 /**
- * An agent's tabs in the person's window, which sleep (docs/design/agent-browser/BRIEF.md,
+ * An agent's tabs in the person's window, which sleep (docs/agents/browser.md,
  * "Memory"). Only the page an agent is acting on stays rendered; a tab it moved on from sleeps:
  * its address and title are kept, and its page closes through the one close path
  * (browser_webview_sleep → close_browser_webview), so its WebKit process goes too. A job on a
@@ -42,7 +42,7 @@ let timer: ReturnType<typeof setInterval> | undefined;
 /** The tab the person is looking at in the split, which never sleeps. */
 let shownScope: string | undefined;
 /**
- * Tabs a run kept as proof (browser_run's keep(), docs/plans/agent-harness.md, Completion): pages
+ * Tabs a run kept as proof (browser_run's keep(), docs/agents/harness.md, Completion): pages
  * the person asked to leave open. They stay awake when idle and when the run ends, so they show
  * at the end; only memory pressure puts them to sleep.
  */

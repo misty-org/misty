@@ -15,7 +15,7 @@ export async function executeWorkflowNodeOnDevice(
   signal.throwIfAborted();
   // Every job carries the run grant the asking device signed. This device
   // checks it natively before acting; the server only carried it, and cannot
-  // widen it (docs/design/devices/BRIEF.md).
+  // widen it (docs/sync/devices.md).
   try {
     await devicesNative.verifyJob(job.operation, job.scopeId, job.config);
   } catch {

@@ -12,7 +12,7 @@ import (
 
 // screen.close closes one of the agent's own extra tabs: a sign-in page, a duplicate or a
 // page the person did not ask to keep, so the tabs left open at the end are the ones the
-// request named (docs/plans/odysseys-campaign.md). The run's first tab stays; it is the
+// request named (docs/agents/evals/odysseys.md). The run's first tab stays; it is the
 // session's, and the agent navigates it instead.
 const screenCloseTool = "screen.close"
 

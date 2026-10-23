@@ -1,6 +1,6 @@
 import type { TaskCompletion } from "./task-completion.js";
 
-// Long requests need persistence (docs/plans/odysseys-campaign.md): the first Odysseys
+// Long requests need persistence (docs/agents/evals/odysseys.md): the first Odysseys
 // batch finished "partial" after a minute or two with most of each run's turns unused,
 // usually right after one page or tool failed. A long request's partial or blocked finish is
 // sent back as part of the run's one verification turn (src/finish-verification.ts) while ten or

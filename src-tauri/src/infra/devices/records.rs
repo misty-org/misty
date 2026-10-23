@@ -1,5 +1,5 @@
 //! Signed device records as JSON arrays led by their domain string
-//! (docs/design/devices/BRIEF.md). Records travel as their exact signed bytes;
+//! (docs/sync/devices.md). Records travel as their exact signed bytes;
 //! nothing here re-serializes a record it verifies.
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};

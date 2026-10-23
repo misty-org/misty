@@ -1,7 +1,7 @@
 #import <CoreGraphics/CoreGraphics.h>
 
 // Misty's control mist: a soft white fog inside the edges of whatever an agent
-// controls (docs/design/agents-at-cursor/BRIEF.md), and a pulse where it acts.
+// controls (docs/agents/cursor-companion.md), and a pulse where it acts.
 // Drawings only; they never take input, nothing is drawn outside the frame,
 // and captures leave them out so the agent sees the content underneath.
 // Rects and points are global display coordinates with a top-left origin.

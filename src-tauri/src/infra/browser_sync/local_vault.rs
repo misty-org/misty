@@ -1,5 +1,5 @@
 //! The local vault: the personal vault of a device with no synced one open, because
-//! nobody is signed in or sync is not set up (docs/design/no-account-browsing/BRIEF.md).
+//! nobody is signed in or sync is not set up (docs/browser/no-account.md).
 //! It is the same encrypted store and records as a synced vault, with a root made on this
 //! device and kept in Misty's credential store, and a worker that never connects. Saved
 //! passwords live in it, so they work without an account.

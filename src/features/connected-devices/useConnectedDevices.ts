@@ -19,7 +19,7 @@ import {
 } from "./connectedDeviceModel";
 
 /**
- * The account's devices (docs/design/devices/BRIEF.md): added once, then
+ * The account's devices (docs/sync/devices.md): added once, then
  * trusted for sync, agents and the shared clipboard through the root-signed
  * list. Everything between devices goes through the server; presence comes
  * from native events and nothing here polls.

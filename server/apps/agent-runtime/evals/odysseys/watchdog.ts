@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-// The progress watch (docs/plans/odysseys-campaign.md). Odysseys tasks are long on purpose, so no
+// The progress watch (docs/agents/evals/odysseys.md). Odysseys tasks are long on purpose, so no
 // clock ends a run. Every few minutes the eval looks at what the run did since its last look:
 // - progressing: a result it had not produced before (a new page, new data, a changed page);
 // - looping: tool calls whose results all repeat earlier ones, for `loopChecks` looks in a row;

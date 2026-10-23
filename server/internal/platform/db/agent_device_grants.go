@@ -33,14 +33,14 @@ var deviceAgentCapabilities = map[string]bool{
 	"browser.downloads.list": true, "browser.upload": true, "browser.act": true, "browser.confirm_high_risk": true,
 	"browser.snapshot": true, "browser.find": true, "browser.extract": true, "browser.wait_for": true, "browser.steps": true, "browser.fill_form": true, "browser.skill": true, "browser.spawn_tabs": true,
 	"browser.tab.list": true, "browser.tab.open": true, "bookmark.list": true, "bookmark.add": true,
-	// Reads one public page without cookies (docs/plans/agent-harness.md, Reading without a screen).
+	// Reads one public page without cookies (docs/agents/harness.md, Reading without a screen).
 	"web.fetch": true,
-	// Opens the agent's own browser session on the sending computer (docs/plans/odysseys-campaign.md).
+	// Opens the agent's own browser session on the sending computer (docs/agents/evals/odysseys.md).
 	"browser.session": true,
-	// Runs the agent's program against its own tabs there (docs/plans/agent-harness.md, browser_run).
+	// Runs the agent's program against its own tabs there (docs/agents/harness.md, browser_run).
 	"browser.run": true,
 	// Coding in a project on the chat's own computer, through the person's own
-	// coding tool (docs/plans/coding-runner-capabilities.md).
+	// coding tool (docs/agents/coding-tools.md).
 	"code.delegate": true,
 }
 

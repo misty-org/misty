@@ -80,7 +80,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               onCreate={create}
             />
           </div>
-          {/* The agent's own browser beside the chat (docs/design/agent-browser/BRIEF.md). */}
+          {/* The agent's own browser beside the chat (docs/agents/browser.md). */}
           <AgentBrowser
             key={activeConversationId ?? ""}
             conversationId={activeConversationId ?? undefined}

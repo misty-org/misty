@@ -12,7 +12,7 @@ import type { AgentDevice } from "../model/types";
 import { ManagedAiRequestError } from "@/api/ai/managed";
 import { isSpaceWindowLabel } from "@/features/workspace/spaceWindow";
 
-// One device identity (docs/design/devices/BRIEF.md). The device key lives in
+// One device identity (docs/sync/devices.md). The device key lives in
 // native code only: this module never sees private key material. It asks the
 // native side to register the device and to sign each device request.
 

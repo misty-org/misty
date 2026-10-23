@@ -10,7 +10,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// Text-first browser tools (docs/plans/agent-harness.md, Page layer). The page
+// Text-first browser tools (docs/agents/harness.md, Page layer). The page
 // is read as an accessibility tree with refs, and acted on by ref through the
 // device's native input; browser_act remains for visual work.
 const (

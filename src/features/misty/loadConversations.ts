@@ -31,7 +31,7 @@ export function createLoadConversations(
       conversationsLoading: true,
     });
     try {
-      // Chats live on this device (docs/design/agent-chats-local/BRIEF.md). Its copy
+      // Chats live on this device (docs/agents/chats-local.md). Its copy
       // paints first when nothing is loaded yet; the server's newer turns merge in after.
       const response = localChats.available()
         ? await localChats

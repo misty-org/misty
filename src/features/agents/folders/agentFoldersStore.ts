@@ -34,7 +34,7 @@ const setConversationFolder = (
 
 /**
  * The agent folders on this device. Folders group chats, and chats live on the device
- * that keeps them (docs/design/agent-chats-local/BRIEF.md), so folders do too. The
+ * that keeps them (docs/agents/chats-local.md), so folders do too. The
  * account's folders from before are copied once.
  */
 export const useAgentFoldersStore = create<AgentFoldersStore>((set, get) => ({

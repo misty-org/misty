@@ -1,4 +1,4 @@
-//! `web.fetch` on the person's device (docs/plans/agent-harness.md, Reading without a screen):
+//! `web.fetch` on the person's device (docs/agents/harness.md, Reading without a screen):
 //! one public page, fetched without cookies or saved sign-ins, so an agent can
 //! read what a search found without opening a screen. Every hop is checked
 //! before connecting: http or https, no credentials in the address, and a host

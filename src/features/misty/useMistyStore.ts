@@ -69,7 +69,7 @@ export const useMistyStore = create<MistyState>((set, get) => ({
   submitAnswer: createSubmitAnswer(set, get),
 }));
 
-// Every change to a chat is saved on this device (docs/design/agent-chats-local/BRIEF.md).
+// Every change to a chat is saved on this device (docs/agents/chats-local.md).
 persistLocalChats((listener) => useMistyStore.subscribe(listener));
 
 startRunReconciler(useMistyStore);

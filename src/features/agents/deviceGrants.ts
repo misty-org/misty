@@ -13,7 +13,7 @@ const folderCapabilities = ["folder.list", "folder.read", "folder.send"];
  * read-only folders do. */
 export const projectCapabilities = [...folderCapabilities, "code.delegate"];
 /** The agent may open its own browser session on this computer: a hidden tab of its
- * own that joins the run (docs/plans/odysseys-campaign.md). */
+ * own that joins the run (docs/agents/evals/odysseys.md). */
 const workspaceCapabilities = [
   "browser.tab.list",
   "browser.tab.open",
@@ -21,7 +21,7 @@ const workspaceCapabilities = [
   "bookmark.add",
   "web.fetch",
   "browser.session",
-  // Programs against the agent's own tabs (docs/plans/agent-harness.md, browser_run).
+  // Programs against the agent's own tabs (docs/agents/harness.md, browser_run).
   "browser.run",
 ];
 

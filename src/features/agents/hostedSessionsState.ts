@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * The agent's own browser sessions on this computer (docs/plans/odysseys-campaign.md):
+ * The agent's own browser sessions on this computer (docs/agents/evals/odysseys.md):
  * a hidden tab of the agent's own that joins the run. This computer signed the run's
  * grant itself, and the job worker checked it before calling here; a grant another
  * device signed is refused. Each session holds its own native lease,

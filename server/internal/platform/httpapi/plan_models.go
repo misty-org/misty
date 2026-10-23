@@ -75,7 +75,7 @@ func planTurnLimit(ctx context.Context, database *db.Database, user string) int 
 
 // evalTurnLimit is the plan's turn limit, or a development eval's own (at most 200) where the
 // stack allows client model choice. Evals compare against benchmarks run with long step budgets
-// (docs/plans/odysseys-campaign.md).
+// (docs/agents/evals/odysseys.md).
 func evalTurnLimit(requested, plan int) int {
 	if requested <= 0 || !agent.ClientModelChoice() {
 		return plan

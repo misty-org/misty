@@ -1,5 +1,5 @@
 //! Voice: dictation into any app, captures, and screen recordings.
-//! Docs: docs/design/voice-memory/BRIEF.md.
+//! Docs: docs/voice-memory/README.md.
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
 pub mod dictation;

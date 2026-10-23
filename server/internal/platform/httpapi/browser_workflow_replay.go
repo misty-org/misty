@@ -9,7 +9,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// Cached workflow replays (docs/plans/agent-harness.md, Workflows as memory). A workflow
+// Cached workflow replays (docs/agents/harness.md, Workflows as memory). A workflow
 // run whose every effect was a browser action is saved with each control named
 // by locator; the next run of that workflow replays it before calling a model.
 

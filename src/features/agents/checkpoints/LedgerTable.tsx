@@ -20,7 +20,7 @@ function verb(row: LedgerRow) {
 }
 
 /**
- * How a run that did not finish ends when it kept a ledger (docs/plans/agent-checkpoints.md):
+ * How a run that did not finish ends when it kept a ledger (docs/agents/checkpoints.md):
  * the parts still open, each with the action it needs, over a count of what is done. Resuming
  * works only the open parts; the finished ones are never done again.
  */

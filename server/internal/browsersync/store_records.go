@@ -19,7 +19,7 @@ const (
 	syncRecordTombstoneDays = 30
 )
 
-// The shared clipboard (docs/design/clipboard/BRIEF.md) is a small ring of
+// The shared clipboard (docs/sync/clipboard.md) is a small ring of
 // sealed clips in its own collection: a few larger records that expire after
 // a day. Only devices whose signed policy turns the clipboard on reach it.
 const (

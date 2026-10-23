@@ -1,6 +1,6 @@
 /* Interim replies fold into one quiet disclosure above the turn's answer. */
 /* Progress: what Misty said while working, and each run of tools as one quiet
-   line that opens to a table of its steps (docs/design/agent-chat).
+   line that opens to a table of its steps (docs/agents/mockups/chat.html).
    State is shown with motion, a word and an icon; color only for waiting and failed. */
 .agent-progress {
   display: grid;

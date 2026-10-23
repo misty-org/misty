@@ -1,6 +1,6 @@
 # Design: Misty Agents
 
-Agents opens straight into the selected agent's New task conversation. Conversations themselves follow [docs/design/agent-chat](../../../docs/design/agent-chat/); the companion has its own [DESIGN.md](companion/DESIGN.md). This file covers the Agents page around them.
+Agents opens straight into the selected agent's New task conversation. Conversations themselves follow [docs/agents/mockups/chat.html](../../../docs/agents/mockups/chat.html/); the companion has its own [DESIGN.md](companion/DESIGN.md). This file covers the Agents page around them.
 
 ## Colors
 

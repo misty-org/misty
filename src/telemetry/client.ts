@@ -31,7 +31,7 @@ export class PostHogTelemetryClient implements TelemetryClient {
     TELEMETRY_DEFAULTS.analyticsEnabled,
   );
   private errorEnabled = readBoolean(errorPreferenceKey, TELEMETRY_DEFAULTS.errorReportingEnabled);
-  // Browsing without an account sends nothing (docs/design/no-account-browsing/BRIEF.md).
+  // Browsing without an account sends nothing (docs/browser/no-account.md).
   private accountPresent = false;
   private pendingIdentity: { userId: string; properties: SafeUserProperties } | null = null;
   // Identity and repeated errors are sent once: re-applying settings or an

@@ -10,7 +10,7 @@ import (
 )
 
 // A device that is running an agent's browser work holds its next claim open
-// for a short while (docs/plans/agent-harness.md,
+// for a short while (docs/agents/harness.md,
 // Device jobs). The next job of the run is handed over the moment it is queued,
 // instead of after a notification reaches the device and it asks again.
 // The claim, its lease and every check are the ordinary queue's; when the

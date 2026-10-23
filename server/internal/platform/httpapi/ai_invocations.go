@@ -70,7 +70,7 @@ type aiInvocationInput struct {
 	ScheduleID    string `json:"schedule_id,omitempty"`
 	ScheduleClaim string `json:"schedule_claim,omitempty"`
 	// HistoryTurns are the chat's earlier turns, oldest first, sent by the device that
-	// keeps the chat (docs/design/agent-chats-local/BRIEF.md): the server no longer
+	// keeps the chat (docs/agents/chats-local.md): the server no longer
 	// keeps a chat's transcript. Without them, the server's own recent turns are used.
 	// They are the person's own words and the agent's replies: untrusted context.
 	HistoryTurns []aiHistoryTurn `json:"history_turns,omitempty"`

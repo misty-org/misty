@@ -10,7 +10,7 @@ import releaseVariant from "@jitl/quickjs-wasmfile-release-sync";
 import wasmLocation from "@jitl/quickjs-wasmfile-release-sync/wasm?url";
 
 /**
- * A browser_run program's sandbox (docs/plans/agent-harness.md, browser_run): QuickJS compiled to
+ * A browser_run program's sandbox (docs/agents/harness.md, browser_run): QuickJS compiled to
  * WebAssembly, a separate JavaScript engine that sees nothing of the app, the network or files.
  * Its only ways out are `__op(name, json)`, which the host answers with a promise of JSON, and
  * `__log(text)`. A program that spins is interrupted at its deadline.

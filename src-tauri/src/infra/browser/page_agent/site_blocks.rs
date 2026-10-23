@@ -1,4 +1,4 @@
-//! Sites agents may read but never act on (docs/plans/agent-harness.md,
+//! Sites agents may read but never act on (docs/agents/harness.md,
 //! Page layer). Banking, brokerage, crypto and adult sites are blocked by default,
 //! as Claude in Chrome does; the account can turn that off and add its own
 //! sites. The device enforces this before any input reaches the page.

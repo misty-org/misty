@@ -1,6 +1,6 @@
 -- +goose Up
 -- Memory: what the person read, heard and recorded, kept for them alone
--- (docs/design/voice-memory/BRIEF.md). Events are owner-only and never
+-- (docs/voice-memory/README.md). Events are owner-only and never
 -- shared through a Space. A revisit of a page that barely changed points at
 -- the visit that holds its text (same_as) instead of storing it again.
 CREATE TABLE memory_events (

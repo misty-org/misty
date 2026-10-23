@@ -1,5 +1,5 @@
 //! Desktop control on Windows: Misty uses the person's apps with its own
-//! cursor (docs/design/agents-at-cursor/BRIEF.md), the counterpart of
+//! cursor (docs/agents/cursor-companion.md), the counterpart of
 //! `MistyDesktopControl.m`.
 //!
 //! The person's pointer and keyboard stay theirs: controls are pressed,

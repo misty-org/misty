@@ -43,7 +43,7 @@ fn main_only(view: &tauri::Webview) -> Result<(), String> {
     Ok(())
 }
 /// The profile id the app uses while nobody is signed in. Its recovery belongs to the
-/// device, so it opens without an account session (docs/design/no-account-browsing).
+/// device, so it opens without an account session (docs/browser/no-account.md).
 const LOCAL_PROFILE: &str = "local";
 
 /// The deployment a profile's recovery is filed under. A signed-in account must still hold

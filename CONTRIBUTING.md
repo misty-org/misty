@@ -24,10 +24,10 @@ component rather than adding a parallel one, and don't leave dead code behind.
 
 ## UI rules
 
-[AGENTS.md](AGENTS.md) holds the UI rules (the monochrome palette and its few exceptions,
-skeletons instead of loading text, settings layout, tabs in the sidebar, and so on). The
-approved design briefs it cites live in [docs/design](docs/README.md). Read both before changing
-a surface.
+[docs/ui](docs/ui/README.md) holds the shared UI rules (the monochrome palette and its few exceptions,
+skeletons instead of loading text, tabs in the sidebar, and so on). Each feature folder under
+[docs](docs/README.md) adds its own interface rules. Read the shared rules and the feature's README
+before changing a surface.
 
 ## Commits
 

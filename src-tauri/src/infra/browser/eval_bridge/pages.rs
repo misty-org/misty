@@ -1,5 +1,5 @@
 //! Every open page and its picture, for the Odysseys benchmark's judge (debug
-//! builds only; docs/plans/odysseys-campaign.md). The judge grades a run from a
+//! builds only; docs/agents/evals/odysseys.md). The judge grades a run from a
 //! screenshot of each step, so the benchmark captures the agent's own tabs as the
 //! run goes, without showing them or touching the agent's grants.
 use super::*;

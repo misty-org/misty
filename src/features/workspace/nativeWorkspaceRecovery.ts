@@ -111,7 +111,7 @@ export function continueWithTemporaryWorkspace(accountId: string, error: unknown
 /**
  * Opens a profile's saved windows and tabs. `keepLive` keeps what the window shows now and
  * saves it as that profile's instead: signing in adopts the local profile's tabs, and signing
- * out hands them back (docs/design/no-account-browsing/BRIEF.md). A record the profile had
+ * out hands them back (docs/browser/no-account.md). A record the profile had
  * is archived first, never lost.
  */
 export function restoreNativeWorkspace(accountId: string, keepLive = false): Promise<void> {

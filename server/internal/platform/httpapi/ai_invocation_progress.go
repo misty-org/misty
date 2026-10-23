@@ -46,7 +46,7 @@ func (s *AIService) InvocationProgress() http.HandlerFunc {
 
 // InvocationState returns only whether a request is still going. A device
 // running another device's browser session uses it to close the session when
-// the request is stopped (docs/design/devices/BRIEF.md).
+// the request is stopped (docs/sync/devices.md).
 func (s *AIService) InvocationState() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := s.requireUser(w, r)

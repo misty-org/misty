@@ -1,5 +1,5 @@
 //! One device key for sync trust, agents and the shared clipboard
-//! (docs/design/devices/BRIEF.md), kept in the credential store. The private
+//! (docs/sync/devices.md), kept in the credential store. The private
 //! key never leaves native code: every signature here prefixes an allow-listed
 //! domain, so one made for one purpose is never valid for another.
 use base64::{engine::general_purpose::STANDARD, Engine as _};

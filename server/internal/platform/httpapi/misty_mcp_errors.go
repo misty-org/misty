@@ -62,7 +62,7 @@ func mcpToolError(err error) *mcp.CallToolResult {
 		message = "The tool arguments are invalid."
 	} else if code := deviceFailureCode(err.Error()); code != "" {
 		// The device's own failure category is safe to show and tells the agent what to do next
-		// (docs/plans/agent-harness.md, Errors and budget); "could not complete" told it nothing.
+		// (docs/agents/harness.md, Errors and budget); "could not complete" told it nothing.
 		message = deviceFailureMessage(code)
 	} else if strings.Contains(err.Error(), "drawing_conflict") {
 		message = "The drawing changed since it was read. Call drawing_read again, then retry with its latest base_hash."

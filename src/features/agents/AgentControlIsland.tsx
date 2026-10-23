@@ -15,7 +15,7 @@ import { useAgentControlAutopilot } from "./useAgentControlAutopilot";
 import { useAgentControlDesktop } from "./useAgentControlDesktop";
 
 /**
- * The control island (docs/design/agents-at-cursor/BRIEF.md): the one place to
+ * The control island (docs/agents/cursor-companion.md): the one place to
  * see and steer what an agent is doing, at the bottom of the window. It shows
  * the task's status and sub-agents, takes a message that steers the task or
  * queues a new one, and holds Take over, Resume, Stop and Done. With no task
@@ -70,7 +70,7 @@ export function AgentControlIsland() {
 
   if (!execution) {
     // Agents working in tabs of their own show in their chat's agent browser and its picture
-    // (docs/design/agent-browser/BRIEF.md), not here; the island keeps only their questions.
+    // (docs/agents/browser.md), not here; the island keeps only their questions.
     if (!questions) return null;
     return <AgentControlQuestions />;
   }

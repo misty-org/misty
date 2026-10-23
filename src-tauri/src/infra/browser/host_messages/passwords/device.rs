@@ -1,5 +1,5 @@
 //! Saved passwords crossing between this device's local vault and the signed-in account's
-//! synced vault (docs/design/no-account-browsing/BRIEF.md): turning on sync brings the
+//! synced vault (docs/browser/no-account.md): turning on sync brings the
 //! local ones into the account, and signing out keeps a copy on the device, or erases it.
 use super::manage::require_main;
 use super::*;

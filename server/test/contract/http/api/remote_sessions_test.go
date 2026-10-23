@@ -15,7 +15,7 @@ import (
 	. "github.com/kannachi323/misty/server/internal/platform/httpapi"
 )
 
-// The agent's own browser session (docs/plans/odysseys-campaign.md): when a run
+// The agent's own browser session (docs/agents/evals/odysseys.md): when a run
 // needs a browser, the computer the person sent it from takes the job through
 // the signed claim, opens the agent's own tab and signs it; the server accepts
 // nothing it could have forged. An agent run never works on another device.

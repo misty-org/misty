@@ -70,7 +70,7 @@ export async function keepChatOnThisDevice(conversationId: string): Promise<stri
 
 /**
  * This device's chats, brought up to date with what the server holds for it
- * (docs/design/agent-chats-local/BRIEF.md):
+ * (docs/agents/chats-local.md):
  * - once, a copy of every chat from before chats moved to devices;
  * - its own chats that ran in the last two days, merged turn by turn;
  * - the inbox: chats Misty started by email, Slack or a schedule, which the

@@ -1,5 +1,5 @@
 //! The local bridge Kura, the separate file manager, uses to reach this
-//! device's shared clipboard (docs/design/clipboard/BRIEF.md). Kura has no
+//! device's shared clipboard (docs/sync/clipboard.md). Kura has no
 //! account; Misty answers only on a user-only channel and only after the
 //! person allows Kura once. Nothing but clips this device could already
 //! paste crosses the bridge. The channel is a Unix socket in an owner-only

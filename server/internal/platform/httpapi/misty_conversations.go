@@ -54,7 +54,7 @@ func (s *AIService) MistyConversations() http.HandlerFunc {
 				ReasoningEffort string `json:"reasoning_effort,omitempty"`
 				Title           string `json:"title"`
 				SpaceID         string `json:"space_id,omitempty"`
-				// The device that starts the chat keeps it (docs/design/agent-chats-local/BRIEF.md).
+				// The device that starts the chat keeps it (docs/agents/chats-local.md).
 				DeviceID string `json:"device_id,omitempty"`
 			}
 			if err := decodeAIJSON(w, r, &body); err != nil {
@@ -276,7 +276,7 @@ func (s *AIService) MistyConversation() http.HandlerFunc {
 }
 
 // conversationInScope filters the listing for local-first chats
-// (docs/design/agent-chats-local/BRIEF.md). "legacy" is the one-time copy of chats
+// (docs/agents/chats-local.md). "legacy" is the one-time copy of chats
 // from before chats moved to devices that no device has taken yet. "device" is what
 // one device needs: the chats it keeps that ran in the last two days (whose runs the
 // server still holds), and the inbox of chats no device keeps yet. No scope lists

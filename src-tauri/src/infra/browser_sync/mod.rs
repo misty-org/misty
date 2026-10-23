@@ -162,7 +162,7 @@ struct Session {
     #[cfg(any(target_os = "macos", windows))]
     capture_view: Option<capture::CaptureView>,
     /// While the vault is open this device can admit and remove devices
-    /// (docs/design/devices/BRIEF.md). Dropped, and zeroized, on lock. For
+    /// (docs/sync/devices.md). Dropped, and zeroized, on lock. For
     /// the personal vault it also opens every Space vault.
     admission_root: VaultRoot,
     /// This device's signing key, shared by every vault it is in.

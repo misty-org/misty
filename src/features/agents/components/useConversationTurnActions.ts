@@ -21,7 +21,7 @@ export function useConversationTurnActions(
     send(prompt, false);
   });
   // Carries on from an answer's ledger: what came after that answer is replaced, so the run
-  // continues from that point with its finished parts kept (docs/plans/agent-checkpoints.md).
+  // continues from that point with its finished parts kept (docs/agents/checkpoints.md).
   const resumeLedger = useStableCallback(
     (messageId: string, rows: LedgerRow[], only?: string[]) => {
       const messages = conversation?.messages ?? [];

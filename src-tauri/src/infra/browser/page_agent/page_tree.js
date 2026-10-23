@@ -177,7 +177,7 @@
 
   // Site menus (navigation, header, footer, sidebars) come first in most pages' order and used to
   // take the whole budget, so a long page's snapshot showed menus and cut off the content, search
-  // box and filters the agent came for (docs/plans/agent-harness.md, Page layer). When a page doesn't fit,
+  // box and filters the agent came for (docs/agents/harness.md, Page layer). When a page doesn't fit,
   // each menu gets a small share and says how much it left out; the rest goes to the content.
   const CHROME = new Set(["navigation", "banner", "contentinfo", "complementary", "menubar"]);
   const CHROME_CHARS = 1500;

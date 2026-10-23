@@ -1,4 +1,4 @@
-// The Odysseys benchmark through Misty's product path (docs/plans/odysseys-campaign.md):
+// The Odysseys benchmark through Misty's product path (docs/agents/evals/odysseys.md):
 // each task is a composer request on the local stack, with this computer as the device,
 // so the agent searches, fetches and opens its own browser tab as it would for a person.
 // The recorder pictures the agent's tabs as it goes; Odysseys' per-rubric judge grades.

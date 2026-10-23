@@ -26,7 +26,7 @@ func ClientModelChoice() bool {
 
 // FreeEvalModel reports whether id is a model on NVIDIA's free hosted endpoints (`nim/…`),
 // which a development stack with ClientModelChoice runs for evals without paid credit
-// (docs/plans/free-model-evals.md). These ids are not in the Gateway's catalog, so the
+// (docs/agents/evals/free-model.md). These ids are not in the Gateway's catalog, so the
 // catalog's availability and retirement checks don't apply to them.
 func FreeEvalModel(id string) bool {
 	return strings.HasPrefix(strings.TrimSpace(id), "nim/") && ClientModelChoice()

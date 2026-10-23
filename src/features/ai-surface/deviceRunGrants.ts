@@ -6,7 +6,7 @@ import type { AiInvocationDeviceContext } from "./types";
 
 /**
  * Signs one run grant per target device for an agent chat's device contexts
- * (docs/design/devices/BRIEF.md). This device's native key signs; the server
+ * (docs/sync/devices.md). This device's native key signs; the server
  * cannot widen a grant, and the target checks it again before acting.
  */
 export async function withDeviceRunGrants(

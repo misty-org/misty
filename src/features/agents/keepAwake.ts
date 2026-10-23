@@ -4,7 +4,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 /**
  * While an agent works on this computer it stays awake, unless the account
  * turned that off in Settings › Agents › Screens
- * (docs/design/devices/BRIEF.md). Each kind of work holds a reason;
+ * (docs/sync/devices.md). Each kind of work holds a reason;
  * the computer is held while any reason remains.
  */
 const reasons = new Set<string>();

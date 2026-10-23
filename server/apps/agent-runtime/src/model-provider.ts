@@ -72,7 +72,7 @@ function nimKey(env: Environment) {
 
 /**
  * A `nim/…` model runs on NVIDIA's hosted endpoints (build.nvidia.com), free with rate limits,
- * so evals can run without paid credit (docs/plans/free-model-evals.md). Development only:
+ * so evals can run without paid credit (docs/agents/evals/free-model.md). Development only:
  * production never admits a model the person didn't get from the catalog.
  */
 function directNim(modelId: string, env: Environment) {

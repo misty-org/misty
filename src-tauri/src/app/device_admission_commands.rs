@@ -1,5 +1,5 @@
 //! Device admission, approval, removal, names and policy commands
-//! (docs/design/devices/BRIEF.md). Each runs only in the main window.
+//! (docs/sync/devices.md). Each runs only in the main window.
 #![cfg(desktop)]
 
 use tauri::{AppHandle, State};

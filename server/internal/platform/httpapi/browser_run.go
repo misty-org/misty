@@ -11,7 +11,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// browser.run (docs/plans/agent-harness.md, browser_run): the agent writes a short program against
+// browser.run (docs/agents/harness.md, browser_run): the agent writes a short program against
 // a page API, and the computer the run was sent from runs it in a sandbox against the agent's own
 // tabs. One call can open pages, act on them and read many items, where a step tool takes a turn
 // for each. Every page call is the device operation a step tool would run, under the run's grant

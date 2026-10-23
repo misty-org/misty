@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// AgentNotebook is a run's plan and findings (docs/plans/agent-harness.md, Sub-agents and the notebook).
+// AgentNotebook is a run's plan and findings (docs/agents/harness.md, Sub-agents and the notebook).
 // A conversation and every sub-agent it starts share one notebook.
 type AgentNotebook struct {
 	Key       string    `json:"key"`

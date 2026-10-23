@@ -10,11 +10,11 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// The agent's own browser session (docs/plans/odysseys-campaign.md): when the
+// The agent's own browser session (docs/agents/evals/odysseys.md): when the
 // agent needs a browser, the computer the person sent the request from opens a
 // hidden tab of the agent's own under its own lease and signs the grant for it,
 // and the tab joins the run. An agent run works only on the device it was sent
-// from; no request names another device (docs/design/agent-browser/BRIEF.md).
+// from; no request names another device (docs/agents/browser.md).
 const (
 	remoteSessionOp = "browser.session"
 	// deviceOnlineWindow matches the claim check (validateDeviceJobTargetTx).
@@ -42,7 +42,7 @@ type remoteScreen struct {
 
 // sessionTarget is the workspace grant a browser session opens under: the
 // sending computer's own (the agent's own hidden tab,
-// docs/plans/odysseys-campaign.md). A workspace grant for any other device is
+// docs/agents/evals/odysseys.md). A workspace grant for any other device is
 // never used.
 func sessionTarget(contexts []db.AIInvocationContext) *db.AIInvocationContext {
 	for index := range contexts {
@@ -77,7 +77,7 @@ func (s *SpacesService) deviceDisplayName(ctx context.Context, userID, deviceID 
 // openRemoteSession asks the sending computer to open a browser session for
 // this run and returns its tab, signed by that computer.
 func (s *SpacesService) openRemoteSession(ctx context.Context, record *db.AIInvocationRecord, body aiInvocationInput, target *db.AIInvocationContext, callID, url, reason string, newTab bool) (*remoteScreen, error) {
-	// Where opening a page spends its time, one line per call (docs/plans/agent-harness.md, Device jobs).
+	// Where opening a page spends its time, one line per call (docs/agents/harness.md, Device jobs).
 	timing := newPhaseTimer("screen_open_timing", record.ID)
 	defer timing.log()
 	name, online := s.deviceDisplayName(ctx, record.UserID, target.DeviceID)

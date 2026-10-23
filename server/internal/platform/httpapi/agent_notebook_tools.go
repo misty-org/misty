@@ -12,7 +12,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// The run notebook (docs/plans/agent-harness.md, Sub-agents and the notebook): a plan and
+// The run notebook (docs/agents/harness.md, Sub-agents and the notebook): a plan and
 // findings with sources that live outside the model's context, so long runs
 // re-read them after compaction and sub-agents report into them. Each write
 // shows in the conversation and is mirrored to a note in the personal Space.

@@ -201,7 +201,7 @@ export interface AiSurfaceAdapter {
 export interface AiInvocationRequest {
   /**
    * The chat's earlier turns, oldest first, from this device's copy: the server keeps no
-   * transcript (docs/design/agent-chats-local/BRIEF.md).
+   * transcript (docs/agents/chats-local.md).
    */
   historyTurns?: { invocation_id?: string; prompt: string; reply?: string; created_at: string }[];
   /** A scheduled run this computer claimed and is starting (roadmap C1). */

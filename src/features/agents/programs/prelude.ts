@@ -1,5 +1,5 @@
 /**
- * The page API a browser_run program sees (docs/plans/agent-harness.md, browser_run), defined
+ * The page API a browser_run program sees (docs/agents/harness.md, browser_run), defined
  * inside the sandbox over its one host call. Targets are a ref from a read ("e12"), a locator
  * ({ role, name, index }), or words describing the control ("Search button"); the host keeps
  * each tab's document, so a program never copies ids.

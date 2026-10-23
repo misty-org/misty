@@ -9,7 +9,7 @@ import { DeviceSection } from "./DeviceSection";
 import { PendingApprovals } from "./PendingApprovals";
 
 /**
- * Settings → Devices (docs/design/devices/BRIEF.md): this device first, then
+ * Settings → Devices (docs/sync/devices.md): this device first, then
  * the others. Each device's permissions can be changed only on that device.
  */
 export function DevicesSettings() {

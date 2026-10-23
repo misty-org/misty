@@ -1,13 +1,15 @@
 # Spaces as profiles: build plan
 
+Graduates to: docs/spaces/
+
 Status: planned 2026-10-16; built in part since. Built: vaults per Space on the server (Phase 1),
 switching a window's Space in place with the Space row (Phase 3b, which replaced Phase 3's OS
 window per Space), the memory tree per Space (Phase 7), and private and public layers with each
 agent's home Space (Phase 9). Per-Space integration picks (Phase 8) were built and then dropped.
 "Where the code stands" describes the code before this work. Design:
-[Spaces as profiles](../design/spaces-as-profiles/BRIEF.md). The engine probe for separate
+[Spaces as profiles](../spaces/as-profiles.md). The engine probe for separate
 website data per Space is `src-tauri/tests/webextensions/space-probe.m`. It builds on
-[Spaces, simplified](../design/spaces-simplified/BRIEF.md), which is in `main`.
+[Spaces, simplified](../spaces/simplified.md), which is in `main`.
 
 A Space becomes a browser profile: one encrypted vault per person per Space, its own website data
 store, its own OS windows, extensions, memory tree and integration picks. One sync password opens
@@ -261,7 +263,7 @@ the Space's color. Virtual windows go away.
   native side and has one layout. `windowColors.ts` becomes the Space color; the picker moves to the
   Space's menu. `WorkspaceScopeKey` keeps `space:<id>` and drops `global`.
 - **Sync tree.** The workspace tree keeps window → tab → pane → view; a "window" is now an OS window
-  of that Space, with the same stored names (`docs/design/sync/BRIEF.md` vocabulary is frozen).
+  of that Space, with the same stored names (`docs/sync/README.md` vocabulary is frozen).
 - **Windows platform.** `browser.rs` `with_browser_data` already points views at
   `~/.misty/profiles/<profile>/webview`; give each Space its own folder (option 1 in the spike).
 - **Incognito windows replace private tabs.** An incognito window belongs to a Space; all of that
@@ -645,7 +647,7 @@ accounts that Space uses; the chat card offers "Use <account>" for a pick.
 Every Space item has a private/public toggle, except the layers that are always one or the other.
 One check, in one place: a private layer opens only for its owner, and for the owner's own agents on
 runs the owner asked for. Agents have a home Space. The layer map is in the
-[brief](../design/spaces-as-profiles/BRIEF.md#private-and-public).
+[brief](../spaces/as-profiles.md#private-and-public).
 
 **Touches.**
 - **Layers in the code.** Every agent tool, device job and read path declares the layer it touches

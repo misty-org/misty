@@ -1,4 +1,4 @@
-//! Approving a new device from one already added (docs/design/devices/BRIEF.md).
+//! Approving a new device from one already added (docs/sync/devices.md).
 //! The new device commits to a nonce, the approver answers with an ephemeral
 //! key and nonce, the new device reveals. Both show a six-digit code over the
 //! whole exchange; a server that swaps any key changes the code. The approver

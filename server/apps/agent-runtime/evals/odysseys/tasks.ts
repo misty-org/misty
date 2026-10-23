@@ -1,5 +1,5 @@
 // Odysseys tasks (data/odysseys.json, MIT; see data/NOTICE) and the campaign's fixed
-// splits (docs/plans/odysseys-campaign.md): dev for every iteration, holdout for
+// splits (docs/agents/evals/odysseys.md): dev for every iteration, holdout for
 // milestones, rest only in full passes. The split is a stable hash of each task id, per
 // level, so it never changes between runs or machines.
 import { createHash } from "node:crypto";

@@ -98,7 +98,7 @@ func currentTabGuidance(tab *aiCurrentTab, tools []string) string {
 
 // agentCapabilityGuidance explains the tool families present in one catalog.
 // ownTab reports a run that can open its own browser tab mid-run (screen_open with a
-// browser session, docs/plans/odysseys-campaign.md); it then learns the browser tools
+// browser session, docs/agents/evals/odysseys.md); it then learns the browser tools
 // up front, since the prompt is written before the tab joins.
 func agentCapabilityGuidance(tools []string, desktopControl bool, ownTab ...bool) string {
 	return agentCapabilityGuidanceWith(tools, desktopControl, len(ownTab) > 0 && ownTab[0], nil)
@@ -138,9 +138,9 @@ func agentCapabilityGuidanceWith(tools []string, desktopControl bool, ownTab boo
 	if has("web.search") {
 		guidance.WriteString("\n\nWeb: for research, news, current facts or anything outside the user's own data, call web_search; it needs no app or sign-in. Search more than once when a task needs several angles, prefer primary and reputable sources, and cite the links you use.")
 		if has(webFetchTool) {
-			// The routing note (docs/plans/agent-harness.md, Reading without a screen): reading never needs a screen.
+			// The routing note (docs/agents/harness.md, Reading without a screen): reading never needs a screen.
 			if own {
-				// An agent with its own window works where the person watches (docs/design/agents-at-cursor/BRIEF.md, "Agent windows").
+				// An agent with its own window works where the person watches (docs/agents/cursor-companion.md, "Agent windows").
 				guidance.WriteString(" A few searches and the pages they point to are usually enough. Work the pages your answer relies on in your own browser tab, where the person watches you: open them there, read them with browser_snapshot, and click, toggle, filter and scroll with browser_steps as a person would. Keep web_fetch for a quick look at a page you will not rely on.")
 			} else {
 				guidance.WriteString(" When a result's excerpt doesn't hold the answer, read the page with web_fetch instead of searching again; a few searches and the pages they point to are usually enough. Answer from search and fetched pages; open a browser or screen only to click, sign in or act, or for a page web_fetch could not read.")
@@ -169,7 +169,7 @@ func agentCapabilityGuidanceWith(tools []string, desktopControl bool, ownTab boo
 		}
 		guidance.WriteString(" Never enter passwords or MFA codes. Include source URLs when saving or sharing research. Report facts as the pages you read show them, with their conditions (such as billed yearly or monthly); if a page did not show something, open it or say you could not confirm it rather than filling it in from memory.")
 		if has(browserRunTool) {
-			// docs/plans/agent-harness.md, browser_run: a program per call instead of a turn per step.
+			// docs/agents/harness.md, browser_run: a program per call instead of a turn per step.
 			guidance.WriteString(off.rule("browser.run-how", " Work pages with browser_run: one program opens pages, searches, clicks through results and reads many items in one call, so a list of ten is a loop, not ten turns. Its targets are words, locators or refs, never a documentId. Keep each program to one stretch of work (a site, a search), return what it found, and read the result before the next. The single-step page tools below load with agent_tool_use browse, for what a program cannot do (a page skill, the screen agent)."))
 		}
 		if has("browser.snapshot") && has("browser.steps") || own {
@@ -196,7 +196,7 @@ func agentCapabilityGuidanceWith(tools []string, desktopControl bool, ownTab boo
 		guidance.WriteString("\n\nWaiting for the user: when the screen needs the person (a sign-in, a password or code, a CAPTCHA or verification, choosing an account, a permission dialog), or browser_act stops for one, call browser_request_user_action with that screen's scopeId and say in the reason exactly what they need to do. Misty hands them control, shows a Waiting for you card in the conversation and continues this run when they are done; do not end your response or ask in text instead. Afterwards look at the screen again before acting.")
 	}
 	if own {
-		// How a good browser agent works a page (docs/plans/agent-harness.md, Page layer, after
+		// How a good browser agent works a page (docs/agents/harness.md, Page layer, after
 		// browser-use's rules). Across 116 Odysseys runs the agent read pages but rarely used them:
 		// directory searches never filled, results never clicked into, sizes never chosen.
 		guidance.WriteString("\n\nWorking a page:")

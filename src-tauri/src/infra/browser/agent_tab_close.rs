@@ -1,7 +1,7 @@
 //! Agent tabs: sleeping one, waiting for its first load and a small picture of its page.
 use super::*;
 
-/// Puts an agent's tab to sleep (docs/design/agent-browser/BRIEF.md, "Memory"): reads where its
+/// Puts an agent's tab to sleep (docs/agents/browser.md, "Memory"): reads where its
 /// page is, then closes the page through the one close path, so its page process goes too. The
 /// tab wakes later from what this returns.
 #[tauri::command]
@@ -29,7 +29,7 @@ pub async fn browser_webview_await_load(
     Ok(super::page_agent::first_load(&app, &request.id).await)
 }
 
-/// A small picture of an agent's page (docs/design/agent-browser/BRIEF.md): the PiP and the view
+/// A small picture of an agent's page (docs/agents/browser.md): the PiP and the view
 /// switcher show it instead of a second live page.
 #[tauri::command]
 pub async fn browser_webview_picture(

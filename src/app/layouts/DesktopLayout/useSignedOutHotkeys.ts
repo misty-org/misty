@@ -7,7 +7,7 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 /**
  * While nobody is signed in, the companion chord and the dictation key open the sign-in
  * sheet for agents. The native side arms them only when Input Monitoring is already granted,
- * so browsing without an account never asks for it (docs/design/no-account-browsing/BRIEF.md).
+ * so browsing without an account never asks for it (docs/browser/no-account.md).
  */
 export function useSignedOutHotkeys(signedOut: boolean) {
   useEffect(() => {

@@ -73,7 +73,7 @@ url = "2"
 walkdir = "2.5"
 image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "jpeg"] }
 ed25519-dalek = "2"
-# Devices (docs/design/devices/BRIEF.md): sealing the vault key to a newly
+# Devices (docs/sync/devices.md): sealing the vault key to a newly
 # approved device, the control channel socket, and LAN discovery.
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 futures-util = { version = "0.3", features = ["sink"] }

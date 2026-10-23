@@ -4,7 +4,7 @@
 // success/failure parse. A rubric scores 1 when the trajectory satisfies it; a task is
 // perfect when every rubric does. Differences from the official runs are only the judge
 // model (MISTY_ODYSSEYS_JUDGE: a Claude model on Misty's own key, or a free `nim/` model, see
-// docs/plans/free-model-evals.md) and a cap of 60 pictures
+// docs/agents/evals/free-model.md) and a cap of 60 pictures
 // (the recorder skips unchanged ones, so long runs rarely reach it).
 import { readFileSync } from "node:fs";
 import { streamText } from "ai";
@@ -66,7 +66,7 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
   let inputTokens = 0;
   let outputTokens = 0;
   // Each rubric item is judged on its own, as the original does; the calls run together,
-  // except on a free model's rate limit (docs/plans/free-model-evals.md), where a few at a time
+  // except on a free model's rate limit (docs/agents/evals/free-model.md), where a few at a time
   // (judgeLanes) keep a 429 from being graded as a failed rubric.
   const free = model.startsWith("nim/") || model.startsWith("gemini/");
   const fallbackModel = process.env.MISTY_ODYSSEYS_JUDGE_FALLBACK?.trim() ?? "";

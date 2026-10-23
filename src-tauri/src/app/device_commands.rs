@@ -1,4 +1,4 @@
-//! Device commands (docs/design/devices/BRIEF.md). The webview drives the UI;
+//! Device commands (docs/sync/devices.md). The webview drives the UI;
 //! identity, trust, signatures and the control channel stay native. Commands
 //! that change trust run only in the main window.
 #![cfg(desktop)]

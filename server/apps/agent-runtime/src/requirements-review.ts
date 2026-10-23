@@ -3,7 +3,7 @@ import type { RuntimeIdentity } from "./control-plane.js";
 import type { TaskCompletion } from "./task-completion.js";
 
 // Long requests list many requirements: every item, every field of each item, pages to keep
-// open, a step to carry out. Odysseys grades each one (docs/plans/odysseys-campaign.md), and
+// open, a step to carry out. Odysseys grades each one (docs/agents/evals/odysseys.md), and
 // answers that read well still skipped some. Before a finish stands, one short call with the
 // run's own model checks the draft against the request; its gaps join the run's one
 // verification note (src/finish-verification.ts). A review that fails never blocks the finish.

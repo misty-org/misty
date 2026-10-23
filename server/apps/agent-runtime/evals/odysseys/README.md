@@ -1,6 +1,6 @@
 # Odysseys
 
-The Odysseys benchmark ([paper](https://arxiv.org/abs/2604.24964), [tasks](https://github.com/ljang0/Odysseys), MIT) run through Misty's product path, for [docs/plans/odysseys-campaign.md](../../../../../docs/plans/odysseys-campaign.md). Odysseys has 200 long, multi-site tasks from real browsing, each with 3 to 12 rubric items; the headline score is the share of tasks where every rubric item passes ("perfect").
+The Odysseys benchmark ([paper](https://arxiv.org/abs/2604.24964), [tasks](https://github.com/ljang0/Odysseys), MIT) run through Misty's product path, for [docs/agents/evals/odysseys.md](../../../../../docs/agents/evals/odysseys.md). Odysseys has 200 long, multi-site tasks from real browsing, each with 3 to 12 rubric items; the headline score is the share of tasks where every rubric item passes ("perfect").
 
 Each task is one composer request on the local stack, with this computer as the device, so the agent does what it does for a person: search, fetch pages, and open its own browser tab, which joins the run. The recorder pictures the agent's tabs (and tabs it opened for the person) after every browser step and once at the end, through the desktop's debug bridge, without showing them. `judge.ts` is Odysseys' per-rubric judge with its prompt unchanged: one call per rubric item, from the action history and every screenshot.
 
@@ -10,7 +10,7 @@ Differences from the paper's setup, kept on purpose:
 - The judge runs on a Claude model on Misty's own key (`MISTY_ODYSSEYS_JUDGE`), not Gemini 3.1 Flash-Lite, and sees at most the last 60 screenshots (unchanged pages are pictured once).
 - The browser profile has no saved sign-ins (`MISTY_EVAL_EPHEMERAL_PAGES=1` on the desktop).
 
-Without paid credit, the agent and the judge run on NVIDIA's free hosted models (`nim/…`); see [docs/plans/free-model-evals.md](../../../../../docs/plans/free-model-evals.md). Scores on a free model compare only with other passes on the same model.
+Without paid credit, the agent and the judge run on NVIDIA's free hosted models (`nim/…`); see [docs/agents/evals/free-model.md](../../../../../docs/agents/evals/free-model.md). Scores on a free model compare only with other passes on the same model.
 
 ## Splits
 

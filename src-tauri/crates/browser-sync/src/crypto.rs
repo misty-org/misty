@@ -141,7 +141,7 @@ impl VaultRoot {
     }
 
     /// Signs a device admission record: a device grant or the account's device
-    /// list (docs/design/devices/BRIEF.md). Only payloads in those two domains
+    /// list (docs/sync/devices.md). Only payloads in those two domains
     /// are signed here, so this path never signs sync protocol bytes.
     pub fn sign_device_record(&self, payload: &[u8]) -> Result<String> {
         const DOMAINS: [&[u8]; 2] = [
@@ -212,7 +212,7 @@ impl VaultRoot {
     }
 
     /// The key that seals cloud clipboard clips for this vault's devices
-    /// (docs/design/clipboard/BRIEF.md). Every admitted device derives the same key.
+    /// (docs/sync/clipboard.md). Every admitted device derives the same key.
     pub fn clipboard_key(&self, scope: &VaultScope) -> Result<ClipboardKey> {
         scope.validate()?;
         let key = self.derive(

@@ -14,7 +14,7 @@ import { agentTab } from "../agentTabs";
 import { setBrowserExpanded, useAgentBrowser } from "./agentBrowserStore";
 
 /**
- * The agent browser in the full split (docs/design/agent-browser/BRIEF.md): a small copy of
+ * The agent browser in the full split (docs/agents/browser.md): a small copy of
  * Misty's own browser beside the open chat. Its views' switcher sits above; the side card holds
  * back, forward and reload, the address and the shown view's tabs; the page fills the rest. The
  * person reads and scrolls; while the agent acts, its page takes no input until they take over.

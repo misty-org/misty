@@ -12,7 +12,7 @@ const MAX_CODE = 20_000;
 const MAX_VALUE = 20_000;
 
 /**
- * browser.run (docs/plans/agent-harness.md, browser_run): runs the agent's program in a sandbox on
+ * browser.run (docs/agents/harness.md, browser_run): runs the agent's program in a sandbox on
  * this computer against its own tabs. The job comes at the run's browser workspace scope, as
  * browser.session does; tabs the program opens come back with the grants this device signed, so
  * the server attaches them to the run as screen_open's are.

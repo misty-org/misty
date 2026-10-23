@@ -1,7 +1,7 @@
 # web-fetch
 
 `web.fetch` for agent runs when none of the person's devices is online: schedules, `+misty`
-email and integration entries (docs/plans/agent-harness.md, Reading without a screen). Runs with a device read
+email and integration entries (docs/agents/harness.md, Reading without a screen). Runs with a device read
 pages on the device instead (`src-tauri/src/infra/agents/web_fetch.rs`).
 
 It reads one public page without cookies, follows at most five redirects, re-checks every hop,

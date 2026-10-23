@@ -1,5 +1,5 @@
 // Misty agent page runtime, part 5: pattern and app skills
-// (docs/plans/agent-harness.md, Page layer). Most hard web UIs are a few
+// (docs/agents/harness.md, Page layer). Most hard web UIs are a few
 // widget types; each skill detects its pattern on any site and offers actions
 // for it. App skills only add what one app's quirks need. A skill either acts
 // in the page directly (pasting into a grid or an editor, reading values) or

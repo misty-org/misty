@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * The agent browser (docs/design/agent-browser/BRIEF.md): per chat, the views its agent works in,
+ * The agent browser (docs/agents/browser.md): per chat, the views its agent works in,
  * each with its own tabs. Device-local: not in the sync tree, kept across a renderer reload (session
  * storage) and gone on an app restart. Pages themselves live in agentTabs.ts; this is what the split
  * and the PiP show.

@@ -1,4 +1,4 @@
-//! Adding and removing devices (docs/design/devices/BRIEF.md). Every change to
+//! Adding and removing devices (docs/sync/devices.md). Every change to
 //! the device list is signed by the vault root, which only devices that
 //! unlocked the vault hold; the server verifies but cannot produce it.
 //! Approval from another device lives in `device_approval`.

@@ -115,7 +115,7 @@ func sessionOpened(scopeID, name, url string, reused, programs bool, tabs ...str
 		tabs = []string{scopeID}
 	}
 	if programs {
-		// With browser_run the page is worked in programs (docs/plans/agent-harness.md, browser_run): no
+		// With browser_run the page is worked in programs (docs/agents/harness.md, browser_run): no
 		// snapshot follows, and the message points there rather than at the step tools.
 		return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "tabs": tabs, "catalog_changed": true,
 			"message": opened + " (scopeId " + scopeID + "). Work it with browser_run: getTab(\"" + scopeID + "\") gives this tab in a program, openTab(url) opens another. " +

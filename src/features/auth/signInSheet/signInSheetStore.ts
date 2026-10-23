@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 /**
  * What asked for an account. Misty works as a full browser without one; the sign-in sheet
- * opens only for these, and its title says which (docs/design/no-account-browsing/BRIEF.md).
+ * opens only for these, and its title says which (docs/browser/no-account.md).
  */
 export type SignInReason = "account" | "sync" | "space" | "invite" | "agents" | "expired";
 

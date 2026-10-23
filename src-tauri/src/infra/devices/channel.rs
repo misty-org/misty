@@ -1,4 +1,4 @@
-//! The device control channel (docs/design/devices/BRIEF.md): one socket per
+//! The device control channel (docs/sync/devices.md): one socket per
 //! device carrying presence, device-list hints and removal. It never carries
 //! file data, and devices never connect to each other directly.
 use std::{

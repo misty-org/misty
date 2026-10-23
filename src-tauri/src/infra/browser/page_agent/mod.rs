@@ -1,4 +1,4 @@
-//! Text-first page layer for agents (docs/plans/agent-harness.md, Page layer):
+//! Text-first page layer for agents (docs/agents/harness.md, Page layer):
 //! accessibility snapshots with refs that survive actions, batches of actions
 //! by ref, waiting without model calls, and page text for extraction.
 //!

@@ -27,7 +27,7 @@ function markAsked(accountId: string) {
  * Passwords saved while browsing without an account live in this device's local vault.
  * When sync turns on they join the account: silently for an account with none yet, and
  * after asking once, with a count, for one that already syncs from other devices
- * (docs/design/no-account-browsing/BRIEF.md, decision 4).
+ * (docs/browser/no-account.md, decision 4).
  */
 export function DevicePasswordsMerge({ accountId }: { accountId: string }) {
   const [count, setCount] = useState(0);

@@ -1,4 +1,4 @@
-//! Cross-origin frames for the agent page layer (docs/plans/agent-harness.md,
+//! Cross-origin frames for the agent page layer (docs/agents/harness.md,
 //! Page layer). Embedded widgets such as class schedules, booking calendars and forms often live
 //! in a frame from another origin, which the page layer's script in the top document can
 //! neither read nor reach. Every frame of a tab announces itself from a private content

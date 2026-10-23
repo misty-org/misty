@@ -3,7 +3,7 @@
 
 // The control island: the in-app island's view outside Misty during desktop
 // control. Misty's island owns its state and actions; this panel shows them
-// and sends the person's presses back (docs/design/agents-at-cursor/BRIEF.md).
+// and sends the person's presses back (docs/agents/cursor-companion.md).
 static void (*notifyIsland)(const char *);
 static NSTextField *islandStatus, *islandMeta, *islandField;
 static NSButton *islandSend, *islandQueue, *islandTake, *islandDone;

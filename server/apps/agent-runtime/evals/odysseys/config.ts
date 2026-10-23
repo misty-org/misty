@@ -39,7 +39,7 @@ export const ledger = new Ledger(
 export const resumeDir = env("MISTY_ODYSSEYS_RESUME");
 // MISTY_ODYSSEYS_RESUME_FAILED names an earlier pass's folder (reports/<time>): only its tasks that
 // did not pass go on, each from its own checkpoint, with the parts that passed kept (the ledger,
-// docs/plans/agent-checkpoints.md). The passed tasks count in the summary as carried. A resumed
+// docs/agents/checkpoints.md). The passed tasks count in the summary as carried. A resumed
 // pass is for iterating on fixes; the number to report is a full pass, run once every task has
 // passed in resumed form (the gate printed at the end), then now and then.
 export const resumeFailedDir = env("MISTY_ODYSSEYS_RESUME_FAILED");

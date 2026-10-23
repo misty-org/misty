@@ -3,7 +3,7 @@ import { applyCompaction, CLEAR_AT, clearOldToolResults, COMPACT_AT, estimateInp
 import { pruneStalePageSnapshots } from "./prompt-cache.js";
 import { CUT_BATCH_CHARS, cutOldResults, WORKING_TOKENS } from "./working-set.js";
 
-// One condenser interface (docs/plans/agent-harness.md, Context): every way the
+// One condenser interface (docs/agents/harness.md, Context): every way the
 // runtime keeps a transcript inside the model's window is a step with the same
 // shape, run in order from the cheapest and most cache-friendly to the most
 // lossy. Adding a step means adding it here, not in the agent loop.
@@ -62,7 +62,7 @@ export const SUMMARY_EVERY_TURNS = 20;
 
 /**
  * A summary of older steps every SUMMARY_EVERY_TURNS turns once the transcript is past the
- * working budget (docs/plans/agent-harness.md, Context): one rewrite on a schedule, then
+ * working budget (docs/agents/harness.md, Context): one rewrite on a schedule, then
  * twenty turns that only append, so the prompt cache holds between summaries.
  */
 export function periodicSummary(summarize: (older: ModelMessage[]) => Promise<string>, due: () => boolean, done: () => void): Condenser {

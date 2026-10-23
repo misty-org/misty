@@ -1,4 +1,4 @@
-//! Device job commands (docs/design/devices/BRIEF.md): signing this device's
+//! Device job commands (docs/sync/devices.md): signing this device's
 //! requests and run grants natively, and checking a job's grant before acting.
 #![cfg(desktop)]
 

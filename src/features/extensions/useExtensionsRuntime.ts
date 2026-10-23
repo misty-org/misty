@@ -94,7 +94,7 @@ export function useExtensionsRuntime() {
   const [runtimeGeneration, setRuntimeGeneration] = useState(0);
   // Extensions belong to this device, as their install list (a device setting) does: signing
   // in or out keeps them installed and running, with nothing to move
-  // (docs/design/no-account-browsing/BRIEF.md).
+  // (docs/browser/no-account.md).
   const account = localProfileId;
   const profile = useDevicePreferences((s) => s.state);
   const profilesReady = useDevicePreferences((s) => s.ready);

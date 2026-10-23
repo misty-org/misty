@@ -1,5 +1,5 @@
 /**
- * Readable text from a fetched page, for `web.fetch` (docs/plans/agent-harness.md,
+ * Readable text from a fetched page, for `web.fetch` (docs/agents/harness.md,
  * Reading without a screen). The HTML is parsed into an inert document: nothing in it runs or
  * loads. Navigation, scripts and page chrome are dropped; every other visible
  * text becomes one plain line per block (headings and list items keep their
@@ -72,7 +72,7 @@ export function billingNote(text: string): string | undefined {
 
 /**
  * A page a fetch can't read: an error, a sign-in wall or a script-only shell with little
- * text. The agent's own browser tab can (docs/plans/odysseys-campaign.md).
+ * text. The agent's own browser tab can (docs/agents/evals/odysseys.md).
  */
 export function browserNote(status: number, text: string): string | undefined {
   const shell =

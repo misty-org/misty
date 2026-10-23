@@ -12,7 +12,7 @@ pub struct LeaseRequest {
     #[serde(default)]
     pub(super) renew: bool,
     /// The agent's own hidden session: it runs beside other tasks
-    /// (docs/plans/odysseys-campaign.md).
+    /// (docs/agents/evals/odysseys.md).
     #[serde(default)]
     pub(super) background: bool,
 }

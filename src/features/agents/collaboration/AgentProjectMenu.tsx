@@ -24,7 +24,7 @@ const none = "none";
 /**
  * The composer toolbar's project menu, beside the mode: the folder on this
  * computer the conversation works in, or none. Coding there runs in the person's own
- * coding tool (docs/plans/coding-runner-capabilities.md).
+ * coding tool (docs/agents/coding-tools.md).
  * Only the chosen project travels with the chat; the next message uses a new
  * choice. Desktop only, since projects are folders on this computer; with another
  * device picked, its own shared folders apply instead and the menu steps aside.

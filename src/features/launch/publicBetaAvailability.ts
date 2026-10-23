@@ -6,7 +6,7 @@
  */
 const publicBetaAvailability = {
   recurringBriefings: false,
-  // Voice, notes and memory (docs/design/voice-memory/BRIEF.md), by phase.
+  // Voice, notes and memory (docs/voice-memory/README.md), by phase.
   voiceDictation: false,
   voiceNotes: false,
   recall: true,

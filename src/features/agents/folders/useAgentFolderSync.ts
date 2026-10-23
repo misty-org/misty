@@ -6,7 +6,7 @@ import { useAgentFoldersStore } from "./agentFoldersStore";
 /**
  * Loads this device's agent folders and follows the names the server generates
  * after a conversation starts. Folders, filing and read state live on this device
- * (docs/design/agent-chats-local/BRIEF.md), so only titles arrive from the account.
+ * (docs/agents/chats-local.md), so only titles arrive from the account.
  * The first run only needs folders; the Agents page already loads conversations.
  */
 export function useAgentFolderSync(accountId: string): void {

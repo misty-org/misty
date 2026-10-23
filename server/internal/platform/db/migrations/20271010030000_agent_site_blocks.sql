@@ -1,5 +1,5 @@
 -- +goose Up
--- Sites agents may read but never act on (docs/plans/agentic-browser.md,
+-- Sites agents may read but never act on (docs/agents/harness.md,
 -- Phase 5): banking, crypto, payment and adult sites by default, plus the
 -- account's own list. Devices enforce it before any input reaches a page.
 ALTER TABLE ai_user_settings ADD COLUMN IF NOT EXISTS agent_block_sensitive boolean NOT NULL DEFAULT true;

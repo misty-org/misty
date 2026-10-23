@@ -92,7 +92,7 @@ pub(super) fn adopt_existing(
 
 /// Debug builds only: with `MISTY_EVAL_EPHEMERAL_PAGES=1` every page opens in one temporary
 /// session for this run of the app, so benchmarks browse the live web with no saved
-/// sign-ins while the app itself stays signed in (docs/plans/odysseys-campaign.md).
+/// sign-ins while the app itself stays signed in (docs/agents/evals/odysseys.md).
 pub(super) fn eval_ephemeral_session() -> Option<String> {
     let enabled = cfg!(debug_assertions)
         && std::env::var("MISTY_EVAL_EPHEMERAL_PAGES").is_ok_and(|value| value == "1");

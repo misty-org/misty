@@ -1,6 +1,6 @@
 import type { ModelMessage, ToolResultPart } from "ai";
 
-// The working set (docs/plans/agent-harness.md, Context). A run's context grew to 35,000
+// The working set (docs/agents/harness.md, Context). A run's context grew to 35,000
 // input tokens at the median and 100,000 at p90, because every page snapshot, extract and fetch
 // stayed until the transcript neared the model's window. Each turn reread all of it: turns took
 // 9.4 s and the model lost the thread. Like browser-use, the run keeps the current page state

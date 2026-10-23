@@ -1,4 +1,4 @@
-//! The shared clipboard (docs/design/clipboard/BRIEF.md): what a person copies
+//! The shared clipboard (docs/sync/clipboard.md): what a person copies
 //! reaches their account's other added devices through sync, as a small ring
 //! of sealed clips. Each clip is compressed and sealed on the device with a key
 //! derived from the vault root; the server only ever holds ciphertext.

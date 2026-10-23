@@ -10,7 +10,7 @@ import (
 )
 
 // Every device context an agent chat attaches carries a run grant signed by
-// the device that asked (docs/design/devices/BRIEF.md), and names that same
+// the device that asked (docs/sync/devices.md), and names that same
 // device: an agent run works only on the computer the person sent it from. A
 // signed-in device may do so before it is added. The runtime may request less
 // than a grant, never more.

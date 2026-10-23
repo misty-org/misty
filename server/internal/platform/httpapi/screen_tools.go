@@ -118,7 +118,7 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 				kind = "desktop"
 				input.URL = ""
 			case "current_tab":
-				// Agents act only in their own tabs (docs/plans/agent-harness.md, browser_run).
+				// Agents act only in their own tabs (docs/agents/harness.md, browser_run).
 				return nil, agent.ErrInvalidRequest("You work only in tabs of your own, never in the person's. Open the page you need in your own tab (screen_open with its url and no target); to see what the person sees, use screen_look.")
 			case "", "new_tab", "window":
 			default:
@@ -152,7 +152,7 @@ func (s *SpacesService) screenRequestHandler(tool string) agenttools.Handler {
 			screen.Location = "window"
 		}
 		// An agent never works in the person's own tab, whatever the setting says: a new tab of
-		// its own instead (docs/plans/agent-harness.md, browser_run).
+		// its own instead (docs/agents/harness.md, browser_run).
 		if screen.Location == "current" && kind != "look" {
 			screen.Location = "window"
 		}

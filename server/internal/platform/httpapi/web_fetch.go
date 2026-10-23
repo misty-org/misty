@@ -15,7 +15,7 @@ import (
 )
 
 // web.fetch reads one public page in the background, so the agent can read what
-// a search found without opening a screen (docs/plans/agent-harness.md, Reading without a screen).
+// a search found without opening a screen (docs/agents/harness.md, Reading without a screen).
 // It runs on the person's own device; when no device is attached, an isolated
 // Cloudflare Worker does the same. The server only passes the result on.
 const (

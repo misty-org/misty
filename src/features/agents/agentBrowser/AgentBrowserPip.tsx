@@ -47,8 +47,8 @@ function LivePipPage({ scopeId, locked }: { scopeId: string; locked: boolean }) 
 }
 
 /**
- * The open chat's agent browser as a picture at the top of the chat (docs/design/agent-browser/
- * BRIEF.md): a picture refreshed after each step, never a live page. With several views it flips
+ * The open chat's agent browser as a picture at the top of the chat (docs/agents/browser.md):
+ * a picture refreshed after each step, never a live page. With several views it flips
  * between them. Clicking it expands the full split.
  *
  * It lives inside the conversation view, so it stays within the chat and is gone once the person

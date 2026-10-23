@@ -13,7 +13,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// Signed device records (docs/design/devices/BRIEF.md). Each is a compact JSON
+// Signed device records (docs/sync/devices.md). Each is a compact JSON
 // array whose first element is its domain string, sent as the exact signed
 // bytes. The server verifies those bytes and then reads them; it never
 // re-serializes a record, so client and server cannot disagree on encoding.

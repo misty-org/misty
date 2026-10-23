@@ -1,4 +1,4 @@
-//! Approving a new device, on a device already added (docs/design/devices/BRIEF.md):
+//! Approving a new device, on a device already added (docs/sync/devices.md):
 //! verify the request, answer it once, check the reveal against the
 //! commitment, show the code, and only after the person confirms it, sign the
 //! grant and list and seal the vault root to the new device.

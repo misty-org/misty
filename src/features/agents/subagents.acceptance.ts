@@ -3,7 +3,7 @@ import { liveAcceptanceEnabled } from "@/tests/acceptance/liveEnv";
 import { MistyClient, type InvocationRun } from "@/tests/acceptance/mistyClient";
 import { writeAcceptanceReport } from "@/tests/acceptance/report";
 
-// docs/plans/agent-harness.md (Sub-agents and the notebook), live on the local server: a run
+// docs/agents/harness.md (Sub-agents and the notebook), live on the local server: a run
 // splits research across sub-agents with agent_delegate, keeps a notebook,
 // and merges what they found. No browser is attached, so the sub-agents
 // research with web search. The account's first Space is its personal one,

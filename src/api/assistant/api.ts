@@ -23,7 +23,7 @@ export const assistantApi = {
       { onCached },
     ),
   /**
-   * The device that starts a chat keeps it (docs/design/agent-chats-local/BRIEF.md);
+   * The device that starts a chat keeps it (docs/agents/chats-local.md);
    * without a device the chat waits in the inbox for the first device to take it.
    */
   createConversation: <T>(title: string, spaceId?: string, agentId?: string, deviceId?: string) =>

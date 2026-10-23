@@ -14,8 +14,8 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
 
-// Sub-agents (docs/plans/agent-harness.md, Sub-agents and the notebook). agent_delegate starts
-// up to three child runs (with the parent, four views of its chat, docs/design/agent-browser/BRIEF.md). Each is an ordinary invocation that runs under the
+// Sub-agents (docs/agents/harness.md, Sub-agents and the notebook). agent_delegate starts
+// up to three child runs (with the parent, four views of its chat, docs/agents/browser.md). Each is an ordinary invocation that runs under the
 // parent's lease, agent and approval setting, never more; with a browser, the
 // parent's device opens a tab per child and signs that child's grant itself.
 // Children report into the parent's notebook and return their answers here.

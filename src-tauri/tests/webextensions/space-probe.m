@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Spike (docs/design/spaces-as-profiles/BRIEF.md): one extension controller per Space,
+// Spike (docs/spaces/as-profiles.md): one extension controller per Space,
 // both live at once, each bound to its Space's named website data store.
 // Usage: space-probe <extension-dir> <page-url> <write|verify|cleanup> <uuid> x4
 //   uuids: Space A store, Space B store, Space A controller, Space B controller.

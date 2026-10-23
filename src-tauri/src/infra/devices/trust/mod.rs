@@ -1,4 +1,4 @@
-//! What this device trusts (docs/design/devices/BRIEF.md): the vault root it
+//! What this device trusts (docs/sync/devices.md): the vault root it
 //! pinned when it unlocked the vault, the newest device list that verifies
 //! against that root, and its own signed policy. Peers are trusted only
 //! through this list, never through anything the server asserts.

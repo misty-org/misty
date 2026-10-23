@@ -144,7 +144,7 @@ pub async fn navigation_names_update(
     state.navigation_names.update(account, key, name).await
 }
 
-/// Agent chats kept on this device (docs/design/agent-browser/BRIEF.md, local chats).
+/// Agent chats kept on this device (docs/agents/browser.md, local chats).
 #[tauri::command]
 pub async fn agent_chats_list(
     webview: tauri::Webview,
