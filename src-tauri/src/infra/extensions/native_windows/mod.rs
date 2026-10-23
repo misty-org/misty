@@ -19,6 +19,8 @@ mod package;
 mod profile;
 mod toolbar;
 #[cfg(test)]
+mod store_probe;
+#[cfg(test)]
 mod tests;
 
 use std::{
@@ -43,7 +45,7 @@ use toolbar::{actions, invoke, options};
 const TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_ICON_BYTES: u64 = 1024 * 1024;
 /// APIs WebView2 does not offer extensions yet.
-const LIMITED: [&str; 10] = [
+pub(super) const LIMITED: [&str; 10] = [
     "contextMenus",
     "notifications",
     "nativeMessaging",
@@ -69,8 +71,6 @@ struct Host {
     space: String,
     account: String,
     loaded: HashMap<String, Loaded>,
-    /// Per profile path, the folder each extension was last installed from.
-    applied: HashMap<String, HashMap<String, PathBuf>>,
     private_tabs: HashSet<String>,
 }
 
@@ -129,6 +129,11 @@ fn removal(space: &str, crx: &str) -> String {
 struct Ledger {
     managed: HashSet<String>,
     removed: HashSet<String>,
+    /// Per profile path, the folder each extension was last installed from.
+    /// Kept across launches: installing an extension again reruns its
+    /// `onInstalled`, and some open tabs there on every start.
+    #[serde(default)]
+    applied: HashMap<String, HashMap<String, PathBuf>>,
 }
 
 fn ledger_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {

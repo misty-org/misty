@@ -42,9 +42,7 @@ pub(super) async fn load(host: &mut Host, request: &Value) -> Result<Value, Stri
 pub(super) async fn unload(host: &mut Host, id: &str) -> Option<String> {
     let loaded = host.loaded.remove(id)?;
     let crx = page_host(&loaded.origin)?;
-    for applied in host.applied.values_mut() {
-        applied.remove(&crx);
-    }
+    forget_applied(&crx);
     for view in browser_views(&host.space) {
         let _ = set_enabled(&view, crx.clone(), false).await;
     }
@@ -81,8 +79,16 @@ pub(super) async fn unload_all(host: &mut Host) {
     for id in ids {
         unload(host, &id).await;
     }
-    host.applied.clear();
     host.private_tabs.clear();
+}
+
+/// The extension installs again the next time a profile should run it.
+fn forget_applied(crx: &str) {
+    update_ledger(|ledger| {
+        for applied in ledger.applied.values_mut() {
+            applied.remove(crx);
+        }
+    });
 }
 
 /// The open browser views of one Space.
@@ -132,14 +138,20 @@ pub(super) async fn reconcile(host: &mut Host, view: &Webview) -> Result<(), Str
             set_enabled(view, crx.clone(), false).await?;
         }
     }
-    let applied = host.applied.entry(profile.path).or_default();
+    let applied = ledger.applied.get(&profile.path);
     for (crx, folder) in wanted {
         let installed = profile.installed.iter().any(|(id, on)| *id == crx && *on);
-        if installed && applied.get(&crx) == Some(&folder) {
+        if installed && applied.and_then(|applied| applied.get(&crx)) == Some(&folder) {
             continue;
         }
         add(view, folder.clone()).await?;
-        applied.insert(crx, folder);
+        update_ledger(|ledger| {
+            ledger
+                .applied
+                .entry(profile.path.clone())
+                .or_default()
+                .insert(crx, folder);
+        });
     }
     Ok(())
 }

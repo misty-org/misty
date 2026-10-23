@@ -164,5 +164,10 @@ arboard = { path = "vendor/arboard" }
 # declare their own global `ipc` (see vendor/wry/MISTY-PATCH.md).
 wry = { path = "vendor/wry" }
 
+# Hold runtime messages that arrive while a webview is being created, so a
+# nested create or close can't wait on its own thread on Windows (see
+# vendor/tauri-runtime-wry/MISTY-PATCH.md).
+tauri-runtime-wry = { path = "vendor/tauri-runtime-wry" }
+
 # Backport the upstream VariantStrIter soundness fix to Tauri's GTK3-compatible GLib.
 glib = { path = "vendor/glib" }
