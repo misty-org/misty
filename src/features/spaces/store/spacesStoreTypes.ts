@@ -18,6 +18,7 @@ export interface SpacesStore {
   messageErrorsBySpace: Record<string, string>;
   nodesBySpace: Record<string, SpaceNode[]>;
   presenceBySpace: Record<string, SpacePresenceViewer[]>;
+  typingByConversation: Record<string, Record<string, number>>;
   snapshotReady: boolean;
   referenceOnly: boolean;
   loading: boolean;
@@ -63,5 +64,6 @@ export interface SpacesStore {
   connectRealtime: (accountId: string) => Promise<void>;
   disconnectRealtime: () => void;
   setViewingSpace: (spaceId: string) => void;
+  sendTyping: (spaceId: string, conversationId: string, active: boolean) => void;
   clearError: () => void;
 }

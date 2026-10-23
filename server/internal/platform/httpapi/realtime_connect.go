@@ -100,23 +100,100 @@ func (s *RealtimeService) removeViewerLocked(spaceID string, client *RealtimeCli
 	}
 }
 
-// handleClientMessage processes a message sent by a connected client. The
-// only message clients currently send is a "viewing" declaration, used to
-// drive the per-Space "active users" presence capsule. It carries an
-// "active" flag distinguishing a client that has the space's chat in focus
-// from one that's merely still connected while viewing something else
-// (idle).
+// handleClientMessage processes viewing and ephemeral typing declarations
+// sent by a connected client.
 func (s *RealtimeService) handleClientMessage(client *RealtimeClient, payload []byte) {
 	var msg struct {
-		Type    string `json:"type"`
-		SpaceID string `json:"space_id"`
-		Active  bool   `json:"active"`
+		Type           string `json:"type"`
+		SpaceID        string `json:"space_id"`
+		ConversationID string `json:"conversation_id"`
+		Active         bool   `json:"active"`
 	}
 	if json.Unmarshal(payload, &msg) != nil {
 		return
 	}
 	if msg.Type == "viewing" {
 		s.SetViewing(client, msg.SpaceID, msg.Active)
+	} else if msg.Type == "typing" {
+		s.broadcastTyping(client, msg.SpaceID, msg.ConversationID, msg.Active)
+	}
+}
+
+// broadcastTyping sends transient state only to people who can read the same chat.
+// It is never persisted; clients expire a stale active event after a few seconds.
+func (s *RealtimeService) broadcastTyping(client *RealtimeClient, spaceID, conversationID string, active bool) {
+	if spaceID == "" {
+		return
+	}
+	scopeKey := spaceID + "\x00" + conversationID
+	s.Mu.Lock()
+	if client.typingScopes == nil {
+		client.typingScopes = map[string]bool{}
+	}
+	if active && time.Since(client.lastTypingAt) < 250*time.Millisecond {
+		s.Mu.Unlock()
+		return
+	}
+	if !active && !client.typingScopes[scopeKey] {
+		s.Mu.Unlock()
+		return
+	}
+	client.lastTypingAt = time.Now()
+	if active {
+		client.typingScopes[scopeKey] = true
+	} else {
+		delete(client.typingScopes, scopeKey)
+	}
+	s.Mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	recipients := map[string]bool{}
+	if conversationID == "" {
+		members, err := s.database.SpaceMembers(ctx, client.UserID, spaceID)
+		if err != nil {
+			return
+		}
+		for _, member := range members {
+			recipients[member.UserID] = true
+		}
+	} else {
+		conversations, err := s.database.SpaceConversations(ctx, client.UserID, spaceID)
+		if err != nil {
+			return
+		}
+		for _, conversation := range conversations {
+			if conversation.ID != conversationID {
+				continue
+			}
+			for _, participant := range conversation.Participants {
+				if participant.Kind == "person" && participant.UserID != "" {
+					recipients[participant.UserID] = true
+				}
+			}
+			break
+		}
+		if len(recipients) == 0 {
+			return
+		}
+	}
+	delete(recipients, client.UserID)
+	payload, err := json.Marshal(map[string]any{
+		"type": "typing", "space_id": spaceID, "conversation_id": conversationID,
+		"user_id": client.UserID, "active": active,
+	})
+	if err != nil {
+		return
+	}
+	s.Mu.RLock()
+	targets := make([]*RealtimeClient, 0)
+	for userID := range recipients {
+		for target := range s.clientsByUser[userID] {
+			targets = append(targets, target)
+		}
+	}
+	s.Mu.RUnlock()
+	for _, target := range targets {
+		s.deliver(target, payload)
 	}
 }
 

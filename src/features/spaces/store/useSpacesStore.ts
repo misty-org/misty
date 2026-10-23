@@ -41,6 +41,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   messageErrorsBySpace: {},
   nodesBySpace: {},
   presenceBySpace: {},
+  typingByConversation: {},
   snapshotReady: false,
   referenceOnly: false,
   loading: false,
@@ -252,6 +253,7 @@ export function resetSpacesAccountState(): void {
     messageErrorsBySpace: {},
     nodesBySpace: {},
     presenceBySpace: {},
+    typingByConversation: {},
     snapshotReady: false,
     referenceOnly: false,
     // Stay in a loading state rather than flashing an empty "no Spaces yet"

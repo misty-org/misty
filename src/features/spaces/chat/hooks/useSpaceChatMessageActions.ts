@@ -39,7 +39,6 @@ export interface SpaceChatMessageActionsOptions {
     fileNodeIds: string[],
   ) => Promise<unknown>;
   storeDeleteMessage: (spaceId: string, messageId: string) => Promise<unknown>;
-  /** Starts the typing indicator without waiting for the queued run event. */
   storeToggleReaction: (
     spaceId: string,
     messageId: string,
@@ -121,7 +120,10 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     if (!nonce || sending.current.has(nonce)) return;
     sending.current.add(nonce);
     const optimistic = { ...message, local_delivery_state: "sending" as const };
-    if (conversationId) setGroupMessages((current) => mergeSpaceMessages(current, [optimistic]));
+    if (conversationId) {
+      setGroupChatError("");
+      setGroupMessages((current) => mergeSpaceMessages(current, [optimistic]));
+    }
     try {
       if (conversationId) {
         const response = await spacesApi.sendConversationMessage(
@@ -147,8 +149,9 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           optimistic,
         );
       }
-    } catch {
-      if (conversationId)
+    } catch (error) {
+      if (conversationId) {
+        reportConversationError(error, "The message could not be sent.");
         setGroupMessages((current) =>
           current.map((item) =>
             item.client_nonce === nonce && item.local_delivery_state
@@ -156,6 +159,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
               : item,
           ),
         );
+      }
     } finally {
       sending.current.delete(nonce);
     }

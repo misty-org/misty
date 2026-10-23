@@ -21,6 +21,7 @@ import { useMessageEditing } from "./hooks/useMessageEditing";
 import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
 import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
+import { useSpaceChatTyping } from "./hooks/useSpaceChatTyping";
 import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
 import { useSpaceChatAiAdapter } from "./hooks/useSpaceChatAiAdapter";
 import { useChatReadReceipts } from "./hooks/useChatReadReceipts";
@@ -74,6 +75,12 @@ export function SpaceChat({
     store,
   });
   const access = useSpaceChatAccess(spaceId);
+  const typing = useSpaceChatTyping({
+    spaceId,
+    conversationId,
+    currentUserId: user?.id,
+    members: scope.members,
+  });
   useWorkspaceViewTitle(workspaceTabId, `${spaceName} Chat`);
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
@@ -259,11 +266,16 @@ export function SpaceChat({
             canUploadAttachments={access.canWriteMessages}
             canBrowseLibrary={access.canWriteMessages}
             mentionNames={mentionNames}
+            typingLabel={typing.label}
+            onTypingInput={typing.onTextInput}
             replyToSenderName={
               scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
               "message"
             }
-            onSubmit={(event) => void actions.submit(event)}
+            onSubmit={(event) => {
+              typing.stop();
+              void actions.submit(event);
+            }}
             onOpenPicker={openPicker}
           />
         ) : (
@@ -302,6 +314,9 @@ export function SpaceChat({
           rootId={threadRootId}
           messages={scope.messages}
           canWrite={access.canWriteMessages}
+          typingLabel={typing.label}
+          onTypingInput={typing.onTextInput}
+          onStopTyping={typing.stop}
           onSend={actions.sendReply}
         />
       ) : null}

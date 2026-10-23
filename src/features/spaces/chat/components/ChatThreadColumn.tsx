@@ -21,11 +21,17 @@ export function ChatThreadColumn({
   rootId,
   messages,
   canWrite,
+  typingLabel,
+  onTypingInput,
+  onStopTyping,
   onSend,
 }: {
   rootId: string;
   messages: SpaceMessage[];
   canWrite: boolean;
+  typingLabel: string;
+  onTypingInput: (text: string) => void;
+  onStopTyping: () => void;
   onSend(replyToMessageId: string, text: string): Promise<void>;
 }) {
   const [text, setText] = useState("");
@@ -40,6 +46,7 @@ export function ChatThreadColumn({
     const value = text;
     if (!value.trim()) return;
     setText("");
+    onStopTyping();
     void onSend(rootId, value);
   };
   const entry = (message: SpaceMessage) => (
@@ -83,12 +90,24 @@ export function ChatThreadColumn({
       </ol>
       {canWrite && root ? (
         <form onSubmit={submit} className="border-t border-charcoal-border p-3">
+          {typingLabel ? (
+            <p
+              className="m-0 mb-1 min-h-4 text-xs text-cream-muted"
+              role="status"
+              aria-live="polite"
+            >
+              {typingLabel}
+            </p>
+          ) : null}
           <Textarea
             aria-label="Reply"
             rows={2}
             value={text}
             placeholder="Reply…"
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+              onTypingInput(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();

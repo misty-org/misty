@@ -34,6 +34,9 @@ type RealtimeClient struct {
 	// while viewingSpaceID is non-empty. Mutated only while holding
 	// RealtimeService.mu.
 	active bool
+	// lastTypingAt bounds typing frame processing for this socket.
+	lastTypingAt time.Time
+	typingScopes map[string]bool
 }
 
 type RealtimeService struct {

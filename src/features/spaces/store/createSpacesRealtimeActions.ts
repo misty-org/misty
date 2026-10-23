@@ -5,7 +5,7 @@ import { readRealtimeCursor } from "@/api/spaces/realtime-cursor";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "./spacesStoreTypes";
-import type { RealtimeEnvelope } from "./realtimeTypes";
+import { spaceTypingScopeKey, type RealtimeEnvelope } from "./realtimeTypes";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;
@@ -39,7 +39,7 @@ export function createSpacesRealtimeActions(
   set: SpacesSet,
   get: () => SpacesStore,
   readGeneration: () => number,
-): Pick<SpacesStore, "connectRealtime" | "disconnectRealtime" | "setViewingSpace"> {
+): Pick<SpacesStore, "connectRealtime" | "disconnectRealtime" | "setViewingSpace" | "sendTyping"> {
   readAccountGeneration = readGeneration;
   return {
     connectRealtime: async (accountId) => {
@@ -125,6 +125,19 @@ export function createSpacesRealtimeActions(
                     [envelope.space_id]: envelope.viewers,
                   },
                 }));
+              } else if (envelope.type === "typing") {
+                set((state) => {
+                  const key = spaceTypingScopeKey(envelope.space_id, envelope.conversation_id);
+                  const typingByUser = { ...(state.typingByConversation[key] ?? {}) };
+                  if (envelope.active) typingByUser[envelope.user_id] = Date.now() + 4_000;
+                  else delete typingByUser[envelope.user_id];
+                  return {
+                    typingByConversation: {
+                      ...state.typingByConversation,
+                      [key]: typingByUser,
+                    },
+                  };
+                });
               } else {
                 void resyncSpaces(get);
               }
@@ -181,6 +194,21 @@ export function createSpacesRealtimeActions(
       if (currentViewingSpaceId === spaceId) return;
       currentViewingSpaceId = spaceId;
       sendViewingMessage(spaceId, currentViewingActive);
+    },
+    sendTyping: (spaceId, conversationId, active) => {
+      if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
+      try {
+        realtimeSocket.send(
+          JSON.stringify({
+            type: "typing",
+            space_id: spaceId,
+            conversation_id: conversationId,
+            active,
+          }),
+        );
+      } catch {
+        /* Typing is ephemeral; a missed event expires on other clients. */
+      }
     },
   };
 }
