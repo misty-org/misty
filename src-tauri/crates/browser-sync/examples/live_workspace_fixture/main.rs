@@ -67,6 +67,7 @@ async fn main() {
             root_public_key: public.clone(),
             key_envelope: Some(wrapper.clone()),
             space_key_envelope: None,
+            key_transition: None,
         },
         bootstrap_pending: bootstrap,
         enrollment_pending: true,

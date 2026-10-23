@@ -94,7 +94,7 @@ mod tests {
             "extensions_action",
             "extensions_reconcile",
             "browser_sync_availability",
-            "browser_sync_generate_secret",
+            "browser_sync_use_account_password",
             "browser_sync_setup",
             "browser_sync_connect",
             "browser_sync_state",
@@ -121,6 +121,24 @@ mod tests {
                 "incognito-1",
             ] {
                 assert!(!allows(label, command));
+            }
+        }
+    }
+
+    #[test]
+    fn password_derivation_is_for_misty_windows_only() {
+        for command in ["account_login_credential", "account_check_password"] {
+            for label in ["window-1", "incognito-1"] {
+                assert!(allows(label, command), "{label}: {command}");
+            }
+            // Website views and agent windows cannot use them to test password guesses.
+            for label in [
+                "browser-a",
+                "misty-agent-01951d32-40ac-7000-8000-000000000001",
+                "misty-cursor-1",
+                "window-1-spoof",
+            ] {
+                assert!(!allows(label, command), "{label}: {command}");
             }
         }
     }

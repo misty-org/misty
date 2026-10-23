@@ -88,20 +88,8 @@ pub(super) fn store_extension(page: &Url) -> Option<String> {
                 .find(|segment| crate::infra::extensions::is_chrome_store_id(segment))
                 .map(|id| (*id).to_owned())
         }
-        "addons.mozilla.org" => {
-            // /<locale>/firefox/addon/<slug>/…
-            let at = segments.iter().take(3).position(|s| *s == "addon")?;
-            if at == 0 || segments[at - 1] != "firefox" {
-                return None;
-            }
-            let slug = segments.get(at + 1)?;
-            (!slug.is_empty()
-                && slug.len() <= 200
-                && slug
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"-_.~@{}".contains(&b)))
-            .then(|| (*slug).to_owned())
-        }
+        // Firefox Add-ons is not offered: Misty's one extension standard is
+        // Chrome (Manifest V3), so only Chrome Web Store pages are read.
         _ => None,
     }
 }
@@ -125,15 +113,9 @@ mod tests {
                 .as_deref(),
             Some("ddkjiahejlhfcafbddmgiahcphecmpfh")
         );
-        assert_eq!(
-            extension("https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/").as_deref(),
-            Some("ublock-origin")
-        );
-        assert_eq!(
-            extension("https://addons.mozilla.org/firefox/addon/darkreader/reviews/").as_deref(),
-            Some("darkreader")
-        );
         for url in [
+            "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/",
+            "https://addons.mozilla.org/firefox/addon/darkreader/reviews/",
             "https://chromewebstore.google.com/category/extensions",
             "https://chromewebstore.google.com/detail/slug/notanid",
             "http://chromewebstore.google.com/detail/ddkjiahejlhfcafbddmgiahcphecmpfh",

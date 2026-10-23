@@ -93,7 +93,8 @@ pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Re
     Ok(())
 }
 
-#[cfg(test)]
+// The paths are Unix paths; a path like /Users/me is not absolute on Windows.
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

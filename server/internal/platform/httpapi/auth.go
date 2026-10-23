@@ -28,6 +28,8 @@ func RegisterWithVerification(database *db.Database, analytics telemetry.Client,
 			Username string `json:"username"`
 			Email    string `json:"email"`
 			Password string `json:"password"`
+			// Credential: the password is one the app derived on the device.
+			Credential bool `json:"credential"`
 		}
 		if decodeJSON(w, r, &body) != nil {
 			return
@@ -79,6 +81,13 @@ func RegisterWithVerification(database *db.Database, analytics telemetry.Client,
 			}
 		}
 
+		if body.Credential {
+			if err := database.SetCredentialPassword(user.ID, true); err != nil {
+				http.Error(w, "failed to create user", http.StatusInternalServerError)
+				return
+			}
+			user.CredentialPassword = true
+		}
 		verification.AfterSignup(r, user, false)
 		writeAuthSession(w, r, database, user, http.StatusCreated)
 	}
@@ -151,11 +160,12 @@ func writeAuthSession(
 		return
 	}
 
-	writeJSON(w, status, map[string]string{
-		"user_id":  user.ID,
-		"username": user.Username,
-		"email":    user.Email,
-		"provider": user.Provider,
+	writeJSON(w, status, map[string]any{
+		"user_id":            user.ID,
+		"username":           user.Username,
+		"email":              user.Email,
+		"provider":           user.Provider,
+		"credential_account": user.CredentialPassword,
 	})
 }
 

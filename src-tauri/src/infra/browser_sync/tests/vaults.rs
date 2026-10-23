@@ -105,6 +105,7 @@ fn two_vaults() -> TwoVaults {
             root_public_key: public,
             key_envelope: None,
             space_key_envelope: Some(sealed),
+            key_transition: None,
         },
         bootstrap_pending: false,
         enrollment_pending: true,

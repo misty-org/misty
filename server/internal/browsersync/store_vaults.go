@@ -34,20 +34,26 @@ func (k SyncVaultKeys) valid() bool {
 		return false
 	}
 	if k.KeyEnvelope != nil {
-		return k.KeyEnvelope.Valid()
+		// A new vault is sealed under the account password. The sync-secret wrapper
+		// exists only for vaults made before it, and is never created again.
+		return k.KeyEnvelope.Valid() && k.KeyEnvelope.KDF == SyncKDFAccount
 	}
 	return k.SpaceKeyEnvelope.Validate(4096)
 }
 
-const syncVaultColumns = `v.space_id,v.vault_id,v.key_epoch,v.head_sequence,v.root_public_key,v.key_envelope,v.space_key_envelope`
+const syncVaultColumns = `v.space_id,v.vault_id,v.key_epoch,v.head_sequence,v.root_public_key,v.key_envelope,v.space_key_envelope,v.key_generation,v.key_transition_signature`
 
 func scanSyncVault(row interface{ Scan(...any) error }) (*SyncSpaceVault, error) {
 	var v SyncSpaceVault
-	var key, space []byte
-	if err := row.Scan(&v.SpaceID, &v.VaultID, &v.KeyEpoch, &v.HeadSequence, &v.RootPublicKey, &key, &space); err != nil {
+	var key, space, transition []byte
+	var generation int64
+	if err := row.Scan(&v.SpaceID, &v.VaultID, &v.KeyEpoch, &v.HeadSequence, &v.RootPublicKey, &key, &space, &generation, &transition); err != nil {
 		return nil, err
 	}
 	v.KeyEnvelope, v.SpaceKeyEnvelope = key, space
+	if generation > 0 {
+		v.KeyTransition = &SyncKeyTransition{Generation: generation, Signature: transition}
+	}
 	return &v, nil
 }
 

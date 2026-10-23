@@ -114,6 +114,8 @@ fn context(launch: &Launch) -> BridgeContext {
     }
 }
 
+// The stand-in CLI is a shell script.
+#[cfg(unix)]
 #[tokio::test]
 async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
     let (runner, launch, host, answer) = setup(true);
@@ -146,6 +148,8 @@ async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
         .any(|e| matches!(e, RunnerEvent::Done { .. })));
 }
 
+// The stand-in CLI is a shell script.
+#[cfg(unix)]
 #[tokio::test]
 async fn a_no_from_the_person_reaches_the_tool_as_a_deny() {
     let (runner, launch, host, answer) = setup(false);

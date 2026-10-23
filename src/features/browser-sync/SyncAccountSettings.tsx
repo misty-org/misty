@@ -6,8 +6,9 @@ import {
 } from "@/features/settings/desktop";
 import { SettingsNote } from "@/features/settings/SettingsControls";
 import { SyncDeleteVaultDialog } from "./SyncDeleteVaultDialog";
+import { SyncPasswordDialog } from "./SyncPasswordDialog";
 import { SyncVaultForm } from "./SyncVaultForm";
-import { generateSyncSecret } from "./native";
+import { isCredentialAccount } from "@/features/auth";
 import type { SyncController } from "./useSyncController";
 export function SyncUnlockForm({
   controller,
@@ -19,18 +20,60 @@ export function SyncUnlockForm({
   compact?: boolean;
 }) {
   const { vault, reenroll, unlock } = controller;
+  const [choosing, setChoosing] = useState(false);
   if (!vault) return <SyncVaultFormSkeleton />;
+  const create = !reenroll && !vault.local && vault.remote === false;
+  const google = controller.provider === "google";
   return (
-    <SyncVaultForm
-      sectionTitle={sectionTitle}
-      compact={compact}
-      key={`${vault.account.accountId}:${vault.generation}:${reenroll}`}
-      local={vault.local}
-      create={!reenroll && !vault.local && vault.remote === false}
-      reenroll={reenroll}
-      onGenerateSecret={generateSyncSecret}
-      onUnlock={unlock}
-    />
+    <>
+      <SyncVaultForm
+        sectionTitle={sectionTitle}
+        compact={compact}
+        key={`${vault.account.accountId}:${vault.generation}:${reenroll}`}
+        local={vault.local}
+        create={create}
+        legacy={vault.accountPassword === false}
+        needsNewPassword={create && !google && !isCredentialAccount(controller.accountId)}
+        onChooseNewPassword={() => setChoosing(true)}
+        confirmPassword={create && google}
+        reenroll={reenroll}
+        onUnlock={unlock}
+      />
+      <SyncPasswordDialog
+        open={choosing}
+        onOpenChange={setChoosing}
+        google={google}
+        onSubmit={controller.changePassword}
+      />
+    </>
+  );
+}
+
+/** Moves a vault that still needs a sync secret to the Misty password, or changes that password. */
+function PasswordRow({ controller, compact }: { controller: SyncController; compact: boolean }) {
+  const [open, setOpen] = useState(false);
+  const legacy = controller.vault?.accountPassword === false;
+  const google = controller.provider === "google";
+  return (
+    <Row
+      label={legacy ? "Use your Misty password" : google ? "Sync password" : "Misty password"}
+      description={
+        legacy
+          ? "Your vault still needs a sync secret. Choose a new Misty password to unlock it with that one password."
+          : "Changes the password your synced data is encrypted with on this device."
+      }
+      density={compact ? "compact" : "normal"}
+    >
+      <Button variant="outline" disabled={controller.busy} onClick={() => setOpen(true)}>
+        {legacy ? "Choose password…" : "Change password…"}
+      </Button>
+      <SyncPasswordDialog
+        open={open}
+        onOpenChange={setOpen}
+        google={google}
+        onSubmit={controller.changePassword}
+      />
+    </Row>
   );
 }
 /** Mirrors the SyncVaultForm layout: a section header, hairline rows and the action footer. */
@@ -85,7 +128,7 @@ function DeleteVaultRow({ controller }: { controller: SyncController }) {
       label="Delete vault"
       description={
         "Removes synced data from the server and stops sync on every device, so you can " +
-        "create a new vault. Use it if you lost your sync password or secret."
+        "create a new vault. Use it if you lost your password."
       }
     >
       <Button variant="outline" disabled={controller.busy} onClick={() => setOpen(true)}>
@@ -94,6 +137,7 @@ function DeleteVaultRow({ controller }: { controller: SyncController }) {
       <SyncDeleteVaultDialog
         open={open}
         onOpenChange={setOpen}
+        needsPassword={controller.provider !== "google"}
         onConfirm={controller.deleteVault}
       />
     </Row>
@@ -108,8 +152,12 @@ export function ResetSyncRow({ controller }: { controller: SyncController }) {
   if (!vault || (!vault.local && vault.remote !== true)) return null;
   return (
     <Row
-      label="Lost your sync password or secret?"
-      description="Resetting removes synced data from the server and stops sync on every device. You can then set up sync again."
+      label="Lost your password?"
+      description={
+        "Reset your password by email and sign in with it, then reset sync here with that " +
+        "password. It removes synced data from the server and stops sync on every device; " +
+        "you can then set up sync again."
+      }
     >
       <Button variant="ghost" disabled={controller.busy} onClick={() => setOpen(true)}>
         Reset sync…
@@ -117,6 +165,7 @@ export function ResetSyncRow({ controller }: { controller: SyncController }) {
       <SyncDeleteVaultDialog
         open={open}
         onOpenChange={setOpen}
+        needsPassword={controller.provider !== "google"}
         onConfirm={controller.deleteVault}
       />
     </Row>
@@ -173,7 +222,7 @@ export function SyncAccountSettings({
           </Row>
           <Row
             label="Saved device key"
-            description="Forget it to require your password and secret next time."
+            description="Forget it to require your password next time."
             density={compact ? "compact" : "normal"}
           >
             <Button
@@ -184,6 +233,7 @@ export function SyncAccountSettings({
               Forget key
             </Button>
           </Row>
+          <PasswordRow controller={controller} compact={compact} />
           {showDelete ? <DeleteVaultRow controller={controller} /> : null}
         </>
       ) : (

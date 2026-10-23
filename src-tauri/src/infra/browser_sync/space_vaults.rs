@@ -147,6 +147,7 @@ async fn create_space_vault(keys: &Keys, space_id: &str) -> Result<Vault, String
         root_public_key: public,
         key_envelope: None,
         space_key_envelope: Some(sealed),
+        key_transition: None,
     })
 }
 

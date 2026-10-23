@@ -2,9 +2,8 @@ import { Puzzle } from "lucide-react";
 import { MenuItem, MenuSubmenu } from "@/shared/ui";
 import { rememberedExtensionIcon } from "./extensionIcons";
 import { openStorePage } from "./openStorePage";
-import { storeHomes, storeNames } from "./store";
+import { offeredStores, storeHomes, storeNames } from "./store";
 import { useExtensionActions } from "./useExtensionActions";
-import type { ExtensionStore } from "./types";
 
 /** The installed extensions as a menu submenu: each row runs its extension's action. */
 export function ExtensionsMenuRows({
@@ -38,7 +37,7 @@ export function ExtensionsMenuRows({
           />
         );
       })}
-      {(["chrome", "firefox"] as ExtensionStore[]).map((store) => (
+      {offeredStores.map((store) => (
         <MenuItem
           key={store}
           label={storeNames[store]}

@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   resumeAccount: vi.fn(),
   removeAccount: vi.fn(),
   accountSignIn: vi.fn(),
+  CredentialSignInRefused: class CredentialSignInRefused extends Error {
+    constructor() {
+      super("That password did not work.");
+    }
+  },
   accountForgotPassword: vi.fn(),
 }));
 
@@ -43,6 +48,7 @@ vi.mock("./AuthContext", () => ({
 vi.mock("./store/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
   accountForgotPassword: mocks.accountForgotPassword,
+  CredentialSignInRefused: mocks.CredentialSignInRefused,
 }));
 
 import SignIn from "./SignInPage";
@@ -287,8 +293,45 @@ describe("SignInPage", () => {
     });
 
     expect(mocks.authenticateAccount).toHaveBeenCalled();
-    expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123");
+    expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123", {
+      legacy: false,
+    });
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
+  });
+
+  it("sends the password in plain form only when asked, after a refused credential sign-in", async () => {
+    mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
+    mocks.accountSignIn.mockRejectedValueOnce(new mocks.CredentialSignInRefused());
+    mocks.accountSignIn.mockResolvedValueOnce({ id: "acc-1", email: "a@example.com", username: "A" });
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/signin"]}>
+          <SignIn />
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      setInputValue(container.querySelector<HTMLInputElement>('input[type="email"]')!, "a@example.com");
+      setInputValue(container.querySelector<HTMLInputElement>('input[type="password"]')!, "reset password");
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLFormElement>("form")!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(mocks.accountSignIn).toHaveBeenLastCalledWith("a@example.com", "reset password", {
+      legacy: false,
+    });
+    await act(async () => {});
+    expect(container.textContent).toContain("Reset your password by email?");
+    const plain = [...container.querySelectorAll("button")].find((b) =>
+      b.textContent?.includes("Sign in with the reset password"),
+    )!;
+    expect(plain).toBeTruthy();
+    await act(async () => plain.click());
+    expect(mocks.accountSignIn).toHaveBeenLastCalledWith("a@example.com", "reset password", {
+      legacy: true,
+    });
   });
 
   it("sends a reset link from the forgot-password form and returns to sign-in", async () => {

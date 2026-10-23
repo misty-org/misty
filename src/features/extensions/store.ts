@@ -70,6 +70,12 @@ export const storeNames: Record<ExtensionStore, string> = {
   chrome: "Chrome Web Store",
   firefox: "Firefox Add-ons",
 };
+/**
+ * The stores people can add extensions from. Misty's one extension standard is
+ * Chrome (Manifest V3), so Firefox Add-ons is not offered; extensions already
+ * installed from it keep their own identity and stay manageable.
+ */
+export const offeredStores: ExtensionStore[] = ["chrome"];
 export const storeHomes: Record<ExtensionStore, string> = {
   chrome: "https://chromewebstore.google.com/",
   firefox: "https://addons.mozilla.org/firefox/",
@@ -234,7 +240,8 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
       installed: true,
       enabled: old?.enabled ?? true,
       privateAccess: review.privateAllowed && privateAccess,
-      agentAccess: old?.agentAccess ?? true,
+      // A new extension is off limits to agents until the person allows it.
+      agentAccess: old?.agentAccess ?? false,
       permissions: [...new Set([...(old?.permissions ?? []), ...review.permissions])],
       hosts: [...new Set([...(old?.hosts ?? []), ...review.hosts])],
     };

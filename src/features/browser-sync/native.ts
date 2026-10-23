@@ -142,10 +142,17 @@ export const activeDeviceEpoch = (session: NativeSyncView): string | null =>
     ? session.workspace.active_device.epoch
     : null;
 export const vaultAvailability = (account: SyncAccount) =>
-  invoke<{ local: boolean; remote: boolean | null }>("browser_sync_availability", { ...account });
-export const generateSyncSecret = () => invoke<string>("browser_sync_generate_secret");
+  invoke<{ local: boolean; remote: boolean | null; accountPassword: boolean | null }>(
+    "browser_sync_availability",
+    { ...account },
+  );
+/**
+ * A vault is sealed under the Misty password (`email` and `password`). One made
+ * before that also needs its sync secret until it is moved over.
+ */
 export const unlockNativeSync = (
   account: SyncAccount,
+  email: string | null,
   password: string | null,
   syncSecret: string | null,
   remember: boolean,
@@ -156,16 +163,19 @@ export const unlockNativeSync = (
   invoke<NativeSyncView>(
     create ? "browser_sync_setup" : "browser_sync_connect",
     create
-      ? { ...account, password, syncSecret, remember }
-      : { ...account, password, syncSecret, remember, reenroll },
+      ? { ...account, email, password, remember }
+      : { ...account, email, password, syncSecret, remember, reenroll },
   );
+/** Re-seals the open vault under a Misty password the server has never seen in plain form. */
+export const resealSyncWithAccountPassword = (account: SyncAccount, email: string, password: string) =>
+  invoke<void>("browser_sync_use_account_password", { ...account, email, password });
 export const lockNativeSync = (sessionId: string, forget = false) =>
   invoke<void>("browser_sync_lock", { sessionId, forget });
 export const forgetNativeSyncKey = (account: SyncAccount) =>
   invoke<void>("browser_sync_forget_key", { ...account });
 /** Deletes the account's only vault, everywhere, so a new one can be created. */
-export const deleteNativeSyncVault = (account: SyncAccount) =>
-  invoke<void>("browser_sync_delete_vault", { ...account });
+export const deleteNativeSyncVault = (account: SyncAccount, currentPassword: string | null) =>
+  invoke<void>("browser_sync_delete_vault", { ...account, currentPassword });
 
 export const controlNativeDevice = (
   sessionId: string,

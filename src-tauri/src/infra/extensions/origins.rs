@@ -36,6 +36,13 @@ pub(super) fn drop_space_origins(space: &str) {
 pub(super) fn installation_origin(account: &str, guid: &str) -> String {
     uuid_for(&format!("{account}:{guid}"))
 }
+/// The host an installation's pages load from, which is the key `allow_origin`
+/// and `drop_origin` use: the origin itself on macOS, the extension ID derived
+/// from it on Windows. Dropping by the origin left a removed extension's pages
+/// allowed on Windows.
+pub(super) fn installation_host(account: &str, guid: &str) -> String {
+    page_host(&installation_origin(account, guid)).unwrap_or_default()
+}
 pub(crate) fn is_extension_url(url: &url::Url) -> bool {
     url.scheme() == EXTENSION_SCHEME
         && url.port().is_none()

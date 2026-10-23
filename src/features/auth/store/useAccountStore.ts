@@ -1,6 +1,18 @@
 import { clearApiCache } from "@/api/cache/api-cache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
-import { accountApi, AccountApiError, configureAccountApi } from "@/api/account/api";
+import {
+  accountApi,
+  AccountApiError,
+  configureAccountApi,
+  isAccountUnauthorizedError,
+} from "@/api/account/api";
+import {
+  deriveLoginCredential,
+  isCredentialEmail,
+  markCredentialAccount,
+  passwordProblem,
+  unmarkCredentialAccount,
+} from "./accountCredential";
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
 import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
 import { analytics } from "@/telemetry/client";
@@ -35,8 +47,41 @@ async function persistLogin(data: LoginResponse, operation: string): Promise<Acc
   return user;
 }
 
-export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
-  return persistLogin(await accountApi.signIn(email, password), "Sign-in");
+/**
+ * The password did not open an account this device knows signs in with a derived
+ * credential. The password is not sent a second time in plain form: a typo
+ * would reach the server, and so would the real password if the server lied.
+ * The person can ask for that explicitly (`legacy`) after a reset by email.
+ */
+export class CredentialSignInRefused extends AccountApiError {
+  name = "CredentialSignInRefused";
+  constructor() {
+    super("That password did not work.", 401);
+  }
+}
+
+export async function accountSignIn(
+  email: string,
+  password: string,
+  options: { legacy?: boolean } = {},
+): Promise<AccountAuthUser> {
+  // The desktop app sends a credential derived on the device, not the password.
+  const credential = options.legacy ? null : await deriveLoginCredential(email, password);
+  if (credential) {
+    try {
+      const user = await persistLogin(await accountApi.signIn(email, credential), "Sign-in");
+      markCredentialAccount(user.id, email);
+      return user;
+    } catch (error) {
+      if (!isAccountUnauthorizedError(error)) throw error;
+      if (isCredentialEmail(email)) throw new CredentialSignInRefused();
+    }
+  }
+  // An account made before that, or one whose password was reset by email,
+  // holds the password itself: the server has seen it, so it must not seed keys.
+  const user = await persistLogin(await accountApi.signIn(email, password), "Sign-in");
+  unmarkCredentialAccount(user.id);
+  return user;
 }
 
 export async function accountGoogleSignIn(
@@ -116,8 +161,17 @@ export async function accountRegister(
   email: string,
   password: string,
 ): Promise<AccountAuthUser> {
-  const body = { username, email, password };
-  return persistLogin(await accountApi.register(body), "Registration");
+  // The password protects the sync vault, so its rules are enforced here: the
+  // server only ever sees a value derived from it.
+  const credential = await deriveLoginCredential(email, password);
+  if (credential) {
+    const problem = await passwordProblem(email, password);
+    if (problem) throw new Error(problem);
+  }
+  const body = { username, email, password: credential ?? password, credential: Boolean(credential) };
+  const user = await persistLogin(await accountApi.register(body), "Registration");
+  if (credential) markCredentialAccount(user.id, email);
+  return user;
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {

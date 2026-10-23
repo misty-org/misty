@@ -1,11 +1,16 @@
 # Extensions
 
 Mode: Operate. Misty has no Extensions page or catalog. People find extensions the
-way they would in Chrome or Firefox: on the Chrome Web Store
-(`chromewebstore.google.com`) and Firefox Add-ons (`addons.mozilla.org`), opened in
-an ordinary browser tab. Old `/extensions` routes and `misty://extensions` open
-Settings › Browser › Extensions, and saved Extensions tabs reopen as the Chrome Web
-Store.
+way they would in Chrome: on the Chrome Web Store (`chromewebstore.google.com`),
+opened in an ordinary browser tab. Chrome (Manifest V3) is Misty's one extension
+standard on every platform (decided 2026-10-22,
+[docs/plans/extensions-sync-plan.md](../../../docs/plans/extensions-sync-plan.md)), so
+Firefox Add-ons is not offered: no store button, menu entry or Settings row
+(`offeredStores` in `store.ts`). The Firefox install path below stays in the code, and
+extensions already installed from it keep running where the platform allows. Old
+`/extensions` routes and `misty://extensions` open Settings › Browser › Extensions, and
+saved Extensions tabs reopen as the Chrome Web Store. First-run setup offers an
+optional ad blocker and password manager (`ExtensionsSetupStep.tsx`).
 
 ## Adding an extension
 

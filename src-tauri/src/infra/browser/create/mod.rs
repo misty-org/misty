@@ -70,9 +70,13 @@ pub async fn browser_webview_create(
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = caller.window();
     if !request.preview_only {
-        window
-            .set_theme(browser_theme(&request.theme)?)
-            .map_err(|error| error.to_string())?;
+        // A `None` theme reset can repaint WebView2's native scrollbar. Match
+        // the update path and apply a theme only when one is explicit.
+        if let Some(theme) = browser_theme(&request.theme)? {
+            window
+                .set_theme(Some(theme))
+                .map_err(|error| error.to_string())?;
+        }
     }
     // A live webview's cookie store cannot be changed by updating its metadata.
     // Account switches must close/reopen through the owning host view.
@@ -124,6 +128,11 @@ pub async fn browser_webview_create(
             request.profile_id.as_deref()
         },
     )?;
+    // WebView2 already supplies the browser's default canvas. A Misty-themed
+    // background leaks through transparent website surfaces and can repaint
+    // the native scrollbar during creation.
+    #[cfg(not(windows))]
+    let builder = builder.background_color(browser_background());
     // An incognito view joins its Space's incognito session (see vendor/wry's
     // MISTY-PATCH.md): the identifier names the session, never a persistent store.
     let builder = match incognito {
@@ -169,7 +178,6 @@ pub async fn browser_webview_create(
             "HTMLMediaElement.prototype.play = function(){ return Promise.resolve(); }; document.addEventListener('play', event => { if (event.target instanceof HTMLMediaElement) { event.target.muted = true; event.target.pause(); } }, true); if (window.AudioContext) window.AudioContext.prototype.resume = function(){ return Promise.resolve(); };"
         } else { "" })
         .accept_first_mouse(true)
-        .background_color(browser_background(&request.theme))
         // Captions for questions about a video, read in every frame; private tabs keep none.
         .initialization_script_for_all_frames(if request.private || preview_only {
             String::new()
@@ -232,7 +240,12 @@ pub async fn browser_webview_create(
     #[cfg(not(windows))]
     let initial_position = position;
     trace_create("creating the native webview");
-    let webview = match window.add_child(builder, initial_position, size) {
+    let created = {
+        // A popup requested while this view is created is opened as a tab (see creation_guard).
+        let _creating = super::creation_guard::Creating::enter();
+        window.add_child(builder, initial_position, size)
+    };
+    let webview = match created {
         Ok(webview) => webview,
         Err(error) => {
             release_first_paint(&app, &request.id);
@@ -291,7 +304,6 @@ pub async fn browser_webview_create(
     apply_macos_webview_theme(&webview, &request.theme)?;
     configure_browser_webview(&webview, request.native_live_resize)?;
     apply_shortcuts(&webview, &state)?;
-    webview.set_zoom(1.0).map_err(|error| error.to_string())?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     trace_create("created and presented");
     present_macos_webview(&webview)

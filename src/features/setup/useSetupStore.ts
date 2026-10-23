@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-export type SetupStep = "import" | "tabs";
+export type SetupStep = "import" | "extensions" | "tabs";
 
 const guestAccountKey = "guest";
 export const setupStorageKey = "misty-first-run-setup";

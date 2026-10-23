@@ -22,6 +22,7 @@ pub(crate) fn open_hidden_profile_view(
         builder.data_store_identifier(super::browser_profile::data_store_identifier(profile)?);
     #[cfg(windows)]
     let builder = super::browser::with_browser_data(builder, app, profile)?;
+    let _creating = super::browser::creation_guard::Creating::enter();
     let view = owner
         .add_child(
             builder,

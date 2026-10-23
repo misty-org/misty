@@ -6,12 +6,24 @@ import {
   readApiSessionGeneration,
 } from "@/api/client/session";
 import { resolveApiBase } from "@/api/deployment/api";
+import { accountApi } from "@/api/account/api";
+import {
+  accountChangePassword,
+  credentialEmail,
+  deriveLoginCredential,
+  isCredentialAccount,
+  markCredentialAccount,
+  passwordProblem,
+  unmarkCredentialAccount,
+  useAuth,
+} from "@/features/auth";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import {
   lockNativeSync,
   deleteNativeSyncVault,
   forgetNativeSyncKey,
+  resealSyncWithAccountPassword,
   unlockNativeSync,
   vaultAvailability,
   type SyncAccount,
@@ -23,6 +35,12 @@ import { useBrowserSyncStore } from "./store";
 import type { VaultUnlockRequest } from "./SyncVaultForm";
 
 export function useSyncController(accountId: string) {
+  const { user } = useAuth();
+  // The keys are derived from the email the account was first seen with, as typed, and rebuilt
+  // from that every time. The email the server reports can change, and would change the keys.
+  const email = credentialEmail(accountId) ?? user?.email ?? "";
+  // A Google account has no Misty password, so its sync password never touches the server.
+  const [provider, setProvider] = useState<"misty" | "google">("misty");
   const sync = useBrowserSyncStore();
   const spaces = useSpacesStore((state) => state.spaces);
   const recovery = useWorkspaceRecoveryState();
@@ -33,6 +51,8 @@ export function useSyncController(accountId: string) {
     generation: number;
     local: boolean;
     remote: boolean | null;
+    /** True once the vault is sealed under the Misty password; false while it still needs a sync secret. */
+    accountPassword: boolean | null;
   } | null>(null);
   const [form, setForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,6 +74,22 @@ export function useSyncController(accountId: string) {
     };
   }, []);
   useEffect(() => {
+    if (!hasTauriInternals() || !accountId) return;
+    let active = true;
+    void accountApi.me()
+      .then((me) => {
+        if (!active) return;
+        setProvider(me.provider === "google" ? "google" : "misty");
+        // The server says it has seen this password in plain form (a reset by email, on
+        // another device or here): the account is no longer safe to seal a vault under.
+        if (me.credential_account === false) unmarkCredentialAccount(accountId);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [accountId]);
+  useEffect(() => {
     setAvailable(null);
     setForm(false);
     setError(null);
@@ -66,7 +102,7 @@ export function useSyncController(accountId: string) {
       try {
         const account = { apiBase: await resolveApiBase(), accountId };
         if (!valid()) return;
-        setAvailable({ account, generation, local: false, remote: null });
+        setAvailable({ account, generation, local: false, remote: null, accountPassword: null });
         await readApiAuthToken();
         if (!valid()) return;
         const found = await vaultAvailability(account);
@@ -150,6 +186,7 @@ export function useSyncController(accountId: string) {
     if (!valid()) throw new Error("Your account changed. Reopen sync.");
     const opened = await unlockNativeSync(
       vault.account,
+      email,
       request.password,
       request.syncSecret,
       request.remember,
@@ -172,11 +209,25 @@ export function useSyncController(accountId: string) {
       setForm(true);
     });
   /** Throws so the confirmation can show what went wrong; nothing changes on failure. */
-  const deleteVault = async () => {
+  const deleteVault = async (password: string) => {
     if (!vault || isApiSessionTransitioning() || vault.generation !== readApiSessionGeneration())
       throw new Error("Your account changed. Reopen sync.");
     await readApiAuthToken();
-    await deleteNativeSyncVault(vault.account);
+    // The password confirms it: the credential derived from it for an account that uses
+    // them, as typed for one the server holds that way, nothing for an account with none.
+    const confirmation =
+      provider === "google"
+        ? null
+        : isCredentialAccount(accountId)
+          ? await deriveLoginCredential(email, password)
+          : password;
+    try {
+      await deleteNativeSyncVault(vault.account, confirmation);
+    } catch (cause) {
+      if (typeof cause === "string" && /password did not work/i.test(cause))
+        throw new Error("That password did not work.");
+      throw cause;
+    }
     if (!mounted.current || vault.generation !== readApiSessionGeneration()) return;
     useBrowserSyncStore.setState({ session: null, issue: null, reenroll: null, locked: null });
     setAvailable((previous) =>
@@ -185,8 +236,33 @@ export function useSyncController(accountId: string) {
     setError(null);
     setForm(true);
   };
+  /**
+   * Chooses the Misty password the vault is sealed under; `current` is the old
+   * one. The open vault is re-sealed first, which needs only its unlocked key,
+   * then the server's password changes (it is sent only a derived credential), so
+   * a failure on either step is retried with the same two passwords. A Google
+   * account has no Misty password, so its sync password is local and needs no
+   * `current`. The account counts as safe for new vaults only after both steps.
+   */
+  const changePassword = async (current: string, next: string) => {
+    if (!vault || !email || isApiSessionTransitioning() || vault.generation !== readApiSessionGeneration())
+      throw new Error("Your account changed. Reopen sync.");
+    // A vault that exists must be open to be re-sealed; no vault yet needs nothing to open.
+    if (!session && (vault.local || vault.remote === true))
+      throw new Error("Unlock sync before changing your password.");
+    if (current === next) throw new Error("Choose a password you have not used before.");
+    const problem = await passwordProblem(email, next);
+    if (problem) throw new Error(problem);
+    if (session) await resealSyncWithAccountPassword(vault.account, email, next);
+    if (provider !== "google") await accountChangePassword(email, current, next);
+    markCredentialAccount(accountId, email);
+    if (mounted.current) setAttempt((n) => n + 1);
+  };
   return {
     accountId,
+    email,
+    provider,
+    changePassword,
     session,
     desktop,
     status,

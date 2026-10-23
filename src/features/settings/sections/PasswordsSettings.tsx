@@ -1,9 +1,10 @@
 import { Copy, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth";
 import { useSyncController } from "@/features/browser-sync/useSyncController";
 import { PasswordEditor } from "@/features/passwords/PasswordEditor";
 import { passwordsApi, siteLabel, type SavedLogin } from "@/features/passwords/api";
+import { loginsToCsv, parseLoginsCsv, type CsvLogin } from "@/features/passwords/csv";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { Button, IconButton, Input, SkeletonList } from "@/shared/ui";
 import {
@@ -23,6 +24,8 @@ export function PasswordsSettings() {
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<SavedLogin | "new" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -35,6 +38,58 @@ export function PasswordsSettings() {
   useEffect(() => {
     if (unlocked) void load();
   }, [unlocked, load]);
+
+  const importLogins = async (file: File) => {
+    setNotice(null);
+    const parsed = parseLoginsCsv(await file.text());
+    if (!parsed.length) {
+      setNotice("That file has no passwords Misty can read. It needs url and password columns.");
+      return;
+    }
+    let added = 0;
+    for (const login of parsed) {
+      try {
+        await passwordsApi.save(login);
+        added += 1;
+      } catch {
+        // Counted below as skipped.
+      }
+    }
+    setNotice(
+      added === parsed.length
+        ? `Imported ${added} password${added === 1 ? "" : "s"}.`
+        : `Imported ${added} of ${parsed.length} passwords. The rest could not be saved.`,
+    );
+    void load();
+  };
+
+  const exportLogins = async () => {
+    setNotice(null);
+    const confirmed = await confirmAction(
+      "The file will contain every saved password in plain text. Keep it somewhere safe and delete it when you are done. Export?",
+    );
+    if (!confirmed || !logins) return;
+    try {
+      const rows: CsvLogin[] = [];
+      for (const login of logins) {
+        rows.push({
+          site: login.origin,
+          username: login.username,
+          password: await passwordsApi.reveal(login.id),
+        });
+      }
+      const url = URL.createObjectURL(
+        new Blob([loginsToCsv(rows)], { type: "text/csv;charset=utf-8" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "misty-passwords.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setNotice("Passwords could not be exported. Try again.");
+    }
+  };
 
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -84,7 +139,31 @@ export function PasswordsSettings() {
         <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
           Add password
         </Button>
+        <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
+          Import CSV
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!logins?.length}
+          onClick={() => void exportLogins()}
+        >
+          Export CSV
+        </Button>
+        <Input
+          ref={fileInput}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          aria-label="Import passwords from a CSV file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void importLogins(file);
+          }}
+        />
       </div>
+      {notice ? <SettingsNote>{notice}</SettingsNote> : null}
       {editing ? (
         <PasswordEditor
           login={editing === "new" ? null : editing}

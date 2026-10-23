@@ -128,6 +128,7 @@ describe("BrowserSyncStartup", () => {
       { apiBase: "https://misty.example/v1", accountId: "account-1" },
       null,
       null,
+      null,
       false,
     );
     expect(mocks.setState).toHaveBeenCalledWith({ session: restarted, issue: null });
@@ -175,6 +176,7 @@ describe("BrowserSyncStartup", () => {
     await act(async () => restored());
     expect(mocks.unlock).toHaveBeenCalledWith(
       { apiBase: "https://misty.example/v1", accountId: "account-1" },
+      null,
       null,
       null,
       false,

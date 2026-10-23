@@ -19,7 +19,7 @@ Misty is in development, and its everyday browser features and cross-device sync
 | `kiri/` | Kiri, the native web platform layer that supplies web APIs the system webviews leave out. |
 | `server/` | The Go API (accounts, sync, files, memory) and the TypeScript apps under `server/apps/`, such as the agent runtime and journal collaboration. |
 | `cli/` | The `misty` CLI for setup, the local server stack, checks and releases, plus the TypeScript build tasks in `cli/tasks/`. |
-| `docs/` | Design briefs and plans. [AGENTS.md](AGENTS.md) holds the UI rules every change follows. |
+| `docs/` | What Misty is, one folder per feature, and plans. Start at [docs/README.md](docs/README.md). |
 | `.githooks/` | The commit and push checks. There is no hosted CI. |
 
 ## Prerequisites
@@ -40,6 +40,8 @@ misty setup desktop
 ```
 
 `misty setup desktop` checks the Node.js version, runs `npm ci` and writes a `.env` that points the app at the local API. Point `MISTY_PUBLIC_API_URL` in that file at another Misty server to develop against it instead.
+
+Keep packaged builds separate from the everyday `.env` with local `.env.staging` and `.env.production` files. These files are ignored by Git. Build with `MISTY_APP_ENV=staging` or `MISTY_APP_ENV=production`; each profile reads only its matching file and does not inherit `.env`. Without `MISTY_APP_ENV`, builds continue to use `.env`. The staging server guide below uses `127.0.0.1:8082` through an SSH tunnel, so the tunnel must be open while using a staging build. Production builds use the live API and website. The signed release and publishing workflow uses the separate `MISTY_RELEASE_*` settings in `cli/.env/release.env`.
 
 Start the desktop app:
 

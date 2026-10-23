@@ -21,6 +21,10 @@ Open a new tab with ⌘T / Ctrl+T and go to the first store page below.
 
 Store page: `https://chromewebstore.google.com/detail/<ID>`
 
+## What was already checked without the app
+
+On 2026-10-23 the four extensions below were loaded into a real WebView2 profile through Misty's own download, unpack, grant and staging steps (`cargo test --lib webview2_loads_real_store_extensions -- --ignored --nocapture`). Before a fix to staging, WebView2 refused all of them with "Access is denied"; now each loads under Misty's derived ID, enabled, and its popup page opens. That does not cover the install review, the Add to Misty button, or what each extension does on a page.
+
 ## What the live package check already showed
 
 `cargo test -p misty-native --lib windows_limited_apis -- --ignored --nocapture` downloads each package and lists the APIs WebView2 does not offer extensions (2026-10-22):

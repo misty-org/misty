@@ -13,6 +13,15 @@ pub(super) fn provider_popup(
     url: &Url,
     features: tauri::webview::NewWindowFeatures,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
+    #[cfg(debug_assertions)]
+    eprintln!("[popup] {source_id} asked to open {url}");
+    // Creating a webview pumps messages while it waits for WebView2. A popup requested in
+    // that pump cannot be built there (it would wait on a lock its own thread holds), so
+    // it falls back to opening as a tab.
+    #[cfg(windows)]
+    if super::creation_guard::in_flight() {
+        return None;
+    }
     let _lifecycle = super::super::browser_sync::popup_lifecycle_lease()?;
     let state = app.state::<BrowserSessionState>();
     let (provider, profile, logical_profile, oauth_callback, origin_space_id, private) = {
@@ -152,6 +161,10 @@ fn create_popup(
             let started = matches!(payload.event(), tauri::webview::PageLoadEvent::Started);
             if let Some(state) = page_app.try_state::<BrowserSessionState>() {
                 if started {
+                    // Keep popup zoom consistent with normal browser tabs: apply
+                    // it before the page paints so the scrollbar is not resized
+                    // again at load completion.
+                    apply_page_zoom_policy(webview, &page_app, &page_id);
                     if let Ok(mut sessions) = state.sessions.lock() {
                         if let Some(session) = sessions.get_mut(&page_id) {
                             session.element_targets.clear();
@@ -175,7 +188,6 @@ fn create_popup(
                 },
             );
             if !started {
-                apply_page_zoom_policy(webview, &page_app, &page_id);
                 request_browser_favicon(webview, &page_app, &page_id);
                 request_browser_compatibility(webview, &page_app, &page_id);
             }
@@ -246,7 +258,11 @@ fn create_popup(
     } else {
         builder
     };
-    let window = match builder.build() {
+    let built = {
+        let _creating = super::creation_guard::Creating::enter();
+        builder.build()
+    };
+    let window = match built {
         Ok(window) => window,
         Err(_) => {
             if let Ok(mut sessions) = state.sessions.lock() {

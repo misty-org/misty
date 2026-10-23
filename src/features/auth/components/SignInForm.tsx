@@ -2,7 +2,7 @@ import { Button } from "@/shared/ui";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useAuth } from "../AuthContext";
-import { accountSignIn } from "../store/useAccountStore";
+import { accountSignIn, CredentialSignInRefused } from "../store/useAccountStore";
 import AuthField from "./AuthField";
 import AuthMessage from "./AuthMessage";
 import AuthSubmitButton from "./AuthSubmitButton";
@@ -22,21 +22,29 @@ export default function SignInForm(props: {
   const { transitioning, authenticateAccount } = useAuth();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  // After a reset by email the account holds the password as typed. That is sent only when asked for.
+  const [offerPlainSignIn, setOfferPlainSignIn] = useState(false);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function signIn(legacy: boolean) {
     props.onErrorChange("");
+    setOfferPlainSignIn(false);
     setLoading(true);
     try {
-      await authenticateAccount(() => accountSignIn(props.email, password));
+      await authenticateAccount(() => accountSignIn(props.email, password, { legacy }));
       props.onSuccess();
     } catch (signInError) {
+      setOfferPlainSignIn(signInError instanceof CredentialSignInRefused);
       props.onErrorChange(
         signInError instanceof Error ? signInError.message : "Could not sign in.",
       );
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await signIn(false);
   }
 
   return (
@@ -77,6 +85,23 @@ export default function SignInForm(props: {
         </Button>
       </div>
       {props.error ? <AuthMessage tone="error" message={props.error} /> : null}
+      {offerPlainSignIn ? (
+        <div className="flex flex-col gap-1 text-sm text-cream-muted">
+          <span>
+            Reset your password by email? That password is sent to Misty as typed, once, and your
+            sync vault needs a new password afterwards.
+          </span>
+          <Button
+            type="button"
+            variant="link"
+            className="h-auto self-start p-0 text-cream"
+            disabled={loading || transitioning}
+            onClick={() => void signIn(true)}
+          >
+            Sign in with the reset password
+          </Button>
+        </div>
+      ) : null}
       <AuthSubmitButton
         idleLabel="Sign In"
         loadingLabel="Signing in..."

@@ -68,6 +68,8 @@ pub(super) fn page_load(
         renderer(webview.window().label()).tracking,
     );
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                // Apply saved zoom before the page paints. Applying it at load
+                // completion resizes the page and scrollbar after render.
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             if let Ok(mut sessions) = state.sessions.lock() {
                 if let Some(session) = sessions.get_mut(page_id) {

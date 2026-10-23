@@ -67,6 +67,7 @@ pub(super) use corner_scrollbars::install as install_corner_scrollbars;
 mod attachment_download_macos;
 #[cfg(any(target_os = "macos", windows))]
 mod popups;
+pub(crate) mod creation_guard;
 #[cfg(any(target_os = "macos", windows))]
 use popups::provider_popup;
 
@@ -151,7 +152,9 @@ use self::scripts::{
     browser_viewport_script, emit_browser_pointer, set_status_bubble_enabled,
     BROWSER_COMPATIBILITY_SCRIPT, BROWSER_FAVICON_SCRIPT,
 };
-use self::theme::{browser_background, browser_theme, default_browser_theme};
+#[cfg(not(windows))]
+use self::theme::browser_background;
+use self::theme::{browser_theme, default_browser_theme};
 #[cfg(target_os = "macos")]
 use super::browser_macos::configure_main_webview_pointer_guard;
 use super::browser_macos::{

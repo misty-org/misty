@@ -13,15 +13,60 @@ impl SyncApi {
         Ok(response.vault)
     }
 
+    /// Replaces the personal vault's password wrapper after a password change
+    /// or the upgrade from a sync secret. The server accepts it only with a
+    /// transition signed by the vault root, and returns the vault as stored.
+    pub async fn rotate_key(
+        &self,
+        key_envelope: &KeyEnvelope,
+        key_transition: &KeyTransition,
+    ) -> Result<Vault> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            key_envelope: &'a KeyEnvelope,
+            key_transition: &'a KeyTransition,
+        }
+        #[derive(Deserialize)]
+        struct Response {
+            vault: Vault,
+        }
+        let response: Response = self
+            .request(
+                reqwest::Method::PUT,
+                "vault/key",
+                Some(&Body {
+                    key_envelope,
+                    key_transition,
+                }),
+            )
+            .await?;
+        if response.vault.key_envelope.as_ref() != Some(key_envelope)
+            || response.vault.key_transition.as_ref() != Some(key_transition)
+        {
+            return Err(Error::Identity);
+        }
+        Ok(response.vault)
+    }
+
     /// Deletes the account's vault and every Space vault sealed to it, so a
-    /// new one can be created. Reports whether a vault existed.
-    pub async fn delete_vault(&self) -> Result<bool> {
+    /// new one can be created. Reports whether a vault existed. The password
+    /// (in the desktop app, the credential derived from it) confirms it: a
+    /// session alone cannot destroy every device's synced data.
+    pub async fn delete_vault(&self, current_password: &str) -> Result<bool> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            current_password: &'a str,
+        }
         #[derive(Deserialize)]
         struct Response {
             deleted: bool,
         }
         let response: Response = self
-            .request(reqwest::Method::DELETE, "vault", None::<&()>)
+            .request(
+                reqwest::Method::DELETE,
+                "vault",
+                Some(&Body { current_password }),
+            )
             .await?;
         Ok(response.deleted)
     }

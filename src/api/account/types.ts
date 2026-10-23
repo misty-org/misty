@@ -6,6 +6,8 @@ export interface AccountAuthUser {
 }
 
 export interface AccountMeResponse {
+  /** The server's record that it has only ever seen a derived credential, never the password. */
+  credential_account?: boolean;
   provider?: "misty" | "google";
   id: string;
   username: string;
@@ -35,6 +37,8 @@ export type AccountHandoffPath =
   "/settings" | "/settings/account" | "/settings/usage" | "/settings/billing" | "/settings/privacy";
 
 export interface LoginResponse {
+  /** The server's record that it has only ever seen a derived credential, never the password. */
+  credential_account?: boolean;
   provider?: "misty" | "google";
   id?: string;
   user_id?: string;

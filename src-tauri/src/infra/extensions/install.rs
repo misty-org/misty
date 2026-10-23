@@ -203,7 +203,8 @@ pub async fn extensions_commit(
                         enabled: true,
                         // The package's own manifest decides, never the caller.
                         private_access: review.private_allowed,
-                        agent_access: true,
+                        // Agents may not use a new extension until the person allows it.
+                        agent_access: false,
                         permissions: review.permissions.clone(),
                         hosts: review.hosts.clone(),
                     },

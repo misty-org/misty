@@ -23,6 +23,15 @@ export const tabFeatureCommands = [
     windows: null,
     allowInEditable: true,
   }),
+  command("workspace.clear_tabs", "Clear tabs", {
+    description: "Close every tab that is not pinned, keeping the one you are on.",
+    category: "Tabs and panes",
+    scope: "workspace",
+    aliases: ["clear", "close other tabs", "tidy tabs", "close all tabs"],
+    mac: null,
+    windows: null,
+    allowInEditable: true,
+  }),
   command("workspace.search_tabs", "Search open tabs", {
     description: "List the open tabs in every virtual window and switch to one.",
     category: "Tabs and panes",

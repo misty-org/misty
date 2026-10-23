@@ -72,7 +72,7 @@ export function BrowserSyncStartup({
         useBrowserSyncStore.setState({ connecting: true });
         // Try the saved client key directly, even without cached vault metadata.
         // Native code fetches any missing metadata and verifies the key.
-        const opened = await unlockNativeSync(account, null, null, false);
+        const opened = await unlockNativeSync(account, null, null, null, false);
         if (canConnect()) {
           if (opened.status?.phase === "ready") failures = 0;
           useBrowserSyncStore.setState({ session: opened, issue: null });

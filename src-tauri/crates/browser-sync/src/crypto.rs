@@ -3,11 +3,15 @@ use aes_gcm::{
     Aes256Gcm, KeyInit, Nonce,
 };
 use argon2::{Algorithm, Argon2, Params, Version};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+    Engine,
+};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use hkdf::Hkdf;
 use rand::{rngs::OsRng, RngCore};
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
+use unicode_normalization::UnicodeNormalization;
 use zeroize::Zeroizing;
 
 use crate::{protocol::*, Error, Result};
@@ -64,6 +68,9 @@ fn random<const N: usize>() -> [u8; N] {
     bytes
 }
 
+/// A random 256-bit secret for the legacy wrapper (`VaultRoot::wrap`). Only
+/// vaults created before account wrappers still use one; nothing creates a
+/// new one outside tests.
 pub fn generate_sync_secret() -> Zeroizing<String> {
     let secret = Zeroizing::new(random::<32>());
     Zeroizing::new(STANDARD.encode(secret.as_ref()))
@@ -113,7 +120,7 @@ fn decrypt(
         .map_err(|_| Error::Unlock)
 }
 
-fn wrapping_key(password: &str, secret: &str, salt: &[u8; 16]) -> Result<Zeroizing<[u8; 32]>> {
+fn legacy_wrapping_key(password: &str, secret: &str, salt: &[u8; 16]) -> Result<Zeroizing<[u8; 32]>> {
     if !(12..=1024).contains(&password.len()) {
         return Err(Error::Invalid);
     }
@@ -133,6 +140,101 @@ fn wrapping_key(password: &str, secret: &str, salt: &[u8; 16]) -> Result<Zeroizi
         )
         .map_err(|_| Error::Unlock)?;
     Ok(key)
+}
+
+impl KeyTransition {
+    /// Checks the signature against a vault's pinned root public key.
+    pub fn verify(
+        &self,
+        root_public_key: &str,
+        vault_id: &str,
+        envelope: &KeyEnvelope,
+    ) -> Result<()> {
+        let bytes = Self::signing_bytes(vault_id, self.generation, envelope)?;
+        let key = VerifyingKey::from_bytes(&decode_fixed::<32>(root_public_key)?)
+            .map_err(|_| Error::Identity)?;
+        let signature = Signature::from_bytes(&decode_fixed::<64>(&self.signature)?);
+        key.verify_strict(&bytes, &signature)
+            .map_err(|_| Error::Identity)
+    }
+}
+
+/// Two independent values derived on the device from one Misty password, so
+/// the person types a single password and the server still cannot open the
+/// vault. Argon2id stretches the password with a salt from the account's email;
+/// HKDF then splits the result by purpose. `login_credential` is what the
+/// server receives in place of the password. The wrapping key never leaves the
+/// device and is never derivable from the credential.
+///
+/// A password the server has seen in plaintext (an account that signed in
+/// before credentials existed, or one set through an email reset) must never
+/// seed these keys; the upgrade flow makes the person choose a new one.
+pub struct AccountKeys {
+    login_credential: Zeroizing<String>,
+    master: Zeroizing<[u8; 32]>,
+}
+
+impl AccountKeys {
+    /// The salt names the deployment as well as the email, so the same email and
+    /// password give a different credential on every Misty server: one that
+    /// receives a credential cannot sign in to another with it, and cannot reuse
+    /// guesses across them.
+    ///
+    /// Email and password are put in Unicode compatibility form (NFKC) first, so
+    /// the same text typed on another keyboard or operating system, composed or
+    /// decomposed, full-width or not, gives the same keys.
+    pub fn derive(deployment: &str, email: &str, password: &str) -> Result<Self> {
+        let deployment = deployment.trim().trim_end_matches('/').to_lowercase();
+        let email = email.trim().nfkc().collect::<String>().to_lowercase();
+        let password = Zeroizing::new(password.nfkc().collect::<String>());
+        if deployment.is_empty()
+            || deployment.len() > 2048
+            || deployment.contains('\0')
+            || email.is_empty()
+            || email.len() > 320
+            || !(1..=1024).contains(&password.len())
+        {
+            return Err(Error::Invalid);
+        }
+        let salt = Sha256::new()
+            .chain_update(b"misty.account-kdf.salt.v3\0")
+            .chain_update(deployment.as_bytes())
+            .chain_update(b"\0")
+            .chain_update(email.as_bytes())
+            .finalize();
+        let params = Params::new(65536, 3, 1, Some(32)).map_err(|_| Error::Invalid)?;
+        let mut memory = Zeroizing::new(vec![argon2::Block::default(); params.block_count()]);
+        let mut master = Zeroizing::new([0; 32]);
+        Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
+            .hash_password_into_with_memory(
+                password.as_bytes(),
+                &salt,
+                master.as_mut(),
+                memory.as_mut_slice(),
+            )
+            .map_err(|_| Error::Unlock)?;
+        let mut credential = Zeroizing::new([0; 32]);
+        Hkdf::<Sha256>::new(None, master.as_ref())
+            .expand(b"misty.account.login-credential.v2", credential.as_mut())
+            .map_err(|_| Error::Invalid)?;
+        Ok(Self {
+            login_credential: Zeroizing::new(URL_SAFE_NO_PAD.encode(credential.as_ref())),
+            master,
+        })
+    }
+
+    /// 43 characters of URL-safe base64, sent to the server as the password.
+    pub fn login_credential(&self) -> &str {
+        &self.login_credential
+    }
+
+    fn wrapping_key(&self, salt: &[u8; 16]) -> Result<Zeroizing<[u8; 32]>> {
+        let mut key = Zeroizing::new([0; 32]);
+        Hkdf::<Sha256>::new(Some(salt), self.master.as_ref())
+            .expand(b"misty.sync.root-wrap.v2", key.as_mut())
+            .map_err(|_| Error::Invalid)?;
+        Ok(key)
+    }
 }
 
 impl VaultRoot {
@@ -233,7 +335,7 @@ impl VaultRoot {
 
     pub fn wrap(&self, scope: &VaultScope, password: &str, secret: &str) -> Result<KeyEnvelope> {
         let salt = random::<16>();
-        let key = wrapping_key(password, secret, &salt)?;
+        let key = legacy_wrapping_key(password, secret, &salt)?;
         let aad = scope.aad("misty.sync.root-wrapper.v1", &(1, KDF))?;
         let envelope = encrypt(key.as_ref(), self.0.as_ref(), &aad, 4096)?;
         Ok(KeyEnvelope {

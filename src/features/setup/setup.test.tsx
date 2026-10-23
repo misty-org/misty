@@ -5,6 +5,7 @@ import { isSetupCompletedForAccount, setupStorageKey, useSetupStore } from "./us
 
 const mocks = vi.hoisted(() => ({
   native: false,
+  extensions: false,
   suspend: vi.fn(),
   setLayout: vi.fn(),
 }));
@@ -20,6 +21,13 @@ vi.mock("@/features/workspace", () => ({
   useWorkspaceStore: (select: (state: unknown) => unknown) =>
     select({ setWindowDockingLayout: mocks.setLayout }),
 }));
+vi.mock("@/features/extensions/store", () => ({
+  useExtensionsStore: (select: (state: { supported: boolean }) => unknown) =>
+    select({ supported: mocks.extensions }),
+}));
+vi.mock("@/features/extensions/ExtensionsSetupStep", () => ({
+  ExtensionsSetupStep: () => <p>Extension choices</p>,
+}));
 vi.mock("@/features/browser-import", () => ({
   BrowserImportFlow: (props: { onClose(): void; closeLabel?: string }) => (
     <button type="button" onClick={props.onClose}>
@@ -32,6 +40,7 @@ beforeEach(() => {
   localStorage.clear();
   useSetupStore.setState({ isOpen: false, step: "import", completedAccounts: {} });
   mocks.native = false;
+  mocks.extensions = false;
   vi.clearAllMocks();
 });
 afterEach(cleanup);
@@ -57,6 +66,27 @@ it("starts with importing from another browser in the desktop app", () => {
   expect(screen.getByText("Where do you want your tabs?")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   expect(isSetupCompletedForAccount(useSetupStore.getState(), "account-1")).toBe(true);
+});
+
+it("offers optional extensions between importing and the tab side where extensions run", () => {
+  mocks.native = true;
+  mocks.extensions = true;
+  render(<FirstRunSetup />);
+  act(() => useSetupStore.getState().startSetup());
+  fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+  expect(screen.getByText("Add an ad blocker and a password manager")).toBeTruthy();
+  expect(screen.getByText("Step 2 of 3")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(screen.getByText("Where do you want your tabs?")).toBeTruthy();
+});
+
+it("skips the extensions step where extensions do not run", () => {
+  mocks.native = true;
+  render(<FirstRunSetup />);
+  act(() => useSetupStore.getState().startSetup());
+  fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+  expect(screen.queryByText("Add an ad blocker and a password manager")).toBeNull();
+  expect(screen.getByText("Step 2 of 2")).toBeTruthy();
 });
 
 it("can be cancelled, and hides page views while open", () => {

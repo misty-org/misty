@@ -22,7 +22,7 @@ func syncTestEnvelope() SyncEnvelope {
 }
 func syncTestKeyEnvelope() SyncKeyEnvelope {
 	e := syncTestEnvelope()
-	return SyncKeyEnvelope{e.Version, "argon2id-m65536-t3-p1", base64.StdEncoding.EncodeToString(make([]byte, 16)), e.Nonce, e.Ciphertext}
+	return SyncKeyEnvelope{e.Version, SyncKDFAccount, base64.StdEncoding.EncodeToString(make([]byte, 16)), e.Nonce, e.Ciphertext}
 }
 func syncTestGrant(vault string, root ed25519.PrivateKey) (SyncDeviceGrant, ed25519.PrivateKey) {
 	pub, key, _ := ed25519.GenerateKey(rand.Reader)

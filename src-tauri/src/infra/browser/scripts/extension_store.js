@@ -7,7 +7,6 @@
   if (window.top !== window) return;
   const pages = {
     'chromewebstore.google.com': /^\/detail\/(?:[^/]+\/)?[a-p]{32}(?:[/?#]|$)/,
-    'addons.mozilla.org': /^\/(?:[^/]+\/)?firefox\/addon\/[^/]+/,
   };
   const page = pages[location.hostname];
   if (location.protocol !== 'https:' || !page) return;

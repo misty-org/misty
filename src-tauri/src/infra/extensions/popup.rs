@@ -127,6 +127,8 @@ pub async fn extension_popup_open(
     let x = (origin.x + size.width - width - 60.0).max(origin.x);
     let label = format!("{POPUP_PREFIX}{}", uuid::Uuid::new_v4());
     let title: String = title.chars().take(200).collect();
+    // A popup a page requests while this window is created opens as a tab instead.
+    let _creating = crate::infra::browser::creation_guard::Creating::enter();
     let host = WebviewWindowBuilder::new(
         &app,
         &label,

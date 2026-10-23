@@ -9,6 +9,16 @@ export { SavedAccountSessionUnavailableError } from "./sessionErrors";
 export { default as SignInPage } from "./SignInPage";
 export * from "./store/accountEvents";
 export * from "./store/useAccountStore";
+export {
+  credentialEmail,
+  deriveLoginCredential,
+  isCredentialAccount,
+  isCredentialEmail,
+  markCredentialAccount,
+  passwordProblem,
+  unmarkCredentialAccount,
+} from "./store/accountCredential";
+export { accountChangePassword } from "./store/accountPassword";
 export * from "./store/useAuthTokenStore";
 export * from "./store/useUserStore";
 export { SignInSheet } from "./signInSheet/SignInSheet";

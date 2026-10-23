@@ -62,6 +62,10 @@ func syncErrorCode(err error) (string, int) {
 		return "account_usage_limit_reached", 402
 	case errors.Is(err, ErrSyncInvalid):
 		return "invalid_sync_request", 400
+	case errors.Is(err, ErrSyncReauth):
+		return "sync_reauthentication_failed", 412
+	case errors.Is(err, ErrSyncRateLimited):
+		return "sync_rate_limited", 429
 	case errors.Is(err, ErrSyncForbidden):
 		return "sync_device_forbidden", 403
 	case errors.Is(err, ErrSyncExists):
@@ -96,6 +100,23 @@ func decodeSync(r io.Reader, target any) error {
 	}
 	return nil
 }
+// confirmPassword checks the password given to confirm deleting the vault.
+func (s *BrowserSyncService) confirmPassword(userID, password string) error {
+	account, err := s.database.GetUserByID(userID)
+	if err != nil {
+		return err
+	}
+	if account == nil {
+		return ErrSyncForbidden
+	}
+	var hash string
+	if account.Provider == "misty" {
+		if _, hash, err = s.database.GetUserByEmail(account.Email); err != nil {
+			return err
+		}
+	}
+	return confirmPassword(reauthFailures, userID, account.Provider, hash, password, time.Now())
+}
 func (s *BrowserSyncService) user(w http.ResponseWriter, r *http.Request) (string, bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	user, ok := accounts.AuthenticatedUser(w, r)
@@ -120,6 +141,20 @@ func (s *BrowserSyncService) Vault() http.HandlerFunc {
 			return
 		}
 		if r.Method == http.MethodDelete {
+			// Deleting the vault destroys every device's synced data, so a session alone is
+			// not enough: the person confirms with their password (a derived credential in
+			// the desktop app).
+			var body struct {
+				CurrentPassword string `json:"current_password"`
+			}
+			if err := decodeSync(http.MaxBytesReader(w, r.Body, 4096), &body); err != nil {
+				writeSyncError(w, err)
+				return
+			}
+			if err := s.confirmPassword(user, body.CurrentPassword); err != nil {
+				writeSyncError(w, err)
+				return
+			}
 			// An account holds one vault at a time; deleting it is how a new one is made.
 			deleted, err := s.store.DeleteBrowserSyncVaults(r.Context(), user)
 			if err != nil {
@@ -143,6 +178,35 @@ func (s *BrowserSyncService) Vault() http.HandlerFunc {
 			return
 		}
 		transport.WriteJSON(w, 201, map[string]string{"vault_id": body.Device.VaultID})
+	}
+}
+
+// VaultKey replaces the personal vault's password wrapper (PUT). The body
+// carries the new wrapper and a transition signed by the vault root.
+func (s *BrowserSyncService) VaultKey() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.user(w, r)
+		if !ok {
+			return
+		}
+		var body struct {
+			KeyEnvelope   SyncKeyEnvelope   `json:"key_envelope"`
+			KeyTransition SyncKeyTransition `json:"key_transition"`
+		}
+		if err := decodeSync(http.MaxBytesReader(w, r.Body, 16384), &body); err != nil {
+			writeSyncError(w, err)
+			return
+		}
+		if !keyRotations.note(user, time.Now()) {
+			writeSyncError(w, ErrSyncRateLimited)
+			return
+		}
+		vault, err := s.store.RotateBrowserSyncVaultKey(r.Context(), user, body.KeyEnvelope, body.KeyTransition)
+		if err != nil {
+			writeSyncError(w, err)
+			return
+		}
+		transport.WriteJSON(w, 200, map[string]any{"vault": vault})
 	}
 }
 

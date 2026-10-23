@@ -47,6 +47,14 @@ export const accountApi = {
       password,
     }),
   register: (body: unknown) => requestJson<LoginResponse>("POST", "/register", body),
+  /** Both values are opaque to the server: in the desktop app they are derived from the password on the device. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    requestJson<{ status: string }>("PUT", "/me/password", {
+      current_password: currentPassword,
+      new_password: newPassword,
+      // The new value is derived on the device, so the server records it holds no plain password.
+      credential: true,
+    }),
   logout: () =>
     requestJson<{
       status?: string;

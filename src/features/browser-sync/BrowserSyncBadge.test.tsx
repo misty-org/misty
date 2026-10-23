@@ -23,7 +23,15 @@ vi.mock("@/api/client/session", () => ({
 }));
 vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://example.test" }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: mocks.user, transitioning: false }) }));
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({ user: mocks.user, transitioning: false }),
+  accountChangePassword: vi.fn(),
+  credentialEmail: () => null,
+  unmarkCredentialAccount: vi.fn(),
+  isCredentialAccount: () => true,
+  markCredentialAccount: vi.fn(),
+  passwordProblem: async () => null,
+}));
 vi.mock("@/features/auth/core", () => ({
   useUserStore: (select: (s: unknown) => unknown) => select({ me: { name: "User" } }),
 }));
@@ -125,6 +133,7 @@ it("unlocks with the saved key in place", async () => {
     { apiBase: "https://example.test", accountId: "a" },
     null,
     null,
+    null,
     false,
   );
   expect(settings).not.toHaveBeenCalled();
@@ -139,13 +148,13 @@ it("offers one reconnect action and replaces it with the re-enrollment form", as
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Reconnect device" })));
   expect(mocks.lock).toHaveBeenCalledWith("s", true);
   expect(mocks.unlock).not.toHaveBeenCalled();
-  expect(screen.getByLabelText("Sync password")).toBeTruthy();
+  expect(screen.getByLabelText("Misty password")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Use saved device key" })).toBeNull();
   expect(screen.getAllByRole("button", { name: "Reconnect device" })).toHaveLength(1);
 });
 it("falls back to credentials when no saved key is available", async () => {
   useBrowserSyncStore.setState({ session: null });
-  mocks.availability.mockResolvedValue({ local: false, remote: true });
+  mocks.availability.mockResolvedValue({ local: false, remote: true, accountPassword: false });
   mocks.unlock.mockRejectedValue(new Error("no key"));
   await open();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Unlock sync" })));

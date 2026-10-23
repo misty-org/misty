@@ -46,6 +46,48 @@ export function siteStylesWith(raw: string, host: string, style: Omit<SiteStyle,
   return JSON.stringify(keep ? [...rest, { host, css: style.css, dark: style.dark }] : rest);
 }
 
+export const boostFonts = [
+  { value: "", label: "Site default" },
+  { value: "system-ui, sans-serif", label: "System sans" },
+  { value: "Georgia, 'Times New Roman', serif", label: "Serif" },
+  { value: "ui-monospace, Menlo, Consolas, monospace", label: "Monospace" },
+];
+export const boostSizes = [
+  { value: "", label: "Site default" },
+  { value: "90", label: "Smaller" },
+  { value: "112", label: "Larger" },
+  { value: "125", label: "Largest" },
+];
+
+const boostStart = "/* misty-boost */";
+const boostEnd = "/* end misty-boost */";
+const boostBlock = /\/\* misty-boost \*\/[\s\S]*?\/\* end misty-boost \*\/\n?/;
+
+/** A site's font and text size, kept in a marked block at the top of its CSS. */
+export interface Boost {
+  font: string;
+  size: string;
+}
+
+export function readBoost(css: string): Boost {
+  const block = css.match(boostBlock)?.[0] ?? "";
+  const font = boostFonts.find((option) => option.value && block.includes(`font-family: ${option.value} `));
+  const size = boostSizes.find((option) => option.value && block.includes(`font-size: ${option.value}%`));
+  return { font: font?.value ?? "", size: size?.value ?? "" };
+}
+
+/** Replaces the font and size block, leaving the rest of the CSS as the person wrote it. */
+export function withBoost(css: string, boost: Boost): string {
+  const rest = css.replace(boostBlock, "");
+  const rules = [
+    boost.font ? `  font-family: ${boost.font} !important;` : "",
+    boost.size ? `  font-size: ${boost.size}% !important;` : "",
+  ].filter(Boolean);
+  if (!rules.length) return rest;
+  const block = [boostStart, "html, body {", ...rules, "}", boostEnd, ""].join("\n");
+  return `${block}${rest}`;
+}
+
 let pushed: string | null = null;
 
 /** Sends the account's site styles to the native browser, which applies them per page. */

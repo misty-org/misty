@@ -10,7 +10,7 @@ use std::{
 };
 
 use misty_browser_sync::{
-    crypto::{generate_sync_secret, DeviceKey, VaultRoot, VaultScope},
+    crypto::{AccountKeys, DeviceKey, VaultRoot, VaultScope},
     document::{self, Change, Document, Payload, WorkspaceView},
     protocol::{Presence, Vault},
     secure_store,
@@ -32,6 +32,7 @@ mod capture;
 #[cfg(any(target_os = "macos", windows))]
 mod collect;
 mod control_advertisement;
+mod account_credentials;
 mod device_data;
 #[cfg(any(target_os = "macos", windows))]
 mod device_signin;
@@ -103,11 +104,19 @@ pub(crate) use space_vaults::{
 pub(super) use vault_open::account_api;
 use vault_open::open_vault_with;
 pub(crate) use vault_open::{
-    __cmd__browser_sync_connect, __cmd__browser_sync_generate_secret, __cmd__browser_sync_setup,
-    __tauri_command_name_browser_sync_connect, __tauri_command_name_browser_sync_generate_secret,
-    __tauri_command_name_browser_sync_setup,
+    __cmd__browser_sync_connect, __cmd__browser_sync_setup,
+    __tauri_command_name_browser_sync_connect, __tauri_command_name_browser_sync_setup,
 };
-pub use vault_open::{browser_sync_connect, browser_sync_generate_secret, browser_sync_setup};
+pub use vault_open::{browser_sync_connect, browser_sync_setup};
+pub(crate) use account_credentials::{
+    __cmd__account_check_password, __cmd__account_login_credential,
+    __cmd__browser_sync_use_account_password, __tauri_command_name_account_check_password,
+    __tauri_command_name_account_login_credential,
+    __tauri_command_name_browser_sync_use_account_password,
+};
+pub use account_credentials::{
+    account_check_password, account_login_credential, browser_sync_use_account_password,
+};
 use view::view;
 pub(crate) use view::{
     __cmd__browser_sync_account_feed, __cmd__browser_sync_state,
@@ -194,7 +203,7 @@ fn issue(error: misty_browser_sync::Error) -> String {
         Error::InactiveDevice => {
             "This device is following sync. Make it active to publish changes."
         }
-        Error::Unlock => "Could not unlock sync. Check the password and sync secret.",
+        Error::Unlock => "That password did not work. Check it, and for an older vault the sync secret too.",
         Error::Identity => "Sync identity did not match. Local data has been preserved.",
         Error::Authentication => "Sign in again to reconnect sync.",
         Error::DeviceForbidden => "This device does not have permission to sync this account. Check its sync access, then retry.",

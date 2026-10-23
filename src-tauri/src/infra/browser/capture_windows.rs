@@ -27,17 +27,25 @@ pub async fn capture(webview: Webview) -> Result<Value, String> {
         .unwrap_or(1.0);
     // Never upscale; keep the longest side within the limit.
     let scale = (MAX_SIDE / (viewport_width.max(viewport_height) * device_ratio)).min(1.0);
-    let parameters = json!({
-        "clip": {
-            "x": page_x,
-            "y": page_y,
-            "width": viewport_width,
-            "height": viewport_height,
-            "scale": scale,
-        },
-        "fromSurface": true,
-        "format": "png",
-    });
+    // A clip makes Chromium resize the page's viewport for the shot and
+    // restore it after, which repaints the page's scrollbar white for a frame
+    // after every preview. The visible viewport needs no clip; only a shot
+    // that must be scaled down does.
+    let parameters = if scale >= 1.0 {
+        json!({ "fromSurface": true, "format": "png" })
+    } else {
+        json!({
+            "clip": {
+                "x": page_x,
+                "y": page_y,
+                "width": viewport_width,
+                "height": viewport_height,
+                "scale": scale,
+            },
+            "fromSurface": true,
+            "format": "png",
+        })
+    };
 
     // Misty's own overlay is drawn into the page; leave it out of the picture.
     let _ = webview2::evaluate(view, OVERLAY_HIDE.to_owned(), None).await;

@@ -121,11 +121,17 @@ pub(super) fn granted_manifest(
     manifest
 }
 
-/// Copies a package's runtime, skipping links: packages never contain them.
+/// Copies a package's runtime, skipping links (packages never contain them) and
+/// Misty's own `__misty_` folders, such as the sync bridge macOS uses. Chromium
+/// refuses an extension with a folder named like that, and WebView2 reports it
+/// as "Access is denied", so every real store extension failed to install.
 pub(super) fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(to)?;
     for entry in std::fs::read_dir(from)? {
         let entry = entry?;
+        if entry.file_name().to_string_lossy().starts_with("__misty_") {
+            continue;
+        }
         let kind = entry.file_type()?;
         let target = to.join(entry.file_name());
         if kind.is_dir() {
@@ -142,8 +148,9 @@ pub(super) fn copy_tree(from: &Path, to: &Path) -> std::io::Result<()> {
 /// change while it is installed, so a version's folder is never rewritten.
 pub(super) fn stage(root: &Path, runtime: &Path, manifest: &Value) -> Result<PathBuf, String> {
     let bytes = serde_json::to_vec_pretty(manifest).map_err(|e| e.to_string())?;
+    // "staged-v2": folders staged before Misty's own folders were left out are never reused.
     let version = short(&format!(
-        "{}:{}",
+        "staged-v2:{}:{}",
         runtime.display(),
         hex::encode(Sha256::digest(&bytes))
     ));

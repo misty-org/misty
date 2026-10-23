@@ -9,6 +9,7 @@ pub(super) async fn open_vault_with(
     app: tauri::AppHandle,
     api_base: String,
     account_id: String,
+    email: Option<String>,
     password: Option<Zeroizing<String>>,
     secret: Option<Zeroizing<String>>,
     provided_root: Option<VaultRoot>,
@@ -17,10 +18,10 @@ pub(super) async fn open_vault_with(
     reenroll: bool,
 ) -> Result<SyncView, String> {
     // Re-enrolling registers a new device identity, so it must be authorized by
-    // the vault password and sync secret, never by a remembered key alone.
+    // the vault password, never by a remembered key alone.
     let reenroll = reenroll && !create;
-    if reenroll && (password.is_none() || secret.is_none()) {
-        return Err("Enter your sync password and secret to reconnect this device.".into());
+    if reenroll && password.is_none() {
+        return Err("Enter your password to reconnect this device.".into());
     }
     let lifecycle = browser_lifecycle().write().await;
     let api = account_api(&api_base, &account_id)?;
@@ -67,6 +68,19 @@ pub(super) async fn open_vault_with(
     // Retrying setup after a lost response reopens the persisted root using the
     // same credentials. It must never generate a replacement root or device.
     let create = create && cached.is_none();
+    // Typing the password on a device whose copy of the vault is older than the
+    // server's (the password was changed, or the vault moved to the account
+    // password, on another device) unlocks with the server's wrapper, but only
+    // when the server's copy carries a transition signed by this vault's root.
+    let rotated = match (&cached, password.is_some() && provided_root.is_none()) {
+        (Some(pinned), true) => match api.vault().await {
+            Ok(Some(remote)) if pinned.is_rotation(&remote) && pinned.check_remote(&remote).is_ok() => {
+                Some(remote)
+            }
+            _ => None,
+        },
+        _ => None,
+    };
     // Cached vaults can unlock without a network request. Authorization and remote
     // identity are checked when the reconnecting worker obtains a fresh ticket.
     let remote = if cached.is_none() {
@@ -110,9 +124,10 @@ pub(super) async fn open_vault_with(
         let database_lock = database_lock;
         let (root, vault) = if create {
             let password = password.ok_or(misty_browser_sync::Error::Invalid)?;
-            let secret = secret.ok_or(misty_browser_sync::Error::Invalid)?;
+            let email = email.ok_or(misty_browser_sync::Error::Invalid)?;
+            let keys = AccountKeys::derive(&native_scope.deployment, &email, &password)?;
             let root = VaultRoot::generate();
-            let wrapper = root.wrap(&native_scope, &password, &secret)?;
+            let wrapper = root.wrap_account(&native_scope, &keys)?;
             let server = Vault {
                 vault_id: native_scope.vault_id.clone(),
                 key_epoch: 1,
@@ -120,6 +135,7 @@ pub(super) async fn open_vault_with(
                 root_public_key: root.public_key()?,
                 key_envelope: Some(wrapper),
                 space_key_envelope: None,
+                key_transition: None,
             };
             (
                 root,
@@ -131,7 +147,15 @@ pub(super) async fn open_vault_with(
             )
         } else {
             let vault = match cached.clone() {
-                Some(vault) => vault,
+                Some(mut vault) => {
+                    // The server's newer wrapper, already checked against the
+                    // root this device pinned, is the one the password opens.
+                    if let Some(rotated) = &rotated {
+                        vault.vault.key_envelope = rotated.key_envelope.clone();
+                        vault.vault.key_transition = rotated.key_transition.clone();
+                    }
+                    vault
+                }
                 None => CachedVault {
                     vault: remote.ok_or(misty_browser_sync::Error::Recovery)?,
                     bootstrap_pending: false,
@@ -139,26 +163,44 @@ pub(super) async fn open_vault_with(
                 },
             };
             let server = &vault.vault;
-            let root = match (password, secret, provided_root) {
-                (Some(password), Some(secret), None) => VaultRoot::unlock(
-                    &native_scope,
-                    server
+            let root = match (password, provided_root) {
+                (Some(password), None) => {
+                    let wrapper = server
                         .key_envelope
                         .as_ref()
-                        .ok_or(misty_browser_sync::Error::Identity)?,
-                    &password,
-                    &secret,
-                    &server.root_public_key,
-                )?,
+                        .ok_or(misty_browser_sync::Error::Identity)?;
+                    if wrapper.is_account() {
+                        let email = email.ok_or(misty_browser_sync::Error::Invalid)?;
+                        let keys =
+                            AccountKeys::derive(&native_scope.deployment, &email, &password)?;
+                        VaultRoot::unlock_account(
+                            &native_scope,
+                            wrapper,
+                            &keys,
+                            &server.root_public_key,
+                        )?
+                    } else {
+                        // Made before account passwords: a sync password and a
+                        // sync secret open it until it is moved over.
+                        let secret = secret.ok_or(misty_browser_sync::Error::Invalid)?;
+                        VaultRoot::unlock(
+                            &native_scope,
+                            wrapper,
+                            &password,
+                            &secret,
+                            &server.root_public_key,
+                        )?
+                    }
+                }
                 // Sealed to this device by an approving one; it must match the
                 // vault the server names before anything is opened with it.
-                (None, None, Some(root)) => {
+                (None, Some(root)) => {
                     if root.public_key()? != server.root_public_key {
                         return Err(misty_browser_sync::Error::Identity);
                     }
                     root
                 }
-                (None, None, None) => secure_store::recall(&native_scope, &server.root_public_key)?
+                (None, None) => secure_store::recall(&native_scope, &server.root_public_key)?
                     .ok_or(misty_browser_sync::Error::Unlock)?,
                 _ => return Err(misty_browser_sync::Error::Invalid),
             };
@@ -178,6 +220,9 @@ pub(super) async fn open_vault_with(
         let (store, device) = if existing_identity {
             let (mut store, device) = Store::unlock(&path, native_scope.clone(), &root)?;
             store.cache_verified_vault(&root, &vault)?;
+            if let Some(rotated) = &rotated {
+                store.adopt_rotated_vault(rotated)?;
+            }
             (store, device)
         } else {
             let device = DeviceKey::generate();

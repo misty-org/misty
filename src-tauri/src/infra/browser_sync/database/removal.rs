@@ -55,14 +55,18 @@ pub async fn browser_sync_delete_vault(
     app: tauri::AppHandle,
     api_base: String,
     account_id: String,
+    current_password: Option<String>,
 ) -> Result<(), String> {
     require_main(&webview)?;
+    // Confirms the request; an account with no Misty password (Google) sends nothing.
+    let current_password = Zeroizing::new(current_password.unwrap_or_default());
     let _lifecycle = browser_lifecycle().write().await;
     let api = account_api(&api_base, &account_id)?;
+    // The server goes first: if it cannot delete (a wrong password, say), this device keeps
+    // its vault and keeps syncing.
+    api.delete_vault(&current_password).await.map_err(issue)?;
     stop_all().await;
     let _ = crate::infra::space_windows::emit(&app, "misty:browser-sync-changed", "");
-    // The server goes first: if it cannot delete, this device keeps its vault.
-    api.delete_vault().await.map_err(issue)?;
     let deployment = api.deployment();
     let personal = personal_vault_id(&app, &deployment, &account_id)?;
     let pointer = personal_pointer(&deployment, &account_id)?;

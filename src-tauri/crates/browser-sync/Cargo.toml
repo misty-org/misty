@@ -28,6 +28,7 @@ zeroize = "1"
 misty-credential-store = { path = "../../vendor/misty-credential-store" }
 # Only the bulk API; skip legacy formats and the dictionary builder.
 zstd = { version = "0.13", default-features = false }
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 tempfile = "3"

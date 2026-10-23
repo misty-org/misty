@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::{Error, Result};
@@ -9,7 +10,13 @@ pub use frames::{AccountEvent, ClientFrame, ServerFrame};
 
 pub const MAX_COUNTER: u64 = 9_007_199_254_740_991;
 pub const MAX_EVENT_BYTES: usize = 1 << 20;
+/// The legacy wrapper: the root sealed under a sync password plus a separate
+/// 256-bit sync secret. New vaults never use it; existing ones are upgraded.
 pub const KDF: &str = "argon2id-m65536-t3-p1";
+/// The account wrapper: the root sealed under a key derived on the device from
+/// the person's Misty password alone (`crypto::AccountKeys`). The server only
+/// ever sees a different value derived from the same password.
+pub const KDF_ACCOUNT: &str = "argon2id-m65536-t3-p1+hkdf-sha256.account-v2";
 
 pub(crate) fn valid_id(id: &str) -> bool {
     Uuid::parse_str(id).is_ok_and(|u| !u.is_nil() && u.to_string() == id)
@@ -59,6 +66,57 @@ pub struct KeyEnvelope {
     pub salt: String,
     pub nonce: String,
     pub ciphertext: String,
+}
+
+impl KeyEnvelope {
+    pub fn is_account(&self) -> bool {
+        self.kdf == KDF_ACCOUNT
+    }
+
+    /// What a key transition signs: a digest of every wrapper field, so a
+    /// transition covers exactly one wrapper and cannot be moved to another.
+    pub fn digest(&self) -> [u8; 32] {
+        let mut hash = Sha256::new();
+        hash.update(b"misty.sync.key-envelope.v1");
+        for part in [
+            self.version.to_string().as_str(),
+            &self.kdf,
+            &self.salt,
+            &self.nonce,
+            &self.ciphertext,
+        ] {
+            hash.update(b"\n");
+            hash.update(part.as_bytes());
+        }
+        hash.finalize().into()
+    }
+}
+
+/// Authorizes replacing a vault's password wrapper (a password change, or the
+/// one-time upgrade from the sync secret). It is signed by the vault root, so
+/// only a device that holds the unlocked root can make one, and every other
+/// device checks it against the root public key it pinned when it enrolled. The
+/// server can store and serve it but cannot forge or substitute a wrapper.
+/// `generation` only rises, which rejects a server replaying an older wrapper.
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct KeyTransition {
+    pub generation: u64,
+    pub signature: String,
+}
+
+impl KeyTransition {
+    pub fn signing_bytes(vault_id: &str, generation: u64, envelope: &KeyEnvelope) -> Result<Vec<u8>> {
+        if !valid_id(vault_id) || !counter(generation) {
+            return Err(Error::Invalid);
+        }
+        Ok(serde_json::to_vec(&(
+            "misty.sync.key-transition.v1",
+            vault_id,
+            generation,
+            STANDARD.encode(envelope.digest()),
+        ))?)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -167,11 +225,19 @@ pub struct Vault {
     /// (`VaultRoot::open_space_root`). Exactly one of the two is set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub space_key_envelope: Option<Envelope>,
+    /// Present once the wrapper has been replaced after creation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_transition: Option<KeyTransition>,
 }
 
 impl Vault {
     pub fn is_space(&self) -> bool {
         self.space_key_envelope.is_some()
+    }
+
+    /// How many times the wrapper has been replaced; 0 for the original.
+    pub fn key_generation(&self) -> u64 {
+        self.key_transition.as_ref().map_or(0, |t| t.generation)
     }
 }
 
@@ -184,6 +250,7 @@ impl From<SpaceVault> for Vault {
             root_public_key: vault.root_public_key,
             key_envelope: vault.key_envelope,
             space_key_envelope: vault.space_key_envelope,
+            key_transition: vault.key_transition,
         }
     }
 }
@@ -203,6 +270,8 @@ pub struct SpaceVault {
     pub key_envelope: Option<KeyEnvelope>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub space_key_envelope: Option<Envelope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_transition: Option<KeyTransition>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

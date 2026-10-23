@@ -64,9 +64,11 @@ describe("saved website permissions", () => {
     expect(
       container.querySelector('button[aria-label="Reset permissions for https://example.com"]'),
     ).toBeNull();
+    // Failures show in plain language, never the native error text.
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
       "Site permissions could not be reset.",
     );
+    expect(container.querySelector('[role="alert"]')?.textContent).not.toContain("timed out");
     expect(container.textContent).not.toContain("Camera: Block");
   });
 });

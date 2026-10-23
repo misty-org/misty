@@ -81,15 +81,15 @@ impl WebsiteStorage {
                 self.owner.app_handle(),
                 Some(&self.physical),
             )?;
-            let view = self
-                .owner
-                .window()
-                .add_child(
+            let created = {
+                let _creating = super::super::browser::creation_guard::Creating::enter();
+                self.owner.window().add_child(
                     builder,
                     tauri::LogicalPosition::new(-10000., -10000.),
                     tauri::LogicalSize::new(1., 1.),
                 )
-                .map_err(|_| "Could not open website storage")?;
+            };
+            let view = created.map_err(|_| "Could not open website storage")?;
             let view = OriginView(view);
             view.0
                 .hide()

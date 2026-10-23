@@ -140,6 +140,13 @@ pub(in crate::infra) fn lock_database(path: &std::path::Path) -> Result<std::fs:
 pub struct VaultAvailability {
     local: bool,
     remote: Option<bool>,
+    /// Whether the vault is sealed under the Misty password (true), or still
+    /// under a sync password and secret (false). None when not known yet.
+    account_password: Option<bool>,
+}
+
+fn account_password(vault: &Vault) -> Option<bool> {
+    vault.key_envelope.as_ref().map(|wrapper| wrapper.is_account())
 }
 
 /// Local metadata can be inspected without fetching or decrypting credentials.
@@ -153,30 +160,37 @@ pub async fn browser_sync_availability(
     require_main(&webview)?;
     let current = personal_session().await;
     let api = account_api(&api_base, &account_id)?;
+    // The server's copy, when reachable, says which wrapper opens the vault now.
+    let server_kind = || async { api.vault().await.ok().flatten().and_then(|v| account_password(&v)) };
     if current.as_ref().is_some_and(|active| {
         active.scope.deployment == api.deployment() && active.scope.account_id == account_id
     }) {
         return Ok(VaultAvailability {
             local: true,
             remote: None,
+            account_password: server_kind().await,
         });
     }
     if let Some(vault) = personal_vault_id(&app, &api.deployment(), &account_id)? {
         let path = database_path(&api.deployment(), &account_id, &vault)?;
-        let _lock = lock_database(&path)?;
-        if Store::read_cached_vault(&path, &api.deployment(), &account_id)
-            .map_err(issue)?
-            .is_some()
-        {
+        let cached = {
+            let _lock = lock_database(&path)?;
+            Store::read_cached_vault(&path, &api.deployment(), &account_id).map_err(issue)?
+        };
+        if let Some(cached) = cached {
+            let local_kind = account_password(&cached.vault);
             return Ok(VaultAvailability {
                 local: true,
                 remote: None,
+                account_password: server_kind().await.or(local_kind),
             });
         }
     }
+    let remote = api.vault().await.map_err(issue)?;
     Ok(VaultAvailability {
         local: false,
-        remote: Some(api.vault().await.map_err(issue)?.is_some()),
+        remote: Some(remote.is_some()),
+        account_password: remote.as_ref().and_then(account_password),
     })
 }
 

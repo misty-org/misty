@@ -36,6 +36,7 @@ pub(crate) async fn open_with_transferred_root(
         account_id,
         None,
         None,
+        None,
         Some(root),
         remember,
         false,

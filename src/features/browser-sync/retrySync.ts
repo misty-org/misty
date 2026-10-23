@@ -54,7 +54,7 @@ export function retrySync(
     const account = { apiBase: await resolveApiBase(), accountId };
     if (!valid()) return "stale";
     try {
-      const opened = await unlockNativeSync(account, null, null, false);
+      const opened = await unlockNativeSync(account, null, null, null, false);
       if (!valid()) return "stale";
       useBrowserSyncStore.setState({ session: opened, issue: null, reenroll: null, locked: null });
       return "complete";

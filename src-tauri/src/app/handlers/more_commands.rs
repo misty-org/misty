@@ -50,6 +50,7 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::site_settings::style::browser_set_site_styles,
             #[cfg(desktop)]
+            #[cfg(desktop)]
             crate::infra::site_settings::style::browser_webview_pick_element,
             #[cfg(desktop)]
             crate::infra::browser::night_light::browser_set_night_light,

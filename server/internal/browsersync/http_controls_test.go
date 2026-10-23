@@ -17,7 +17,7 @@ func TestBrowserSyncControlRequestReachesSocketAndRequiresTargetSignature(t *tes
 	ctx := context.Background()
 	root, rootKey, _ := ed25519.GenerateKey(rand.Reader)
 	grant, key := socketTestGrant(uuid.NewString(), rootKey)
-	wrapper := SyncKeyEnvelope{Version: 1, KDF: "argon2id-m65536-t3-p1", Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
+	wrapper := SyncKeyEnvelope{Version: 1, KDF: SyncKDFAccount, Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
 	if err := NewStore(database.Conn).CreateBrowserSyncVault(ctx, "owner", "", root, PasswordVaultKeys(wrapper), grant); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestBrowserSyncDevicesAdvertiseKnownControlVersionsOnly(t *testing.T) {
 	ctx := context.Background()
 	root, rootKey, _ := ed25519.GenerateKey(rand.Reader)
 	grant, _ := socketTestGrant(uuid.NewString(), rootKey)
-	wrapper := SyncKeyEnvelope{Version: 1, KDF: "argon2id-m65536-t3-p1", Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
+	wrapper := SyncKeyEnvelope{Version: 1, KDF: SyncKDFAccount, Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
 	store := NewStore(database.Conn)
 	if err := store.CreateBrowserSyncVault(ctx, "owner", "", root, PasswordVaultKeys(wrapper), grant); err != nil {
 		t.Fatal(err)

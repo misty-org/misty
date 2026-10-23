@@ -1,10 +1,9 @@
 import { routes } from "@/features/app-shell";
 import { useSetupStore } from "@/features/setup/useSetupStore";
-import { Button, Pressable } from "@/shared/ui";
+import { Button, FlyingMisty, Pressable } from "@/shared/ui";
 import "@fontsource/instrument-serif/400-italic.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FlyingMisty } from "@/shared/ui";
 import { WelcomeNav } from "./WelcomeNav";
 import "./welcome.css";
 

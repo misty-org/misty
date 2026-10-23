@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { passwordsApi, type SavedLogin } from "@/features/passwords/api";
+import { generatePassword } from "@/features/passwords/generate";
 import { Button, Input } from "@/shared/ui";
 
 /** Adds a sign-in, or changes the username and password of a saved one. */
@@ -7,6 +8,7 @@ export function PasswordEditor(props: { login: SavedLogin | null; onDone(saved: 
   const [site, setSite] = useState(props.login?.origin ?? "");
   const [username, setUsername] = useState(props.login?.username ?? "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
@@ -45,15 +47,30 @@ export function PasswordEditor(props: { login: SavedLogin | null; onDone(saved: 
         disabled={busy}
         onChange={(event) => setUsername(event.target.value)}
       />
-      <Input
-        aria-label="Password"
-        type="password"
-        autoComplete="new-password"
-        placeholder={props.login ? "Leave empty to keep the current password" : "Password"}
-        value={password}
-        disabled={busy}
-        onChange={(event) => setPassword(event.target.value)}
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          aria-label="Password"
+          type={showPassword ? "text" : "password"}
+          autoComplete="new-password"
+          placeholder={props.login ? "Leave empty to keep the current password" : "Password"}
+          value={password}
+          disabled={busy}
+          className="min-w-0 flex-1"
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => {
+            setPassword(generatePassword());
+            setShowPassword(true);
+          }}
+        >
+          Generate
+        </Button>
+      </div>
       {error ? (
         <p role="alert" className="text-sm text-cream-muted">
           {error}

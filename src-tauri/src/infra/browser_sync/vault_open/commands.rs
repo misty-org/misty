@@ -1,14 +1,6 @@
 //! Setting up and connecting the account's sync, and opening a vault for it.
 use super::*;
 
-#[tauri::command]
-pub fn browser_sync_generate_secret(webview: tauri::Webview) -> Result<String, String> {
-    require_main(&webview)?;
-    // This secret is shown to the user before setup, so a lost setup response
-    // cannot leave them with a vault whose second unlock secret they never saw.
-    Ok(generate_sync_secret().to_string())
-}
-
 pub(in crate::infra) fn account_api(api_base: &str, account_id: &str) -> Result<SyncApi, String> {
     let url = super::super::super::account::cookies::server(api_base)?;
     let client = super::super::super::account::cookies::current(&url)?;
@@ -29,25 +21,30 @@ pub(in crate::infra) fn account_api(api_base: &str, account_id: &str) -> Result<
         .map_err(issue)
 }
 
+/// Creates the account's vault, sealed under the Misty password. The password is
+/// one the server has not seen in plain form (see `account_credentials`).
 #[tauri::command]
 pub async fn browser_sync_setup(
     webview: tauri::Webview,
     app: tauri::AppHandle,
     api_base: String,
     account_id: String,
+    email: String,
     password: String,
-    sync_secret: String,
     remember: bool,
 ) -> Result<SyncView, String> {
     let password = Zeroizing::new(password);
-    let secret = Zeroizing::new(sync_secret);
     require_main(&webview)?;
+    if let Some(issue) = misty_browser_sync::password::check(&password, &email).err() {
+        return Err(issue.message().into());
+    }
     open_vault(
         app,
         api_base,
         account_id,
+        Some(email),
         Some(password),
-        Some(secret),
+        None,
         remember,
         true,
         false,
@@ -55,12 +52,17 @@ pub async fn browser_sync_setup(
     .await
 }
 
+/// Unlocks the vault. A vault sealed under the Misty password needs `email` and
+/// `password`; one made before that (a sync password and a sync secret) also
+/// needs `sync_secret`, and stays that way until it is moved to the account
+/// password with `browser_sync_use_account_password`.
 #[tauri::command]
 pub async fn browser_sync_connect(
     webview: tauri::Webview,
     app: tauri::AppHandle,
     api_base: String,
     account_id: String,
+    email: Option<String>,
     password: Option<String>,
     sync_secret: Option<String>,
     remember: bool,
@@ -73,6 +75,7 @@ pub async fn browser_sync_connect(
         app,
         api_base,
         account_id,
+        email,
         password,
         secret,
         remember,
@@ -82,10 +85,12 @@ pub async fn browser_sync_connect(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn open_vault(
     app: tauri::AppHandle,
     api_base: String,
     account_id: String,
+    email: Option<String>,
     password: Option<Zeroizing<String>>,
     secret: Option<Zeroizing<String>>,
     remember: bool,
@@ -93,7 +98,7 @@ pub(super) async fn open_vault(
     reenroll: bool,
 ) -> Result<SyncView, String> {
     open_vault_with(
-        app, api_base, account_id, password, secret, None, remember, create, reenroll,
+        app, api_base, account_id, email, password, secret, None, remember, create, reenroll,
     )
     .await
 }

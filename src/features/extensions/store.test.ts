@@ -65,7 +65,7 @@ describe("extension account controls", () => {
   it("preserves identity on updates and respects forbidden private access", async () => {
     await install(review, true);
     const first = parseInstallations(String(mocks.values["extensions.installations"]))[0];
-    expect(first).toMatchObject({ enabled: true, privateAccess: true, agentAccess: true });
+    expect(first).toMatchObject({ enabled: true, privateAccess: true, agentAccess: false });
     await install({ ...review, privateAllowed: false, permissions: ["storage", "tabs"] }, true);
     expect(parseInstallations(String(mocks.values["extensions.installations"]))[0]).toMatchObject({
       generation: first.generation,

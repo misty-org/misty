@@ -12,13 +12,13 @@ import {
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
+  SyncRestoreSettings,
 } from "@/features/settings/desktop";
 import { ChoiceControl, stringSetting } from "@/features/settings/SettingsControls";
 import type { SettingsContentProps } from "@/features/settings/settingsTypes";
 import { ResetSyncRow, SyncAccountSettings } from "./SyncAccountSettings";
 import { SyncStatusView } from "./SyncStatusView";
 import { useSyncController } from "./useSyncController";
-import { SyncRestoreSettings } from "@/features/settings";
 import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
 import { deviceRows, publishingDeviceId } from "./deviceControl";
 import { SyncDeviceList } from "./SyncDeviceList";
@@ -93,6 +93,7 @@ function AccountSyncSettings(props: SettingsContentProps) {
                   />
                 ) : null}
                 <div className="pt-2">
+                  {/* A locked vault is reset from here: with no way in, there is no second step. */}
                   <SyncAccountSettings
                     controller={controller}
                     showDelete={!controller.session}

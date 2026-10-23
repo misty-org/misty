@@ -1,5 +1,7 @@
 import { useAuth } from "@/features/auth";
 import { BrowserImportFlow } from "@/features/browser-import";
+import { ExtensionsSetupStep } from "@/features/extensions/ExtensionsSetupStep";
+import { useExtensionsStore } from "@/features/extensions/store";
 import { normalizeDockingLayout, type TabSide } from "@/features/app-shell/dockingLayout";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
@@ -28,6 +30,10 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
     title: "Import from your browser",
     description: "Bring bookmarks, history, settings and sign-ins into Misty, or skip this step.",
   },
+  extensions: {
+    title: "Add an ad blocker and a password manager",
+    description: "Both are optional extensions from the Chrome Web Store. Add them now or skip.",
+  },
   tabs: {
     title: "Where do you want your tabs?",
     description: "Tabs sit in a sidebar on one side of the window.",
@@ -35,8 +41,9 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
 };
 
 /**
- * First-run setup after the welcome, signed in or not, in place of a walkthrough: importing from another browser (desktop
- * app only) and which side the tabs sit on. The tab side applies immediately and stays in Settings.
+ * First-run setup after the welcome, signed in or not, in place of a walkthrough: importing from
+ * another browser (desktop app only), optional extensions for ads and passwords (where extensions
+ * run), and which side the tabs sit on. The tab side applies immediately and stays in Settings.
  */
 export function FirstRunSetup() {
   const { user, transitioning } = useAuth();
@@ -45,8 +52,15 @@ export function FirstRunSetup() {
   const setStep = useSetupStore((state) => state.setStep);
   const finishSetup = useSetupStore((state) => state.finishSetup);
   const visible = isOpen && !transitioning;
-  // Importing reads other browsers on this computer, so it needs the native app.
-  const steps: SetupStep[] = hasTauriInternals() ? ["import", "tabs"] : ["tabs"];
+  const extensionsSupported = useExtensionsStore((state) => state.supported);
+  // Importing reads other browsers on this computer, so it needs the native app; extensions need a
+  // platform that runs them.
+  const native = hasTauriInternals();
+  const steps: SetupStep[] = native
+    ? extensionsSupported
+      ? ["import", "extensions", "tabs"]
+      : ["import", "tabs"]
+    : ["tabs"];
   const index = Math.max(0, steps.indexOf(step));
   const finish = () => finishSetup(user?.id);
   const next = () => (index < steps.length - 1 ? setStep(steps[index + 1]) : finish());
@@ -88,11 +102,12 @@ export function FirstRunSetup() {
         </DialogDescription>
         <div className="mt-6">
           {steps[index] === "tabs" ? <TabsStep /> : null}
+          {steps[index] === "extensions" ? <ExtensionsSetupStep /> : null}
           {steps[index] === "import" ? (
             <BrowserImportFlow onClose={next} closeLabel="Skip" />
           ) : null}
         </div>
-        {steps[index] === "tabs" ? (
+        {steps[index] !== "import" ? (
           <div className="mt-7 flex items-center gap-2">
             <Button variant="ghost" size="sm" className="text-cream-muted" onClick={finish}>
               Cancel

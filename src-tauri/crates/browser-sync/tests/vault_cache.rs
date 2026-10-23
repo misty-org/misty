@@ -31,6 +31,7 @@ fn fixture() -> (
                 .unwrap(),
         ),
         space_key_envelope: None,
+        key_transition: None,
     };
     (
         scope,

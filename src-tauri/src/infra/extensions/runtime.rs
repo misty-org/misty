@@ -22,7 +22,7 @@ async fn activate(
             .await?;
         service(space).lock().await.loaded.remove(&id);
         sync::forget(account, space, &id);
-        drop_origin(space, &installation_origin(account, &installation.guid));
+        drop_origin(space, &installation_host(account, &installation.guid));
         let review = selected_package(&package_root, false)
             .ok()
             .and_then(|path| read_review(&path).ok());
@@ -212,7 +212,7 @@ pub async fn extensions_reconcile(
     for old in absent {
         native::request(json!({"operation":"unload","account":account,"space":space,"id":old.id})).await?;
         sync::forget(&account,&space,&old.id);
-        drop_origin(&space, &installation_origin(&account, &old.guid));
+        drop_origin(&space, &installation_host(&account, &old.guid));
         let mut state=service(&space).lock().await; state.states.remove(&old.id); state.loaded.remove(&old.id);
     }
     { let mut state = service(&space).lock().await; state.desired = installations.iter().cloned().map(|v|(v.id.clone(),v)).collect(); state.agent_access = agent_access; }
@@ -224,7 +224,7 @@ pub async fn extensions_reconcile(
             sync::queue_removal(&app,&account,&space,installation)?;
             sync::forget(&account,&space,&installation.id);
             sync::clear_local(&app,&account,&space,installation).await?;
-            drop_origin(&space, &installation_origin(&account, &installation.guid));
+            drop_origin(&space, &installation_host(&account, &installation.guid));
             // Sync teardown can hold the account session lock; never await it while
             // holding the extension lifecycle lock used by account teardown.
             let removed=installation.clone(); let removed_account=account.clone(); let removed_space=space.clone();

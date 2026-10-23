@@ -48,7 +48,7 @@ func TestBrowserSyncWorkspaceSocketWatchClaimAndPublish(t *testing.T) {
 	root, rootKey, _ := ed25519.GenerateKey(rand.Reader)
 	a, keyA := socketTestGrant(uuid.NewString(), rootKey)
 	b, keyB := socketTestGrant(a.VaultID, rootKey)
-	wrapper := SyncKeyEnvelope{Version: 1, KDF: "argon2id-m65536-t3-p1", Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
+	wrapper := SyncKeyEnvelope{Version: 1, KDF: SyncKDFAccount, Salt: base64.StdEncoding.EncodeToString(make([]byte, 16)), Nonce: base64.StdEncoding.EncodeToString(make([]byte, 12)), Ciphertext: base64.StdEncoding.EncodeToString(make([]byte, 32))}
 	store := NewStore(database.Conn)
 	if err := store.CreateBrowserSyncVault(ctx, "owner", "", root, PasswordVaultKeys(wrapper), a); err != nil {
 		t.Fatal(err)

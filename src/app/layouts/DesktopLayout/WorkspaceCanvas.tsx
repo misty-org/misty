@@ -17,7 +17,7 @@ import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 import { closePeek } from "@/features/workspace/peek";
-import { resetPinnedTabForView, usePinTabShortcut } from "./usePinTabShortcut";
+import { resetPinnedTabForView, useClearTabsShortcut, usePinTabShortcut } from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { SpaceBar } from "./SpaceBar";
 import type { WorkspaceTab } from "@/features/workspace/model";
@@ -132,6 +132,7 @@ export function WorkspaceCanvas(props: {
 
   useWorkspaceTabShortcuts(navigateToActiveLayoutTab);
   const pinBlockedNotice = usePinTabShortcut();
+  useClearTabsShortcut();
   useWorkspaceCanvasShortcuts({ openTab, splitWorkspacePane });
 
   const dockTree = (tab: WorkspaceTab, active: boolean) => (

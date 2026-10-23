@@ -78,6 +78,12 @@ describe("AppFrameLayout", () => {
   let container: HTMLDivElement;
   let root: Root;
 
+  // AppFrameLayout holds the layout back until a two second opening flight, started when the
+  // module loads, has finished. Wait it out once so no test depends on how quickly it runs.
+  beforeAll(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 2_100));
+  }, 5_000);
+
   beforeEach(() => {
     (
       globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }

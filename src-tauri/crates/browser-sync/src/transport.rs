@@ -182,6 +182,8 @@ impl SyncApi {
         match response.status().as_u16() {
             200 | 201 => {}
             401 => return Err(Error::Authentication),
+            // The password given to confirm a destructive request was wrong.
+            412 => return Err(Error::Unlock),
             403 => return Err(Error::DeviceForbidden),
             409 | 426 => return Err(Error::Recovery),
             _ => return Err(Error::Network),

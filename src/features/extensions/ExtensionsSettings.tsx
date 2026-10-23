@@ -12,6 +12,7 @@ import { UninstallDialog } from "./ExtensionDialogs";
 import { ExtensionSettingsItem } from "./ExtensionSettingsItem";
 import { openStorePage } from "./openStorePage";
 import {
+  offeredStores,
   parseInstallations,
   spaceInstallationsRaw,
   storeHomes,
@@ -21,10 +22,11 @@ import {
 } from "./store";
 import type { ExtensionStore, Installation } from "./types";
 
-const stores: { store: ExtensionStore; description: string }[] = [
-  { store: "chrome", description: "Extensions made for Chrome." },
-  { store: "firefox", description: "Extensions made for Firefox." },
-];
+const storeDescriptions: Record<ExtensionStore, string> = {
+  chrome: "Extensions made for Chrome.",
+  firefox: "Extensions made for Firefox.",
+};
+const stores = offeredStores.map((store) => ({ store, description: storeDescriptions[store] }));
 
 /**
  * Settings › Browser › Extensions. People find extensions on the stores' own

@@ -52,7 +52,7 @@ type SyncKeyEnvelope struct {
 }
 
 func (e SyncKeyEnvelope) Valid() bool {
-	if e.Version != 1 || e.KDF != "argon2id-m65536-t3-p1" || len(e.Salt) != 24 {
+	if e.Version != 1 || (e.KDF != SyncKDFLegacy && e.KDF != SyncKDFAccount) || len(e.Salt) != 24 {
 		return false
 	}
 	salt, err := base64.StdEncoding.Strict().DecodeString(e.Salt)
@@ -68,6 +68,8 @@ type SyncVault struct {
 	// Space vault's root sealed to the personal root.
 	KeyEnvelope      json.RawMessage `json:"key_envelope,omitempty"`
 	SpaceKeyEnvelope json.RawMessage `json:"space_key_envelope,omitempty"`
+	// Present once the password wrapper has been replaced after creation.
+	KeyTransition *SyncKeyTransition `json:"key_transition,omitempty"`
 }
 
 type SyncDeviceGrant struct {

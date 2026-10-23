@@ -19,6 +19,8 @@ var ErrInvalidUsername = accounts.ErrInvalidUsername
 var ErrInvalidPassword = accounts.ErrInvalidPassword
 var ErrUsernameTaken = accounts.ErrUsernameTaken
 var ErrEmailTaken = accounts.ErrEmailTaken
+var ErrWrongCurrentPassword = accounts.ErrWrongCurrentPassword
+var ErrNoPasswordAccount = accounts.ErrNoPasswordAccount
 var ErrProviderConflict = accounts.ErrProviderConflict
 
 func (db *Database) GoogleUser(email, subject string) (*User, error) {
@@ -39,6 +41,12 @@ func (db *Database) GetUserByEmail(email string) (*User, string, error) {
 	return db.accountStore().GetUserByEmail(email)
 }
 func (db *Database) GetUserByID(id string) (*User, error) { return db.accountStore().GetUserByID(id) }
+func (db *Database) ChangePassword(id, current, next, keepSessionHash string, credential bool) error {
+	return db.accountStore().ChangePassword(id, current, next, keepSessionHash, credential)
+}
+func (db *Database) SetCredentialPassword(id string, credential bool) error {
+	return db.accountStore().SetCredentialPassword(id, credential)
+}
 func (db *Database) BumpUserAvatarVersion(id string) (int64, error) {
 	return db.accountStore().BumpUserAvatarVersion(id)
 }
