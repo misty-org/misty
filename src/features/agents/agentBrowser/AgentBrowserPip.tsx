@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { IconButton } from "@/shared/ui";
+import { IconButton, Pressable } from "@/shared/ui";
 import "./agentBrowser.css";
 import { showView, useAgentBrowser } from "./agentBrowserStore";
 import { statusWord } from "./AgentViewSwitcher";
@@ -28,9 +28,9 @@ export function AgentBrowserPip({
     showView(chat.conversationId, chat.views[(index + step + chat.views.length) % chat.views.length]!.id);
   return (
     <div className="agent-browser-pip">
-      <button type="button" className="agent-browser-pip-picture" aria-label={`Open ${view.label} in the agent browser`} onClick={onExpand}>
+      <Pressable className="agent-browser-pip-picture" aria-label={`Open ${view.label} in the agent browser`} onClick={onExpand}>
         {view.picture ? <img src={view.picture} alt="" /> : <span className="agent-view-blank" />}
-      </button>
+      </Pressable>
       <div className="agent-browser-pip-foot">
         <span className="agent-view-label">{view.label}</span>
         <span className="agent-view-status" data-working={view.status === "working" || undefined}>

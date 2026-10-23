@@ -277,7 +277,7 @@ describe("agent page runtime", () => {
     expect(result.tree).toContain("Category number 0");
   });
 
-  it("names a popup covering the page and closes it with its own close control", () => {
+  it("names a popup covering the page and closes it with its own close control", async () => {
     const page = load(`
       <main><h1>Hotel results</h1><p>Twelve hotels near the park.</p></main>
       <div id="promo" style="position:fixed"><h2>Get 10% off your first stay</h2>
@@ -290,8 +290,11 @@ describe("agent page runtime", () => {
     expect(result.tree.split("\n")[0]).toMatch(/^- note: A popup covers this page \("Get 10% off your first stay"\)\. Close it first: click ref=e\d+\.$/);
     const pressed: string[] = [];
     promo.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => pressed.push(button.textContent ?? "")));
-    expect(page.call("dismissPopup").dismissed).toContain("Get 10% off");
+    // Its close control is pressed first; a popup that stays is then hidden in the agent's tab.
+    const dismissed = await page.call("dismissPopup");
+    expect(dismissed.dismissed).toContain("Get 10% off");
     expect(pressed).toEqual(["×"]);
+    expect(promo.style.display).toBe("none");
   });
 
   it("scrolls what it finds into view", () => {

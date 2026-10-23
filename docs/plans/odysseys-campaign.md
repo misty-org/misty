@@ -391,3 +391,57 @@ six of the last eight pages on one site.
 The campaign's Anthropic credit is nearly spent, so later passes run on NVIDIA's free hosted models
 ([free-model-evals.md](free-model-evals.md)). Its scores compare only with passes on the same model:
 the first is batch 17's ten tasks before and after the change above, on the Mac.
+
+### October 20, evening: one task at a time on Nemotron
+
+Agent and judge are `nim/nvidia/nemotron-3.5-super-vl-120b-a12b`, not Haiku. GLM-5.3-Flash, the
+model free-model-evals.md chose, takes at most 8 images a prompt on NVIDIA and fails the judge; of
+the fallbacks only Nemotron passed all four smoke checks. The paid keys were taken out of the dev
+stack for these runs. Tasks now run one at a time across all 200, each read and fixed before the next.
+
+The before/after comparison on batch 17 was dropped: its first task showed the harness itself
+ending runs, and those causes came first.
+
+| Cause | What happened | Change |
+|---|---|---|
+| A clock ended long tasks | The eval cancelled at 60 minutes, the runtime allowed 30 minutes of execution, and the time budget forced an answer past its estimate | No clock in the eval: a progress watch (`evals/odysseys/watchdog.ts`) looks every 3 minutes and stops only a run that went quiet or repeats itself. Dev evals get 4 hours of execution (migration `20271103000000`), the time budget lets a run past its estimate continue while its results are new, and the judge retries only a call that went quiet |
+| Narration ended runs | The model narrates its next move ("Let me try the link directly.") and sometimes makes no call; the loop took that as the answer | Such a line is a progress note and goes back, until three text-only turns in a row |
+| A recap replaced the answer | Asked to confirm with agent_finish, the model wrote "my full answer is above" and a recap became the final answer | An unreported run keeps its fullest answer since its last tool call (`closingText`) |
+| Garbled document ids | The model spliced a page's documentId with its tab's scopeId, so every action on a site failed as stale and the run gave the site up | The run repairs a missing or garbled documentId from the tab's latest one (`src/document-ids.ts`); a real older id still fails |
+| Guessed domains | `jjs-house.com` for `jjshouse.com`: the tab never loaded and the site was called a blocker | screen_open and browser_navigate refuse a host with no DNS record and say to search for the real address |
+| Navigate reported the old page | A navigation that never left the old document was returned as the new page | The old document is marked first; the landed page must be another document, a bot check is waited out, and an unchanged page says so |
+| Popups | An empty backdrop left by a hidden cookie banner, and a close control that did nothing | Empty covers are hidden; a covered click closes the popup and checks it went (close, Escape, then hide in the agent's tab) |
+| Opaque failures | A run failed with nothing logged; a failed read was reported as "uncertain" | Unclassified runtime failures are logged; reads and calls that never reached the page fail plainly |
+
+Checkpoints: `MISTY_ODYSSEYS_RESUME` continues a stopped task in its own conversation after a fix,
+with the request and last answer as history, and grades both runs as one trajectory.
+
+| Task 46ecc9a5dc (medium) | Rubric | Ended |
+|---|---|---|
+| First run | 0.25 | Narration, after 4 minutes |
+| Rerun with the narration fix | 0.38 | Narration again, 15 minutes |
+| Resumed | 0.50 | Recap replaced the answer |
+| Resumed again | 0.75 | Completed; missed JJ's House (picked a prom dress) and ALS (searched the full product name only) |
+
+The last two misses were the agent's choices; the prompt now asks it to search again with fewer
+words before saying a site lacks an item, and to match the category it was asked for.
+
+| Task 8f005e9f09 (hard) | Rubric | Ended |
+|---|---|---|
+| First run | 0.33 | Completed in 10 of its estimated 45 minutes; most tabs were read as about:blank and two insurer pages were 404s |
+| Rerun with the fixes below | 0.78 | Reported completed but marked failed; missed the count (8 of 10 pediatricians) and some daycare tabs |
+
+What task 8f005e9f09 showed, and the changes:
+
+- **New tabs were read before they loaded.** screen_open returned as soon as the tab existed, so
+  the run's first read of every new tab was about:blank, and runs that open tabs in batches worked
+  from blanks. A new agent tab now waits for its first page (`browser_webview_await_load`, at
+  most 15 s, or 25 s past a bot check); each took 0–2 s in the rerun.
+- **Error pages read like answers.** A snapshot whose title or heading says 404 or "can't find
+  that page" now starts with a note that the address is wrong and to find the page by search.
+- **A reported finish was marked failed.** Two sub-agents that never started (`tool_not_attempted`)
+  counted as unconfirmed effects and turned a completed run into a failure; never-attempted
+  actions no longer count.
+- **The judge returned no verdict** for two rubrics (thinking used the 4,000-token cap). Free
+  models get 16,000 tokens and a reply without a verdict is asked again; `MISTY_ODYSSEYS_REGRADE`
+  judges a saved run again without rerunning it.

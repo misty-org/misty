@@ -14,23 +14,15 @@ import { agentsDeviceSnapshot, agentsPrepareScopedDocument } from "./store/useAg
 import { deviceAgentOperations, runDeviceAgentOperation } from "./deviceAgentTools";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  browserFailureIsCertain,
   browserUncertainErrorCode,
-  isBrowserSnapshotStale,
   deviceContentReference,
   deviceWorkflowErrorCode,
 } from "./workerDeviceJobs";
 
-import {
-  browserAgentExecutionRequest,
-  browserDeviceRequest,
-  browserRuntimeIdForScope,
-  DeviceOperationNotAttempted,
-  registerRunBoundBrowserContext,
-  type ClaimedWorkflowNodeJob,
-} from "./workerBrowserJobs";
+import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
 import { HeldClaims } from "./workerHeldClaim";
-import { agentTab, noteAgentTabJob, pictureAgentTab, wakeAgentTab } from "./agentTabs";
-import { touchHostedSession } from "./hostedSessionsState";
+import { browserExecutionControl, executeBrowserJob } from "./browserJobRun";
 
 export { deviceContentReference, deviceWorkflowErrorCode } from "./workerDeviceJobs";
 export { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
@@ -224,7 +216,9 @@ export class DesktopAgentJobWorker {
               throw new Error("device_execution_stopped");
             leaseExpiresAt = renewed.leaseExpiresAt;
             arm();
-            if (job.operation.startsWith("browser."))
+            // A program has no native execution of its own: each page call registers one under
+            // its own id and reads the current lease when it starts (programs/pageHost.ts).
+            if (job.operation.startsWith("browser.") && job.operation !== "browser.run")
               await invoke("browser_agent_execution_renew", {
                 request: browserExecutionControl(job, leaseExpiresAt),
               });
@@ -244,7 +238,7 @@ export class DesktopAgentJobWorker {
         })();
       }, leaseHeartbeatMs);
       const output = await abortable(
-        executeWorkflowNodeOnDevice(job, controller.signal, leaseExpiresAt, deviceId),
+        executeWorkflowNodeOnDevice(job, controller.signal, () => leaseExpiresAt, deviceId),
         controller.signal,
       );
       report = () =>
@@ -258,7 +252,8 @@ export class DesktopAgentJobWorker {
       const uncertain =
         began &&
         job.operation.startsWith("browser.") &&
-        !(error instanceof DeviceOperationNotAttempted);
+        !(error instanceof DeviceOperationNotAttempted) &&
+        !browserFailureIsCertain(job.operation, error);
       report = () =>
         (uncertain ? devicesApi.uncertainWorkflowJob : devicesApi.failWorkflowJob)(
           signedAgentDeviceRequest,
@@ -308,19 +303,6 @@ export function deviceExecutionRemaining(
   return remaining;
 }
 
-function browserExecutionControl(
-  job: ClaimedWorkflowNodeJob["job"],
-  leaseExpiresAt: string | null | undefined,
-) {
-  return {
-    executionId: job.id,
-    deadlineAt: job.deadlineAt,
-    leaseExpiresAt,
-    scopeId: job.scopeId,
-    grantId: `${job.contextId}:${job.id}`,
-  };
-}
-
 async function claimNextWorkflowNodeJob(
   deviceId: string,
   localDeviceId: string,
@@ -344,7 +326,7 @@ async function claimNextWorkflowNodeJob(
 async function executeWorkflowNodeOnDevice(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
-  leaseExpiresAt: string | null | undefined,
+  lease: () => string | null | undefined,
   deviceId: string,
 ): Promise<Record<string, unknown>> {
   signal.throwIfAborted();
@@ -369,60 +351,11 @@ async function executeWorkflowNodeOnDevice(
     // One goal runs as a local loop: Midscene plans, Misty's native input acts.
     return (await import("./screenAct/screenActJob")).runScreenAct(job, signal);
   }
-  if (job.operation.startsWith("browser.")) {
-    touchHostedSession(job.scopeId, job.runId);
-    // An agent's sleeping tab opens its page again first (agentTabs.ts); one whose run's lease
-    // ended stays asleep and the job is not attempted.
-    if (agentTab(job.scopeId) && !(await wakeAgentTab(job.scopeId)))
-      throw new DeviceOperationNotAttempted(new Error("agent_tab_closed"));
-    noteAgentTabJob(job.scopeId, job.runId, true);
-    const cancel = () => {
-      void invoke("browser_agent_execution_cancel", {
-        request: browserExecutionControl(job, leaseExpiresAt),
-      }).catch(() => undefined);
-    };
-    signal.addEventListener("abort", cancel, { once: true });
-    try {
-      try {
-        await registerRunBoundBrowserContext(job);
-        signal.throwIfAborted();
-      } catch (error) {
-        throw new DeviceOperationNotAttempted(error);
-      }
-      return await invoke<Record<string, unknown>>("browser_agent_execute_bounded", {
-        request: {
-          control: browserExecutionControl(job, leaseExpiresAt),
-          operation: await browserDeviceRequest(job),
-        },
-      });
-    } catch (error) {
-      // Let the coordinator request a new frame; no input was attempted and
-      // this is not a terminal desktop-control error for the user.
-      if (isBrowserSnapshotStale(error)) throw new DeviceOperationNotAttempted(error);
-      if (job.operation.startsWith("browser.workspace.")) {
-        window.dispatchEvent(
-          new CustomEvent("misty:autopilot-error", {
-            detail: {
-              taskId: browserAgentExecutionRequest(job).input.__mistyTaskId,
-              message: String(error),
-            },
-          }),
-        );
-        if (job.operation === "browser.workspace.visual")
-          throw new DeviceOperationNotAttempted(error);
-      }
-      throw error;
-    } finally {
-      noteAgentTabJob(job.scopeId, job.runId, false);
-      void pictureAgentTab(job.scopeId);
-      signal.removeEventListener("abort", cancel);
-      const id = await browserRuntimeIdForScope(job.scopeId).catch(() => null);
-      if (id)
-        await invoke("browser_agent_grant_revoke", {
-          request: { id, grantId: `${job.contextId}:${job.id}` },
-        }).catch(() => undefined);
-    }
+  if (job.operation === "browser.run") {
+    // A program the agent wrote, run in a sandbox against its own tabs (programs/runProgram.ts).
+    return (await import("./programs/runProgram")).runProgram(job, signal, lease);
   }
+  if (job.operation.startsWith("browser.")) return executeBrowserJob(job, signal, lease());
   if (deviceAgentOperations.has(job.operation)) {
     return runDeviceAgentOperation(job, signal);
   }

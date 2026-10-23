@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModelMessage } from "ai";
-import { estimateMinutes, timeBudget } from "../src/time-budget.js";
+import { estimateMinutes, stillProgressing, timeBudget } from "../src/time-budget.js";
 
 const minutes = (value: number) => value * 60_000;
 const checklist = (estimate: number): ModelMessage => ({
@@ -46,5 +46,29 @@ describe("timeBudget", () => {
   it("holds an ordinary task's generous estimate to half an hour", () => {
     const asked: ModelMessage[] = [{ role: "user", content: "Compare three hotels near Disney and keep the pages open." }];
     expect(timeBudget(minutes(30), asked, 45).note).toMatch(/^Time budget \(wrap\)/);
+  });
+
+  it("lets a run past its estimate keep going while it still finds new things", () => {
+    const going = timeBudget(minutes(20), [], 10, true);
+    expect(going).toMatchObject({ answerOnly: false });
+    expect(going.note).toMatch(/^Time budget \(progress\)/);
+    const told: ModelMessage[] = [{ role: "user", content: going.note! }];
+    expect(timeBudget(minutes(25), told, 10, true)).toEqual({ answerOnly: false, note: undefined });
+    expect(timeBudget(minutes(25), told, 10, false).answerOnly).toBe(true);
+  });
+});
+
+const result = (id: string, value: string): ModelMessage => ({
+  role: "tool",
+  content: [{ type: "tool-result", toolCallId: id, toolName: "browser_snapshot", output: { type: "text", value } }],
+});
+
+describe("stillProgressing", () => {
+  it("counts results the run has not seen before, not repeats", () => {
+    const pages = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map((page, index) => result(`c${index}`, `page ${page}`));
+    expect(stillProgressing(pages)).toBe(true);
+    const repeats = [...pages, ...pages.slice(0, 8).map((message, index) => ({ ...message, content: (message.content as never[]).map((part: object) => ({ ...part, toolCallId: `r${index}` })) }) as ModelMessage)];
+    expect(stillProgressing(repeats)).toBe(false);
+    expect(stillProgressing([result("x", "same [ref=e1]"), result("y", "same [ref=e9]")], 2, 2)).toBe(false);
   });
 });

@@ -21,6 +21,8 @@ const workspaceCapabilities = [
   "bookmark.add",
   "web.fetch",
   "browser.session",
+  // Programs against the agent's own tabs (docs/plans/agent-harness-v3.md, change 1).
+  "browser.run",
 ];
 
 /**

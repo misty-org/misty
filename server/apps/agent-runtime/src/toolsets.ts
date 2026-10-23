@@ -24,13 +24,19 @@ const mistyData = [
 const mistyRequest =
   /\b(my|our|this|the person's) (own )?(notes?|notebook|drawings?|sketch(es)?|files?|documents in misty|chats?|threads?|messages in misty|spaces?|bookmarks?|saved workflows?|workflows?|memory|memories|preferences|recordings?|voice notes?|schedules?|agents?)\b|\b(in|on|from|to) misty\b|\bmisty('s)? (notes?|files?|chat|spaces?|drawings?|bookmarks?)\b|\bremember (that|this|my|me)\b|\bweather\b|\b(a|the|this) space\b/i;
 
+// A request that names an app people connect (docs/plans/agent-harness-v3.md, change 7): the
+// app tools load up front, so the first action comes a turn after the request, not three.
+const appRequest =
+  /\b(e-?mail|gmail|inbox|outlook|calendar|meeting invite|slack|github|pull request|notion|linear|jira|asana|trello|google (docs?|sheets?|drive|calendar)|drive folder|spreadsheet in (my )?drive|hubspot|salesforce|dropbox|figma|discord|my (contacts|events|repos?|channels?))\b/i;
+
 /** Which agent.tool a catalog tool (Misty name) belongs to; undefined is answer. */
 function toolsetOf(name: string): Toolset | Family | undefined {
+  // Opening the agent's own tab is how a run reads what a fetch can't, so it stays in answer, and
+  // so does a program against those tabs (docs/plans/agent-harness-v3.md, change 1). Checked
+  // before the browser prefix, which would put browser.run behind browse with the step tools.
+  if (name === "screen.open" || name === "browser.run") return undefined;
   if (name.startsWith("browser.workspace.")) return "desktop";
-  if (name === "browser.act") return "browse";
   if (name.startsWith("browser.") && !name.startsWith("browser.tab.")) return "browse";
-  // Opening the agent's own tab is how a run reads what a fetch can't, so it stays in answer.
-  if (name === "screen.open") return undefined;
   if (name.startsWith("code.")) return "code";
   if (name.startsWith("integration.")) return "integration";
   if (name === "agent.delegate" || name === "agent.wait") return "agent";
@@ -40,7 +46,7 @@ function toolsetOf(name: string): Toolset | Family | undefined {
 
 const toolsetWords: Record<Toolset, string> = {
   answer: "answer: read, search, fetch pages and work with the person's own data (the default)",
-  browse: "browse: also use a web browser to click, type, sign in and act on sites",
+  browse: "browse: also the single-step page tools (snapshot, steps, forms, page skills, screen agent) for what a browser_run program cannot do",
   desktop: "desktop: also control other apps on the person's computer",
   code: "code: also hand coding in an attached project to the person's coding tool",
 };
@@ -71,13 +77,17 @@ export function agentTools(catalog: ModelCatalog, request = "") {
   const offered = new Set(catalog.tools.map((item) => toolsetOf(item.name)).filter((value): value is Toolset | Family => value !== undefined));
   const toolsets = (["answer", "browse", "desktop", "code"] as const).filter((name) => name === "answer" || offered.has(name));
   // Browser tools exist only once a browser is attached (a screen the agent
-  // opened, or a tab the person shared), so such a run starts in browse.
-  const initial: Toolset = catalog.tools.some((item) => item.name.startsWith("browser.") && toolsetOf(item.name) === "browse" && item.name !== "browser.request_user_action")
+  // opened, or a tab the person shared), so such a run starts in browse, unless it
+  // has browser_run: then pages are worked with programs, and the 17 single-step
+  // tools wait behind browse (docs/plans/agent-harness-v3.md, change 2).
+  const programs = catalog.tools.some((item) => item.name === "browser.run");
+  const initial: Toolset = !programs && catalog.tools.some((item) => item.name.startsWith("browser.") && toolsetOf(item.name) === "browse" && item.name !== "browser.request_user_action")
     ? "browse"
     : "answer";
   const families = (["integration", "agent", "misty"] as const).filter((name) => offered.has(name));
   // A request about Misty's own things starts with them loaded.
   const preloaded = new Set<Family>(offered.has("misty") && mistyRequest.test(request) ? ["misty"] : []);
+  if (offered.has("integration") && appRequest.test(request)) preloaded.add("integration");
   // A run with its own tabs splits a broad task across sub-agents (docs/plans/agent-harness-v2.md,
   // "Breadth"); behind agent_tool_load they were never used, and 10-to-20-item tasks ran one by one.
   if (offered.has("agent") && catalog.tools.some((item) => item.name === "screen.open")) preloaded.add("agent");

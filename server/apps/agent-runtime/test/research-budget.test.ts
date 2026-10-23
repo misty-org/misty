@@ -29,6 +29,12 @@ describe("research budget", () => {
     expect(use.stage).toBe("wrap-up");
   });
 
+  it("keeps the larger budget a run had after its checklist was summarized away", () => {
+    const many = calls(...Array.from({ length: researchLimits.close }, (_, i) => fetchPage(`https://site${i}.com`)));
+    expect(researchUse(many, tools).stage).toBe("closed");
+    expect(researchUse(many, tools, 4).stage).toBe("open");
+  });
+
   it("does not call different questions repeats", () => {
     expect(sameQuery(new Set(["rust", "async", "runtime"]), new Set(["postgres", "pricing", "tiers"]))).toBe(false);
   });

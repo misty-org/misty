@@ -96,10 +96,41 @@ export const finishMissingNote = "You answered in text but did not report the ta
   "with only outcome and remaining, set honestly: leave summary out, since your answer above is already the summary and the person has read it. " +
   "Don't repeat the answer or call other tools first unless the answer is missing something.";
 
-/** Whether plain text is the turn's progress line rather than an answer. */
+/** An announced next move: "Let me click…", "I'll open…", "Now I need to…". */
+const announcedMove = /\b(let me|let's|i'll|i will|i'm going to|i am going to|i need to|i should|i'm trying|i'll try|now i|next,? i)\b/i;
+
+/**
+ * Whether plain text is the turn's progress line rather than an answer: "Last: … Next: …", or a
+ * short note that announces the next move and makes no call ("The popup is still showing. Let me
+ * try the link directly."). A run ended on such a line with five sites left (Odysseys, Oct 20).
+ */
 export function isProgressNote(text: string): boolean {
-  const head = text.trim().slice(0, 400);
-  return head.length < 400 && /^(\*\*)?(Last|Have|Next)\b/i.test(head) && /\bNext\b/i.test(head);
+  const head = text.trim().slice(0, 600);
+  if (head.length < 400 && /^(\*\*)?(Last|Have|Next)\b/i.test(head) && /\bNext\b/i.test(head)) return true;
+  if (head.length >= 500 || head.includes("?") || /^#|\n\s*[-*|#]/.test(head)) return false;
+  const sentences = head.split(/(?<=[.!:])\s+/).filter(Boolean);
+  return announcedMove.test(sentences.at(-1) ?? "");
+}
+
+/**
+ * What a run that never called agent_finish answered: its fullest plain-text answer since its last
+ * tool call, not just its last words. Asked once to confirm, a model replied "My full answer is
+ * already provided above" with a short recap, and the recap replaced a complete shortlist as the
+ * run's answer (Odysseys, October 20).
+ */
+export function closingText(steps: ReadonlyArray<{ text?: string; content: ReadonlyArray<{ type: string }> }>): string {
+  let lastCall = -1;
+  steps.forEach((step, index) => {
+    if (step.content.some((part) => part.type === "tool-call")) lastCall = index;
+  });
+  const answers = steps.slice(lastCall + 1).map((step) => step.text?.trim() ?? "").filter((text) => text && !isProgressNote(text));
+  const fullest = answers.reduce((best, text) => (text.length > best.length ? text : best), "");
+  if (fullest) return fullest;
+  for (let index = steps.length - 1; index >= 0; index--) {
+    const text = steps[index]?.text?.trim();
+    if (text) return text;
+  }
+  return "";
 }
 
 export const progressNoteNudge = "That was your progress line, not an answer. Make the tool calls for the next step now, " +

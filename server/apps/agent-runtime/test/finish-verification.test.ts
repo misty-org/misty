@@ -47,4 +47,10 @@ describe("verificationNote", () => {
   it("is undefined when nothing was found", () => {
     expect(verificationNote([])).toBeUndefined();
   });
+
+  it("tells a long run that gave up to keep working, not to stop looking", () => {
+    const note = verificationNote(["Not finished yet."], true)!;
+    expect(note).toMatch(/Keep working on the open parts/);
+    expect(note).not.toMatch(/runs only once|rather than looking for it again/);
+  });
 });

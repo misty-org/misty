@@ -68,6 +68,14 @@ async fn prepare(
 ) -> Result<Value, String> {
     let args = json!({"documentId": document, "ref": step.reference, "action": action, "key": key});
     let mut prepared = call_at(view, frame, "prepare", args.clone(), false).await?;
+    // A popup over the control is closed first, as a person would (page_read.js), then the
+    // control is measured again; anything else covering it still fails back to the agent.
+    if prepared["errorCode"] == "browser_target_covered" {
+        let closed = call_at(view, None, "dismissPopup", json!({}), false).await;
+        if closed.is_ok_and(|closed| closed["dismissed"].as_str().is_some_and(|label| !label.is_empty())) {
+            prepared = call_at(view, frame, "prepare", args.clone(), false).await?;
+        }
+    }
     if prepared["ok"] == true && prepared["scrolled"] == true {
         // Let a smooth-scrolling page come to rest, then measure again.
         tokio::time::sleep(Duration::from_millis(120)).await;
@@ -378,6 +386,32 @@ async fn run_step_checked(
         _ => {
             let mut result =
                 call_at(view, frame, "perform", step_args(document, step), false).await?;
+            // An editor that keeps its own model (canvas editors such as OnlyOffice in CryptPad)
+            // drops inserted text and takes only real keystrokes. A fill it did not keep is typed
+            // instead, as a person would; it was reported as done and the document stayed empty
+            // (Odysseys, October 20).
+            let text = step.text.as_deref().unwrap_or("");
+            if step.action == "fill"
+                && result["ok"] == true
+                && result["retained"] == false
+                && !text.is_empty()
+                && text.len() <= 16_000
+            {
+                let focused = script("focus").await?;
+                let select_all = json!({"kind": "key", "key": "a", "modifiers": [if cfg!(target_os = "macos") { "Meta" } else { "Control" }]});
+                let typed = if focused["ok"] == true {
+                    let _ = native(select_all, prepared.clone()).await?;
+                    native(json!({"kind": "type", "text": text}), prepared.clone()).await?
+                } else {
+                    None
+                };
+                result = match typed {
+                    Some(_) => json!({"ok": true, "attempted": true, "input": "native", "typed": true,
+                        "note": "This editor keeps its own copy of the text, so it was typed with real keystrokes. Read the editor to check it."}),
+                    None => json!({"ok": false, "attempted": true, "errorCode": "browser_text_not_kept",
+                        "error": "The editor did not keep the text. Type it with browser_steps type (real keystrokes), in parts if it is long."}),
+                };
+            }
             if step.action == "fill" && step.submit == Some(true) && result["ok"] == true {
                 let enter = Step {
                     action: "key".into(),

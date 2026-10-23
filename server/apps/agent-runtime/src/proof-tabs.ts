@@ -39,3 +39,43 @@ export function proofTabsRefusal(request: string, messages: ModelMessage[], tabL
     "a dialog or banner. Open or fix any that are missing, then call agent_finish again."
   );
 }
+
+/** A page title or address that says the page is an error or empty, not the evidence asked for. */
+const errorPage = /\b404\b|page not found|not found|can.?t (find|locate)|no longer (exists|available)|access denied|forbidden|just a moment|^about:blank$/i;
+
+/**
+ * Kept tabs (browser_run's keep()) that end on an error or empty page, from the run's latest
+ * program results (docs/plans/agent-harness-v3.md, change 4): the proof the person asked to see
+ * must show the page, not "We Can't Find That Page".
+ */
+export function brokenProofTabs(messages: ModelMessage[]): string[] {
+  const kept = new Set<string>();
+  const latest = new Map<string, { url: string; title: string }>();
+  for (const message of messages) {
+    if (message.role !== "tool" || !Array.isArray(message.content)) continue;
+    for (const part of message.content) {
+      if (part.type !== "tool-result" || part.toolName !== "browser_run") continue;
+      const output = part.output as { type?: string; value?: unknown };
+      const value = (output.type === "json" ? output.value : typeof output.value === "string" ? safeParse(output.value) : undefined) as
+        | { kept?: unknown; tabs?: unknown }
+        | undefined;
+      for (const id of Array.isArray(value?.kept) ? value.kept : []) if (typeof id === "string") kept.add(id);
+      for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
+        const { id, url, title } = (tab ?? {}) as { id?: unknown; url?: unknown; title?: unknown };
+        if (typeof id === "string") latest.set(id, { url: String(url ?? ""), title: String(title ?? "") });
+      }
+    }
+  }
+  return [...kept].flatMap((id) => {
+    const page = latest.get(id);
+    return page && (errorPage.test(page.title) || errorPage.test(page.url)) ? [`${page.url || id} ("${page.title}")`] : [];
+  });
+}
+
+function safeParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}

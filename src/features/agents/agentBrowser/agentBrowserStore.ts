@@ -9,7 +9,10 @@ export interface AgentBrowserTab {
   scopeId: string;
   title: string;
   url: string;
-  asleep: boolean;
+  /** Its live page, or "" while the tab sleeps. */
+  viewId: string;
+  loading?: boolean;
+  faviconUrl?: string;
 }
 
 export type AgentViewStatus = "working" | "waiting" | "done";

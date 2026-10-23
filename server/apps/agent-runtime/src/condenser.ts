@@ -67,6 +67,33 @@ export const oldToolResults: Condenser = {
   },
 };
 
+/** How many turns pass between summaries of older steps (Webwright compacts every 20 steps). */
+export const SUMMARY_EVERY_TURNS = 20;
+
+/**
+ * A summary of older steps every SUMMARY_EVERY_TURNS turns once the transcript is past the
+ * working budget (docs/plans/agent-harness-v3.md, change 3): one rewrite on a schedule, then
+ * twenty turns that only append, so the prompt cache holds between summaries.
+ */
+export function periodicSummary(summarize: (older: ModelMessage[]) => Promise<string>, due: () => boolean, done: () => void): Condenser {
+  return {
+    name: "periodic_summary",
+    async condense(messages, { estimate }) {
+      if (!due() || estimate <= WORKING_TOKENS) return undefined;
+      const plan = planCompaction(messages);
+      if (!plan) return undefined;
+      try {
+        const condensed = applyCompaction(plan, await summarize(plan.older));
+        done();
+        return { messages: condensed, estimate: shrink(messages, condensed, estimate) };
+      } catch (error) {
+        console.error("[misty-agent-runtime] periodic summary failed", error);
+        return undefined;
+      }
+    },
+  };
+}
+
 /** A model-written summary of older steps, the last resort. A failed summary leaves the transcript as it was. */
 export function summarizedSteps(summarize: (older: ModelMessage[]) => Promise<string>): Condenser {
   return {

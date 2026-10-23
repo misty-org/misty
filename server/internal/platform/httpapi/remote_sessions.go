@@ -227,6 +227,7 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 		return nil, nil
 	}
 	name := "this computer"
+	programs := contextAllows(target, browserRunTool)
 	// The agent's own tabs on that device in this run. A call with a url opens another
 	// one beside them (up to maxOwnTabs), so pages the person asked to keep open stay
 	// open; a call without one goes back to the first.
@@ -243,10 +244,10 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 		}
 	}
 	if already != "" {
-		return sessionOpened(already, name, url, true, own...)
+		return sessionOpened(already, name, url, true, programs, own...)
 	}
 	if len(own) > 0 && (url == "" || len(own) >= maxOwnTabs) {
-		return sessionOpened(own[0], name, url, true, own...)
+		return sessionOpened(own[0], name, url, true, programs, own...)
 	}
 	remote, err := s.openRemoteSession(ctx, record, body, target, callID, url, strings.TrimSpace(reason), len(own) > 0)
 	if err != nil {
@@ -269,13 +270,13 @@ func (s *SpacesService) remoteScreenOpen(ctx context.Context, record *db.AIInvoc
 		if attached, readErr := s.database.AIInvocationContexts(ctx, record.UserID, record.ID); readErr == nil {
 			for _, item := range attached {
 				if item.OpaqueRef == tab.OpaqueRef {
-					return sessionOpened(tab.OpaqueRef, name, url, true, append(own, tab.OpaqueRef)...)
+					return sessionOpened(tab.OpaqueRef, name, url, true, programs, append(own, tab.OpaqueRef)...)
 				}
 			}
 		}
 		return nil, err
 	}
-	return sessionOpened(tab.OpaqueRef, name, url, false, append(own, tab.OpaqueRef)...)
+	return sessionOpened(tab.OpaqueRef, name, url, false, programs, append(own, tab.OpaqueRef)...)
 }
 
 // screenOpenLocks serialize screen_open per run (striped, so nothing accumulates).
@@ -293,7 +294,7 @@ func fnv32(text string) uint32 {
 const maxOwnTabs = 32
 
 // sessionOpened tells the agent which of its own tabs it is in, and lists every one.
-func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json.RawMessage, error) {
+func sessionOpened(scopeID, name, url string, reused, programs bool, tabs ...string) (json.RawMessage, error) {
 	opened := "Your own browser tab is open on " + name
 	if reused {
 		opened = "Your own browser tab on " + name + " is already open"
@@ -305,6 +306,13 @@ func sessionOpened(scopeID, name, url string, reused bool, tabs ...string) (json
 	}
 	if len(tabs) == 0 {
 		tabs = []string{scopeID}
+	}
+	if programs {
+		// With browser_run the page is worked in programs (docs/plans/agent-harness-v3.md): no
+		// snapshot follows, and the message points there rather than at the step tools.
+		return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "tabs": tabs, "catalog_changed": true,
+			"message": opened + " (scopeId " + scopeID + "). Work it with browser_run: getTab(\"" + scopeID + "\") gives this tab in a program, openTab(url) opens another. " +
+				"Your open tabs: " + strings.Join(tabs, ", ") + "."})
 	}
 	return json.Marshal(map[string]any{"status": "open", "scopeId": scopeID, "tabs": tabs, "catalog_changed": true,
 		"message": opened + " (scopeId " + scopeID + "). Browser tools act on it from your next step; pass its scopeId. " + next + ", and keep working in this run. " +

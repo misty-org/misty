@@ -79,7 +79,10 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               />
           </div>
           {/* The agent's own browser beside the chat (docs/design/agent-browser/BRIEF.md). */}
-          <AgentBrowser conversationId={activeConversationId ?? undefined} />
+          <AgentBrowser
+            key={activeConversationId ?? ""}
+            conversationId={activeConversationId ?? undefined}
+          />
         </div>
       </div>
     </>

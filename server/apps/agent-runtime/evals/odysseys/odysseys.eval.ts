@@ -5,16 +5,18 @@
 // Batches stop early when failures pile up, so fixes come before more spending.
 //
 //   MISTY_ODYSSEYS=1 npm run eval:odysseys          (see README.md for the setup)
-import { mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { expect, it } from "vitest";
 import { EvalClient } from "../workflows/client.js";
 import { device, deviceContexts } from "../workflows/device.js";
 import { runUsage } from "../workflows/usage.js";
 import { judgeTask } from "./judge.js";
-import { Recorder } from "./recorder.js";
+import { Recorder, type Step } from "./recorder.js";
 import { leakedProcesses, pageProcesses } from "./leak-check.js";
 import { Ledger, searchesUsd, tokenUsd } from "./spend.js";
+import { ProgressWatch } from "./watchdog.js";
 import { loadTasks, selectTasks, type OdysseysTask } from "./tasks.js";
 
 const env = (name: string, fallback = "") => process.env[name]?.trim() || fallback;
@@ -25,24 +27,32 @@ const list = (value: string) =>
     .filter(Boolean);
 const model = env("MISTY_ODYSSEYS_MODEL", "anthropic/claude-haiku-5.5");
 const effort = env("MISTY_ODYSSEYS_EFFORT", "low");
-// Model turns per task: Ultra+'s 90 by default, near the paper's 100-step budget.
-const turns = Number(env("MISTY_ODYSSEYS_TURNS", "90"));
+// Model turns per task: 200, the most a dev eval may ask for, as the leaders run 100 to 200.
+const turns = Number(env("MISTY_ODYSSEYS_TURNS", "200"));
 const judgeModel = env("MISTY_ODYSSEYS_JUDGE", "anthropic/claude-haiku-5.5");
 const split = env("MISTY_ODYSSEYS_SPLIT", "dev");
 const limit = Number(env("MISTY_ODYSSEYS_LIMIT", "10"));
 const offset = Number(env("MISTY_ODYSSEYS_OFFSET", "0"));
 const earlyStop = env("MISTY_ODYSSEYS_EARLY_STOP", "1") === "1";
-// How long a task should take is the agent's own estimate (its checklist), which its time
-// budget enforces; each result shows estimate against time. This cap is only the safety net
-// for a run that never stops. Past it the run is cancelled and the pass stops, so what it
-// looped on is found and fixed first.
-const taskMs = Number(env("MISTY_ODYSSEYS_TASK_MINUTES", "60")) * 60_000;
+// No clock ends a run: Odysseys tasks are long on purpose. The progress watch (watchdog.ts)
+// looks every few minutes and stops only a run that went quiet or only repeats itself.
+// MISTY_ODYSSEYS_TASK_MINUTES still sets a hard cap when one is wanted; past it the pass stops.
+const taskMs = env("MISTY_ODYSSEYS_TASK_MINUTES") ? Number(env("MISTY_ODYSSEYS_TASK_MINUTES")) * 60_000 : Infinity;
+const watchMs = Number(env("MISTY_ODYSSEYS_WATCH_MINUTES", "3")) * 60_000;
 const parallel = Number(env("MISTY_ODYSSEYS_PARALLEL", "3"));
 const here = resolve(import.meta.dirname);
 const ledger = new Ledger(
   join(here, "reports", "ledger.json"),
   Number(env("MISTY_ODYSSEYS_CAP", "50")),
 );
+// Checkpoints: MISTY_ODYSSEYS_RESUME names a task's folder from an earlier pass. That task goes
+// on in the same conversation from where it stopped (after a fix, instead of starting over): the
+// request and its last answer are the chat's history, the new turn asks for what remains, and the
+// judge grades both runs' steps together as one trajectory.
+const resumeDir = env("MISTY_ODYSSEYS_RESUME");
+// MISTY_ODYSSEYS_REGRADE names a task's folder to judge again from its saved steps and pictures,
+// without running it (after a judge fix, or a verdict the judge never gave).
+const regradeDir = env("MISTY_ODYSSEYS_REGRADE");
 const bridgeUrl = env("MISTY_BROWSER_EVAL_BRIDGE").replace(/\/$/, "");
 const bridge = bridgeUrl
   ? { url: bridgeUrl, token: env("MISTY_BROWSER_EVAL_BRIDGE_TOKEN") }
@@ -65,10 +75,49 @@ export interface OdysseysRun {
   costUsd: number;
   answer: string;
   dir: string;
+  invocationId: string;
+  conversationId: string;
+  /** The earlier run this one continued, when it resumed from a checkpoint. */
+  resumedFrom?: string;
 }
+
+/** Where an earlier run of a task stopped: what it answered and the conversation to continue. */
+interface Checkpoint {
+  dir: string;
+  taskId: string;
+  answer: string;
+  invocationId: string;
+  conversationId: string;
+  seconds: number;
+}
+
+/** A run's conversation, from the local stack's database. */
+function conversationOf(invocationId: string): string {
+  if (!/^invocation_[0-9a-f-]{36}$/.test(invocationId)) return "";
+  const container = env("MISTY_ACCEPTANCE_DB_CONTAINER", "misty-server-postgres-1");
+  return execFileSync("docker", ["exec", container, "psql", "-U", "misty", "-d", "misty_server", "-t", "-A", "-c",
+    `SELECT coalesce(conversation_id,'') FROM ai_invocations WHERE id='${invocationId}'`], { encoding: "utf8" }).trim();
+}
+
+function checkpointAt(dir: string): Checkpoint {
+  const file = join(dir, "result.json");
+  if (!existsSync(file)) throw new Error(`No result.json in ${dir}: only a graded run can be resumed.`);
+  const run = JSON.parse(readFileSync(file, "utf8")) as Partial<OdysseysRun> & { taskId: string };
+  const invocationId = run.invocationId ?? "";
+  const conversationId = run.conversationId || conversationOf(invocationId);
+  if (!conversationId) throw new Error(`${dir} has no conversation to continue (result.json needs its invocationId).`);
+  return { dir, taskId: run.taskId, answer: run.answer ?? "", invocationId, conversationId, seconds: run.seconds ?? 0 };
+}
+
+/** The turn that resumes a task: what remains, then the whole answer again. */
+const resumePrompt =
+  "Continue the task above from where you stopped. Your last answer says what you found and what was not done: do what remains, " +
+  "and make sure every page the request asks to keep open is open in its own tab. Then give the complete final answer for the whole " +
+  "request, including what you found before.";
 
 interface Performed {
   task: OdysseysTask;
+  checkpoint?: Checkpoint;
   dir: string;
   recorder: Recorder;
   result: Awaited<ReturnType<EvalClient["run"]>>;
@@ -82,12 +131,24 @@ async function perform(
   agentId: string,
   userId: string,
   dir: string,
+  checkpoint?: Checkpoint,
 ): Promise<Performed> {
   const recorder = new Recorder(dir, bridge);
+  if (checkpoint) recorder.carry(checkpoint.dir);
   await recorder.start();
+  const watch = new ProgressWatch(task.id.slice(0, 10));
+  const observe = (event: Record<string, unknown>) => {
+    watch.observe(event);
+    return recorder.observe(event);
+  };
+  const looks = { everyMs: watchMs, check: () => watch.check() };
   const started = performance.now();
   const body = {
-    prompt: task.prompt,
+    prompt: checkpoint ? resumePrompt : task.prompt,
+    ...(checkpoint && {
+      conversation_id: checkpoint.conversationId,
+      history_turns: [{ invocation_id: checkpoint.invocationId, prompt: task.prompt, reply: checkpoint.answer, created_at: new Date().toISOString() }],
+    }),
     model_override: model,
     reasoning_effort: effort,
     window_label: "main",
@@ -97,7 +158,7 @@ async function perform(
     surface_id: "global",
     eval_turn_limit: turns,
   };
-  let result = await client.run(body, taskMs, [], (event) => recorder.observe(event));
+  let result = await client.run(body, taskMs, [], observe, looks);
   // A run that failed before its first tool call with no answer never reached the agent (the
   // model provider was unreachable, say): run the task once more rather than grade nothing.
   if (result.terminal === "invocation.failed" && !result.tools.length && !result.answer.trim()) {
@@ -106,17 +167,27 @@ async function perform(
       { ...body, device_contexts: await deviceContexts(userId, agentId) },
       taskMs,
       [],
-      (event) => recorder.observe(event),
+      observe,
+      looks,
     );
   }
   const seconds = (performance.now() - started) / 1000;
   await recorder.finish(result.answer);
-  return { task, dir, recorder, result, seconds };
+  return { task, checkpoint, dir, recorder, result, seconds };
 }
 
-/** Judges a recorded run and prices it; runs beside the next task's run. */
-async function grade({ task, dir, recorder, result, seconds }: Performed): Promise<OdysseysRun> {
-  const verdict = await judgeTask(judgeModel, task, recorder.steps, recorder.screenshots);
+/** A run that made no call and wrote no answer (cancelled, or refused at the start) did no work. */
+const didNoWork = (result: Performed["result"]) => !result.tools.length && !result.answer.trim();
+
+/** Judges a recorded run and prices it; runs beside the next task's run. A run that did no work
+ * is not sent to the judge: every rubric fails, and minutes of grading are saved. */
+async function grade({ task, checkpoint, dir, recorder, result, seconds }: Performed): Promise<OdysseysRun> {
+  const verdict = didNoWork(result)
+    ? {
+        rubrics: task.rubrics.map((rubric) => ({ id: rubric.id, success: false, reasoning: `Not graded: the run did no work (${result.terminal}).` })),
+        average: 0, perfect: false, inputTokens: 0, outputTokens: 0,
+      }
+    : await judgeTask(judgeModel, task, recorder.steps, recorder.screenshots);
   const usage = await runUsage(result.invocationId).catch(() => undefined);
   const searches = result.tools.filter((tool) => tool === "web_search").length;
   const costUsd =
@@ -137,11 +208,15 @@ async function grade({ task, dir, recorder, result, seconds }: Performed): Promi
       .map(({ id, reasoning }) => ({ id, reasoning })),
     tools: result.tools,
     turns: usage?.turns ?? 0,
-    seconds: Number(seconds.toFixed(1)),
+    // A resumed task's time is both runs': the time the task took.
+    seconds: Number((seconds + (checkpoint?.seconds ?? 0)).toFixed(1)),
     estimateMinutes: estimateOf(result.toolResults),
     costUsd: Number(costUsd.toFixed(4)),
     answer: result.answer.slice(0, 4_000),
     dir,
+    invocationId: result.invocationId,
+    conversationId: conversationOf(result.invocationId),
+    ...(checkpoint && { resumedFrom: checkpoint.dir }),
   };
   writeFileSync(
     join(dir, "result.json"),
@@ -166,6 +241,8 @@ const failedRun = (task: OdysseysTask, dir: string, error: unknown): OdysseysRun
   costUsd: 0,
   answer: "",
   dir,
+  invocationId: "",
+  conversationId: "",
 });
 
 /** The agent's estimate from its checklist results (the tool echoes it back). */
@@ -218,7 +295,23 @@ function summary(all: OdysseysRun[]) {
   };
 }
 
-it.skipIf(env("MISTY_ODYSSEYS") !== "1")(
+it.skipIf(env("MISTY_ODYSSEYS") !== "1" || !regradeDir)("judges a saved run again", async () => {
+  const previous = JSON.parse(readFileSync(join(regradeDir, "result.json"), "utf8")) as OdysseysRun & { rubrics: unknown };
+  const task = selectTasks(loadTasks(), "all", [previous.taskId])[0]!;
+  const steps = readFileSync(join(regradeDir, "steps.jsonl"), "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as Step);
+  const pictures = steps.flatMap((step) => step.screenshots.map((file) => join(regradeDir, file))).filter((file) => existsSync(file));
+  const verdict = await judgeTask(judgeModel, task, steps, pictures);
+  const run: OdysseysRun = {
+    ...previous,
+    perfect: verdict.perfect,
+    average: verdict.average,
+    failed: verdict.rubrics.filter((item) => !item.success).map(({ id, reasoning }) => ({ id, reasoning })),
+  };
+  writeFileSync(join(regradeDir, "result.json"), JSON.stringify({ ...run, prompt: task.prompt, rubrics: verdict.rubrics }, null, 2));
+  process.stderr.write(line(run));
+});
+
+it.skipIf(env("MISTY_ODYSSEYS") !== "1" || Boolean(regradeDir))(
   "runs Odysseys tasks through the product path",
   async () => {
     if (!device || !bridge)
@@ -238,10 +331,10 @@ it.skipIf(env("MISTY_ODYSSEYS") !== "1")(
     const agentId =
       (await client.json<{ agents: Array<{ id: string }> }>("/misty/agents")).agents[0]?.id ?? "";
     const me = await client.json<{ id: string }>("/me");
-    const tasks = selectTasks(loadTasks(), split, list(env("MISTY_ODYSSEYS_TASKS"))).slice(
-      offset,
-      offset + limit,
-    );
+    const checkpoint = resumeDir ? checkpointAt(resumeDir) : undefined;
+    const tasks = checkpoint
+      ? selectTasks(loadTasks(), "all", [checkpoint.taskId])
+      : selectTasks(loadTasks(), split, list(env("MISTY_ODYSSEYS_TASKS"))).slice(offset, offset + limit);
     // The leak check (leak-check.ts): page processes before the pass, compared after it.
     const processesBefore = await pageProcesses(bridge);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -269,8 +362,13 @@ it.skipIf(env("MISTY_ODYSSEYS") !== "1")(
         mkdirSync(dir, { recursive: true });
         let performed: Performed;
         try {
-          performed = await perform(client, task, agentId, me.id, dir);
+          performed = await perform(client, task, agentId, me.id, dir, checkpoint);
           refusedInARow = 0;
+          // The run's end, as it happens: grading takes minutes more, and the trajectory can be
+          // read meanwhile (steps.jsonl is already written).
+          process.stderr.write(
+            `RUN ENDED ${task.id.slice(0, 10)} ${performed.result.terminal} ${performed.seconds.toFixed(0)}s ${performed.result.tools.length} tools — ${didNoWork(performed.result) ? "no work, not graded" : "grading"} ${dir}\n`,
+          );
           // Out of AI usage, every later task would fail in a second: stop instead of grading them.
           if (/usage limit/i.test(performed.result.answer) && performed.result.tools.length < 3) {
             stopped =

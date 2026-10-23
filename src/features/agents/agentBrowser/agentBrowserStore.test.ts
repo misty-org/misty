@@ -10,7 +10,7 @@ import {
   viewOfTab,
 } from "./agentBrowserStore";
 
-const tab = (scopeId: string) => ({ scopeId, url: `https://example.com/${scopeId}`, title: "", asleep: false });
+const tab = (scopeId: string) => ({ scopeId, url: `https://example.com/${scopeId}`, title: "", viewId: `page-${scopeId}` });
 const chat = () => useAgentBrowser.getState().chats.c!;
 
 beforeEach(resetAgentBrowser);

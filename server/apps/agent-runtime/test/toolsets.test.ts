@@ -53,4 +53,10 @@ describe("agent.tool", () => {
     expect(attached.initial).toBe("browse");
     expect(attached.visible(["web_search", "browser_snapshot", "browser_steps"], toolState([], attached.initial))).toHaveLength(3);
   });
+
+  it("offers browser_run in answer and keeps the step tools behind browse", () => {
+    const programs = agentTools(catalogOf(["web.search", "screen.open", "browser.run", "browser.snapshot", "browser.steps"]));
+    expect(programs.initial).toBe("answer");
+    expect(programs.visible(["web_search", "screen_open", "browser_run", "browser_snapshot", "browser_steps"], toolState([], programs.initial))).toEqual(["web_search", "screen_open", "browser_run"]);
+  });
 });

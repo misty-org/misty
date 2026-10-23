@@ -95,11 +95,14 @@ export class EvalClient {
   /** Starts one run and reads its events until it ends. */
   /** `approve` names the app actions (Composio slugs) whose approval cards the run may pass, because the task asked for them. */
   /** `observe` sees every event as it arrives (the Odysseys recorder captures pages with it). */
+  /** `watch` looks at the run every `everyMs` and stops it when `check` gives a reason (no
+   * progress); with it, `timeoutMs` may be Infinity. */
   async run(
     body: Record<string, unknown>,
     timeoutMs = 10 * 60_000,
     approve: string[] = [],
     observe?: (event: Record<string, unknown>) => Promise<void>,
+    watch?: { everyMs: number; check(): string | undefined },
   ): Promise<EvalRun> {
     const key = `workflow-eval-${randomUUID()}`;
     const created = await this.json<{ eventsUrl: string }>("/ai/invocations", {
@@ -130,7 +133,16 @@ export class EvalClient {
       invocationId: created.eventsUrl.split("/").at(-2) ?? "",
     };
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let stopped = "";
+    const timer = Number.isFinite(timeoutMs) ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+    const looks = watch
+      ? setInterval(() => {
+          const reason = watch.check();
+          if (!reason || controller.signal.aborted) return;
+          stopped = reason;
+          controller.abort();
+        }, watch.everyMs)
+      : undefined;
     try {
       const response = await this.raw(created.eventsUrl, {
         headers: { Accept: "text/event-stream" },
@@ -226,7 +238,7 @@ export class EvalClient {
       return run;
     } catch (error) {
       run.terminal = controller.signal.aborted
-        ? "timeout"
+        ? stopped || "timeout"
         : `error: ${String(error).slice(0, 200)}`;
       // A run past the eval's time keeps working otherwise, beside the next task.
       if (controller.signal.aborted && run.invocationId)
@@ -236,6 +248,7 @@ export class EvalClient {
       return run;
     } finally {
       clearTimeout(timer);
+      clearInterval(looks);
       this.active.delete(run.invocationId);
     }
   }

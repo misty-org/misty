@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { browserUncertainErrorCode } from "./workerDeviceJobs";
+import { browserFailureIsCertain, browserUncertainErrorCode } from "./workerDeviceJobs";
 
 const mocks = vi.hoisted(() => ({
   claim: vi.fn(),
@@ -65,7 +65,7 @@ it("reports a native rejection after begin as uncertain without repeating the op
     nodeId: "node",
     scopeId: "scope",
     contextId: "context",
-    operation: "browser.inspect",
+    operation: "browser.steps",
     attempt: 1,
     controlVersion: 2,
     deadlineAt: expiry,
@@ -73,7 +73,7 @@ it("reports a native rejection after begin as uncertain without repeating the op
     input: {},
     config: {
       agentId: "agent",
-      contextCapabilities: ["browser.inspect"],
+      contextCapabilities: ["browser.steps"],
       contextExpiresAt: expiry,
     },
   };
@@ -99,4 +99,10 @@ it("reports a native rejection after begin as uncertain without repeating the op
   expect(
     mocks.invoke.mock.calls.filter(([command]) => command === "browser_agent_execute_bounded"),
   ).toHaveLength(1);
+});
+
+it("treats a failed read, or a script that never reached the page, as certain", () => {
+  expect(browserFailureIsCertain("browser.snapshot", "Browser page returned invalid data: x")).toBe(true);
+  expect(browserFailureIsCertain("browser.steps", "failed to send message to the webview")).toBe(true);
+  expect(browserFailureIsCertain("browser.steps", "Browser page returned invalid data: x")).toBe(false);
 });

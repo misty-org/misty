@@ -205,7 +205,10 @@
   max-width: 160px;
   flex: 1 1 120px;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   width: 100%;
   min-width: 0;

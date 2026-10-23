@@ -18,7 +18,10 @@ vi.mock("./MistyPanel", () => ({
 }));
 
 const suspend = vi.hoisted(() => vi.fn());
-vi.mock("@/features/webviews/browserRuntime", () => ({ setBrowserWebviewsSuspended: suspend }));
+vi.mock("@/features/webviews/browserRuntime", () => ({
+  setBrowserWebviewsSuspended: suspend,
+  onBrowserRuntimeClose: () => () => undefined,
+}));
 
 const pane = (id: string, surfaceId: string): WorkspacePane => ({
   type: "leaf",

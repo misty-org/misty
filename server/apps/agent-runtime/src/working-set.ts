@@ -25,7 +25,7 @@ const KEEP_RESULTS = 6;
 const DIGEST_CHARS = 700;
 
 /** Tools whose results are reading: what they found is kept as a digest. */
-const reading = new Set(["web_fetch", "web_search", "browser_extract", "browser_find", "log_work_read"]);
+const reading = new Set(["web_fetch", "web_search", "browser_extract", "browser_find", "log_work_read", "browser_run"]);
 /** Tools whose results are a page's state (its tree): stale after the next action. */
 const pageState = new Set(["browser_snapshot", "browser_navigate", "browser_steps", "browser_fill_form", "browser_skill", "browser_visual", "browser_inspect"]);
 

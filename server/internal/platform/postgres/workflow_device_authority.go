@@ -102,7 +102,8 @@ func validateDeviceJobTargetTx(ctx context.Context, tx *sql.Tx, job *WorkflowDev
 			}
 			// Acting in a page needs a live agent task. Folders, tabs and
 			// bookmarks follow their grants instead.
-			if input.Mode == "user" && strings.HasPrefix(job.RequiredCapability, "browser.") && job.RequiredCapability != "browser.session" && !userModeBrowserCapability[job.RequiredCapability] && !remote {
+			// browser.run acts only in the agent's own session tabs, which the device enforces.
+			if input.Mode == "user" && strings.HasPrefix(job.RequiredCapability, "browser.") && job.RequiredCapability != "browser.session" && job.RequiredCapability != "browser.run" && !userModeBrowserCapability[job.RequiredCapability] && !remote {
 				return ErrSpaceForbidden
 			}
 			// A browser tab belongs to the window that started the request.

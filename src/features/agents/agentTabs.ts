@@ -9,7 +9,9 @@ import {
   setViewPicture,
   updateBrowserTab,
   viewOfTab,
+  type AgentBrowserTab,
 } from "./agentBrowser/agentBrowserStore";
+import { followAgentPages } from "./agentBrowser/agentPageEvents";
 
 /**
  * An agent's tabs in the person's window, which sleep (docs/design/agent-browser/BRIEF.md,
@@ -49,6 +51,17 @@ const pending = new Map<string, Promise<unknown>>();
 let timer: ReturnType<typeof setInterval> | undefined;
 /** The tab the person is looking at in the split, which never sleeps. */
 let shownScope: string | undefined;
+/**
+ * Tabs a run kept as proof (browser_run's keep(), docs/plans/agent-harness-v3.md change 5): pages
+ * the person asked to leave open. They stay awake when idle and when the run ends, so they show
+ * at the end; only memory pressure puts them to sleep.
+ */
+const kept = new Set<string>();
+
+/** Keeps a tab awake as proof of the run's answer. */
+export function keepAgentTab(scopeId: string) {
+  if (tabs.has(scopeId)) kept.add(scopeId);
+}
 /** Live agent pages the system can spare now, by memory pressure. */
 const LIVE_UNDER_PRESSURE = { normal: Infinity, warning: 2, critical: 1 } as const;
 let pressure: { level: keyof typeof LIVE_UNDER_PRESSURE; at: number } = { level: "normal", at: 0 };
@@ -89,9 +102,24 @@ export function trackAgentTab(
       scopeId: tab.scopeId,
       url: tab.url ?? "",
       title: "",
-      asleep: false,
+      viewId: tab.viewId,
     });
   timer ??= setInterval(() => void sleepIdleAgentTabs(), CHECK_MS);
+  followAgentPages(noteAgentPage);
+}
+
+/** What an agent's live page reported (address, title, icon, loading), for its tab's row and
+ * the agent browser's address. A sleeping tab wakes where the page last was. */
+export function noteAgentPage(
+  viewId: string,
+  change: Partial<Pick<AgentBrowserTab, "url" | "title" | "loading" | "faviconUrl">>,
+) {
+  const tab = agentTabOfView(viewId);
+  if (!tab) return;
+  const reported = Object.fromEntries(Object.entries(change).filter(([, value]) => value !== undefined));
+  if (reported.url) tab.url = String(reported.url);
+  if (reported.title) tab.title = String(reported.title);
+  updateBrowserTab(tab.scopeId, reported);
 }
 
 /** The tab the person looks at in the split, or none; it stays live while shown. */
@@ -109,6 +137,9 @@ async function pressureLevel(): Promise<keyof typeof LIVE_UNDER_PRESSURE> {
 }
 
 export const agentTab = (scopeId: string) => tabs.get(scopeId);
+/** The tab whose live page this is. */
+export const agentTabOfView = (viewId: string) =>
+  viewId ? [...tabs.values()].find((tab) => tab.viewId === viewId) : undefined;
 export const agentTabsForTask = (taskId: string) => [...tabs.values()].filter((tab) => tab.taskId === taskId);
 
 /** Marks a job starting or ending on a tab. */
@@ -146,13 +177,14 @@ export function sleepAgentTab(scopeId: string): Promise<void> {
     }).catch(() => ({}) as { url?: string; title?: string });
     if (where.url && /^https?:/.test(where.url)) tab.url = where.url;
     if (where.title) tab.title = where.title;
-    updateBrowserTab(scopeId, { asleep: true, url: tab.url, title: tab.title });
+    updateBrowserTab(scopeId, { viewId: "", loading: false, url: tab.url, title: tab.title });
   });
 }
 
 /**
  * Opens a sleeping tab's page again under its scope, bound to its task's lease, before a job
- * runs on it. False when the tab is unknown here or its task's lease has ended.
+ * runs on it. A finished task's tab (its proof, kept for the person) has no lease left, so it
+ * opens for viewing only, with no agent bound. False when the tab is unknown here or could not open.
  */
 export function wakeAgentTab(scopeId: string): Promise<boolean> {
   return serial(scopeId, async () => {
@@ -161,6 +193,7 @@ export function wakeAgentTab(scopeId: string): Promise<boolean> {
     if (tab.viewId) return true;
     await makeRoom(scopeId);
     const id = `agent-${crypto.randomUUID()}`;
+    const finished = viewOfTab(scopeId)?.view.status === "done";
     try {
       await invoke("browser_webview_create", {
         request: {
@@ -169,11 +202,11 @@ export function wakeAgentTab(scopeId: string): Promise<boolean> {
           url: tab.url || browserHomeUrl(),
           originSpaceId: "",
           theme: "dark",
-          agentRunId: tab.runId,
+          agentRunId: finished ? undefined : tab.runId,
           ...agentPageBounds(),
         },
       });
-      await invoke("agent_workspace_bind_scope", { taskId: tab.taskId, scopeId });
+      if (!finished) await invoke("agent_workspace_bind_scope", { taskId: tab.taskId, scopeId });
       // Parked out of sight rather than hidden, so it keeps painting for the agent.
       await invoke("browser_webview_hide", { request: { id, keepLive: true } });
     } catch {
@@ -183,7 +216,7 @@ export function wakeAgentTab(scopeId: string): Promise<boolean> {
     tab.viewId = id;
     tab.lastUsed = Date.now();
     setBrowserRuntimeKeepLive(id, true);
-    updateBrowserTab(scopeId, { asleep: false });
+    updateBrowserTab(scopeId, { viewId: id });
     return true;
   });
 }
@@ -215,7 +248,8 @@ export async function sleepIdleAgentTabs(now = Date.now()) {
     if (tab.viewId && (!newest.has(tab.taskId) || tab.lastUsed > newest.get(tab.taskId)!.lastUsed))
       newest.set(tab.taskId, tab);
   const idle = [...tabs.values()].filter(
-    (tab) => tab.viewId && !tab.busy && now - tab.lastUsed >= SLEEP_AFTER_MS && newest.get(tab.taskId) !== tab,
+    (tab) =>
+      tab.viewId && !tab.busy && !kept.has(tab.scopeId) && now - tab.lastUsed >= SLEEP_AFTER_MS && newest.get(tab.taskId) !== tab,
   );
   await Promise.allSettled(idle.map((tab) => sleepAgentTab(tab.scopeId)));
 }
@@ -226,7 +260,7 @@ export async function sleepTaskTabs(taskId: string) {
   await Promise.allSettled(
     agentTabsForTask(taskId).map((tab) => {
       tab.busy = 0;
-      return sleepAgentTab(tab.scopeId);
+      return kept.has(tab.scopeId) ? undefined : sleepAgentTab(tab.scopeId);
     }),
   );
   forgetOldest();
@@ -237,6 +271,7 @@ export async function closeAgentTab(scopeId: string) {
   if (shownScope === scopeId) shownScope = undefined;
   await sleepAgentTab(scopeId);
   tabs.delete(scopeId);
+  kept.delete(scopeId);
   removeBrowserTab(scopeId);
 }
 
@@ -252,6 +287,7 @@ function forgetOldest() {
 /** For tests. */
 export function resetAgentTabs() {
   tabs.clear();
+  kept.clear();
   pending.clear();
   pictured.clear();
   shownScope = undefined;

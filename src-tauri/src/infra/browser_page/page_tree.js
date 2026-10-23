@@ -287,13 +287,28 @@
     // A popup over the page leads the snapshot, with its close control, so the agent closes it
     // before it reads or acts: as text, a covered page read like any other (page_read.js).
     let popup = null;
-    try { popup = root === document && P.coveringPopup ? P.coveringPopup() : null; } catch { popup = null; }
+    try {
+      popup = root === document && P.coveringPopup ? P.coveringPopup() : null;
+      // An empty backdrop has nothing to close; hidden, it stops catching clicks (page_read.js).
+      for (let tries = 0; popup?.empty && tries < 3; tries++) { P.hideCover(popup.box); popup = P.coveringPopup(); }
+      if (popup?.empty) popup = null;
+    } catch { popup = null; }
     const cover = popup
       ? `- note: A popup covers this page ("${popup.name}"). Close it first: ${popup.close ? `click ref=${P.register(popup.close)}` : "press Escape (browser_steps key Escape)"}.\n`
       : "";
+    // An error page reads like any other, and a run that guessed an address took one as the
+    // site's answer ("We Can't Find That Page", Odysseys, October 20): say what it is.
+    let missing = "";
+    try {
+      const heading = document.querySelector("h1")?.innerText ?? "";
+      const said = `${document.title || ""} ${heading}`;
+      if (root === document && (document.body?.innerText ?? "").length < 6000 &&
+        /\b404\b|page not found|not found|can.?t (find|locate) (that|this|the) page|page (doesn.?t|does not|no longer) exist|no longer available/i.test(said))
+        missing = `- note: This is an error page ("${P.clip(said, 80)}"): the address is wrong or gone. Find the page through the site's own search or links, or a web search, instead of guessing another address.\n`;
+    } catch { missing = ""; }
     return {
       ok: true, documentId: S.documentId, url: location.href, title: document.title || "",
-      tree: cover + (out.text || "- text: (the page shows no readable content)"),
+      tree: missing + cover + (out.text || "- text: (the page shows no readable content)"),
       truncated: out.truncated || built.scanLimited || built.refLimited,
       refCount: built.interactive.length, dialogs: P.dialogs(), focused: P.focused(),
       // Pattern and app skills that apply to this page (page_skills.js).

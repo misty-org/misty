@@ -48,27 +48,49 @@ pub(super) fn park_windows_webview(webview: &Webview) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), String> {
-    let mut errors = Vec::new();
-    for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-")
-            && webview.window().label() == caller.window().label()
-        {
-            if let Err(error) = webview
-                .hide()
-                .map_err(|error| error.to_string())
-                .and_then(|()| refresh_browser_cursor_ownership(&webview))
-            {
-                errors.push(error);
-            }
-        }
-    }
+/// The pages of the caller's window whose label starts with `prefix`, except the ids in `keep`.
+fn window_pages(caller: &Webview, app: &AppHandle, prefix: &str, keep: &[String]) -> Vec<Webview> {
+    let keep: HashSet<String> = keep
+        .iter()
+        .filter_map(|id| webview_label(id).ok())
+        .collect();
+    app.webviews()
+        .into_iter()
+        .filter(|(label, webview)| {
+            label.starts_with(prefix)
+                && !keep.contains(label)
+                && webview.window().label() == caller.window().label()
+        })
+        .map(|(_, webview)| webview)
+        .collect()
+}
+
+/// Runs `step` on every page, collecting each failure.
+fn each_page(
+    pages: Vec<Webview>,
+    step: impl Fn(&Webview) -> Result<(), String>,
+) -> Result<(), String> {
+    let errors: Vec<String> = pages.iter().filter_map(|page| step(page).err()).collect();
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors.join("; "))
     }
+}
+
+fn hide_page(webview: &Webview) -> Result<(), String> {
+    webview
+        .hide()
+        .map_err(|error| error.to_string())
+        .and_then(|()| refresh_browser_cursor_ownership(webview))
+}
+
+#[tauri::command]
+pub fn browser_webviews_hide_all(caller: Webview, app: AppHandle) -> Result<(), String> {
+    each_page(
+        window_pages(&caller, &app, "misty-browser-", &[]),
+        hide_page,
+    )
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,32 +108,16 @@ pub fn browser_webviews_hide_except(
     app: AppHandle,
     request: BrowserWebviewsHideExceptRequest,
 ) -> Result<(), String> {
-    let keep: HashSet<String> = request
-        .keep
-        .iter()
-        .filter_map(|id| webview_label(id).ok())
-        .collect();
-    let mut errors = Vec::new();
-    for (label, webview) in app.webviews() {
-        if !label.starts_with("misty-browser-tab-")
-            || keep.contains(&label)
-            || webview.window().label() != caller.window().label()
-        {
-            continue;
-        }
-        #[cfg(windows)]
-        let hidden = park_windows_webview(&webview);
-        #[cfg(not(windows))]
-        let hidden = webview.hide().map_err(|error| error.to_string());
-        if let Err(error) = hidden.and_then(|()| refresh_browser_cursor_ownership(&webview)) {
-            errors.push(error);
-        }
-    }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("; "))
-    }
+    #[cfg(windows)]
+    let hide = |webview: &Webview| {
+        park_windows_webview(webview).and_then(|()| refresh_browser_cursor_ownership(webview))
+    };
+    #[cfg(not(windows))]
+    let hide = hide_page;
+    each_page(
+        window_pages(&caller, &app, "misty-browser-tab-", &request.keep),
+        hide,
+    )
 }
 
 /// Closes every tab page in the caller's window whose tab no longer exists. Pages outlive the
@@ -126,11 +132,6 @@ pub async fn browser_webviews_close_except(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewsHideExceptRequest,
 ) -> Result<(), String> {
-    let keep: HashSet<String> = request
-        .keep
-        .iter()
-        .filter_map(|id| webview_label(id).ok())
-        .collect();
     let pending: HashSet<String> = state
         .pending_popups
         .lock()
@@ -138,27 +139,27 @@ pub async fn browser_webviews_close_except(
         .iter()
         .cloned()
         .collect();
-    let orphans: Vec<String> = app
-        .webviews()
-        .into_iter()
-        .filter(|(label, webview)| {
-            label.starts_with("misty-browser-tab-")
-                && !keep.contains(label)
-                && webview.window().label() == caller.window().label()
+    let orphans: Vec<String> = window_pages(&caller, &app, "misty-browser-tab-", &request.keep)
+        .iter()
+        .filter_map(|webview| {
+            webview
+                .label()
+                .strip_prefix("misty-browser-")
+                .map(str::to_owned)
         })
-        .filter_map(|(label, _)| label.strip_prefix("misty-browser-").map(str::to_owned))
         .filter(|id| !pending.contains(id))
         .collect();
-    let mut errors = Vec::new();
-    for id in orphans {
-        if let Err(error) = close_browser_webview(
-            app.clone(),
-            app.state::<BrowserSessionState>(),
-            BrowserWebviewIdRequest { id },
-        ) {
-            errors.push(error);
-        }
-    }
+    let errors: Vec<String> = orphans
+        .into_iter()
+        .filter_map(|id| {
+            close_browser_webview(
+                app.clone(),
+                app.state::<BrowserSessionState>(),
+                BrowserWebviewIdRequest { id },
+            )
+            .err()
+        })
+        .collect();
     if errors.is_empty() {
         Ok(())
     } else {
@@ -166,36 +167,28 @@ pub async fn browser_webviews_close_except(
     }
 }
 
+/// Parks every page in the caller's window except the ones the interface still shows outside a
+/// browser tab (`keep`: an agent's page beside its chat), which stay where they are.
 #[tauri::command]
-pub fn browser_webviews_park_all(caller: Webview, app: AppHandle) -> Result<(), String> {
+pub fn browser_webviews_park_all(
+    caller: Webview,
+    app: AppHandle,
+    request: Option<BrowserWebviewsHideExceptRequest>,
+) -> Result<(), String> {
+    let keep = request.map(|request| request.keep).unwrap_or_default();
     // On Windows pages stay in place beneath the renderer (`stacked_pages`):
     // overlays leave stacked pages where they are, and the renderer is opaque
     // while no page is presented, so they never show over Home or Agents, and
     // coming back only raises them, already drawn.
     #[cfg(windows)]
-    {
-        let mut errors = Vec::new();
-        for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-")
-                && webview.window().label() == caller.window().label()
-            {
-                if let Err(error) = stack_windows_webview(&app, &webview) {
-                    errors.push(error);
-                }
-            }
-        }
-        return if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors.join("; "))
-        };
-    }
+    let park = |webview: &Webview| stack_windows_webview(&app, webview);
     // Inactive pages must be hidden, not merely stacked below the renderer.
     // Closing an overlay restacks browser children above it, which otherwise
     // exposes parked pages over Home or Agents. Hiding retains the native page
     // and its session for the next explicit reconciliation.
     #[cfg(not(windows))]
-    browser_webviews_hide_all(caller, app)
+    let park = hide_page;
+    each_page(window_pages(&caller, &app, "misty-browser-", &keep), park)
 }
 
 /// Caller holds the browser lifecycle write lease. Enumerate real native views
@@ -417,6 +410,16 @@ pub async fn browser_webview_sleep(
     let title = page_title(&webview).await;
     close_browser_webview(app.clone(), state, request)?;
     Ok(json!({ "closed": true, "url": url, "title": title }))
+}
+
+/// Waits for a new agent tab's first page to load before the agent reads it
+/// (browser_page/mod.rs, `first_load`). True once it loaded; false after the wait ran out.
+#[tauri::command]
+pub async fn browser_webview_await_load(
+    app: AppHandle,
+    request: BrowserWebviewIdRequest,
+) -> Result<bool, String> {
+    Ok(super::page_agent::first_load(&app, &request.id).await)
 }
 
 /// A small picture of an agent's page (docs/design/agent-browser/BRIEF.md): the PiP and the view

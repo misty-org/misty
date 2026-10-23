@@ -32,11 +32,16 @@ func TestScreenToolsAreOfferedOnlyToDesktopAgentRuns(t *testing.T) {
 	names := []string{}
 	for _, registration := range got {
 		names = append(names, registration.Descriptor.Name)
-		if registration.Descriptor.Risk != "read" || registration.Handler == nil {
-			t.Fatalf("%s must be a read with a handler", registration.Descriptor.Name)
+		// browser.run acts in the agent's own tabs, so it is a write; the screen tools only read.
+		want := "read"
+		if registration.Descriptor.Name == browserRunTool {
+			want = "write"
+		}
+		if registration.Descriptor.Risk != want || registration.Handler == nil {
+			t.Fatalf("%s must be a %s with a handler", registration.Descriptor.Name, want)
 		}
 	}
-	if strings.Join(names, ",") != "screen.open,screen.look,screen.close" {
+	if strings.Join(names, ",") != "screen.open,screen.look,screen.close,browser.run" {
 		t.Fatalf("screen tools = %v", names)
 	}
 }

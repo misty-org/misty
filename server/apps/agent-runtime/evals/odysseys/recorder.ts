@@ -3,7 +3,7 @@
 // desktop's debug bridge right after each browser step and once more at the end, since
 // tasks ask for pages left open "as visual proof".
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface Step {
@@ -39,6 +39,31 @@ export class Recorder {
     private readonly bridge: Bridge | undefined,
   ) {
     mkdirSync(dir, { recursive: true });
+  }
+
+  /**
+   * Starts from an earlier run of the same task (a checkpoint, odysseys.eval.ts): its steps and
+   * pictures come first, so the judge reads one trajectory. Its final answer becomes an earlier
+   * answer, since the resumed run writes the final one.
+   */
+  carry(fromDir: string): void {
+    const file = join(fromDir, "steps.jsonl");
+    if (!existsSync(file)) return;
+    for (const line of readFileSync(file, "utf8").split("\n").filter(Boolean)) {
+      const earlier = JSON.parse(line) as { action: string; response: string; screenshots?: string[] };
+      const screenshots = (earlier.screenshots ?? []).flatMap((shot) => {
+        if (!existsSync(join(fromDir, shot))) return [];
+        const copy = `shot-${String(++this.shots).padStart(3, "0")}${shot.slice(shot.lastIndexOf("."))}`;
+        copyFileSync(join(fromDir, shot), join(this.dir, copy));
+        return [copy];
+      });
+      this.steps.push({
+        step: this.steps.length + 1,
+        action: earlier.action === "final_answer" ? "earlier_answer" : earlier.action,
+        response: earlier.response,
+        screenshots,
+      });
+    }
   }
 
   /** Notes the pages open before the run, so only the run's own are pictured. */

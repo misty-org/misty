@@ -147,12 +147,20 @@ pub async fn browser_agent_execute(
                 .ok_or_else(|| "Browser tab is not running.".to_owned())?;
             let previous = view.url().map_err(|error| error.to_string())?;
             let target = external_url(url)?;
+            let snapshot = request.input["includeSnapshot"] != false;
+            let mark = if snapshot {
+                page_agent::mark_document(&app, &id).await
+            } else {
+                None
+            };
             view.navigate(target.clone())
                 .map_err(|error| error.to_string())?;
             let mut landed = json!({"ok": true, "url": url});
             // The page it lands on, read once it has loaded, unless the caller only navigates.
-            if request.input["includeSnapshot"] != false {
-                if let Some(snapshot) = page_agent::landed(&app, &id, &previous, &target).await {
+            if snapshot {
+                if let Some(snapshot) =
+                    page_agent::landed(&app, &id, &previous, &target, mark.as_deref()).await
+                {
                     if snapshot["url"].is_string() {
                         landed["url"] = snapshot["url"].clone();
                     }

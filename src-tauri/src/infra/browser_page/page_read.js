@@ -11,6 +11,12 @@
       .filter((el) => !P.hidden(el)).map((el) => P.clip(el.innerText ?? el.textContent, 160)).filter(Boolean).slice(0, 3),
   });
 
+  /** Marks this document before a navigation, so Rust can tell a new page from this one. */
+  P.mark = (args) => { S.navMark = { document, token: String(args.token || "") }; return { ok: true }; };
+
+  // A site's bot check, which a normal browser passes by waiting a few seconds. Never solved.
+  const CHALLENGE = /performing security verification|checking your browser|checking if the site connection is secure|verify(ing)? you are (a )?human|press (&|and) hold/;
+
   /** Whether a wait condition holds now. Rust polls this; it makes no model calls. */
   P.waitCheck = (args) => {
     const body = (document.body?.innerText ?? document.body?.textContent ?? "").toLowerCase();
@@ -18,7 +24,11 @@
     if (args.text) checks.push(body.includes(String(args.text).toLowerCase()));
     if (args.textGone) checks.push(!body.includes(String(args.textGone).toLowerCase()));
     if (args.urlIncludes) checks.push(location.href.includes(String(args.urlIncludes)));
-    return { ok: true, met: checks.length > 0 && checks.every(Boolean), ready: document.readyState === "complete", url: location.href };
+    return {
+      ok: true, met: checks.length > 0 && checks.every(Boolean), ready: document.readyState === "complete", url: location.href,
+      mark: S.navMark?.document === document ? S.navMark.token : "",
+      challenge: /^just a moment/i.test(document.title || "") || (body.length < 3000 && CHALLENGE.test(body)),
+    };
   };
 
   /** Resolves once the DOM has been quiet for quietMs, or after maxMs. */
@@ -80,6 +90,8 @@
       const banner = consentBanner(el, true);
       if (!banner) continue;
       banner.style.setProperty("display", "none", "important");
+      // Its dimmed backdrop is often a separate element; left alone, it covers the page.
+      for (let tries = 0, cover = P.coveringPopup(); cover?.empty && tries < 3; tries++, cover = P.coveringPopup()) P.hideCover(cover.box);
       return { ok: true, declined: "hid the cookie banner" };
     }
     return { ok: true, declined: "" };
@@ -106,6 +118,9 @@
         if (rect.width * rect.height >= area * 0.25) box = el;
       }
       if (!box) continue;
+      // A backdrop with nothing to read or press: left by a banner that closed, or a scrim.
+      if (!(box.innerText || "").trim() && !box.querySelector(CONTROLS + ",input,select,textarea,img,video,iframe,canvas"))
+        return { box, close: null, name: "", empty: true };
       let close = null;
       for (const el of box.querySelectorAll(CONTROLS + ",[aria-label],[class*=close i],[id*=close i]")) {
         const label = closeLabel(el);
@@ -119,18 +134,39 @@
     }
     return null;
   };
-  /** Closes an uninvited popup covering the page: its close control, else Escape. */
-  P.dismissPopup = () => {
-    const popup = P.coveringPopup();
-    if (!popup) return { ok: true, dismissed: "" };
-    if (popup.close) {
-      const label = closeLabel(popup.close) || "close";
-      popup.close.click();
-      return { ok: true, dismissed: `${label} (${popup.name})` };
-    }
+  /** Hides an empty cover in the agent's own tab: nothing on it can be read, pressed or agreed to. */
+  P.hideCover = (box) => box.style.setProperty("display", "none", "important");
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const escape = () => {
     const target = document.activeElement || document.body;
     for (const type of ["keydown", "keyup"]) target.dispatchEvent(new KeyboardEvent(type, { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
-    return { ok: true, dismissed: `Escape (${popup.name})` };
+  };
+  /** Whether a popup's box still covers the page after an attempt to close it. */
+  const stillCovers = (box) => box.isConnected && !P.hidden(box) && P.coveringPopup()?.box === box;
+  /**
+   * Closes an uninvited popup covering the page, as a person would, and checks it went: its own
+   * close control, then Escape, and if it still covers the agent's own tab, hidden there (nothing
+   * on it was pressed or agreed to). A close control that does nothing left a run's every click
+   * "covered" on one site (Odysseys, October 20).
+   */
+  P.dismissPopup = async () => {
+    const popup = P.coveringPopup();
+    if (!popup) return { ok: true, dismissed: "" };
+    if (popup.empty) {
+      P.hideCover(popup.box);
+      return { ok: true, dismissed: "an empty overlay" };
+    }
+    if (popup.close) {
+      popup.close.click();
+      await pause(400);
+      if (!stillCovers(popup.box)) return { ok: true, dismissed: `${closeLabel(popup.close) || "close"} (${popup.name})` };
+    }
+    escape();
+    await pause(300);
+    if (!stillCovers(popup.box)) return { ok: true, dismissed: `Escape (${popup.name})` };
+    P.hideCover(popup.box);
+    for (let tries = 0, cover = P.coveringPopup(); cover?.empty && tries < 3; tries++, cover = P.coveringPopup()) P.hideCover(cover.box);
+    return { ok: true, dismissed: `hid it (${popup.name})` };
   };
   /** The cookie or consent banner holding a control, or with `pinned`, only one fixed or sticky
    * over the page (the box a person would see covering it). */
@@ -149,7 +185,7 @@
   const operations = {
     snapshot: (args) => P.snapshot(args), find: (args) => P.find(args), markdown: (args) => P.markdown(args),
     prepare: (args) => P.prepare(args), perform: (args) => P.perform(args), observe: () => P.observe(),
-    waitCheck: (args) => P.waitCheck(args), settle: (args) => P.settle(args),
+    waitCheck: (args) => P.waitCheck(args), settle: (args) => P.settle(args), mark: (args) => P.mark(args),
     skill: (args) => P.skill(args), locate: (args) => P.locate(args), declineConsent: () => P.declineConsent(), dismissPopup: () => P.dismissPopup(),
     locatorFor: (args) => {
       const resolved = P.resolve(args.documentId, args.ref);

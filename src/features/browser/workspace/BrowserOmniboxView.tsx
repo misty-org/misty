@@ -97,7 +97,7 @@ function toolbarAddress(value: string): string {
 }
 
 /** A secure page's site without protocol, www or path; anything else keeps its full address. */
-function hostAddress(value: string): string {
+export function hostAddress(value: string): string {
   try {
     const url = new URL(value);
     if (url.protocol === "https:") return url.hostname.replace(/^www\./, "");

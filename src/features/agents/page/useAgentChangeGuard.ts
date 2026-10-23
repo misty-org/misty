@@ -3,10 +3,12 @@ import { useCallback, useRef, useState } from "react";
 const idle = { dirty: false, busy: false };
 
 /**
- * Holds back navigation while the agent editor or conversation is busy, and asks before a
- * change would discard unsaved edits or an unsent message.
+ * Holds back navigation while the agent editor or the composer is busy (recording, uploading),
+ * and asks before a change would discard unsaved edits or an unsent message. A running agent
+ * does not hold it: runs keep working in their own chats while the person moves between them
+ * (docs/design/agent-browser/BRIEF.md).
  */
-export function useAgentChangeGuard(working: boolean) {
+export function useAgentChangeGuard() {
   const [editorStatus, setEditorStatus] = useState(idle);
   // Whether the draft is dirty matters only when a change is attempted. Keeping it out
   // of state spares the whole Agents page a render on the first keystroke of a message.
@@ -18,12 +20,7 @@ export function useAgentChangeGuard(working: boolean) {
   }, []);
   const [pendingChange, setPendingChange] = useState<() => void>();
   const change = (action: () => void, replacesConversation = true) => {
-    if (
-      pendingChange ||
-      editorStatus.busy ||
-      (replacesConversation && (conversationBusy || working))
-    )
-      return;
+    if (pendingChange || editorStatus.busy || (replacesConversation && conversationBusy)) return;
     if (editorStatus.dirty || (replacesConversation && conversationDirty.current)) {
       setPendingChange(() => action);
     } else action();

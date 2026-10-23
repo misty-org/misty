@@ -2,6 +2,7 @@
 // side of actions. Clicks and keys go through native input on macOS, so pages
 // receive trusted events; the script paths here are the fallback elsewhere.
 ((P) => {
+  const S = P.state;
   const fail = (error, extra = {}) => ({ ok: false, attempted: false, error, ...extra });
 
   const deepHit = (doc, x, y) => {

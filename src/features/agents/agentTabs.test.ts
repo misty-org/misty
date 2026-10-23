@@ -11,8 +11,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@/features/workspace/browserHome", () => ({ browserHomeUrl: () => "misty://home" }));
 
+import { resetAgentBrowser, useAgentBrowser } from "./agentBrowser/agentBrowserStore";
 import {
   agentTab,
+  noteAgentPage,
   noteAgentTabJob,
   resetAgentTabs,
   sleepIdleAgentTabs,
@@ -26,6 +28,7 @@ const commands = (name: string) => calls.list.filter((call) => call.command === 
 
 beforeEach(() => {
   resetAgentTabs();
+  resetAgentBrowser();
   calls.list.length = 0;
   calls.fail.clear();
 });
@@ -60,6 +63,14 @@ describe("agent tabs", () => {
     expect(commands("browser_webview_create")).toHaveLength(1);
   });
 
+  it("opens a finished run's proof tab for viewing, with no agent bound", async () => {
+    trackAgentTab({ scopeId: "proof", viewId: "v", taskId: "done-task", runId: "run-2", conversationId: "c" });
+    await sleepTaskTabs("done-task");
+    expect(await wakeAgentTab("proof")).toBe(true);
+    expect(commands("browser_webview_create")[0]!.args.request.agentRunId).toBeUndefined();
+    expect(commands("agent_workspace_bind_scope")).toHaveLength(0);
+  });
+
   it("closes a half-opened page when its task's lease is gone", async () => {
     trackAgentTab({ scopeId: "s", viewId: "v", taskId: "t", runId: "r" });
     await sleepTaskTabs("t");
@@ -69,6 +80,25 @@ describe("agent tabs", () => {
     expect(commands("browser_webview_close").map((call) => call.args.request.id)).toEqual([created]);
     expect(agentTab("s")!.viewId).toBe("");
     expect(await wakeAgentTab("unknown")).toBe(false);
+  });
+
+  it("keeps the agent browser's tab in step with its live page, asleep or awake", async () => {
+    trackAgentTab({ scopeId: "s", viewId: "v", taskId: "t", runId: "r", url: "https://example.com/", conversationId: "c" });
+    const shown = () => useAgentBrowser.getState().tabs.s!;
+    expect(shown().viewId).toBe("v");
+    noteAgentPage("v", { url: "https://example.com/next", loading: true, title: undefined });
+    noteAgentPage("v", { title: "Next", faviconUrl: "https://example.com/icon.png" });
+    noteAgentPage("someone-else", { url: "https://elsewhere.test/" });
+    expect(shown()).toMatchObject({ url: "https://example.com/next", title: "Next", loading: true });
+    expect(agentTab("s")!.url).toBe("https://example.com/next");
+    await sleepTaskTabs("t");
+    expect(shown()).toMatchObject({ viewId: "", loading: false });
+    // The old page's late events no longer reach the tab.
+    noteAgentPage("v", { url: "https://example.com/late" });
+    expect(shown().url).toBe("https://example.com/item");
+    await wakeAgentTab("s");
+    expect(shown().viewId).toBe(agentTab("s")!.viewId);
+    expect(shown().viewId).not.toBe("");
   });
 
   it("sleeps every tab of a run that ended, its newest and busy ones too", async () => {

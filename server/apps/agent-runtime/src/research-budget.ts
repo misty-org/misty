@@ -84,8 +84,12 @@ export function budgetScale(messages: ModelMessage[]): number {
   return Math.min(20, Math.max(1, steps.size, requirements));
 }
 
-/** What the run has spent on research so far, read from its tool calls. */
-export function researchUse(messages: ModelMessage[], tools: ResearchTools): ResearchUse {
+/**
+ * What the run has spent on research so far, read from its tool calls. `minScale` is the largest
+ * budget the run has had: a summarized transcript loses the checklist and requirements that set
+ * it, and on October 20 a 200-turn run lost search and fetch at turn 29 that way.
+ */
+export function researchUse(messages: ModelMessage[], tools: ResearchTools, minScale = 1): ResearchUse {
   const use = { searches: 0, fetches: 0, repeats: 0 };
   const queries: Array<Set<string>> = [];
   const pages = new Set<string>();
@@ -108,7 +112,7 @@ export function researchUse(messages: ModelMessage[], tools: ResearchTools): Res
     }
   }
   const cost = use.searches + use.fetches + use.repeats;
-  return { ...use, cost, stage: stageFor(cost, budgetScale(messages)) };
+  return { ...use, cost, stage: stageFor(cost, Math.max(minScale, budgetScale(messages))) };
 }
 
 /** The tools to hide: both research tools once the budget is closed. */

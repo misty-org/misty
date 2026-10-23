@@ -45,7 +45,9 @@
 }
 
 /* The tab sidebar: roomy. Favorites are a four-column tile grid, tabs are 40px
-   rounded rows with hover-only close buttons, and the window actions sit in a footer. */
+   rounded rows with hover-only close buttons, and the window actions sit in a footer.
+   Its tab rows are shared: any side tab list (`data-side-tab-list`, the agent browser's)
+   draws the same rows. */
 .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
   --shell-tab-height: 32px;
   gap: 0;
@@ -75,26 +77,41 @@
   .misty-workspace-favorite[data-active] {
   background: rgba(255, 255, 255, 0.09);
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab-list {
   gap: 2px;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   border-radius: 8px;
   font-size: 13px;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab-close {
   opacity: 0;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab:is(:hover, :focus-within)
   .misty-workspace-tab-close {
   opacity: 1;
 }
 @media (pointer: coarse) {
-  .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+  :is(
+      .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+      [data-side-tab-list]
+    )
     .misty-workspace-tab-close {
     opacity: 1;
   }
@@ -129,7 +146,10 @@
 
 /* The vertical tab list sits directly on the sidebar, fading at the edges that still have
    tabs beyond them so it reads as scrollable. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab-list {
   margin-top: 2px;
 }
@@ -181,7 +201,10 @@
 
 /* Tabs fade out at the list's edges while more sit beyond them. The bottom is a mask; the
    top is a gradient hanging off the sticky New Tab row, so tabs dissolve into that row. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab-list {
   mask-image: linear-gradient(to bottom, black calc(100% - var(--tab-fade-end, 0px)), transparent);
 }
@@ -198,17 +221,26 @@
 }
 
 /* Vertical tabs: selected and hovered rows are a soft highlight, not a bordered card. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   border-color: transparent;
   box-shadow: none;
   background: transparent;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab:hover {
   background: rgba(255, 255, 255, 0.05);
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab[data-active="true"] {
   background: rgba(255, 255, 255, 0.09);
 }

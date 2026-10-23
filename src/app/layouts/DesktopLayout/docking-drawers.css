@@ -1,4 +1,7 @@
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab:not(:hover, :focus-within)
   .misty-workspace-tab-close {
   opacity: 0;
@@ -291,7 +294,10 @@
 /* A vertical tab's speaker sits right after the favicon rather than at the row's end. The real
    button floats over the row; a gap of its width keeps the favicon, speaker and title evenly
    spaced, and exists only while the speaker is there. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   position: relative;
 }
@@ -324,7 +330,10 @@
   margin-right: 6px;
   transition: margin-right 120ms ease-out;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab:is(:hover, :focus-within)
   .misty-tab-pane-chips {
   margin-right: 32px;
@@ -335,11 +344,17 @@
     margin-right: 32px;
   }
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab {
   position: relative;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab
   .misty-workspace-tab-close {
   position: absolute;
@@ -349,7 +364,10 @@
   margin: auto 0;
   border-radius: 6px;
 }
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab:not([data-pinned], .misty-tab-has-chips):is(:hover, :focus-within)
   .misty-workspace-tab-title {
   /* The title makes way for the close button whenever the button shows, also when the title
@@ -365,7 +383,10 @@
 /* With the pane chips the title already ends before them, and they step clear of the close
    button themselves, so the title keeps only a short fade at its own edge, and only when it
    really is too long to fit. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
+:is(
+    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
+    [data-side-tab-list]
+  )
   .misty-workspace-tab.misty-tab-has-chips:is(:hover, :focus-within)
   [data-text-overflowing="true"] {
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);

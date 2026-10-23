@@ -75,10 +75,10 @@ it("a short question's honest partial answer stands the first time", async () =>
   expect(fixture.completions).toEqual([expect.objectContaining({ error_code: "task_incomplete" })]);
 });
 
-it("a long request's give-up goes back once, and the next finish stands", async () => {
+it("a long request's give-up goes back, and a next finish that found nothing new stands", async () => {
   fixture.prompt = `Find every streetwear release this week. ${"For each one give the brand, item, price, date and the store, with a link to the page you read. ".repeat(4)}`;
   await runSpaceTaskAgent({ mistyRunId: "run-long", controlPlaneURL: "https://control.invalid" });
   expect(fixture.finishOutputs).toHaveLength(2);
-  expect(fixture.finishOutputs[0]).toEqual({ status: "failure", tool_error: { message: expect.stringMatching(/Confirm the Jordan 11 Low release date[\s\S]*runs only once/) } });
+  expect(fixture.finishOutputs[0]).toEqual({ status: "failure", tool_error: { message: expect.stringMatching(/Confirm the Jordan 11 Low release date[\s\S]*Keep working on the open parts/) } });
   expect(fixture.finishOutputs[1]).toEqual(expect.objectContaining({ outcome: "partial" }));
 });

@@ -120,6 +120,8 @@ async function openSessionTab(session: HostedSession, url: string, signal: Abort
     });
     await invoke("agent_workspace_bind_scope", { taskId: session.taskId, scopeId });
     await invoke("browser_webview_hide", { request: { id, keepLive: true } });
+    // As above: the new tab's first read waits for its page, not about:blank.
+    await invoke("browser_webview_await_load", { request: { id } }).catch(() => false);
   } catch (error) {
     await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
     throw new DeviceOperationNotAttempted(error);
@@ -216,6 +218,8 @@ export async function startHostedSession(
       // Parked out of sight rather than hidden: a hidden page stops rendering, and
       // embedded widgets (schedules, booking calendars) never draw for the agent to read.
       await invoke("browser_webview_hide", { request: { id: viewId, keepLive: true } });
+      // The agent reads the page next: let it load first, or its first read is about:blank.
+      await invoke("browser_webview_await_load", { request: { id: viewId } }).catch(() => false);
     } catch (error) {
       await Promise.allSettled([
         invoke("browser_webview_close", { request: { id: viewId } }),

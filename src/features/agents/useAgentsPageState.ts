@@ -40,7 +40,7 @@ export function useAgentsPageState() {
   );
   const [draftSeed, setDraftSeed] = useState({ agentId: "", text: "" });
   const working = useMistyStore((s) => s.working);
-  const guard = useAgentChangeGuard(working);
+  const guard = useAgentChangeGuard();
   const workingAgentId = useMistyStore((s) => s.selectedAgentId);
   const conversations = useMistyStore((s) => s.conversations);
   const activeConversationId = useMistyStore((s) => s.activeConversationId);

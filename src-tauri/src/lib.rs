@@ -74,7 +74,8 @@ use infra::browser::{
     browser_agent_execute, browser_agent_grant_register, browser_agent_grant_revoke,
     browser_set_hidden_tab_sleep, browser_webview_back, browser_webview_capture_region,
     browser_webview_close, browser_webview_create, browser_webview_restore_focus, browser_webview_forward,
-    browser_webview_held, browser_webview_hide, browser_webview_navigate, browser_webview_picture,
+    browser_webview_await_load, browser_webview_held, browser_webview_hide, browser_webview_navigate,
+    browser_webview_picture,
     browser_webview_preview_document, browser_webview_reconcile, browser_webview_reload,
     browser_webview_set_bounds, browser_webview_set_theme, browser_webview_set_zoom,
     browser_webview_show, browser_webview_sleep, browser_webviews_close_except,
@@ -731,6 +732,7 @@ pub fn run() {
                     browser_webview_close,
                     browser_webview_sleep,
                     browser_webview_picture,
+                    browser_webview_await_load,
                     infra::system_memory::system_memory_pressure,
                     #[cfg(desktop)]
                     browser_agent_grant_register,

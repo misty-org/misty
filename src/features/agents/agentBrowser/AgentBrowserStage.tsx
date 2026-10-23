@@ -1,84 +1,71 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef } from "react";
-import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { Skeleton } from "@/shared/ui";
-import { agentTab, setShownAgentTab, wakeAgentTab } from "../agentTabs";
+import { useEffect, useRef, useState } from "react";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { SkeletonDocument } from "@/shared/ui";
+import { setShownAgentTab, wakeAgentTab } from "../agentTabs";
 import { useAgentBrowser } from "./agentBrowserStore";
-
-/** Whether the stage is on screen: its page (a native view above the app) must not cover anything else. */
-const onScreen = (element: HTMLElement) => {
-  const rect = element.getBoundingClientRect();
-  return (
-    element.isConnected &&
-    document.visibilityState === "visible" &&
-    rect.width > 0 &&
-    rect.height > 0 &&
-    !element.closest('[aria-hidden="true"], [hidden], [inert]')
-  );
-};
+import { agentPageKey, useAgentPageGeometry } from "./useAgentPageGeometry";
 
 /**
- * Where an agent's live page shows in the split. Showing a tab wakes it (a tab in view never
- * sleeps, agentTabs.ts); the page follows the stage's size, and goes back out of sight, still
- * painting for the agent, when the stage leaves the screen.
+ * The agent browser's page area, the small counterpart of a tab's page host (BrowserPageStage):
+ * the agent's live page is placed over it by the same runtime, and until that page is on screen
+ * the host paints the page color instead of showing through. Showing a tab wakes it (a tab in
+ * view never sleeps, agentTabs.ts); a tab that cannot open again shows its last picture.
  */
-export function AgentBrowserStage({ scopeId, locked }: { scopeId: string; locked: boolean }) {
+export function AgentBrowserStage({
+  scopeId,
+  locked,
+  picture,
+}: {
+  scopeId: string;
+  locked: boolean;
+  /** The view's last picture, for a page that cannot open again. */
+  picture?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
-  const asleep = useAgentBrowser((state) => state.tabs[scopeId]?.asleep ?? true);
+  const viewId = useAgentBrowser((state) => state.tabs[scopeId]?.viewId ?? "");
+  const presented = useBrowserRuntimeStore((state) => Boolean(viewId && state.presented[agentPageKey(viewId)]));
+  const [closed, setClosed] = useState(false);
 
   useEffect(() => {
     if (!scopeId) return;
+    let current = true;
+    setClosed(false);
     setShownAgentTab(scopeId);
-    let shownId = "";
-    let placed = "";
-    let stopped = false;
-    const hide = () => {
-      if (shownId) void invoke("browser_webview_hide", { request: { id: shownId, keepLive: true } }).catch(() => undefined);
-      shownId = "";
-      placed = "";
-    };
-    const place = () => {
-      const element = ref.current;
-      const id = agentTab(scopeId)?.viewId;
-      if (stopped || !element || !id || !onScreen(element)) return hide();
-      if (shownId && shownId !== id) hide();
-      const rect = element.getBoundingClientRect();
-      const scale = getAppliedAppRenderScale();
-      const bounds = { x: rect.left * scale, y: rect.top * scale, width: rect.width * scale, height: rect.height * scale };
-      const key = `${id}:${Object.values(bounds).map(Math.round).join(",")}`;
-      if (key === placed) return;
-      placed = key;
-      shownId = id;
-      void invoke("browser_webview_set_bounds", { request: { id, ...bounds } })
-        .then(() => invoke("browser_webview_show", { request: { id } }))
-        .catch(() => undefined);
-    };
-    void wakeAgentTab(scopeId).then(place);
-    const observer = new ResizeObserver(place);
-    if (ref.current) observer.observe(ref.current);
-    // A page that woke, moved or was replaced by the agent, and a chat page that left the screen.
-    const timer = window.setInterval(place, 1_000);
-    window.addEventListener("misty:workspace-geometry-changed", place);
+    void wakeAgentTab(scopeId).then((open) => {
+      if (current) setClosed(!open);
+    });
     return () => {
-      stopped = true;
-      observer.disconnect();
-      window.clearInterval(timer);
-      window.removeEventListener("misty:workspace-geometry-changed", place);
+      current = false;
       setShownAgentTab(undefined);
-      hide();
     };
   }, [scopeId]);
 
-  // While the agent acts, its page takes no input from the person (the ring marks it).
+  useAgentPageGeometry(ref, viewId);
+
+  // While the agent acts, its page takes no input from the person; the ring marks it.
   useEffect(() => {
-    const id = agentTab(scopeId)?.viewId;
-    if (!id) return;
-    void invoke("browser_agent_set_locked", { request: { id }, locked, ring: locked }).catch(() => undefined);
-  }, [scopeId, locked, asleep]);
+    if (!viewId) return;
+    void invoke("browser_agent_set_locked", { request: { id: viewId }, locked, ring: locked }).catch(() => undefined);
+  }, [viewId, locked]);
 
   return (
-    <div ref={ref} className="agent-browser-stage">
-      {asleep && <Skeleton className="agent-browser-stage-skeleton" />}
+    <div className="agent-browser-page" data-browser-corner-clip="">
+      <div
+        ref={ref}
+        className="agent-browser-page-host"
+        data-agent-page-awaiting={presented ? undefined : ""}
+      >
+        {viewId ? null : closed ? (
+          picture ? (
+            <img className="agent-browser-page-picture" src={picture} alt="The page's last picture" />
+          ) : (
+            <p className="agent-browser-page-note">This page is closed.</p>
+          )
+        ) : (
+          <SkeletonDocument label="Page" className="agent-browser-page-skeleton" />
+        )}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { Pressable } from "@/shared/ui";
 import { showView, type AgentBrowserChat, type AgentViewStatus } from "./agentBrowserStore";
 
 export const statusWord: Record<AgentViewStatus, string> = { working: "Working", waiting: "Waiting", done: "Done" };
@@ -8,9 +9,8 @@ export function AgentViewSwitcher({ chat }: { chat: AgentBrowserChat }) {
   return (
     <div className="agent-view-switcher" role="tablist" aria-label="Views">
       {chat.views.map((view) => (
-        <button
+        <Pressable
           key={view.id}
-          type="button"
           role="tab"
           aria-selected={view.id === chat.shownView}
           className="agent-view"
@@ -21,7 +21,7 @@ export function AgentViewSwitcher({ chat }: { chat: AgentBrowserChat }) {
           <span className="agent-view-status" data-working={view.status === "working" || undefined}>
             {statusWord[view.status]}
           </span>
-        </button>
+        </Pressable>
       ))}
     </div>
   );

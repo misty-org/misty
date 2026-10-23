@@ -122,8 +122,73 @@ const awaitingFirstPaint = new Set<string>();
 
 /** Whether the tab's page is on screen in its host; until it is, the host paints a fill. */
 function setBrowserPagePresented(runtimeId: string, presented: boolean): void {
-  const tabId = runtimeTabIds.get(runtimeId);
+  const tabId = runtimeTabIds.get(runtimeId) ?? adoptedPages.get(runtimeId);
   if (tabId) useBrowserRuntimeStore.getState().setPresented(tabId, presented);
+}
+
+/**
+ * Pages another owner creates and closes, shown through this runtime all the same: an agent's
+ * pages beside its chat (agentTabs.ts). They take the tab pages' placement, presented state,
+ * first-paint hold, parking and switching, under their own runtime id, with the key their
+ * presented state is kept under. This runtime never creates them, and they are not tabs: their
+ * page events never reach the person's tabs or history.
+ */
+const adoptedPages = new Map<string, string>();
+/** The newest bounds for an adopted page whose placement is queued. */
+const adoptedBounds = new Map<string, BrowserBounds>();
+
+/** Shows an adopted page at `bounds`, as a tab's page is shown in its host. */
+export function showAdoptedBrowserPage(
+  runtimeId: string,
+  presentedKey: string,
+  bounds: BrowserBounds,
+): Promise<void> {
+  adoptedPages.set(runtimeId, presentedKey);
+  // Parking leaves this page up, so showing it never calls off a park as a tab's sync does.
+  desiredVisibleRuntimeIds.add(runtimeId);
+  cancelDeferredHide(runtimeId);
+  if (visibleRuntimeIds.has(runtimeId) && lastBounds.get(runtimeId) === serializeBounds(bounds))
+    return Promise.resolve();
+  // Only the newest measurement is applied, like a tab's sync.
+  const queued = adoptedBounds.has(runtimeId);
+  adoptedBounds.set(runtimeId, bounds);
+  if (queued) return Promise.resolve();
+  return enqueue(runtimeId, async () => {
+    const latest = adoptedBounds.get(runtimeId);
+    adoptedBounds.delete(runtimeId);
+    if (!latest || !adoptedPages.has(runtimeId) || !desiredVisibleRuntimeIds.has(runtimeId)) return;
+    // Coming on screen, it may still be parked for its first paint (a page just woken).
+    const arriving = !visibleRuntimeIds.has(runtimeId);
+    const exists = await invoke<boolean>("browser_webview_reconcile", {
+      request: { id: runtimeId, nativeLiveResize: false, ...latest },
+    });
+    // Its owner closed it meanwhile, and only its owner opens it again.
+    if (!exists) {
+      visibleRuntimeIds.delete(runtimeId);
+      lastBounds.delete(runtimeId);
+      setBrowserPagePresented(runtimeId, false);
+      return;
+    }
+    lastBounds.set(runtimeId, serializeBounds(latest));
+    await presentReconciledPage(runtimeId, arriving);
+  });
+}
+
+/** Takes an adopted page off screen; its owner keeps it live or closes it. */
+export function hideAdoptedBrowserPage(runtimeId: string): Promise<void> {
+  if (!adoptedPages.has(runtimeId)) return Promise.resolve();
+  adoptedBounds.delete(runtimeId);
+  return hideBrowserRuntime(runtimeId).then(() => {
+    // Shown again while it was going.
+    if (desiredVisibleRuntimeIds.has(runtimeId)) return;
+    adoptedPages.delete(runtimeId);
+    lastBounds.delete(runtimeId);
+  });
+}
+
+/** Adopted pages wanted on screen now, which parking and switching leave in place. */
+function shownAdoptedPages(): string[] {
+  return [...adoptedPages.keys()].filter((id) => desiredVisibleRuntimeIds.has(id));
 }
 
 export function browserRuntimeIdForTabId(tabId: string): string | null {
@@ -406,6 +471,14 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
     if (!exists) throw new Error("Browser webview could not be attached.");
   }
   lastBounds.set(id, boundsKey);
+  await presentReconciledPage(id, createdNow);
+}
+
+/**
+ * Brings a reconciled page on screen, unless its host stopped wanting it meanwhile. A page still
+ * parked for its first paint is not presented yet, and its host keeps its fill until it is.
+ */
+async function presentReconciledPage(id: string, createdNow: boolean): Promise<void> {
   markBrowserPerf(id, "reconciled");
   // The Browser surface can unmount while native creation or reconciliation
   // is still in flight. Honor the latest desired visibility before exposing
@@ -491,7 +564,8 @@ export async function closeOrphanBrowserPages(liveTabs: () => BrowserRuntimeTab[
  * under. The ordinary sync still runs afterward and corrects any page whose bounds moved.
  */
 export function switchBrowserPages(ids: readonly string[]): void {
-  const wanted = ids.filter((id) => createdRuntimeIds.has(id));
+  // An agent's page beside its chat is not a tab, and stays up through any switch.
+  const wanted = ids.filter((id) => createdRuntimeIds.has(id)).concat(shownAdoptedPages());
   const leaving = [...visibleRuntimeIds].filter((id) => !wanted.includes(id));
   for (const id of wanted) markBrowserPerf(id, "instant switch sent", true);
   // With no page coming up the window turns opaque now and covers the pages going under.
@@ -753,7 +827,10 @@ export function setBrowserRuntimeKeepLive(runtimeId: string, keepLive: boolean):
 const hideRequest = (id: string) => ({ id, keepLive: keepLiveRuntimeIds.has(id) });
 
 export function hideBrowserWebview(tab: BrowserRuntimeTab, graceMs = 0): Promise<void> {
-  const id = registerBrowserRuntime(tab);
+  return hideBrowserRuntime(registerBrowserRuntime(tab), graceMs);
+}
+
+function hideBrowserRuntime(id: string, graceMs = 0): Promise<void> {
   desiredVisibleRuntimeIds.delete(id);
   visibleRuntimeIds.delete(id);
   releaseDeferredNavigation(id);
@@ -889,9 +966,18 @@ export async function closeBrowserRuntime(
 
 export async function parkAllBrowserWebviews(): Promise<void> {
   const generation = ++browserParkGeneration;
-  desiredVisibleRuntimeIds.clear();
-  visibleRuntimeIds.clear();
-  useBrowserRuntimeStore.setState({ presented: {} });
+  // Adopted pages on screen stay where they are: an agent's page beside its chat is on the
+  // Agents page, which is what parks the tabs.
+  const kept = new Set(shownAdoptedPages());
+  const keptKeys = new Set([...kept].map((id) => adoptedPages.get(id)!));
+  for (const id of [...desiredVisibleRuntimeIds])
+    if (!kept.has(id)) desiredVisibleRuntimeIds.delete(id);
+  for (const id of [...visibleRuntimeIds]) if (!kept.has(id)) visibleRuntimeIds.delete(id);
+  useBrowserRuntimeStore.setState((state) => ({
+    presented: Object.fromEntries(
+      Object.entries(state.presented).filter(([key]) => keptKeys.has(key)),
+    ),
+  }));
   [...deferredNavigations.keys()].forEach(releaseDeferredNavigation);
   createdRuntimeIds.forEach((id) => lastBounds.delete(id));
 
@@ -899,9 +985,14 @@ export async function parkAllBrowserWebviews(): Promise<void> {
   // before hiding every native child. Keep the pages loaded, but do not
   // expose them again until their Browser surface requests reconciliation.
   await Promise.all([...runtimeQueues.values()].map((pending) => pending.catch(() => undefined)));
-  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > 0) return;
-  await invoke<void>("browser_webviews_park_all").catch(() => undefined);
-  if (desiredVisibleRuntimeIds.size > 0 && typeof window !== "undefined") {
+  const keep = shownAdoptedPages();
+  if (generation !== browserParkGeneration || desiredVisibleRuntimeIds.size > keep.length) return;
+  await (
+    keep.length
+      ? invoke<void>("browser_webviews_park_all", { request: { keep } })
+      : invoke<void>("browser_webviews_park_all")
+  ).catch(() => undefined);
+  if (desiredVisibleRuntimeIds.size > keep.length && typeof window !== "undefined") {
     desiredVisibleRuntimeIds.forEach((id) => lastBounds.delete(id));
     window.dispatchEvent(new Event(browserRuntimeResumeEvent));
   }

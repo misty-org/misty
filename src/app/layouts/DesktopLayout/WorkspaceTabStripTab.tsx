@@ -8,6 +8,7 @@ import { cn, IconButton, OverflowFadeText, Pressable, TreeBranch } from "@/share
 import { Blocks, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { RefObject } from "react";
 import { BrowserViewAudioButton } from "@/features/browser/workspace";
+import { browserTabRowStyles } from "@/features/browser";
 import type { useTabHoverCards } from "./TabHoverCard";
 import { TabPageMenu } from "./PinnedTabMenu";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
@@ -84,12 +85,7 @@ export function WorkspaceTabStripTab({
         className={cn(
           group && "misty-tab-group-member",
           rotatable && "misty-tab-has-chips",
-          "misty-workspace-tab group/tab flex items-center rounded-md border text-xs transition-colors",
-          "duration-150 select-none focus-within:ring-1",
-          "focus-within:ring-cream-muted/50",
-          active
-            ? "border-charcoal-border/70 bg-charcoal-card text-cream-bright shadow-sm"
-            : "border-transparent text-cream-muted hover:bg-charcoal-card/40 hover:text-cream",
+          browserTabRowStyles.row(active),
         )}
       >
         {group ? (
@@ -107,7 +103,7 @@ export function WorkspaceTabStripTab({
           tabIndex={active ? 0 : -1}
           title={label}
           data-reorder-handle="true"
-          className="flex h-full min-w-0 flex-1 items-center justify-start gap-1.5 overflow-hidden pl-2 pr-2"
+          className={browserTabRowStyles.button}
           onClick={() => onSelect(tab.id)}
           onKeyDown={(event) => {
             const index = tabs.findIndex((item) => item.id === tab.id);
@@ -137,9 +133,7 @@ export function WorkspaceTabStripTab({
           />
           {/* Room for the speaker, so the favicon, speaker and title are spaced evenly. */}
           <span aria-hidden="true" className="misty-tab-audio-gap" />
-          <OverflowFadeText className="misty-workspace-tab-title min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-            {label}
-          </OverflowFadeText>
+          <OverflowFadeText className={browserTabRowStyles.title}>{label}</OverflowFadeText>
         </Pressable>
         {rotatable ? (
           <PaneRotateChips
