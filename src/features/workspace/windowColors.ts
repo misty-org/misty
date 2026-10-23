@@ -30,17 +30,6 @@ export function windowColorHex(color: WindowColor): string {
   return color.startsWith("#") ? color : windowColors[color as PaletteWindowColor];
 }
 
-/** The first color no window uses yet, else the least used one. */
-export function nextWindowColor(used: (WindowColor | undefined)[]): PaletteWindowColor {
-  const counts = new Map(windowColorNames.map((name) => [name, 0]));
-  for (const color of used)
-    if (color && counts.has(color as PaletteWindowColor))
-      counts.set(color as PaletteWindowColor, (counts.get(color as PaletteWindowColor) ?? 0) + 1);
-  return windowColorNames.reduce((best, name) =>
-    (counts.get(name) ?? 0) < (counts.get(best) ?? 0) ? name : best,
-  );
-}
-
 /** The chrome background for a window color: a quiet wash over the theme's own surface. */
 export function windowChromeBackground(color: WindowColor | undefined): string | undefined {
   return color

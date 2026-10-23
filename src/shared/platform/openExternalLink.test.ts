@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ openUrl: vi.fn(async () => undefined) }));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.openUrl }));
-vi.mock("@tauri-apps/plugin-os", () => ({ platform: () => "windows" }));
 
 import {
   configureMistyBrowserLinkOpener,
@@ -11,7 +10,6 @@ import {
   normalizeExternalUrl,
   openExternalLink,
   openSystemExternalLink,
-  openProviderAuthorizationLink,
 } from "@/shared/platform/openExternalLink";
 
 afterEach(() => {
@@ -83,9 +81,6 @@ describe("openExternalLink", () => {
       throw new Error("view unavailable");
     });
     await expect(openSystemExternalLink("https://example.com")).rejects.toThrow("view unavailable");
-    await expect(
-      openProviderAuthorizationLink("https://login.microsoftonline.com"),
-    ).rejects.toThrow("view unavailable");
     expect(mocks.openUrl).not.toHaveBeenCalled();
   });
 

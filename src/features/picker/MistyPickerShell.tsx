@@ -3,7 +3,7 @@ import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
 export type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
 
-import { MistyLibraryPicker } from "@/features/library/library";
+import { MistyLibraryPicker } from "@/features/library";
 import {
   Dialog,
   DialogContent,

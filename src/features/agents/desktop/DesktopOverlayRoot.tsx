@@ -9,14 +9,11 @@ import "./desktopOverlay.css";
  * Misty's windows while it controls the desktop or its own window on Windows
  * (src-tauri/src/infra/desktop_overlays_windows.rs): the control island, and
  * the mist that rings what Misty controls and carries its own pointer. The
- * window's label says which this page is. The agent dock's stack shares the
- * page (agent_dock_windows.rs): live thumbnails of docked agent windows,
- * drawn by Windows over the cards this page lays out.
+ * window's label says which this page is.
  */
 export function DesktopOverlayRoot() {
   const label = getCurrentWindow().label;
   if (label === "misty-desktop-island") return <DesktopIsland />;
-  if (label === "misty-dock-stack") return <DockStack />;
   if (label === "misty-dictation-pill") return <DictationPill />;
   return <DesktopMist />;
 }
@@ -155,63 +152,6 @@ function DesktopMist() {
           <circle key={pointer.pulse} className="desktop-pointer-pulse" cx="2" cy="2" r="10" />
         </svg>
       )}
-    </div>
-  );
-}
-
-interface DockCard {
-  id: string;
-  name: string;
-  status: string;
-  waiting: boolean;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-function DockStack() {
-  const [cards, setCards] = useState<DockCard[]>([]);
-  useEffect(() => {
-    const remove = getCurrentWindow().listen<{ cards: DockCard[] }>(
-      "misty://dock-stack",
-      ({ payload }) => setCards(payload.cards),
-    );
-    return () => void remove.then((fn) => fn());
-  }, []);
-  const press = (action: "open" | "stop", id: string) =>
-    void invoke("agent_dock_card", { action, id }).catch(() => {});
-  return (
-    <div className="dock-stack">
-      {cards.map((card) => (
-        <div
-          key={card.id}
-          className="dock-card"
-          style={{ left: card.x, top: card.y, width: card.width, height: card.height }}
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            className="dock-card-view"
-            aria-label={`Open ${card.name || "agent"} window`}
-            onClick={() => press("open", card.id)}
-          />
-          <div className="dock-card-caption">
-            <span className="dock-card-text">
-              <strong>{card.name || "Agent"}</strong>
-              <span>{card.waiting ? "Waiting for you" : card.status || "Working"}</span>
-            </span>
-            <Button
-              type="button"
-              variant="secondary"
-              size="xs"
-              onClick={() => press("stop", card.id)}
-            >
-              Stop
-            </Button>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

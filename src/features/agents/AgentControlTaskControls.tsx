@@ -1,14 +1,12 @@
 import { Check, Hand, Play, Square } from "lucide-react";
 import { formatShortcutLabel, detectShortcutPlatform } from "@/features/shortcuts";
 import { Button } from "@/shared/ui";
-import { AgentDockControls } from "./dock/AgentDockControls";
 import { finishLocalExecution, type Execution } from "./localExecution";
 import { autopilotStopShortcut } from "./workspaceAutopilot";
 
-/** The island's button row: Take over or Resume, the dock controls, the autopilot hint, and Done or Stop. */
+/** The island's button row: Take over or Resume, the autopilot hint, and Done or Stop. */
 export function AgentControlTaskControls({
   execution,
-  name,
   running,
   pending,
   stopped,
@@ -18,7 +16,6 @@ export function AgentControlTaskControls({
   stop,
 }: {
   execution: Execution;
-  name: string;
   running: boolean;
   pending: boolean;
   stopped: boolean;
@@ -51,7 +48,6 @@ export function AgentControlTaskControls({
           </Button>
         )
       )}
-      <AgentDockControls execution={execution} agentName={name} disabled={pending} act={act} />
       <span className="flex-1" />
       {execution.autopilot && running && !execution.desktopControl && (
         <kbd className="text-xs text-cream-muted">

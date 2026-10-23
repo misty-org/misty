@@ -13,7 +13,7 @@ import {
   useBrowserRuntimeStore,
   setBrowserWebviewsSuspended,
   browserOverlayReady,
-} from "./browserRuntime";
+} from "@/features/webviews/browserRuntime";
 import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback, useMemo, type ReactNode } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";

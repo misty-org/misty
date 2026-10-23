@@ -4,7 +4,7 @@ import { layoutTabs } from "@/features/workspace/layoutTabs";
 import { dockLeaves } from "@/features/workspace/dockTree";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiContextReference, AiSelectionSnapshot } from "@/features/ai-surface/types";
-import type { GlobalAiContextRef } from "@/features/global-search/types";
+import type { GlobalAiContextRef } from "./types";
 
 export interface MistyContextTarget {
   kind: "workspace" | "window" | "tab" | "pane" | "view";

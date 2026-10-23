@@ -4,7 +4,7 @@ import { act, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { emit, mocks, mounted } from "./CompanionController.testFixtures";
 import { companionControl, useCompanionState } from "./companionState";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+import type { MistyImageAttachment } from "@/features/misty/types";
 const attachment: MistyImageAttachment = {
   id: "fixture-file",
   name: "notes.txt",
@@ -282,7 +282,7 @@ it("speaks the saved result of delegated work without replaying the task", async
   view.unmount();
 });
 
-it.each(["user", "agent", "team"] as const)(
+it.each(["user", "agent"] as const)(
   "delegates voice work in user mode after a %s task, with the screens",
   async (previous) => {
     const view = await mounted();

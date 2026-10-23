@@ -1,14 +1,14 @@
 import { DesktopSettingsRow as Row } from "../components/DesktopSettingsUI";
-import { definitionById, fromLegacy } from "../profiles/registry";
-import { useSettingsProfiles } from "../profiles/store";
+import { definitionById, fromLegacy } from "../devicePreferences/registry";
+import { useDevicePreferences } from "../devicePreferences/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
 import { useSettingsStore } from "../store/useSettingsStore";
 
-/** One synced preference from the settings registry, with its matching control. */
+/** One preference from the settings registry, with its matching control. */
 export function PreferenceRow({ id, description }: { id: string; description?: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
-  const ready = useSettingsProfiles((s) => s.ready);
+  const ready = useDevicePreferences((s) => s.ready);
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = fromLegacy(d, section?.[d.key]);
   const update = (next: string | number | boolean) =>

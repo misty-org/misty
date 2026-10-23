@@ -108,7 +108,9 @@ export function useBrowserFocusReturn(): void {
     };
     const paneKey = () => {
       const { layout } = useWorkspaceStore.getState();
-      const pane = dockLeaves(layout.root).find((candidate) => candidate.id === layout.focusedPaneId);
+      const pane = dockLeaves(layout.root).find(
+        (candidate) => candidate.id === layout.focusedPaneId,
+      );
       return `${layout.activeTabId}|${layout.focusedPaneId}|${pane?.activeViewId}`;
     };
     let current = paneKey();

@@ -40,6 +40,11 @@ export const itemTones = {
   milestone: "violet",
   schedule: "amber",
   activity: "sand",
+  memoryMoment: "blue",
+  memoryScreen: "orange",
+  memorySummary: "violet",
+  memoryFact: "amber",
+  memoryWorkflow: "teal",
 } as const satisfies Record<string, ItemTone>;
 
 export function itemToneClass(tone: ItemTone): string {

@@ -45,7 +45,13 @@ unsafe fn fail(reply: *mut Object, error: &str) {
     reply.call((std::ptr::null_mut(), string(error).cast()));
 }
 
-extern "C" fn receive(_handler: &Object, _selector: Sel, _controller: *mut Object, message: *mut Object, reply: *mut Object) {
+extern "C" fn receive(
+    _handler: &Object,
+    _selector: Sel,
+    _controller: *mut Object,
+    message: *mut Object,
+    reply: *mut Object,
+) {
     unsafe {
         let frame: *mut Object = msg_send![message, frameInfo];
         let main_frame: BOOL = msg_send![frame, isMainFrame];

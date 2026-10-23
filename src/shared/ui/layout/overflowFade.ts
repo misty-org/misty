@@ -1,7 +1,7 @@
 // Keep utility-based labels (including portaled menus) in sync with their real
 // available width. One observer is shared by the whole app, not one per row.
 const candidates =
-  '[class*="truncate"], [class*="text-ellipsis"], [class*="line-clamp-1"], .pointer-pane-title, .misty-input-agent';
+  '[class*="truncate"], [class*="text-ellipsis"], [class*="line-clamp-1"], .pointer-pane-title';
 const marker = "data-overflow-fade";
 
 export function installOverflowFade(root: HTMLElement = document.body) {

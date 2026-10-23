@@ -3,8 +3,6 @@ import {
   Field,
   Input,
   Label,
-  RadioGroup,
-  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
@@ -59,14 +57,6 @@ export function FormsSection() {
         <Label className="flex items-center gap-2 text-cream">
           <Checkbox defaultChecked /> Checkbox
         </Label>
-        <RadioGroup defaultValue="a" className="flex gap-4">
-          <Label className="flex items-center gap-2 text-cream">
-            <RadioGroupItem value="a" /> Option A
-          </Label>
-          <Label className="flex items-center gap-2 text-cream">
-            <RadioGroupItem value="b" /> Option B
-          </Label>
-        </RadioGroup>
       </GalleryRow>
       <GalleryRow label="Slider">
         <Slider defaultValue={[40]} max={100} className="w-60" aria-label="Volume" />

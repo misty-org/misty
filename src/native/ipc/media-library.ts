@@ -15,21 +15,3 @@ export interface ListDirectoryRequest {
   showHidden?: boolean;
   forceRemoteRefresh?: boolean;
 }
-export interface PasteItem {
-  path: string;
-  isDirectory: boolean;
-  sizeBytes?: number | null;
-  remoteModified?: string | null;
-}
-export interface PrepareOpenItemRequest {
-  path: string;
-  sizeBytes?: number | null;
-  remoteModified?: string | null;
-}
-export interface PreparedOpenItem {
-  localPath: string;
-  cached: boolean;
-  sourcePath?: string | null;
-  cachePath?: string | null;
-  cacheHit?: boolean;
-}

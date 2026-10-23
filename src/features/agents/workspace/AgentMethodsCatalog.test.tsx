@@ -20,7 +20,11 @@ vi.mock("@/api/ai/agent-methods", () => ({
     saveSchedule: mocks.saveSchedule,
   },
 }));
-vi.mock("@/api/accountEvents", () => ({ observeAccountChanges: () => () => {} }));
+vi.mock("@/api/devices/api", () => ({ devicesApi: { list: async () => ({ devices: [] }) } }));
+vi.mock("../workflows/deviceScheduledRuns", () => ({
+  thisComputerDeviceId: async () => "this-computer",
+}));
+vi.mock("@/api/account-events", () => ({ observeAccountChanges: () => () => {} }));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: Object.assign((selector: (state: unknown) => unknown) => selector(mocks.state), {
     getState: () => ({
@@ -104,6 +108,7 @@ it("saves a schedule on the workflow with its rules and inputs without starting 
   catalog();
   fireEvent.click(await screen.findByRole("button", { name: "Schedule" }));
   fireEvent.change(screen.getByLabelText("Topic"), { target: { value: "Weekly research" } });
+  await screen.findByText(/Runs on this computer/);
   fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
   await waitFor(() =>
     expect(mocks.saveSchedule).toHaveBeenCalledWith(
@@ -111,6 +116,7 @@ it("saves a schedule on the workflow with its rules and inputs without starting 
       expect.objectContaining({
         inputs: { topic: "Weekly research" },
         enabled: true,
+        device_id: "this-computer",
         rules: [expect.objectContaining({ frequency: "weekly", times: ["09:00"] })],
       }),
     ),

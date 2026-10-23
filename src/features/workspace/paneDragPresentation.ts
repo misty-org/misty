@@ -1,6 +1,9 @@
 import { dockLeaves, dockPaneBounds, removeDockLeaf } from "./dockTree";
 import type { WorkspaceDockNode } from "./model";
-import { browserTabShowsInternalPage, useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import {
+  browserTabShowsInternalPage,
+  useBrowserRuntimeStore,
+} from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /** A reversible visual lift; no store updates or app remounts during the gesture. */
@@ -48,7 +51,7 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
       save(handle);
       handle.style.visibility = "hidden";
     });
-  entries.forEach(({ pane, element }, index) => {
+  entries.forEach(({ pane, element }) => {
     const rect = dockPaneBounds(remaining, pane.id, bounds);
     save(element);
     if (!rect) {
@@ -75,9 +78,7 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
     // painted opaque so no page beneath it shows.
     const view = pane.views.find((item) => item.id === pane.activeViewId);
     const livePage =
-      hasTauriInternals() &&
-      view?.surfaceId === "browser" &&
-      !browserTabShowsInternalPage(view.id);
+      hasTauriInternals() && view?.surfaceId === "browser" && !browserTabShowsInternalPage(view.id);
     if (livePage) return;
     element.style.setProperty("background-color", "var(--color-charcoal-bg)", "important");
     // The native page can't move with the pane, so its last preview stands in for it and
@@ -85,7 +86,9 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
     const preview = useBrowserRuntimeStore.getState().previews[pane.activeViewId ?? ""];
     if (!preview?.dataUrl) return;
     const toolbar = element.querySelector<HTMLElement>("[data-browser-toolbar]");
-    const below = toolbar ? toolbar.getBoundingClientRect().bottom - element.getBoundingClientRect().top : 0;
+    const below = toolbar
+      ? toolbar.getBoundingClientRect().bottom - element.getBoundingClientRect().top
+      : 0;
     const overlay = document.createElement("img");
     overlay.src = preview.dataUrl;
     overlay.alt = "";
@@ -108,7 +111,9 @@ export function liftPanePresentation(root: WorkspaceDockNode, paneId: string): (
     overlays.push(overlay);
   });
   // Pages follow their pane's new size on their own; this makes sure ones that only moved do too.
-  window.requestAnimationFrame(() => window.dispatchEvent(new Event("misty:workspace-geometry-changed")));
+  window.requestAnimationFrame(() =>
+    window.dispatchEvent(new Event("misty:workspace-geometry-changed")),
+  );
   return () => {
     overlays.forEach((overlay) => overlay.remove());
     saved.forEach((style, element) => {

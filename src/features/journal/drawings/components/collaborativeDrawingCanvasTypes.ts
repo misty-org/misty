@@ -1,6 +1,5 @@
 import type { BinaryFileData } from "@excalidraw/excalidraw/types";
 import type { DrawingSession } from "../drawingRuntime";
-import type { FigmaCanvasReference } from "../figma/figmaCanvasReference";
 import type { DrawingAssetReference, SpaceDrawing } from "../types";
 
 interface DrawingCanvasRuntime {
@@ -18,7 +17,6 @@ export interface CollaborativeDrawingCanvasProps {
   runtime: DrawingCanvasRuntime;
   drawing: SpaceDrawing;
   session: DrawingSession;
-  figmaImport?: { requestId: number; reference: FigmaCanvasReference };
   onAiSnapshot?: (snapshot: DrawingAiSnapshot) => void;
   onAiController?: (controller: DrawingAiController | null) => void;
 }

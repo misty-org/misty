@@ -30,10 +30,10 @@ fn health_rejects_failed_migrations_and_unhealthy_services() {
 
 #[test]
 fn development_commands_select_the_explicit_compose_file() {
-    let up = development_up_command(true, true).display();
+    let up = development_up_command(true).display();
     assert!(!up.contains("--env-file"));
     assert!(up.ends_with("--file compose.dev.yml up --build --remove-orphans --detach"));
-    let up_without_build = development_up_command(true, false).display();
+    let up_without_build = development_up_command(false).display();
     assert!(up_without_build.ends_with("--file compose.dev.yml up --remove-orphans --detach"));
     let down = development_down_command(true).display();
     assert!(down.ends_with("--file compose.dev.yml down --volumes --remove-orphans"));
@@ -50,26 +50,7 @@ fn development_commands_select_the_explicit_compose_file() {
 #[test]
 fn development_api_url_uses_the_static_tunnel_hostname_by_default() {
     assert!(env::var("MISTY_DEV_API_TUNNEL_HOSTNAME").is_err());
-    assert!(env::var("MISTY_DEV_TUNNEL_HOSTNAME").is_err());
     assert_eq!(development_tunnel_hostname(), "");
-}
-
-#[test]
-fn desktop_builds_pin_the_current_and_previous_ticket_keys() {
-    let directory = tempfile::tempdir().unwrap();
-    let path = directory.path().join("devices.env");
-    assert!(ensure_connected_devices_development_config(&path).unwrap());
-    let previous = STANDARD.encode([7u8; 32]);
-    let mut contents = fs::read_to_string(&path).unwrap();
-    contents.push_str(&format!(
-        "{DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS}={previous}\n"
-    ));
-    fs::write(&path, contents).unwrap();
-    let keys: BTreeMap<String, String> =
-        serde_json::from_str(&device_ticket_public_keys(&path).unwrap()).unwrap();
-    assert_eq!(keys.len(), 2);
-    assert_eq!(keys.get(&device_ticket_key_id(&[7u8; 32])), Some(&previous));
-    assert!(keys.iter().all(|(id, _)| id.len() == 12));
 }
 
 #[test]
@@ -106,25 +87,6 @@ fn development_server_configures_connected_devices_once() {
 
     assert!(!ensure_connected_devices_development_config(&path).unwrap());
     assert_eq!(fs::read_to_string(&path).unwrap(), first);
-}
-
-#[test]
-fn development_server_removes_the_legacy_connected_devices_toggle() {
-    let directory = tempfile::tempdir().unwrap();
-    let path = directory.path().join(".env.dev");
-    fs::write(&path, "MISTY_CONNECTED_DEVICES_ENABLED=false\n").unwrap();
-
-    assert!(ensure_connected_devices_development_config(&path).unwrap());
-    let contents = fs::read_to_string(&path).unwrap();
-    assert!(!contents.contains("MISTY_CONNECTED_DEVICES_ENABLED"));
-    assert_eq!(
-        environment_values(&contents, DEVICE_TICKET_PRIVATE_KEY).len(),
-        1
-    );
-    assert_eq!(
-        environment_values(&contents, DEVICE_PAIRING_PEPPER).len(),
-        1
-    );
 }
 
 #[test]
@@ -209,8 +171,7 @@ fn production_generation_writes_a_matched_private_bundle_once() {
 
     let production = fs::read_to_string(&production_path).unwrap();
     let worker =
-        fs::read_to_string(server.join("apps/journal-collab/.secrets/worker.prod.env"))
-            .unwrap();
+        fs::read_to_string(server.join("apps/journal-collab/.secrets/worker.prod.env")).unwrap();
     assert!(production.contains(&format!("{ROOM_SALT}={room_salt}\n")));
     assert!(!production.contains("replace-"));
     assert!(!worker.contains(TICKET_PRIVATE_KEY));

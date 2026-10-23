@@ -3,7 +3,6 @@ import type { AiRecapRecord, AiUserSettings } from "@/features/ai-surface/api";
 import {
   Button,
   Input,
-  mistyRoadmapUrl,
   Select,
   SelectContent,
   SelectItem,
@@ -30,30 +29,7 @@ type MistyBriefingsSectionProps = {
 };
 
 export function MistyBriefingsSection(props: MistyBriefingsSectionProps) {
-  if (!publicBetaFeatureEnabled("recurringBriefings")) {
-    return (
-      <SettingsSectionBlock
-        title="Recurring briefings"
-        description="Personal scheduled briefings are being prepared for a future Misty release."
-      >
-        <div className="flex min-h-16 items-center justify-between gap-4 border-t border-charcoal-border py-3.5">
-          <span className="text-[13px] text-cream-muted">coming soon...</span>
-          <a
-            className={
-              "text-[13px] text-cream underline underline-offset-4 hover:text-cream-bright " +
-              "focus-visible:rounded-sm focus-visible:outline-none " +
-              "focus-visible:ring-2 focus-visible:ring-charcoal-active"
-            }
-            href={mistyRoadmapUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View roadmap
-          </a>
-        </div>
-      </SettingsSectionBlock>
-    );
-  }
+  if (!publicBetaFeatureEnabled("recurringBriefings")) return null;
 
   const disabled = props.working || props.settings?.enabled === false;
   const { recapDraft } = props;

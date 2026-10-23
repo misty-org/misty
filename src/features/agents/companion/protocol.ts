@@ -1,4 +1,5 @@
 import type { AiCaptureAttachment } from "@/features/ai-surface/types";
+import type { SketchElement } from "./companionSketch";
 type CompanionMode = "team" | "auto";
 type CompanionPhase = "idle" | "listening" | "processing" | "responding";
 /** Global coordinates are CG display points on macOS, physical pixels on Windows. */
@@ -77,7 +78,7 @@ export interface PresentedSketch {
   surface: "board" | "screen";
   title?: string;
   displayId?: number;
-  elements: import("./companionSketch").SketchElement[];
+  elements: SketchElement[];
   done: boolean;
 }
 /** A region outlined on screen, in the same global units as cursor samples. */

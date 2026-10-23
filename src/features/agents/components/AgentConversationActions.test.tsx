@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { globalMistyApi } from "@/features/global-search/globalMistyApi";
+import { globalMistyApi } from "@/features/misty/globalMistyApi";
 import { useMistyDraftAttachments } from "@/features/misty/draftAttachments";
 import { AgentConversationActions } from "./AgentConversationActions";
 
@@ -58,11 +58,10 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("keeps a failed rename editable, then uses the server title on retry", async () => {
+it("renames the chat here even when the server cannot be reached", async () => {
   const rename = vi
     .spyOn(globalMistyApi, "renameConversation")
-    .mockRejectedValueOnce(new Error("Connection lost. Try again."))
-    .mockResolvedValueOnce({ id: "chat-1", title: "New title" });
+    .mockRejectedValue(new Error("Connection lost. Try again."));
   mount();
   await choose("Rename");
   const input = await screen.findByRole("textbox", { name: "Conversation name" });
@@ -70,16 +69,12 @@ it("keeps a failed rename editable, then uses the server title on retry", async 
   expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
   fireEvent.change(input, { target: { value: "  New title  " } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect((await screen.findByRole("alert")).textContent).toContain("Connection lost");
-  expect(useMistyStore.getState().conversations[0].title).toBe("Launch plan");
-  expect((input as HTMLInputElement).value).toBe("  New title  ");
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(rename).toHaveBeenLastCalledWith("chat-1", "New title");
   expect(useMistyStore.getState().conversations[0].title).toBe("New title");
 });
 
-it("confirms deletion, prevents duplicate requests, and clears the active route and draft", async () => {
+it("confirms deletion, then clears the active route and draft without waiting for the server", async () => {
   let resolve!: () => void;
   const remove = vi.spyOn(globalMistyApi, "deleteConversation").mockImplementation(
     () =>
@@ -99,11 +94,8 @@ it("confirms deletion, prevents duplicate requests, and clears the active route 
   );
   await choose("Delete");
   fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-  fireEvent.click(screen.getByRole("button", { name: "Deleting…" }));
-  expect(remove).toHaveBeenCalledTimes(1);
-  expect(useMistyStore.getState().conversations).toHaveLength(1);
-  await act(async () => resolve());
   await waitFor(() => expect(screen.getByTestId("route").textContent).toBe("?agent=agent-1"));
+  expect(remove).toHaveBeenCalledTimes(1);
   expect(useMistyStore.getState()).toMatchObject({
     conversations: [],
     activeConversationId: "",
@@ -114,23 +106,18 @@ it("confirms deletion, prevents duplicate requests, and clears the active route 
     invocationConversationId: undefined,
     invocationId: undefined,
   });
+  await act(async () => resolve());
 });
 
-it("retains the conversation and confirmation after failed deletion", async () => {
+it("deletes the chat here even when the server cannot be reached", async () => {
   vi.spyOn(globalMistyApi, "deleteConversation").mockRejectedValue(
     new Error("Could not delete. Try again."),
   );
   mount();
   await choose("Delete");
   fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-  expect((await screen.findByRole("alert")).textContent).toContain("Could not delete");
-  expect(screen.getByRole("alertdialog")).toBeTruthy();
-  expect(useMistyStore.getState()).toMatchObject({
-    conversations: [conversation],
-    activeConversationId: "chat-1",
-    query: "draft",
-  });
-  expect(screen.getByTestId("route").textContent).toContain("conversation=chat-1");
+  await waitFor(() => expect(useMistyStore.getState().conversations).toEqual([]));
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 it("preserves another conversation selected while deletion is pending", async () => {
@@ -148,8 +135,8 @@ it("preserves another conversation selected while deletion is pending", async ()
     selectedAgentId: "agent-2",
     query: "another draft",
   });
-  resolve();
   await removal;
+  resolve?.();
   expect(useMistyStore.getState()).toMatchObject({
     activeConversationId: "chat-2",
     selectedAgentId: "agent-2",

@@ -10,7 +10,7 @@ import type {
 } from "./lessonTypes";
 
 /** Paused lessons older than this are not offered for "resume"; they can still be opened. */
-export const RESUME_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const RESUME_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 const objectiveStatuses = new Set(["pending", "in_progress", "done", "skipped"]);
 
 /** "3 of 5", counting done and skipped objectives. */

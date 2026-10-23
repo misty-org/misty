@@ -53,14 +53,11 @@ export function useWindowStyleSetup() {
         shellBounds && drawerButtonBounds
           ? (drawerButtonBounds.top + drawerButtonBounds.height / 2 - shellBounds.top) / scale
           : null;
-      const verticalDrawerOffset = drawerButtonCenter !== null
-        ? drawerButtonCenter - trafficLightRestY
-        : sideTabInset;
+      const verticalDrawerOffset =
+        drawerButtonCenter !== null ? drawerButtonCenter - trafficLightRestY : sideTabInset;
       const verticalOffset = tabs === "left" ? verticalDrawerOffset : 0;
       await enableModernWindowStyle(getCurrentWindow(), {
-        x:
-          trafficLightOffsetDefault.x +
-          (tabs === "left" ? sideTabTrafficLightNudgeX : 0),
+        x: trafficLightOffsetDefault.x + (tabs === "left" ? sideTabTrafficLightNudgeX : 0),
         y: trafficLightOffsetDefault.y + verticalOffset,
       });
       if (disposed) return;

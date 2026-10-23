@@ -1,0 +1,86 @@
+/* The page is a rounded pane in every tab layout: a 1px gray outline hugs it from the
+   margin just outside, where the native page cannot cover it. */
+.misty-docking-frame .misty-pane-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2147483647;
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 13px;
+  pointer-events: none;
+}
+/* The page's corners are curved, but its area is square: its background would show in the four
+   corners, notably the two beside the Misty panel, which no pane mask covers. Paint them in
+   the chrome color. */
+.misty-docking-frame .misty-pane-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  background:
+    radial-gradient(
+        circle at 100% 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top left / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 0 100%,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      top right / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 100% 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom left / 12px 12px no-repeat,
+    radial-gradient(
+        circle at 0 0,
+        transparent 11.5px,
+        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
+      )
+      bottom right / 12px 12px no-repeat;
+}
+
+/* Once a tab is split, every pane is its own rounded container with a gap between them, so the
+   page's single outline gives way to each pane's own. */
+.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id])::after {
+  display: none;
+}
+.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id]) [data-workspace-pane] {
+  border: 1px solid var(--color-charcoal-border);
+  border-radius: 12px;
+}
+
+/* Split panes float on the dark workspace backdrop. Nothing opaque may sit behind a page: while
+   a popover is open the native pages drop below the app layer and show only through transparent
+   CSS, so the frame and panes container stay transparent (styles.css) and the backdrop is painted
+   only where no page is: the margin (the tabpanel's inset shadow, in --misty-window-chrome), the
+   gaps (the resize handles) and the four corners outside each pane's rounded edge. */
+.misty-docking-frame:has([data-panel-resize-handle-id]) {
+  --misty-window-chrome: var(--misty-theme-workspace) !important;
+}
+.misty-docking-frame [data-panel-resize-handle-id] {
+  background-color: var(--misty-theme-workspace);
+}
+.misty-docking-frame
+  .misty-pane-frame:has([data-panel-resize-handle-id])
+  [data-pane-layout-content]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
+      left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
+      right / 12px 12px no-repeat,
+    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
+      left / 12px 12px no-repeat,
+    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
+      right / 12px 12px no-repeat;
+}

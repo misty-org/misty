@@ -6,15 +6,12 @@ import {
   readApiAuthToken,
   readApiSessionGeneration,
 } from "@/api/client/session";
-import { readDownloadBlob } from "@/api/spaces/signed-download";
 import { assertUploadLimit } from "@/api/spaces/upload-limits";
-import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 import {
   assertStableSpaceAccount,
   resolveSpacesApiBase,
-  spaceErrorMessage,
   spaceRequest,
   SpaceRequestError,
 } from "./api";
@@ -109,7 +106,7 @@ export function fileNameFromPath(path: string): string {
   );
 }
 
-export async function uploadLibraryFile(
+async function uploadLibraryFile(
   spaceId: string,
   file: File,
   purpose: "library" | "attachment",
@@ -233,7 +230,7 @@ export async function transferLibraryObject(
   assertStableSpaceAccount(accountGeneration);
 }
 
-export function directTransferErrorMessage(direct: boolean, status: number): string {
+function directTransferErrorMessage(direct: boolean, status: number): string {
   if (!direct) return "The cloud upload failed.";
   if (status === 403 || status === 0) {
     return "The direct R2 upload was blocked by the bucket CORS/preflight policy.";
@@ -241,57 +238,9 @@ export function directTransferErrorMessage(direct: boolean, status: number): str
   return "The direct R2 upload failed.";
 }
 
-export { libraryPreviewPath } from "./library-transfer-paths";
-export async function downloadProtectedFile(
-  path: string,
-  filename: string,
-  init?: RequestInit,
-): Promise<void> {
-  const blob = await fetchProtectedBlob(path, init);
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.rel = "noopener";
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-}
-
-export async function fetchProtectedBlob(path: string, init?: RequestInit): Promise<Blob> {
-  const accountGeneration = readApiSessionGeneration();
-  assertStableSpaceAccount(accountGeneration);
-  const base = await resolveSpacesApiBase();
-  const token = await readApiAuthToken();
-  assertStableSpaceAccount(accountGeneration);
-  const headers = addRequestCorrelation(new Headers(init?.headers));
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  let response: Response;
-  try {
-    response = await httpRequest(`${base}${path}`, { credentials: "include", ...init, headers });
-  } catch (error) {
-    assertStableSpaceAccount(accountGeneration);
-    throw error;
-  }
-  assertStableSpaceAccount(accountGeneration);
-  if (!response.ok) {
-    const text = await response.text();
-    assertStableSpaceAccount(accountGeneration);
-    let code: string | undefined;
-    try {
-      code = (JSON.parse(text) as { code?: string }).code;
-    } catch {
-      /* plain text */
-    }
-    throw new SpaceRequestError(spaceErrorMessage(code, text), response.status, code);
-  }
-  const blob = await readDownloadBlob(response);
-  assertStableSpaceAccount(accountGeneration);
-  return blob;
-}
-
 export const maxWebviewUploadBytes = 128 * 1024 * 1024;
 
-export function webviewUploadSizeError(): Error {
+function webviewUploadSizeError(): Error {
   return new Error(
     "This beta can safely copy files up to 128 MB. Larger files need Misty’s streaming uploader.",
   );

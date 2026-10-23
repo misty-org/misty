@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import type { ScreenRequest } from "@/features/ai-surface/types";
-import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
+import type { MistyState } from "./mistyState";
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(async () => ({ capture: { id: "shot" }, label: "Window" })),
   desktop: true,
@@ -26,11 +26,9 @@ import {
   openScreenAndContinue,
 } from "./screenRequests";
 
-let state: GlobalSearchState;
+let state: MistyState;
 const get = () => state;
-const set = (
-  patch: Partial<GlobalSearchState> | ((s: GlobalSearchState) => Partial<GlobalSearchState>),
-) => {
+const set = (patch: Partial<MistyState> | ((s: MistyState) => Partial<MistyState>)) => {
   state = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
 };
 const submitAnswer = vi.fn(async (..._args: unknown[]) => {});
@@ -60,7 +58,7 @@ function withRequest(request: ScreenRequest) {
         ],
       },
     ],
-  } as unknown as GlobalSearchState;
+  } as unknown as MistyState;
 }
 const current = () => state.conversations[0].messages[0].screenRequest;
 beforeEach(() => {
@@ -104,7 +102,7 @@ it("follows the place the user named even when a tab matches", async () => {
   expect(submitAnswer.mock.calls[0][6]).toMatchObject({ openScreen: { place: "new" } });
 });
 
-it("continues in a separate window by default, without a new user turn", async () => {
+it("opens a retired separate-window request as a new tab, without a new user turn", async () => {
   withRequest({
     kind: "open",
     reason: "Read the site",
@@ -115,13 +113,17 @@ it("continues in a separate window by default, without a new user turn", async (
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(current()?.state).toBe("opened"));
   expect(submitAnswer).toHaveBeenCalledWith(
-    expect.stringContaining("separate Misty window"),
+    expect.stringContaining("new browser tab"),
     [],
     undefined,
     "workspace",
     [],
     { conversationId: "chat", context: [] },
-    expect.objectContaining({ executionMode: "team", continuation: true, openScreen: undefined }),
+    expect.objectContaining({
+      executionMode: "agent",
+      continuation: true,
+      openScreen: expect.objectContaining({ place: "new" }),
+    }),
   );
   expect(submitAnswer.mock.calls[0][0]).toContain("Start at https://example.com.");
 });
@@ -172,7 +174,7 @@ it("starts desktop control with Misty's own cursor, whatever the screen location
   withRequest({
     kind: "desktop",
     reason: "Add a row in Numbers",
-    location: "separate",
+    location: "window",
     state: "pending",
   });
   continueAfterScreenRequest(set, get, "chat", "reply");
@@ -206,7 +208,7 @@ it("looks through the companion when it runs, so the answer can point at the scr
 });
 
 it("attaches a window capture when the companion is not running", async () => {
-  withRequest({ kind: "look", reason: "See the error", location: "separate", state: "pending" });
+  withRequest({ kind: "look", reason: "See the error", location: "window", state: "pending" });
   continueAfterScreenRequest(set, get, "chat", "reply");
   await vi.waitFor(() => expect(current()?.state).toBe("opened"));
   expect(mocks.capture).toHaveBeenCalledOnce();
@@ -217,9 +219,9 @@ it("attaches a window capture when the companion is not running", async () => {
 });
 
 it("reports a failure on the card instead of starting work while another task runs", async () => {
-  withRequest({ kind: "open", reason: "Read the site", location: "separate", state: "pending" });
+  withRequest({ kind: "open", reason: "Read the site", location: "window", state: "pending" });
   state = { ...state, working: true };
-  await openScreenAndContinue(set, get, "chat", "reply", "separate");
+  await openScreenAndContinue(set, get, "chat", "reply", "window");
   expect(current()).toMatchObject({
     state: "failed",
     error: expect.stringContaining("Another task"),

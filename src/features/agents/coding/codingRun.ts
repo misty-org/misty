@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ApiRequestError, apiRequest } from "@/api/client";
-import { resolveSetting, useSettingsProfiles } from "@/features/settings";
+import { resolveSetting, useDevicePreferences } from "@/features/settings";
 import { appsApi } from "../apps/api";
 
 /**
@@ -51,7 +51,7 @@ class LeaseRefused extends Error {
 }
 
 const setting = (id: string) => {
-  const state = useSettingsProfiles.getState().state;
+  const state = useDevicePreferences.getState().state;
   const value = state ? String(resolveSetting(state, id).value) : "none";
   return value === "none" ? undefined : value;
 };

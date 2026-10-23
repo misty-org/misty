@@ -5,7 +5,7 @@ import {
   updateMistyDraftAttachments,
   useMistyDraftAttachments,
 } from "./draftAttachments";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+import type { MistyImageAttachment } from "./types";
 const image: MistyImageAttachment = {
   id: "image",
   name: "drawing.png",

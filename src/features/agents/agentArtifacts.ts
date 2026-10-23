@@ -10,7 +10,7 @@ import { spaceAgentsApi } from "@/api/spaces/space-agents";
  * made them. It counts toward the agent owner's storage. Files stay on this
  * computer too.
  */
-export interface AgentArtifactInput {
+interface AgentArtifactInput {
   agentId: string;
   path: string;
   kind: AgentArtifactProvenance["kind"];
@@ -19,7 +19,7 @@ export interface AgentArtifactInput {
 }
 
 /** The Space an agent saves to, with its name for status lines. */
-export async function agentHomeSpace(agentId: string): Promise<{ id: string; name: string }> {
+async function agentHomeSpace(agentId: string): Promise<{ id: string; name: string }> {
   const { agents } = await spaceAgentsApi.mine();
   const memberships = agents.filter((item) => item.agent_id === agentId);
   const spaces = useSpacesStore.getState().spaces;

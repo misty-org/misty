@@ -4,7 +4,15 @@ import { parseEnv } from "node:util";
 
 // One file for desktop renderer configuration. Shell/CI values take precedence.
 export function loadAppEnv(root, environment = process.env) {
-  const path = resolve(root, ".env");
+  const profile = environment.MISTY_APP_ENV?.trim().toLowerCase();
+  if (profile && !/^[a-z0-9][a-z0-9-]{0,31}$/.test(profile)) {
+    throw new Error("MISTY_APP_ENV must be a simple environment name, such as staging");
+  }
+
+  const path = resolve(root, profile ? `.env.${profile}` : ".env");
+  if (profile && !existsSync(path)) {
+    throw new Error(`Desktop environment file ${path} does not exist`);
+  }
   return { ...(existsSync(path) ? parseEnv(readFileSync(path, "utf8")) : {}), ...environment };
 }
 

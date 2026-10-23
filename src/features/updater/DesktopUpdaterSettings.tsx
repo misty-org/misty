@@ -4,7 +4,6 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { DesktopSettingsRow } from "@/features/settings/desktop";
 import { SystemErrorNotice } from "@/features/support/systemErrors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -18,8 +17,6 @@ import {
 
 type UpdateState = "idle" | "checking" | "available" | "current" | "installing" | "error";
 
-let checkedThisSession = false;
-
 export function DesktopUpdaterSettings() {
   const updateRef = useRef<Update | null>(null);
   const busyRef = useRef(false);
@@ -29,9 +26,6 @@ export function DesktopUpdaterSettings() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<UpdateProgress>(EMPTY_UPDATE_PROGRESS);
   const supported = hasTauriInternals();
-  const autoUpdateEnabled = useSettingsStore((state) =>
-    settingsBoolean(state.settings?.document ?? {}, "general", "auto_update_enabled", true),
-  );
 
   const releaseUpdate = useCallback(async () => {
     const update = updateRef.current;
@@ -68,17 +62,12 @@ export function DesktopUpdaterSettings() {
     void getVersion()
       .then(setVersion)
       .catch(() => undefined);
-    // Only the *automatic* check is gated; the manual "Check for updates"
-    // button always works, so turning this off never strands anyone on an old
-    // build.
-    if (!checkedThisSession && autoUpdateEnabled) {
-      checkedThisSession = true;
-      void checkForUpdates();
-    }
+    // The launch check belongs to UpdateNotices; this row only checks when asked, so opening
+    // Settings never waits on the network.
     return () => {
       void releaseUpdate();
     };
-  }, [autoUpdateEnabled, checkForUpdates, releaseUpdate, supported]);
+  }, [releaseUpdate, supported]);
 
   async function installUpdate() {
     const update = updateRef.current;

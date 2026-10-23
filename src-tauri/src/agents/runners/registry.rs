@@ -9,8 +9,6 @@ use tokio::sync::oneshot;
 
 /// A running tool: dropping or firing `stop` ends it.
 pub struct RunningTool {
-    pub engine: &'static str,
-    pub project_root: String,
     stop: Option<oneshot::Sender<()>>,
 }
 
@@ -21,24 +19,13 @@ fn running() -> &'static Mutex<HashMap<String, RunningTool>> {
 
 /// Records a run's tool. Returns the receiver its session waits on to stop,
 /// or None when this run already has a tool running.
-pub fn register(
-    run_id: &str,
-    engine: &'static str,
-    project_root: &str,
-) -> Option<oneshot::Receiver<()>> {
+pub fn register(run_id: &str) -> Option<oneshot::Receiver<()>> {
     let mut map = running().lock().ok()?;
     if map.contains_key(run_id) {
         return None;
     }
     let (send, receive) = oneshot::channel();
-    map.insert(
-        run_id.to_owned(),
-        RunningTool {
-            engine,
-            project_root: project_root.to_owned(),
-            stop: Some(send),
-        },
-    );
+    map.insert(run_id.to_owned(), RunningTool { stop: Some(send) });
     Some(receive)
 }
 
@@ -72,16 +59,4 @@ pub fn stop_all() {
     for id in ids {
         stop(&id);
     }
-}
-
-/// Runs in progress, for the device's status.
-pub fn active() -> Vec<(String, &'static str)> {
-    running()
-        .lock()
-        .map(|map| {
-            map.iter()
-                .map(|(id, tool)| (id.clone(), tool.engine))
-                .collect()
-        })
-        .unwrap_or_default()
 }

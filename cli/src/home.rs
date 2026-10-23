@@ -6,7 +6,6 @@ use std::{
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-
 /// Shared with the desktop app, which applies the same layout on every launch.
 const LAYOUT_JSON: &str = include_str!("../../src-tauri/misty-home-layout.json");
 
@@ -24,8 +23,7 @@ fn layout() -> Layout {
 }
 
 pub fn default_root() -> Result<PathBuf> {
-    let data_root = env::var_os("MISTY_DESKTOP_DATA_ROOT")
-        .or_else(|| env::var_os("MISTY_DATA_ROOT"))
+    let data_root = env::var_os("MISTY_DATA_ROOT")
         .map(PathBuf::from)
         .or_else(dirs::home_dir)
         .context("could not locate the user home directory")?;

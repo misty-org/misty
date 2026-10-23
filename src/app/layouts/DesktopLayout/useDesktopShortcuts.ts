@@ -1,6 +1,7 @@
 import { useMistyPanelStore } from "@/features/agents";
 import { useAppStore } from "@/features/app-shell";
-import { useBrowserSearchStore } from "@/features/browser-workspace/search";
+import { openSignInSheet, openSignOutSheet } from "@/features/auth";
+import { useBrowserSearchStore } from "@/features/browser-sync/search";
 import { registerShortcutHandler, useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { useCallback, useEffect } from "react";
@@ -10,8 +11,22 @@ import type { NavigateFunction } from "react-router-dom";
 export function useDesktopShortcuts(options: {
   navigate: NavigateFunction;
   openSettingsOverlay: () => void;
+  /** Someone is signed in; agents and new Spaces need an account. */
+  signedIn: boolean;
 }) {
-  const { navigate, openSettingsOverlay } = options;
+  const { navigate, openSettingsOverlay, signedIn } = options;
+  useShortcutHandler(
+    "account.sign_in",
+    useCallback(() => openSignInSheet("account"), []),
+    !signedIn,
+  );
+  useShortcutHandler("account.sign_out", openSignOutSheet, signedIn);
+  // Signed in, the Space row's menu makes the Space; signed out, Spaces need an account.
+  useShortcutHandler(
+    "workspace.new_space",
+    useCallback(() => openSignInSheet("space"), []),
+    !signedIn,
+  );
   useShortcutHandler(
     "search.toggle",
     useCallback(() => useBrowserSearchStore.getState().toggle(), []),
@@ -19,7 +34,10 @@ export function useDesktopShortcuts(options: {
   useShortcutHandler("app.open_settings", openSettingsOverlay);
   useShortcutHandler(
     "misty.contextual_companion",
-    useCallback(() => useMistyPanelStore.getState().toggle(), []),
+    useCallback(
+      () => (signedIn ? useMistyPanelStore.getState().toggle() : openSignInSheet("agents")),
+      [signedIn],
+    ),
   );
   useShortcutHandler(
     "navigation.refresh",
@@ -41,7 +59,7 @@ export function useDesktopShortcuts(options: {
   );
 
   useEffect(() => {
-    const tools = ["browser", "agents"];
+    const tools = ["browser"];
     const unregister = tools.map((tool) =>
       registerShortcutHandler(`tool.${tool}`, () => focusTool(tool)),
     );

@@ -7,7 +7,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
   Button,
   Dialog,
   DialogContent,
@@ -15,24 +14,25 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   Popover,
   PopoverContent,
   PopoverTrigger,
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetHeader,
   SheetTitle,
-  SheetTrigger,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/shared/ui";
+import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
 export function OverlaysSection() {
+  const [open, setOpen] = useState<"dialog" | "alert" | "sheet" | null>(null);
+  const openChange = (kind: "dialog" | "alert" | "sheet") => (next: boolean) =>
+    setOpen(next ? kind : null);
   return (
     <GallerySection
       title="Overlays"
@@ -64,10 +64,10 @@ export function OverlaysSection() {
         </TooltipProvider>
       </GalleryRow>
       <GalleryRow label="Dialogs">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button size="sm">Open dialog</Button>
-          </DialogTrigger>
+        <Button size="sm" onClick={() => setOpen("dialog")}>
+          Open dialog
+        </Button>
+        <Dialog open={open === "dialog"} onOpenChange={openChange("dialog")}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Rename space</DialogTitle>
@@ -79,12 +79,10 @@ export function OverlaysSection() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="sm">
-              Delete…
-            </Button>
-          </AlertDialogTrigger>
+        <Button variant="destructive" size="sm" onClick={() => setOpen("alert")}>
+          Delete…
+        </Button>
+        <AlertDialog open={open === "alert"} onOpenChange={openChange("alert")}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this note?</AlertDialogTitle>
@@ -98,17 +96,13 @@ export function OverlaysSection() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="secondary" size="sm">
-              Open sheet
-            </Button>
-          </SheetTrigger>
+        <Button variant="secondary" size="sm" onClick={() => setOpen("sheet")}>
+          Open sheet
+        </Button>
+        <Sheet open={open === "sheet"} onOpenChange={openChange("sheet")}>
           <SheetContent>
-            <SheetHeader>
-              <SheetTitle>Details</SheetTitle>
-              <SheetDescription>Sheets hold secondary panels.</SheetDescription>
-            </SheetHeader>
+            <SheetTitle>Details</SheetTitle>
+            <SheetDescription>Sheets hold secondary panels.</SheetDescription>
           </SheetContent>
         </Sheet>
       </GalleryRow>

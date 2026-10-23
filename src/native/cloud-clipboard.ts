@@ -1,7 +1,7 @@
 import { invoke } from "./invoke";
 
 /**
- * The shared clipboard across this account's devices (docs/design/clipboard/BRIEF.md). Clips
+ * The shared clipboard across this account's devices (docs/sync/clipboard.md). Clips
  * travel through sync as a small ring; "unavailable" means sync can't be reached.
  */
 type CloudClipboardStatus = "off" | "locked" | "connecting" | "ready" | "unavailable";

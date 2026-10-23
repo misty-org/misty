@@ -10,6 +10,8 @@ export const AuthContext = createContext<AuthContextValue>({
   setUser: async () => {},
   accounts: [],
   transitioning: false,
+  sessionExpired: false,
+  outletKey: "local",
   refreshUser: async () => null,
   authenticateAccount: async (request) => request(),
   switchAccount: async () => {},

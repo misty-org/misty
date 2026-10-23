@@ -161,8 +161,11 @@ mod tests {
         let folder = parent.path().join("copy");
         std::fs::create_dir(&folder).unwrap();
         clone_into(&address, &folder).unwrap();
+        // Git on Windows may check files out with CRLF line endings.
         assert_eq!(
-            std::fs::read_to_string(folder.join("index.html")).unwrap(),
+            std::fs::read_to_string(folder.join("index.html"))
+                .unwrap()
+                .replace("\r\n", "\n"),
             "<h1>Hi</h1>\n"
         );
     }

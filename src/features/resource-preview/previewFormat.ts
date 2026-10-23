@@ -1,4 +1,4 @@
-import type { GlobalPreviewSource } from "@/features/file-ui";
+import type { GlobalPreviewSource } from "./previewTypes";
 import {
   archiveExtensions,
   audioMimeTypes,

@@ -2,9 +2,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { useSpacesStore } from "../store/useSpacesStore";
-import { ChatCollection } from "./SpaceChatEntry";
+import { SpaceChatEntry } from "./SpaceChatEntry";
 vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
-vi.mock("./SpaceChat", () => ({ SpaceSocial: () => null }));
+vi.mock("./hooks/useSpaceChatAccess", () => ({
+  useSpaceChatAccess: () => ({ isOwner: false, canWriteMessages: true }),
+}));
+vi.mock("./SpaceChat", () => ({ SpaceChat: () => null }));
 vi.mock("./sidebar/CreateEditConversationDialog", () => ({
   CreateEditConversationDialog: () => null,
 }));
@@ -34,41 +37,26 @@ function Route() {
   );
 }
 afterEach(cleanup);
-it("filters channel chats and opens the conversation", () => {
-  useSpacesStore.setState({ membersBySpace: { test: [] }, spaces: [] });
+const mount = (path: string) => {
+  useSpacesStore.setState({ membersBySpace: { test: [] }, nodesBySpace: { test: [] }, spaces: [] });
   render(
-    <MemoryRouter initialEntries={["/spaces/test/social"]}>
-      <ChatCollection spaceId="test" />
+    <MemoryRouter initialEntries={[path]}>
+      <SpaceChatEntry spaceId="test" spaceName="Test" />
       <Route />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Direct" }));
-  expect(screen.queryByRole("button", { name: "Design updates" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Channels" }));
+};
+
+it("lists channels in the sidebar and opens the conversation", () => {
+  mount("/spaces/test/social/misty");
   fireEvent.click(screen.getByRole("button", { name: "Design updates" }));
   expect(screen.getByTestId("route").textContent).toBe(
     "/spaces/test/social/misty?conversation=design",
   );
 });
 
-it("filters chats by creator independently of section tabs and clears the filter", () => {
-  useSpacesStore.setState({ membersBySpace: { test: [] }, spaces: [] });
-  render(
-    <MemoryRouter>
-      <ChatCollection spaceId="test" />
-    </MemoryRouter>,
-  );
-  const open = () =>
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Filter chats" }), {
-      button: 0,
-      ctrlKey: false,
-    });
-  open();
-  expect(screen.queryByRole("menuitemradio", { name: "Connected" })).toBeNull();
-  fireEvent.click(screen.getByRole("menuitemradio", { name: "Me" }));
-  expect(screen.queryByRole("button", { name: "Everyone" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Design updates" })).toBeTruthy();
-  open();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Reset filters" }));
-  expect(screen.getByRole("button", { name: "Everyone" })).toBeTruthy();
+it("returns to the Space-wide channel from a conversation", () => {
+  mount("/spaces/test/social/misty?conversation=design");
+  fireEvent.click(screen.getByRole("button", { name: "everyone" }));
+  expect(screen.getByTestId("route").textContent).toBe("/spaces/test/social/misty");
 });

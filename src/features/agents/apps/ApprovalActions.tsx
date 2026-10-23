@@ -26,12 +26,7 @@ export function ApprovalActions({
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => onDecide("deny")}
-        >
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => onDecide("deny")}>
           Deny
         </Button>
         <Button size="sm" variant="primary" disabled={busy} onClick={() => onDecide("continue")}>

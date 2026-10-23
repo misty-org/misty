@@ -102,19 +102,28 @@ fn invalid(what: &str) -> KiriError {
 
 /// The RP ID must be the caller's host or a registrable suffix of it, never a
 /// public suffix such as `co.uk`.
-pub(super) fn relying_party(caller: &Caller, requested: Option<String>) -> Result<String, KiriError> {
-    let url = url::Url::parse(&caller.origin).map_err(|_| KiriError::security("Invalid origin."))?;
+pub(super) fn relying_party(
+    caller: &Caller,
+    requested: Option<String>,
+) -> Result<String, KiriError> {
+    let url =
+        url::Url::parse(&caller.origin).map_err(|_| KiriError::security("Invalid origin."))?;
     let host = match url.host() {
         Some(url::Host::Domain(domain)) => domain.to_ascii_lowercase(),
         _ => return Err(KiriError::security("Passkeys need a domain name.")),
     };
-    let rp_id = requested.map(|id| id.to_ascii_lowercase()).unwrap_or_else(|| host.clone());
+    let rp_id = requested
+        .map(|id| id.to_ascii_lowercase())
+        .unwrap_or_else(|| host.clone());
     let owned = rp_id == host || host.ends_with(&format!(".{rp_id}"));
     let registrable = rp_id == "localhost" || psl::domain_str(&rp_id).is_some();
     if owned && registrable {
         Ok(rp_id)
     } else {
-        Err(KiriError::security(format!("{rp_id} is not a valid relying party for {}.", caller.origin)))
+        Err(KiriError::security(format!(
+            "{rp_id} is not a valid relying party for {}.",
+            caller.origin
+        )))
     }
 }
 
@@ -133,7 +142,8 @@ fn credential_ids(list: Vec<Descriptor>) -> Vec<Vec<u8>> {
 }
 
 pub(super) fn create(caller: &Caller, args: serde_json::Value) -> Result<CreateRequest, KiriError> {
-    let options: CreateOptions = serde_json::from_value(args).map_err(|_| invalid("creation options"))?;
+    let options: CreateOptions =
+        serde_json::from_value(args).map_err(|_| invalid("creation options"))?;
     if options.challenge.0.is_empty() {
         return Err(invalid("challenge"));
     }
@@ -149,10 +159,15 @@ pub(super) fn create(caller: &Caller, args: serde_json::Value) -> Result<CreateR
     let algorithms = if options.pub_key_cred_params.is_empty() {
         vec![ES256, RS256]
     } else {
-        requested.into_iter().filter(|alg| [ES256, EDDSA, RS256].contains(alg)).collect()
+        requested
+            .into_iter()
+            .filter(|alg| [ES256, EDDSA, RS256].contains(alg))
+            .collect()
     };
     if algorithms.is_empty() {
-        return Err(KiriError::not_supported("None of the requested algorithms are supported."));
+        return Err(KiriError::not_supported(
+            "None of the requested algorithms are supported.",
+        ));
     }
     let selection = options.authenticator_selection.unwrap_or_default();
     let resident_key = selection.resident_key.or_else(|| {
@@ -187,7 +202,8 @@ pub(super) fn create(caller: &Caller, args: serde_json::Value) -> Result<CreateR
 }
 
 pub(super) fn get(caller: &Caller, args: serde_json::Value) -> Result<GetRequest, KiriError> {
-    let options: GetOptions = serde_json::from_value(args).map_err(|_| invalid("request options"))?;
+    let options: GetOptions =
+        serde_json::from_value(args).map_err(|_| invalid("request options"))?;
     if options.challenge.0.is_empty() {
         return Err(invalid("challenge"));
     }

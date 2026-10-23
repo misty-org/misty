@@ -15,7 +15,7 @@ const setReadAt = (conversationId: string, lastReadAt: string) =>
 
 /**
  * Marks a conversation read on this device. Chats live on the device that keeps them
- * (docs/design/agent-chats-local/BRIEF.md), so read state does too: the dot clears at
+ * (docs/agents/chats-local.md), so read state does too: the dot clears at
  * once and is saved with the chat.
  */
 export function markConversationRead(conversationId: string) {

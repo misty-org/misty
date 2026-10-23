@@ -1,18 +1,9 @@
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  Button,
-  IconButton,
-} from "@/shared/ui";
+import { globalMistyError } from "@/features/misty/globalMistyActions";
+import { IconButton } from "@/shared/ui";
 import { AgentFolderGroup } from "../folders/AgentFolderGroup";
 import { useAgentFoldersStore, type AgentConversationFolder } from "../folders/agentFoldersStore";
 import { useConversationDrop, type ConversationDrop } from "../folders/useConversationDrop";
@@ -74,7 +65,6 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
   );
   const [selected, setSelected] = useState<string[]>([]);
   const anchor = useRef<string | undefined>(undefined);
-  const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [params, setParams] = useSearchParams();
@@ -166,7 +156,6 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
         await store.deleteConversation(id);
         removed.push(id);
       }
-      setConfirming(false);
       setSelected([]);
     } catch (failure) {
       setSelected((ids) => ids.filter((id) => !removed.includes(id)));
@@ -201,6 +190,8 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
       active={activeId === c.id}
       selected={selected.includes(c.id)}
       selecting={count > 0}
+      selectedCount={selected.includes(c.id) ? count : 0}
+      onDeleteSelected={() => void deleteSelected()}
       disabled={disabled}
       onClick={(event) => click(event, c.id)}
       onMove={(direction) => step(c.id, direction)}
@@ -251,53 +242,14 @@ export const AgentRecentConversations = memo(function AgentRecentConversations({
         </div>
         {recent.map(row)}
       </div>
-      {count ? (
-        // Pinned to the bottom of the list so it stays in reach however far you scroll.
-        <div className="agent-studio-recents-selection" role="toolbar" aria-label="Selection">
-          <span>{count} selected</span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={disabled}
-            aria-label={`Delete ${count} conversation${count === 1 ? "" : "s"}`}
-            onClick={() => {
-              setError("");
-              setConfirming(true);
-            }}
-          >
-            <Trash2 size={14} />
-            Delete
-          </Button>
-          <IconButton label="Clear selection" onClick={() => setSelected([])}>
-            <X size={15} />
-          </IconButton>
-        </div>
-      ) : null}
       <span className="sr-only" role="status">
         {announcement}
       </span>
-      <AlertDialog open={confirming} onOpenChange={(open) => !busy && setConfirming(open)}>
-        <AlertDialogContent>
-          <AlertDialogTitle>
-            Delete {count} conversation{count === 1 ? "" : "s"}?
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            They and their messages will be permanently deleted, along with any unsent drafts. This
-            cannot be undone.
-          </AlertDialogDescription>
-          {error && (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <Button disabled={disabled || busy} onClick={() => void deleteSelected()}>
-              {busy ? "Deleting…" : "Delete"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {error && (
+        <p role="alert" className="px-2 py-1 text-xs text-cream-muted">
+          {error}
+        </p>
+      )}
     </section>
   );
 });

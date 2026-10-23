@@ -8,7 +8,7 @@ import { useCollaborationStore } from "./store";
 import type { AgentChecklist as Checklist, ChecklistItem } from "./types";
 
 /** Why a run's step in progress is not moving: it stopped, or waits on someone. */
-export type ChecklistHold = "stopped" | "waiting_for_you" | { device: string } | undefined;
+type ChecklistHold = "stopped" | "waiting_for_you" | { device: string } | undefined;
 
 function holdText(hold: ChecklistHold) {
   if (!hold) return undefined;
@@ -51,7 +51,12 @@ function ItemRows({
               {item.title}
             </StatusRow>
             {nested?.get(item.id)?.map((child) => (
-              <ItemRows key={child.invocationId} items={child.items} hold={hold} depth={depth + 1} />
+              <ItemRows
+                key={child.invocationId}
+                items={child.items}
+                hold={hold}
+                depth={depth + 1}
+              />
             ))}
           </Fragment>
         );
@@ -65,7 +70,7 @@ function ItemRows({
  * ("3 of 6 · Editing tests") over a table of the steps, which stays open unless
  * folded. Delegated runs' steps nest under the step that handed them off.
  */
-export function AgentChecklist({
+function AgentChecklist({
   checklist,
   children = [],
   hold,

@@ -39,22 +39,6 @@ export function selectGeneralPreferences(
     ),
   };
 }
-export function selectShortcutPreferences(
-  document: Record<string, unknown> | null | undefined,
-): ShortcutPreferences {
-  const source = document ?? {};
-  return {
-    shortcutHintsEnabled: settingsBoolean(source, "shortcuts", "shortcut_hints_enabled", true),
-  };
-}
-export function selectAdvancedPreferences(
-  document: Record<string, unknown> | null | undefined,
-): AdvancedPreferences {
-  const source = document ?? {};
-  return {
-    mountPath: settingsString(source, "advanced", "mount_path", ".misty/mnt"),
-  };
-}
 function themeMode(value: string): AppThemeMode {
   return value === "system" || value === "light" ? value : "dark";
 }
@@ -76,10 +60,4 @@ export interface GeneralPreferences {
   searchEngineIndex: number;
   startupViewIndex: number;
   workspaceDefaultTabIndex: number;
-}
-export interface ShortcutPreferences {
-  shortcutHintsEnabled: boolean;
-}
-export interface AdvancedPreferences {
-  mountPath: string;
 }

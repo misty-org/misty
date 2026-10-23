@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import type { Presentation } from "./protocol";
-import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
+import type { MistyState } from "@/features/misty/mistyState";
 export interface CompanionSubmission {
   prompt: string;
-  attachments?: Parameters<GlobalSearchState["submitAnswer"]>[1];
+  attachments?: Parameters<MistyState["submitAnswer"]>[1];
   conversationId: string;
   /** Capture the displays first: the task asked to look at the screen. */
   look?: boolean;

@@ -1,124 +1,10 @@
-import { Plus, Trash2, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ScheduleFrequency, ScheduleRule } from "@/api/ai/agent-methods";
-import { Button, IconButton, Input, OptionSelect, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
-import { monthNames, nthNames, weekdayLongNames, weekdayNames } from "./scheduleSummary";
-
-const frequencies: { value: ScheduleFrequency; label: string; unit: string }[] = [
-  { value: "once", label: "On specific dates", unit: "" },
-  { value: "hourly", label: "Hourly", unit: "hours" },
-  { value: "daily", label: "Daily", unit: "days" },
-  { value: "weekly", label: "Weekly", unit: "weeks" },
-  { value: "monthly", label: "Monthly", unit: "months" },
-  { value: "yearly", label: "Yearly", unit: "years" },
-];
-
-/** A fresh rule of a frequency, keeping the times and dates already chosen. */
-export function ruleFor(frequency: ScheduleFrequency, from?: ScheduleRule): ScheduleRule {
-  const times = from?.times?.length ? from.times : ["09:00"];
-  const today = new Date().toLocaleDateString("en-CA");
-  switch (frequency) {
-    case "once":
-      return { frequency, dates: [today], times };
-    case "hourly":
-      return { frequency, interval: 1, minute: 0 };
-    case "weekly":
-      return { frequency, interval: 1, weekdays: [new Date().getDay()], times };
-    case "monthly":
-      return { frequency, interval: 1, month_days: [new Date().getDate()], times };
-    case "yearly":
-      return {
-        frequency,
-        interval: 1,
-        months: [new Date().getMonth() + 1],
-        month_days: [new Date().getDate()],
-        times,
-      };
-    default:
-      return { frequency, interval: 1, times };
-  }
-}
-
-function parseDays(text: string) {
-  return text
-    .split(/[,\s]+/)
-    .filter(Boolean)
-    .map((part) => (/^last$/i.test(part) ? -1 : Number(part)))
-    .filter((day) => day === -1 || (Number.isInteger(day) && day >= 1 && day <= 31));
-}
-
-function Days({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number[];
-  onChange(days: number[]): void;
-}) {
-  return (
-    <ToggleGroup
-      type="multiple"
-      variant="outline"
-      aria-label={label}
-      value={value.map(String)}
-      onValueChange={(next) => onChange(next.map(Number).sort())}
-    >
-      {weekdayNames.map((name, day) => (
-        <ToggleGroupItem key={name} value={String(day)} aria-label={weekdayLongNames[day]}>
-          {name.slice(0, 2)}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
-}
-
-function List({
-  label,
-  type,
-  values,
-  fallback,
-  onChange,
-}: {
-  label: string;
-  type: "time" | "date";
-  values: string[];
-  fallback: string;
-  onChange(values: string[]): void;
-}) {
-  return (
-    <div className="workflow-schedule-list" role="group" aria-label={label}>
-      {values.map((value, index) => (
-        <span key={index} className="workflow-schedule-chip">
-          <Input
-            type={type}
-            required
-            aria-label={`${label} ${index + 1}`}
-            value={value}
-            onChange={(e) => onChange(values.map((v, i) => (i === index ? e.target.value : v)))}
-          />
-          {values.length > 1 && (
-            <IconButton
-              label={`Remove ${label.toLowerCase()} ${index + 1}`}
-              onClick={() => onChange(values.filter((_, i) => i !== index))}
-            >
-              <X size={13} />
-            </IconButton>
-          )}
-        </span>
-      ))}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => onChange([...values, fallback])}
-      >
-        <Plus size={13} />
-        Add
-      </Button>
-    </div>
-  );
-}
+import { IconButton, Input, OptionSelect, ToggleGroup, ToggleGroupItem } from "@/shared/ui";
+import { scheduleFrequencies as frequencies, parseDays, ruleFor } from "./scheduleRules";
+import { Days, List, NthWeekdays } from "./ScheduleRuleInputs";
+import { monthNames } from "./scheduleSummary";
 
 /** Edits one repeating pattern of a schedule. */
 export function ScheduleRuleEditor({
@@ -255,59 +141,10 @@ export function ScheduleRuleEditor({
               }}
             />
           </label>
-          <div className="workflow-schedule-list" role="group" aria-label="Weekdays of the month">
-            {(rule.nth_weekdays ?? []).map((nth, i) => (
-              <span key={i} className="workflow-schedule-chip">
-                the
-                <OptionSelect
-                  aria-label="Which week"
-                  value={String(nth.nth)}
-                  options={[1, 2, 3, 4, 5, -1].map((n) => ({
-                    value: String(n),
-                    label: nthNames[n],
-                  }))}
-                  onValueChange={(value) =>
-                    set({
-                      nth_weekdays: rule.nth_weekdays!.map((x, j) =>
-                        j === i ? { ...x, nth: Number(value) } : x,
-                      ),
-                    })
-                  }
-                />
-                <OptionSelect
-                  aria-label="Weekday"
-                  value={String(nth.weekday)}
-                  options={weekdayLongNames.map((label, d) => ({ value: String(d), label }))}
-                  onValueChange={(value) =>
-                    set({
-                      nth_weekdays: rule.nth_weekdays!.map((x, j) =>
-                        j === i ? { ...x, weekday: Number(value) } : x,
-                      ),
-                    })
-                  }
-                />
-                <IconButton
-                  label={`Remove weekday rule ${i + 1}`}
-                  onClick={() =>
-                    set({ nth_weekdays: rule.nth_weekdays!.filter((_, j) => j !== i) })
-                  }
-                >
-                  <X size={13} />
-                </IconButton>
-              </span>
-            ))}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                set({ nth_weekdays: [...(rule.nth_weekdays ?? []), { nth: 1, weekday: 1 }] })
-              }
-            >
-              <Plus size={13} />
-              Add a weekday, such as the first Monday
-            </Button>
-          </div>
+          <NthWeekdays
+            value={rule.nth_weekdays ?? []}
+            onChange={(nth_weekdays) => set({ nth_weekdays })}
+          />
         </>
       )}
       {rule.frequency === "once" && (

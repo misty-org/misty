@@ -126,11 +126,6 @@
   line-height: 16px;
   white-space: nowrap;
 }
-.agent-studio-catalog {
-  width: 960px;
-  max-width: calc(100% - 64px);
-  margin: 31px auto 60px;
-}
 /* Categories are shared chips; the strip only lays them out. */
 .agent-studio-category-strip {
   display: flex;
@@ -139,17 +134,6 @@
   scrollbar-width: none;
   white-space: nowrap;
   margin-bottom: 11px;
-}
-.agent-studio-catalog .agent-studio-grid {
-  gap: 16px;
-}
-.agent-studio-catalog .agent-studio-template-card > button {
-  height: 104px;
-}
-.agent-studio-catalog-empty {
-  padding: 50px;
-  text-align: center;
-  color: var(--color-cream-muted);
 }
 .agent-studio-dialog {
   width: 672px !important;

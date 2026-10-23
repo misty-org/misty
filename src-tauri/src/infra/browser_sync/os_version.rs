@@ -1,5 +1,4 @@
 //! Best-effort OS version reported to the account's device list.
-use super::*;
 
 /// Best-effort OS version for the device list; empty when unknown.
 pub(super) fn os_version() -> String {

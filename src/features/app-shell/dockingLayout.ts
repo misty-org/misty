@@ -1,4 +1,3 @@
-import { writeProfilePreference } from "@/features/settings/sync";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -32,41 +31,20 @@ const storedPositions = ["left", "top", "right", "bottom"];
 export function validDockingLayout(value: unknown): value is StoredDockingLayout {
   if (!value || typeof value !== "object") return false;
   const layout = value as Partial<StoredDockingLayout>;
-  return storedPositions.includes(layout.navigation ?? "") && storedPositions.includes(layout.tabs ?? "");
+  return (
+    storedPositions.includes(layout.navigation ?? "") && storedPositions.includes(layout.tabs ?? "")
+  );
 }
 interface DockingState {
   /** Previous device-wide choice, used only for windows without their own layout. */
   initialLayout: DockingLayout;
   savedLayouts: SavedDockingLayout[];
-  saveLayout(name: string, layout: DockingLayout): Promise<string | null>;
-  removeLayout(id: string): Promise<void>;
 }
 export const useDockingLayoutStore = create<DockingState>()(
   persist(
-    (_set, get) => ({
+    (): DockingState => ({
       initialLayout: defaultDockingLayout,
       savedLayouts: [],
-      saveLayout: async (name, layout) => {
-        if (!validDockingLayout(layout)) return null;
-        const trimmed = name.trim().slice(0, 40);
-        if (!trimmed) return null;
-        const existing = get().savedLayouts.find(
-          (layout) => layout.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase(),
-        );
-        const id = existing?.id ?? crypto.randomUUID();
-        const saved = { ...normalizeDockingLayout(layout), id, name: trimmed };
-        const savedLayouts = existing
-          ? get().savedLayouts.map((item) => (item.id === id ? saved : item))
-          : [...get().savedLayouts, saved];
-        await writeProfilePreference("app.layout.presets", JSON.stringify(savedLayouts));
-        return id;
-      },
-      removeLayout: async (id) => {
-        await writeProfilePreference(
-          "app.layout.presets",
-          JSON.stringify(get().savedLayouts.filter((item) => item.id !== id)),
-        );
-      },
     }),
     {
       name: "misty:desktop-docking:v1",

@@ -171,14 +171,14 @@ pub(crate) async fn pending_navigation(space: &str, tab: &str) -> bool {
 pub(crate) fn has_extensions() -> bool {
     origins().read().is_ok_and(|v| !v.is_empty())
 }
-pub(crate) async fn context_menu(tab: &str, agent: bool) -> Result<Value, String> {
+pub(crate) async fn context_menu(tab: &str) -> Result<Value, String> {
     let space = tab_space(tab)?;
     let state = service(&space).lock().await;
     let account = state.account.clone();
     let allowed: Vec<String> = state
         .desired
         .values()
-        .filter(|v| v.installed && v.enabled && (!agent || (state.agent_access && v.agent_access)))
+        .filter(|v| v.installed && v.enabled)
         .map(|v| v.id.clone())
         .collect();
     drop(state);

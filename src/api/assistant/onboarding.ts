@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 
 /** Get started steps only the server sees the account do. */
 export type OnboardingStep = "page_ask" | "workflow_run";

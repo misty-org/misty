@@ -41,42 +41,46 @@ export function AgentGrantsSection() {
       setWorking("");
     }
   };
-  const revokeAll = async (agentId: string, agentName: string) => {
-    if (
-      !(await confirmAction(`Forget every approval you remembered for ${agentName}?`, "Revoke all"))
-    )
+  const groups = groupGrants(grants ?? []);
+  const revokeAll = async () => {
+    if (!(await confirmAction("Forget every approval you remembered for any agent?", "Revoke all")))
       return;
     await run(
-      agentId,
-      () => grantsApi.revokeAll(agentId),
+      "all",
+      () => Promise.all(groups.map((group) => grantsApi.revokeAll(group.agentId))),
       "Misty couldn’t revoke those approvals.",
     );
   };
-  const groups = groupGrants(grants ?? []);
+  if (error && grants === null)
+    return (
+      <DesktopSettingsNotice
+        action={
+          <Button variant="ghost" size="sm" onClick={() => void refresh()}>
+            Retry
+          </Button>
+        }
+      >
+        {error}
+      </DesktopSettingsNotice>
+    );
+  if (grants !== null && !groups.length) return null;
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      {grants === null && !error ? (
-        <Section title="Remembered approvals">
+      <Section
+        title="Remembered approvals"
+        description="When you choose Accept and remember on an agent’s request, it appears here and skips the pause while a chat is in Auto. Ask always asks."
+      >
+        {grants === null && !error ? (
           <SkeletonList label="Remembered approvals" rows={3} leading="none" trailing />
-        </Section>
-      ) : null}
-      {grants !== null && !groups.length ? (
-        <Section
-          title="Remembered approvals"
-          description="When you choose Accept and remember on an agent’s request, it appears here. Remembered approvals apply only while a chat is in Auto."
-        >
-          {null}
-        </Section>
-      ) : null}
-      {groups.map((group) => (
-        <Section
-          key={group.agentId}
-          title={group.agentName}
-          description="These skip the pause while a chat with this agent is in Auto. Ask always asks."
-        >
-          {group.grants.map((grant) => (
-            <Row key={grant.id} label={grant.label} description={lastUsedText(grant)}>
+        ) : null}
+        {groups.flatMap((group) =>
+          group.grants.map((grant) => (
+            <Row
+              key={grant.id}
+              label={grant.label}
+              description={`${group.agentName} · ${lastUsedText(grant)}`}
+            >
               <Button
                 variant="outline"
                 disabled={Boolean(working)}
@@ -91,21 +95,16 @@ export function AgentGrantsSection() {
                 Revoke
               </Button>
             </Row>
-          ))}
-          <Row
-            label="Revoke all"
-            description={`Forget every approval remembered for ${group.agentName}.`}
-          >
-            <Button
-              variant="outline"
-              disabled={Boolean(working)}
-              onClick={() => void revokeAll(group.agentId, group.agentName)}
-            >
+          )),
+        )}
+        {(grants?.length ?? 0) > 1 ? (
+          <Row label="Revoke all" description="Forget every remembered approval for every agent.">
+            <Button variant="outline" disabled={Boolean(working)} onClick={() => void revokeAll()}>
               Revoke all
             </Button>
           </Row>
-        </Section>
-      ))}
+        ) : null}
+      </Section>
     </>
   );
 }

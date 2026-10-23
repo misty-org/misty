@@ -9,7 +9,7 @@ import { screenModelClient, screenModelConfig } from "./screenModel";
 import { screenSurface, surfaceAdapter } from "./screenActSurface";
 
 /** The device job the server queues for one browser_act goal. */
-export interface ScreenActJob {
+interface ScreenActJob {
   id: string;
   scopeId: string;
   contextId?: string;
@@ -18,7 +18,7 @@ export interface ScreenActJob {
   config: unknown;
 }
 
-export interface ScreenActResult extends Record<string, unknown> {
+interface ScreenActResult extends Record<string, unknown> {
   status: "done" | "incomplete" | "needs_confirmation";
   summary: string;
   actions: number;

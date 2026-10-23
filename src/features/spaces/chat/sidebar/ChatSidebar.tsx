@@ -1,7 +1,9 @@
 import { ChevronDown, Hash, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import type { MouseEvent } from "react";
 import { useState, type ReactNode } from "react";
 import type { SpaceConversation } from "@/api/spaces/dto/entities";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,6 +36,10 @@ export function ChatSidebar(props: {
   onSelect(selection: ChatSelection): void;
   onEdit(conversation: SpaceConversation): void;
   onDelete(conversation: SpaceConversation): void;
+  onDeleteMany(ids: string[]): void;
+  selectedIds: string[];
+  onRangeSelect(event: MouseEvent, id: string, onOpen: () => void): void;
+  onClearSelection(): void;
   onNewConversation(): void;
 }) {
   const [collapsed, setCollapsed] = useState(() => readChatSidebar());
@@ -47,7 +53,11 @@ export function ChatSidebar(props: {
     <Row
       key={id}
       active={props.selected === id}
-      onClick={() => props.onSelect(id)}
+      selected={props.selectedIds.includes(id)}
+      onClick={(event) => {
+        if (conversation && props.isOwner) props.onRangeSelect(event, id, () => props.onSelect(id));
+        else props.onSelect(id);
+      }}
       icon={<Hash />}
       trailing={
         conversation && props.isOwner ? (
@@ -80,6 +90,27 @@ export function ChatSidebar(props: {
   );
   return (
     <WorkspaceSidebar aria-label={`Chats in ${props.spaceName}`} className="gap-1">
+      {props.selectedIds.length ? (
+        <div className="mx-1 mb-2 flex items-center gap-2 rounded-lg bg-charcoal-card px-2 py-1.5">
+          <span className="text-xs">{props.selectedIds.length} selected</span>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
+            onClick={() => props.onDeleteMany(props.selectedIds)}
+          >
+            Delete
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-cream-muted"
+            onClick={props.onClearSelection}
+          >
+            Clear
+          </Button>
+        </div>
+      ) : null}
       <Section
         title="Channels"
         collapsed={collapsed.channels}
@@ -166,7 +197,8 @@ function Collapse(props: { open: boolean; children: ReactNode }) {
 
 function Row(props: {
   active: boolean;
-  onClick(): void;
+  selected?: boolean;
+  onClick(event: MouseEvent): void;
   icon: ReactNode;
   trailing?: ReactNode;
   children: ReactNode;
@@ -175,13 +207,14 @@ function Row(props: {
     <div
       className={cn(
         "group/row flex h-8 min-w-0 items-center rounded-md pr-1",
-        props.active
+        props.active || props.selected
           ? "bg-charcoal-active text-cream-bright"
           : "text-cream-muted hover:bg-charcoal-hover hover:text-cream",
       )}
     >
       <Pressable
         aria-current={props.active ? "page" : undefined}
+        aria-pressed={props.selected}
         onClick={props.onClick}
         className="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left text-sm"
       >

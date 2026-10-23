@@ -11,7 +11,6 @@ pub type ClipboardChangeCallback = Arc<dyn Fn(ClipboardPayload) + Send + Sync + 
 pub trait NativeClipboard: Send + Sync {
     fn supported(&self) -> bool;
     fn start(&self, on_changed: Arc<dyn Fn() + Send + Sync + 'static>) -> bool;
-    fn stop(&self);
     fn read_payload(&self) -> Option<ClipboardPayload>;
     fn write_payload(&self, payload: &ClipboardPayload) -> bool;
 }
@@ -71,24 +70,10 @@ impl ClipboardService {
         }))
     }
 
-    pub fn stop(&self) {
-        if let Some(native) = &self.native {
-            native.stop();
-        }
-    }
-
     pub fn set_device_identity(&self, device_id: String, device_name: String) {
         let mut state = self.state.lock().expect("clipboard state lock");
         state.device_id = device_id;
         state.device_name = device_name;
-    }
-
-    pub fn current_local(&self) -> ClipboardPayload {
-        self.state
-            .lock()
-            .expect("clipboard state lock")
-            .local
-            .clone()
     }
 
     pub fn latest_shared(&self) -> ClipboardPayload {
@@ -97,10 +82,6 @@ impl ClipboardService {
             .expect("clipboard state lock")
             .shared
             .clone()
-    }
-
-    pub fn publish_current_to_shared(&self) -> bool {
-        self.publish_payload_to_shared(&self.current_local())
     }
 
     pub fn publish_payload_to_shared(&self, payload: &ClipboardPayload) -> bool {
@@ -144,18 +125,6 @@ impl ClipboardService {
             state.next_revision = state.next_revision.max(payload.revision.saturating_add(1));
         }
         self.set_shared_payload(payload);
-    }
-
-    pub fn set_local_misty_payload(&self, payload: ClipboardPayload) -> ClipboardPayload {
-        let payload = self.finalize_payload(payload, ClipboardOrigin::LocalMisty);
-        self.set_local_payload(payload.clone());
-        payload
-    }
-
-    pub fn publish_local_system_payload_to_shared(&self, payload: ClipboardPayload) -> bool {
-        let payload = self.finalize_payload(payload, ClipboardOrigin::LocalSystem);
-        self.set_local_payload(payload.clone());
-        self.publish_payload_to_shared(&payload)
     }
 
     pub fn finalize_payload(
@@ -283,124 +252,4 @@ impl ClipboardService {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fingerprint_changes_with_binary_image_content() {
-        let mut first = ClipboardPayload {
-            kind: ClipboardPayloadKind::Image,
-            images: vec![super::super::ClipboardImage {
-                bytes: vec![1, 2, 3],
-                ..super::super::ClipboardImage::default()
-            }],
-            ..ClipboardPayload::default()
-        };
-        let first_fingerprint = ClipboardService::fingerprint_for(&first);
-        first.images[0].bytes[2] = 4;
-        assert_ne!(first_fingerprint, ClipboardService::fingerprint_for(&first));
-    }
-
-    #[test]
-    fn fingerprint_distinguishes_remote_file_ref_provider_metadata() {
-        let first = ClipboardPayload {
-            kind: ClipboardPayloadKind::FileRefs,
-            file_refs: vec![super::super::ClipboardFileRef {
-                display_name: "report.pdf".into(),
-                provider_type: "drive".into(),
-                remote_name: "work".into(),
-                remote_path: "/report.pdf".into(),
-                ..super::super::ClipboardFileRef::default()
-            }],
-            ..ClipboardPayload::default()
-        };
-        let mut second = first.clone();
-        second.file_refs[0].provider_type = "onedrive".into();
-        let mut third = first.clone();
-        third.file_refs[0].display_name = "renamed-report.pdf".into();
-
-        let first_fingerprint = ClipboardService::fingerprint_for(&first);
-        assert_ne!(
-            first_fingerprint,
-            ClipboardService::fingerprint_for(&second)
-        );
-        assert_ne!(first_fingerprint, ClipboardService::fingerprint_for(&third));
-    }
-
-    #[test]
-    fn publishes_local_system_image_payload_to_shared_client() {
-        #[derive(Default)]
-        struct CaptureSharedClient {
-            published: Mutex<Option<ClipboardPayload>>,
-        }
-
-        impl SharedClipboardClient for CaptureSharedClient {
-            fn publish(&self, payload: &ClipboardPayload) -> bool {
-                *self.published.lock().expect("published lock") = Some(payload.clone());
-                true
-            }
-
-            fn hydrate_payload(&self, _payload: &mut ClipboardPayload) -> bool {
-                true
-            }
-        }
-
-        let client = Arc::new(CaptureSharedClient::default());
-        let shared: Arc<dyn SharedClipboardClient> = client.clone();
-        let service = ClipboardService::new(None, Some(shared));
-        service.set_device_identity("device-a".into(), "Laptop".into());
-        let ok = service.publish_local_system_payload_to_shared(ClipboardPayload {
-            kind: ClipboardPayloadKind::Image,
-            images: vec![super::super::ClipboardImage {
-                mime_type: "image/png".into(),
-                size_bytes: 3,
-                width: 12,
-                height: 8,
-                bytes: vec![1, 2, 3],
-                ..super::super::ClipboardImage::default()
-            }],
-            ..ClipboardPayload::default()
-        });
-
-        assert!(ok);
-        let local = service.current_local();
-        assert_eq!(local.origin, ClipboardOrigin::LocalSystem);
-        assert_eq!(local.source_device_id, "device-a");
-        assert_eq!(local.revision, 1);
-
-        let published = client
-            .published
-            .lock()
-            .expect("published lock")
-            .clone()
-            .expect("published payload");
-        assert_eq!(published.origin, ClipboardOrigin::LocalSystem);
-        assert_eq!(published.images[0].mime_type, "image/png");
-        assert_eq!(published.images[0].width, 12);
-        assert_eq!(published.images[0].height, 8);
-        assert_eq!(published.images[0].bytes, vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn remote_lamport_clock_rejects_stale_payloads_and_breaks_ties_by_endpoint() {
-        let service = ClipboardService::new(None, None);
-        let remote = |revision, endpoint: &str, text: &str| ClipboardPayload {
-            kind: ClipboardPayloadKind::Text,
-            source_device_id: endpoint.to_owned(),
-            revision,
-            text: text.to_owned(),
-            ..ClipboardPayload::default()
-        };
-        service.accept_remote_payload(remote(7, "endpoint-b", "new"));
-        service.accept_remote_payload(remote(6, "endpoint-z", "stale"));
-        service.accept_remote_payload(remote(7, "endpoint-a", "lower tie"));
-        assert_eq!(service.latest_shared().text, "new");
-
-        service.accept_remote_payload(remote(7, "endpoint-c", "higher tie"));
-        assert_eq!(service.latest_shared().text, "higher tie");
-        assert_eq!(
-            service.latest_shared().origin,
-            ClipboardOrigin::RemoteShared
-        );
-    }
-}
+mod tests;

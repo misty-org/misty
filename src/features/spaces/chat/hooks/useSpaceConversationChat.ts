@@ -1,5 +1,4 @@
-import { socialEvents } from "../SocialRuntime";
-import { socialApi as spacesApi } from "../SocialRuntime";
+import { spacesApi } from "@/api/spaces/api";
 import type { SpaceConversation, SpaceEvent, SpaceMessage } from "@/api/spaces/dto/entities";
 import { readApiSessionGeneration } from "@/api/client/session";
 import {
@@ -129,10 +128,10 @@ export function useSpaceConversationChat(spaceId: string, conversationId: string
             );
         });
     };
-    socialEvents.addEventListener("misty:space-message-event", reload);
+    window.addEventListener("misty:space-message-event", reload);
     return () => {
       active = false;
-      socialEvents.removeEventListener("misty:space-message-event", reload);
+      window.removeEventListener("misty:space-message-event", reload);
     };
   }, [conversationId, reloadRevision, spaceId, key, setMessages]);
   return {

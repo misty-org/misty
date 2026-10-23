@@ -9,7 +9,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Mutex,
 };
-use tauri::{AppHandle, Emitter, State, Webview};
+use tauri::{AppHandle, State, Webview};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,16 +80,6 @@ fn open(
         },
     )
     .map_err(|error| error.to_string())
-}
-
-/// The default microphone's name, apps playing audio, and what this computer can capture.
-#[tauri::command]
-pub fn voice_capture_sources(webview: Webview) -> Result<serde_json::Value, String> {
-    require_main(&webview)?;
-    let sources = audeeo_core::capture_sources().unwrap_or_default();
-    Ok(
-        json!({"microphone": sources.microphone, "applications": sources.applications, "capabilities": audeeo_core::capabilities()}),
-    )
 }
 
 /// Starts a capture and returns its session number. Audio arrives as

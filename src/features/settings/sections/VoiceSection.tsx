@@ -1,4 +1,3 @@
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import { voiceSettings } from "@/features/voice";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -50,16 +49,6 @@ export function VoiceSection(props: SettingsContentProps) {
   const voice = voiceSettings(props.document);
   const set = (key: string, value: string | boolean) => props.onSettingChange("voice", key, value);
   const dictationOff = props.working || !voice.dictation;
-  if (!publicBetaFeatureEnabled("voiceDictation")) {
-    return (
-      <SettingsSectionBlock
-        title="Voice"
-        description="Dictation into any app and voice notes are being prepared for a future Misty release."
-      >
-        {null}
-      </SettingsSectionBlock>
-    );
-  }
   return (
     <>
       <SettingsSectionBlock
@@ -101,30 +90,22 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="AI cleanup"
-          description="Fixes punctuation and drops filler words before typing. Uses your AI allowance."
+          description="Fixes punctuation and drops filler words before typing, in the style you pick. Uses your AI allowance."
           muted={!voice.dictation}
         >
-          <SwitchControl
-            checked={voice.cleanup}
-            disabled={dictationOff}
-            onChange={(value) => set("dictation_cleanup", value)}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Style"
-          description="How cleaned-up text reads."
-          muted={!voice.dictation || !voice.cleanup}
-          indent
-        >
           <ChoiceControl
-            value={voice.style}
+            value={voice.cleanup ? voice.style : "off"}
             options={[
+              { value: "off", label: "Off" },
               { value: "plain", label: "Plain" },
               { value: "casual", label: "Casual" },
               { value: "formal", label: "Formal" },
             ]}
-            disabled={dictationOff || !voice.cleanup}
-            onValueChange={(value) => set("dictation_style", value)}
+            disabled={dictationOff}
+            onValueChange={(value) => {
+              set("dictation_cleanup", value !== "off");
+              if (value !== "off") set("dictation_style", value);
+            }}
           />
         </SettingsRow>
         <SettingsRow

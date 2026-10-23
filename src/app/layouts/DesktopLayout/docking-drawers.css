@@ -1,13 +1,3 @@
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab:not(:hover, :focus-within)
-  .misty-workspace-tab-close {
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* The focused browser pane's toolbar (nav, address field, tools) sits at the top of a vertical
    strip. Empty, as on a non-browser page, it takes no room. */
 .misty-workspace-toolbar-slot {
@@ -26,16 +16,6 @@
   align-items: center;
   min-height: 28px;
   padding-left: max(0px, calc(var(--window-chrome-left, 0px) - var(--shell-gap, 8px)));
-}
-
-.misty-docking-rail-cap {
-  background: var(--misty-window-chrome, var(--misty-theme-workspace));
-  pointer-events: none;
-}
-
-/* A rail on the right has no traffic lights above it, so it starts at the window's top edge. */
-.misty-docking-frame[data-rail-flush] .misty-global-navigator {
-  padding-top: 10px;
 }
 
 /* The vertical sidebar's holder. Open it is a column; collapsed, its width animates to nothing
@@ -110,28 +90,12 @@
 }
 
 /* Flat sidebar: the color the sticky New Tab row and the top fade blend into. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]) {
+.misty-workspace-tabs {
   --misty-tab-well: var(--misty-window-chrome, var(--misty-theme-workspace));
 }
 
 /* Stand-ins for the focused browser page's address field and nav buttons, shown on any other
    page and hidden while a browser page fills their slots. */
-.misty-sidebar-address-fallback {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--workspace-tab-muted, var(--color-cream-muted));
-  font-size: 13px;
-  text-align: left;
-}
-.misty-sidebar-address-fallback:hover {
-  background: rgba(255, 255, 255, 0.09);
-}
 .misty-sidebar-address:has(.misty-workspace-toolbar-slot:not(:empty))
   .misty-sidebar-address-fallback,
 .misty-sidebar-nav:has(> div:first-child:not(:empty)) .misty-sidebar-nav-fallback {
@@ -230,8 +194,7 @@
   border-radius: 12px;
   background: var(--workspace-tab-surface);
 }
-.misty-sidebar-card .misty-sidebar-address,
-.misty-sidebar-card .misty-workspace-favorites-grid {
+.misty-sidebar-card .misty-sidebar-address {
   margin-bottom: 12px;
 }
 /* Revealed over the page, the card floats on its own shadow, with no backdrop of its own. */
@@ -242,193 +205,4 @@
 }
 .misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-card {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-}
-
-/* The page is a rounded pane in every tab layout: a 1px gray outline hugs it from the
-   margin just outside, where the native page cannot cover it. */
-.misty-docking-frame .misty-pane-frame::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  z-index: 2147483647;
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 13px;
-  pointer-events: none;
-}
-/* The page's corners are curved, but its area is square: its background would show in the four
-   corners, notably the two beside the Misty panel, which no pane mask covers. Paint them in
-   the chrome color. */
-.misty-docking-frame .misty-pane-frame::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2147483646;
-  pointer-events: none;
-  background:
-    radial-gradient(
-        circle at 100% 100%,
-        transparent 11.5px,
-        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
-      )
-      top left / 12px 12px no-repeat,
-    radial-gradient(
-        circle at 0 100%,
-        transparent 11.5px,
-        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
-      )
-      top right / 12px 12px no-repeat,
-    radial-gradient(
-        circle at 100% 0,
-        transparent 11.5px,
-        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
-      )
-      bottom left / 12px 12px no-repeat,
-    radial-gradient(
-        circle at 0 0,
-        transparent 11.5px,
-        var(--misty-window-chrome, var(--misty-theme-workspace)) 12px
-      )
-      bottom right / 12px 12px no-repeat;
-}
-
-/* A vertical tab's speaker sits right after the favicon rather than at the row's end. The real
-   button floats over the row; a gap of its width keeps the favicon, speaker and title evenly
-   spaced, and exists only while the speaker is there. */
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab {
-  position: relative;
-}
-.misty-tab-audio-slot {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  /* Row padding (8) + favicon (16) + flex gap (6) + gap margin (2), less the button's own 6. */
-  left: 26px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-}
-.misty-tab-audio-gap {
-  display: none;
-  width: 12px;
-  margin-inline: 2px;
-  flex-shrink: 0;
-}
-.misty-workspace-tab:has(.misty-tab-audio-slot:not(:empty)) .misty-tab-audio-gap {
-  display: block;
-}
-
-/* Vertical tabs reserve no room for the close button: it appears at the row's right edge on
-   hover, and the title fades out before it instead of being cut short all the time. Anything
-   else at the row's end, such as the pane chips, rests at the edge and steps aside, clear of the
-   button's whole slot (6px in, 20px wide, and a gap), exactly when the button shows. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-tab-pane-chips {
-  margin-right: 6px;
-  transition: margin-right 120ms ease-out;
-}
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab:is(:hover, :focus-within)
-  .misty-tab-pane-chips {
-  margin-right: 32px;
-}
-@media (pointer: coarse) {
-  .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
-    .misty-tab-pane-chips {
-    margin-right: 32px;
-  }
-}
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab {
-  position: relative;
-}
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab
-  .misty-workspace-tab-close {
-  position: absolute;
-  /* Centered with inset and auto margins: a translate would land it on a half pixel. */
-  inset-block: 0;
-  right: 6px;
-  margin: auto 0;
-  border-radius: 6px;
-}
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab:not([data-pinned], .misty-tab-has-chips):is(:hover, :focus-within)
-  .misty-workspace-tab-title {
-  /* The title makes way for the close button whenever the button shows, also when the title
-     fits its row but still runs under the button: it fades out and is gone before the button,
-     so the button needs no backing of its own and nothing shows through it. */
-  -webkit-mask-image: linear-gradient(
-    to right,
-    black calc(100% - 54px),
-    transparent calc(100% - 26px)
-  );
-  mask-image: linear-gradient(to right, black calc(100% - 54px), transparent calc(100% - 26px));
-}
-/* With the pane chips the title already ends before them, and they step clear of the close
-   button themselves, so the title keeps only a short fade at its own edge, and only when it
-   really is too long to fit. */
-:is(
-    .misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"]),
-    [data-side-tab-list]
-  )
-  .misty-workspace-tab.misty-tab-has-chips:is(:hover, :focus-within)
-  [data-text-overflowing="true"] {
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
-  mask-image: linear-gradient(to right, black calc(100% - 12px), transparent);
-}
-
-/* Once a tab is split, every pane is its own rounded container with a gap between them, so the
-   page's single outline gives way to each pane's own. */
-.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id])::after {
-  display: none;
-}
-.misty-docking-frame .misty-pane-frame:has([data-panel-resize-handle-id]) [data-workspace-pane] {
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: 12px;
-}
-
-/* Split panes float on the dark workspace backdrop. Nothing opaque may sit behind a page: while
-   a popover is open the native pages drop below the app layer and show only through transparent
-   CSS, so the frame and panes container stay transparent (styles.css) and the backdrop is painted
-   only where no page is: the margin (the tabpanel's inset shadow, in --misty-window-chrome), the
-   gaps (the resize handles) and the four corners outside each pane's rounded edge. */
-.misty-docking-frame:has([data-panel-resize-handle-id]) {
-  --misty-window-chrome: var(--misty-theme-workspace) !important;
-}
-.misty-docking-frame [data-panel-resize-handle-id] {
-  background-color: var(--misty-theme-workspace);
-}
-.misty-docking-frame
-  .misty-pane-frame:has([data-panel-resize-handle-id])
-  [data-pane-layout-content]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 100% 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
-      left / 12px 12px no-repeat,
-    radial-gradient(circle at 0 100%, transparent 11.5px, var(--misty-theme-workspace) 12px) top
-      right / 12px 12px no-repeat,
-    radial-gradient(circle at 100% 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
-      left / 12px 12px no-repeat,
-    radial-gradient(circle at 0 0, transparent 11.5px, var(--misty-theme-workspace) 12px) bottom
-      right / 12px 12px no-repeat;
 }

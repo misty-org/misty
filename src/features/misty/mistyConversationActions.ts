@@ -1,196 +1,31 @@
-import { ApiRequestError } from "@/api/client";
-import { subscribeAgentsInvocation as subscribeToAiInvocation } from "@/features/agents/AgentsRuntime";
+import { pendingServerDeletes } from "./pendingServerDeletes";
 import { selectedPersonalAgent } from "@/features/agents/personalAgentsStore";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
-import { globalMistyApi } from "@/features/global-search/globalMistyApi";
-import type { GlobalSearchState } from "@/features/global-search/globalSearchState";
-import {
-  applyGlobalInvocationEvent,
-  normalizeConversation,
-  patchConversationMessage,
-  replaceActiveGlobalInvocationStream,
-  type GlobalSearchGet,
-  type GlobalSearchSet,
-} from "@/features/global-search/globalSearchStoreHelpers";
-import { settleRun } from "./settleRun";
-import { useCollaborationStore } from "@/features/agents/agentCollaboration";
+import { globalMistyError } from "./globalMistyActions";
+import { globalMistyApi } from "./globalMistyApi";
+import type { MistyState } from "./mistyState";
+import { normalizeConversation, type MistyGet, type MistySet } from "./mistyStoreHelpers";
 import { updateMistyDraftAttachments } from "./draftAttachments";
-import { localChats, markStoredChats } from "./localChats";
-import { syncLocalChats, thisDeviceId } from "./localChatSync";
+import { localChats } from "./localChats";
+import { thisDeviceId } from "./localChatSync";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 
+import { createLoadConversations } from "./loadConversations";
 /** Loading, opening, creating, renaming and deleting Misty conversations. */
 export function createMistyConversationActions(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
 ): Pick<
-  GlobalSearchState,
+  MistyState,
   | "loadConversations"
   | "newConversation"
-  | "bindConversationSpace"
   | "selectConversation"
   | "deleteConversation"
   | "renameConversation"
+  | "rewindConversation"
+  | "setMessageLedger"
 > {
   return {
-    loadConversations: async (reconnect = false, expected) => {
-      const epoch = submissionEpoch();
-      const accountId = get().accountId;
-      if (!accountId) return;
-      set({
-        conversationsLoading: true,
-      });
-      try {
-        // Chats live on this device (docs/design/agent-chats-local/BRIEF.md). Its copy
-        // paints first when nothing is loaded yet; the server's newer turns merge in after.
-        const response = localChats.available()
-          ? await localChats
-              .conversations(accountId)
-              .catch(() => [])
-              .then(async (saved) => {
-                const local = saved.map(normalizeConversation);
-                markStoredChats(local);
-                if (get().accountId === accountId && !get().working && !get().conversations.length)
-                  set({ conversations: local });
-                return { conversations: await syncLocalChats(accountId, local) };
-              })
-          : // Outside the desktop app there is no device to keep chats: the server lists them.
-            await globalMistyApi.conversations("", (saved) => {
-              if (get().accountId !== accountId || get().working || get().conversations.length)
-                return;
-              set({ conversations: saved.conversations.map(normalizeConversation) });
-            });
-        if (get().accountId !== accountId) return;
-        if ((get().working && !reconnect) || epoch !== submissionEpoch()) {
-          set({
-            conversationsLoading: false,
-          });
-          return;
-        }
-        const conversations = response.conversations.map(normalizeConversation);
-        // What the device sync returned is saved already.
-        if (localChats.available()) markStoredChats(conversations);
-        if (
-          expected &&
-          (expected.accountId !== accountId ||
-            get().selectedAgentId !== expected.agentId ||
-            get().activeConversationId !== expected.conversationId ||
-            !conversations.some(
-              (conversation) =>
-                conversation.id === expected.conversationId &&
-                // Misty's own chats may carry no agent.
-                (!conversation.agentId || conversation.agentId === expected.agentId) &&
-                conversation.messages.some(
-                  (message) =>
-                    message.role === "assistant" && message.invocationId === expected.invocationId,
-                ),
-            ))
-        ) {
-          set({ conversationsLoading: false });
-          return;
-        }
-        const activeConversationId =
-          get().activeConversationId || (get().selectedAgentId ? "" : conversations[0]?.id) || "";
-        set({
-          conversations,
-          pendingArtifact: conversations
-            .find((c) => c.id === activeConversationId)
-            ?.messages.slice()
-            .reverse()
-            .find((m) => m.artifact)?.artifact,
-          artifactConversationId: activeConversationId,
-          artifactPaneId: undefined,
-          activeConversationId,
-          selectedAgentId:
-            conversations.find((item) => item.id === activeConversationId)?.agentId ||
-            get().selectedAgentId,
-          conversationsLoading: false,
-        });
-        if (reconnect) {
-          replaceActiveGlobalInvocationStream();
-          set({
-            working: false,
-            error: null,
-            ...(expected
-              ? {
-                  invocationId: expected.invocationId,
-                  invocationConversationId: expected.conversationId,
-                }
-              : {}),
-          });
-        }
-        const candidates = [...conversations].sort(
-          (a, b) => Number(b.id === activeConversationId) - Number(a.id === activeConversationId),
-        );
-        const running = candidates.flatMap((conversation) =>
-          conversation.messages
-            .filter(
-              (message) =>
-                message.role === "assistant" &&
-                message.invocationId &&
-                (!expected ||
-                  (conversation.id === expected.conversationId &&
-                    message.invocationId === expected.invocationId)) &&
-                (message.state === "pending" || message.state === "streaming"),
-            )
-            .map((message) => ({ conversation, message })),
-        )[0];
-        if (running) {
-          const { conversation, message } = running;
-          const invocationId = message.invocationId!;
-          set({ working: true, invocationId, invocationConversationId: conversation.id });
-          // Replay the saved stream into an empty response so deltas are never duplicated.
-          patchConversationMessage(set, get, conversation.id, message.id, {
-            content: "",
-            activity: "Reconnecting to the task…",
-          });
-          replaceActiveGlobalInvocationStream(
-            subscribeToAiInvocation(`/ai/invocations/${encodeURIComponent(invocationId)}/events`, {
-              onEvent: (event) => {
-                if (
-                  get().accountId !== accountId ||
-                  get().invocationId !== invocationId ||
-                  epoch !== submissionEpoch()
-                )
-                  return;
-                applyGlobalInvocationEvent(set, get, conversation.id, message.id, event);
-                if (
-                  ["invocation.completed", "invocation.failed", "invocation.canceled"].includes(
-                    event.type,
-                  )
-                )
-                  // Goal continuations chain: attach to the next one when it starts.
-                  useCollaborationStore.getState().afterRunSettled(
-                    conversation.id,
-                    () => void get().loadConversations(true),
-                    () => get().working,
-                  );
-                if (event.type === "artifact.proposed" || event.type === "approval.required") {
-                  patchConversationMessage(set, get, conversation.id, message.id, {
-                    artifact: event.artifact,
-                  });
-                  set({ pendingArtifact: event.artifact, artifactConversationId: conversation.id });
-                }
-              },
-              onError: (error) => {
-                if (get().accountId !== accountId || get().invocationId !== invocationId) return;
-                // A reattach that drops again ends here; the next reload retries.
-                settleRun(set, get, {
-                  state: "failed",
-                  conversationId: conversation.id,
-                  error: error.message,
-                });
-              },
-            }),
-          );
-        }
-      } catch {
-        if (get().accountId === accountId)
-          set({
-            conversationsLoading: false,
-          });
-      }
-    },
+    loadConversations: createLoadConversations(set, get),
     newConversation: async (_legacySpaceId, requestedAgentId) => {
       const accountId = get().accountId;
       const epoch = submissionEpoch();
@@ -215,7 +50,6 @@ export function createMistyConversationActions(
         pendingArtifact: undefined,
         artifactPaneId: undefined,
         artifactConversationId: undefined,
-        mode: "ask",
         panel: get().panel === "closed" ? "closed" : "answer",
         query: "",
         context: [],
@@ -224,8 +58,6 @@ export function createMistyConversationActions(
       });
       return conversation.id;
     },
-    // Retained for old entry points; context does not bind AI ownership.
-    bindConversationSpace: async () => {},
     selectConversation: (activeConversationId) =>
       set({
         pendingArtifact: get()
@@ -242,7 +74,6 @@ export function createMistyConversationActions(
         selectedSpaceId: "",
         pendingModelOverride: undefined,
         activeConversationId,
-        mode: "ask",
         panel: get().panel === "closed" ? "closed" : "answer",
         query: "",
         context: [],
@@ -260,11 +91,10 @@ export function createMistyConversationActions(
         )
           throw new Error("Stop the response before deleting this conversation.");
         // The server's row only admits and bills the chat's runs; the chat itself is here.
-        if (existing.remote)
-          await globalMistyApi.deleteConversation(conversationId).catch((error: unknown) => {
-            if (!(error instanceof ApiRequestError && error.status === 404)) throw error;
-          });
+        // A server that is down must not block deleting a chat that lives here: its row is
+        // removed on a later sync.
         await localChats.deleteConversation(requestAccount, conversationId);
+        if (existing.remote) void pendingServerDeletes.delete(conversationId);
         if (get().accountId !== requestAccount) return;
         updateMistyDraftAttachments(requestAccount, conversationId, (attachments) => {
           attachments.forEach((attachment) => {
@@ -327,6 +157,30 @@ export function createMistyConversationActions(
         set({ error: globalMistyError(error) });
         throw error;
       }
+    },
+    setMessageLedger: (conversationId, messageId, content) => {
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId
+            ? {
+                ...item,
+                messages: item.messages.map((message) =>
+                  message.id === messageId ? { ...message, content } : message,
+                ),
+              }
+            : item,
+        ),
+      });
+    },
+    rewindConversation: (conversationId, messageId) => {
+      const existing = get().conversations.find((item) => item.id === conversationId);
+      const index = existing?.messages.findIndex((message) => message.id === messageId) ?? -1;
+      if (!existing || index < 0 || get().working) return;
+      set({
+        conversations: get().conversations.map((item) =>
+          item.id === conversationId ? { ...item, messages: item.messages.slice(0, index) } : item,
+        ),
+      });
     },
   };
 }

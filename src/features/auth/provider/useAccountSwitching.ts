@@ -1,4 +1,4 @@
-import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
+import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
 import { useNativeSessionStore } from "@/features/native-session";
 import { restoreAccountWorkspace, saveAccountWorkspace } from "@/features/workspace";
 import { useCallback } from "react";

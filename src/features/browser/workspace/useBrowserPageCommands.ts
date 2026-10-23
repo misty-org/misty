@@ -15,7 +15,11 @@ import { desktopOs } from "@/shared/platform/desktopOs";
 import { useState } from "react";
 import { browserPageTools } from "../library/native";
 import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
-import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
+import {
+  browserRuntimeCreated,
+  browserRuntimeId,
+  useBrowserRuntimeStore,
+} from "@/features/webviews/browserRuntime";
 
 export interface BrowserPageCommands {
   newTab: () => void;

@@ -69,6 +69,25 @@ export function restoreAccountWorkspace(accountId: string): void | Promise<void>
   useWorkspaceStore.getState().reset();
 }
 
+/**
+ * Makes `live` (the windows and tabs on screen before an identity change) the profile's
+ * workspace: signing in adopts the local profile's tabs and signing out returns them.
+ */
+export function adoptAccountWorkspace(
+  accountId: string,
+  live: ReturnType<typeof partialWorkspaceStore>,
+): void | Promise<void> {
+  if (isIncognitoWindow()) return;
+  useWorkspaceStore.setState(live);
+  if (nativeWorkspaceRecoveryEnabled()) return restoreNativeWorkspace(accountId, true);
+  saveAccountWorkspace(accountId);
+}
+
+/** The windows and tabs on screen, to carry across an identity change. */
+export function liveWorkspace(): ReturnType<typeof partialWorkspaceStore> {
+  return partialWorkspaceStore(useWorkspaceStore.getState());
+}
+
 export function removeAccountWorkspace(accountId: string): void | Promise<void> {
   if (isIncognitoWindow()) return;
   if (nativeWorkspaceRecoveryEnabled()) return removeNativeAccountWorkspace(accountId);

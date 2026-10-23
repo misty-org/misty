@@ -3,7 +3,7 @@ import { liveAcceptanceEnabled } from "./liveEnv";
 import { MistyClient, seedSpaceMember, type InvocationRun } from "./mistyClient";
 import { writeAcceptanceReport } from "./report";
 
-// Phases 1–3, live: the acceptance prompts from docs/design/agent-architecture
+// Phases 1–3, live: the acceptance prompts from docs/agents/architecture.md
 // BRIEF.md, sent to the local development server (its runtime, model and
 // Composio project) as a fresh account with known notes and a team chat.
 // Phase 4 runs separately in screenAct.acceptance.ts.

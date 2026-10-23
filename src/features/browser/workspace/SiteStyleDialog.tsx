@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { settingsString, useSettingsStore } from "@/features/settings";
-import { parseSiteStyles, siteStyleHost, siteStylesWith } from "@/features/webviews/siteStyles";
+import {
+  boostFonts,
+  boostSizes,
+  parseSiteStyles,
+  readBoost,
+  siteStyleHost,
+  siteStylesWith,
+  withBoost,
+} from "@/features/webviews/siteStyles";
 import {
   Button,
   Dialog,
@@ -9,6 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  OptionSelect,
   Switch,
   Textarea,
 } from "@/shared/ui";
@@ -80,6 +89,34 @@ export function SiteStyleDialog(props: {
             }}
           />
         </label>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm">
+            <span>Font</span>
+            <OptionSelect
+              aria-label="Font"
+              value={readBoost(css).font}
+              options={boostFonts}
+              onValueChange={(font) => {
+                const next = withBoost(css, { ...readBoost(css), font });
+                setCss(next);
+                save({ css: next, dark });
+              }}
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span>Text size</span>
+            <OptionSelect
+              aria-label="Text size"
+              value={readBoost(css).size}
+              options={boostSizes}
+              onValueChange={(size) => {
+                const next = withBoost(css, { ...readBoost(css), size });
+                setCss(next);
+                save({ css: next, dark });
+              }}
+            />
+          </label>
+        </div>
         <div className="grid gap-2">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm">Custom CSS</span>

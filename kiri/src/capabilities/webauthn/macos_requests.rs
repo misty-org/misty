@@ -50,12 +50,16 @@ unsafe fn resident_key(value: &str) -> Id {
 unsafe fn client_data(challenge: &[u8], origin: &str) -> Result<Id, KiriError> {
     let data_class = class("ASPublicKeyCredentialClientData")?;
     let allocated: Id = msg_send![data_class, alloc];
-    Ok(made(msg_send![allocated, initWithChallenge: data(challenge) origin: string(origin)]))
+    Ok(made(
+        msg_send![allocated, initWithChallenge: data(challenge) origin: string(origin)],
+    ))
 }
 
 unsafe fn provider_for(name: &str, rp_id: &str) -> Result<Id, KiriError> {
     let allocated: Id = msg_send![class(name)?, alloc];
-    Ok(made(msg_send![allocated, initWithRelyingPartyIdentifier: string(rp_id)]))
+    Ok(made(
+        msg_send![allocated, initWithRelyingPartyIdentifier: string(rp_id)],
+    ))
 }
 
 unsafe fn platform_descriptors(ids: &[Vec<u8>]) -> Result<Id, KiriError> {
@@ -86,7 +90,10 @@ unsafe fn security_key_descriptors(ids: &[Vec<u8>]) -> Result<Id, KiriError> {
 const SECURITY_KEY: &str = "ASAuthorizationSecurityKeyPublicKeyCredentialProvider";
 const PLATFORM: &str = "ASAuthorizationPlatformPublicKeyCredentialProvider";
 
-pub(super) unsafe fn registration_requests(request: &CreateRequest, platform: bool) -> Result<Vec<Id>, KiriError> {
+pub(super) unsafe fn registration_requests(
+    request: &CreateRequest,
+    platform: bool,
+) -> Result<Vec<Id>, KiriError> {
     let mut requests = Vec::new();
     if platform {
         let provider = provider_for(PLATFORM, &request.rp_id)?;
@@ -98,14 +105,17 @@ pub(super) unsafe fn registration_requests(request: &CreateRequest, platform: bo
             let _: () = msg_send![entry, setDisplayName: string(&request.user_display_name)];
         }
         let _: () = msg_send![entry, setUserVerificationPreference: verification(&request.user_verification)];
-        let _: () = msg_send![entry, setAttestationPreference: attestation_kind(&request.attestation)];
+        let _: () =
+            msg_send![entry, setAttestationPreference: attestation_kind(&request.attestation)];
         if responds(entry, sel!(setExcludedCredentials:)) {
-            let _: () = msg_send![entry, setExcludedCredentials: platform_descriptors(&request.exclude)?];
+            let _: () =
+                msg_send![entry, setExcludedCredentials: platform_descriptors(&request.exclude)?];
         }
         requests.push(entry);
     }
     let provider = provider_for(SECURITY_KEY, &request.rp_id)?;
-    let with_client_data = sel!(createCredentialRegistrationRequestWithClientData:displayName:name:userID:);
+    let with_client_data =
+        sel!(createCredentialRegistrationRequestWithClientData:displayName:name:userID:);
     if request.attachment != Some(Attachment::Platform) && responds(provider, with_client_data) {
         let display_name = if request.user_display_name.is_empty() {
             &request.user_name
@@ -129,31 +139,41 @@ pub(super) unsafe fn registration_requests(request: &CreateRequest, platform: bo
         let _: () = msg_send![entry, setCredentialParameters: array(&parameters)];
         let _: () = msg_send![entry, setResidentKeyPreference: resident_key(&request.resident_key)];
         let _: () = msg_send![entry, setUserVerificationPreference: verification(&request.user_verification)];
-        let _: () = msg_send![entry, setAttestationPreference: attestation_kind(&request.attestation)];
-        let _: () = msg_send![entry, setExcludedCredentials: security_key_descriptors(&request.exclude)?];
+        let _: () =
+            msg_send![entry, setAttestationPreference: attestation_kind(&request.attestation)];
+        let _: () =
+            msg_send![entry, setExcludedCredentials: security_key_descriptors(&request.exclude)?];
         requests.push(entry);
     }
     Ok(requests)
 }
 
-pub(super) unsafe fn assertion_requests(request: &GetRequest, platform: bool) -> Result<Vec<Id>, KiriError> {
+pub(super) unsafe fn assertion_requests(
+    request: &GetRequest,
+    platform: bool,
+) -> Result<Vec<Id>, KiriError> {
     let mut requests = Vec::new();
     if platform {
         let provider = provider_for(PLATFORM, &request.rp_id)?;
         let entry: Id = msg_send![provider,
             createCredentialAssertionRequestWithClientData: client_data(&request.challenge, &request.origin)?];
         if !request.allow.is_empty() {
-            let _: () = msg_send![entry, setAllowedCredentials: platform_descriptors(&request.allow)?];
+            let _: () =
+                msg_send![entry, setAllowedCredentials: platform_descriptors(&request.allow)?];
         }
         let _: () = msg_send![entry, setUserVerificationPreference: verification(&request.user_verification)];
         requests.push(entry);
     }
     let provider = provider_for(SECURITY_KEY, &request.rp_id)?;
-    if responds(provider, sel!(createCredentialAssertionRequestWithClientData:)) {
+    if responds(
+        provider,
+        sel!(createCredentialAssertionRequestWithClientData:),
+    ) {
         let entry: Id = msg_send![provider,
             createCredentialAssertionRequestWithClientData: client_data(&request.challenge, &request.origin)?];
         if !request.allow.is_empty() {
-            let _: () = msg_send![entry, setAllowedCredentials: security_key_descriptors(&request.allow)?];
+            let _: () =
+                msg_send![entry, setAllowedCredentials: security_key_descriptors(&request.allow)?];
         }
         let _: () = msg_send![entry, setUserVerificationPreference: verification(&request.user_verification)];
         requests.push(entry);

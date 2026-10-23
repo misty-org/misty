@@ -1,5 +1,5 @@
 import { blankBrowserUrl } from "@/features/workspace/model";
-import { resolveDirectAddress } from "../browserAddress";
+import { resolveDirectAddress } from "@/features/browser-sync/address";
 
 /** An http(s) page address, or null for anything the address bar should not list. */
 function webUrl(value: string): URL | null {

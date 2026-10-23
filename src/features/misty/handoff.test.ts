@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { globalMistyApi } from "@/features/global-search/globalMistyApi";
+import { globalMistyApi } from "./globalMistyApi";
 import type { AiArtifact } from "@/features/ai-surface/types";
 import { useMistyStore } from "./useMistyStore";
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
-import type { GlobalAiConversation } from "@/features/global-search/types";
+import type { GlobalAiConversation } from "./types";
 
 const windowMocks = vi.hoisted(() => ({
   getByLabel: vi.fn(),
@@ -42,7 +42,6 @@ describe("openMisty", () => {
       selectedSpaceId: "",
       handoff: undefined,
       panel: "closed",
-      mode: "ask",
       query: "",
       context: [],
       conversations: [],

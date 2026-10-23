@@ -50,7 +50,7 @@ describe("ProfileMenu", () => {
     renderMenu();
     const menu = screen.getByRole("menu", { name: "Profile" });
     expect(menu.textContent).toContain("owner@example.com");
-    for (const label of [/Account settings/, /Switch accounts/, /Log out/]) {
+    for (const label of [/Account settings/, /Switch accounts/, /Sign out/]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
     }
     expect(menu.textContent).not.toContain("Report a problem");
@@ -60,7 +60,7 @@ describe("ProfileMenu", () => {
     mockUser = null;
     renderMenu();
     expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeTruthy();
-    for (const label of [/Account settings/, /Switch accounts/, /Log out/]) {
+    for (const label of [/Account settings/, /Switch accounts/, /Sign out/]) {
       expect(screen.queryByRole("menuitem", { name: label })).toBeNull();
     }
   });

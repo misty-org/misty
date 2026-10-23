@@ -7,6 +7,10 @@
 static inline NSError *ExtensionError(NSString *message) {
     return [NSError errorWithDomain:@"MistyExtensions" code:1 userInfo:@{NSLocalizedDescriptionKey:message}];
 }
+static inline NSString *ExtensionJSON(id value) {
+    NSData *data = [NSJSONSerialization dataWithJSONObject:value options:NSJSONWritingFragmentsAllowed error:nil];
+    return data ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"null";
+}
 typedef void (^Reply)(NSDictionary *);
 
 @class MistyExtensionHost, MistyExtensionWindow;
@@ -68,7 +72,6 @@ API_AVAILABLE(macos(15.4))
 /// Navigation and UI delegate of this host's extension popup windows.
 @property id popupWindowDelegate;
 - (void)event:(NSString *)kind data:(NSDictionary *)data;
-- (void)request:(NSDictionary *)request reply:(Reply)reply;
 /// Makes the Space's controller once, over the Space's store. A host never
 /// rebuilds it; the host is freed with the Space's last window instead.
 - (void)startWithStore:(WKWebsiteDataStore *)store;
@@ -77,6 +80,22 @@ API_AVAILABLE(macos(15.4))
 - (void)load:(NSDictionary *)descriptor reply:(Reply)reply;
 - (void)unload:(NSString *)identifier;
 - (void)registerOpenTab:(MistyExtensionTab *)tab;
+@end
+
+/// The operations Misty's app sends a host. Implemented in MistyExtensionRequests.m.
+API_AVAILABLE(macos(15.4))
+@interface MistyExtensionHost (Requests)
+- (void)request:(NSDictionary *)request reply:(Reply)reply;
+@end
+
+/// WebKit delegate callbacks and the notifications a host observes.
+/// Implemented in MistyExtensionDelegate.m.
+API_AVAILABLE(macos(15.4))
+@interface MistyExtensionHost (Delegate)
+- (void)permissionsRemoved:(NSNotification *)notification;
+- (void)runtimeErrors:(NSNotification *)notification;
+- (void)popupClosed:(NSNotification *)notification;
+- (void)windowFocused:(NSNotification *)notification;
 - (void)openTabURL:(NSURL *)url private:(BOOL)privateTab options:(NSDictionary *)options complete:(void (^)(MistyExtensionTab *,NSError *))done;
 @end
 
@@ -90,10 +109,27 @@ API_AVAILABLE(macos(15.4))
 - (void)compatMessage:(WKScriptMessage *)message reply:(void (^)(id, NSString *))reply;
 /// Handles compat-reply and compat-event operations; returns NO for others.
 - (BOOL)compatRequest:(NSDictionary *)request reply:(Reply)reply;
-/// The extension page that receives an OAuth redirect to `url`, if it is one.
-- (NSURL *)identityRedirect:(NSURL *)url;
 /// Sends an extension API event to one extension, if its grants allow it.
 - (void)deliverCompatEvent:(NSString *)event args:(NSArray *)args to:(NSString *)identifier;
+@end
+
+/// The native work behind compatibility requests. Implemented in
+/// MistyExtensionCompatActions.m.
+API_AVAILABLE(macos(15.4))
+@interface MistyExtensionHost (CompatActions)
+- (NSDictionary *)detectLanguage:(id)text;
+/// Removes website data from the browsing profile's store, then calls `complete`.
+- (void)removeWebsiteData:(NSDictionary *)options types:(NSDictionary *)types complete:(void (^)(void))complete;
+/// Returns an error message on failure.
+- (NSString *)moveTab:(id)request context:(WKWebExtensionContext *)context;
+- (MistyExtensionTab *)locateTab:(id)request context:(WKWebExtensionContext *)context;
+/// The stored script's package path, or nil.
+- (NSString *)writeUserScript:(id)code identifier:(NSString *)identifier;
+- (NSString *)idleState:(id)threshold;
+/// Returns an error message on failure.
+- (NSString *)startDownload:(id)options context:(WKWebExtensionContext *)context;
+/// The extension page that receives an OAuth redirect to `url`, if it is one.
+- (NSURL *)identityRedirect:(NSURL *)url;
 @end
 
 /// Native popup windows for extension pages. Implemented in MistyExtensionPopupWindows.m.

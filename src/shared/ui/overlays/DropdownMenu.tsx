@@ -6,7 +6,6 @@ import {
   menuItemClass,
   menuLabelClass,
   menuSeparatorClass,
-  menuShortcutClass,
   menuWidthClass,
   type MenuWidth,
 } from "./popupStyles";
@@ -22,16 +21,6 @@ const dropdownViewportClass =
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
-
-const DropdownMenuGroup = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.Group>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Group>
->(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.Group ref={ref} className={cn("grid gap-1", className)} {...props} />
-));
-DropdownMenuGroup.displayName = DropdownMenuPrimitive.Group.displayName;
-
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
@@ -201,29 +190,15 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return (
-    <span
-      data-slot="dropdown-menu-shortcut"
-      className={cn(menuShortcutClass, className)}
-      {...props}
-    />
-  );
-};
-DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
-
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,

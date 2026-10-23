@@ -1,6 +1,6 @@
 import { invoke } from "./invoke";
 
-// Devices (docs/design/devices/BRIEF.md). Identity, trust, signatures and the
+// Devices (docs/sync/devices.md). Identity, trust, signatures and the
 // control channel stay native; these only drive them. Everything between a
 // person's devices goes through the server.
 

@@ -1,4 +1,4 @@
-import { useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 
 export function setBrowserError(tabId: string, error: unknown) {
   useBrowserRuntimeStore

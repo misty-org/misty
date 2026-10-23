@@ -1,5 +1,5 @@
 import { httpRequest } from "@/api/client/http";
-import { usageLimitText } from "@/api/client/usageLimits";
+import { usageLimitText } from "@/api/client/usage-limits";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,
@@ -90,11 +90,8 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     }
     if (payload?.code === "rate_limited") {
       const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);
-      const retryPolicy = path.includes("/media-search/")
-        ? ""
-        : " Requests are never retried automatically.";
       throw new ManagedAiRequestError(
-        `Agent request limit reached. Try again in ${retryAfter} seconds.${retryPolicy}`,
+        `Agent request limit reached. Try again in ${retryAfter} seconds. Requests are never retried automatically.`,
         response.status,
         payload.code,
         retryAfter,

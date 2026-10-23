@@ -1,7 +1,9 @@
 import { Pressable } from "@/shared/ui";
-import { settingSearchEntries } from "../profiles/registry";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { settingSearchEntries } from "../devicePreferences/registry";
 import {
   settingsAreaEntry,
+  settingsAreaIsNativeOnly,
   settingsAreas,
   settingsGroups,
   settingsPage,
@@ -19,7 +21,10 @@ export function searchSettings(query: string): SettingsSearchResult[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
   const rows = settingSearchEntries
-    .filter((d) => settingsPage(d.page as SettingsSection))
+    .filter((d) => {
+      const page = settingsPage(d.page as SettingsSection);
+      return page && (hasTauriInternals() || !settingsAreaIsNativeOnly(page.area));
+    })
     .filter((d) =>
       `${d.label} ${d.id} ${d.page} ${d.keywords?.join(" ") ?? ""}`.toLowerCase().includes(needle),
     )
@@ -38,6 +43,7 @@ export function searchSettings(query: string): SettingsSearchResult[] {
     .flatMap((group) => group.areas)
     .filter((area) => settingsAreas[area].label.toLowerCase().includes(needle))
     .flatMap((area) => {
+      if (!hasTauriInternals() && settingsAreaIsNativeOnly(area)) return [];
       const entry = settingsAreaEntry(area);
       return entry
         ? [{ key: `page:${entry.id}`, label: settingsAreas[area].label, page: entry.id, focus: "" }]

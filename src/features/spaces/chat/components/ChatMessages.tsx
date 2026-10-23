@@ -31,16 +31,13 @@ export interface SpaceChatMessagesProps {
   onError: (message: string) => void;
   onLibraryItem: (item: SpaceLibraryItem) => void;
   onReload: () => void;
-  spaceName?: string;
   directRecipient?: { userId: string; name: string };
   onStarter?: (starter: SpaceChatStarter) => void;
 }
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";
-import {
-  SocialError as SystemErrorNotice,
-  socialErrorMessage as systemErrorMessage,
-} from "../SocialRuntime";
+import { SystemErrorNotice } from "@/features/support/systemErrors";
+import { errorText as systemErrorMessage } from "@/shared/lib/format";
 import { Button } from "@/shared/ui";
 import { CircleAlert, RefreshCw } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef } from "react";
@@ -48,8 +45,8 @@ import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
 import { ChatMessageRow } from "./ChatMessageRow";
 import { threadRootOf } from "./messageHelpers";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
-import { SpaceChatStarters } from "./ChatStarters";
-import { SpaceDirectMessageIntro } from "./DirectMessageIntro";
+import { ChatStarters } from "./ChatStarters";
+import { DirectMessageIntro } from "./DirectMessageIntro";
 
 export function SpaceChatMessages(props: SpaceChatMessagesProps) {
   const displayRows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
@@ -87,7 +84,7 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
             <SystemErrorNotice
               error={props.error}
               scope={`social:${props.spaceId}`}
-              title="Social messages could not be loaded"
+              title="Messages could not be loaded"
             />
             <div
               className="mb-3 flex items-start gap-3 rounded-xl border border-charcoal-border bg-charcoal-card px-4 py-3"
@@ -114,12 +111,9 @@ export function SpaceChatMessages(props: SpaceChatMessagesProps) {
           <ChatMessagesSkeleton />
         ) : props.messages.length === 0 ? (
           props.error ? null : props.directRecipient ? (
-            <SpaceDirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
+            <DirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
           ) : (
-            <SpaceChatStarters
-              spaceName={props.spaceName}
-              onStarter={props.canWrite ? props.onStarter : undefined}
-            />
+            <ChatStarters onStarter={props.canWrite ? props.onStarter : undefined} />
           )
         ) : (
           displayRows.map(({ message, compact, dateLabel }) => {

@@ -22,7 +22,10 @@ it.each([
   [3, "agents"],
 ])("uses configured starting page %s", (index, surfaceId) => {
   configureWorkspaceDefaultView(Number(index));
-  expect(createDefaultWorkspaceView("space:personal")).toMatchObject({ surfaceId, placeholder: true });
+  expect(createDefaultWorkspaceView("space:personal")).toMatchObject({
+    surfaceId,
+    placeholder: true,
+  });
 });
 it("falls back to Browser for invalid preferences and allocates independent identities", () => {
   configureWorkspaceDefaultView(999);
@@ -43,7 +46,7 @@ it("maps stored indexes to the options shown in Settings", () => {
 
 it("round-trips the configurable starting page through portable settings", async () => {
   const { portableValues, projectPreferences } =
-    await import("@/features/settings/profiles/registry");
+    await import("@/features/settings/devicePreferences/registry");
   expect(projectPreferences({}, {})).toMatchObject({
     general: { workspace_default_tab_index: 1 },
   });

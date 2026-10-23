@@ -8,7 +8,7 @@ import { saveAgentArtifact } from "./agentArtifacts";
  * the agent's Space as a Library item with the agent's provenance, so it shows
  * up there on every computer. This list only tracks this session's progress.
  */
-export interface TaskArtifact {
+interface TaskArtifact {
   id: string;
   taskId: string;
   agentId: string;

@@ -7,8 +7,6 @@ use tauri::{
     AppHandle, Manager, Runtime, Wry,
 };
 
-use crate::infra::misty;
-
 const TRAY_SHOW_MISTY: &str = "tray_show_misty";
 const TRAY_REFRESH_STATUS: &str = "tray_refresh_status";
 const TRAY_STOP_SERVICES: &str = "tray_stop_services";
@@ -38,7 +36,6 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, id: &str) {
             let _ = refresh(app);
         }
         TRAY_STOP_SERVICES => {
-            let _ = misty::stop_misty();
             let _ = refresh(app);
         }
         TRAY_RESTART_APP => {

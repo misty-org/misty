@@ -1,10 +1,12 @@
+#[cfg(not(windows))]
+use std::fs;
 use std::{
-    env, fs,
+    env,
     path::{Path, PathBuf},
 };
 
 #[cfg(target_os = "windows")]
-use crate::platform::windows::registry;
+use crate::platform::shared_windows::registry;
 
 /// Where Windows lists programs to start at sign-in for the current user.
 #[cfg(target_os = "windows")]
@@ -241,7 +243,7 @@ fn escape_xml(value: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
 

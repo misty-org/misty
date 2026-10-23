@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { pathData } from "./BrowserAnnotationLayer";
-import { browserViewportDefaults, browserViewportFrameStyle } from "./BrowserViewportMenu";
+import { pathData } from "./AnnotationShape";
+import { browserViewportDefaults, browserViewportFrameStyle } from "./browserViewport";
 describe("browser annotation paths", () => {
   it("creates an SVG path through each captured point", () => {
     expect(

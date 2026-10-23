@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { resolveDirectAddress } from "@/features/browser-workspace/address";
-import type { SharedRecord } from "@/features/browser-workspace/model";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
+import { resolveDirectAddress } from "@/features/browser-sync/address";
+import type { SharedRecord } from "@/features/browser-sync/model";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import {
   bookmarkRoots,
   bookmarkTree,

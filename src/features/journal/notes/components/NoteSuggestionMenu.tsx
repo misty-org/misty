@@ -37,7 +37,7 @@ export function updateSuggestion(editor: Editor, set: (value: SuggestionState | 
     y: coords.bottom + 8,
   });
 }
-export function SuggestionMenu(props: {
+export function NoteSuggestionMenu(props: {
   editor: Editor;
   suggestion: SuggestionState;
   notes: Array<{

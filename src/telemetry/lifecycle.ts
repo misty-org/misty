@@ -124,7 +124,7 @@ export class AnalyticsLifecycleManager {
   }
 }
 
-export function shouldStartNewSession(lastActivity: number, now: number): boolean {
+function shouldStartNewSession(lastActivity: number, now: number): boolean {
   return now - lastActivity >= ANALYTICS_SESSION_TIMEOUT_MS;
 }
 
@@ -172,9 +172,25 @@ export function setAnalyticsAuthenticationState(value: boolean): void {
   lifecycle.setAuthenticationState(value);
   syncTelemetryPreferencesToServer();
 }
+// Browsing without an account sends nothing, native error reports included.
+let accountPresent = false;
+let nativeErrorReports = false;
+function syncNativeErrorReporting(): void {
+  void telemetrySetErrorReportingEnabled(nativeErrorReports && accountPresent).catch(
+    () => undefined,
+  );
+}
+/** Someone is signed in on this device; while nobody is, no telemetry leaves it. */
+export function setTelemetryAccountPresent(present: boolean): void {
+  if (accountPresent === present) return;
+  accountPresent = present;
+  analytics.setAccountPresent(present);
+  syncNativeErrorReporting();
+}
 export function telemetryPreferencesChanged(usageAnalytics: boolean, errorReports: boolean): void {
   lifecycle.preferencesChanged(usageAnalytics, errorReports);
-  void telemetrySetErrorReportingEnabled(errorReports).catch(() => undefined);
+  nativeErrorReports = errorReports;
+  syncNativeErrorReporting();
   syncTelemetryPreferencesToServer();
 }
 export function trackOnboardingCompleted(): Promise<void> {

@@ -5,7 +5,7 @@ export const managedSurfaces: Array<{ id: AiSurfaceId; label: string }> = [
   { id: "global", label: "Global Misty" },
   { id: "notes", label: "Notes" },
   { id: "browser", label: "Browser" },
-  { id: "space.chat", label: "Space Social" },
+  { id: "space.chat", label: "Space Chat" },
   { id: "drawings", label: "Drawings" },
   { id: "library", label: "Library" },
   { id: "photo-editor", label: "Photo editor" },

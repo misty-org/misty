@@ -129,7 +129,11 @@ where
                 let _ = reply.send(self.records_list(&collection));
             }
             Command::RecordsReady(collection, reply) => {
-                let _ = reply.send(self.store.collection(&self.root, &collection).map(|state| state.loaded));
+                let _ = reply.send(
+                    self.store
+                        .collection(&self.root, &collection)
+                        .map(|state| state.loaded),
+                );
             }
             Command::RecordsWrite(collection, writes, reply) => {
                 let _ = reply.send(self.records_write(&collection, writes));
@@ -287,5 +291,4 @@ where
         }
         Ok(true)
     }
-
 }

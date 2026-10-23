@@ -77,7 +77,6 @@ const execution: Execution = {
   agentId: "agent",
   accountId: "account",
   spaceId: "space",
-  mode: "agent",
   state: "running",
   views: [],
   context: [],

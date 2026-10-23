@@ -5,7 +5,6 @@ export const routes = {
   invite: "/invite",
   newTab: "/new",
   spaces: "/spaces",
-  providers: "/providers",
   scheduled: "/scheduled",
   register: "/register",
   settings: "/settings",

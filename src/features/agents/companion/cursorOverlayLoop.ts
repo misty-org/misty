@@ -16,7 +16,7 @@ import { createSketchPainter } from "./overlaySketch";
 import { focusBoxes, pointBubbleText, pointLayout, type PointLayout } from "./pointLayout";
 import type { CursorSample, Presentation } from "./protocol";
 
-export type CursorOverlayRefs = {
+type CursorOverlayRefs = {
   latest: { current: Presentation };
   group: RefObject<HTMLDivElement | null>;
   bubble: RefObject<HTMLDivElement | null>;

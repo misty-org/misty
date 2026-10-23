@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSettingsProfiles } from "@/features/settings";
+import { useDevicePreferences } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { extensionsNative } from "./native";
 import { rememberExtensionIcons } from "./extensionIcons";
@@ -16,7 +16,7 @@ import type { ExtensionAction } from "./types";
  * toolbar popover and the sidebar's menu. `run` opens an extension's popup under `anchor`.
  */
 export function useExtensionActions(tabId: string, agentOwned: boolean) {
-  const profile = useSettingsProfiles((s) => s.state);
+  const profile = useDevicePreferences((s) => s.state);
   const supported = useExtensionsStore((s) => s.supported);
   const revision = useExtensionsStore((s) => s.revision);
   const [actions, setActions] = useState<ExtensionAction[]>([]);

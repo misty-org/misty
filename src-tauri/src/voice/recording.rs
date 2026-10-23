@@ -53,8 +53,7 @@ mod platform {
 }
 
 #[cfg(target_os = "windows")]
-#[path = "recording_windows.rs"]
-mod platform;
+use super::recording_windows as platform;
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod platform {

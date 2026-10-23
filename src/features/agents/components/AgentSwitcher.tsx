@@ -1,7 +1,7 @@
 import { useState, type Ref } from "react";
 import { Check, Plus, Settings } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
-import type { GlobalAiConversation } from "@/features/global-search/types";
+import type { GlobalAiConversation } from "@/features/misty/types";
 import {
   cn,
   Command,

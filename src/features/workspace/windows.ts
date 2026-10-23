@@ -158,7 +158,7 @@ export function mapAllWorkspaceWindowViews(
 }
 
 /** Shows another scope's layout in this window (a device profile, or back to the Space). */
-export function switchWorkspaceScope(
+function switchWorkspaceScope(
   state: WorkspaceWindowsState,
   scopeKey: WorkspaceScopeKey,
 ): WorkspaceWindowsUpdate | null {

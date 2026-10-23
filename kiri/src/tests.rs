@@ -44,8 +44,14 @@ impl Capability for Powerful {
 }
 
 fn kiri(allowed: Vec<&'static str>) -> (Kiri, Arc<Recorder>) {
-    let recorder = Arc::new(Recorder { allowed, ..Recorder::default() });
-    (Kiri::new("misty-browser-", recorder.clone()).with(Powerful), recorder)
+    let recorder = Arc::new(Recorder {
+        allowed,
+        ..Recorder::default()
+    });
+    (
+        Kiri::new("misty-browser-", recorder.clone()).with(Powerful),
+        recorder,
+    )
 }
 
 /// Every capability here resolves without suspending.
@@ -56,7 +62,12 @@ fn run<F: Future>(future: F) -> F::Output {
     }
 }
 
-fn dispatch(kiri: &Kiri, view: &str, url: &str, request: serde_json::Value) -> Result<Value, KiriError> {
+fn dispatch(
+    kiri: &Kiri,
+    view: &str,
+    url: &str,
+    request: serde_json::Value,
+) -> Result<Value, KiriError> {
     let request: Request = serde_json::from_value(request).unwrap();
     run(kiri.dispatch(view, &Url::parse(url).unwrap(), request))
 }
@@ -64,7 +75,12 @@ fn dispatch(kiri: &Kiri, view: &str, url: &str, request: serde_json::Value) -> R
 #[test]
 fn media_state_reaches_the_host_as_the_engine_reported_caller() {
     let (kiri, recorder) = kiri(vec![]);
-    let reply = dispatch(&kiri, VIEW, "http://radio.example/live", json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } }));
+    let reply = dispatch(
+        &kiri,
+        VIEW,
+        "http://radio.example/live",
+        json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } }),
+    );
     assert_eq!(reply, Ok(Value::Null));
     let signals = recorder.signals.lock().unwrap();
     let (caller, signal) = &signals[0];
@@ -76,11 +92,25 @@ fn media_state_reaches_the_host_as_the_engine_reported_caller() {
 #[test]
 fn media_rejects_malformed_state_and_unknown_methods() {
     let (kiri, recorder) = kiri(vec![]);
-    for args in [json!({ "audible": "yes" }), json!({ "audible": true, "origin": "x" }), json!(null)] {
-        let reply = dispatch(&kiri, VIEW, "https://a.example/", json!({ "v": 1, "cap": "media", "method": "state", "args": args }));
+    for args in [
+        json!({ "audible": "yes" }),
+        json!({ "audible": true, "origin": "x" }),
+        json!(null),
+    ] {
+        let reply = dispatch(
+            &kiri,
+            VIEW,
+            "https://a.example/",
+            json!({ "v": 1, "cap": "media", "method": "state", "args": args }),
+        );
         assert_eq!(reply.unwrap_err().name, "TypeError");
     }
-    let reply = dispatch(&kiri, VIEW, "https://a.example/", json!({ "v": 1, "cap": "media", "method": "mute" }));
+    let reply = dispatch(
+        &kiri,
+        VIEW,
+        "https://a.example/",
+        json!({ "v": 1, "cap": "media", "method": "mute" }),
+    );
     assert_eq!(reply.unwrap_err().name, "NotSupportedError");
     assert!(recorder.signals.lock().unwrap().is_empty());
 }
@@ -88,14 +118,39 @@ fn media_rejects_malformed_state_and_unknown_methods() {
 #[test]
 fn media_audio_reaches_the_host_bounded() {
     let (kiri, recorder) = kiri(vec![]);
-    let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "audio", "args": { "session": 7, "pcm": "AAEC" } }));
+    let reply = dispatch(
+        &kiri,
+        VIEW,
+        "https://meet.example/",
+        json!({ "v": 1, "cap": "media", "method": "audio", "args": { "session": 7, "pcm": "AAEC" } }),
+    );
     assert_eq!(reply, Ok(Value::Null));
-    assert_eq!(recorder.signals.lock().unwrap()[0].1, Signal::MediaAudio { session: 7, pcm: "AAEC".into() });
-    for args in [json!({ "session": 7, "pcm": "not base64!" }), json!({ "session": 7, "pcm": "A".repeat(70_000) }), json!({ "session": -1, "pcm": "AA" })] {
-        let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "audio", "args": args }));
+    assert_eq!(
+        recorder.signals.lock().unwrap()[0].1,
+        Signal::MediaAudio {
+            session: 7,
+            pcm: "AAEC".into()
+        }
+    );
+    for args in [
+        json!({ "session": 7, "pcm": "not base64!" }),
+        json!({ "session": 7, "pcm": "A".repeat(70_000) }),
+        json!({ "session": -1, "pcm": "AA" }),
+    ] {
+        let reply = dispatch(
+            &kiri,
+            VIEW,
+            "https://meet.example/",
+            json!({ "v": 1, "cap": "media", "method": "audio", "args": args }),
+        );
         assert_eq!(reply.unwrap_err().name, "TypeError");
     }
-    let reply = dispatch(&kiri, VIEW, "https://meet.example/", json!({ "v": 1, "cap": "media", "method": "notice", "args": { "session": 7, "notice": "Some audio here can't be heard." } }));
+    let reply = dispatch(
+        &kiri,
+        VIEW,
+        "https://meet.example/",
+        json!({ "v": 1, "cap": "media", "method": "notice", "args": { "session": 7, "notice": "Some audio here can't be heard." } }),
+    );
     assert_eq!(reply, Ok(Value::Null));
     assert_eq!(recorder.signals.lock().unwrap().len(), 2);
 }
@@ -103,7 +158,12 @@ fn media_audio_reaches_the_host_bounded() {
 #[test]
 fn unknown_capabilities_are_not_supported() {
     let (kiri, _) = kiri(vec![]);
-    let reply = dispatch(&kiri, VIEW, "https://a.example/", json!({ "v": 1, "cap": "bluetooth", "method": "request-device" }));
+    let reply = dispatch(
+        &kiri,
+        VIEW,
+        "https://a.example/",
+        json!({ "v": 1, "cap": "bluetooth", "method": "request-device" }),
+    );
     assert_eq!(reply.unwrap_err().name, "NotSupportedError");
 }
 
@@ -111,7 +171,12 @@ fn unknown_capabilities_are_not_supported() {
 fn only_prefixed_views_are_served() {
     let (kiri, recorder) = kiri(vec![]);
     for view in ["main", "misty-agent-1", "misty-browse"] {
-        let reply = dispatch(&kiri, view, "https://a.example/", json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } }));
+        let reply = dispatch(
+            &kiri,
+            view,
+            "https://a.example/",
+            json!({ "v": 1, "cap": "media", "method": "state", "args": { "audible": true } }),
+        );
         assert_eq!(reply.unwrap_err().name, "SecurityError", "{view}");
     }
     assert!(recorder.signals.lock().unwrap().is_empty());
@@ -121,8 +186,18 @@ fn only_prefixed_views_are_served() {
 fn powerful_capabilities_need_a_secure_context_and_a_grant() {
     let (kiri, _) = kiri(vec!["https://granted.example"]);
     let call = json!({ "v": 1, "cap": "powerful", "method": "use" });
-    assert_eq!(dispatch(&kiri, VIEW, "http://granted.example/", call.clone()).unwrap_err().name, "SecurityError");
-    assert_eq!(dispatch(&kiri, VIEW, "https://other.example/", call.clone()).unwrap_err().name, "NotAllowedError");
+    assert_eq!(
+        dispatch(&kiri, VIEW, "http://granted.example/", call.clone())
+            .unwrap_err()
+            .name,
+        "SecurityError"
+    );
+    assert_eq!(
+        dispatch(&kiri, VIEW, "https://other.example/", call.clone())
+            .unwrap_err()
+            .name,
+        "NotAllowedError"
+    );
     assert_eq!(
         dispatch(&kiri, VIEW, "https://granted.example/page", call),
         Ok(json!({ "origin": "https://granted.example" }))
@@ -134,7 +209,12 @@ fn page_script_installs_every_shim_once() {
     let script = page_script();
     assert!(!script.contains("__KIRI_CAPABILITIES__"));
     assert_eq!(script.matches("signal('media', 'state'").count(), 1);
-    assert_eq!(script.matches("defineProperty(window, '__kiriMediaTap'").count(), 1);
+    assert_eq!(
+        script
+            .matches("defineProperty(window, '__kiriMediaTap'")
+            .count(),
+        1
+    );
     assert!(script.contains("plugin:kiri|call"));
     // The transport never navigates to report; navigations can cancel page loads.
     assert!(!script.contains("location.href"));

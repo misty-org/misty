@@ -5,8 +5,7 @@ import {
 } from "@/features/webviews/browserRuntime";
 import { dockingMotion } from "./dockingGeometry";
 
-const surfaces =
-  ".misty-docking-nav, .misty-workspace-tabs, [data-workspace-panes] > [role='tabpanel']:not([hidden])";
+const surfaces = ".misty-workspace-tabs, [data-workspace-panes] > [role='tabpanel']:not([hidden])";
 
 /** Move existing chrome to its new edge without replacing any workspace subtree.
  * Native webviews stay hidden until both CSS tracks and chrome motion settle. */

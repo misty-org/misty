@@ -49,7 +49,7 @@ describe("NavIsland CVA component", () => {
 
   it("supports custom size and variant props", () => {
     render(
-      <NavIsland size="sm" variant="subtle" aria-label="Compact">
+      <NavIsland size="sm" variant="ghost" aria-label="Compact">
         <NavIslandItem size="sm">Small</NavIslandItem>
       </NavIsland>,
     );

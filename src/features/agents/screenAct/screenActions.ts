@@ -3,7 +3,7 @@ import { defineAction } from "@midscene/core/device";
 import { workspaceKeys, type PlannedAction, type ScreenSurface } from "./screenActSurface";
 
 /** What the device does with one action the agent planned; each returns a note for the next plan. */
-export interface ScreenActionHandlers {
+interface ScreenActionHandlers {
   act(
     action: PlannedAction,
     plan: { consequential: boolean; description: string },

@@ -34,7 +34,7 @@ vi.mock("./components/NoteBlockEditor", () => ({
 }));
 
 import { SpaceNotes } from "./SpaceNotes";
-import { useNotesStore } from "./store";
+import { useNotesStore } from "./store/useNotesStore";
 import { resetNotesAccountState } from "./store/useNotesStore";
 
 function buttonByText(text: string): HTMLButtonElement {
@@ -68,7 +68,6 @@ describe("SpaceNotes beta simplification", () => {
     spaceRequestMock.mockReset();
     spaceRequestMock.mockImplementation(async (path: string) => {
       if (path.endsWith("/status")) return { connected: false };
-      if (path.endsWith("/integrations")) return { integrations: [], providers: [] };
       return { notes: [] };
     });
     resetNotesAccountState();

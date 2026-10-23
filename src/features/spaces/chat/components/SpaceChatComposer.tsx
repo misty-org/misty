@@ -35,6 +35,8 @@ export interface SpaceChatComposerProps {
   replyToSenderName: string;
   /** Real names in the Space's roster, so only actual mentions light up. */
   mentionNames: string[];
+  typingLabel?: string;
+  onTypingInput?: (text: string) => void;
   onSubmit: (event: FormEvent) => void;
   onOpenPicker: (source: MistyPickerSource) => void;
 }
@@ -99,6 +101,11 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
   };
   return (
     <div className={cn("shrink-0 bg-charcoal-bg px-[clamp(16px,2.5vw,32px)] pt-2", "pb-5")}>
+      {props.typingLabel ? (
+        <p className="m-0 mb-1 min-h-4 text-xs text-cream-muted" role="status" aria-live="polite">
+          {props.typingLabel}
+        </p>
+      ) : null}
       <form onSubmit={props.onSubmit}>
         <Popover open={suggestions.open} onOpenChange={suggestions.setOpen}>
           <PopoverAnchor asChild>
@@ -176,7 +183,10 @@ export function SpaceChatComposer(props: SpaceChatComposerProps) {
                 maxLength: MAX_MESSAGE_LENGTH,
                 placeholder: "Write a message…",
                 value: draft.text,
-                onChange: (event) => input.onChange(event.target.value),
+                onChange: (event) => {
+                  input.onChange(event.target.value);
+                  props.onTypingInput?.(event.target.value);
+                },
                 onKeyDown,
                 onScroll: (event) => {
                   if (overlayRef.current)

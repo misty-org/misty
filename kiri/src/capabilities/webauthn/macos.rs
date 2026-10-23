@@ -23,7 +23,6 @@ use requests::{assertion_requests, registration_requests};
 
 pub(super) type Id = *mut Object;
 
-
 #[link(name = "Security", kind = "framework")]
 extern "C" {
     fn SecTaskCreateFromSelf(allocator: *const c_void) -> *const c_void;
@@ -60,7 +59,11 @@ unsafe fn entitled() -> bool {
     if task.is_null() {
         return false;
     }
-    let value = SecTaskCopyValueForEntitlement(task, string(ENTITLEMENT) as *const c_void, std::ptr::null_mut());
+    let value = SecTaskCopyValueForEntitlement(
+        task,
+        string(ENTITLEMENT) as *const c_void,
+        std::ptr::null_mut(),
+    );
     CFRelease(task);
     if value.is_null() {
         return false;
@@ -71,7 +74,8 @@ unsafe fn entitled() -> bool {
 }
 
 pub(super) fn class(name: &str) -> Result<&'static Class, KiriError> {
-    Class::get(name).ok_or_else(|| KiriError::not_supported("Passkeys are not available on this Mac."))
+    Class::get(name)
+        .ok_or_else(|| KiriError::not_supported("Passkeys are not available on this Mac."))
 }
 
 pub(super) unsafe fn string(text: &str) -> Id {
@@ -96,7 +100,6 @@ pub(super) unsafe fn responds(object: Id, selector: objc::runtime::Sel) -> bool 
 pub(super) unsafe fn made(object: Id) -> Id {
     msg_send![object, autorelease]
 }
-
 
 enum Ask {
     Create(CreateRequest),
@@ -163,10 +166,13 @@ unsafe fn begin(host: Arc<dyn Host>, ask: Ask, reply: Reply) {
     let busy = pending().lock().map_or(true, |slot| slot.is_some())
         || authorizing().lock().map_or(true, |slot| slot.is_some());
     if busy {
-        let _ = reply.send(Err(KiriError::not_allowed("A passkey request is already open.")));
+        let _ = reply.send(Err(KiriError::not_allowed(
+            "A passkey request is already open.",
+        )));
         return;
     }
-    let Some(manager_class) = Class::get("ASAuthorizationWebBrowserPublicKeyCredentialManager") else {
+    let Some(manager_class) = Class::get("ASAuthorizationWebBrowserPublicKeyCredentialManager")
+    else {
         perform(ask, false, reply);
         return;
     };
@@ -186,7 +192,9 @@ unsafe fn begin(host: Arc<dyn Host>, ask: Ask, reply: Reply) {
         host.run_on_main(Box::new(move || unsafe {
             let _: () = msg_send![manager_address as Id, release];
             // Gone if the page canceled while the system was asking.
-            if let Some((ask, reply, _)) = authorizing().lock().ok().and_then(|mut slot| slot.take()) {
+            if let Some((ask, reply, _)) =
+                authorizing().lock().ok().and_then(|mut slot| slot.take())
+            {
                 perform(ask, state == 0, reply);
             }
         }));
@@ -195,7 +203,10 @@ unsafe fn begin(host: Arc<dyn Host>, ask: Ask, reply: Reply) {
         requestAuthorizationForPublicKeyCredentials: &*answered as *const block2::Block<dyn Fn(isize)> as *const c_void];
 }
 
-fn start(host: Arc<dyn Host>, ask: Ask) -> impl std::future::Future<Output = Result<Outcome, KiriError>> + Send {
+fn start(
+    host: Arc<dyn Host>,
+    ask: Ask,
+) -> impl std::future::Future<Output = Result<Outcome, KiriError>> + Send {
     let (send, receive) = oneshot::channel();
     let main = host.clone();
     host.run_on_main(Box::new(move || unsafe { begin(main, ask, send) }));
@@ -216,7 +227,9 @@ impl Authenticator for MacAuthenticator {
         Box::pin(async move {
             match outcome.await? {
                 Outcome::Registration(registration) => Ok(registration),
-                Outcome::Assertion(_) => Err(KiriError::not_allowed("The authenticator answered a different request.")),
+                Outcome::Assertion(_) => Err(KiriError::not_allowed(
+                    "The authenticator answered a different request.",
+                )),
             }
         })
     }
@@ -226,7 +239,9 @@ impl Authenticator for MacAuthenticator {
         Box::pin(async move {
             match outcome.await? {
                 Outcome::Assertion(assertion) => Ok(assertion),
-                Outcome::Registration(_) => Err(KiriError::not_allowed("The authenticator answered a different request.")),
+                Outcome::Registration(_) => Err(KiriError::not_allowed(
+                    "The authenticator answered a different request.",
+                )),
             }
         })
     }
@@ -235,11 +250,15 @@ impl Authenticator for MacAuthenticator {
         host.run_on_main(Box::new(|| unsafe {
             // Still waiting on the system's passkey access question: settle the
             // page's request now; the late answer finds nothing to run.
-            if let Some((_, reply, _)) = authorizing().lock().ok().and_then(|mut slot| slot.take()) {
+            if let Some((_, reply, _)) = authorizing().lock().ok().and_then(|mut slot| slot.take())
+            {
                 let _ = reply.send(Err(KiriError::not_allowed("The request was canceled.")));
                 return;
             }
-            let controller = pending().lock().ok().and_then(|slot| slot.as_ref().map(|pending| pending.controller));
+            let controller = pending()
+                .lock()
+                .ok()
+                .and_then(|slot| slot.as_ref().map(|pending| pending.controller));
             if let Some(controller) = controller {
                 let _: () = msg_send![controller as Id, cancel];
             }

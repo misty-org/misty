@@ -1,22 +1,10 @@
 import { useEffect } from "react";
-import { subscribeEmbeddedBrowserSuspension } from "@/shared/platform/browserSuspensionSignal";
 import { browserBlockingOverlayOpen } from "./browserBlockingOverlay";
 import {
   reconcileBrowserOverlayState,
   setBrowserPointerGestureActive,
   setBrowserWebviewsSuspended,
 } from "./browserRuntime";
-
-/** Suspends native pages while the embedded browser surface asks for it. */
-export function useEmbeddedBrowserSuspension(): void {
-  useEffect(
-    () =>
-      subscribeEmbeddedBrowserSuspension((suspended, reason) =>
-        setBrowserWebviewsSuspended(suspended, reason),
-      ),
-    [],
-  );
-}
 
 /** Suspends native pages during pointer reorders and drags that cross native views. */
 export function useBrowserPointerSuspension(): void {

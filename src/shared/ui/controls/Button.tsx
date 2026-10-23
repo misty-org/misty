@@ -72,11 +72,6 @@ const buttonVariants = cva(
           "aria-pressed:border-transparent aria-pressed:bg-charcoal-active aria-pressed:text-cream-bright",
           "data-[state=open]:bg-control-active data-[state=open]:text-cream",
         ],
-        "nav-action": [
-          "rounded-md border-0 bg-transparent p-0 text-cream-muted hover:bg-control-hover hover:text-cream",
-          "aria-pressed:bg-control-active aria-expanded:bg-control-active data-[state=open]:bg-control-active",
-          "focus-visible:ring-2 focus-visible:ring-cream/15 disabled:cursor-wait",
-        ],
       },
       /*
        * The control scale. Each height carries its own text size, so controls that share
@@ -105,8 +100,6 @@ const buttonVariants = cva(
         icon: "size-9",
         "icon-xs":
           "size-6 in-data-[slot=button-group]:rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8 in-data-[slot=button-group]:rounded-md",
-        "icon-lg": "size-10",
         chip: "h-7 gap-1.5 px-2.5 text-xs [&_svg:not([class*='size-'])]:size-3.5",
         none: "",
       },
@@ -116,20 +109,6 @@ const buttonVariants = cva(
         end: "justify-end",
         between: "justify-between",
         none: "",
-      },
-      reveal: {
-        always: "",
-        "row-hover": [
-          "opacity-0 pointer-events-none group-hover/app-row:opacity-100",
-          "group-hover/app-row:pointer-events-auto",
-          "group-focus-within/app-row:opacity-100",
-          "group-focus-within/app-row:pointer-events-auto",
-          "data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto",
-          "[@media(hover:none)]:opacity-100",
-          "[@media(hover:none)]:pointer-events-auto",
-        ],
-        "tree-hover":
-          "!opacity-0 group-hover/tree-row:!opacity-100 group-focus-within/tree-row:!opacity-100 [@media(hover:none)]:!opacity-100",
       },
     },
     // Chips keep a minimum width (about 1.75x their height) so a short label like "All"
@@ -142,13 +121,12 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
       justify: "center",
-      reveal: "always",
     },
   },
 );
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, justify, reveal, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, justify, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
@@ -156,8 +134,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         data-variant={variant ?? "default"}
         data-size={size ?? "default"}
         data-justify={justify ?? "center"}
-        data-reveal={reveal ?? "always"}
-        className={cn(buttonVariants({ variant, size, justify, reveal, className }))}
+        className={cn(buttonVariants({ variant, size, justify, className }))}
         ref={ref}
         {...props}
       />

@@ -1,4 +1,4 @@
-//! Journal ticket keys, room salt and device ticket public keys.
+//! Journal ticket keys and room salt.
 
 use super::*;
 
@@ -155,47 +155,6 @@ pub(super) fn ensure_room_salt(path: &std::path::Path, random: &mut OsRng) -> Re
     }
     updated.push_str(&format!("{ROOM_SALT}={}\n", random_secret(random)));
     write_private(path, updated.as_bytes())
-}
-
-/// The ticket keys a desktop build pins for Connected Devices, as the app's
-/// `MISTY_DEVICE_TICKET_PUBLIC_KEYS` JSON: key id to base64 public key. Release
-/// builds trust only these, so a server cannot hand the app other keys.
-pub(crate) fn device_ticket_public_keys(devices_env: &Path) -> Result<String> {
-    let contents = fs::read_to_string(devices_env)
-        .with_context(|| format!("could not read {}", devices_env.display()))?;
-    let private = environment_values(&contents, DEVICE_TICKET_PRIVATE_KEY);
-    let encoded = private.first().with_context(|| {
-        format!(
-            "{DEVICE_TICKET_PRIVATE_KEY} is missing from {}",
-            devices_env.display()
-        )
-    })?;
-    let signing = SigningKey::from_pkcs8_der(&STANDARD.decode(encoded)?)
-        .context("the Connected Devices ticket key is not Ed25519 PKCS#8")?;
-    let mut keys = BTreeMap::new();
-    let current = VerifyingKey::from(&signing).to_bytes();
-    keys.insert(device_ticket_key_id(&current), STANDARD.encode(current));
-    for list in environment_values(&contents, DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS) {
-        for previous in list
-            .split(',')
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-        {
-            let raw = STANDARD
-                .decode(previous)
-                .context("a previous Connected Devices ticket key is not base64")?;
-            if raw.len() != 32 {
-                bail!("a previous Connected Devices ticket key is not an Ed25519 public key");
-            }
-            keys.insert(device_ticket_key_id(&raw), previous.to_owned());
-        }
-    }
-    Ok(serde_json::to_string(&keys)?)
-}
-
-/// Matches the server's key id: the first nine bytes of SHA-256, base64url.
-pub(super) fn device_ticket_key_id(public_key: &[u8]) -> String {
-    URL_SAFE_NO_PAD.encode(&Sha256::digest(public_key)[..9])
 }
 
 pub(super) fn environment_values<'a>(contents: &'a str, name: &str) -> Vec<&'a str> {

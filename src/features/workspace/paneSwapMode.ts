@@ -34,7 +34,8 @@ export function paneInDirection(
     const point = center(rect);
     const dx = point.x - origin.x;
     const dy = point.y - origin.y;
-    const along = direction === "left" ? -dx : direction === "right" ? dx : direction === "up" ? -dy : dy;
+    const along =
+      direction === "left" ? -dx : direction === "right" ? dx : direction === "up" ? -dy : dy;
     const across = direction === "left" || direction === "right" ? dy : dx;
     if (along <= 0) continue;
     const score = along + Math.abs(across) * 2;
@@ -46,7 +47,9 @@ export function paneInDirection(
 function paneRects(): PaneRect[] {
   const ids = dockLeaves(useWorkspaceStore.getState().layout.root).map((pane) => pane.id);
   return ids.flatMap((id) => {
-    const element = document.querySelector<HTMLElement>(`[data-workspace-pane="${CSS.escape(id)}"]`);
+    const element = document.querySelector<HTMLElement>(
+      `[data-workspace-pane="${CSS.escape(id)}"]`,
+    );
     if (!element) return [];
     const { left, top, right, bottom } = element.getBoundingClientRect();
     return [{ id, left, top, right, bottom }];

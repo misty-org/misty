@@ -35,7 +35,7 @@ export function configureStartupPreference(preference: StartupPreference): void 
   }
 }
 
-export function readStartupPreference(): StartupPreference {
+function readStartupPreference(): StartupPreference {
   try {
     const raw = window.localStorage.getItem(startupPreferenceKey);
     if (!raw) return { reopenLastSession: true, startupViewIndex: 0 };
@@ -55,7 +55,7 @@ export function readStartupPreference(): StartupPreference {
  * `lastRoute` comes from the route-memory store, which already persists and
  * validates the last rememberable route.
  */
-export function resolveStartupRoute(lastRoute: string, _fallback: string): string {
+export function resolveStartupRoute(lastRoute: string): string {
   const preference = readStartupPreference();
   if (preference.reopenLastSession) {
     const path = lastRoute.split(/[?#]/)[0];

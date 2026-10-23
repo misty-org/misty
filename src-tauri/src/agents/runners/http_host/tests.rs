@@ -3,12 +3,8 @@ use std::path::PathBuf;
 use serde_json::{json, Value};
 
 use super::{
-    super::{
-        events::ActionKind, events::RunnerEvent, EngineId, Launch, LaunchMode, RunnerError,
-        BYPASS_MARKERS,
-    },
+    super::{events::ActionKind, events::RunnerEvent, Launch, LaunchMode},
     dsh::DshProtocol,
-    hosted_for,
     opencode::OpencodeProtocol,
     HostCall, HostedProtocol,
 };

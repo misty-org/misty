@@ -5,7 +5,6 @@ use walkdir::WalkDir;
 
 use crate::{
     artifacts,
-    environment::{self, Target},
     process::{npm, CommandSpec},
     workspace::Workspace,
 };
@@ -33,20 +32,10 @@ pub(super) fn platform(
         arguments.extend(["--target", target]);
     }
     arguments.push("--config");
-    // Connected Devices in a release build trusts only the production ticket
-    // keys compiled into it; without them, devices cannot connect at all.
-    let ticket_keys = match std::env::var("MISTY_DEVICE_TICKET_PUBLIC_KEYS") {
-        Ok(keys) if !keys.trim().is_empty() => keys,
-        _ => crate::server::device_ticket_public_keys(
-            &environment::root(workspace, Target::Prod).join("crypto/devices.env"),
-        )
-        .context("could not pin the production Connected Devices ticket keys")?,
-    };
     CommandSpec::new(npm())
         .args(arguments)
         .arg(config_path.as_os_str())
         .arg("--ci")
-        .env("MISTY_DEVICE_TICKET_PUBLIC_KEYS", ticket_keys)
         .run(&workspace.misty)?;
     let output = match cross_target(platform) {
         Some(target) => workspace.misty.join("src-tauri/target").join(target),

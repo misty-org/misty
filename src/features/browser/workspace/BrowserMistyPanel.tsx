@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Bot, MessagesSquare } from "lucide-react";
-import { useMistyPanelStore, type MistyPanelView } from "@/features/agents";
+import { showAgentsPanel, useMistyPanelStore, type MistyPanelView } from "@/features/agents";
 import { appIcon, IconButton } from "@/shared/ui";
 
 /** Whether the side panel is open on `view`, for the buttons' pressed state. */
@@ -25,11 +25,6 @@ export function BrowserMistyButton() {
 }
 
 const AgentsIcon = appIcon("agents") ?? Bot;
-
-/** Opens the agent side panel (below the chat panel when that is open), or closes it. */
-export function showAgentsPanel() {
-  useMistyPanelStore.getState().show("agents");
-}
 
 /** The toolbar's Agents button, beside Chat: an agent conversation in the side panel. */
 export function BrowserAgentsButton() {

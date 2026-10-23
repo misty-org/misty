@@ -48,7 +48,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       nodes={scope.nodes}
       libraryItems={suggestions.libraryItems}
       spaceId={spaceId}
-      spaceName={scope.activeConversation?.title || access.activeSpace?.name}
       directRecipient={scope.directRecipient}
       onStarter={(starter) => {
         if (starter === "files" || starter === "library") return props.onOpenPicker(starter);

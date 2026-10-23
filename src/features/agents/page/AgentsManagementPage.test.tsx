@@ -5,12 +5,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import DesktopAgentsPage from "../AgentsPage";
 
-vi.mock("../mcp/McpConnectionsSheet", () => ({
-  McpConnectionsSheet: ({ open }: { open: boolean }) =>
-    open ? <aside aria-label="Tool connections sheet">Connections</aside> : null,
-  McpConnectionsView: () => <aside aria-label="Tool connections sheet">Connections</aside>,
-}));
-
 // Agents opens straight into an agent's workspace, so the store needs one.
 vi.mock("../personalAgentsStore", () => ({
   usePersonalAgentsStore: () => ({

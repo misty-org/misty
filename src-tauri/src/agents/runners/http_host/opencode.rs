@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use super::{
     super::{
         events::{PermissionRequest, RunnerEvent},
-        Capabilities, CommandSpec, EngineId, Launch, LaunchMode, RunnerError,
+        CommandSpec, Launch, LaunchMode, RunnerError,
     },
     text_at,
     wire::{opencode_error, opencode_permission, opencode_usage},
@@ -23,20 +23,6 @@ const ASK_CONFIG: &str = r#"{"permission":{"edit":"ask","bash":"ask","webfetch":
 pub struct OpencodeRunner;
 
 impl HostedRunner for OpencodeRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Opencode
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            interactive_asks: true,
-            plan_mode: true,
-            todos: false,
-            rate_limits: false,
-            full_access_only: false,
-        }
-    }
-
     fn server(&self, launch: &Launch, port: u16) -> Result<CommandSpec, RunnerError> {
         if launch.task.trim().is_empty() {
             return Err(RunnerError::Invalid("the task is empty"));

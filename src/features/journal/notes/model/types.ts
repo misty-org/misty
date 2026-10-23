@@ -4,13 +4,6 @@ export type NoteBodyFormat = "markdown" | "tiptap-json" | "html";
 
 type NoteSyncStatus = "synced" | "syncing" | "error" | "conflict" | "local-only";
 
-/**
- * Mirrors the connection lifecycle already used by Misty provider remotes so a
- * notes source reports status in the same vocabulary as any other integration.
- */
-export type NoteProviderStatus =
-  "connected" | "disconnected" | "needs_reconnect" | "syncing" | "error";
-
 export type UnifiedNote = {
   id: string;
   source: NoteSource;
@@ -34,9 +27,6 @@ export type UnifiedNote = {
   /** Number of accessible native notes that link to this note. */
   backlinkCount?: number;
   syncStatus: NoteSyncStatus;
-  sourceUrl?: string;
-  connectorId?: string;
-  providerStatus?: NoteProviderStatus;
   /** Server-authoritative delete access for the current user. */
   canDelete?: boolean;
 };

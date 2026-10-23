@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * The agent's own browser sessions on this computer (docs/plans/odysseys-campaign.md):
+ * The agent's own browser sessions on this computer (docs/agents/evals/odysseys.md):
  * a hidden tab of the agent's own that joins the run. This computer signed the run's
  * grant itself, and the job worker checked it before calling here; a grant another
  * device signed is refused. Each session holds its own native lease,
@@ -36,7 +36,9 @@ export function hostedSessionForTask(taskId: string): HostedSession | undefined 
 /** Marks a session in use when any of its tabs runs a job: a run working in its other tabs
  * is still using the session, which would otherwise idle out and close them mid-run. */
 export function touchHostedSession(scopeId: string, runId: string) {
-  const session = sessions().find((item) => item.scopeId === scopeId || item.childScopes?.includes(scopeId));
+  const session = sessions().find(
+    (item) => item.scopeId === scopeId || item.childScopes?.includes(scopeId),
+  );
   if (session)
     update(
       sessions().map((item) =>
@@ -69,7 +71,11 @@ export function addHostedChildViews(taskId: string, views: string[], scopes: str
   update(
     sessions().map((item) =>
       item.taskId === taskId
-        ? { ...item, childViews: [...item.childViews, ...views], childScopes: [...(item.childScopes ?? []), ...scopes] }
+        ? {
+            ...item,
+            childViews: [...item.childViews, ...views],
+            childScopes: [...(item.childScopes ?? []), ...scopes],
+          }
         : item,
     ),
   );

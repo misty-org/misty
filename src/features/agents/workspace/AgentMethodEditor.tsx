@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-  IconButton,
   Input,
   OptionSelect,
   Textarea,
@@ -16,34 +15,11 @@ import type {
   AgentMethod,
   AgentMethodDefinition,
   AgentMethodInput,
-  AgentMethodInputs,
   AgentMethodKind,
   SaveAgentMethod,
 } from "@/api/ai/agent-methods";
-
-export const methodTargets = [
-  { value: "cloud", label: "Connected apps and Misty context" },
-  { value: "separate_window", label: "A separate Misty window" },
-  { value: "current_window", label: "This Misty window" },
-];
-export const blankDefinition = (): AgentMethodDefinition => ({
-  title: "",
-  description: "",
-  instructions: "",
-  inputs: [],
-  target: "cloud",
-  required_tools: [],
-});
-export function methodError(error: unknown) {
-  if (error && typeof error === "object" && "status" in error && error.status === 409)
-    return (
-      "This method changed or a method limit was reached. Your draft is kept here. " +
-      "Reload the latest version; if eight skills are enabled, disable one before adding another."
-    );
-  return error instanceof Error
-    ? error.message
-    : "The request failed. Your changes have been kept; try again.";
-}
+import { blankDefinition, methodError, methodTarget, methodTargets } from "./agentMethodDefinition";
+import { AgentMethodInputEditor } from "./AgentMethodInputEditor";
 
 export function AgentMethodEditor({
   agentId,
@@ -64,7 +40,10 @@ export function AgentMethodEditor({
 }) {
   // Saved templates are workflows to the person; the kind itself is saved as it was.
   const noun = kind === "template" ? "workflow" : kind;
-  const [definition, setDefinition] = useState(method?.definition ?? initial ?? blankDefinition());
+  const [definition, setDefinition] = useState(() => {
+    const start = method?.definition ?? initial ?? blankDefinition();
+    return { ...start, target: methodTarget(start) };
+  });
   const [tools, setTools] = useState(
     (method?.definition ?? initial)?.required_tools.join(", ") ?? "",
   );
@@ -228,77 +207,15 @@ export function AgentMethodEditor({
                   </Button>
                 </div>
                 {definition.inputs.map((input, index) => (
-                  <div className="agent-method-input-editor" key={index}>
-                    <label>
-                      Question
-                      <Input
-                        aria-label={`Input ${index + 1} question`}
-                        required
-                        maxLength={160}
-                        value={input.label}
-                        onChange={(e) => field(index, { label: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Key
-                      <Input
-                        aria-label={`Input ${index + 1} key`}
-                        required
-                        pattern="[a-z][a-z0-9_]{0,39}"
-                        maxLength={40}
-                        value={input.key}
-                        onChange={(e) => field(index, { key: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Answer type
-                      <OptionSelect
-                        aria-label={`Input ${index + 1} type`}
-                        value={input.type}
-                        options={["text", "number", "boolean", "choice"].map((value) => ({
-                          value,
-                          label:
-                            value === "boolean"
-                              ? "Yes or no"
-                              : value[0].toUpperCase() + value.slice(1),
-                        }))}
-                        onValueChange={(type) =>
-                          field(index, { type: type as AgentMethodInput["type"] })
-                        }
-                      />
-                    </label>
-                    <label className="agent-method-check">
-                      <Checkbox
-                        checked={input.required}
-                        onCheckedChange={(checked) => field(index, { required: checked === true })}
-                      />
-                      Required
-                    </label>
-                    <IconButton
-                      type="button"
-                      label={`Remove input ${index + 1}`}
-                      onClick={() =>
-                        patch({ inputs: definition.inputs.filter((_, i) => i !== index) })
-                      }
-                    >
-                      <X size={15} />
-                    </IconButton>
-                    {input.type === "choice" && (
-                      <label className="agent-method-options">
-                        Options
-                        <Input
-                          required
-                          value={(input.options ?? []).join(", ")}
-                          onChange={(e) =>
-                            field(index, {
-                              options: e.target.value.split(",").map((s) => s.trim()),
-                            })
-                          }
-                          placeholder="First option, second option"
-                        />
-                      </label>
-                    )}
-                  </div>
+                  <AgentMethodInputEditor
+                    key={index}
+                    index={index}
+                    input={input}
+                    onChange={(values) => field(index, values)}
+                    onRemove={() =>
+                      patch({ inputs: definition.inputs.filter((_, i) => i !== index) })
+                    }
+                  />
                 ))}
               </>
             )}
@@ -326,73 +243,5 @@ export function AgentMethodEditor({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Keep unanswered booleans distinct from false; required questions must be answered explicitly. */
-export function AgentMethodInputFields({
-  fields,
-  values,
-  onChange,
-}: {
-  fields: AgentMethodInput[];
-  values: AgentMethodInputs;
-  onChange(values: AgentMethodInputs): void;
-}) {
-  const update = (key: string, value: string | number | boolean | undefined) => {
-    const next = { ...values };
-    if (value === undefined) delete next[key];
-    else next[key] = value;
-    onChange(next);
-  };
-  return (
-    <>
-      {fields.map((field) => (
-        <label key={field.key}>
-          {field.label}
-          {field.required ? " *" : ""}
-          {field.type === "boolean" || field.type === "choice" ? (
-            <OptionSelect
-              aria-label={field.label}
-              value={values[field.key] === undefined ? "" : String(values[field.key])}
-              options={[
-                { value: "", label: "Choose an answer" },
-                ...(field.type === "boolean"
-                  ? [
-                      { value: "true", label: "Yes" },
-                      { value: "false", label: "No" },
-                    ]
-                  : (field.options ?? []).map((value) => ({ value, label: value }))),
-              ]}
-              onValueChange={(value) =>
-                update(
-                  field.key,
-                  value === "" ? undefined : field.type === "boolean" ? value === "true" : value,
-                )
-              }
-            />
-          ) : (
-            <Input
-              aria-label={field.label}
-              required={field.required}
-              type={field.type === "number" ? "number" : "text"}
-              step={field.type === "number" ? "any" : undefined}
-              maxLength={2000}
-              value={values[field.key] === undefined ? "" : String(values[field.key])}
-              onChange={(e) =>
-                update(
-                  field.key,
-                  e.target.value === ""
-                    ? undefined
-                    : field.type === "number"
-                      ? Number(e.target.value)
-                      : e.target.value,
-                )
-              }
-            />
-          )}
-        </label>
-      ))}
-    </>
   );
 }

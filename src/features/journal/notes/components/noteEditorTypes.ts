@@ -51,11 +51,6 @@ export interface NoteBlockEditorProps {
   }>;
   onOpenNote?: (noteId: string) => void;
   aiContext?: AiContextReference;
-  onContentChange?: (content: {
-    body: string;
-    bodyFormat: "tiptap-json";
-    bodyMarkdown: string;
-  }) => void;
 }
 export type NoteAiSelection = {
   snapshot: AiSelectionSnapshot;

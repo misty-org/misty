@@ -11,8 +11,7 @@ use super::{
     events::{PermissionRequest, RunnerEvent},
     lease::{Lease, LeaseMeter},
     session::{run_turn, BoxFuture, Outcome, SessionHost},
-    Capabilities, CommandSpec, EngineId, Launch, LaunchMode, Protocol, Runner, RunnerError,
-    Transport,
+    CommandSpec, Launch, LaunchMode, Protocol, Runner, RunnerError,
 };
 
 /// Claude's protocol, but the "tool" is a script that asks to push, prints
@@ -22,15 +21,6 @@ struct ScriptedClaude {
 }
 
 impl Runner for ScriptedClaude {
-    fn engine(&self) -> EngineId {
-        EngineId::Claude
-    }
-    fn transport(&self) -> Transport {
-        Transport::StreamJson
-    }
-    fn capabilities(&self) -> Capabilities {
-        ClaudeRunner.capabilities()
-    }
     fn build_command(&self, launch: &Launch) -> Result<CommandSpec, RunnerError> {
         Ok(CommandSpec {
             program: "sh".into(),
@@ -124,6 +114,8 @@ fn context(launch: &Launch) -> BridgeContext {
     }
 }
 
+// The stand-in CLI is a shell script.
+#[cfg(unix)]
 #[tokio::test]
 async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
     let (runner, launch, host, answer) = setup(true);
@@ -156,6 +148,8 @@ async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
         .any(|e| matches!(e, RunnerEvent::Done { .. })));
 }
 
+// The stand-in CLI is a shell script.
+#[cfg(unix)]
 #[tokio::test]
 async fn a_no_from_the_person_reaches_the_tool_as_a_deny() {
     let (runner, launch, host, answer) = setup(false);

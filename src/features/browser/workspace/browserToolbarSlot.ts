@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 /**
- * Where a vertical tab strip wants the focused browser pane's toolbar: back/forward beside the
- * sidebar toggle, the address field below. The strip registers its slots here;
+ * Where the tab sidebar wants the focused browser pane's toolbar: back/forward beside the
+ * sidebar toggle, the address field below. The sidebar registers its slots here;
  * with a top slot present, that pane portals its toolbar into the sidebar and no pane keeps a
  * toolbar row of its own.
  */

@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isBrowserSnapshotStale } from "./workerDeviceJobs";
+import { deviceExecutionRemaining } from "./workerClaims";
+import { browserAgentExecutionRequest, browserDeviceRequest } from "./workerBrowserJobs";
 import {
-  browserAgentExecutionRequest,
-  browserDeviceRequest,
-  deviceExecutionRemaining,
   deviceContentReference,
   deviceWorkflowErrorCode,
-} from "./worker";
+  isBrowserSnapshotStale,
+} from "./workerDeviceJobs";
 
 describe("task download uploads", () => {
   const job = {

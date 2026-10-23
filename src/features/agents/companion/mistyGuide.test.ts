@@ -26,11 +26,19 @@ it("names only controls that exist in the app", () => {
     .join("\n");
   const names = [...guide.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
   expect(names.length).toBeGreaterThan(20);
-  expect(names.filter((name) => !app.includes(`"${name}"`))).toEqual([]);
+  const inApp = (name: string) =>
+    app.includes(`"${name}"`) ||
+    new RegExp(`>\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*<`).test(app);
+  expect(names.filter((name) => !inApp(name))).toEqual([]);
 });
 
 it("lists only shortcuts that are bound", () => {
-  const registry = ["registry.ts", "browserFeatureCommands.ts"]
+  const registry = [
+    "registry.ts",
+    "workspaceCommands.ts",
+    "browserCommands.ts",
+    "browserFeatureCommands.ts",
+  ]
     .map((file) => readFileSync(`${process.cwd()}/src/features/shortcuts/${file}`, "utf8"))
     .join("\n");
   const keyName: Record<string, string> = { ",": "Comma", "`": "Grave" };

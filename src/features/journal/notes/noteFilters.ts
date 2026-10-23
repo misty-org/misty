@@ -1,4 +1,3 @@
-import { matchesQuery } from "./connectorUtils";
 import type { NoteGroupId, UnifiedNote } from "./model/types";
 
 export function notesInGroup(
@@ -17,6 +16,16 @@ export function notesInGroup(
 
 function sortNotes(notes: UnifiedNote[]): UnifiedNote[] {
   return [...notes].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+}
+
+/** A note matches when every search term appears in its title, preview, tags, source or Space. */
+function matchesQuery(note: UnifiedNote, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [note.title, note.preview, note.source, note.spaceName ?? "", ...note.tags]
+    .join(" ")
+    .toLowerCase();
+  return needle.split(/\s+/).every((term) => haystack.includes(term));
 }
 
 export function searchNotes(notes: UnifiedNote[], query: string): UnifiedNote[] {

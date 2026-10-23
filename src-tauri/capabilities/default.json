@@ -9,8 +9,7 @@
   ],
   "webviews": [
     "window-*",
-    "incognito-*",
-    "misty-agent-*"
+    "incognito-*"
   ],
   "permissions": [
     "core:default",

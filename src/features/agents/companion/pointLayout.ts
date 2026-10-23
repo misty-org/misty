@@ -103,7 +103,7 @@ export function focusBoxes(
 }
 
 /** The whiteboard card's box on the cursor's display, in overlay pixels. */
-export const BOARD_SIZE = { width: 380, height: 280 };
+const BOARD_SIZE = { width: 380, height: 280 };
 const BOARD_GAP = 48;
 const BOARD_MARGIN = 16;
 

@@ -4,7 +4,9 @@ import { lessonTurnPayload } from "./lessonRouter";
 import { nextCourseLesson, useLessonStore } from "./lessonStore";
 
 const plan =
-  '[ROUTE:new:components]\nlet\'s start with components.\n[COURSE:{"title":"react","lessons":[{"title":"components","goal":"build one"},{"title":"state"},{"title":"effects"}]}]';
+  "[ROUTE:new:components]\nlet's start with " +
+  'components.\n[COURSE:{"title":"react","lessons":[{"title":"components","goal":"build ' +
+  'one"},{"title":"state"},{"title":"effects"}]}]';
 
 describe("courses", () => {
   beforeEach(() =>

@@ -44,7 +44,12 @@ export function AgentActionQuestions() {
             label={`${name} needs your OK`}
             actions={
               <>
-                <Button size="sm" variant="primary" disabled={closed} onClick={() => answer(question.id, true)}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={closed}
+                  onClick={() => answer(question.id, true)}
+                >
                   Accept and continue
                 </Button>
                 {question.rememberable && question.origin ? (
@@ -57,7 +62,12 @@ export function AgentActionQuestions() {
                     Accept and remember
                   </Button>
                 ) : null}
-                <Button size="sm" variant="outline" disabled={closed} onClick={() => answer(question.id, false)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={closed}
+                  onClick={() => answer(question.id, false)}
+                >
                   Deny
                 </Button>
               </>

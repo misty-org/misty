@@ -3,13 +3,7 @@ import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { beforeEach, expect, it, vi } from "vitest";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import { normalizeWorkspaceLayout } from "@/features/workspace/windows";
-import { clearNavigationRestoreHistory } from "./clearHistory";
-import {
-  navigationName,
-  tabNameKey,
-  groupNameKey,
-  useNavigationNames,
-} from "./store";
+import { navigationName, tabNameKey, groupNameKey, useNavigationNames } from "./store";
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command, args) => {
     if (command === "navigation_names_update") {
@@ -65,40 +59,4 @@ it("retains names through automatic updates, navigation, Spaces, restoration and
     instancePolicy: "multiple",
   });
   expect(navigationName(tabNameKey(fresh.id), "Browser")).toBe("Browser");
-});
-it("only prunes discarded restore aliases and keeps open group and sidebar aliases", async () => {
-  const store = useWorkspaceStore.getState();
-  const open = store.addSurface({
-    surfaceId: "browser",
-    groupKey: "tool:browser",
-    title: "Browser",
-    route: "/browser",
-    instancePolicy: "multiple",
-  });
-  const closed = store.addSurface({
-    surfaceId: "browser",
-    groupKey: "tool:browser",
-    title: "Browser",
-    route: "/browser",
-    instancePolicy: "multiple",
-  });
-  const group = allLayoutViews(useWorkspaceStore.getState().layout).find(
-    (t) => t.id === open.id,
-  )!.groupInstanceId!;
-  useNavigationNames.setState({
-    names: {
-      [tabNameKey(open.id)]: "Open",
-      [tabNameKey(closed.id)]: "Closed",
-      [groupNameKey(group)]: "Research",
-      "section:browser": "Web",
-    },
-  });
-  store.closeView(closed.id);
-  await clearNavigationRestoreHistory();
-  expect(useNavigationNames.getState().names).toEqual({
-    [tabNameKey(open.id)]: "Open",
-    [groupNameKey(group)]: "Research",
-    "section:browser": "Web",
-  });
-  expect(useWorkspaceStore.getState().closedItems).toEqual([]);
 });

@@ -25,7 +25,7 @@ export function PasswordOfferNotice(props: { runtimeId: string; active: boolean 
       <p>
         {offer.update
           ? `Update the saved password for ${offer.username || site}?`
-          : `Save ${offer.username ? `the password for ${offer.username}` : "this password"} on ${site}? It's encrypted with your sync vault.`}
+          : `Save ${offer.username ? `the password for ${offer.username}` : "this password"} on ${site}? It's encrypted and kept in Misty.`}
       </p>
       {error ? <p role="alert">{error}</p> : null}
       <div className="flex shrink-0 gap-2">

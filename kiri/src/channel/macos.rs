@@ -27,7 +27,12 @@ fn installed() -> &'static Mutex<HashSet<usize>> {
     INSTALLED.get_or_init(Mutex::default)
 }
 
-extern "C" fn receive(this: &Object, _selector: Sel, _controller: *mut Object, message: *mut Object) {
+extern "C" fn receive(
+    this: &Object,
+    _selector: Sel,
+    _controller: *mut Object,
+    message: *mut Object,
+) {
     let Some(label) = targets()
         .lock()
         .ok()
@@ -73,7 +78,8 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
             }
             let class = Class::get(HANDLER_CLASS).unwrap_or_else(|| {
                 let mut declaration =
-                    objc::declare::ClassDecl::new(HANDLER_CLASS, Class::get("NSObject").unwrap()).unwrap();
+                    objc::declare::ClassDecl::new(HANDLER_CLASS, Class::get("NSObject").unwrap())
+                        .unwrap();
                 declaration.add_method(
                     sel!(userContentController:didReceiveScriptMessage:),
                     receive as extern "C" fn(&Object, Sel, *mut Object, *mut Object),

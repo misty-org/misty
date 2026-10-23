@@ -68,26 +68,7 @@ aside[data-misty-panel] .agent-conversation[data-empty="true"] .agent-compose-ar
   outline: none;
   touch-action: none;
 }
-/* The margin between two stacked cards moves the line between them; its grip reaches a few
-   pixels onto each card's outline. */
-.misty-panel-splitter {
-  position: relative;
-  z-index: 2;
-  flex-shrink: 0;
-  cursor: row-resize;
-  outline: none;
-  touch-action: none;
-}
-.misty-panel-splitter::before {
-  content: "";
-  position: absolute;
-  inset: -3px 0;
-}
 html:has(.misty-panel-resizer[data-dragging]) {
   cursor: col-resize;
-  user-select: none;
-}
-html:has(.misty-panel-splitter[data-dragging]) {
-  cursor: row-resize;
   user-select: none;
 }

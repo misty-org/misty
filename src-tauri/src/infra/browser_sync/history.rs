@@ -14,6 +14,9 @@ use serde_json::{json, Value};
 
 use super::*;
 
+mod batches;
+use batches::{batch_of, parts, visits_of, Visit};
+
 const PASS: std::time::Duration = std::time::Duration::from_secs(60);
 const HOUR_MS: i64 = 3_600_000;
 /// Batches kept on the server. Local history may be older.
@@ -21,77 +24,8 @@ const RETENTION_HOURS: i64 = 90 * 24;
 /// Serialized visits per batch part, well inside the server's record limit.
 const PART_BYTES: usize = 40 << 10;
 
-type Visit = (String, String, i64, bool);
-
-fn batch_id(origin: &str, hour: i64, part: usize) -> String {
-    format!("history:{origin}:{hour}:{part}")
-}
-
-/// `(origin, hour)` of a batch record, if it is one.
-fn batch_of(record: &ViewRecord) -> Option<(String, i64)> {
-    if record.kind != Kind::HistoryBatch {
-        return None;
-    }
-    Some((
-        record.fields.get("origin")?.as_str()?.to_owned(),
-        record.fields.get("hour")?.as_i64()?,
-    ))
-}
-
 /// Batches to write, and the local `(origin, hour)`s they cover.
 type Uploads = (Vec<(String, Option<ViewRecord>)>, Vec<(String, i64)>);
-
-fn visits_of(record: &ViewRecord) -> Vec<Visit> {
-    record
-        .fields
-        .get("visits")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|v| {
-            Some((
-                v.get("url")?.as_str()?.to_owned(),
-                v.get("title")?.as_str()?.to_owned(),
-                v.get("visited_at")?.as_i64()?,
-                v.get("typed")?.as_bool()?,
-            ))
-        })
-        .collect()
-}
-
-/// One hour's visits as batch parts of bounded size.
-fn parts(origin: &str, hour: i64, visits: &[Visit]) -> Vec<ViewRecord> {
-    let mut out = Vec::new();
-    let mut chunk: Vec<Value> = Vec::new();
-    let mut bytes = 0;
-    let flush = |chunk: &mut Vec<Value>, out: &mut Vec<ViewRecord>| {
-        if chunk.is_empty() {
-            return;
-        }
-        let part = out.len();
-        let fields = serde_json::from_value(json!({
-            "origin": origin, "hour": hour, "part": part, "visits": std::mem::take(chunk),
-        }))
-        .unwrap_or_default();
-        out.push(ViewRecord {
-            kind: Kind::HistoryBatch,
-            id: batch_id(origin, hour, part),
-            fields,
-        });
-    };
-    for (url, title, visited_at, typed) in visits {
-        let visit = json!({"url": url, "title": title, "visited_at": visited_at, "typed": typed});
-        let size = visit.to_string().len();
-        if bytes + size > PART_BYTES || chunk.len() >= 2000 {
-            flush(&mut chunk, &mut out);
-            bytes = 0;
-        }
-        bytes += size;
-        chunk.push(visit);
-    }
-    flush(&mut chunk, &mut out);
-    out
-}
 
 pub(super) fn spawn(app: tauri::AppHandle, slot: Slot, expected: String) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -345,126 +279,4 @@ fn merge(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn library() -> Connection {
-        let connection = Connection::open_in_memory().unwrap();
-        connection
-            .execute_batch(
-                "CREATE TABLE visits (id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id TEXT NOT NULL,
-                   url TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', visited_at INTEGER NOT NULL,
-                   typed INTEGER NOT NULL DEFAULT 0, origin TEXT NOT NULL DEFAULT '', changed INTEGER NOT NULL DEFAULT 1);
-                 CREATE TABLE history_dirty (origin TEXT NOT NULL, hour INTEGER NOT NULL, PRIMARY KEY (origin, hour));",
-            )
-            .unwrap();
-        connection
-    }
-
-    fn visit(connection: &Connection, url: &str, at: i64) {
-        connection
-            .execute(
-                "INSERT INTO visits (profile_id, url, title, visited_at) VALUES ('p', ?1, 'T', ?2)",
-                params![url, at],
-            )
-            .unwrap();
-    }
-
-    fn urls(connection: &Connection) -> Vec<(String, String)> {
-        let mut s = connection
-            .prepare("SELECT origin, url FROM visits ORDER BY origin, url")
-            .unwrap();
-        s.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
-            .unwrap()
-            .collect::<Result<_, _>>()
-            .unwrap()
-    }
-
-    #[test]
-    fn visits_travel_as_hourly_batches_and_merge_on_other_devices() {
-        let now = super::super::super::browser_library::now_ms();
-        let a = library();
-        visit(&a, "https://one.test/", now);
-        visit(&a, "https://two.test/", now);
-        let (writes, hours) = uploads(&a, "device-a", "p", &[]).unwrap();
-        assert_eq!(writes.len(), 1);
-        uploaded(&a, "p", &writes, &hours).unwrap();
-        // Nothing left to send until something changes.
-        assert!(uploads(&a, "device-a", "p", &[]).unwrap().0.is_empty());
-
-        let batches: Vec<ViewRecord> = writes.into_iter().filter_map(|(_, r)| r).collect();
-        let b = library();
-        merge(&b, "device-b", "p", &batches).unwrap();
-        assert_eq!(
-            urls(&b),
-            [
-                ("device-a".to_string(), "https://one.test/".to_string()),
-                ("device-a".to_string(), "https://two.test/".to_string()),
-            ]
-        );
-        // Merging again changes nothing.
-        merge(&b, "device-b", "p", &batches).unwrap();
-        assert_eq!(urls(&b).len(), 2);
-    }
-
-    #[test]
-    fn a_visit_deleted_on_another_device_leaves_every_device() {
-        let now = super::super::super::browser_library::now_ms();
-        let a = library();
-        visit(&a, "https://one.test/", now);
-        visit(&a, "https://two.test/", now);
-        let (writes, hours) = uploads(&a, "device-a", "p", &[]).unwrap();
-        uploaded(&a, "p", &writes, &hours).unwrap();
-        let batches: Vec<ViewRecord> = writes.into_iter().filter_map(|(_, r)| r).collect();
-
-        // Device B deletes one of A's visits: it rewrites A's batch.
-        let b = library();
-        merge(&b, "device-b", "p", &batches).unwrap();
-        b.execute(
-            "INSERT INTO history_dirty SELECT origin, visited_at / 3600000 FROM visits WHERE url = 'https://one.test/'",
-            [],
-        )
-        .unwrap();
-        b.execute("DELETE FROM visits WHERE url = 'https://one.test/'", [])
-            .unwrap();
-        let (rewrite, _) = uploads(&b, "device-b", "p", &batches).unwrap();
-        let rewritten: Vec<ViewRecord> = rewrite.into_iter().filter_map(|(_, r)| r).collect();
-        assert_eq!(rewritten.len(), 1);
-        assert_eq!(batch_of(&rewritten[0]).unwrap().0, "device-a");
-
-        // A merges its own rewritten batch: the deleted visit goes there too.
-        merge(&a, "device-a", "p", &rewritten).unwrap();
-        assert_eq!(urls(&a), [(String::new(), "https://two.test/".to_string())]);
-    }
-
-    #[test]
-    fn an_unsynced_visit_survives_a_merge() {
-        let now = super::super::super::browser_library::now_ms();
-        let a = library();
-        visit(&a, "https://new.test/", now);
-        merge(&a, "device-a", "p", &[]).unwrap();
-        assert_eq!(urls(&a).len(), 1);
-    }
-
-    #[test]
-    fn a_busy_hour_splits_into_parts() {
-        let visits: Vec<Visit> = (0..3000)
-            .map(|i| {
-                (
-                    format!("https://site.test/{i}"),
-                    "Title".into(),
-                    7 * HOUR_MS + i,
-                    false,
-                )
-            })
-            .collect();
-        let written = parts("device-a", 7, &visits);
-        assert!(written.len() > 1);
-        let total: usize = written.iter().map(|r| visits_of(r).len()).sum();
-        assert_eq!(total, 3000);
-        for record in &written {
-            misty_browser_sync::document::entities::validate(Kind::HistoryBatch, &record.fields)
-                .unwrap();
-        }
-    }
-}
+mod tests;

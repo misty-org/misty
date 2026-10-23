@@ -1,11 +1,11 @@
-import { useBrowserSearchStore } from "@/features/browser-workspace/search";
+import { useBrowserSearchStore } from "@/features/browser-sync/search";
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useExtensionsStore } from "@/features/extensions/store";
-import { useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { BrowserWorkspace } from "./BrowserWorkspace";
 const invoke = vi.hoisted(() =>
   vi.fn<(command: string, args?: unknown) => Promise<unknown>>(async (command) =>

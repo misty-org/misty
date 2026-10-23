@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 
-const script = readFileSync(new URL("../../src-tauri/src/infra/browser_background.js", import.meta.url), "utf8");
+const script = readFileSync(new URL("../../src-tauri/src/infra/browser/scripts/background.js", import.meta.url), "utf8");
 test("native background reporting coalesces changes and sends only changed colors", () => {
   const reports: string[] = [];
   const timers = new Map<number, () => void>();

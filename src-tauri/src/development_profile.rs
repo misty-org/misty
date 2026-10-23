@@ -21,11 +21,10 @@ fn bundle_profile(executable: &Path) -> Option<&str> {
 
 fn select<'a>(
     profile: Option<&'a str>,
-    desktop: Option<&'a str>,
     bundle: Option<&'a str>,
 ) -> Result<Option<&'a str>, &'static str> {
-    let selected = profile.or(desktop).or(bundle);
-    for candidate in [profile, desktop, bundle].into_iter().flatten() {
+    let selected = profile.or(bundle);
+    for candidate in [profile, bundle].into_iter().flatten() {
         if !valid(candidate) || Some(candidate) != selected {
             return Err("Development profile identifiers disagree or are invalid");
         }
@@ -35,21 +34,14 @@ fn select<'a>(
 
 pub fn configure(context: &mut tauri::Context<tauri::Wry>) -> Result<(), &'static str> {
     let profile = std::env::var("MISTY_PROFILE").ok();
-    let desktop = std::env::var("MISTY_DESKTOP_PROFILE").ok();
     let executable = std::env::current_exe().map_err(|_| "Development executable unavailable")?;
-    let Some(profile) = select(
-        profile.as_deref(),
-        desktop.as_deref(),
-        bundle_profile(&executable),
-    )?
-    else {
+    let Some(profile) = select(profile.as_deref(), bundle_profile(&executable))? else {
         return Ok(());
     };
-    // Set both before any plugin/credential client starts. Tauri uses its
+    // Set it before any plugin/credential client starts. Tauri uses its
     // context identifier for storage and single-instance handling, not the
     // bundle's display name or Info.plist identifier.
     std::env::set_var("MISTY_PROFILE", profile);
-    std::env::set_var("MISTY_DESKTOP_PROFILE", profile);
     context.config_mut().identifier = format!("com.misty.desktop.{profile}");
     context.config_mut().product_name = Some(format!("Misty {profile}"));
     if let Ok(port) = std::env::var("MISTY_DESKTOP_DEV_PORT") {
@@ -80,7 +72,7 @@ mod tests {
         for profile in ["dev1", "dev2"] {
             let path = format!("/build/misty-dev-apps/{profile}.app/Contents/MacOS/misty-desktop");
             assert_eq!(
-                select(None, None, bundle_profile(Path::new(&path))).unwrap(),
+                select(None, bundle_profile(Path::new(&path))).unwrap(),
                 Some(profile)
             );
         }
@@ -90,17 +82,13 @@ mod tests {
             )),
             None
         );
-        assert_eq!(select(None, None, None).unwrap(), None);
+        assert_eq!(select(None, None).unwrap(), None);
     }
 
     #[test]
     fn credentials_and_tauri_must_select_the_same_development_profile() {
-        assert_eq!(
-            select(Some("dev1"), Some("dev1"), Some("dev1")).unwrap(),
-            Some("dev1")
-        );
-        assert!(select(Some("dev1"), Some("dev2"), None).is_err());
-        assert!(select(Some("dev1"), None, Some("dev2")).is_err());
-        assert!(select(Some("../production"), None, None).is_err());
+        assert_eq!(select(Some("dev1"), Some("dev1")).unwrap(), Some("dev1"));
+        assert!(select(Some("dev1"), Some("dev2")).is_err());
+        assert!(select(Some("../production"), None).is_err());
     }
 }

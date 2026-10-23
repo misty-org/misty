@@ -1,9 +1,9 @@
 import { routes } from "@/features/app-shell";
-import { Button } from "@/shared/ui";
+import { useSetupStore } from "@/features/setup/useSetupStore";
+import { Button, FlyingMisty, Pressable } from "@/shared/ui";
 import "@fontsource/instrument-serif/400-italic.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FlyingMisty } from "./FlyingMisty";
 import { WelcomeNav } from "./WelcomeNav";
 import "./welcome.css";
 
@@ -12,15 +12,23 @@ const legalLinks = [
   { label: "Privacy Policy", href: "https://mistysys.com/privacy" },
 ];
 
-/** The signed-out start screen: a floating bar with the logo and socials, then what Misty is. */
+/** The first-run welcome: a floating bar with the logo and socials, then what Misty is, with
+ * Start browsing ahead of Sign in. It shows once per device; adding an account reuses it. */
 export function WelcomePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
   const addingAccount = Boolean(routeState?.addingAccount);
+  const finishWelcome = useSetupStore((state) => state.finishWelcome);
+  // Misty is a full browser without an account; signing in waits until sync, a Space or an
+  // agent asks for it.
+  const startBrowsing = () => {
+    finishWelcome();
+    navigate(routes.browser, { replace: true });
+  };
 
   return (
-    <div className="relative grid h-full min-h-0 place-items-center bg-window-chrome px-6 pb-16 pt-28 text-center">
+    <div className="relative grid h-full min-h-0 place-items-center bg-window-chrome px-6 pb-16 pt-36 text-center">
       <FlyingMisty />
       <WelcomeNav
         onBack={
@@ -43,37 +51,65 @@ export function WelcomePage() {
             </mark>
           </span>
         </h1>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button
-            className="rounded-full bg-cream-bright px-7 text-charcoal-bg hover:bg-cream"
-            size="lg"
-            onClick={() => navigate(routes.signIn, { state: location.state })}
-          >
-            Sign in
-          </Button>
-          <Button
-            className="rounded-full border border-charcoal-border bg-transparent px-7 text-cream-bright hover:bg-white/5"
-            size="lg"
-            onClick={() => navigate(routes.register, { state: location.state })}
-          >
-            Create account
-          </Button>
-        </div>
+        {addingAccount ? (
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              className="px-7"
+              size="lg"
+              onClick={() => navigate(routes.signIn, { state: location.state })}
+            >
+              Sign in
+            </Button>
+            <Button
+              variant="outline"
+              className="px-7"
+              size="lg"
+              onClick={() => navigate(routes.register, { state: location.state })}
+            >
+              Create account
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button variant="primary" className="px-7" size="lg" onClick={startBrowsing}>
+                Start browsing
+              </Button>
+              <Button
+                variant="outline"
+                className="px-7"
+                size="lg"
+                onClick={() => navigate(routes.signIn, { state: location.state })}
+              >
+                Sign in
+              </Button>
+            </div>
+            <p className="text-sm text-cream-muted">
+              No account needed. Sign in later to sync, share Spaces or use agents.
+            </p>
+          </div>
+        )}
       </div>
-      <footer className="misty-page-in absolute inset-x-4 bottom-4 mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 text-xs text-cream-muted sm:inset-x-8">
+      <footer
+        className={
+          "misty-page-in absolute inset-x-4 bottom-4 mx-auto flex max-w-5xl flex-wrap " +
+          "items-center justify-between gap-x-6 gap-y-1 px-4 text-xs text-cream-muted " +
+          "sm:inset-x-8"
+        }
+      >
         <span>© {new Date().getFullYear()} Misty</span>
         <p className="leading-5">
           By continuing you agree to our{" "}
           {legalLinks.map(({ label, href }, index) => (
             <span key={label}>
               {index > 0 ? " and " : null}
-              <button
-                type="button"
+              <Pressable
                 className="underline underline-offset-2 hover:text-cream-bright"
                 onClick={() => void openUrl(href)}
               >
                 {label}
-              </button>
+              </Pressable>
             </span>
           ))}
         </p>

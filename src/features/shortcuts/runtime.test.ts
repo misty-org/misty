@@ -1,14 +1,7 @@
 import { useSettingsStore } from "@/features/settings/store/useSettingsStore";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
-import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  dispatchShortcutEvent,
-  invokeShortcutCommand,
-  registerShortcutHandler,
-  useShortcutHandler,
-  useShortcutTitle,
-} from "./runtime";
+import { dispatchShortcutEvent, invokeShortcutCommand, registerShortcutHandler } from "./runtime";
 import { detectShortcutPlatform } from "./bindings";
 
 describe("shortcut dispatcher", () => {
@@ -217,20 +210,6 @@ describe("shortcut dispatcher", () => {
 
     removeSection();
     removeTab();
-  });
-
-  it("does not rerender shortcut consumers when handlers register", () => {
-    const { result, rerender } = renderHook(
-      ({ label }: { label: string }) => {
-        useShortcutHandler("navigation.back", () => undefined);
-        return useShortcutTitle(label, "navigation.back");
-      },
-      { initialProps: { label: "Back" } },
-    );
-
-    expect(result.current).toContain("Back");
-    rerender({ label: "Previous" });
-    expect(result.current).toContain("Previous");
   });
 
   it("opens a new tab with Cmd+T only; Cmd+K is not bound", () => {

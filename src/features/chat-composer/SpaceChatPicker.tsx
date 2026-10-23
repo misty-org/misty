@@ -1,5 +1,5 @@
 import type { MistyPickerSource } from "@/features/picker";
-import { SocialPicker as MistyPicker } from "@/features/spaces";
+import { MistyPicker } from "@/features/picker";
 import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
 
 /** The shared Files/Library picker, scoped to what this member may attach. */

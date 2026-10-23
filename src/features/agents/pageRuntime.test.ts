@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import core from "../../../src-tauri/src/infra/browser_page/page_core.js?raw";
-import tree from "../../../src-tauri/src/infra/browser_page/page_tree.js?raw";
-import actions from "../../../src-tauri/src/infra/browser_page/page_actions.js?raw";
-import read from "../../../src-tauri/src/infra/browser_page/page_read.js?raw";
-import skills from "../../../src-tauri/src/infra/browser_page/page_skills.js?raw";
+import core from "../../../src-tauri/src/infra/browser/page_agent/page_core.js?raw";
+import tree from "../../../src-tauri/src/infra/browser/page_agent/page_tree.js?raw";
+import actions from "../../../src-tauri/src/infra/browser/page_agent/page_actions.js?raw";
+import read from "../../../src-tauri/src/infra/browser/page_agent/page_read.js?raw";
+import skills from "../../../src-tauri/src/infra/browser/page_agent/page_skills.js?raw";
 
-// The agent page runtime (src-tauri/src/infra/browser_page) runs inside each
+// The agent page runtime (src-tauri/src/infra/browser/page_agent) runs inside each
 // browser page. These tests load the same files into jsdom.
 type Page = { call: (operation: string, args?: Record<string, unknown>) => any };
 const globals = globalThis as unknown as { __mistyAgentPageV1?: Page };
@@ -263,7 +263,10 @@ describe("agent page runtime", () => {
   });
 
   it("keeps a long page's content and search box ahead of its menus", () => {
-    const links = Array.from({ length: 300 }, (_, i) => `<li><a href="/c/${i}">Category number ${i}</a></li>`).join("");
+    const links = Array.from(
+      { length: 300 },
+      (_, i) => `<li><a href="/c/${i}">Category number ${i}</a></li>`,
+    ).join("");
     const page = load(`
       <header><nav aria-label="Departments"><ul>${links}</ul></nav></header>
       <main><h1>Find a doctor</h1><form role="search"><input aria-label="Doctor name or specialty"><button>Search</button></form>
@@ -285,11 +288,27 @@ describe("agent page runtime", () => {
     const promo = document.getElementById("promo")!;
     const inside = promo.querySelector("h2")!;
     document.elementFromPoint = vi.fn(() => inside);
-    vi.spyOn(promo, "getBoundingClientRect").mockReturnValue({ x: 0, y: 0, left: 0, top: 0, right: 1024, bottom: 768, width: 1024, height: 768, toJSON: () => ({}) } as DOMRect);
+    vi.spyOn(promo, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 1024,
+      bottom: 768,
+      width: 1024,
+      height: 768,
+      toJSON: () => ({}),
+    } as DOMRect);
     const result = snapshot(page);
-    expect(result.tree.split("\n")[0]).toMatch(/^- note: A popup covers this page \("Get 10% off your first stay"\)\. Close it first: click ref=e\d+\.$/);
+    expect(result.tree.split("\n")[0]).toMatch(
+      /^- note: A popup covers this page \("Get 10% off your first stay"\)\. Close it first: click ref=e\d+\.$/,
+    );
     const pressed: string[] = [];
-    promo.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => pressed.push(button.textContent ?? "")));
+    promo
+      .querySelectorAll("button")
+      .forEach((button) =>
+        button.addEventListener("click", () => pressed.push(button.textContent ?? "")),
+      );
     // Its close control is pressed first; a popup that stays is then hidden in the agent's tab.
     const dismissed = await page.call("dismissPopup");
     expect(dismissed.dismissed).toContain("Get 10% off");

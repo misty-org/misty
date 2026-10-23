@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeBrowserAddress } from "@/features/browser-workspace/address";
+import { normalizeBrowserAddress } from "@/features/browser-sync/address";
 import {
   browserInternalPage,
   browserInternalUrl,

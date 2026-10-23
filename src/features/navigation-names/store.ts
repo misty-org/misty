@@ -54,6 +54,5 @@ export async function setNavigationName(key: string, value: string | null) {
     await refreshNavigationNames(account);
   }
 }
-export const windowNameKey = (id: string) => `window:${id}`;
 export const tabNameKey = (id: string) => `tab:${id}`;
 export const groupNameKey = (id: string) => `group:${id}`;

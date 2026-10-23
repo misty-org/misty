@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { useAuth } from "@/features/auth";
-import { useSettingsProfiles } from "@/features/settings";
+import { localProfileId } from "@/features/workspace/profileId";
+import { useDevicePreferences } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -92,11 +92,13 @@ function openFromExtension(event: ExtensionEvent) {
 
 export function useExtensionsRuntime() {
   const [runtimeGeneration, setRuntimeGeneration] = useState(0);
-  const { user } = useAuth();
-  const account = user?.id ?? "";
-  const profile = useSettingsProfiles((s) => s.state);
-  const profilesReady = useSettingsProfiles((s) => s.ready);
-  const profilesError = useSettingsProfiles((s) => s.error);
+  // Extensions belong to this device, as their install list (a device setting) does: signing
+  // in or out keeps them installed and running, with nothing to move
+  // (docs/browser/no-account.md).
+  const account = localProfileId;
+  const profile = useDevicePreferences((s) => s.state);
+  const profilesReady = useDevicePreferences((s) => s.ready);
+  const profilesError = useDevicePreferences((s) => s.error);
   const raw = spaceInstallationsRaw(profile);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)

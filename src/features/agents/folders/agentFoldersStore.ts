@@ -2,7 +2,7 @@ import { create } from "zustand";
 import {
   conversationFoldersApi,
   type AgentConversationFolder,
-} from "@/api/assistant/conversationFolders";
+} from "@/api/assistant/conversation-folders";
 import { localChats } from "@/features/misty/localChats";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 
@@ -34,7 +34,7 @@ const setConversationFolder = (
 
 /**
  * The agent folders on this device. Folders group chats, and chats live on the device
- * that keeps them (docs/design/agent-chats-local/BRIEF.md), so folders do too. The
+ * that keeps them (docs/agents/chats-local.md), so folders do too. The
  * account's folders from before are copied once.
  */
 export const useAgentFoldersStore = create<AgentFoldersStore>((set, get) => ({

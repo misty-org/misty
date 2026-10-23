@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from "react";
+import type { MouseEvent } from "react";
 import { Button } from "../../controls/Button";
 import { Card } from "../../display/Card";
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "../../overlays/ContextMenu";
@@ -12,33 +13,6 @@ import {
 export function CollectionGrid({ children }: { children: ReactNode }) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{children}</div>
-  );
-}
-
-export function CollectionTile({
-  icon,
-  title,
-  description,
-  onClick,
-}: {
-  icon: ReactNode;
-  title: string;
-  description?: string;
-  onClick: () => void;
-}) {
-  return (
-    <Card className="gap-0 p-0">
-      <Button
-        variant="ghost"
-        size="none"
-        onClick={onClick}
-        className="h-full min-h-20 w-full flex-col items-start gap-2 whitespace-normal p-4 text-left"
-      >
-        <span className="text-cream-muted [&_svg]:!size-5">{icon}</span>
-        <span className="font-medium">{title}</span>
-        {description && <span className="text-xs font-normal text-cream-muted">{description}</span>}
-      </Button>
-    </Card>
   );
 }
 
@@ -95,18 +69,27 @@ export function CollectionItemsGrid({
   hasCreators,
   creatorLabel,
   layout = "preview",
+  selectedIds = [],
+  onSelect,
 }: {
   items: CollectionItem[];
   hasCreators: boolean;
   creatorLabel: string;
   layout?: "preview" | "compact";
+  selectedIds?: string[];
+  onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
   return (
     <CollectionGrid>
       {items.map((item) => (
         <CollectionItemSurface key={item.id} item={item}>
           {layout === "compact" ? (
-            <Card className="group/collection-item min-w-0 gap-0 p-0 hover:bg-charcoal-hover focus-within:bg-charcoal-hover">
+            <Card
+              className={cn(
+                "group/collection-item min-w-0 gap-0 p-0 hover:bg-charcoal-hover focus-within:bg-charcoal-hover",
+                selectedIds.includes(item.id) && "bg-charcoal-active",
+              )}
+            >
               <Button
                 variant="ghost"
                 size="none"
@@ -116,7 +99,10 @@ export function CollectionItemsGrid({
                   "rounded-none p-4 pb-0 text-left font-normal hover:bg-transparent",
                   "focus-visible:ring-inset",
                 )}
-                onClick={item.onOpen}
+                onClick={(event) => {
+                  if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+                  else item.onOpen();
+                }}
               >
                 <span className="flex min-h-10 min-w-0 items-center gap-3">
                   <span
@@ -149,13 +135,21 @@ export function CollectionItemsGrid({
               )}
             </Card>
           ) : (
-            <Card className="group/collection-item relative gap-0 p-0">
+            <Card
+              className={cn(
+                "group/collection-item relative gap-0 p-0",
+                selectedIds.includes(item.id) && "bg-charcoal-active",
+              )}
+            >
               <Button
                 variant="ghost"
                 size="none"
                 aria-label={item.title}
                 className="h-64 w-full flex-col items-stretch gap-0 whitespace-normal p-4 text-left font-normal"
-                onClick={item.onOpen}
+                onClick={(event) => {
+                  if (item.selectable && onSelect) onSelect(event, item.id, item.onOpen);
+                  else item.onOpen();
+                }}
               >
                 <span className={cn("flex h-8 min-w-0 items-center gap-2", item.actions && "pr-8")}>
                   <CollectionCardTitle title={item.title} />

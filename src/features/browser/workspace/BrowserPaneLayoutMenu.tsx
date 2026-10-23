@@ -1,13 +1,7 @@
 import { LayoutPanelLeft, PanelBottomDashed, PanelRightDashed, X } from "lucide-react";
 import { dockLeaves, useWorkspaceStore } from "@/features/workspace";
 import { invokeShortcutCommand } from "@/features/shortcuts/runtime";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  MenuItem,
-  MenuSubmenu,
-  MenuTrigger,
-} from "@/shared/ui";
+import { DropdownMenu, DropdownMenuContent, MenuItem, MenuSubmenu, MenuTrigger } from "@/shared/ui";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 

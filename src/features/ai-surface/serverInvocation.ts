@@ -1,0 +1,91 @@
+import type { AiInvocationRequest, AiContextReference } from "./types";
+
+/** The invocation request as the server reads it: snake_case, captures flattened. */
+export function toServerInvocation(input: AiInvocationRequest) {
+  return {
+    mode: input.mode,
+    surface_id: input.surfaceId,
+    trigger: input.trigger,
+    prompt: input.prompt,
+    context: input.context.map(toServerContextReference),
+    selection: input.selection,
+    companion_mode: input.companionMode,
+    method_version_id: input.methodVersionId,
+    method_inputs: input.methodInputs,
+    schedule_id: input.scheduleId,
+    schedule_claim: input.scheduleClaim,
+    skill_version_ids: input.skillVersionIds,
+    companion_model: input.companionModel,
+    model_override: input.modelOverride,
+    collaboration_mode: input.collaborationMode,
+    lesson: input.lesson,
+    lesson_index: input.lessonIndex,
+    media_context: input.mediaContext,
+    permission_mode: input.permissionMode,
+    coding_tool: input.codingTool,
+    display_captures: input.displayCaptures?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      mime_type: c.mimeType,
+      data_url: c.dataUrl,
+      width: c.width,
+      height: c.height,
+      content_hash: c.contentHash,
+      screen: c.screen,
+      primary: c.primary,
+      captured_at: c.capturedAt,
+      display_id: c.display.id,
+      source: c.source,
+      controls: c.controls,
+    })),
+    capture: input.capture
+      ? {
+          id: input.capture.id,
+          name: input.capture.name,
+          mime_type: input.capture.mimeType,
+          data_url: input.capture.dataUrl,
+          width: input.capture.width,
+          height: input.capture.height,
+          content_hash: input.capture.contentHash,
+        }
+      : undefined,
+    attachment_ids: input.attachmentIds,
+    agent_id: input.agentId,
+    task_id: input.taskId,
+    execution_mode: input.executionMode,
+    window_label: input.windowLabel,
+    current_tab: input.currentTab,
+    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
+    device_contexts: input.deviceContexts?.map((context) => ({
+      device_id: context.deviceId,
+      kind: context.kind,
+      opaque_ref: context.opaqueRef,
+      display_name: context.displayName,
+      capabilities: context.capabilities,
+      metadata: context.metadata,
+      run_grant: context.runGrant,
+    })),
+    thinking_mode: input.thinkingMode,
+    model_id: input.modelId,
+    reasoning_effort: input.reasoningEffort,
+    requested_artifact_kind: input.requestedArtifactKind,
+    conversation_id: input.conversationId,
+    idempotency_key: input.idempotencyKey,
+    timezone: input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  };
+}
+
+function toServerContextReference(reference: AiContextReference) {
+  return {
+    kind: reference.kind,
+    id: reference.id,
+    title: reference.title,
+    privacy: reference.privacy,
+    space_id: reference.spaceId,
+    href: reference.href,
+    revision: reference.revision,
+    opaque_scope_id: reference.opaqueScopeId,
+    attached: reference.attached,
+    metadata: reference.metadata,
+  };
+}

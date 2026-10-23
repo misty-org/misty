@@ -139,10 +139,6 @@
   background: var(--color-charcoal-bg);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cream) 8%, transparent);
 }
-.misty-tiptap-ai-selection {
-  position: fixed;
-  z-index: 2147483401;
-}
 .find-and-replace-result {
   background: color-mix(in srgb, #d7a928 35%, transparent);
 }

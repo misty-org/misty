@@ -7,15 +7,14 @@ mod config;
 mod console;
 mod deploy;
 mod desktop;
-mod development;
 mod diagnostics;
 mod environment;
 mod home;
 mod process;
 mod release;
 mod server;
-mod server_release;
 mod setup;
+mod tasks;
 mod website;
 mod workspace;
 

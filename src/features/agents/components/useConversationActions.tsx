@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
+import { globalMistyError } from "@/features/misty/globalMistyActions";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -36,10 +36,15 @@ export function useConversationActions({
   conversation,
   disabled,
   onOpen,
+  selectedCount = 0,
+  onDeleteSelected,
 }: {
   conversation: { id: string; title?: string };
   disabled?: boolean;
   onOpen?(): void;
+  /** More than one selected row: the menus end with a Delete all for the selection. */
+  selectedCount?: number;
+  onDeleteSelected?(): void;
 }) {
   const [params, setParams] = useSearchParams();
   const [action, setAction] = useState<"rename" | "delete">();
@@ -98,6 +103,7 @@ export function useConversationActions({
   const keepDialogFocus = (event: Event) => {
     if (action) event.preventDefault();
   };
+  const deleteAll = selectedCount > 1 && !!onDeleteSelected;
   const dropdown = (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -110,6 +116,14 @@ export function useConversationActions({
         <MenuItem icon={<Pencil />} label="Rename" disabled={disabled} onSelect={startRename} />
         <DropdownMenuSeparator />
         <MenuItem icon={<Trash2 />} label="Delete" disabled={disabled} onSelect={startDelete} />
+        {deleteAll && (
+          <MenuItem
+            icon={<Trash2 />}
+            label={`Delete all ${selectedCount}`}
+            disabled={disabled}
+            onSelect={onDeleteSelected}
+          />
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -129,6 +143,14 @@ export function useConversationActions({
         disabled={disabled || busy}
         onSelect={startDelete}
       />
+      {deleteAll && (
+        <ContextMenuAction
+          icon={<Trash2 />}
+          label={`Delete all ${selectedCount}`}
+          disabled={disabled || busy}
+          onSelect={onDeleteSelected}
+        />
+      )}
     </ContextMenuContent>
   );
   const dialogs = (

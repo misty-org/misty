@@ -25,8 +25,22 @@ function assertLocal(base: string) {
  * invite route would send a real email through the development mail provider.
  */
 export function seedSpaceMember(spaceId: string, userId: string) {
-  if (![spaceId, userId].every((id) => /^[A-Za-z0-9_-]+$/.test(id)))
-    throw new Error("unexpected id format");
+  runAcceptanceSQL(
+    [spaceId, userId],
+    `INSERT INTO space_members(space_id,user_id,role) VALUES ('${spaceId}','${userId}','member')`,
+  );
+}
+
+/** Brings an agent into a space under its owner, as the agent's own tool does. */
+export function seedSpaceAgent(spaceId: string, agentId: string, ownerId: string) {
+  runAcceptanceSQL(
+    [spaceId, agentId, ownerId],
+    `INSERT INTO space_agents(space_id,agent_id,owner_user_id) VALUES ('${spaceId}','${agentId}','${ownerId}')`,
+  );
+}
+
+function runAcceptanceSQL(ids: string[], sql: string) {
+  if (!ids.every((id) => /^[A-Za-z0-9_-]+$/.test(id))) throw new Error("unexpected id format");
   const container = process.env.MISTY_ACCEPTANCE_DB_CONTAINER ?? "misty-server-postgres-1";
   execFileSync("docker", [
     "exec",
@@ -39,7 +53,7 @@ export function seedSpaceMember(spaceId: string, userId: string) {
     "-v",
     "ON_ERROR_STOP=1",
     "-c",
-    `INSERT INTO space_members(space_id,user_id,role) VALUES ('${spaceId}','${userId}','member')`,
+    sql,
   ]);
 }
 

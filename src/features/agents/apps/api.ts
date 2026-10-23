@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 
 /** An app account connected once to the Misty account; agents use it in every Space. */
