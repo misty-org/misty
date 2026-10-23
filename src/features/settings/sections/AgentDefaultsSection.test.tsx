@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSettingsStore } from "../store/useSettingsStore";
-import { useSettingsProfiles } from "../profiles/store";
-import { registerProfileWriter } from "../profiles/bridge";
+import { useDevicePreferences } from "../devicePreferences/store";
+import { registerPreferenceWriter } from "../devicePreferences/bridge";
 import { AgentDefaultsSection } from "./FeatureSections";
 
 describe("AgentDefaultsSection Misty panel controls", () => {
@@ -10,7 +10,7 @@ describe("AgentDefaultsSection Misty panel controls", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useSettingsProfiles.setState({ ready: true });
+    useDevicePreferences.setState({ ready: true });
     useSettingsStore.setState({
       working: false,
       settings: {
@@ -22,7 +22,7 @@ describe("AgentDefaultsSection Misty panel controls", () => {
         },
       },
     });
-    registerProfileWriter(async (id, value) => {
+    registerPreferenceWriter(async (id, value) => {
       updateSettingSpy(id, value);
     });
   });

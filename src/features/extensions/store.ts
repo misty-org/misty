@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useSettingsProfiles } from "@/features/settings";
+import { useDevicePreferences } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { spaceWindow } from "@/features/workspace/spaceWindow";
 import type {
@@ -57,7 +57,7 @@ export function finishPermission(requestId: string) {
 }
 
 function preference<T>(key: string, fallback: T): T {
-  const state = useSettingsProfiles.getState().state;
+  const state = useDevicePreferences.getState().state;
   return state ? (resolveSetting(state, `extensions.${key}`).value as T) : fallback;
 }
 const chromeId = /^[a-p]{32}$/;
@@ -70,6 +70,12 @@ export const storeNames: Record<ExtensionStore, string> = {
   chrome: "Chrome Web Store",
   firefox: "Firefox Add-ons",
 };
+/**
+ * The stores people can add extensions from. Misty's one extension standard is
+ * Chrome (Manifest V3), so Firefox Add-ons is not offered; extensions already
+ * installed from it keep their own identity and stay manageable.
+ */
+export const offeredStores: ExtensionStore[] = ["chrome"];
 export const storeHomes: Record<ExtensionStore, string> = {
   chrome: "https://chromewebstore.google.com/",
   firefox: "https://addons.mozilla.org/firefox/",
@@ -127,7 +133,7 @@ export function parseInstallations(raw: string): Installation[] {
     return [];
   }
 }
-type SettingsState = NonNullable<ReturnType<typeof useSettingsProfiles.getState>["state"]>;
+type SettingsState = NonNullable<ReturnType<typeof useDevicePreferences.getState>["state"]>;
 /** Every other Space's installations: `[{ space, installations }]`. */
 type SpaceList = { space: string; installations: unknown };
 function spaceLists(raw: unknown): SpaceList[] {
@@ -158,7 +164,7 @@ export function spaceInstallationsRaw(state: SettingsState | null | undefined): 
   return Array.isArray(list) ? JSON.stringify(list) : "[]";
 }
 function installationsRaw(): string {
-  return spaceInstallationsRaw(useSettingsProfiles.getState().state);
+  return spaceInstallationsRaw(useDevicePreferences.getState().state);
 }
 export function installations() {
   return parseInstallations(installationsRaw());
@@ -178,7 +184,7 @@ async function setInstallations(raw: string) {
   );
 }
 export async function setPreference(key: string, value: string | boolean) {
-  await useSettingsProfiles.getState().edit(`extensions.${key}`, value);
+  await useDevicePreferences.getState().edit(`extensions.${key}`, value);
 }
 let controlQueue: Promise<unknown> = Promise.resolve();
 function changeControls(work: () => Promise<void>) {
@@ -220,11 +226,7 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
   const account = useExtensionsStore.getState().account;
   const existing = installations().find((item) => item.id === review.entry.id && item.installed);
   const generation = existing?.generation ?? crypto.randomUUID();
-  await extensionsNative.commit(
-    review.token,
-    existing ? null : generation,
-    review.privateAllowed && privateAccess,
-  );
+  await extensionsNative.commit(review.token, existing ? null : generation);
   if (account !== useExtensionsStore.getState().account)
     throw new Error("The account changed during installation.");
   await changeControls(async () => {
@@ -238,7 +240,8 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
       installed: true,
       enabled: old?.enabled ?? true,
       privateAccess: review.privateAllowed && privateAccess,
-      agentAccess: old?.agentAccess ?? true,
+      // A new extension is off limits to agents until the person allows it.
+      agentAccess: old?.agentAccess ?? false,
       permissions: [...new Set([...(old?.permissions ?? []), ...review.permissions])],
       hosts: [...new Set([...(old?.hosts ?? []), ...review.hosts])],
     };

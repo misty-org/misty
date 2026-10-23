@@ -14,9 +14,14 @@ import { useBrowserOverlayControl } from "@/features/browser";
 import { rememberedExtensionIcon } from "./extensionIcons";
 import { useExtensionActions } from "./useExtensionActions";
 import { openStorePage } from "./openStorePage";
-import { reportExtensionError, storeHomes, storeNames, updateInstallation } from "./store";
+import {
+  offeredStores,
+  reportExtensionError,
+  storeHomes,
+  storeNames,
+  updateInstallation,
+} from "./store";
 import { PinnedExtensionButton } from "./PinnedExtensionButton";
-import type { ExtensionStore } from "./types";
 
 function openExtensionSettings() {
   window.dispatchEvent(
@@ -124,7 +129,7 @@ export function ExtensionsToolbar({
                 );
               })}
             </ul>
-            {(["chrome", "firefox"] as ExtensionStore[]).map((store) => (
+            {offeredStores.map((store) => (
               <Button
                 key={store}
                 variant="ghost"

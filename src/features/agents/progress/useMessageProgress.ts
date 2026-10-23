@@ -1,12 +1,12 @@
 import { aiSurfaceApi } from "@/features/ai-surface/api";
 import type { AiProgressItem } from "@/features/ai-surface/types";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useEffect, useState } from "react";
 
 /**
  * Keeps a fetched timeline with its reply, so the chat saved on this device has it after
- * the server lets the run go (docs/design/agent-chats-local/BRIEF.md).
+ * the server lets the run go (docs/agents/chats-local.md).
  */
 function keepProgress(invocationId: string, items: AiProgressItem[]) {
   if (!items.length) return;

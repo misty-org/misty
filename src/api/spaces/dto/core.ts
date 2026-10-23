@@ -1,9 +1,8 @@
 import type { MessageSpan, SpaceRole } from "./common";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
-import type { SpaceMessageSender } from "./conversationTypes";
-export type * from "./agentArchitectureTypes";
-export type * from "./memberTypes";
-export type * from "./conversationTypes";
+import type { SpaceMessageSender } from "./conversation-types";
+export type * from "./member-types";
+export type * from "./conversation-types";
 
 export interface Space {
   id: string;

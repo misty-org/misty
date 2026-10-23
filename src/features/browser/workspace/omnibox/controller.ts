@@ -5,7 +5,7 @@ const OMNIBOX_MAX_MATCHES = 8;
 
 /** Matches for the same web page merge into one row; searches merge by text. */
 function dedupeKey(match: OmniboxMatch): string {
-  const isPage = match.kind !== "search" && match.kind !== "suggestion" && match.kind !== "content";
+  const isPage = match.kind !== "search" && match.kind !== "suggestion";
   return isPage ? `page:${urlKey(match.target.url)}` : match.id;
 }
 

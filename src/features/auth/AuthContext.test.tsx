@@ -83,8 +83,6 @@ const mocks = vi.hoisted(() => {
     resetSpacesAccountState: vi.fn(),
     resetAgentAccountState: vi.fn(),
     resetNotesAccountState: vi.fn(),
-    resetSearchAccountState: vi.fn(),
-    explorerSetState: vi.fn(),
   };
 });
 vi.mock("./store/useAccountStore", () => ({
@@ -146,16 +144,9 @@ vi.mock("@/features/app-shell", () => {
         lastAppRoute: "/browser",
       }),
     }),
+    routes: { browser: "/browser", welcome: "/welcome", signIn: "/signin" },
   };
 });
-vi.mock("@/features/files/workspace/explorer", () => ({
-  useExplorerStore: {
-    setState: mocks.explorerSetState,
-  },
-}));
-vi.mock("@/features/files/workspace/search", () => ({
-  resetSearchAccountState: mocks.resetSearchAccountState,
-}));
 vi.mock("@/features/spaces", () => ({
   resetSpacesAccountState: mocks.resetSpacesAccountState,
   useSpacesStore: mocks.useSpacesStore,
@@ -173,6 +164,7 @@ vi.mock("@/features/journal/notes", () => ({
 }));
 vi.mock("@/telemetry/lifecycle", () => ({
   setAnalyticsAuthenticationState: vi.fn(),
+  setTelemetryAccountPresent: vi.fn(),
 }));
 vi.mock("@/telemetry/client", () => ({
   analytics: {},
@@ -234,8 +226,6 @@ describe("AuthProvider account switching", () => {
     mocks.resetSpacesAccountState.mockClear();
     mocks.resetAgentAccountState.mockClear();
     mocks.resetNotesAccountState.mockClear();
-    mocks.resetSearchAccountState.mockClear();
-    mocks.explorerSetState.mockClear();
     auth = null;
     container = document.createElement("div");
     document.body.append(container);
@@ -380,7 +370,7 @@ describe("AuthProvider account switching", () => {
     expect(auth?.user?.id).toBe(mocks.accountA.id);
     expect(mocks.accountFetchMe).toHaveBeenCalled();
   });
-  it("clears an expired legacy identity during StrictMode startup and releases the transition", async () => {
+  it("keeps browsing with an expired restored identity and asks to sign in again", async () => {
     mocks.accountFetchMe.mockRejectedValue(
       Object.assign(new Error("not authenticated"), {
         status: 401,
@@ -401,13 +391,14 @@ describe("AuthProvider account switching", () => {
         </StrictMode>,
       );
     });
-    expect(mocks.deactivateActiveAccount).toHaveBeenCalledOnce();
-    expect(mocks.signOut).toHaveBeenCalledOnce();
-    expect(auth?.user).toBeNull();
+    // A dead session no longer signs anyone out: the window keeps browsing.
+    expect(mocks.deactivateActiveAccount).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(auth?.user).not.toBeNull();
+    expect(auth?.sessionExpired).toBe(true);
     expect(auth?.transitioning).toBe(false);
-    expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
   });
-  it("releases the transition after an expired-cookie event changes the visible account", async () => {
+  it("marks the session expired after a confirmed expired-cookie event and keeps the account", async () => {
     function Probe() {
       auth = useAuth();
       return null;
@@ -429,10 +420,10 @@ describe("AuthProvider account switching", () => {
     await act(async () => {
       window.dispatchEvent(new CustomEvent("misty:account-session-invalid"));
     });
-    expect(mocks.deactivateActiveAccount).toHaveBeenCalledOnce();
-    expect(auth?.user).toBeNull();
+    expect(mocks.deactivateActiveAccount).not.toHaveBeenCalled();
+    expect(auth?.user).not.toBeNull();
+    expect(auth?.sessionExpired).toBe(true);
     expect(auth?.transitioning).toBe(false);
-    expect(mocks.setAccountSessionTransitioning).toHaveBeenLastCalledWith(false);
   });
   it.each(["valid", "offline", "account changed"])(
     "keeps the account active after a stale 401 when validation is %s",
@@ -708,6 +699,7 @@ describe("AuthProvider account switching", () => {
     });
     expect(mocks.accountLogout).toHaveBeenCalledWith(mocks.accountA.id);
     expect(mocks.deactivateActiveAccount).toHaveBeenCalled();
+    expect(mocks.removeSavedAccountSession).toHaveBeenCalledWith(mocks.accountA.id);
     expect(mocks.activateAccountSession).not.toHaveBeenCalled();
     expect(auth?.user).toBeNull();
     expect(auth?.transitioning).toBe(false);

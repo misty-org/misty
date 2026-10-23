@@ -1,9 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import parsers from "../../../../src-tauri/src/infra/browser_caption_parsers.js?raw";
-import frames from "../../../../src-tauri/src/infra/browser_captions.js?raw";
+import parsers from "../../../../src-tauri/src/infra/browser/scripts/caption_parsers.js?raw";
+import frames from "../../../../src-tauri/src/infra/browser/scripts/captions.js?raw";
 
 // Video captions for questions at the cursor are read inside each browser frame by
-// src-tauri/src/infra/browser_captions.js (browser_captions_script in browser_scripts.rs).
+// src-tauri/src/infra/browser/scripts/captions.js (browser_captions_script in browser/scripts/mod.rs).
 // These tests load the same files into jsdom.
 type Cue = [number, string];
 type Parsers = {

@@ -1,10 +1,9 @@
 import { useAuth } from "@/features/auth";
 import { BrowserImportFlow } from "@/features/browser-import";
-import {
-  selectAppearancePreferences,
-  useSettingsStore,
-  type AppThemeMode,
-} from "@/features/settings";
+import { ExtensionsSetupStep } from "@/features/extensions/ExtensionsSetupStep";
+import { useExtensionsStore } from "@/features/extensions/store";
+import { normalizeDockingLayout, type TabSide } from "@/features/app-shell/dockingLayout";
+import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
@@ -18,34 +17,33 @@ import {
 } from "@/shared/ui";
 import { Check } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { ThemePreview } from "./SetupPreviews";
-import { SpacesStep } from "./SpacesStep";
+import { TabsPreview } from "./SetupPreviews";
 import { useSetupStore, type SetupStep } from "./useSetupStore";
 
-const themeChoices: Array<{ value: AppThemeMode; label: string }> = [
-  { value: "system", label: "System" },
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+const tabSideChoices: Array<{ value: TabSide; label: string }> = [
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
 ];
 
 const stepCopy: Record<SetupStep, { title: string; description: string }> = {
-  spaces: {
-    title: "Meet Spaces",
-    description: "A Space is a profile for one part of your life, like work, school or family.",
-  },
-  theme: {
-    title: "Choose a theme",
-    description: "System follows your computer's light or dark appearance.",
-  },
   import: {
     title: "Import from your browser",
     description: "Bring bookmarks, history, settings and sign-ins into Misty, or skip this step.",
   },
+  extensions: {
+    title: "Add an ad blocker and a password manager",
+    description: "Both are optional extensions from the Chrome Web Store. Add them now or skip.",
+  },
+  tabs: {
+    title: "Where do you want your tabs?",
+    description: "Tabs sit in a sidebar on one side of the window.",
+  },
 };
 
 /**
- * First-run setup after sign-in, in place of a walkthrough: Spaces, theme and, in the desktop app,
- * importing from another browser. Each choice applies immediately; all of them stay in Settings.
+ * First-run setup after the welcome, signed in or not, in place of a walkthrough: importing from
+ * another browser (desktop app only), optional extensions for ads and passwords (where extensions
+ * run), and which side the tabs sit on. The tab side applies immediately and stays in Settings.
  */
 export function FirstRunSetup() {
   const { user, transitioning } = useAuth();
@@ -53,11 +51,16 @@ export function FirstRunSetup() {
   const step = useSetupStore((state) => state.step);
   const setStep = useSetupStore((state) => state.setStep);
   const finishSetup = useSetupStore((state) => state.finishSetup);
-  const visible = isOpen && !transitioning && Boolean(user?.id);
-  // Importing reads other browsers on this computer, so it needs the native app.
-  const steps: SetupStep[] = hasTauriInternals()
-    ? ["spaces", "theme", "import"]
-    : ["spaces", "theme"];
+  const visible = isOpen && !transitioning;
+  const extensionsSupported = useExtensionsStore((state) => state.supported);
+  // Importing reads other browsers on this computer, so it needs the native app; extensions need a
+  // platform that runs them.
+  const native = hasTauriInternals();
+  const steps: SetupStep[] = native
+    ? extensionsSupported
+      ? ["import", "extensions", "tabs"]
+      : ["import", "tabs"]
+    : ["tabs"];
   const index = Math.max(0, steps.indexOf(step));
   const finish = () => finishSetup(user?.id);
   const next = () => (index < steps.length - 1 ? setStep(steps[index + 1]) : finish());
@@ -68,11 +71,26 @@ export function FirstRunSetup() {
     return () => setBrowserWebviewsSuspended(false, "first-run-setup");
   }, [visible]);
 
+  useEffect(() => {
+    // The dialog is portaled outside #root, so the whole app behind it can go inert: no clicks,
+    // hovers or keystrokes reach the tab sidebar, Space bar or title bar while setup is open.
+    const root = document.getElementById("root");
+    if (!visible || !root) return;
+    root.setAttribute("inert", "");
+    return () => root.removeAttribute("inert");
+  }, [visible]);
+
   if (!visible) return null;
   const copy = stepCopy[steps[index]];
   return (
-    <Dialog open onOpenChange={(open) => !open && finish()}>
-      <DialogContent className="max-w-[560px] gap-0 p-7">
+    <Dialog open>
+      {/* Only Cancel leaves setup: clicking outside or pressing Escape must not. */}
+      <DialogContent
+        hideClose
+        className="max-w-[560px] gap-0 p-7"
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+      >
         <p className="text-xs text-cream-muted">
           Step {index + 1} of {steps.length}
         </p>
@@ -83,16 +101,16 @@ export function FirstRunSetup() {
           {copy.description}
         </DialogDescription>
         <div className="mt-6">
-          {steps[index] === "spaces" ? <SpacesStep /> : null}
-          {steps[index] === "theme" ? <ThemeStep /> : null}
+          {steps[index] === "tabs" ? <TabsStep /> : null}
+          {steps[index] === "extensions" ? <ExtensionsSetupStep /> : null}
           {steps[index] === "import" ? (
-            <BrowserImportFlow onClose={finish} closeLabel="Skip" />
+            <BrowserImportFlow onClose={next} closeLabel="Skip" />
           ) : null}
         </div>
         {steps[index] !== "import" ? (
           <div className="mt-7 flex items-center gap-2">
             <Button variant="ghost" size="sm" className="text-cream-muted" onClick={finish}>
-              Skip setup
+              Cancel
             </Button>
             <div className="ml-auto flex gap-2">
               {index > 0 ? (
@@ -110,21 +128,21 @@ export function FirstRunSetup() {
   );
 }
 
-function ThemeStep() {
-  const themeMode = useSettingsStore(
-    (state) => selectAppearancePreferences(state.settings?.document).themeMode,
-  );
-  const updateSetting = useSettingsStore((state) => state.updateSetting);
+function TabsStep() {
+  const layout = useWindowDockingLayout();
+  const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
   return (
-    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-3">
-      {themeChoices.map((choice) => (
+    <div role="radiogroup" aria-label="Tab side" className="grid grid-cols-2 gap-3">
+      {tabSideChoices.map((choice) => (
         <Choice
           key={choice.value}
           label={choice.label}
-          selected={themeMode === choice.value}
-          onSelect={() => updateSetting("appearance", "theme_mode", choice.value)}
+          selected={layout.tabs === choice.value}
+          onSelect={() =>
+            setLayout(normalizeDockingLayout({ navigation: layout.navigation, tabs: choice.value }))
+          }
         >
-          <ThemePreview mode={choice.value} />
+          <TabsPreview side={choice.value} />
         </Choice>
       ))}
     </div>

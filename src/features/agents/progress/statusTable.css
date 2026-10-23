@@ -112,9 +112,6 @@
   padding: 10px 14px;
   border-top: 1px solid var(--color-charcoal-border);
 }
-.agent-status-actions .agent-status-spacer {
-  flex: 1;
-}
 @keyframes agent-status-spin {
   to {
     transform: rotate(360deg);

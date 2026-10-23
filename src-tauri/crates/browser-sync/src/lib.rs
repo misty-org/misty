@@ -4,6 +4,7 @@ pub mod batch;
 pub mod collections;
 pub mod crypto;
 pub mod document;
+pub mod password;
 pub mod protocol;
 pub mod recovery;
 mod recovery_pending;

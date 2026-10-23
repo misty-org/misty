@@ -1,10 +1,10 @@
 //! One native snapshot of a browser profile's website data: cookies plus each
 //! origin's sign-in storage. Items that cannot sync are skipped and reported, while
 //! items synced by devices that can hold them are carried, never deleted.
-use super::super::browser_data_budget::{fit, Candidate, Held, Limit};
-use super::super::browser_data_coverage::{identity, Coverage};
-use super::super::browser_signin_scope::scoped;
-use super::super::{browser_cookie_store, browser_website_capture};
+use super::super::website_data::budget::{fit, Candidate, Held, Limit};
+use super::super::website_data::coverage::{identity, Coverage};
+use super::super::website_data::signin_scope::scoped;
+use super::super::website_data::{capture, cookie_store};
 use misty_browser_sync::{
     document::{
         credentials::{Area, Cookie},
@@ -19,7 +19,7 @@ pub(super) const COOKIES_UNREADABLE: &str = "Native cookie observation failed";
 
 /// Keeps which step failed. The kind is a fieldless enum, so no cookie or
 /// platform error text can reach the renderer through it.
-fn cookies_unreadable(error: browser_cookie_store::CookieStoreError) -> String {
+fn cookies_unreadable(error: cookie_store::CookieStoreError) -> String {
     format!("{COOKIES_UNREADABLE}: {error:?}")
 }
 
@@ -38,7 +38,7 @@ pub(super) async fn collect(
     limit: Limit,
 ) -> Result<Collected, String> {
     let mut coverage = Coverage::default();
-    let mut cookies = browser_cookie_store::read(view, physical)
+    let mut cookies = cookie_store::read(view, physical)
         .await
         .map_err(cookies_unreadable)?;
     let baseline: Vec<Cookie> = previous
@@ -47,12 +47,9 @@ pub(super) async fn collect(
         .filter_map(|record| serde_json::from_value::<Vec<Cookie>>(record.payload.clone()).ok())
         .flatten()
         .collect();
-    cookies.align_same_site(
-        &baseline,
-        browser_cookie_store::SAME_SITE_NONE_IS_UNSPECIFIED,
-    );
+    cookies.align_same_site(&baseline, cookie_store::SAME_SITE_NONE_IS_UNSPECIFIED);
     let local: BTreeSet<_> = cookies.cookies.iter().map(identity).collect();
-    cookies.carry(&baseline, browser_cookie_store::representable);
+    cookies.carry(&baseline, cookie_store::representable);
     let carried = cookies
         .cookies
         .iter()
@@ -60,8 +57,7 @@ pub(super) async fn collect(
         .filter(|cookie| !local.contains(cookie))
         .collect();
     cookies.record(&mut coverage);
-    let storage =
-        browser_website_capture::capture(app, physical, previous, extra, &mut coverage).await?;
+    let storage = capture::capture(app, physical, previous, extra, &mut coverage).await?;
     // Only sign-in storage syncs; a copy synced before that is trimmed too.
     let candidates = storage
         .candidates

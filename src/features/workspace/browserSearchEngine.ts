@@ -56,7 +56,7 @@ export interface BrowserCustomBang {
 const customBangTriggerPattern = /^[a-z0-9][a-z0-9.-]{0,23}$/;
 
 /** Why a custom shortcut is unusable, or null when it is fine. */
-export function customBangProblem(bang: BrowserCustomBang): string | null {
+function customBangProblem(bang: BrowserCustomBang): string | null {
   if (!customBangTriggerPattern.test(bang.trigger))
     return "Use up to 24 lowercase letters, digits, dots or dashes.";
   if (!bang.name.trim() || bang.name.length > 60) return "Use a name between 1 and 60 characters.";
@@ -71,7 +71,7 @@ export function customBangProblem(bang: BrowserCustomBang): string | null {
 }
 
 /** Anything malformed is dropped, not repaired. */
-export function parseBrowserCustomBangs(raw: string): BrowserCustomBang[] {
+function parseBrowserCustomBangs(raw: string): BrowserCustomBang[] {
   try {
     return sanitizeBrowserCustomBangs(JSON.parse(raw));
   } catch {

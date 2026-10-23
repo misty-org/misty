@@ -1,6 +1,6 @@
-import { socialApi as spacesApi } from "../SocialRuntime";
+import { spacesApi } from "@/api/spaces/api";
 import type { SpaceLibraryItem, SpaceMember } from "@/api/spaces/dto/entities";
-import type { ChatComposerSuggestion } from "@/api/spaces/dto/SpaceChat";
+import type { ChatComposerSuggestion } from "@/api/spaces/dto/space-chat";
 import type { SpaceAgent } from "@/api/spaces/space-agents";
 import { agentOwnerLabel } from "../../members/agents/useSpaceAgentMembers";
 import { useEffect, useMemo, useState } from "react";

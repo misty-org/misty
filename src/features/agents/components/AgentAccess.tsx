@@ -1,4 +1,4 @@
-import { observeAccountChanges } from "@/api/accountEvents";
+import { observeAccountChanges } from "@/api/account-events";
 import { appsApi } from "../apps/api";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { AgentDeviceSnapshot } from "../model/types";

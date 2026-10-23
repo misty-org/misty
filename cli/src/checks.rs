@@ -45,6 +45,26 @@ pub fn app(workspace: &Workspace) -> Result<()> {
             "--locked",
         ])
         .run(&workspace.misty)?;
+    // Kiri's core tests need no Tauri, matching the kiri-crate git hook step.
+    CommandSpec::new("cargo")
+        .args([
+            "fmt",
+            "--manifest-path",
+            "kiri/Cargo.toml",
+            "--all",
+            "--",
+            "--check",
+        ])
+        .run(&workspace.misty)?;
+    CommandSpec::new("cargo")
+        .args([
+            "test",
+            "--locked",
+            "--no-default-features",
+            "--manifest-path",
+            "kiri/Cargo.toml",
+        ])
+        .run(&workspace.misty)?;
     CommandSpec::new(npm())
         .args(["run", "test:scripts"])
         .run(&workspace.misty)?;
@@ -120,9 +140,9 @@ pub fn website(workspace: &Workspace) -> Result<()> {
     Ok(())
 }
 
-pub fn builtin_tools(workspace: &Workspace) -> Result<()> {
+pub fn features(workspace: &Workspace) -> Result<()> {
     if !workspace.features.is_dir() {
-        bail!("built-in features directory is missing");
+        bail!("features directory is missing");
     }
     CommandSpec::new(npm())
         .args(["test", "--", "src/features"])

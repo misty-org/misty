@@ -8,7 +8,7 @@ import {
 } from "@/features/workspace";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
-import { browserRuntimeCreated, browserRuntimeId } from "./browserRuntime";
+import { browserRuntimeCreated, browserRuntimeId } from "@/features/webviews/browserRuntime";
 
 export function useBrowserOnlineStatus(
   tab: WorkspaceView,

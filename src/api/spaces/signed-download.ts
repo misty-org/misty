@@ -9,7 +9,7 @@
  */
 export const SIGNED_DOWNLOAD_HEADER = "X-Misty-Signed-Download";
 
-export interface SignedDownloadDescriptor {
+interface SignedDownloadDescriptor {
   url: string;
   expires_at: string;
   filename: string;

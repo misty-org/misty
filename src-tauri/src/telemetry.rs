@@ -21,35 +21,28 @@ enum Message {
         operation: &'static str,
         handled: bool,
     },
-    Flush(mpsc::SyncSender<()>),
     Stop(mpsc::SyncSender<()>),
 }
 #[derive(Clone, Copy, Debug)]
 pub enum SafeOperation {
     ApplicationStartup,
-    BackgroundTask,
     Unknown,
 }
 impl SafeOperation {
     fn as_str(self) -> &'static str {
         match self {
             Self::ApplicationStartup => "application_startup",
-            Self::BackgroundTask => "background_task",
             Self::Unknown => "unknown",
         }
     }
 }
 pub trait TelemetryReporter {
     fn capture_error(&self, error: &(dyn Error + 'static), operation: SafeOperation);
-    fn flush(&self);
 }
 pub struct PostHogTelemetryReporter;
 impl TelemetryReporter for PostHogTelemetryReporter {
     fn capture_error(&self, error: &(dyn Error + 'static), operation: SafeOperation) {
         report(&error.to_string(), operation, true);
-    }
-    fn flush(&self) {
-        drain(false);
     }
 }
 fn report(value: &str, operation: SafeOperation, handled: bool) {
@@ -141,7 +134,6 @@ pub fn initialize() {
                         window_started = Some(now);
                     }
                 }
-                Message::Flush(done) => { send(&mut pending); window_started = None; let _ = done.send(()); }
                 Message::Stop(done) => { send(&mut pending); let _ = done.send(()); break; }
             }
         }
@@ -163,21 +155,14 @@ pub fn initialize() {
 pub fn telemetry_set_error_reporting_enabled(enabled: bool) {
     ERROR_REPORTING_ENABLED.store(enabled, Ordering::Relaxed);
 }
-fn drain(stop: bool) {
+/// Sends what is queued and stops the reporter, waiting up to two seconds.
+pub fn shutdown() {
     if let Some(sender) = REPORTER.get() {
         let (done, receiver) = mpsc::sync_channel(1);
-        let message = if stop {
-            Message::Stop(done)
-        } else {
-            Message::Flush(done)
-        };
-        if sender.try_send(message).is_ok() {
+        if sender.try_send(Message::Stop(done)).is_ok() {
             let _ = receiver.recv_timeout(Duration::from_secs(2));
         }
     }
-}
-pub fn shutdown() {
-    drain(true);
 }
 
 pub fn redact_text(value: &str) -> String {

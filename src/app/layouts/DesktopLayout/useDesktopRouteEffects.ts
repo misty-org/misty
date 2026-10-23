@@ -1,5 +1,4 @@
-import { routes } from "@/features/app-shell";
-import { useSettingsStore } from "@/features/settings";
+import { isAuthPath, routes } from "@/features/app-shell";
 import { isSetupCompletedForAccount, useSetupStore } from "@/features/setup";
 import {
   activeLayoutView,
@@ -32,29 +31,23 @@ export function useDesktopRouteEffects(options: {
   } = options;
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
 
+  // Setup follows the welcome on first run, for an account or for browsing without one.
+  const onAuthPage = isAuthPath(location.pathname);
   useEffect(() => {
-    if (!userId || transitioning) return;
+    if (transitioning || onAuthPage) return;
     const setup = useSetupStore.getState();
+    // Signing in passes the welcome as Start browsing does.
+    if (userId) setup.finishWelcome();
     if (!isSetupCompletedForAccount(setup, userId) && !setup.isOpen) setup.startSetup();
-  }, [userId, transitioning]);
+  }, [userId, transitioning, onAuthPage]);
 
   useEffect(() => {
-    // Extensions are managed in Settings; old /extensions links open them there.
-    const extensions = /^\/extensions(?:\/|$)/.test(location.pathname);
-    if (!location.pathname.startsWith("/settings") && !extensions) return;
-    if (extensions) useSettingsStore.getState().setActiveSection("browser-extensions");
+    if (!location.pathname.startsWith("/settings")) return;
     openSettingsOverlay();
     navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
       replace: true,
     });
   }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate, openSettingsOverlay]);
-
-  useEffect(() => {
-    if (!location.pathname.startsWith("/providers")) return;
-    navigate(settingsFallbackRoute(lastNonSettingsRouteRef.current, lastAppRoute), {
-      replace: true,
-    });
-  }, [lastAppRoute, lastNonSettingsRouteRef, location.pathname, navigate]);
 
   useEffect(() => {
     const currentRoute = `${location.pathname}${location.search}${location.hash}`;

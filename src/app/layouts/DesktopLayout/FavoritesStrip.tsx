@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StarOff } from "lucide-react";
 import { removeFavorite, useFavorites } from "@/features/bookmarks/favorites";
 import type { Bookmark } from "@/features/bookmarks/tree";
-import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import { activeLayoutView } from "@/features/workspace/layoutTabs";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";

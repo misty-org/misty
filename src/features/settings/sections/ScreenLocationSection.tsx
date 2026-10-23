@@ -7,7 +7,6 @@ import { setKeepAwakeForAgents } from "@/features/agents/keepAwake";
 // "window" is a new tab in this window; the stored name predates the label.
 const options: { value: ScreenLocation; label: string }[] = [
   { value: "window", label: "New tab" },
-  { value: "separate", label: "Separate window" },
   { value: "ask", label: "Ask each time" },
 ];
 
@@ -23,7 +22,7 @@ export function ScreenLocationSection() {
       .settings()
       .then((result) => {
         if (!live) return;
-        setLocation(result.settings.screen_location ?? "window");
+        setLocation(result.settings.screen_location === "ask" ? "ask" : "window");
         setKeepAwake(result.settings.keep_awake_for_agents ?? true);
       })
       .catch(() => live && setError("This setting couldn’t load."));
@@ -37,9 +36,9 @@ export function ScreenLocationSection() {
     setError("");
     try {
       const { settings } = await aiSurfaceApi.updateScreenLocation(value);
-      setLocation(settings.screen_location ?? value);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "This setting couldn’t be saved.");
+      setLocation(settings.screen_location === "ask" ? "ask" : "window");
+    } catch {
+      setError("The screen preference could not be saved. Try again.");
     } finally {
       setWorking(false);
     }
@@ -53,8 +52,8 @@ export function ScreenLocationSection() {
       const next = settings.keep_awake_for_agents ?? value;
       setKeepAwake(next);
       setKeepAwakeForAgents(next);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "This setting couldn’t be saved.");
+    } catch {
+      setError("The keep-awake preference could not be saved. Try again.");
     } finally {
       setWorking(false);
     }
@@ -70,8 +69,7 @@ export function ScreenLocationSection() {
       <DesktopSettingsRow
         label="Where Misty opens new screens"
         description={
-          "A new tab opens beside your work. A separate window works small in a corner of " +
-          "your screen, so you can watch it while this one stays yours. " +
+          "A new tab opens beside your work, or Misty asks first. " +
           "Saying where in your request, such as this tab or my whole screen, always wins."
         }
       >

@@ -20,7 +20,7 @@ import {
   type SitePermissions,
   type SitePermissionDecision,
   permissionLabels,
-} from "@/features/browser-workspace/sitePermissions";
+} from "@/features/browser-sync/sitePermissions";
 import { useBrowserOverlayControl } from "./useBrowserOverlayControl";
 import { SiteStyleDialog } from "./SiteStyleDialog";
 

@@ -1,4 +1,4 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 
 export type AgentMethodKind = "workflow" | "template" | "skill";
@@ -15,7 +15,8 @@ export interface AgentMethodDefinition {
   description: string;
   instructions: string;
   inputs: AgentMethodInput[];
-  target: "cloud" | "separate_window" | "current_window";
+  /** Older methods may still hold "separate_window"; it runs as "current_window". */
+  target: "cloud" | "current_window";
   required_tools: string[];
 }
 export type ScheduleFrequency = "once" | "hourly" | "daily" | "weekly" | "monthly" | "yearly";

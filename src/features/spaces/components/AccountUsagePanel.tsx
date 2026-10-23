@@ -1,8 +1,8 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { readApiSessionGeneration } from "@/api/client";
 import { Progress, Skeleton } from "@/shared/ui";
 import { useEffect, useState } from "react";
-import { formatStorageBytes } from "./spacePanel/storageFormat";
+import { formatStorageBytes } from "./storageFormat";
 
 type Meter = {
   used: number;
@@ -60,12 +60,6 @@ function loadUsage(force = false): void {
       notify();
     });
   inflight = { generation, promise };
-}
-
-/** Forgets the shared reading, so the next panel to open fetches a fresh one. */
-export function resetAccountUsageCache(): void {
-  cache = undefined;
-  inflight = undefined;
 }
 
 /** One account's AI and storage allowances across every Space; shared and cached. */

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/features/auth";
-import { SyncUnlockForm } from "@/features/browser-workspace/SyncAccountSettings";
-import { useSyncController } from "@/features/browser-workspace/useSyncController";
+import { SyncUnlockForm } from "@/features/browser-sync/SyncAccountSettings";
+import { useSyncController } from "@/features/browser-sync/useSyncController";
 import { useConnectedDevices } from "@/features/connected-devices";
 import type { AdmissionView } from "@/native/devices";
 import { Button } from "@/shared/ui";
@@ -36,9 +36,7 @@ export function AddThisDevice() {
     const timer = window.setTimeout(() => {
       void controller.current
         .approvalStatus(approval.requestId)
-        .then(setApproval, (cause: unknown) => {
-          setError(cause instanceof Error ? cause.message : String(cause));
-        });
+        .then(setApproval, () => setError("The approval status could not be checked. Try again."));
     }, pollMs);
     return () => window.clearTimeout(timer);
   }, [approval]);
@@ -49,7 +47,7 @@ export function AddThisDevice() {
         setError("");
         setApproval(view);
       },
-      (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+      () => setError("A device approval request could not be started. Try again."),
     );
 
   // A new account has no vault yet: creating one is what adds its first device.
@@ -91,7 +89,7 @@ export function AddThisDevice() {
           )}
         </Row>
         {approval?.code && !approval.admitted ? (
-          <div className="border-t border-charcoal-border py-3">
+          <div className="py-3">
             <p className="text-[13px] text-cream-muted">Your other device must show this code:</p>
             <p className="mt-1 font-mono text-2xl tracking-[0.3em] text-cream" aria-live="polite">
               {approval.code.slice(0, 3)} {approval.code.slice(3)}
@@ -99,7 +97,7 @@ export function AddThisDevice() {
           </div>
         ) : null}
         {error ? (
-          <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
+          <p role="alert" className="py-2 text-sm text-cream-muted">
             {error}
           </p>
         ) : null}

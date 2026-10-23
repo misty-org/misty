@@ -1,7 +1,7 @@
 //! The windows Misty shows while it controls the desktop or its own window
 //! on Windows: the control island, and the mist that rings what Misty
 //! controls and carries Misty's own pointer
-//! (docs/design/agents-at-cursor/BRIEF.md). Both render `desktop.html`, are
+//! (docs/agents/cursor-companion.md). Both render `desktop.html`, are
 //! kept out of screen captures, and never take focus by being shown. The
 //! mist ignores the mouse; the island takes it only when the person clicks.
 use std::sync::Mutex;

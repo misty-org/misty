@@ -9,9 +9,13 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { invoke } from "@tauri-apps/api/core";
-import { normalizeBrowserAddress } from "./browserAddress";
+import { normalizeBrowserAddress } from "@/features/browser-sync/address";
 import { setBrowserError } from "./browserErrors";
-import { browserRuntimeCreated, browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
+import {
+  browserRuntimeCreated,
+  browserRuntimeId,
+  useBrowserRuntimeStore,
+} from "@/features/webviews/browserRuntime";
 
 /** Address navigation, back and forward, reload, and the shortcuts that drive them. */
 export function useBrowserNavigation({

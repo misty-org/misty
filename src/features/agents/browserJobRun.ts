@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { agentTab, noteAgentTabJob, pictureAgentTab, wakeAgentTab } from "./agentTabs";
+import { pictureAgentTab } from "./agentTabPictures";
+import { agentTab, noteAgentTabJob, wakeAgentTab } from "./agentTabs";
 import { touchHostedSession } from "./hostedSessionsState";
 import { isBrowserSnapshotStale } from "./workerDeviceJobs";
 import {

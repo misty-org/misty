@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Skeleton } from "@/shared/ui";
@@ -13,7 +13,7 @@ import { useProjectReview } from "./useProjectReview";
 const delegated = /^code[._]delegate$/;
 const settled = new Set(["completed", "failed", "canceled"]);
 
-export function delegatedCoding(message: GlobalAiMessage): boolean {
+function delegatedCoding(message: GlobalAiMessage): boolean {
   return Boolean(
     message.progress?.some((item) => item.type === "tool" && delegated.test(item.name)),
   );

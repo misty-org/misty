@@ -54,22 +54,5 @@ export function createSpaceMembersApi(
         method: "POST",
         body: JSON.stringify({ user_id: userId }),
       }),
-    memberPermissions: (spaceId: string, userId: string) =>
-      request<{ permissions: Record<string, boolean> }>(
-        `${memberPath(spaceId, userId)}/permissions`,
-      ),
-    setMemberPermission: (
-      spaceId: string,
-      userId: string,
-      permission: string,
-      effect: "allow" | "deny" | "inherit",
-    ) =>
-      request<{ permissions: Record<string, boolean> }>(
-        `${memberPath(spaceId, userId)}/permissions`,
-        {
-          method: "PUT",
-          body: JSON.stringify({ permission, effect }),
-        },
-      ),
   };
 }

@@ -21,7 +21,9 @@ export function AgentMentionsPage({ agentId }: { agentId: string }) {
     const controller = new AbortController();
     agentMentionsApi
       .list(controller.signal)
-      .then((items) => setMentions(items.filter((item) => item.request.target_agent_id === agentId)))
+      .then((items) =>
+        setMentions(items.filter((item) => item.request.target_agent_id === agentId)),
+      )
       .catch(() => !controller.signal.aborted && setFailed(true));
     return () => controller.abort();
   }, [agentId]);

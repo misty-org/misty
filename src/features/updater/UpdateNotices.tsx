@@ -8,14 +8,16 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 /** Checks only. Downloads and installation always follow an explicit user action. */
 const minCheckIntervalMs = 6 * 60 * 60_000;
 
-export function UpdateNotices({ accountId }: { accountId: string }) {
+/** `profileId` is the signed-in account, or `local` while nobody is signed in: updates
+ * don't wait for an account. */
+export function UpdateNotices({ profileId }: { profileId: string }) {
   const [hostVersion, setHostVersion] = useState("");
   const [notice, setNotice] = useState("");
   const [dismissed, setDismissed] = useState("");
   const enabled = useSettingsStore((s) =>
     settingsBoolean(s.settings?.document ?? {}, "general", "auto_update_enabled", true),
   );
-  const key = JSON.stringify([accountId, hostVersion, notice]);
+  const key = JSON.stringify([profileId, hostVersion, notice]);
   useEffect(() => {
     const show = (event: Event) => {
       setNotice(String((event as CustomEvent).detail));
@@ -25,7 +27,7 @@ export function UpdateNotices({ accountId }: { accountId: string }) {
     return () => window.removeEventListener("misty:workspace-notice", show);
   }, []);
   useEffect(() => {
-    if (!accountId || !enabled || !hasTauriInternals()) return;
+    if (!profileId || !enabled || !hasTauriInternals()) return;
     let closed = false,
       checking = false,
       found = false,
@@ -69,7 +71,7 @@ export function UpdateNotices({ accountId }: { accountId: string }) {
       clearTimeout(timer);
       window.removeEventListener("focus", run);
     };
-  }, [accountId, enabled]);
+  }, [profileId, enabled]);
   if ((!hostVersion && !notice) || key === dismissed) return null;
   const title = notice || `Misty ${hostVersion} is available`;
   return (

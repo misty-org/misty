@@ -40,8 +40,6 @@ pub(super) fn select_bound_profile(
 pub(in crate::infra) struct BrowserProfileLease {
     _lifecycle: RwLockReadGuard<'static, ()>,
     _store: Option<tokio::sync::OwnedRwLockReadGuard<()>>,
-    /// The vault (Space) whose store the page opens in, if any.
-    pub vault_id: Option<String>,
     pub profile_id: Option<String>,
     pub logical_profile_id: Option<String>,
     pub tab_session: Option<serde_json::Value>,
@@ -164,7 +162,6 @@ pub(in crate::infra) async fn browser_profile_lease(
         tab_session,
         _lifecycle: lifecycle,
         _store: store,
-        vault_id,
         profile_id,
         logical_profile_id,
     })

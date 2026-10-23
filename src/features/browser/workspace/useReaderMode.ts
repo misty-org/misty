@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import type { WorkspaceView } from "@/features/workspace";
 import { browserPageTools } from "../library/native";
-import { browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
+import { browserRuntimeId, useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { parseReaderArticle, type ReaderArticle } from "./readerArticle";
 
 /**

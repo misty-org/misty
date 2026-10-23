@@ -3,7 +3,6 @@ import {
   ContextMenuAction,
   ContextMenuContent,
   ContextMenuSeparator,
-  ContextMenuSubmenu,
   ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -101,9 +100,6 @@ export function MenusSection() {
           <ContextMenuContent width="md">
             <ContextMenuAction icon={<Copy />} label="Copy" shortcut="⌘C" onSelect={() => {}} />
             <ContextMenuAction icon={<Pencil />} label="Rename" onSelect={() => {}} />
-            <ContextMenuSubmenu icon={<Share2 />} label="Share">
-              <ContextMenuAction icon={<Copy />} label="Copy link" onSelect={() => {}} />
-            </ContextMenuSubmenu>
             <ContextMenuSeparator />
             <ContextMenuAction icon={<Trash2 />} label="Delete" destructive onSelect={() => {}} />
           </ContextMenuContent>

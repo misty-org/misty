@@ -49,7 +49,9 @@ pub(crate) fn builtin() -> Vec<Box<dyn Capability>> {
     // WebView2 reaches Windows Hello itself; WKWebView needs Kiri for any site.
     #[cfg(all(target_os = "macos", feature = "tauri"))]
     if webauthn::macos::available() {
-        capabilities.push(Box::new(webauthn::WebAuthn::new(webauthn::macos::MacAuthenticator)));
+        capabilities.push(Box::new(webauthn::WebAuthn::new(
+            webauthn::macos::MacAuthenticator,
+        )));
     }
     capabilities
 }

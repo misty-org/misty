@@ -8,7 +8,7 @@ import {
 } from "@/features/workspace";
 import { migrateRetiredWorkspaceView } from "@/features/workspace/workspaceMigrations";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
-import { FlyingMisty } from "@/features/welcome/FlyingMisty";
+import { FlyingMisty } from "@/shared/ui";
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const current = migrateRetiredWorkspaceView(tab);

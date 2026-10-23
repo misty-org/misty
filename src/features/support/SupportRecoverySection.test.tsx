@@ -108,7 +108,7 @@ describe("SupportRecoverySection", () => {
   });
 
   it("reopens setup and closes settings when requested", async () => {
-    useSetupStore.setState({ isOpen: false, step: "theme" });
+    useSetupStore.setState({ isOpen: false, step: "tabs" });
     const closeSettingsListener = vi.fn();
     window.addEventListener("misty:close-settings", closeSettingsListener);
 
@@ -122,7 +122,7 @@ describe("SupportRecoverySection", () => {
 
     expect(closeSettingsListener).toHaveBeenCalledOnce();
     expect(useSetupStore.getState().isOpen).toBe(true);
-    expect(useSetupStore.getState().step).toBe("spaces");
+    expect(useSetupStore.getState().step).toBe("import");
     window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });

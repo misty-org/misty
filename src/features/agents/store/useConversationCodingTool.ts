@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 /**
  * The coding tool each conversation hands its project work to, or none for the
- * Settings default (docs/plans/coding-runner-capabilities.md). Tools are installed
+ * Settings default (docs/agents/coding-tools.md). Tools are installed
  * per computer, so the choice is per device and kept in local storage, like the
  * project. A new chat's choice is a draft until the conversation exists.
  */

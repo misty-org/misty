@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { subscribeAccountEvents } from "@/api/accountEvents";
+import { subscribeAccountEvents } from "@/api/account-events";
 import { useAuth } from "@/features/auth";
-import { spacePersonalItemsApi, type SpacePersonalItem } from "@/api/spaces/personalItems";
+import { spacePersonalItemsApi, type SpacePersonalItem } from "@/api/spaces/personal-items";
 import { readApiSessionGeneration } from "@/api/client/session";
 const eventName = "misty:space-personal-items";
 const pendingReads = new Map<string, Promise<{ items: SpacePersonalItem[] }>>();
@@ -38,7 +38,7 @@ export function useSpacePersonalItems(spaceId: string) {
         })
         .catch(() => {
           if (active && current === generation && session === readApiSessionGeneration())
-            setFailure({ scope, message: "Favorites and recent items couldn’t load." });
+            setFailure({ scope, message: "Recent items couldn’t load." });
         });
     };
     const changed = (event: Event) => {
@@ -71,7 +71,7 @@ export function useSpacePersonalItems(spaceId: string) {
     };
   }, [scope, user?.id, spaceId, revision, session]);
   const update = useCallback(
-    async (itemKey: string, patch: { favorite?: boolean; opened?: boolean }) => {
+    async (itemKey: string, patch: { opened?: boolean }) => {
       try {
         const item = await spacePersonalItemsApi.update(spaceId, itemKey, patch);
         if (session !== readApiSessionGeneration() || currentScope.current !== scope) return;

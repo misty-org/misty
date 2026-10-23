@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use misty_browser_sync::document::CredentialRecord;
 use serde::Serialize;
 
-use super::super::browser_data_coverage::SiteCoverage;
+use super::super::website_data::coverage::SiteCoverage;
 
 /// The native browser store this session uses for the device it writes.
 #[derive(Clone, Debug, PartialEq, Eq)]

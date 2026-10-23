@@ -1,4 +1,4 @@
-import type { BrowserTheme } from "./types";
+import type { BrowserTheme } from "@/features/webviews/types";
 export function browserThemeFromDocument(): BrowserTheme {
   const theme = document.documentElement.dataset.theme;
   if (theme === "light" || theme === "dark") return theme;

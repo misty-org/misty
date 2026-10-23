@@ -59,16 +59,6 @@ export async function refreshSpaceSearch(): Promise<void> {
   apply();
 }
 
-/** Replaces the window's Space's custom bangs. */
-export async function saveSpaceBangs(bangs: BrowserCustomBang[]): Promise<void> {
-  const space = await invoke<SpaceSearch | null>("browser_space_search", { bangs });
-  if (!space) throw new Error("Turn on sync to keep search shortcuts with this Space.");
-  useSpaceSearchStore.setState({
-    space: { ...space, bangs: sanitizeBrowserCustomBangs(space.bangs) },
-  });
-  apply();
-}
-
 let started = false;
 
 /** The device's own shortcuts changed (settings load or edit while sync is off). */

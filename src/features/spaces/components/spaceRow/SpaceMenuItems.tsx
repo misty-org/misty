@@ -1,12 +1,4 @@
-import {
-  AppWindowMac,
-  Globe,
-  LogOut,
-  Palette,
-  Pencil,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { AppWindowMac, Globe, LogOut, Palette, Pencil, Plus, Trash2 } from "lucide-react";
 import type { Space } from "@/api/spaces/dto/entities";
 import {
   openSpaceWindow,

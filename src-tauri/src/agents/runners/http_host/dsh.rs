@@ -13,7 +13,7 @@ use super::{
     super::{
         acp_engines::push_guard_env,
         events::{PermissionRequest, RunnerEvent},
-        Capabilities, CommandSpec, EngineId, Launch, LaunchMode, RunnerError,
+        CommandSpec, Launch, LaunchMode, RunnerError,
     },
     text_at,
     wire::{dsh_approval, dsh_chunk, dsh_rejected, dsh_reply},
@@ -23,20 +23,6 @@ use super::{
 pub struct DshRunner;
 
 impl HostedRunner for DshRunner {
-    fn engine(&self) -> EngineId {
-        EngineId::Dsh
-    }
-
-    fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            interactive_asks: false,
-            plan_mode: false,
-            todos: false,
-            rate_limits: false,
-            full_access_only: true,
-        }
-    }
-
     fn server(&self, launch: &Launch, port: u16) -> Result<CommandSpec, RunnerError> {
         if launch.task.trim().is_empty() {
             return Err(RunnerError::Invalid("the task is empty"));

@@ -22,45 +22,35 @@ vi.mock("@/features/journal/notes/SpaceNotes", () => ({
 vi.mock("@/features/journal/drawings/SpaceDrawings", () => ({
   SpaceDrawings: ({ spaceId }: { spaceId: string }) => <div>Drawings in {spaceId}</div>,
 }));
-// Keep the real runtime guards and host initializers: a shallow tool mock used
-// to hide missing service setup in the restored built-in entry point.
-vi.mock("@/features/library/library/SpaceLibrary", async () => {
-  const { libraryRuntime } = await import("@/features/library/library/LibraryRuntime");
-  return {
-    SpaceLibrary: ({ spaceId }: { spaceId: string }) => {
-      expect(libraryRuntime().api).toBeTruthy();
-      return <div>Library in {spaceId}</div>;
-    },
-  };
-});
-vi.mock("./chat/SpaceChatEntry", async () => {
-  const { useSocialAuth } = await import("./chat/SocialRuntime");
-  return {
-    SpaceChatEntry: ({ spaceId }: { spaceId: string }) => {
-      const { user } = useSocialAuth();
-      expect(user?.id).toBe("one");
-      return <div>Chat in {spaceId}</div>;
-    },
-  };
-});
+vi.mock("@/features/library/SpaceLibrary", () => ({
+  SpaceLibrary: ({ spaceId }: { spaceId: string }) => <div>Library in {spaceId}</div>,
+}));
+vi.mock("./chat/SpaceChatEntry", () => ({
+  SpaceChatEntry: ({ spaceId }: { spaceId: string }) => <div>Chat in {spaceId}</div>,
+}));
 vi.mock("./home/SpaceHome", () => ({
   SpaceHome: ({ space }: { space: { id: string } }) => <div>Home in {space.id}</div>,
 }));
 afterEach(() => {
   cleanup();
 });
+// Notes and Drawings without an item show the home, so the item opens them.
 it.each([
-  ["home", "Home"],
-  ["notes", "Notes"],
-  ["drawings", "Drawings"],
-  ["library", "Library"],
-  ["social", "Chat"],
-])("opens %s directly without an installed app", async (section, label) => {
+  ["home", "Home", "", ""],
+  ["notes", "Home", "", ""],
+  ["drawings", "Home", "", ""],
+  ["notes", "Notes", "?note=n1", ""],
+  ["drawings", "Drawings", "", "d1"],
+  ["library", "Library", "", ""],
+  ["social", "Chat", "", ""],
+])("opens %s as %s directly without an installed app", async (section, label, search, kind) => {
   render(
     <MemoryRouter
-      initialEntries={[`/spaces/family/${section === "social" ? "social/misty" : section}`]}
+      initialEntries={[
+        `/spaces/family/${section === "social" ? "social/misty" : section}${search}`,
+      ]}
     >
-      <SpaceSectionView spaceId="family" section={section} />
+      <SpaceSectionView spaceId="family" section={section} studioKind={kind} />
     </MemoryRouter>,
   );
   expect(

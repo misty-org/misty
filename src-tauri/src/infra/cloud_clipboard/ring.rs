@@ -10,7 +10,7 @@ use misty_browser_sync::{
 
 use super::{clip, payload, CloudStart, CloudStatus, Inner};
 use crate::domain::clipboard::ClipboardPayload;
-use crate::infra::device_trust;
+use crate::infra::devices::trust;
 
 /// How many clips the ring keeps (one per slot).
 const SLOTS: u8 = misty_browser_sync::collections::CLIPBOARD_SLOTS;
@@ -29,7 +29,7 @@ pub(super) struct Session {
 
 pub(super) async fn run(inner: std::sync::Arc<Inner>, generation: u64, start: CloudStart) {
     while inner.current(generation) {
-        if !device_trust::effective_policy().clipboard || !device_trust::self_admitted() {
+        if !trust::effective_policy().clipboard || !trust::self_admitted() {
             close(&inner, CloudStatus::Off);
             tokio::time::sleep(Duration::from_secs(15)).await;
             continue;
@@ -70,7 +70,7 @@ async fn follow(inner: &Inner, generation: u64, session: &Session) {
     let mut rows = session.handle.clipboard_rows.clone();
     let mut status = session.handle.status.clone();
     loop {
-        if !inner.current(generation) || !device_trust::effective_policy().clipboard {
+        if !inner.current(generation) || !trust::effective_policy().clipboard {
             return;
         }
         inner.set_status(match status.borrow().phase {

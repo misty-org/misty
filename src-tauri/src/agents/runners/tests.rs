@@ -1,4 +1,4 @@
-//! Runner core tests: the permission bridge, lease accounting, the mirror and
+//! Runner core tests: the permission bridge, lease accounting, the registry and
 //! the rule that routed work never passes a tool's bypass flags.
 use std::path::PathBuf;
 
@@ -6,9 +6,8 @@ use serde_json::json;
 
 use super::{
     bridge::{classify_command, decide, inside, BridgeContext, Decision},
-    events::{ActionKind, PermissionRequest, RunnerEvent, TodoItem, Usage},
+    events::{ActionKind, PermissionRequest, Usage},
     lease::{Lease, LeaseMeter},
-    mirror::Mirror,
     registry, runner_for, EngineId, Launch, LaunchMode, BYPASS_MARKERS,
 };
 
@@ -199,49 +198,16 @@ fn a_lease_stops_the_next_turn_once_spent_or_expired() {
         10
     ));
     assert!(!meter.valid(10));
-    meter.renew(lease);
-    assert!(meter.valid(10));
-    assert!(!meter.valid(100), "an expired lease is not valid");
+    let fresh = LeaseMeter::new(lease);
+    assert!(fresh.valid(10));
+    assert!(!fresh.valid(100), "an expired lease is not valid");
     assert!(!LeaseMeter::default().valid(0), "no lease, no turn");
 }
 
 #[test]
-fn the_mirror_merges_deltas_and_keeps_only_the_newest_todos() {
-    let mut mirror = Mirror::default();
-    mirror.push(RunnerEvent::Delta { text: "Hel".into() });
-    mirror.push(RunnerEvent::Delta { text: "lo".into() });
-    let todo = |status: &str| RunnerEvent::Todos {
-        items: vec![TodoItem {
-            id: "1".into(),
-            title: "Edit".into(),
-            status: status.into(),
-        }],
-    };
-    mirror.push(todo("pending"));
-    mirror.push(todo("in_progress"));
-    let batch = mirror.drain();
-    assert_eq!(batch.len(), 2);
-    assert_eq!(
-        batch[0].event,
-        RunnerEvent::Delta {
-            text: "Hello".into()
-        }
-    );
-    assert_eq!(batch[1].event, todo("in_progress"));
-    assert!(batch[0].seq < batch[1].seq);
-    mirror.push(RunnerEvent::Message {
-        text: "done".into(),
-    });
-    mirror.requeue(batch);
-    let again = mirror.drain();
-    assert_eq!(again.len(), 3);
-    assert!(again.windows(2).all(|pair| pair[0].seq < pair[1].seq));
-}
-
-#[test]
 fn the_registry_stops_a_run_once() {
-    let mut stop = registry::register("run-registry", "claude", "/work/app").expect("registers");
-    assert!(registry::register("run-registry", "claude", "/work/app").is_none());
+    let mut stop = registry::register("run-registry").expect("registers");
+    assert!(registry::register("run-registry").is_none());
     assert!(registry::stop("run-registry"));
     assert!(stop.try_recv().is_ok());
     assert!(!registry::stop("run-registry"));

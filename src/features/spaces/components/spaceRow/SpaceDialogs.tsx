@@ -3,9 +3,9 @@ import type { Space } from "@/api/spaces/dto/entities";
 import { Button, cn, Input, PopoverContent } from "@/shared/ui";
 import { SpaceColorPanel } from "./SpaceColorPanel";
 import { SpaceMembers } from "../../members";
-import { SpaceSettingsDangerDialogs } from "../SpaceSettingsDangerDialogs";
+import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
 import { SpaceSiteLinks } from "../SpaceSiteLinks";
-import { useSpaceSettingsController } from "../useSpaceSettingsController";
+import { useSpaceLifecycleActions } from "../useSpaceLifecycleActions";
 import { useSpacesStore } from "../../store/useSpacesStore";
 
 /** The small windows the Space menu and People open, in place of a settings page. */
@@ -21,7 +21,7 @@ export function SpaceDialogs({
   open: SpaceDialog;
   onClose: () => void;
 }) {
-  const controller = useSpaceSettingsController(space.id);
+  const controller = useSpaceLifecycleActions(space.id);
   const { setLeaveOpen, setDeleteOpen, setDeleteConfirmation, clearError } = controller;
   // Leave and delete use the confirmations the settings page had.
   useEffect(() => {
@@ -58,7 +58,7 @@ export function SpaceDialogs({
           )}
         </PopoverContent>
       )}
-      <SpaceSettingsDangerDialogs spaceName={space.name} controller={controller} />
+      <LeaveDeleteSpaceDialogs spaceName={space.name} controller={controller} />
     </>
   );
 }

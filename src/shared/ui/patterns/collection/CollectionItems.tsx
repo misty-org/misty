@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, type MouseEvent } from "react";
 import { CollectionItemsGrid } from "./CollectionCards";
 import { CollectionColumnsContext } from "./CollectionColumns";
 import { CollectionItemsTable, type CollectionSort } from "./CollectionItemsTable";
@@ -20,6 +20,8 @@ export function CollectionItems({
   sortResetKey = "",
   stickyActions = false,
   gridLayout = "preview",
+  selectedIds = [],
+  onSelect,
 }: {
   items: CollectionItem[];
   categoryLabel?: string;
@@ -36,6 +38,8 @@ export function CollectionItems({
   stickyActions?: boolean;
   /** Compact cards suit icon-based catalogs; preview cards emphasize artwork. */
   gridLayout?: "preview" | "compact";
+  selectedIds?: string[];
+  onSelect?: (event: MouseEvent, id: string, onOpen: () => void) => void;
 }) {
   const hasActions = items.some((item) => item.actions);
   const hasCreators = items.some((item) => item.creator !== undefined);
@@ -130,6 +134,8 @@ export function CollectionItems({
         hasCreators={hasCreators}
         creatorLabel={creatorLabel}
         layout={gridLayout}
+        selectedIds={selectedIds}
+        onSelect={onSelect}
       />
     );
   return (
@@ -141,6 +147,8 @@ export function CollectionItems({
       stickyActions={stickyActions}
       sort={activeSort}
       onSort={(next: CollectionSort | null) => setSort(next && { ...next, scope })}
+      selectedIds={selectedIds}
+      onSelect={onSelect}
     />
   );
 }

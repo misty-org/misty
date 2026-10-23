@@ -13,7 +13,6 @@ const navIslandVariants = cva(
     variants: {
       variant: {
         default: "",
-        subtle: "",
         ghost: "",
       },
       size: {
@@ -115,11 +114,4 @@ const NavIslandItem = React.forwardRef<HTMLButtonElement, NavIslandItemProps>(
 );
 NavIslandItem.displayName = "NavIslandItem";
 
-export {
-  NavIsland,
-  NavIslandItem,
-  navIslandVariants,
-  navIslandItemVariants,
-  NavIsland as IslandNav,
-  NavIslandItem as IslandNavItem,
-};
+export { NavIsland, NavIslandItem };

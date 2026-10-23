@@ -1,5 +1,6 @@
 import { resolveStartupRoute, routes, useAppRouteMemoryStore } from "@/features/app-shell";
 import { RegisterPage, SignInPage, useAuth } from "@/features/auth";
+import { useSetupStore } from "@/features/setup/useSetupStore";
 import { WelcomePage } from "@/features/welcome";
 import { SpaceInvitationRedemption } from "@/features/spaces";
 import { createBrowserRouter, Navigate } from "react-router";
@@ -15,11 +16,13 @@ import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
  */
 function StartupRedirect() {
   const { user } = useAuth();
+  const welcomed = useSetupStore((state) => state.welcomed);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-  if (!user) {
+  // Misty is a full browser without an account: the welcome shows once, on first run.
+  if (!user && !welcomed) {
     return <Navigate to={routes.welcome} replace />;
   }
-  return <Navigate to={resolveStartupRoute(lastAppRoute, routes.browser)} replace />;
+  return <Navigate to={resolveStartupRoute(lastAppRoute)} replace />;
 }
 export const router = createBrowserRouter([
   {
@@ -37,10 +40,6 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <StartupRedirect />,
-          },
-          {
-            path: "providers",
-            element: null,
           },
           {
             element: <AppPagesLayout />,
@@ -65,7 +64,6 @@ export const router = createBrowserRouter([
                 path: "spaces/*",
                 element: null,
               },
-              { path: "extensions/*", element: null },
               {
                 path: "welcome",
                 element: <WelcomePage />,

@@ -4,7 +4,7 @@
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
-use tauri::{AppHandle, Emitter, Manager, Webview};
+use tauri::{AppHandle, Manager, Webview};
 
 fn sessions() -> &'static Mutex<HashMap<String, u64>> {
     static SESSIONS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();

@@ -48,7 +48,13 @@ export function BrowserImportFlow(props: {
   const [sources, setSources] = useState<ImportSource[] | null>(null);
   const [step, setStep] = useState<Step>(() =>
     props.start
-      ? { name: "import", source: props.start.source, kinds: props.start.kinds, outcomes: [], done: false }
+      ? {
+          name: "import",
+          source: props.start.source,
+          kinds: props.start.kinds,
+          outcomes: [],
+          done: false,
+        }
       : { name: "choose" },
   );
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
@@ -120,7 +126,9 @@ export function BrowserImportFlow(props: {
     importIntoNewSpace(name, { source, kinds, extensions })
       .then(() => setStep({ name: "handed", source, space: name }))
       .catch((error: unknown) =>
-        setIssue(error instanceof Error ? error.message : "That Space couldn't be made. Try again."),
+        setIssue(
+          error instanceof Error ? error.message : "That Space couldn't be made. Try again.",
+        ),
       )
       .finally(() => setHanding(false));
   };

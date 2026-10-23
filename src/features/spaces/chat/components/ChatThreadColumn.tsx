@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import type { SpaceMessage } from "@/api/spaces/dto/entities";
-import { IconButton } from "@/shared/ui";
+import { IconButton, Textarea } from "@/shared/ui";
 import { formatChatMessageTime } from "./ChatDisplay";
 import { threadRootOf } from "./messageHelpers";
 import { useChatSidePanel } from "../store/chatSidePanelStore";
@@ -21,11 +21,17 @@ export function ChatThreadColumn({
   rootId,
   messages,
   canWrite,
+  typingLabel,
+  onTypingInput,
+  onStopTyping,
   onSend,
 }: {
   rootId: string;
   messages: SpaceMessage[];
   canWrite: boolean;
+  typingLabel: string;
+  onTypingInput: (text: string) => void;
+  onStopTyping: () => void;
   onSend(replyToMessageId: string, text: string): Promise<void>;
 }) {
   const [text, setText] = useState("");
@@ -40,6 +46,7 @@ export function ChatThreadColumn({
     const value = text;
     if (!value.trim()) return;
     setText("");
+    onStopTyping();
     void onSend(rootId, value);
   };
   const entry = (message: SpaceMessage) => (
@@ -83,19 +90,31 @@ export function ChatThreadColumn({
       </ol>
       {canWrite && root ? (
         <form onSubmit={submit} className="border-t border-charcoal-border p-3">
-          <textarea
+          {typingLabel ? (
+            <p
+              className="m-0 mb-1 min-h-4 text-xs text-cream-muted"
+              role="status"
+              aria-live="polite"
+            >
+              {typingLabel}
+            </p>
+          ) : null}
+          <Textarea
             aria-label="Reply"
             rows={2}
             value={text}
             placeholder="Reply…"
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+              onTypingInput(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            className="w-full resize-none rounded-lg border border-charcoal-border bg-charcoal-card px-3 py-2 text-sm text-cream outline-none"
+            className="min-h-0 resize-none"
           />
         </form>
       ) : null}

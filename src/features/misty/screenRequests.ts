@@ -1,28 +1,24 @@
 import type { ScreenRequest } from "@/features/ai-surface/types";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
-import {
-  patchConversationMessage,
-  type GlobalSearchGet,
-  type GlobalSearchSet,
-} from "@/features/global-search/globalSearchStoreHelpers";
+import { globalMistyError } from "./globalMistyActions";
+import { patchConversationMessage, type MistyGet, type MistySet } from "./mistyStoreHelpers";
 
-/** Where a screen opens: the user's tab, a new tab in this window, or a separate agent window. */
-export type ScreenChoice = "current" | "window" | "separate";
+/** Where a screen opens: the user's tab or a new tab in this window. */
+export type ScreenChoice = "current" | "window";
 
 /** The choice a request's location stands for; "ask" waits for the card. */
 export function screenChoice(location: ScreenRequest["location"]): ScreenChoice {
-  return location === "current" ? "current" : location === "separate" ? "separate" : "window";
+  return location === "current" ? "current" : "window";
 }
 
-function findRequest(get: GlobalSearchGet, conversationId: string, messageId: string) {
+function findRequest(get: MistyGet, conversationId: string, messageId: string) {
   return get()
     .conversations.find((conversation) => conversation.id === conversationId)
     ?.messages.find((message) => message.id === messageId)?.screenRequest;
 }
 
 function patchRequest(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   conversationId: string,
   messageId: string,
   patch: Partial<ScreenRequest>,
@@ -40,8 +36,8 @@ function patchRequest(
  * unless an open tab already matches what the agent needs.
  */
 export async function continueAfterScreenRequest(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   conversationId: string,
   messageId: string,
 ) {
@@ -62,8 +58,8 @@ export async function continueAfterScreenRequest(
 
 /** Opens the screen (or captures it) and continues the same conversation. */
 export async function openScreenAndContinue(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   conversationId: string,
   messageId: string,
   choice: ScreenChoice,
@@ -117,9 +113,7 @@ export async function openScreenAndContinue(
           ? `The user's open tab "${reused.title.slice(0, 120)}" is now attached. Work in it; do not open another.`
           : choice === "current"
             ? "The user's current Misty tab is now attached."
-            : choice === "window"
-              ? "A new browser tab in the user's Misty window is now attached."
-              : "A browser in a separate Misty window is now attached.";
+            : "A new browser tab in the user's Misty window is now attached.";
     const start = request.url && !look && !desktop && !reused ? ` Start at ${request.url}.` : "";
     await get().submitAnswer(
       `Continue the request above. ${where}${start}`,
@@ -130,16 +124,12 @@ export async function openScreenAndContinue(
       { conversationId, context: [] },
       {
         // Agent mode without a browser screen starts desktop control.
-        executionMode: look
-          ? "user"
-          : desktop || reused || choice !== "separate"
-            ? "agent"
-            : "team",
+        executionMode: look ? "user" : "agent",
         continuation: true,
         capture,
         openScreen: reused
           ? { url: request.url, hint: request.reason, tabId: reused.id, place: "current" }
-          : !look && !desktop && choice !== "separate"
+          : !look && !desktop
             ? {
                 url: request.url,
                 hint: request.reason,
@@ -156,8 +146,8 @@ export async function openScreenAndContinue(
 }
 
 export function declineScreenRequest(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   conversationId: string,
   messageId: string,
 ) {

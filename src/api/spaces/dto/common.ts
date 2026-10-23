@@ -1,4 +1,4 @@
-import type { GlobalImageEditDefinition } from "@/api/spaces/dto/imageEditor";
+import type { GlobalImageEditDefinition } from "@/api/spaces/dto/image-editor";
 
 export type SpaceRole = "owner" | "member";
 

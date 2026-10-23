@@ -112,19 +112,13 @@ export function useMergedTitlebar(
         else element.dataset.mistyWindowTitlebarRegion = "true";
       };
       shell
-        .querySelectorAll<HTMLElement>(
-          '[data-window-toolbar], .misty-global-navigator[data-dock-position="top"]',
-        )
+        .querySelectorAll<HTMLElement>("[data-window-toolbar]")
         .forEach((element) => apply(element));
       shell
-        .querySelectorAll<HTMLElement>(
-          '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
-        )
+        .querySelectorAll<HTMLElement>(".misty-workspace-tabs")
         .forEach((element) => apply(element, false, true));
       // A side strip owns the titlebar band, so no page needs a title header of its own.
-      const sideTabs = shell.querySelector(
-        '.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])',
-      );
+      const sideTabs = shell.querySelector(".misty-workspace-tabs");
       if (!sideTabs)
         shell.querySelectorAll<HTMLElement>("[data-workspace-pane]").forEach((pane) => {
           if (![...retained].some((element) => pane.contains(element))) apply(pane, true);
@@ -149,9 +143,7 @@ export function useMergedTitlebar(
       resize.disconnect();
       resize.observe(shell);
       shell
-        .querySelectorAll(
-          "[data-window-toolbar], [data-workspace-pane], .misty-global-navigator, .misty-workspace-tabs",
-        )
+        .querySelectorAll("[data-window-toolbar], [data-workspace-pane], .misty-workspace-tabs")
         .forEach((element) => resize.observe(element));
     };
     const mutations = new MutationObserver((records) => {

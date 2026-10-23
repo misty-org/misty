@@ -16,73 +16,6 @@
   overflow: hidden;
 }
 
-.misty-presence {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2147483400;
-  width: 44px;
-  height: 44px;
-  pointer-events: none;
-  will-change: transform;
-}
-
-/* The companion can visually glide across the pointer while catching up. It
-   must remain transparent to hit testing until it reaches its safe offset or
-   links and text underneath rapidly lose and regain cursor ownership. */
-.misty-presence[data-following="true"] *,
-.misty-presence[data-following="true"] *::before,
-.misty-presence[data-following="true"] *::after {
-  pointer-events: none !important;
-}
-
-.misty-region-capture {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483647;
-  cursor: crosshair;
-  background: rgb(7 10 14 / 34%);
-  user-select: none;
-}
-
-.misty-region-capture-hint {
-  position: fixed;
-  top: 18px;
-  right: 0;
-  left: 0;
-  z-index: 2;
-  width: fit-content;
-  margin-inline: auto;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 999px;
-  background: rgb(18 21 25 / 94%);
-  padding: 8px 13px;
-  color: #eef5ff;
-  box-shadow: 0 12px 30px rgb(0 0 0 / 30%);
-  font-size: 11px;
-  pointer-events: none;
-}
-
-.misty-region-capture-selection {
-  position: fixed;
-  border: 1px solid rgb(142 199 255 / 90%);
-  border-radius: 8px;
-  background: rgb(132 190 255 / 10%);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 25%);
-  pointer-events: none;
-}
-
-.misty-input-agent {
-  align-self: center;
-  max-width: 68px;
-  overflow: hidden;
-  color: var(--color-cream-muted);
-  font-size: 10px;
-  font-weight: 600;
-  text-overflow: clip;
-  white-space: nowrap;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .misty-ai-pane-host *,
   .misty-ai-pane-host *::before,
@@ -91,11 +24,6 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  .misty-presence {
-    animation: none !important;
-    transition: none !important;
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { liveAcceptanceEnabled } from "./liveEnv";
-import { MistyClient, seedSpaceMember, type InvocationRun } from "./mistyClient";
+import { MistyClient, seedSpaceAgent, seedSpaceMember, type InvocationRun } from "./mistyClient";
 import { writeAcceptanceReport } from "./report";
 
 // Agents for other members, live: Alice's agent asks Bob's agent, which Bob
@@ -44,7 +44,7 @@ describe.skipIf(!liveAcceptanceEnabled)("agents ask other members' agents", () =
         enabled: true,
       }),
     });
-    await bob.json(`/spaces/${space}/agents/${researcher.id}`, { method: "PUT" });
+    seedSpaceAgent(space, researcher.id, bob.userId);
     const aliceAgents = await alice.json<{ agents: Array<{ id: string }> }>("/misty/agents");
     const aliceAgent = aliceAgents.agents[0]?.id ?? "";
 

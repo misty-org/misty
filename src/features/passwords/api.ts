@@ -30,6 +30,13 @@ export const passwordsApi = {
     }),
   respondToOffer: (id: string, save: boolean) =>
     invoke<void>("browser_password_offer_respond", { id, save }),
+  /** What turning on sync would bring from this device's local vault into the account. */
+  devicePreview: () =>
+    invoke<{ passwords: number; accountHasPasswords: boolean }>("browser_passwords_device_preview"),
+  /** Moves this device's saved passwords into the account's synced vault. */
+  deviceMerge: () => invoke<number>("browser_passwords_device_merge"),
+  /** Before signing out: keeps a copy on this device, or erases the device's with `remove`. */
+  deviceKeep: (remove: boolean) => invoke<void>("browser_passwords_device_keep", { remove }),
 };
 
 export function siteLabel(origin: string): string {

@@ -7,3 +7,4 @@ export type {
   DesktopSettingsNavEntry,
   DesktopSettingsNavGroup,
 } from "./components/DesktopSettingsUI";
+export { SyncRestoreSettings } from "./sections/SyncRestoreSettings";

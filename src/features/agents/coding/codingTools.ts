@@ -1,8 +1,8 @@
-import { cachedRequest, type CachedRequestOptions } from "@/api/cache/cachedRequest";
+import { cachedRequest, type CachedRequestOptions } from "@/api/cache/cached-request";
 import { invoke } from "@tauri-apps/api/core";
 
 /** A coding tool Misty can hand work to, and what it can do. */
-export interface CodingTool {
+interface CodingTool {
   id: string;
   name: string;
   /** Asks before acting mid-turn, so Ask and Auto both work fully. */
@@ -43,9 +43,6 @@ export const codingTools: CodingTool[] = [
     reportsUsage: false,
   },
 ];
-
-export const codingToolName = (id: string) =>
-  codingTools.find((tool) => tool.id === id)?.name ?? id;
 
 /** What this device found for one tool. */
 export interface CodingToolStatus {

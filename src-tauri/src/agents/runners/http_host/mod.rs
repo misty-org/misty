@@ -16,7 +16,7 @@ use serde_json::Value;
 
 use super::{
     events::{PermissionRequest, RunnerEvent},
-    Capabilities, CommandSpec, EngineId, Launch, RunnerError,
+    CommandSpec, EngineId, Launch, RunnerError,
 };
 
 /// A request to the tool's server. Responses come back through
@@ -93,8 +93,6 @@ pub enum StreamKind {
 
 /// A hosted tool's adapter.
 pub trait HostedRunner: Send + Sync {
-    fn engine(&self) -> EngineId;
-    fn capabilities(&self) -> Capabilities;
     /// The server command for a launch on this port. Refuses a mode the
     /// engine cannot honor.
     fn server(&self, launch: &Launch, port: u16) -> Result<CommandSpec, RunnerError>;

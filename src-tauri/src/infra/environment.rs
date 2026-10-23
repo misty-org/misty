@@ -44,10 +44,6 @@ pub struct AppEnvironmentSnapshot {
 }
 
 impl AppEnvironmentService {
-    pub fn new() -> Self {
-        Self::new_with_data_root(None)
-    }
-
     pub fn new_with_data_root(data_root: Option<PathBuf>) -> Self {
         Self {
             inner: Arc::new(AppEnvironment::load(data_root)),
@@ -56,10 +52,6 @@ impl AppEnvironmentService {
 
     pub fn snapshot(&self) -> AppEnvironmentSnapshot {
         self.inner.snapshot()
-    }
-
-    pub fn misty_config_path(&self) -> PathBuf {
-        self.inner.misty_config_path.clone()
     }
 
     /// The database every store lives in: `~/.misty/.local/data/misty.db`.
@@ -93,11 +85,6 @@ impl AppEnvironmentService {
         self.inner.home_dir.clone()
     }
 
-    /// Legacy remote-mount prefix; paths under it are treated as remote, never indexed.
-    pub fn mount_root(&self) -> PathBuf {
-        self.inner.misty_dir.join("mnt")
-    }
-
     pub fn cache_dir(&self) -> PathBuf {
         self.inner.cache_dir.clone()
     }
@@ -110,13 +97,6 @@ impl AppEnvironmentService {
     /// Undo copies of coding runs (agents::checkpoints).
     pub fn checkpoints_dir(&self) -> PathBuf {
         self.inner.misty_dir.join("checkpoints")
-    }
-
-    #[cfg(test)]
-    pub fn for_test_home(home_dir: PathBuf) -> Self {
-        Self {
-            inner: Arc::new(AppEnvironment::for_home(home_dir)),
-        }
     }
 }
 
@@ -143,31 +123,6 @@ impl AppEnvironment {
             misty_config_path: misty_config_path.clone(),
             commands_path,
             config_exists: misty_config_path.exists(),
-        }
-    }
-
-    #[cfg(test)]
-    fn for_home(home_dir: PathBuf) -> Self {
-        let misty_dir = home_dir.join(".misty");
-        let config_dir = misty_dir.join("config");
-        let db_dir = misty_dir.join("db");
-        let cache_dir = misty_dir.join("cache");
-        let tmp_dir = misty_dir.join("tmp");
-        let settings_path = config_dir.join("settings.json");
-        let misty_config_path = config_dir.join("misty.json");
-        let commands_path = config_dir.join("commands.msy");
-
-        Self {
-            home_dir,
-            misty_dir,
-            config_dir,
-            db_dir,
-            cache_dir,
-            tmp_dir,
-            settings_path,
-            misty_config_path,
-            commands_path,
-            config_exists: false,
         }
     }
 
@@ -216,14 +171,6 @@ fn clean_display_path(path: &str) -> String {
 mod tests {
     use super::*;
     use std::env;
-
-    fn unique_test_home(label: &str) -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        env::temp_dir().join(format!("misty-env-{label}-{nanos}"))
-    }
 
     #[test]
     fn application_database_uses_existing_shared_data_db() {

@@ -1,7 +1,7 @@
 import { browserSlideExtra } from "@/features/webviews/browserSlide";
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { opaqueColorHex } from "./opaqueColorHex";
-import type { BrowserBounds } from "./types";
+import type { BrowserBounds } from "@/features/webviews/types";
 
 /**
  * Where a page host is on screen, as the bounds its native page takes: clipped to the window,

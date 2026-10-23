@@ -1,339 +1,112 @@
 # misty
 
-`misty` is the development and release interface for the Misty workspace.
-Desktop commands use Tauri's operating-system WebView and do not prepare or bundle a separate browser runtime.
-
-## Install and start Misty
-
-From the Misty repository root:
+`misty` is the development and release CLI for this repository. It finds the checkout from any directory inside it; set a fallback with `misty configure --workspace /path/to/misty-org`, which is saved in `~/.misty/cli/config.toml`.
 
 ```sh
 cargo install --path cli --locked
-misty setup server
-# Follow server/README.md for Cloudflare setup, then:
-misty server up
-misty server deploy
-misty doctor server
-misty setup desktop
-misty desktop dev
 ```
 
-On macOS, desktop development signs the native executable with your Apple
-Development certificate on every native rebuild. This gives Keychain a stable
-application identity instead of an ad-hoc signature that changes after linking.
-Both `misty desktop dev` and `npm run tauri -- dev` use this launcher. Restart an
-already running dev command after changing the launcher. Vite-only hot reload
-does not restart or re-sign the native process.
-
-Create an Apple Development certificate through Xcode if one is not installed.
-If several certificates are available, set `MISTY_DEV_SIGNING_IDENTITY` to the
-exact certificate name or SHA-1 from `security find-identity -v -p codesigning`.
-Existing Keychain entries may request access once more when moving from the old
-ad-hoc build to this identity; select **Always Allow** to remember it. On first
-unlock, Misty migrates the old recovery and sync entries to encrypted local
-storage and removes them only after committing and verifying their encrypted
-copies. That migration can still prompt for the old entries. Afterwards there
-is one Keychain device unlock key, cached in native memory for the process
-lifetime. Recovery and sync roots remain separate, encrypted using AES-256-GCM
-in `~/Library/Application Support/com.misty.desktop/device-keys/keys.sqlite`.
-This device key and database are local only and shared across dev profiles;
-neither is uploaded or included in workspace handoff. Removing a saved account
-removes its encrypted roots while retaining the device key for other accounts.
-If that key is missing or mismatched, Misty preserves the database and fails
-closed rather than generating a replacement. The launcher does not loosen
-Keychain access controls.
-Release signing is unchanged. Direct `npx tauri dev` bypasses
-the Misty launcher; use the commands above for stable desktop dev signing.
-
-### Test device sync with two development profiles
-
-Run these in separate terminals:
-
-```sh
-misty desktop dev --profile dev1
-misty desktop dev --profile dev2
-```
-
-Sign in to the same account on the same server in both profiles, and connect
-both to the existing sync vault. Each profile retains its own device ID and
-local sync database across restarts; multiple windows within one profile remain
-one device. Do not copy sync databases between profiles or reset IDs to test sync.
-Their Vite dependency caches are separate, and Control lists the profile name
-alongside its host and device ID.
-
-Native Cargo artifacts and intermediate files are isolated per profile under
-`src-tauri/target/dev-profiles/<profile>`; bundled workers also have private build
-directories. This prevents dev1 and dev2 from sharing build locks or overwriting
-compiled profile configuration. Custom `CARGO_TARGET_DIR` (or
-`CARGO_BUILD_TARGET_DIR`) and `CARGO_BUILD_BUILD_DIR` roots receive the same
-`dev-profiles/<profile>` suffix. The first build of each profile creates its own
-cache. Restart existing dev commands to pick up launcher changes; no CLI reinstall
-is needed.
-
-Enable **Full sync** on both devices. Only the **Active** device publishes tab
-and workspace changes. In the other profile, use **Control → Switch to This
-device** to reverse direction. Website sign-in capture/restoration has its own
-status: a sign-in warning does not mean the device IDs collided or that tab sync
-is disconnected. Full sync off keeps that profile's workspace independent.
-
-Start the website with:
-
-```sh
-misty website dev
-```
-
-Start the documentation site with:
-
-```sh
-misty docs dev
-```
-
-Built-in tools compile with Misty. Native workers are bundled during the desktop build.
-
-The CLI discovers the current Misty checkout, including when run from a nested directory. Built-in tools and the CLI live in `src/features/` and `cli/`. The backend lives in `server/`; the website can live in the sibling `misty-website/` checkout. Configure a fallback location with:
-
-```sh
-misty configure --workspace /path/to/misty-org
-```
+Reinstall after changing the CLI, or run this checkout's code directly with `npm run cli -- <command>`. Run `misty --help`, or add `--help` after any command, for the full option reference.
 
 ## Commands
 
 ```sh
-misty doctor
-misty setup
-misty check tasks
-misty check app
-misty check server
-misty check website
-misty check tools
-misty check cli
-misty check all
+misty setup [all|server|desktop|cloudflare]
+misty doctor [all|server|desktop|cloudflare|release] [--json] [--fix]
+misty check app|scripts|server|go-sizes|website|features|cli|all
 
-misty env init dev
-misty env init staging
-misty env init prod
-misty env status dev
-misty env status staging
-misty env check dev
-misty env check staging
-misty env check prod
+misty env describe
+misty env init dev|staging|prod
+misty env set dev|staging|prod NAME     # reads the value from stdin
+misty env check dev|staging|prod
+misty env status dev|staging|prod
 
-misty home generate
-misty home generate --destination ./portable/.misty --source ~/.misty
-misty home check
+misty home generate [--destination PATH]
+misty home check [--path PATH]
 
-
-misty desktop dev
-misty desktop dev --profile owner --route /spaces
+misty desktop dev [--profile NAME] [--route /spaces]
 misty desktop build
-misty desktop clean
-misty desktop clean --apply
+misty desktop clean [--apply]
 misty desktop icons sync
 
-
-misty docs dev
-misty docs build
+misty docs dev|build
 misty website dev
 
-misty server up --detach
-misty server url
-misty server logs
-misty server down
-misty server prod check
-misty server prod up
-misty server prod logs
-misty server prod down
-misty server staging check
-misty server staging up
-misty server staging status
-misty server staging logs
-misty server staging down
+misty server up [--no-build] [--verbose] [--gui]
+misty server status|url|deploy
+misty server logs [SERVICE] [--follow] [--tail 100]
+misty server down [--volumes]
+misty server prod check|up|down|logs|backup|push|deploy|restore
+misty server staging check|up|down|status|logs
+misty server release VERSION
+misty server worker generate-secrets|deploy
+misty server r2 configure-cors [--apply]
 
-misty release start 0.2.0
-misty release check
-misty release build 0.2.0
-misty release upload 0.2.0
-misty release verify 0.2.0
-misty release publish 0.2.0
+misty release check|start|build|upload|verify|publish VERSION
+
+misty tool NAME [ARGS...]
+misty tasks
+misty task NAME [ARGS...]
 ```
 
-Run `misty --help` or add `--help` after any command group for the complete
-option reference.
+## Desktop development
 
-## Local checks and artifact releases
+`misty setup desktop` checks Node.js, runs `npm ci` and creates a `.env` pointing at the local API. `misty desktop dev` starts Vite and the Tauri shell; `npm run tauri -- dev` uses the same launcher, while a bare `npx tauri dev` bypasses it.
 
-Checks and builds run on your computer. GitHub stores source, GHCR images and
-release assets; GitHub Actions and GitHub signing secrets are not used.
+On macOS every native rebuild is signed with your Apple Development certificate, which gives Keychain a stable identity across rebuilds. If several certificates are installed, set `MISTY_DEV_SIGNING_IDENTITY` in `cli/.env/common.env` to the certificate name or SHA-1 from `security find-identity -v -p codesigning`. Release signing is separate.
 
-Install the current CLI after changing it (`cargo install --path cli --locked`),
-or use `npm run release -- ...` to run this checkout's release code directly.
-Enable hooks in both repositories with `git config core.hooksPath .githooks`.
+`--profile NAME` runs an isolated copy with its own Tauri identifier (`com.misty.desktop.NAME`), app storage, Vite cache and Cargo output under `src-tauri/target/dev-profiles/NAME`. To test sync, run `misty desktop dev --profile dev1` and `--profile dev2` in two terminals and sign both in to the same account and vault.
 
-Before commits, staged paths select frontend typecheck/lint/tests, tooling tests,
-Rust CLI/desktop/helper tests, or server/database tests. Stage or stash remaining
-edits first so tests see the staged snapshot. Each failed command stops its suite.
-Push checks run the complete suite on a clean tracked working tree.
+The desktop app keeps its data in `~/.misty` on every platform (`MISTY_DATA_ROOT` moves it). `misty home generate` creates that layout without replacing existing files, and `misty home check` validates its permissions.
 
-Server and billing checks also connect the real server HTTP adapter to a real
-billing executable and temporary PostgreSQL database with separate migration and
-runtime roles. Both checkouts are needed; locations can be overridden with
-`MISTY_BILLING_REPO` and `MISTY_SERVER_REPO`. Run only that boundary test with
-`bash server/scripts/test-billing-contract.sh`. It creates its own credentials,
-loads no deployment `.env` files and removes its database/process on exit.
-Live Stripe checkout/webhook acceptance remains a separate staging check using
-sandbox credentials; ordinary commits do not need Stripe credentials.
+## Environment files
 
-### Configure the release computer once
+Server settings live in private files under `server/.env/<target>/`, and the CLI's own settings in `cli/.env/common.env`, `release.env` and `cloudflare.env`. Every file must be readable only by you. Each setting has exactly one owning file: `misty env describe` lists them, `misty env set` writes a value to the right file, and `misty env check` rejects unknown settings, duplicates, insecure files and missing required values. Files are created only when they hold a value. Shell exports override file values for Compose interpolation.
 
-Save private settings in `cli/.env/release.env` (mode `600`). The CLI loads this
-file automatically; shell values take precedence. Restore the existing updater
-key from your secure backup. `npm run release:keys` validates it against committed
-trust and saves the local key path/public key. It never sends secrets to GitHub.
+`misty setup server` generates the development keys and Worker secrets on first use and preserves them afterwards. `misty server worker generate-secrets --target production` creates the production Journal keys once and refuses to rotate them. Back up both halves of each key bundle together.
+
+`misty server up` starts billing first, then the server containers, and returns once they are healthy. Build output goes to `server/.misty/logs/`; `--verbose` prints it. `misty server down` keeps database volumes unless you pass `--volumes`. [server/README.md](../server/README.md) walks through the whole server setup.
+
+## Checks
+
+`misty check app` runs `npm run check`, the script tests, and format, clippy and tests for the desktop crate, Kiri and the helper services. `misty check cli` runs format, clippy and tests for this crate. `misty check all` runs every gate, including the server and website. The git hooks in `.githooks/` run the same suites on commit and push; enable them with `git config core.hooksPath .githooks`.
+
+## Releases
+
+Releases build, sign and upload from your computer; GitHub holds the source, the GHCR images and the release assets. Save the private settings in `cli/.env/release.env`, which shell values override:
 
 | Setting | Purpose |
 | --- | --- |
 | `MISTY_RELEASE_API_URL` | Public HTTPS API URL compiled into the app, including `/v1` |
 | `MISTY_RELEASE_WEB_URL` | Public HTTPS website URL compiled into the app |
-| `TAURI_UPDATER_PUBLIC_KEY` | Public key matching the existing updater key |
-| `TAURI_CSP_CONNECT_SOURCES` | Approved HTTPS/WSS origins, including the API origin |
+| `TAURI_UPDATER_PUBLIC_KEY` | Public key matching the updater key |
+| `TAURI_CSP_CONNECT_SOURCES` | Approved HTTPS and WSS origins, including the API origin |
 | `TAURI_CSP_IMAGE_SOURCES` | Approved HTTPS image origins |
 | `TAURI_SIGNING_PRIVATE_KEY` | Absolute path to the local updater private key |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for an encrypted key; optional otherwise |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for an encrypted key, if it has one |
 | `APPLE_SIGNING_IDENTITY` | Installed Developer ID Application certificate, on macOS |
 | `MISTY_NOTARY_KEYCHAIN_PROFILE` | Configured `notarytool` Keychain profile, on macOS |
 | `WINDOWS_CERTIFICATE_THUMBPRINT` / `WINDOWS_TIMESTAMP_URL` | Local certificate and HTTPS timestamp service, on Windows |
 
-Authenticate `gh`, install release Rust targets and `cargo-cyclonedx`, then run
-`misty release check`. It reports missing names together before compilation,
-without printing values. Apple validates notarization credentials at submission.
-The release manifest pins the API/website URLs; these override development
-`.env` URLs, and changing them during a release is rejected. Database passwords,
-Stripe keys and server credentials stay on the deployment host.
-
-### Build locally and upload a draft
-
-Once version files match and tested commits are pushed to `main`:
+Restore the updater key from your backup, then run `npm run release:keys` to check it against `release/trust.json` and save its path. Authenticate `gh`, install the release Rust targets and `cargo-cyclonedx`, and run `misty doctor release`.
 
 ```sh
 misty release check
 misty release start 0.2.0
 misty release build 0.2.0 --upload
 misty release verify 0.2.0
-# Install the candidate; check login, sync, billing and an updater upgrade.
 misty release publish 0.2.0
 ```
 
-`start` runs all local checks and creates a source tag and draft release.
-`build --upload` compiles, signs and notarizes locally, then uploads verified
-assets to the draft in `misty-org/misty`. Omit `--upload` to build only;
-`misty release upload VERSION` can upload later. `verify` downloads and checks
-the hosted files and updater signatures. `publish` makes the finished artifacts
-public after confirmation and marks them the latest release, which is where installed apps look for `latest.json`. Published assets cannot be replaced; use a new version.
+`start` runs every local check, tags the source and creates a draft. `build --upload` compiles, signs, notarizes and uploads verified assets to the draft. `verify` downloads the hosted files and checks their updater signatures, and `publish` makes the release public and latest, which is where installed apps look for `latest.json`. Published assets cannot be replaced, so a fix needs a new version.
 
-`start` defaults to the current OS. Select platforms explicitly with `--os macos`,
-`--os windows`, or `--os macos,windows`. For a release covering both platforms,
-build/upload the same source commit on each respective OS, then verify/publish
-after both are ready. `build` detects the current OS; `--os` selects the release's
-required artifacts, not a cross-compilation target. macOS builds are universal
-and require Apple Silicon and Intel Rust targets.
+`start` targets the current OS unless you pass `--os macos`, `--os windows` or `--os macos,windows`. For both, build and upload the same commit on each OS, then verify and publish. macOS builds are universal and need both Apple Silicon and Intel Rust targets.
 
-Keep one integrated staging deployment with separate API/billing databases and
-Stripe sandbox credentials. Promote tested container digests to production.
-The desktop API URL is compiled in: staging-targeted and production-targeted
-desktop builds are distinct artifacts, so verify the final production package
-as well. Uploading never rewrites its environment. Old `beta:prepare` and
-`beta:promote` Actions commands are retired in favor of the local release CLI.
+`misty server release VERSION` tests the pushed commit, builds and pushes the server images, tags the commit and saves the image digests in `server/.env/prod`. `misty server prod push` and `misty server prod deploy` then copy the production environment to the VPS and start both stacks there.
 
-## Misty home
+## Production Cloudflare Tunnel
 
-Desktop Misty uses `~/.misty` on macOS, Linux, and Windows instead of Library
-or AppData. Create the current layout on a device with:
-
-```sh
-misty home generate
-misty home check
-```
-
-Generation is idempotent and never replaces existing files. To prepare a
-portable seed from an existing installation, generate into a separate path:
-
-```sh
-misty home generate \
-  --source ~/.misty \
-  --destination ./portable/.misty
-```
-
-Only portable plugin web files are copied. Product assets ship inside the app.
-Databases, credentials, note attachments, mounts, caches, logs, platform
-binaries, and release keys stay device-local. Install the platform's Misty
-application separately, then place the generated `.misty` directory in the
-user's home.
-
-The CLI stores its own workspace selection in `~/.misty/cli/config.toml` and
-continues to read older platform-specific config locations during migration.
-Development profiles select distinct Tauri identifiers (`com.misty.desktop.<profile>`)
-and retain their own native application storage. The CLI does not create an unused
-`~/.misty/cli/profiles` directory.
-
-## Setup and diagnostics
-
-The backend lives in `server/`. Run the CLI from any directory inside this checkout.
-
-| Command | Purpose |
-| --- | --- |
-| `misty setup server` | Create development defaults and required development keys. |
-| `misty setup cloudflare --account ID --zone ID --hostname api.example.com` | Validate access and preview tunnel/DNS setup; add `--apply` to provision. |
-| `misty setup cloudflare --target prod --account ID --zone ID --hostname api.example.com` | Preview a separate production tunnel to the VPS host; add `--apply` to provision. |
-| `misty setup desktop` | Create missing desktop API configuration and install frontend dependencies. |
-| `misty env describe` | List registered variables and their owning files. |
-| `misty env set dev NAME` | Read a value from stdin and save it to the correct private file. |
-| `misty doctor server` | Check Docker, configuration, and running service health. |
-| `misty doctor desktop` | Check desktop tool availability. |
-| `misty doctor cloudflare` | Check Cloudflare access, the deployed Worker, and public API health. |
-| `misty doctor release` | Run the existing release readiness checks. |
-
-| `misty doctor server --fix` | Create missing local environment files and keys; preserve existing values. |
-| `misty server status` | Show running services and unfinished or failed setup jobs. |
-| `misty server logs api --tail 100 --follow` | Follow bounded, service-specific logs. |
-| `misty server deploy` | Explicitly deploy the development Worker. |
-
-Environment files are optional until they contain configuration. Setup and migration
-do not create empty or comment-only placeholders, including under `cli/.env/`.
-`misty env set` creates a setting's file on demand with private permissions.
-`misty env check` still rejects missing required values, unknown settings, and
-insecure existing files. Use `misty env describe` to find the file for an optional
-integration before enabling it. Normal CLI commands also validate the files they load.
-
-Server commands pass configured values to Compose interpolation through the process
-environment, with shell values taking precedence there. Variables loaded only through
-a service's `env_file` still come from that file; a shell export does not override
-those container values. Compose skips absent optional files and does not implicitly
-load a default `.env`.
-
-Worker secret generation is first-use only. `misty setup server` preserves existing
-development bundles and can restore a missing `.dev.vars` from its matching server
-keys. `misty server worker generate-secrets --target production` creates a missing
-production Journal configuration and room salt; it preserves an existing salt and
-refuses to rotate configured keys. Back up both halves together. Environment migration
-refuses to overwrite an existing scoped configuration file.
-
-See [the complete CLI/environment audit](../server/docs/environment-audit.md) for
-remaining production and release gaps. `misty tasks` lists executable entrypoints;
-helper modules and tests are not commands.
-
-Doctor aggregates findings and exits nonzero if issues remain. `--json` produces structured findings for server, desktop, Cloudflare, and the default combined check. Release diagnostics retain their existing text output. Configuration checks and health checks do not exercise application workflows.
-
-`misty server up` returns after readiness checks. Build output is retained in bounded private logs under `server/.misty/logs/`; failed stages print their final diagnostic lines. `--verbose` displays captured output after the build. Direct service logs remain available on request. `misty server down` preserves database volumes unless `--volumes` is explicitly supplied.
-
-### Production Cloudflare Tunnel
-
-Run from the checkout on the VPS. The existing command defaults to `--target dev`.
-Production uses only `server/.env/prod/` for its saved routing and connector token;
-it does not initialize development secrets or configure/deploy a Worker.
-Cloudflare API credentials can come from the shell, `cli/.env/cloudflare.env`,
-or the selected target's `integrations/cloudflare.env`. Supply account and zone
-IDs explicitly on first use if they are not already configured. Save a production
-API token using `misty env set prod CLOUDFLARE_API_TOKEN` (value from stdin).
+Run this from the checkout on the VPS. Production keeps its routing and connector token in `server/.env/prod/` and never touches development secrets or the Worker. Save the API token with `misty env set prod CLOUDFLARE_API_TOKEN`, then preview the plan:
 
 ```sh
 misty setup cloudflare --target prod \
@@ -341,24 +114,9 @@ misty setup cloudflare --target prod \
   --hostname api.mistysys.com --tunnel-name misty-prod
 ```
 
-This previews the plan with read-only Cloudflare requests. Repeat with `--apply`
-to create/reuse the tunnel, configure its ingress, create a proxied DNS CNAME,
-and save the connector token and `MISTY_PUBLIC_API_URL=https://api.mistysys.com/v1`.
-Later runs can use `misty setup cloudflare --target prod` with the saved values.
-The default production name is `misty-prod-<hostname-with-hyphens>`; `--tunnel-name`
-overrides it. Existing conflicting DNS records or ingress routes cause an error,
-and a tunnel containing the development API origin cannot be reused for production.
+Repeat with `--apply` to create or reuse the tunnel, configure its ingress, create the proxied DNS record and save the connector token and `MISTY_PUBLIC_API_URL`. Conflicting DNS records or ingress routes stop the run. The origin is `http://127.0.0.1:8081`, the loopback port production Compose binds; save a different `MISTY_HOST_PORT` with `misty env set prod MISTY_HOST_PORT` before provisioning to change it.
 
-The origin is `http://127.0.0.1:8081`, matching production Compose's loopback-only
-API binding. To change it, save `MISTY_HOST_PORT` using `misty env set prod MISTY_HOST_PORT`
-before provisioning and use that same port when starting production. Routing uses
-the target's saved port, so avoid a different shell override when running Compose.
-The tunnel forwards paths unchanged: `/v1` belongs in the public API URL, not in
-the tunnel origin. No Nginx is required for this API route.
-
-Provisioning does not start the connector. Install `cloudflared` on the VPS host,
-then start the API with `misty server prod up`. For an initial connector check,
-run this from the checkout in a separate terminal:
+Provisioning does not start the connector. Install `cloudflared` on the VPS host, start the API with `misty server prod up`, and check the connector from the checkout:
 
 ```sh
 (
@@ -368,15 +126,8 @@ run this from the checkout in a separate terminal:
 )
 ```
 
-[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token)
-keeps the connector token out of command arguments. Run the connector persistently
-under a service manager before relying on it in production; closing this terminal
-stops this foreground check. The connector must run on the VPS host to reach this
-loopback origin. An ordinary isolated Docker container cannot use this origin.
-Verify with `curl --fail https://api.mistysys.com/health`; `misty doctor cloudflare`
-currently checks development. Production collaboration Worker deployment remains
-separate from API tunnel provisioning.
+[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token) keeps the token out of command arguments. Run the connector under a service manager on the VPS host for production use, then verify with `curl --fail https://api.mistysys.com/health`.
 
-## Project tool configuration
+## Project tools
 
-`misty tool <name> [arguments]` uses the shared `.config/tooling.json` registry, as do the root npm scripts. Run it from any directory inside the checkout. Missing configurations produce an error instead of silently using defaults. For example, `misty tool vite build --mode desktop` and `misty tool vitest run src/features/files`. See [the tooling guide](../.config/README.md).
+`misty tool NAME [ARGS...]` runs a project tool through the shared `.config/tooling.json` registry, the same one the npm scripts use, for example `misty tool vitest run src/features/files`. See [the tooling guide](../.config/README.md). `misty tasks` lists the TypeScript tasks in `cli/tasks/` that `misty task NAME` can run.

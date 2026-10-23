@@ -233,77 +233,7 @@ async fn detail(key: &str) -> Result<CatalogEntry, String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn restricts_resources_to_store_origins() {
-        for value in [
-            "https://addons.mozilla.org/file.xpi",
-            "https://addons.cdn.mozilla.net/x",
-            "https://clients2.google.com/service/update2/crx",
-            "https://clients2.googleusercontent.com/crx/blobs/x.crx",
-            "https://edgedl.me.gvt1.com/edgedl/x.crx",
-        ] {
-            assert!(trusted_url(&url::Url::parse(value).unwrap()), "{value}");
-        }
-        for value in [
-            "http://addons.mozilla.org/x",
-            "https://addons.mozilla.org.evil.test/x",
-            "https://user@addons.mozilla.org/x",
-            "https://addons.mozilla.org:8443/x",
-            "https://gvt1.com.evil.test/x",
-            "https://evilgvt1.com/x",
-            "https://googleusercontent.com/x",
-        ] {
-            assert!(!trusted_url(&url::Url::parse(value).unwrap()), "{value}");
-        }
-    }
-
-    #[test]
-    fn extension_ids_name_their_store() {
-        assert_eq!(Store::of("607454"), Some(Store::Firefox));
-        assert_eq!(
-            Store::of("ddkjiahejlhfcafbddmgiahcphecmpfh"),
-            Some(Store::Chrome)
-        );
-        for id in [
-            "",
-            "0",
-            "0123",
-            "ublock-origin",
-            "ddkjiahejlhfcafbddmgiahcphecmpfz",
-            "99999999999999999999999",
-        ] {
-            assert_eq!(Store::of(id), None, "{id}");
-        }
-        assert!(is_slug("ublock-origin") && is_slug("{abc-123}") && !is_slug("a/b"));
-    }
-}
+mod tests;
 
 #[cfg(test)]
-mod live_tests {
-    use super::*;
-    #[tokio::test]
-    #[ignore = "Downloads current public store packages; run explicitly for compatibility intake"]
-    async fn store_package_intake() {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        for key in [
-            "darkreader",
-            "bitwarden-password-manager",
-            "single-file",
-            "clearurls",
-            // uBlock Origin Lite, Dark Reader and Bitwarden on the Chrome Web Store.
-            "ddkjiahejlhfcafbddmgiahcphecmpfh",
-            "eimadpbcbfnmbkopoojfekhnkhdbieeh",
-            "nngceckbapebfimnlniiiahkandclblb",
-        ] {
-            let detail = latest(key).await.unwrap();
-            let bytes = bytes(&detail.download_url, 64 * 1024 * 1024).await.unwrap();
-            let root = tempfile::tempdir().unwrap();
-            let review =
-                super::super::package::extract(&bytes, detail, root.path(), "intake".into())
-                    .unwrap();
-            println!("{} {}: integrity/identity verified; {} required APIs, {} site patterns; blocked={}; runtime compatibility remains unverified",review.entry.name,review.entry.version,review.permissions.len(),review.hosts.len(),review.blocked);
-        }
-    }
-}
+mod live_tests;

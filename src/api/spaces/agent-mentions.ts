@@ -34,13 +34,11 @@ export type AgentMentionStep = z.infer<typeof stepSchema>;
 export const agentMentionsApi = {
   /** How an agent got to its reply: steps and outcomes, never inputs. Only the asker may read it. */
   async transcript(requestId: string, signal?: AbortSignal) {
-    const body = z
-      .object({ steps: z.array(stepSchema) })
-      .parse(
-        await apiRequest<unknown>(`/agent-requests/${encodeURIComponent(requestId)}/transcript`, {
-          signal,
-        }),
-      );
+    const body = z.object({ steps: z.array(stepSchema) }).parse(
+      await apiRequest<unknown>(`/agent-requests/${encodeURIComponent(requestId)}/transcript`, {
+        signal,
+      }),
+    );
     return body.steps;
   },
   /** The person's own mentions of agents, newest first. Nobody else sees these runs. */

@@ -25,6 +25,8 @@ pub struct CookieKey {
     gcm: Option<Zeroizing<Vec<u8>>>,
 }
 
+// Windows keeps the key in DPAPI instead; the tests cover the derivation everywhere.
+#[cfg(any(not(windows), test))]
 fn hmac_sha1(key: &[u8], parts: &[&[u8]]) -> [u8; 20] {
     let mut block = [0u8; 64];
     if key.len() > 64 {
@@ -44,6 +46,7 @@ fn hmac_sha1(key: &[u8], parts: &[&[u8]]) -> [u8; 20] {
 }
 
 /// PBKDF2-HMAC-SHA1 for keys of at most one SHA-1 block (20 bytes).
+#[cfg(any(not(windows), test))]
 pub fn pbkdf2_sha1<const N: usize>(
     password: &[u8],
     salt: &[u8],
@@ -83,6 +86,7 @@ fn gcm_decrypt(key: &[u8], data: &[u8]) -> Option<Zeroizing<Vec<u8>>> {
 }
 
 impl CookieKey {
+    #[cfg(any(not(windows), test))]
     pub fn from_password(password: &[u8], iterations: u32) -> Self {
         Self {
             cbc: Some(pbkdf2_sha1::<16>(password, b"saltysalt", iterations)),

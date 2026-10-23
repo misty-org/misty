@@ -23,9 +23,7 @@ impl Settings {
         let stored = read_stored_settings()?;
         let root = select_workspace(
             command_line_workspace.map(Path::to_path_buf),
-            env::var_os("MISTY_ROOT")
-                .or_else(|| env::var_os("MISTY_ORG_ROOT"))
-                .map(PathBuf::from),
+            env::var_os("MISTY_ROOT").map(PathBuf::from),
             std::env::current_dir()
                 .ok()
                 .and_then(|path| Workspace::discover(&path))
@@ -66,44 +64,17 @@ pub fn load_cli_environment(workspace: &Workspace, files: &[&str]) -> Result<()>
             env::set_var(name, value);
         }
     }
-    copy_legacy_value("MISTY_CODESIGN_IDENTITY", "APPLE_SIGNING_IDENTITY");
     Ok(())
 }
 
-fn copy_legacy_value(old_name: &str, new_name: &str) {
-    if env::var_os(new_name).is_none() {
-        if let Some(value) = env::var_os(old_name) {
-            env::set_var(new_name, value);
-        }
-    }
-}
-
 fn read_stored_settings() -> Result<StoredSettings> {
-    let current = settings_path()?;
-    for path in settings_paths()? {
-        if !path.is_file() {
-            continue;
-        }
-        let contents = fs::read_to_string(&path)
-            .with_context(|| format!("could not read {}", path.display()))?;
-        let settings = toml::from_str(&contents)
-            .with_context(|| format!("could not parse {}", path.display()))?;
-        if path != current && !current.exists() {
-            if let Some(parent) = current.parent() {
-                fs::create_dir_all(parent)
-                    .with_context(|| format!("could not create {}", parent.display()))?;
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
-                        .with_context(|| format!("could not secure {}", parent.display()))?;
-                }
-            }
-            write_private(&current, contents.as_bytes())?;
-        }
-        return Ok(settings);
+    let path = settings_path()?;
+    if !path.is_file() {
+        return Ok(StoredSettings::default());
     }
-    Ok(StoredSettings::default())
+    let contents =
+        fs::read_to_string(&path).with_context(|| format!("could not read {}", path.display()))?;
+    toml::from_str(&contents).with_context(|| format!("could not parse {}", path.display()))
 }
 
 fn settings_path() -> Result<PathBuf> {
@@ -112,20 +83,6 @@ fn settings_path() -> Result<PathBuf> {
 
 fn settings_path_for(home: &Path) -> PathBuf {
     home.join("cli").join("config.toml")
-}
-
-fn settings_paths() -> Result<Vec<PathBuf>> {
-    let current = settings_path()?;
-    let mut paths = vec![current];
-    if let Some(root) = dirs::config_dir() {
-        paths.extend([
-            root.join("misty").join("cli.toml"),
-            root.join("mcli").join("config.toml"),
-            root.join("misty-cli").join("config.toml"),
-        ]);
-    }
-    paths.dedup();
-    Ok(paths)
 }
 
 fn default_workspace() -> PathBuf {

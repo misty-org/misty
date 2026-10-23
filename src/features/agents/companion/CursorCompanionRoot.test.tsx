@@ -181,8 +181,5 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   expect(x - 16).toBeGreaterThan(411);
   for (let time = 4_000; time <= 20_000; time += 500) tick(time);
   expect(marker.style.opacity).toBe("1");
-  expect(mocks.emit).not.toHaveBeenCalledWith(
-    "misty://cursor-point-finished",
-    expect.anything(),
-  );
+  expect(mocks.emit).not.toHaveBeenCalledWith("misty://cursor-point-finished", expect.anything());
 });

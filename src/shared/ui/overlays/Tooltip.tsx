@@ -1,7 +1,5 @@
 import * as React from "react";
 
-import { OverlaySideProvider } from "./OverlaySide";
-
 /**
  * Tooltips are the operating system's own: a short `title`. These primitives keep the old
  * Tooltip / TooltipTrigger / TooltipContent composition working, but draw nothing themselves.
@@ -71,9 +69,6 @@ function TooltipContent({
   return null;
 }
 
-/** Backward-compatible name for navigation hint placement. */
-const TooltipSideProvider = OverlaySideProvider;
-
 /** A native title on one element. */
 function TooltipHint({
   children,
@@ -86,11 +81,4 @@ function TooltipHint({
   return React.cloneElement(children, { title: children.props.title ?? (text || undefined) });
 }
 
-export {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-  TooltipHint,
-  TooltipSideProvider,
-};
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger, TooltipHint };

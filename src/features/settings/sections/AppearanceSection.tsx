@@ -131,6 +131,29 @@ export function AppearanceSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
           />
         </SettingsRow>
+        <SettingsRow
+          label="Dim inactive panes"
+          description="Keep the focused pane visually prominent."
+        >
+          <SwitchControl
+            checked={booleanSetting(props.document, "appearance", "dim_inactive_panes", true)}
+            disabled={props.working}
+            onChange={(value) => props.onSettingChange("appearance", "dim_inactive_panes", value)}
+          />
+        </SettingsRow>
+        {booleanSetting(props.document, "appearance", "dim_inactive_panes", true) ? (
+          <SettingsRow label="Dimming strength" indent>
+            <SliderControl
+              value={numberSetting(props.document, "appearance", "pane_dim_strength", 0.15)}
+              min={0}
+              max={MAX_PANE_DIM}
+              step={0.01}
+              disabled={props.working}
+              format={(value) => `${Math.round(value * 100)}%`}
+              onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
+            />
+          </SettingsRow>
+        ) : null}
       </SettingsSectionBlock>
 
       <SettingsSectionBlock title="Size">
@@ -161,33 +184,6 @@ export function AppearanceSection(props: SettingsContentProps) {
             checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
             disabled={props.working}
             onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
-          />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Pane focus">
-        <SettingsRow
-          label="Dim inactive panes"
-          description="Keep the focused pane visually prominent."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "dim_inactive_panes", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "dim_inactive_panes", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Dimming strength">
-          <SliderControl
-            value={numberSetting(props.document, "appearance", "pane_dim_strength", 0.15)}
-            min={0}
-            max={MAX_PANE_DIM}
-            step={0.01}
-            disabled={
-              props.working ||
-              !booleanSetting(props.document, "appearance", "dim_inactive_panes", true)
-            }
-            format={(value) => `${Math.round(value * 100)}%`}
-            onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>

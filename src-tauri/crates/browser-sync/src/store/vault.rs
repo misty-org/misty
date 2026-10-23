@@ -30,7 +30,9 @@ impl CachedVault {
         }
         match (&self.vault.key_envelope, &self.vault.space_key_envelope) {
             (Some(wrapped), None) => {
-                if wrapped.version != 1 || wrapped.kdf != "argon2id-m65536-t3-p1" {
+                if wrapped.version != 1
+                    || !(wrapped.kdf == crate::protocol::KDF || wrapped.is_account())
+                {
                     return Err(Error::Invalid);
                 }
                 decode_fixed::<16>(&wrapped.salt)?;
@@ -57,10 +59,15 @@ impl CachedVault {
         {
             return Err(Error::Identity);
         }
-        // Password/key rotation needs an authenticated transition; never replace
-        // the locally pinned identity/wrapper merely because a server sent one.
+        // The server may not replace the locally pinned wrapper on its own. A
+        // new wrapper is accepted only with a transition signed by this vault's
+        // root, for a newer generation than the one pinned here.
+        if remote.key_envelope != self.vault.key_envelope
+            || remote.key_transition != self.vault.key_transition
+        {
+            self.check_rotation(remote)?;
+        }
         if remote.key_epoch != self.vault.key_epoch
-            || remote.key_envelope != self.vault.key_envelope
             || remote.space_key_envelope != self.vault.space_key_envelope
             || remote.head_sequence < self.vault.head_sequence
             || remote.head_sequence > MAX_COUNTER
@@ -68,6 +75,33 @@ impl CachedVault {
             return Err(Error::Recovery);
         }
         Ok(())
+    }
+
+    /// Whether `remote` carries a wrapper this device would adopt in place of
+    /// its pinned one.
+    pub fn is_rotation(&self, remote: &Vault) -> bool {
+        remote.key_envelope != self.vault.key_envelope
+            || remote.key_transition != self.vault.key_transition
+    }
+
+    fn check_rotation(&self, remote: &Vault) -> Result<()> {
+        // Only the personal vault has a password wrapper to replace.
+        let (Some(envelope), Some(transition), None) = (
+            &remote.key_envelope,
+            &remote.key_transition,
+            &remote.space_key_envelope,
+        ) else {
+            return Err(Error::Recovery);
+        };
+        if self.vault.is_space()
+            || transition.generation <= self.vault.key_generation()
+            || !envelope.is_account()
+        {
+            return Err(Error::Recovery);
+        }
+        transition
+            .verify(&self.vault.root_public_key, &self.vault.vault_id, envelope)
+            .map_err(|_| Error::Recovery)
     }
 
     /// Called during reconnect while the worker keeps accepting offline edits.
@@ -223,6 +257,27 @@ impl Store {
             [vault.vault.head_sequence],
         )?;
         tx.commit()?;
+        Ok(())
+    }
+
+    /// Replaces the pinned wrapper after a password change, once the new one has
+    /// been checked against a root-signed transition. Pending flags, the head
+    /// and every other field stay as they were.
+    pub fn adopt_rotated_vault(&mut self, remote: &Vault) -> Result<()> {
+        let Some(cached) = self.cached_vault()? else {
+            return Err(Error::Recovery);
+        };
+        if !cached.is_rotation(remote) {
+            return Ok(());
+        }
+        cached.check_remote(remote)?;
+        let mut adopted = cached.vault;
+        adopted.key_envelope = remote.key_envelope.clone();
+        adopted.key_transition = remote.key_transition.clone();
+        self.connection.execute(
+            "UPDATE sync_vault SET vault=?1 WHERE singleton=1",
+            [serde_json::to_string(&adopted)?],
+        )?;
         Ok(())
     }
 

@@ -5,13 +5,14 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection,
   resolveSetting,
-  useSettingsProfiles,
+  useDevicePreferences,
 } from "@/features/settings";
 import { PreferenceRow } from "@/features/settings";
 import { UninstallDialog } from "./ExtensionDialogs";
 import { ExtensionSettingsItem } from "./ExtensionSettingsItem";
 import { openStorePage } from "./openStorePage";
 import {
+  offeredStores,
   parseInstallations,
   spaceInstallationsRaw,
   storeHomes,
@@ -21,10 +22,11 @@ import {
 } from "./store";
 import type { ExtensionStore, Installation } from "./types";
 
-const stores: { store: ExtensionStore; description: string }[] = [
-  { store: "chrome", description: "Extensions made for Chrome." },
-  { store: "firefox", description: "Extensions made for Firefox." },
-];
+const storeDescriptions: Record<ExtensionStore, string> = {
+  chrome: "Extensions made for Chrome.",
+  firefox: "Extensions made for Firefox.",
+};
+const stores = offeredStores.map((store) => ({ store, description: storeDescriptions[store] }));
 
 /**
  * Settings › Browser › Extensions. People find extensions on the stores' own
@@ -32,7 +34,7 @@ const stores: { store: ExtensionStore; description: string }[] = [
  * access and removes them.
  */
 export function ExtensionsSettings() {
-  const profile = useSettingsProfiles((s) => s.state);
+  const profile = useDevicePreferences((s) => s.state);
   const runtime = useExtensionsStore();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -48,8 +50,8 @@ export function ExtensionsSettings() {
     setFailure("");
     try {
       await action();
-    } catch (error) {
-      setFailure(error instanceof Error ? error.message : String(error));
+    } catch {
+      setFailure("The extension could not be updated. Try again.");
     } finally {
       setBusy(false);
     }
@@ -62,11 +64,13 @@ export function ExtensionsSettings() {
         </DesktopSettingsNotice>
       )}
       {(failure || runtime.error) && (
-        <DesktopSettingsNotice>{failure || runtime.error}</DesktopSettingsNotice>
+        <DesktopSettingsNotice>
+          {failure || "Extensions could not be loaded. Try again."}
+        </DesktopSettingsNotice>
       )}
       <DesktopSettingsSection
         title="Extensions"
-        description="Open an extension's page on its store and choose Add to Misty. Extensions stay on this device."
+        description="Open a store, then choose Add to Misty on an extension's page. Extensions stay on this device."
       >
         {stores.map(({ store, description }) => (
           <DesktopSettingsRow key={store} label={storeNames[store]} description={description}>

@@ -13,6 +13,11 @@
 //! transport (`bridge`, macOS), which the embedder's extension host answers.
 #[cfg(all(target_os = "macos", feature = "tauri"))]
 pub mod bridge;
+mod pages;
+#[cfg(test)]
+mod tests;
+
+use pages::inject_pages;
 
 use serde_json::{json, Value};
 use std::{fs, path::Path};
@@ -95,7 +100,12 @@ pub fn apply(runtime: &Path) -> Result<(), String> {
     let original = manifest.clone();
     let declared: Vec<String> = manifest["permissions"]
         .as_array()
-        .map(|values| values.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect())
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect()
+        })
         .unwrap_or_default();
     if let Some(permissions) = manifest["permissions"].as_array_mut() {
         permissions.extend(added_permissions(&declared).into_iter().map(Value::from));
@@ -103,8 +113,11 @@ pub fn apply(runtime: &Path) -> Result<(), String> {
     inject_background(runtime, &mut manifest)?;
     add_toolbar_action(&mut manifest);
     if manifest != original {
-        fs::write(&path, serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
     }
     inject_pages(runtime, runtime)
 }
@@ -117,12 +130,18 @@ fn script_paths() -> Vec<String> {
 }
 
 fn inject_background(runtime: &Path, manifest: &mut Value) -> Result<(), String> {
-    let Some(background) = manifest.get_mut("background").and_then(Value::as_object_mut) else {
+    let Some(background) = manifest
+        .get_mut("background")
+        .and_then(Value::as_object_mut)
+    else {
         return Ok(());
     };
     // A package from an older layer gets the current script list, in order.
     if let Some(scripts) = background.get_mut("scripts").and_then(Value::as_array_mut) {
-        scripts.retain(|s| !s.as_str().is_some_and(|s| s.starts_with(&format!("{DIRECTORY}/"))));
+        scripts.retain(|s| {
+            !s.as_str()
+                .is_some_and(|s| s.starts_with(&format!("{DIRECTORY}/")))
+        });
         for (index, path) in script_paths().into_iter().enumerate() {
             scripts.insert(index, json!(path));
         }
@@ -145,9 +164,15 @@ fn inject_background(runtime: &Path, manifest: &mut Value) -> Result<(), String>
         let module = background.get("type").and_then(Value::as_str) == Some("module");
         let mut imports: Vec<String> = script_paths().iter().map(|p| format!("/{p}")).collect();
         imports.push(worker);
-        let quoted: Vec<String> = imports.iter().map(|p| serde_json::to_string(p).unwrap()).collect();
+        let quoted: Vec<String> = imports
+            .iter()
+            .map(|p| serde_json::to_string(p).unwrap())
+            .collect();
         let source = if module {
-            quoted.iter().map(|p| format!("import {p};\n")).collect::<String>()
+            quoted
+                .iter()
+                .map(|p| format!("import {p};\n"))
+                .collect::<String>()
         } else {
             format!("importScripts({});\n", quoted.join(", "))
         };
@@ -189,129 +214,4 @@ fn add_toolbar_action(manifest: &mut Value) {
         }
     }
     manifest[key] = Value::Object(action);
-}
-
-fn inject_pages(runtime: &Path, directory: &Path) -> Result<(), String> {
-    for entry in fs::read_dir(directory).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        let kind = entry.file_type().map_err(|e| e.to_string())?;
-        if kind.is_dir() {
-            let name = entry.file_name();
-            if directory == runtime && (name == DIRECTORY || name == "__misty_sync__") {
-                continue;
-            }
-            inject_pages(runtime, &path)?;
-            continue;
-        }
-        let is_page = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("html") || e.eq_ignore_ascii_case("htm"));
-        if !kind.is_file() || !is_page || entry.metadata().map_or(true, |m| m.len() > MAX_PAGE_BYTES) {
-            continue;
-        }
-        let Ok(page) = fs::read_to_string(&path) else {
-            continue;
-        };
-        if let Some(updated) = inject_page(&page) {
-            fs::write(&path, updated).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
-}
-
-/// Places the layer before the page's first script. Returns `None` when the
-/// page already loads the current layer; an older layer's tags are replaced.
-fn inject_page(page: &str) -> Option<String> {
-    let tags: String = script_paths()
-        .iter()
-        .map(|p| format!("<script src=\"/{p}\"></script>"))
-        .collect();
-    if page.contains(&tags) {
-        return None;
-    }
-    let first = format!("<script src=\"/{}\"></script>", script_paths()[0]);
-    if let Some(at) = page.find(&first) {
-        let mut rest = page.to_owned();
-        for path in script_paths() {
-            rest = rest.replacen(&format!("<script src=\"/{path}\"></script>"), "", 1);
-        }
-        return Some(format!("{}{}{}", &rest[..at], tags, &rest[at..]));
-    }
-    let lower = page.to_ascii_lowercase();
-    let after_tag = |name: &str| {
-        let start = lower.find(&format!("<{name}"))?;
-        let next = lower.as_bytes().get(start + name.len() + 1)?;
-        (*next == b'>' || next.is_ascii_whitespace())
-            .then(|| lower[start..].find('>').map(|end| start + end + 1))
-            .flatten()
-    };
-    let at = after_tag("head")
-        .or_else(|| after_tag("html"))
-        .or_else(|| lower.find("<!doctype").and_then(|s| lower[s..].find('>').map(|e| s + e + 1)))
-        .unwrap_or(0);
-    Some(format!("{}{}{}", &page[..at], tags, &page[at..]))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn page_injection_runs_before_page_scripts_and_is_idempotent() {
-        let page = "<!doctype html><html><HEAD><script src=\"popup.js\"></script></head></html>";
-        let updated = inject_page(page).unwrap();
-        let compat = updated.find("/__misty_compat__/core.js").unwrap();
-        assert!(compat < updated.find("popup.js").unwrap());
-        assert!(updated.find("<HEAD>").unwrap() < compat);
-        assert!(inject_page(&updated).is_none());
-        let older = "<head><script src=\"/__misty_compat__/core.js\"></script><script src=\"popup.js\"></script></head>";
-        let upgraded = inject_page(older).unwrap();
-        assert!(upgraded.contains("/__misty_compat__/declarative.js"));
-        assert_eq!(upgraded.matches("/__misty_compat__/core.js").count(), 1);
-        assert!(upgraded.find("declarative.js").unwrap() < upgraded.find("popup.js").unwrap());
-        assert!(inject_page("<header>").unwrap().starts_with("<script"));
-    }
-
-    #[test]
-    fn background_scripts_and_workers_load_the_layer_first() {
-        let root = tempfile::tempdir().unwrap();
-        let mut manifest = json!({"background":{"scripts":["bg.js"]}});
-        inject_background(root.path(), &mut manifest).unwrap();
-        assert_eq!(manifest["background"]["scripts"][0], "__misty_compat__/core.js");
-        assert_eq!(manifest["background"]["scripts"][9], "bg.js");
-        inject_background(root.path(), &mut manifest).unwrap();
-        assert_eq!(manifest["background"]["scripts"].as_array().unwrap().len(), 10);
-        // An older layer's list becomes the current one.
-        let mut manifest = json!({"background":{"scripts":["__misty_compat__/core.js","bg.js"]}});
-        inject_background(root.path(), &mut manifest).unwrap();
-        assert_eq!(manifest["background"]["scripts"].as_array().unwrap().len(), 10);
-        assert_eq!(manifest["background"]["scripts"][9], "bg.js");
-
-        fs::create_dir(root.path().join(DIRECTORY)).unwrap();
-        let mut manifest = json!({"background":{"service_worker":"sw.js"}});
-        inject_background(root.path(), &mut manifest).unwrap();
-        assert_eq!(manifest["background"]["service_worker"], WORKER);
-        let worker = fs::read_to_string(root.path().join(WORKER)).unwrap();
-        assert!(worker.starts_with("importScripts(\"/__misty_compat__/core.js\""));
-        assert!(worker.contains("\"/sw.js\""));
-        // Rewriting our own worker keeps the extension's worker last.
-        inject_background(root.path(), &mut manifest).unwrap();
-        let again = fs::read_to_string(root.path().join(WORKER)).unwrap();
-        assert_eq!(again, worker);
-    }
-
-    #[test]
-    fn sidebar_and_page_actions_become_toolbar_popups() {
-        let mut manifest = json!({"manifest_version":2,"sidebar_action":{"default_panel":"panel.html","default_title":"Panel"}});
-        add_toolbar_action(&mut manifest);
-        assert_eq!(manifest["browser_action"]["default_popup"], "panel.html");
-        let mut manifest = json!({"manifest_version":2,"browser_action":{},"page_action":{"default_popup":"p.html"}});
-        add_toolbar_action(&mut manifest);
-        assert_eq!(manifest["browser_action"], json!({}));
-        let mut manifest = json!({"manifest_version":3,"side_panel":{"default_path":"panel.html"}});
-        add_toolbar_action(&mut manifest);
-        assert_eq!(manifest["action"]["default_popup"], "panel.html");
-    }
 }

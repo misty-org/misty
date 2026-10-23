@@ -1,4 +1,4 @@
-use super::{Desktop, PasteKeys};
+use super::insert::{Desktop, PasteKeys};
 use crate::infra::global_hotkey::{held_modifiers, Modifiers};
 use std::time::Duration;
 use windows_sys::Win32::{

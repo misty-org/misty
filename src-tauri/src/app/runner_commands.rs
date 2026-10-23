@@ -79,7 +79,6 @@ pub async fn coding_route(
     let need = route::RouteNeed {
         mode: launch_mode(&request.mode, &request.permission),
         permission: request.permission.clone(),
-        grants: vec![],
     };
     let limits: Vec<(EngineId, RateLimit)> = request
         .limits
@@ -176,12 +175,7 @@ pub async fn coding_run_turn(
         // Without a copy the run still goes ahead; it just can't be undone.
         let _ = tokio::task::spawn_blocking(move || store.ensure(&scope, &run, &root)).await;
     }
-    let stop = registry::register(
-        &request.run_id,
-        engine.as_str(),
-        &project.root.to_string_lossy(),
-    )
-    .ok_or("This coding task is already running.")?;
+    let stop = registry::register(&request.run_id).ok_or("This coding task is already running.")?;
     let host = TauriHost {
         app,
         run_id: request.run_id.clone(),
@@ -233,11 +227,4 @@ pub fn coding_runner_answer(
 ) -> Result<bool, String> {
     require_device_window(&webview)?;
     Ok(tauri_host::answer(&id, allow))
-}
-
-/// Stops a delegated coding run's tool. Returns whether it was running.
-#[tauri::command]
-pub fn coding_runner_stop(webview: tauri::Webview, run_id: String) -> Result<bool, String> {
-    require_device_window(&webview)?;
-    Ok(registry::stop(&run_id))
 }

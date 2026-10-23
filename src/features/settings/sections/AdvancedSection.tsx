@@ -2,9 +2,8 @@ import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
-import { booleanSetting, CopyableValueText, SwitchControl } from "../SettingsControls";
+import { booleanSetting, SwitchControl } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { Skeleton } from "@/shared/ui";
 
 export function AdvancedSection(props: SettingsContentProps) {
   return (
@@ -26,29 +25,6 @@ export function AdvancedSection(props: SettingsContentProps) {
               props.onSettingChange("advanced", "frame_pacing_overlay_enabled", value)
             }
           />
-        </SettingsRow>
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Storage">
-        <SettingsRow
-          label="Config path"
-          description="Where Misty stores local configuration files on this device."
-        >
-          {props.app?.environment.configDir ? (
-            <CopyableValueText value={props.app.environment.configDir} />
-          ) : (
-            <Skeleton className="h-4 w-56" />
-          )}
-        </SettingsRow>
-        <SettingsRow
-          label="Data path"
-          description="Where Misty stores local app data on this device."
-        >
-          {props.app?.environment.mistyDir ? (
-            <CopyableValueText value={props.app.environment.mistyDir} />
-          ) : (
-            <Skeleton className="h-4 w-56" />
-          )}
         </SettingsRow>
       </SettingsSectionBlock>
     </>

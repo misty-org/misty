@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ open: vi.fn(), decline: vi.fn() }));
 vi.mock("./screenRequests", () => ({
   openScreenAndContinue: mocks.open,
   declineScreenRequest: mocks.decline,
-  screenChoice: (location: string) => (location === "separate" ? "separate" : "window"),
+  screenChoice: (location: string) => (location === "current" ? "current" : "window"),
 }));
 import { ScreenRequestCard } from "./ScreenRequestCard";
 import { useMistyStore } from "./useMistyStore";
@@ -50,7 +50,7 @@ it("shows progress without choices once the screen opens on its own", () => {
   render(
     <ScreenRequestCard
       messageId="reply"
-      request={{ kind: "open", reason: "Read example.com", location: "separate", state: "opening" }}
+      request={{ kind: "open", reason: "Read example.com", location: "window", state: "opening" }}
     />,
   );
   expect(screen.getByText("Opening a screen")).toBeTruthy();

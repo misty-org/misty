@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useUserStore } from "@/features/auth/core";
-import { pinnedTabsBlockedReason } from "@/features/browser-workspace/pinnedTabsGate";
-import { useBrowserSyncStore } from "@/features/browser-workspace/store";
+import { pinnedTabsBlockedReason } from "@/features/browser-sync/pinnedTabsGate";
+import { useBrowserSyncStore } from "@/features/browser-sync/store";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore } from "@/features/workspace";
 import { dockTreeViews } from "@/features/workspace/dockTree";
@@ -53,4 +53,18 @@ export function resetPinnedTabForView(viewId: string) {
     dockTreeViews(item.root).some((view) => view.id === viewId),
   );
   return Boolean(owner && dockTreeViews(owner.root).length === 1 && state.resetPinnedTab(owner.id));
+}
+
+/** Closes every unpinned tab except the active one, from the command palette. */
+export function useClearTabsShortcut() {
+  useShortcutHandler(
+    "workspace.clear_tabs",
+    useCallback(() => {
+      const state = useWorkspaceStore.getState();
+      const activeId = state.layout.activeTabId;
+      const doomed = layoutTabs(state.layout).filter((tab) => tab.id !== activeId && !tab.pinnedUrl);
+      for (const tab of doomed) state.closeTab(tab.id);
+      return true;
+    }, []),
+  );
 }

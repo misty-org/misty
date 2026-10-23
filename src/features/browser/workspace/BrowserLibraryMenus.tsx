@@ -1,5 +1,5 @@
 import { Bookmark as BookmarkIcon, Folder, Star } from "lucide-react";
-import { SavedWebsiteIcon } from "@/features/browser-workspace/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
 import { bookmarkRoots, favoritesId, useBookmarkLibrary } from "@/features/bookmarks/library";
 import { useFavorites } from "@/features/bookmarks/favorites";
 import { useWorkspaceStore } from "@/features/workspace";

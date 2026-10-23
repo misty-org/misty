@@ -1,4 +1,4 @@
-import { useSocialSpaces as useSpacesStore } from "../SocialRuntime";
+import { useSpacesStore } from "../../store/useSpacesStore";
 import type { Space } from "@/api/spaces/dto/entities";
 
 export interface SpaceChatAccess {

@@ -9,7 +9,7 @@ interface WorkflowSchedulesState {
   load(): Promise<void>;
 }
 
-/** Every agent's workflow schedules, soonest first, for Home and run notifications. */
+/** Every agent's workflow schedules, soonest first, so this computer can start runs due here. */
 export const useWorkflowSchedulesStore = create<WorkflowSchedulesState>()((set, get) => ({
   accountId: "",
   runs: [],

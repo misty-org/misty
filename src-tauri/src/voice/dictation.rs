@@ -51,12 +51,9 @@ impl Dictation {
         }
     }
 
+    #[cfg(test)]
     pub fn phase(&self) -> Phase {
         self.phase
-    }
-
-    pub fn set_hands_free(&mut self, enabled: bool) {
-        self.hands_free = enabled;
     }
 
     pub fn key_down(&mut self, now: Instant) -> Option<Action> {

@@ -45,25 +45,6 @@ const openMenu = () =>
     ctrlKey: false,
   });
 
-it("shares Journal pins without pruning pins outside the overview", async () => {
-  localStorage.setItem("misty:drawing-pins:user:space", JSON.stringify(["outside"]));
-  render(
-    <MemoryRouter>
-      <Harness item={item} />
-    </MemoryRouter>,
-  );
-  openMenu();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Pin" }));
-  await waitFor(() =>
-    expect(JSON.parse(localStorage.getItem("misty:drawing-pins:user:space")!)).toEqual([
-      "d",
-      "outside",
-    ]),
-  );
-  openMenu();
-  expect(screen.getByRole("menuitem", { name: "Unpin" })).toBeTruthy();
-});
-
 it("renames from the menu, preserves a failed draft and retries", async () => {
   const rename = vi.fn().mockRejectedValueOnce(new Error("Offline")).mockResolvedValue({});
   const refresh = vi.fn();
@@ -142,22 +123,3 @@ it.each([["file", "Move to Trash"]] as const)(
     expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
   },
 );
-
-it("uses the same native note pin IDs as the Notes collection", async () => {
-  localStorage.setItem("misty:note-pins:user:space", JSON.stringify(["misty:n"]));
-  render(
-    <MemoryRouter>
-      <Harness item={{ ...item, id: "note:n", kind: "note" }} />
-    </MemoryRouter>,
-  );
-  openMenu();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Unpin" }));
-  await waitFor(() =>
-    expect(JSON.parse(localStorage.getItem("misty:note-pins:user:space")!)).toEqual([]),
-  );
-  openMenu();
-  fireEvent.click(screen.getByRole("menuitem", { name: "Pin" }));
-  await waitFor(() =>
-    expect(JSON.parse(localStorage.getItem("misty:note-pins:user:space")!)).toEqual(["misty:n"]),
-  );
-});

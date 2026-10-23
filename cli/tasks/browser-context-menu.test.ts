@@ -4,7 +4,7 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 
 const contextMenuScript = readFileSync(
-  new URL("../../src-tauri/src/infra/browser_context_menu.js", import.meta.url),
+  new URL("../../src-tauri/src/infra/browser/scripts/context_menu.js", import.meta.url),
   "utf8",
 );
 

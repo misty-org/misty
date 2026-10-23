@@ -65,21 +65,18 @@
 /* Vertical: the label chip hugs its text, and the members hang beneath it like a tree: the
    shared TreeBranch trunk drops from the chip in the group's color, with a tick into each tab
    and a small rounded corner at the last. */
-[data-tab-position="left"] .misty-tab-group-header,
-[data-tab-position="right"] .misty-tab-group-header {
+.misty-workspace-tabs .misty-tab-group-header {
   margin: 10px 0 3px 2px;
   max-width: calc(100% - 4px);
   align-self: flex-start;
 }
-[data-tab-position="left"] .misty-tab-group-label,
-[data-tab-position="right"] .misty-tab-group-label {
+.misty-workspace-tabs .misty-tab-group-label {
   height: 24px;
   max-width: 100%;
 }
 /* As specific as the vertical tab's own width: 100% (docking-shell.css), so the indent comes
    out of the width instead of pushing the chips and close button past the strip's edge. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-workspace-tab.misty-tab-group-member {
+.misty-workspace-tabs .misty-workspace-tab.misty-tab-group-member {
   position: relative;
   box-shadow: none;
   margin-left: 22px;
@@ -87,8 +84,7 @@
   max-width: calc(100% - 22px);
 }
 /* The branches themselves are the shared TreeBranch, drawn in the group's color. */
-.misty-workspace-tabs:is([data-tab-position="left"], [data-tab-position="right"])
-  .misty-tab-group-member:not(:has(+ .misty-tab-group-member)) {
+.misty-workspace-tabs .misty-tab-group-member:not(:has(+ .misty-tab-group-member)) {
   margin-bottom: 6px;
 }
 

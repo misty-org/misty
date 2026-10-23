@@ -9,22 +9,6 @@ export const profileDockClass = [
   "focus-visible:ring-2 focus-visible:ring-charcoal-active",
 ].join(" ");
 
-export const navigatorFocusRingClass = [
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cream-muted",
-  "focus-visible:ring-offset-1 focus-visible:ring-offset-charcoal-workspace",
-].join(" ");
-
-export const navigatorIslandActionClass = [
-  "misty-navigator-icon-target grid size-8 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0",
-  "text-cream-muted no-underline outline-none transition-colors",
-  "hover:bg-control-hover hover:text-cream",
-  "aria-pressed:bg-control-active aria-pressed:text-cream data-[state=open]:bg-control-active",
-  navigatorFocusRingClass,
-].join(" ");
-
-export const navigatorHeaderRowClass = "flex min-w-0 items-center py-0.5";
-
-export const navigatorHierarchyActionClass = navigatorIslandActionClass;
 export const desktopTitlebarNavigationInset = 84;
 /** Three 36px caption buttons, before they are measured. */
 export const windowsTitlebarControlsFallbackWidth = 108;
@@ -48,6 +32,11 @@ export const windowsTitlebarControlsClass =
 
 export const windowsTitlebarControlButtonClass =
   "grid h-full w-[36px] shrink-0 place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
+/** Signed-out pages have no sidebar: minimize, maximize and close sit in the usual top-right corner. */
+export const windowsStandardControlsClass =
+  "misty-windows-standard-controls pointer-events-auto absolute right-0 top-0 z-[3] flex h-9 w-max flex-nowrap items-center";
+export const windowsStandardControlButtonClass =
+  "grid h-9 w-[46px] shrink-0 place-items-center border-0 bg-transparent p-0 text-cream-muted transition-colors hover:bg-charcoal-hover hover:text-cream";
 /** The same buttons seated in the sidebar's header row, sized like the icons beside them. */
 export const windowsInlineControlsClass = "mr-1 flex shrink-0 items-center gap-0.5";
 export const windowsInlineControlButtonClass =

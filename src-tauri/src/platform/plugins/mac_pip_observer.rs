@@ -16,7 +16,7 @@ use cocoa::{
     foundation::NSString,
 };
 use objc::{class, msg_send, sel, sel_impl};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 static FLOATING: AtomicBool = AtomicBool::new(false);
 

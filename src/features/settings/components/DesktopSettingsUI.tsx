@@ -1,7 +1,7 @@
 import { Button, cn, IconButton } from "@/shared/ui";
 import { CircleAlert, X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
-import { useSettingReset } from "../profiles/SettingScope";
+import { useSettingReset } from "../devicePreferences/SettingScope";
 import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
 export type { DesktopSettingsNavEntry, DesktopSettingsNavGroup } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
@@ -74,18 +74,32 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
   );
 }
 /**
- * A group of rows under a plain header with an optional muted line of context. Rows draw
- * hairlines between themselves; there is no card.
+ * A group of rows under a plain header with an optional muted line of context. Spacing separates
+ * rows; there are no cards or dividers.
  */
 export function DesktopSettingsSection(props: {
   title: string;
   description?: ReactNode;
   children: ReactNode;
+  density?: "normal" | "compact";
 }) {
   return (
-    <section aria-label={props.title} className="@container/settings mb-14 min-w-0 last:mb-0">
-      <div className="mb-2 min-w-0">
-        <h2 className="text-[18px] font-semibold leading-7 text-cream-bright">{props.title}</h2>
+    <section
+      aria-label={props.title}
+      className={cn(
+        "@container/settings min-w-0 last:mb-0",
+        props.density === "compact" ? "mb-8" : "mb-10",
+      )}
+    >
+      <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-2")}>
+        <h2
+          className={cn(
+            "font-semibold text-cream-bright",
+            props.density === "compact" ? "text-base leading-6" : "text-[18px] leading-7",
+          )}
+        >
+          {props.title}
+        </h2>
         {props.description ? (
           <p className="mt-1 max-w-[680px] text-[15px] leading-6 text-cream-muted">
             {props.description}
@@ -111,6 +125,7 @@ export function DesktopSettingsRow(props: {
   indent?: boolean;
   /** The control needs the full width (lists, text areas) and sits under the label. */
   stacked?: boolean;
+  density?: "normal" | "compact";
 }) {
   const reset = useSettingReset(props.label);
   return (
@@ -119,7 +134,8 @@ export function DesktopSettingsRow(props: {
       tabIndex={-1}
       aria-disabled={props.muted || undefined}
       className={cn(
-        "group/setting-row grid min-h-16 items-center gap-x-10 gap-y-3 border-t border-charcoal-border py-4 outline-none first:border-t-0",
+        "group/setting-row grid items-center gap-y-3 outline-none",
+        props.density === "compact" ? "min-h-14 gap-x-6 py-3" : "min-h-14 gap-x-8 py-3",
         "transition-colors duration-700 data-[setting-flash=true]:bg-charcoal-hover data-[setting-flash=true]:duration-0",
         props.stacked
           ? "grid-cols-1"
@@ -178,7 +194,7 @@ export function DesktopSettingsNotice(props: { children: ReactNode; action?: Rea
   return (
     <div
       role="alert"
-      className="mb-5 flex min-w-0 items-center gap-2.5 rounded-lg border border-charcoal-border px-3.5 py-2.5 text-[14px] leading-5 text-cream"
+      className="mb-5 flex min-w-0 items-center gap-2.5 px-0 py-2 text-[14px] leading-5 text-cream"
     >
       <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
       <span className="min-w-0 flex-1">{props.children}</span>

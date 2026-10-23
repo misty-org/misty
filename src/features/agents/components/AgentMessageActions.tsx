@@ -1,5 +1,5 @@
 import { aiSurfaceApi } from "@/features/ai-surface/api";
-import type { GlobalAiMessage } from "@/features/global-search/types";
+import type { GlobalAiMessage } from "@/features/misty/types";
 import { IconButton } from "@/shared/ui";
 import {
   Check,
@@ -28,9 +28,11 @@ export function AgentMessageActions(props: {
   text: string;
   working: boolean;
   retryPrompt?: string;
+  /** The prompt message a retry starts from. */
+  retryFrom?: string;
   /** The prompt can be sent again as typed: no attachments or private context. */
   resendable?: boolean;
-  onRetry: (prompt: string) => void;
+  onRetry: (prompt: string, fromMessageId?: string) => void;
   onEdit?: (text: string) => void;
   onReply?: (quote: string) => void;
 }) {
@@ -51,7 +53,7 @@ export function AgentMessageActions(props: {
         <Action
           label="Ask again"
           disabled={props.working}
-          onClick={() => props.onRetry(props.text)}
+          onClick={() => props.onRetry(props.text, message.id)}
         >
           <RefreshCw />
         </Action>
@@ -73,7 +75,7 @@ export function AgentMessageActions(props: {
         <Action
           label="Try again"
           disabled={props.working}
-          onClick={() => props.onRetry(props.retryPrompt!)}
+          onClick={() => props.onRetry(props.retryPrompt!, props.retryFrom)}
         >
           <RotateCcw />
         </Action>

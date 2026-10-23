@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { openExternalLink } from "@/features/workspace/externalLinks";
-import { Skeleton } from "@/shared/ui";
+import { Pressable, Skeleton } from "@/shared/ui";
 import { knownLinkPreview, loadLinkPreview, type LinkPreview } from "./api";
 import { extractLinks } from "./links";
 import { useLinkPreviewSetting } from "./settings";
@@ -49,9 +49,12 @@ function LinkPreviewCard({ url }: { url: string }) {
   if (!preview) return null;
   return (
     <div role="listitem" className="m-0 max-w-[460px]">
-      <button
-        type="button"
-        className="flex w-full items-stretch overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card/40 text-left transition-colors hover:bg-charcoal-card"
+      <Pressable
+        className={
+          "flex w-full items-stretch overflow-hidden rounded-lg border " +
+          "border-charcoal-border bg-charcoal-card/40 text-left transition-colors " +
+          "hover:bg-charcoal-card"
+        }
         onClick={() => openExternalLink(url)}
         title={url}
       >
@@ -74,14 +77,17 @@ function LinkPreviewCard({ url }: { url: string }) {
             <span className="line-clamp-1 text-xs text-cream-muted">{preview.description}</span>
           ) : null}
         </span>
-      </button>
+      </Pressable>
     </div>
   );
 }
 
 function LinkPreviewSkeleton() {
   return (
-    <div className="m-0 flex max-w-[460px] overflow-hidden rounded-lg border border-charcoal-border" aria-hidden="true">
+    <div
+      className="m-0 flex max-w-[460px] overflow-hidden rounded-lg border border-charcoal-border"
+      aria-hidden="true"
+    >
       <Skeleton className="aspect-video w-32 shrink-0 rounded-none" />
       <span className="grid flex-1 content-center gap-2 p-3">
         <Skeleton className="h-2.5 w-16" />

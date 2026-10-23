@@ -1,9 +1,8 @@
 //! The macOS side of window and desktop control: the Objective-C entry points
 //! (`MistyAutopilot.m`, `MistyDesktopControl.m`) and their callbacks.
 use serde_json::Value;
-use tauri::Emitter;
 
-use super::DESKTOP_APP;
+use super::workspace_autopilot::DESKTOP_APP;
 
 extern "C" {
     pub(super) fn misty_autopilot_supported() -> bool;
@@ -26,10 +25,6 @@ extern "C" {
     pub(super) fn misty_desktop_stop(task: *const std::ffi::c_char);
     pub(super) fn misty_desktop_capture(task: *const std::ffi::c_char) -> *mut std::ffi::c_char;
     pub(super) fn misty_desktop_action(input: *const std::ffi::c_char) -> *mut std::ffi::c_char;
-    pub(super) fn misty_desktop_audio(
-        task: *const std::ffi::c_char,
-        seconds: f64,
-    ) -> *mut std::ffi::c_char;
     pub(super) fn misty_agent_window_ring(view: *mut std::ffi::c_void, active: bool);
     pub(super) fn misty_desktop_yield(task: *const std::ffi::c_char);
 }

@@ -1,6 +1,9 @@
-import { registerProfileWriter } from "@/features/settings/profiles/bridge";
-import { editPreference, initialProfileState } from "@/features/settings/profiles/model";
-import { useSettingsProfiles } from "@/features/settings/profiles/store";
+import { registerPreferenceWriter } from "@/features/settings/devicePreferences/bridge";
+import {
+  editPreference,
+  initialPreferencesState,
+} from "@/features/settings/devicePreferences/model";
+import { useDevicePreferences } from "@/features/settings/devicePreferences/store";
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { CursorCompanionController } from "./CursorCompanionController";
@@ -28,7 +31,7 @@ const mocks = vi.hoisted(() => ({
     accountId: "account",
     activeConversationId: "conversation",
     selectedAgentId: undefined as string | undefined,
-    executionMode: "user" as "user" | "agent" | "team",
+    executionMode: "user" as "user" | "agent",
     working: false,
     error: null as string | null,
     invocationId: undefined as string | undefined,
@@ -116,7 +119,7 @@ const presentations = () =>
 async function mounted() {
   const legacy = JSON.parse(localStorage.getItem("misty.cursor-companion:account") || "null");
   if (legacy) {
-    useSettingsProfiles.setState({ state: initialProfileState({ companion: legacy }) });
+    useDevicePreferences.setState({ state: initialPreferencesState({ companion: legacy }) });
     localStorage.removeItem("misty.cursor-companion:account");
   }
   const result = render(<CursorCompanionController accountId="account" />);
@@ -124,12 +127,12 @@ async function mounted() {
   return result;
 }
 beforeEach(() => {
-  useSettingsProfiles.setState({
-    state: initialProfileState({}),
+  useDevicePreferences.setState({
+    state: initialPreferencesState({}),
     ready: true,
   });
-  registerProfileWriter(async (id, value) => {
-    useSettingsProfiles.setState(({ state }) => ({
+  registerPreferenceWriter(async (id, value) => {
+    useDevicePreferences.setState(({ state }) => ({
       state: editPreference(state!, id, value),
     }));
   });

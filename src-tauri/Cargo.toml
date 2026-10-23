@@ -4,6 +4,7 @@ version = "0.1.0-beta.1"
 description = "Misty native application shell"
 authors = ["Misty Contributors"]
 edition = "2021"
+license = "MIT"
 default-run = "misty-desktop"
 
 [lib]
@@ -72,7 +73,7 @@ url = "2"
 walkdir = "2.5"
 image = { version = "0.25.10", default-features = false, features = ["hdr", "png", "pnm", "jpeg"] }
 ed25519-dalek = "2"
-# Devices (docs/design/devices/BRIEF.md): sealing the vault key to a newly
+# Devices (docs/sync/devices.md): sealing the vault key to a newly
 # approved device, the control channel socket, and LAN discovery.
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 futures-util = { version = "0.3", features = ["sink"] }
@@ -84,7 +85,6 @@ zstd = { version = "0.13", default-features = false }
 tauri-plugin-keystore = { path = "vendor/tauri-plugin-keystore" }
 tauri-plugin-deep-link = "2"
 percent-encoding = "2"
-notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 # Microphone, system and per-process capture (github.com/kannachi323/audeeo,
@@ -163,6 +163,11 @@ arboard = { path = "vendor/arboard" }
 # Honor focused(false) for background WebKit views on macOS, and let pages
 # declare their own global `ipc` (see vendor/wry/MISTY-PATCH.md).
 wry = { path = "vendor/wry" }
+
+# Hold runtime messages that arrive while a webview is being created, so a
+# nested create or close can't wait on its own thread on Windows (see
+# vendor/tauri-runtime-wry/MISTY-PATCH.md).
+tauri-runtime-wry = { path = "vendor/tauri-runtime-wry" }
 
 # Backport the upstream VariantStrIter soundness fix to Tauri's GTK3-compatible GLib.
 glib = { path = "vendor/glib" }

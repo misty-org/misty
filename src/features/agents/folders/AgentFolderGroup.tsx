@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Folder, FolderOpen, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { globalMistyError } from "@/features/global-search/globalMistyActions";
+import { globalMistyError } from "@/features/misty/globalMistyActions";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -145,7 +145,8 @@ export function AgentFolderGroup({
         <AlertDialogContent>
           <AlertDialogTitle>Delete “{folder.name}”?</AlertDialogTitle>
           <AlertDialogDescription>
-            The project is removed. Its conversations move back to Conversations and are not deleted.
+            The project is removed. Its conversations move back to Conversations and are not
+            deleted.
           </AlertDialogDescription>
           {error && (
             <p role="alert" className="text-sm text-cream-muted">

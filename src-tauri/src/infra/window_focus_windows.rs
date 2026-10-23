@@ -118,9 +118,7 @@ fn is_active<R: Runtime>(window: &Window<R>) -> bool {
 /// active one, or while the page is not shown.
 pub(crate) fn restore_page<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
     let label = webview.label().to_owned();
-    let lost = lost_to_app()
-        .lock()
-        .is_ok_and(|lost| lost.contains(&label));
+    let lost = lost_to_app().lock().is_ok_and(|lost| lost.contains(&label));
     if !lost || !is_active(&webview.window()) {
         return Ok(());
     }

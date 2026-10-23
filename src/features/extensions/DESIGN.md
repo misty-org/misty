@@ -1,18 +1,23 @@
 # Extensions
 
 Mode: Operate. Misty has no Extensions page or catalog. People find extensions the
-way they would in Chrome or Firefox: on the Chrome Web Store
-(`chromewebstore.google.com`) and Firefox Add-ons (`addons.mozilla.org`), opened in
-an ordinary browser tab. Old `/extensions` routes and `misty://extensions` open
-Settings › Browser › Extensions, and saved Extensions tabs reopen as the Chrome Web
-Store.
+way they would in Chrome: on the Chrome Web Store (`chromewebstore.google.com`),
+opened in an ordinary browser tab. Chrome (Manifest V3) is Misty's one extension
+standard on every platform (decided 2026-10-22,
+[docs/plans/extensions-sync-plan.md](../../../docs/plans/extensions-sync-plan.md)), so
+Firefox Add-ons is not offered: no store button, menu entry or Settings row
+(`offeredStores` in `store.ts`). The Firefox install path below stays in the code, and
+extensions already installed from it keep running where the platform allows. Old
+`/extensions` routes and `misty://extensions` open Settings › Browser › Extensions, and
+saved Extensions tabs reopen as the Chrome Web Store. First-run setup offers an
+optional ad blocker and password manager (`ExtensionsSetupStep.tsx`).
 
 ## Adding an extension
 
-On an extension's store page, Misty's page script (`browser_extension_store.js`)
+On an extension's store page, Misty's page script (`browser/scripts/extension_store.js`)
 shows a monochrome "Add to Misty" button in a closed shadow root. It reacts only to
 trusted clicks and sends a tokened host message that names no extension. Misty reads
-the extension from the tab's real address (`browser_extension_store.rs`), downloads
+the extension from the tab's real address (`browser/host_messages/extension_store.rs`), downloads
 it from the store itself and opens the install review in Misty's own window
 (`ExtensionInstallRequest`). The most a page can do is ask Misty to review the
 extension it shows. The button sits in place of the store's own install button,
@@ -44,18 +49,19 @@ Two places, nothing else:
 - The browser toolbar's Extensions menu lists installed extensions. Each row runs the
   extension's action and has its on/off switch. The menu also opens either store and
   "Manage extensions".
-- Settings › Browser › Extensions has rows that open each store, the account-wide
+- Settings › Browser › Extensions has rows that open each store, the device-wide
   agent access switch, and one plain section per extension: Enabled, Review access
   (only when a version asks for more), Allow in private tabs, Allow agents, its own
   settings, each granted access with Remove access, its store page and Remove.
 
-Account intent and actual local runtime state are distinct. The Enabled switch is the
-account's intent; its helper line says what this device is doing. A failed or
-unsupported runtime is never represented as running. Extension artwork keeps its
-official colors. All preferences use the device settings system.
+Intent and actual local runtime state are distinct. The Enabled switch is the person's
+intent; its helper line says what this device is doing. A failed or unsupported runtime
+is never represented as running. Extension artwork keeps its official colors. All
+preferences use the device settings system.
 
-Installed extensions sync as `extensions.installations`. Firefox IDs are stored as
-numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32
+Installed extensions are saved on this device in the `extensions.installations` setting
+(other Spaces' lists in `extensions.space_installations`); they never sync. Firefox IDs
+are stored as numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32
 letters a–p and are their own identity (`guid == id`). A Firefox identity never looks
 like a Chrome ID, so approvals and extension origins cannot collide.
 
@@ -104,7 +110,7 @@ used.
 
 Packages installed under an older layer get the current scripts the next time they
 load. Calls that need Misty's data go through the hidden host page; the native host
-checks the account's granted permission per namespace, and `compat/` in this folder
+checks the extension's granted permission per namespace, and `compat/` in this folder
 answers them. Install review blocks only `debugger` and `proxy`; partially covered
 permissions are listed as findings, never presented as fully working.
 

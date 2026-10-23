@@ -25,10 +25,14 @@ fn main() {
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
         println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionRequests.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionDelegate.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionsBridge.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionsInternal.h");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionTabs.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionPopupWindows.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompat.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyExtensionCompatActions.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNotifications.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.h");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionNativeMessaging.m");
@@ -38,24 +42,31 @@ fn main() {
         println!("cargo:rerun-if-changed=native/macos/MistyAutopilot.m");
         println!("cargo:rerun-if-changed=native/macos/MistyBrowserInput.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopControl.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyDesktopControlInternal.h");
+        println!("cargo:rerun-if-changed=native/macos/MistyDesktopIsland.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentPointer.h");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.m");
-        println!("cargo:rerun-if-changed=native/macos/MistyAgentDock.m");
         println!("cargo:rerun-if-changed=native/macos/MistyAgentRing.h");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentRingInternal.h");
+        println!("cargo:rerun-if-changed=native/macos/MistyAgentWindowRing.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDesktopCapture.h");
-        println!("cargo:rerun-if-changed=native/macos/MistyFolderBookmarks.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDefaultBrowser.m");
         println!("cargo:rerun-if-changed=native/macos/MistyDictationInsert.m");
         println!("cargo:rerun-if-changed=native/macos/MistyScreenRecorder.m");
         println!("cargo:rerun-if-changed=native/macos/MistySpaceDock.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyScreenMemory.m");
         cc::Build::new()
             .file("native/macos/MistyContext.m")
             .file("native/macos/MistyExtensions.m")
+            .file("native/macos/MistyExtensionRequests.m")
+            .file("native/macos/MistyExtensionDelegate.m")
+            .file("native/macos/MistyExtensionsBridge.m")
             .file("native/macos/MistyExtensionTabs.m")
             .file("native/macos/MistyExtensionPopupWindows.m")
             .file("native/macos/MistyExtensionCompat.m")
+            .file("native/macos/MistyExtensionCompatActions.m")
             .file("native/macos/MistyExtensionNotifications.m")
             .file("native/macos/MistyExtensionNativeMessaging.m")
             .file("native/macos/MistyCompanionCapture.m")
@@ -63,19 +74,20 @@ fn main() {
             .file("native/macos/MistyAutopilot.m")
             .file("native/macos/MistyBrowserInput.m")
             .file("native/macos/MistyDesktopControl.m")
+            .file("native/macos/MistyDesktopIsland.m")
             .file("native/macos/MistyAgentPointer.m")
             .file("native/macos/MistyAgentRing.m")
-            .file("native/macos/MistyAgentDock.m")
+            .file("native/macos/MistyAgentWindowRing.m")
             .file("native/macos/MistyDesktopCapture.m")
-            .file("native/macos/MistyFolderBookmarks.m")
             .file("native/macos/MistyDefaultBrowser.m")
             .file("native/macos/MistyDictationInsert.m")
             .file("native/macos/MistyScreenRecorder.m")
             .file("native/macos/MistySpaceDock.m")
+            .file("native/macos/MistyScreenMemory.m")
             .flag("-fobjc-arc")
             .flag("-fblocks")
             .compile("misty_context");
-        // Category-only objects (MistyExtensionCompat.m, MistyExtensionNotifications.m)
+        // Category-only objects (MistyExtensionCompat*.m, MistyExtensionNotifications.m)
         // export no symbols, so ld drops them from the static archive without -ObjC.
         println!("cargo:rustc-link-arg=-Wl,-ObjC");
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
@@ -91,6 +103,7 @@ fn main() {
             "CoreVideo",
             "NaturalLanguage",
             "UserNotifications",
+            "Vision",
         ] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
@@ -136,8 +149,6 @@ fn expose_public_app_configuration() {
         "POSTHOG_PROJECT_TOKEN",
         "POSTHOG_HOST",
         "MISTY_RELEASE_CHANNEL",
-        "MISTY_DEVICE_RELAY_URL",
-        "MISTY_DEVICE_TICKET_PUBLIC_KEYS",
     ] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)
@@ -182,7 +193,7 @@ fn build_builtin_workers() {
     let profile = env::var("PROFILE").expect("Cargo profile");
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     let mut source = String::from("match (service, protocol) {\n");
-    for (service, protocol) in [("document-processing", 5)] {
+    for (service, protocol) in [("document-processing", 6)] {
         let directory = root.join(service);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());

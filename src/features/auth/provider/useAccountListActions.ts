@@ -1,10 +1,9 @@
-import { removeSpaceReferenceCache } from "@/features/spaces";
 import {
   removeAccountWorkspace,
   restoreAccountWorkspace,
   saveAccountWorkspace,
 } from "@/features/workspace";
-import { flushWorkspaceRecovery } from "@/features/browser-workspace/recovery";
+import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
 import { useCallback } from "react";
 import { resetAccountScopedState, type AuthUser } from "../authSession";
 import { listSavedAccountSessions, removeSavedAccountSession } from "../store/useAuthTokenStore";
@@ -33,7 +32,6 @@ export function useAccountListActions(
     async (accountId: string) => {
       if (!(await removeSavedAccountSession(accountId)))
         throw new Error("Could not remove the saved account. Its workspace has been preserved.");
-      await removeSpaceReferenceCache(accountId);
       await removeAccountWorkspace(accountId);
       setAccounts(listSavedAccountSessions());
     },

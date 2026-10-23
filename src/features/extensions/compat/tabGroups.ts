@@ -10,7 +10,7 @@ function groupNumber(id: string): number {
     hash ^= id.charCodeAt(index);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 1) || 1;
+  return hash >>> 1 || 1;
 }
 const chromeColor = (color: TabGroupColor) => (color === "gray" ? "grey" : color);
 const mistyColor = (value: unknown): TabGroupColor | undefined =>
@@ -47,7 +47,9 @@ function workspaceTabs(value: unknown): string[] {
   const tabs = layoutTabs(useWorkspaceStore.getState().layout);
   return runtimeIds.map((runtimeId) => {
     const viewId = browserTabIdForRuntime(runtimeId);
-    const tab = tabs.find((candidate) => dockTreeViews(candidate.root).some((v) => v.id === viewId));
+    const tab = tabs.find((candidate) =>
+      dockTreeViews(candidate.root).some((v) => v.id === viewId),
+    );
     if (!tab) throw new Error("Misty can group tabs only in the current window.");
     return tab.id;
   });
@@ -101,7 +103,8 @@ export const tabGroupHandlers: Record<string, CompatHandler> = {
 export function watchTabGroups(): () => void {
   let previous = new Map(openGroups().map((g) => [g.id, g]));
   return useWorkspaceStore.subscribe((state, prior) => {
-    if (state.tabGroups === prior.tabGroups && state.activeScopeKey === prior.activeScopeKey) return;
+    if (state.tabGroups === prior.tabGroups && state.activeScopeKey === prior.activeScopeKey)
+      return;
     const current = new Map(openGroups().map((g) => [g.id, g]));
     // Switching Spaces shows other groups; nothing was made or removed.
     if (state.activeScopeKey !== prior.activeScopeKey) {

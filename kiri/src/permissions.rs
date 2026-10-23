@@ -112,38 +112,84 @@ mod tests {
     #[test]
     fn stored_choices_become_engine_verdicts() {
         let allowed = store(Decision::Allow, Decision::Block);
-        assert_eq!(media_verdict(Some(SITE), Some(SITE), Some(MediaKind::Camera), &allowed), Verdict::Grant);
-        assert_eq!(media_verdict(Some(SITE), Some(SITE), Some(MediaKind::Microphone), &allowed), Verdict::Deny);
-        assert_eq!(media_verdict(Some(SITE), Some(SITE), Some(MediaKind::CameraAndMicrophone), &allowed), Verdict::Deny);
+        assert_eq!(
+            media_verdict(Some(SITE), Some(SITE), Some(MediaKind::Camera), &allowed),
+            Verdict::Grant
+        );
+        assert_eq!(
+            media_verdict(
+                Some(SITE),
+                Some(SITE),
+                Some(MediaKind::Microphone),
+                &allowed
+            ),
+            Verdict::Deny
+        );
+        assert_eq!(
+            media_verdict(
+                Some(SITE),
+                Some(SITE),
+                Some(MediaKind::CameraAndMicrophone),
+                &allowed
+            ),
+            Verdict::Deny
+        );
         let unset = store(Decision::Ask, Decision::Ask);
-        assert_eq!(media_verdict(Some(SITE), Some(SITE), Some(MediaKind::Camera), &unset), Verdict::Prompt);
+        assert_eq!(
+            media_verdict(Some(SITE), Some(SITE), Some(MediaKind::Camera), &unset),
+            Verdict::Prompt
+        );
     }
 
     #[test]
     fn embedded_frames_never_inherit_a_top_level_allowance() {
         let allowed = store(Decision::Allow, Decision::Allow);
-        assert_eq!(media_verdict(Some(SITE), Some(AD), Some(MediaKind::Camera), &allowed), Verdict::Prompt);
+        assert_eq!(
+            media_verdict(Some(SITE), Some(AD), Some(MediaKind::Camera), &allowed),
+            Verdict::Prompt
+        );
     }
 
     #[test]
     fn a_top_level_block_covers_embedded_frames() {
         let blocked = store(Decision::Block, Decision::Ask);
-        assert_eq!(media_verdict(Some(SITE), Some(AD), Some(MediaKind::Camera), &blocked), Verdict::Deny);
-        assert_eq!(media_verdict(Some(SITE), Some(AD), Some(MediaKind::Microphone), &blocked), Verdict::Prompt);
+        assert_eq!(
+            media_verdict(Some(SITE), Some(AD), Some(MediaKind::Camera), &blocked),
+            Verdict::Deny
+        );
+        assert_eq!(
+            media_verdict(Some(SITE), Some(AD), Some(MediaKind::Microphone), &blocked),
+            Verdict::Prompt
+        );
     }
 
     #[test]
     fn unknown_origins_or_kinds_fail_closed() {
         let allowed = store(Decision::Allow, Decision::Allow);
-        assert_eq!(media_verdict(None, Some(SITE), Some(MediaKind::Camera), &allowed), Verdict::Deny);
-        assert_eq!(media_verdict(Some(SITE), None, Some(MediaKind::Camera), &allowed), Verdict::Deny);
-        assert_eq!(media_verdict(Some(SITE), Some(SITE), None, &allowed), Verdict::Deny);
+        assert_eq!(
+            media_verdict(None, Some(SITE), Some(MediaKind::Camera), &allowed),
+            Verdict::Deny
+        );
+        assert_eq!(
+            media_verdict(Some(SITE), None, Some(MediaKind::Camera), &allowed),
+            Verdict::Deny
+        );
+        assert_eq!(
+            media_verdict(Some(SITE), Some(SITE), None, &allowed),
+            Verdict::Deny
+        );
     }
 
     #[test]
     fn origins_keep_scheme_host_and_nondefault_port() {
-        assert_eq!(canonical_origin("https://user:pass@EXAMPLE.com:443/path?q=x").unwrap(), "https://example.com");
-        assert_eq!(canonical_origin("https://example.com:8443/").unwrap(), "https://example.com:8443");
+        assert_eq!(
+            canonical_origin("https://user:pass@EXAMPLE.com:443/path?q=x").unwrap(),
+            "https://example.com"
+        );
+        assert_eq!(
+            canonical_origin("https://example.com:8443/").unwrap(),
+            "https://example.com:8443"
+        );
         assert!(canonical_origin("file:///tmp/x").is_err());
         assert!(canonical_origin("about:blank").is_err());
     }

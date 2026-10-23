@@ -92,6 +92,7 @@ pub(super) async fn session_by_id(session_id: &str) -> SessionGuard {
     }
 }
 
+#[cfg(test)]
 pub(super) fn vault_of_session(session_id: &str) -> Option<String> {
     sessions()
         .vaults

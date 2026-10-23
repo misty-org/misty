@@ -79,38 +79,3 @@ it("draws Misty's pointer where the agent acts", async () => {
   act(() => mocks.listeners.get("misty://desktop-pointer")?.({ payload: null }));
   expect(container.querySelector(".desktop-pointer")).toBeNull();
 });
-
-it("opens or stops a docked agent from its card", async () => {
-  mocks.label = "misty-dock-stack";
-  render(<DesktopOverlayRoot />);
-  await act(async () => {});
-  act(() =>
-    mocks.listeners.get("misty://dock-stack")?.({
-      payload: {
-        cards: [
-          {
-            id: "misty-dock-1",
-            name: "Researcher",
-            status: "",
-            waiting: true,
-            x: 0,
-            y: 0,
-            width: 240,
-            height: 150,
-          },
-        ],
-      },
-    }),
-  );
-  expect(screen.getByText("Waiting for you")).toBeTruthy();
-  fireEvent.click(screen.getByLabelText("Open Researcher window"));
-  expect(mocks.invoke).toHaveBeenCalledWith("agent_dock_card", {
-    action: "open",
-    id: "misty-dock-1",
-  });
-  fireEvent.click(screen.getByText("Stop"));
-  expect(mocks.invoke).toHaveBeenCalledWith("agent_dock_card", {
-    action: "stop",
-    id: "misty-dock-1",
-  });
-});

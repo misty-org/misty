@@ -1,9 +1,10 @@
-import { cachedRequest } from "@/api/cache/cachedRequest";
+import { cachedRequest } from "@/api/cache/cached-request";
 import { useEffect, useState } from "react";
 import { readApiSessionGeneration } from "@/api/client";
-import type { AiLimit } from "@/api/spaces/dto/agentUsageTypes";
-import { formatUsagePercent } from "@/features/global-search/CommandUsageEstimate";
-import { Settings } from "lucide-react";
+import type { AiLimit } from "@/api/spaces/dto/agent-usage-types";
+import { formatUsagePercent } from "@/features/misty/CommandUsageEstimate";
+import { openAccountSettingsInBrowser } from "@/features/account/openAccountSettings";
+import { ExternalLink } from "lucide-react";
 import {
   IconButton,
   Popover,
@@ -39,12 +40,6 @@ function resetLabel(limit: AiLimit): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `Resets in ${hours} hr ${minutes % 60} min`;
   return `Resets in ${Math.floor(hours / 24)} d ${hours % 24} hr`;
-}
-
-function openUsageSettings() {
-  window.dispatchEvent(
-    new CustomEvent("misty:open-settings", { detail: { section: "agents-usage" } }),
-  );
 }
 
 /**
@@ -111,14 +106,14 @@ export function AgentUsageControl({ working }: { working: boolean }) {
           <div className="mb-1.5 flex items-center justify-between">
             <p className="text-base font-medium">Usage</p>
             <IconButton
-              label="Usage settings"
+              label="Manage plan and billing"
               size="xs"
               onClick={() => {
                 setOpen(false);
-                openUsageSettings();
+                void openAccountSettingsInBrowser("/settings/billing");
               }}
             >
-              <Settings className="size-3.5" />
+              <ExternalLink className="size-3.5" />
             </IconButton>
           </div>
           {meter && limits ? (

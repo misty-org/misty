@@ -1,10 +1,10 @@
 // @vitest-environment-options {"url":"https://docs.google.com/document/d/doc123/edit"}
 import { afterEach, describe, expect, it, vi } from "vitest";
-import core from "../../../src-tauri/src/infra/browser_page/page_core.js?raw";
-import tree from "../../../src-tauri/src/infra/browser_page/page_tree.js?raw";
-import actions from "../../../src-tauri/src/infra/browser_page/page_actions.js?raw";
-import read from "../../../src-tauri/src/infra/browser_page/page_read.js?raw";
-import skills from "../../../src-tauri/src/infra/browser_page/page_skills.js?raw";
+import core from "../../../src-tauri/src/infra/browser/page_agent/page_core.js?raw";
+import tree from "../../../src-tauri/src/infra/browser/page_agent/page_tree.js?raw";
+import actions from "../../../src-tauri/src/infra/browser/page_agent/page_actions.js?raw";
+import read from "../../../src-tauri/src/infra/browser/page_agent/page_read.js?raw";
+import skills from "../../../src-tauri/src/infra/browser/page_agent/page_skills.js?raw";
 
 // The Google Docs and Sheets skills (page_skills.js), loaded into jsdom at a
 // docs.google.com address. Docs takes input in a hidden text field and its own

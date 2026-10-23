@@ -84,7 +84,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
           readOnly={saving || drawing.role === "viewer"}
           className={cn(
             "h-8 max-w-md border-charcoal-active bg-charcoal-card px-2 text-sm font-semibold shadow-none",
-            "focus-visible:border-sage-fg/70 focus-visible:ring-2 focus-visible:ring-sage-fg/15",
+            "focus-visible:border-cream-muted focus-visible:ring-2 focus-visible:ring-cream/15",
           )}
           onChange={(event) => {
             setTitle(event.target.value);

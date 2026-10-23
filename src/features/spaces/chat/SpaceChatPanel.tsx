@@ -8,13 +8,9 @@ import { ChatPanelPicker } from "./ChatPanelPicker";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { homeChatSpace, useOpenSpaceChat } from "./useOpenSpaceChat";
 
-// Chat runs on services the host configures first, as the chat page's own loader does; the
-// chat fails on purpose if they are missing.
-const SpaceSocial = lazy(async () => {
-  const { initializeHostSocialRuntime } = await import("./hostSocialRuntime");
-  initializeHostSocialRuntime();
-  const { SpaceSocial } = await import("./SpaceChat");
-  return { default: SpaceSocial };
+const SpaceChat = lazy(async () => {
+  const { SpaceChat } = await import("./SpaceChat");
+  return { default: SpaceChat };
 });
 
 const chatSkeleton = <SkeletonList label="Chat" leading="avatar" rows={4} className="p-4" />;
@@ -61,7 +57,7 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
       <div className="flex min-h-0 flex-1 flex-col">
         {space ? (
           <Suspense fallback={chatSkeleton}>
-            <SpaceSocial
+            <SpaceChat
               spaceId={space.id}
               spaceName={spaceNavigationName(space)}
               conversationId={conversationId}

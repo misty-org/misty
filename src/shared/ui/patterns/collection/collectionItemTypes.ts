@@ -16,6 +16,8 @@ export type CollectionItem = {
   creator?: string;
   creatorDescription?: string;
   onOpen: () => void;
+  /** Whether modifier-click can select this item for a bulk action. */
+  selectable?: boolean;
   actions?: ReactNode;
   marker?: ReactNode;
   contextMenu?: ReactNode;

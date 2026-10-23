@@ -98,7 +98,7 @@ pub fn web_urls<S: AsRef<str>>(args: impl IntoIterator<Item = S>) -> Vec<String>
 /// always names the running copy of Misty.
 #[cfg(windows)]
 mod windows {
-    use crate::platform::windows::registry::{read_string, write_string};
+    use crate::platform::shared_windows::registry::{read_string, write_string};
 
     const PROG_ID: &str = "MistyHTML";
     const CLIENT: &str = r"Software\Clients\StartMenuInternet\Misty";

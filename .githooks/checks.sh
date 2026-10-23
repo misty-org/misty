@@ -63,7 +63,7 @@ desktop_services() {
     cargo test --locked --quiet --manifest-path "$manifest"
   done
 }
-# The same pinned gitleaks image and configuration the old CI used.
+# A pinned gitleaks image with the repository's gitleaks configuration.
 # A linked worktree and the main repository's git directory point at each
 # other by absolute path, so a worktree is mounted at its own path.
 repo=/repo

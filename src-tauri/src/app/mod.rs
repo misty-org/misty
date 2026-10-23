@@ -10,6 +10,8 @@ pub mod device_admission_commands;
 pub mod device_commands;
 #[cfg(desktop)]
 pub mod device_job_commands;
+pub mod handlers;
+pub mod plugins;
 #[cfg(desktop)]
 pub mod project_commands;
 #[cfg(desktop)]

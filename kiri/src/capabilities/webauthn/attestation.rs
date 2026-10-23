@@ -107,7 +107,11 @@ fn der(tag: u8, content: &[u8]) -> Vec<u8> {
     if length < 0x80 {
         out.push(length as u8);
     } else {
-        let bytes: Vec<u8> = length.to_be_bytes().into_iter().skip_while(|byte| *byte == 0).collect();
+        let bytes: Vec<u8> = length
+            .to_be_bytes()
+            .into_iter()
+            .skip_while(|byte| *byte == 0)
+            .collect();
         out.push(0x80 | bytes.len() as u8);
         out.extend(bytes);
     }
@@ -116,7 +120,11 @@ fn der(tag: u8, content: &[u8]) -> Vec<u8> {
 }
 
 fn der_integer(magnitude: &[u8]) -> Vec<u8> {
-    let trimmed: Vec<u8> = magnitude.iter().copied().skip_while(|byte| *byte == 0).collect();
+    let trimmed: Vec<u8> = magnitude
+        .iter()
+        .copied()
+        .skip_while(|byte| *byte == 0)
+        .collect();
     let mut content = if trimmed.first().is_some_and(|byte| byte & 0x80 != 0) {
         vec![0]
     } else {
@@ -178,7 +186,10 @@ pub(super) mod tests {
     fn data_without_an_attested_credential_has_no_key() {
         let mut data = vec![0; 37];
         data[32] = 0x01;
-        let object = Value::Map(vec![(Value::Text("authData".into()), Value::Bytes(data.clone()))]);
+        let object = Value::Map(vec![(
+            Value::Text("authData".into()),
+            Value::Bytes(data.clone()),
+        )]);
         let mut raw = Vec::new();
         ciborium::into_writer(&object, &mut raw).unwrap();
         let attested = read(&raw).unwrap();

@@ -6,18 +6,17 @@ use crate::domain::clipboard::{NativeClipboard, SharedClipboardClient};
 #[cfg(desktop)]
 use crate::infra::cloud_clipboard::CloudClipboard;
 use crate::infra::{
-    agents::AgentService, commands::CommandService, devices::DeviceService,
-    environment::AppEnvironmentService, explorer::ExplorerService,
-    explorer_library::ExplorerLibraryService, settings::SettingsService,
+    agents::AgentService, drives::DeviceService, environment::AppEnvironmentService,
+    explorer::ExplorerService, settings::SettingsService, shortcuts::ShortcutService,
 };
 
 pub struct MistyRuntime {
     pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
-    pub agent_chats: crate::infra::agent_chats::AgentChatsService,
+    pub agent_chats: crate::infra::agents::chats::AgentChatsService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
     pub settings: SettingsService,
-    pub commands: CommandService,
+    pub shortcuts: ShortcutService,
     pub devices: DeviceService,
     #[cfg(desktop)]
     pub cloud_clipboard: CloudClipboard,
@@ -57,10 +56,9 @@ impl MistyRuntime {
             let _ = clipboard.start();
         }
         let settings = SettingsService::new(environment.clone());
-        let commands = CommandService::new(environment.clone());
+        let shortcuts = ShortcutService::new(environment.clone());
         let devices = DeviceService::new();
-        let explorer_library = ExplorerLibraryService::new(environment.clone());
-        let explorer = ExplorerService::new(environment.clone(), explorer_library.clone());
+        let explorer = ExplorerService::new(environment.clone());
         let agents = AgentService::new(environment.clone());
 
         Self {
@@ -68,11 +66,11 @@ impl MistyRuntime {
                 environment.store(),
                 environment.config_dir().join("navigation.json"),
             ),
-            agent_chats: crate::infra::agent_chats::AgentChatsService::new(environment.store()),
+            agent_chats: crate::infra::agents::chats::AgentChatsService::new(environment.store()),
             environment,
             clipboard,
             settings,
-            commands,
+            shortcuts,
             devices,
             #[cfg(desktop)]
             cloud_clipboard,

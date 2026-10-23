@@ -22,8 +22,8 @@ vi.mock("./SpaceSectionView", () => ({
     <input aria-label={`${section} draft`} defaultValue="kept draft" />
   ),
 }));
-vi.mock("./components/SpacePageHeader", () => ({
-  SpacePageHeader: () => <header aria-label="Space navigation" />,
+vi.mock("./components/SpacePageShortcuts", () => ({
+  SpacePageShortcuts: () => <header aria-label="Space navigation" />,
 }));
 vi.mock("./GlobalCreateSpaceDialog", () => ({ GlobalCreateSpaceDialog: () => null }));
 const tab = { id: "space-tab", route: "/spaces/project/social" } as WorkspaceView;

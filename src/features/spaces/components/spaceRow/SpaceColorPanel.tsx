@@ -10,7 +10,7 @@ import {
 } from "@/features/workspace/windowColors";
 import { Input, Pressable } from "@/shared/ui";
 
-const swatch = "relative grid size-7 place-items-center rounded-full text-[#202124]";
+const swatch = "relative grid size-7 place-items-center rounded-full text-black";
 const SAVE_DELAY_MS = 250;
 
 /**

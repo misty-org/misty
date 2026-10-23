@@ -22,11 +22,6 @@ const restrict = (groups) => [
   { patterns: groups.map(([group, message]) => ({ group, message })) },
 ];
 
-const MODELS_BAN = [
-  ["@/models", "@/models/*"],
-  "src/models/ is being removed. Colocate types with their owner: component props in the component, feature types in features/<f>/types.ts, API contracts in api/ or native/.",
-];
-
 const FEATURE_INTERNALS = [
   ["@/features/*/*/*"],
   "Import a feature through its public entrypoint, not its internals.",
@@ -71,43 +66,25 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/dist/**",
       "**/.output/**",
-      "dist-*/**",
-      "build/**",
       "vendor/**",
       "src-tauri/**",
       // Tooling and scratch trees that are not application source.
       ".config/**",
       ".agents/**",
+      ".claude/**",
       ".codex/**",
-      ".codex-qa/**",
-      ".demo/**",
-      ".design-sync/**",
-      ".ds-sync/**",
       ".impeccable/**",
-      ".windows-test/**",
-      ".zed/**",
-      "ds-bundle/**",
-      "artifacts/**",
-      "backlog/**",
       "docs/**",
-      "public/**",
       "cli/tasks/**",
-      "service/**",
       "*.config.js",
       "*.config.ts",
-      // Vendored, minified third-party bundles (e.g. the operator console's htmx).
+      // Vendored, minified third-party bundles.
       "**/*.min.js",
     ],
   },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
-
-  // The operator console's page script runs in the browser as a classic script.
-  {
-    files: ["server/internal/console/assets/**/*.js"],
-    languageOptions: { sourceType: "script", globals: globals.browser },
-  },
 
   {
     files: ["**/*.{ts,tsx}"],
@@ -142,7 +119,6 @@ export default tseslint.config(
       // Real defects — these stay errors.
       "no-empty": ["error", { allowEmptyCatch: true }],
 
-      "no-restricted-imports": restrict([MODELS_BAN]),
       "shared-ui/no-raw-button": "warn",
     },
   },
@@ -160,9 +136,8 @@ export default tseslint.config(
     files: ["src/shared/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        MODELS_BAN,
         [
-          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/platform/*", "@/telemetry/*"],
+          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/telemetry/*"],
           "shared/ must not depend on any layer above it.",
         ],
       ]),
@@ -172,7 +147,6 @@ export default tseslint.config(
     files: ["src/api/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        MODELS_BAN,
         [
           ["@/app/*", "@/features/*", "@/telemetry/*"],
           "api/ must not depend on application or features.",
@@ -184,7 +158,6 @@ export default tseslint.config(
     files: ["src/native/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        MODELS_BAN,
         [
           ["@/api/*", "@/app/*", "@/features/*", "@/telemetry/*"],
           "native/ must not depend on application layers.",
@@ -196,7 +169,6 @@ export default tseslint.config(
     files: ["src/telemetry/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        MODELS_BAN,
         [["@/app/*", "@/features/*"], "telemetry/ must not depend on application or features."],
       ]),
     },
@@ -205,7 +177,6 @@ export default tseslint.config(
     files: ["src/features/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        MODELS_BAN,
         [["@/app/*"], "features/ must not import from app/."],
         FEATURE_INTERNALS,
       ]),
@@ -214,7 +185,7 @@ export default tseslint.config(
   {
     files: ["src/app/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrict([MODELS_BAN, FEATURE_INTERNALS]),
+      "no-restricted-imports": restrict([FEATURE_INTERNALS]),
     },
   },
 
@@ -240,8 +211,6 @@ export default tseslint.config(
       "src/**/*.test.{ts,tsx}",
       "src/**/*.testFixtures.{ts,tsx}",
       "src/tests/**/*.{ts,tsx}",
-      "server/**/*.test.ts",
-      "server/**/test/**/*.ts",
     ],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {

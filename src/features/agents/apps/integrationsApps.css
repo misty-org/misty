@@ -32,19 +32,11 @@
   font-size: 13px;
   line-height: 1.5;
 }
-.agent-integrations-list {
-  border: 1px solid var(--color-charcoal-border);
-  border-radius: var(--radius-xl);
-  background: var(--color-charcoal-card);
-}
 .agent-integrations-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-}
-.agent-integrations-list > * + * {
-  border-top: 1px solid var(--color-charcoal-border);
 }
 /* The popup card for one app's accounts. */
 .agent-integrations-accounts {
@@ -82,14 +74,6 @@
   align-items: center;
   gap: 5px;
   color: var(--color-cream-bright);
-}
-/* A setting that depends on the one above it. */
-.agent-integrations-row.agent-code-projects-indent {
-  padding-left: 80px;
-}
-/* A project's settings explain consequences, so their help text wraps. */
-.agent-integrations-row-text .agent-code-projects-help {
-  white-space: normal;
 }
 .agent-integrations-add {
   justify-self: start;

@@ -1,4 +1,4 @@
-export interface ApiSessionProvider {
+interface ApiSessionProvider {
   isTransitioning: () => boolean;
   readGeneration: () => number;
   readToken: (path?: string) => Promise<string | null>;

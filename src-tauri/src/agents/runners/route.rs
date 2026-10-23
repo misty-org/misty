@@ -58,8 +58,6 @@ pub struct RouteNeed {
     pub mode: LaunchMode,
     /// The chat's Ask or Auto.
     pub permission: String,
-    /// What the person remembered for this project and its remote.
-    pub grants: Vec<String>,
 }
 
 /// Why an engine can't take this task, in plain language, or None when it can.

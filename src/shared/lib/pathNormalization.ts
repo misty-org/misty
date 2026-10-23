@@ -44,11 +44,6 @@ export function isWindowsExplorerPath(path: string): boolean {
   return windowsDrivePathPattern.test(path) || windowsUncPathPattern.test(path);
 }
 
-export function explorerPathName(path: string): string {
-  const normalized = normalizeExplorerPath(path);
-  return normalized.split("/").filter(Boolean).pop() || normalized;
-}
-
 export function joinExplorerPath(root: string, ...parts: string[]): string {
   const normalizedRoot = normalizeExplorerPath(root);
   if (!normalizedRoot) return normalizeExplorerPath(parts.join("/"));

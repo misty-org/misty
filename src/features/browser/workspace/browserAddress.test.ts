@@ -6,7 +6,7 @@ import {
   normalizeBrowserAddress,
   parseAuthority,
   resolveDirectAddress,
-} from "./browserAddress";
+} from "@/features/browser-sync/address";
 
 describe("browser address parsing and normalization", () => {
   describe("isIpv4Address", () => {

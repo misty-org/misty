@@ -1,0 +1,179 @@
+/* Agents opens straight into this shell for the selected agent; there is no collection. */
+.agent-studio {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  container: agent-studio / inline-size;
+}
+.agent-studio-sidebar {
+  position: relative;
+  /* The chosen width (dragged at the trailing edge), never more than 40% of the studio. */
+  width: min(var(--agent-studio-sidebar-width, 240px), 40cqw);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-right: 1px solid var(--color-charcoal-border);
+  background: var(--color-charcoal-sidebar);
+}
+.agent-studio-sidebar > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 4px;
+}
+/* Where the sidebar meets the native window buttons, the identity drops below them
+   (like a Space's title row) rather than squeezing beside them in a narrow sidebar. */
+.agent-studio-sidebar > header[data-window-chrome="true"] {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: calc(var(--shell-titlebar, 38px) - 8px);
+}
+/* Row, label and icon sizes come from the shared --misty-sidebar-* metrics (App.css). */
+/* The switcher hugs its name instead of spanning the sidebar. */
+.agent-studio-identity {
+  flex: 0 0 auto;
+  /* Only the name gives way in a narrow sidebar; the avatar and chevron stay whole. */
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 36px;
+  justify-content: flex-start;
+  padding: 4px 8px 4px 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.agent-studio-sidebar .agent-avatar {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+.agent-studio-sidebar nav {
+  display: grid;
+  gap: 4px;
+}
+.agent-studio-sidebar nav > button,
+.agent-studio-recent-row > button:first-child {
+  width: 100%;
+  height: var(--misty-sidebar-row-height);
+  min-height: var(--misty-sidebar-row-height);
+  gap: 10px;
+  padding: 0 var(--misty-sidebar-row-padding);
+  font-size: var(--misty-sidebar-label-size);
+  font-weight: 400;
+}
+.agent-studio-recent-row > button:first-child {
+  height: var(--misty-sidebar-item-height);
+  min-height: var(--misty-sidebar-item-height);
+}
+.agent-studio-sidebar button[aria-current="page"] {
+  background: var(--color-charcoal-active);
+  color: var(--color-cream-bright);
+}
+.agent-studio-sidebar button > svg {
+  flex-shrink: 0;
+  width: var(--misty-sidebar-icon-size);
+  height: var(--misty-sidebar-icon-size);
+}
+.agent-studio-sidebar button > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.agent-studio-recents {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* Rows end clear of the overlay scrollbar instead of running under it. */
+  padding-right: 10px;
+  margin-right: -2px;
+}
+/* Section labels (Projects, Recents) are quiet: muted, regular weight, aligned with the
+   row labels' leading edge. */
+.agent-studio-recents h2 {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  margin: 0;
+  padding-inline: var(--misty-sidebar-row-padding);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-cream-muted);
+}
+.agent-studio-recent-row > button:first-child {
+  color: var(--color-cream-muted);
+}
+/* Recents fills the rest of the list, so a drop anywhere below the folders files there. */
+.agent-studio-recents-group {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Rows lift with the shared pointer drag, never the native one. */
+.agent-studio-recent-row > [data-reorder-handle] {
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+/* A section heading; Projects carries New project at its end, shown with intent. */
+.agent-studio-recents-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.agent-studio-recents > .agent-studio-recents-heading:first-child {
+  margin-top: 0;
+}
+.agent-studio-recents-heading > button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  margin-right: 4px;
+  color: var(--color-cream-muted);
+  opacity: 0;
+}
+.agent-studio-recents-heading:is(:hover, :focus-within) > button {
+  opacity: 1;
+}
+/* A project reads as a label above its chats: brighter title, open or closed folder glyph
+   in the nav icon column, no count or chevron. */
+.agent-studio-folder-row > button:first-child {
+  color: var(--color-cream);
+}
+/* Long titles fade out at the trailing edge instead of ending in an ellipsis. When the
+   overflow button shows, the fade keeps its width and ends where the button begins. */
+.agent-studio-recent-title {
+  --agent-studio-title-fade: 24px;
+  --agent-studio-title-clear: 0px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: clip;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--agent-studio-title-clear) - var(--agent-studio-title-fade)),
+    transparent calc(100% - var(--agent-studio-title-clear))
+  );
+  mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - var(--agent-studio-title-clear) - var(--agent-studio-title-fade)),
+    transparent calc(100% - var(--agent-studio-title-clear))
+  );
+}
+/* The button sits 4px from the row's edge and is 26px wide; the title already stops at
+   the row padding, so only the rest needs clearing. */
+.agent-studio-recent-row:is(:hover, :focus-within, [data-state="open"]) .agent-studio-recent-title,
+.agent-studio-recent-row[data-current] .agent-studio-recent-title,
+.agent-studio-recent-row:has(> [data-state="open"]) .agent-studio-recent-title {
+  --agent-studio-title-clear: calc(4px + 26px - var(--misty-sidebar-row-padding));
+}

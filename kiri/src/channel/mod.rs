@@ -31,12 +31,13 @@ use unsupported as platform;
 use webview2 as platform;
 
 /// Larger messages are dropped before the embedder sees them.
-pub const MAX_MESSAGE_BYTES: usize = 400_000;
+pub(crate) const MAX_MESSAGE_BYTES: usize = 400_000;
 
 /// Marks host messages on WebView2, where every message shares one event.
 /// Misty's vendored wry skips messages that start with it, so they never
 /// reach Tauri's IPC parser.
-pub const WIRE_PREFIX: &str = "\u{1}kiri-host\u{1}";
+#[cfg(windows)]
+pub(crate) const WIRE_PREFIX: &str = "\u{1}kiri-host\u{1}";
 
 /// The script message handler name on WebKit engines.
 #[cfg_attr(windows, allow(dead_code))]

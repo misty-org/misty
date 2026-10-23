@@ -1,6 +1,5 @@
-import type { NewNoteDialogProps } from "../model/NotesIntegrationsDialog";
-import { NewNoteDialogView } from "./NewNoteDialogView";
-export type { NewNoteDialogProps } from "../model/NotesIntegrationsDialog";
+import { NewNoteDialogView, type NewNoteDialogProps } from "./NewNoteDialogView";
+export type { NewNoteDialogProps } from "./NewNoteDialogView";
 export function NewNoteDialog(props: NewNoteDialogProps) {
   return <NewNoteDialogView {...props} />;
 }

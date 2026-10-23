@@ -11,7 +11,7 @@ import {
   removeBookmarkFolder,
   saveBookmark,
 } from "./library";
-import { recordChanges } from "@/features/browser-workspace/recordChanges";
+import { recordChanges } from "@/features/browser-sync/recordChanges";
 const state = () => useWorkspaceStore.getState();
 beforeEach(() => state().reset());
 it("keeps old saved-link identities and encrypted wire records while editing a bookmark", () => {

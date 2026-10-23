@@ -73,6 +73,33 @@ pub fn forget_workspace_recovery_root(scope: &VaultScope) -> Result<()> {
     platform::delete(&format!("workspace-recovery:v1:{}", account(scope)?))
 }
 
+/// The root of a local vault: one made on this device for browsing without an account, never
+/// wrapped with a sync password because it never reaches a server. Created on first use when
+/// `create` is set. The caller checks it against the vault's stored grant (`Store::unlock`),
+/// so a wrong or replaced root opens nothing.
+pub fn local_vault_root(scope: &VaultScope, create: bool) -> Result<VaultRoot> {
+    let name = format!("local-vault:v1:{}", account(scope)?);
+    if let Some(bytes) = platform::read(&name)? {
+        if bytes.len() != 33 || bytes[0] != 1 {
+            return Err(Error::SecureStorage);
+        }
+        return VaultRoot::from_protected(&bytes[1..]);
+    }
+    if !create {
+        return Err(Error::SecureStorage);
+    }
+    let root = VaultRoot::generate();
+    let mut bytes = Zeroizing::new(Vec::with_capacity(33));
+    bytes.push(1);
+    bytes.extend_from_slice(root.protected_bytes());
+    platform::write(&name, &bytes)?;
+    Ok(root)
+}
+
+pub fn forget_local_vault_root(scope: &VaultScope) -> Result<()> {
+    platform::delete(&format!("local-vault:v1:{}", account(scope)?))
+}
+
 mod platform {
     use super::*;
 

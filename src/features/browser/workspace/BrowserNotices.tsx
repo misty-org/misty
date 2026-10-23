@@ -4,7 +4,7 @@ import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { Button, Notification } from "@/shared/ui";
 import { useEffect } from "react";
 import { setBrowserError } from "./browserErrors";
-import { browserRuntimeId, useBrowserRuntimeStore } from "./browserRuntime";
+import { browserRuntimeId, useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { PasswordOfferNotice } from "./PasswordOfferNotice";
 
 /** Errors, download messages and compatibility warnings for one browser tab. */

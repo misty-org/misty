@@ -7,7 +7,7 @@ export default function AuthShell({ title, description, children, onBack }: Auth
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-8 pt-24 sm:px-6"
+      className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-8 pt-32 sm:px-6"
     >
       <WelcomeNav onBack={onBack} />
       <div ref={panelRef} style={{ zoom: scale }} className="mx-auto my-auto w-full max-w-sm">

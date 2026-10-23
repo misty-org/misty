@@ -1,8 +1,4 @@
-import type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/openExternalLink";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { platform } from "@tauri-apps/plugin-os";
-import { hasTauriInternals } from "./tauri";
-export type { ProviderAuthorizationOpenResult } from "@/shared/platform/model/openExternalLink";
 let openInMistyBrowser: ((url: string) => void | Promise<void>) | null = null;
 export function configureMistyBrowserLinkOpener(
   opener: ((url: string) => void | Promise<void>) | null,
@@ -29,22 +25,6 @@ export async function openSystemExternalLink(url: string): Promise<void> {
   // All callers share the same web routing policy.
   if (isWebUrl(href)) return openExternalLink(href);
   await openNativeUrl(href);
-}
-export async function openProviderAuthorizationLink(
-  url: string,
-): Promise<ProviderAuthorizationOpenResult> {
-  const href = normalizeExternalUrl(url);
-  const attemptedAt = Date.now();
-  if (!href) {
-    throw new Error("Provider authorization URL is empty.");
-  }
-  const currentPlatform = nativePlatform();
-  await openExternalLink(href);
-  return {
-    strategy: "misty-browser",
-    platform: currentPlatform,
-    attemptedAt,
-  };
 }
 export function installExternalLinkRouting(root: Document = document): () => void {
   const handleClick = (event: MouseEvent) => {
@@ -109,11 +89,4 @@ export function normalizeExternalUrl(value: string): string {
 }
 async function openNativeUrl(url: string): Promise<void> {
   await openUrl(url);
-}
-function nativePlatform(): string {
-  try {
-    return hasTauriInternals() ? platform() : "unknown";
-  } catch {
-    return "unknown";
-  }
 }

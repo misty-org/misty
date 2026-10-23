@@ -211,17 +211,11 @@ describe("embodied Misty state", () => {
   });
 
   it("keeps the durable personal-agent run link", () => {
-    const adapter: AiSurfaceAdapter = {
-      surfaceId: "global",
-      label: "Global",
-      getContext: () => [],
-    };
     consumeInvocationEvent(
       useAiSurfaceStore.setState,
       useAiSurfaceStore.getState,
       "account-a",
       "pane-a",
-      adapter,
       { id: "1", type: "run.started", runId: "run-123" },
     );
     expect(useAiSurfaceStore.getState().sessions["account-a:pane-a"]?.runId).toBe("run-123");

@@ -18,7 +18,7 @@ import {
   browserScopeId,
   useBrowserRuntimeStore,
   type BrowserMistyPage,
-} from "./browserRuntime";
+} from "@/features/webviews/browserRuntime";
 
 /** Lets Misty read the attached page and propose one navigation or click for the user to review. */
 export function useBrowserMistyAiAdapter(

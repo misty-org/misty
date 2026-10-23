@@ -1,7 +1,7 @@
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { useEffect, useRef, type RefObject } from "react";
-import { captureBrowserPagePreview } from "./browserRuntime";
+import { captureBrowserPagePreview } from "@/features/webviews/browserRuntime";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 
 export function useBrowserPagePreview(

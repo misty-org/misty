@@ -1,32 +1,12 @@
-import { agentsApi } from "@/api/agents/api";
-import { resolveApiBase } from "@/api/deployment/api";
-import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
-import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import { CompanionVoicePlayback } from "./companionVoicePlayback";
+import {
+  deferred,
+  openVoiceSocket,
+  type ConversationTool,
+  type SavedVoiceTurn,
+} from "./companionVoiceSocket";
 
-function deferred() {
-  let resolve!: () => void;
-  let reject!: (error: Error) => void;
-  const promise = new Promise<void>((yes, no) => {
-    resolve = yes;
-    reject = no;
-  });
-  void promise.catch(() => {});
-  return { promise, resolve, reject };
-}
-export interface ConversationTool {
-  callId: string;
-  name: "start_task" | "steer_task" | "cancel_task";
-  instruction: string;
-  key: string;
-  invocationId: string;
-}
-export interface SavedVoiceTurn {
-  id: string;
-  prompt: string;
-  reply: string;
-  interrupted: boolean;
-}
+export type { ConversationTool, SavedVoiceTurn } from "./companionVoiceSocket";
 interface Options {
   conversation: () => Promise<string>;
   assertCurrent: () => void;
@@ -74,20 +54,9 @@ export class CompanionConversation {
   private async connect() {
     this.conversationId = await this.options.conversation();
     this.current();
-    const snapshot = await agentsDeviceSnapshot();
-    this.current();
-    if (!snapshot.device || snapshot.device.status === "revoked")
-      throw new Error("This device is unavailable.");
-    const device = await ensureServerAgentDevice(snapshot.device);
-    this.current();
-    const { ticket } = await agentsApi.realtimeVoiceTicket(device.id, this.connectAbort.signal);
-    const base = await resolveApiBase();
-    this.current();
-    const url = new URL(`${base}/agent-voice/realtime`, window.location.href);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    url.searchParams.set("mode", "conversation");
-    url.searchParams.set("conversation", this.conversationId);
-    this.socket = new WebSocket(url, ["misty-voice-v1", `misty-voice-auth.${ticket}`]);
+    this.socket = await openVoiceSocket(this.conversationId, this.connectAbort.signal, () =>
+      this.current(),
+    );
     this.socket.onmessage = ({ data }) => {
       if (this.closed) return;
       try {

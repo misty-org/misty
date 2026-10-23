@@ -1,11 +1,11 @@
-import { currentConversationForPrompt } from "@/features/global-search/globalMistyConversationScope";
+import { currentConversationForPrompt } from "./globalMistyConversationScope";
 import {
   conversationMessage,
   updateConversation,
-  type GlobalSearchGet,
-  type GlobalSearchSet,
-} from "@/features/global-search/globalSearchStoreHelpers";
-import type { MistyImageAttachment } from "@/features/global-search/types";
+  type MistyGet,
+  type MistySet,
+} from "./mistyStoreHelpers";
+import type { MistyImageAttachment } from "./types";
 
 /**
  * A prompt and its pending answer, echoed into the conversation in the same
@@ -13,8 +13,8 @@ import type { MistyImageAttachment } from "@/features/global-search/types";
  * preparation can't reorder them.
  */
 export function echoPrompt(
-  set: GlobalSearchSet,
-  get: GlobalSearchGet,
+  set: MistySet,
+  get: MistyGet,
   input: {
     prompt: string;
     attachments: MistyImageAttachment[];

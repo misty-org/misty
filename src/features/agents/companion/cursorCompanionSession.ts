@@ -1,17 +1,14 @@
 import { usePersonalAgentsStore } from "@/features/agents/personalAgentsStore";
-import { effectiveValues, useSettingsProfiles } from "@/features/settings/sync";
+import { effectiveValues, useDevicePreferences } from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
 import type { CompanionConversation } from "./companionConversation";
-import { companionSizeDefault, normalizeCompanionSize } from "./companionSize";
-import { companionStage } from "./companionStage";
+import { normalizeCompanionSize } from "./companionSize";
 import { useCompanionState } from "./companionState";
+import { captureScreens, savedPresentation, withLessonCloseUp } from "./cursorCompanionScreens";
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
 import { CursorCompanionSketch } from "./cursorCompanionSketch";
-import { focusCapture } from "./focusCapture";
 import type { MediaContext } from "./mediaContext";
-import { useCollaborationStore } from "../collaboration/store";
-import { withMistyControls } from "./mistyControls";
 import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
 
 export type CompanionOrigin = { conversationId: string; agentId?: string };
@@ -61,31 +58,8 @@ export class CursorCompanionSession {
   submittedConversationId: string | undefined;
 
   constructor(readonly accountId: string) {
-    let ask = false,
-      teach = false,
-      model = "",
-      size = companionSizeDefault;
-    try {
-      const saved = JSON.parse(localStorage.getItem(`misty.cursor-companion:${accountId}`) || "{}");
-      this.show = saved.visible !== false;
-      ask = saved.ask === true;
-      teach = saved.teach === true;
-      size = normalizeCompanionSize(saved.size);
-      model = typeof saved.model === "string" ? saved.model : "";
-    } catch {
-      /* defaults */
-    }
-    this.state = {
-      generation: 0,
-      phase: "idle",
-      visible: this.show,
-      showCompanion: this.show,
-      mode: "auto",
-      ask,
-      teach,
-      model,
-      size,
-    };
+    this.state = savedPresentation(accountId);
+    this.show = this.state.visible;
   }
 
   originIsCurrent = (origin: CompanionOrigin) => {
@@ -136,7 +110,7 @@ export class CursorCompanionSession {
   };
 
   applyPreferences = () => {
-    const settings = useSettingsProfiles.getState();
+    const settings = useDevicePreferences.getState();
     if (!settings.state) return;
     const values = effectiveValues(settings.state);
     this.show = values["agents.companion.visible"] !== false;
@@ -305,25 +279,11 @@ export class CursorCompanionSession {
    * A Teach turn's screens plus a close-up of the region the last step pointed at,
    * so a check reads the person's work exactly. Without one, the screens alone.
    */
-  withFocusCapture = async (screens: DisplayCapture[], generation: number) => {
-    const chat = useMistyStore.getState().activeConversationId;
-    // The server takes a close-up only on a lesson step.
-    const lesson = useCollaborationStore.getState().modeFor(chat) === "teach";
-    if (!this.state.teach || !lesson || !this.lastFocus || !screens.length) return screens;
-    const close = await focusCapture(generation, this.lastFocus).catch(() => undefined);
-    return close ? [...screens, close] : screens;
-  };
+  withFocusCapture = async (screens: DisplayCapture[], generation: number) =>
+    this.state.teach ? withLessonCloseUp(screens, generation, this.lastFocus) : screens;
 
   /** The screens, with Misty's own visible controls named on the one showing them. */
-  capture = (generation: number, signal: AbortSignal) =>
-    companionStage(
-      invoke<DisplayCapture[]>("cursor_companion_capture", { turn: generation }).then(
-        withMistyControls,
-      ),
-      signal,
-      "Screen capture",
-      20_000,
-    );
+  capture = (generation: number, signal: AbortSignal) => captureScreens(generation, signal);
 }
 
 /** No selection means Misty's own agent; a prompt fills it in when it starts work. */

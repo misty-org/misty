@@ -1,8 +1,8 @@
-import { ManagedAiRequestError } from "@/features/agents/devices";
+import { ManagedAiRequestError } from "@/api/ai/managed";
 import type { ChannelSnapshot, DevicePolicy } from "@/native/devices";
 
 /** One of the account's devices, as the server lists it. Addresses are never
- * listed; presence comes from the device channel (docs/design/devices/BRIEF.md). */
+ * listed; presence comes from the device channel (docs/sync/devices.md). */
 export interface AccountDevice {
   id: string;
   name: string;

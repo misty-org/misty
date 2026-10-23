@@ -1,8 +1,7 @@
 import type { ItemVisibility } from "../visibility";
 import type { LibraryEditDefinition } from "./common";
-export type * from "./agentArchitectureTypes";
-export type * from "./memberTypes";
-export type * from "./conversationTypes";
+export type * from "./member-types";
+export type * from "./conversation-types";
 
 interface LibraryFile {
   id: string;
@@ -40,31 +39,6 @@ export interface SpaceLibraryItem {
   /** A private file opens only for whoever added it. */
   visibility?: ItemVisibility;
   file: LibraryFile;
-}
-
-interface LibraryAssetStackMember {
-  item_id: string;
-  role: "still" | "motion" | "raw" | "alternate" | "burst_frame";
-  position: number;
-  display_name?: string;
-  original_filename?: string;
-  mime_type?: string;
-}
-
-export interface LibraryAssetStack {
-  id: string;
-  space_id: string;
-  kind: "live_photo" | "raw_pair" | "burst";
-  title: string;
-  cover_item_id: string;
-  motion_item_id?: string;
-  effect: "still" | "loop" | "bounce" | "long_exposure";
-  created_by_user_id: string;
-  lifecycle_state: string;
-  version: number;
-  created_at: string;
-  updated_at: string;
-  members: LibraryAssetStackMember[];
 }
 
 export interface LibraryItemQuery {
@@ -140,73 +114,6 @@ export interface LibrarySearchFacets {
   utilities: LibrarySearchFacet[];
 }
 
-export interface LibraryDiscoveryGroup {
-  id: string;
-  kind: "day" | "month" | "year" | "memory" | "trip" | "duplicate";
-  title: string;
-  subtitle: string;
-  cover_item_id?: string;
-  item_count: number;
-  start_at?: string;
-  end_at?: string;
-  music_item_id?: string;
-  playback_seconds?: number;
-  preference_version?: number;
-}
-
-export interface LibraryDiscovery {
-  recent_days: LibraryDiscoveryGroup[];
-  months: LibraryDiscoveryGroup[];
-  years: LibraryDiscoveryGroup[];
-  memories: LibraryDiscoveryGroup[];
-  trips: LibraryDiscoveryGroup[];
-  duplicates: LibraryDiscoveryGroup[];
-}
-
-export interface LibraryPinnedCollection {
-  id: string;
-  space_id: string;
-  target_kind: "system" | "album" | "group" | "person" | "memory" | "trip" | "map";
-  target_id: string;
-  position: number;
-  pinned_by_user_id: string;
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LibraryImportHistoryItem {
-  id: string;
-  direction: "incoming" | "outgoing";
-  source_space_id: string;
-  destination_space_id: string;
-  counterpart_space_name: string;
-  item_id: string;
-  display_name: string;
-  logical_bytes: number;
-  state: string;
-  created_at: string;
-  completed_at?: string;
-}
-
-export interface LibrarySharedReference {
-  id: string;
-  grant_id: string;
-  source_space_id: string;
-  source_space_name: string;
-  source_item_id: string;
-  destination_space_id: string;
-  destination_space_name: string;
-  display_name: string;
-  mime_type: string;
-  byte_size: number;
-  state: string;
-  version: number;
-  expires_at?: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface StorageQuotaDimension {
   percentage_used?: number;
   used_bytes: number;
@@ -257,79 +164,6 @@ export interface MessageAttachment {
 export interface LibraryUploadResult {
   item?: SpaceLibraryItem;
   attachment?: MessageAttachment;
-}
-
-export interface LibraryAlbum {
-  id: string;
-  space_id: string;
-  folder_id?: string;
-  name: string;
-  description: string;
-  cover_item_id?: string;
-  position: number;
-  view_mode: "grid" | "list";
-  sort_mode: "custom" | "oldest" | "newest";
-  created_by_user_id: string;
-  item_count: number;
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LibraryAlbumFolder {
-  id: string;
-  space_id: string;
-  parent_folder_id?: string;
-  name: string;
-  position: number;
-  album_count: number;
-  folder_count: number;
-  created_by_user_id: string;
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface LibraryGroupRule {
-  field: "favorite" | "hidden" | "tag" | "mime" | "filename" | "album";
-  op: "is" | "contains" | "prefix" | "in";
-  value: boolean | string;
-}
-
-export interface LibraryGroup {
-  id: string;
-  space_id: string;
-  name: string;
-  rules: { all: LibraryGroupRule[] };
-  created_by_user_id: string;
-  version: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LibraryIntelligencePolicy {
-  space_id: string;
-  faces_enabled: boolean;
-  pets_enabled: boolean;
-  ai_enabled: boolean;
-  semantic_search_enabled: boolean;
-  version: number;
-  queued_face_jobs: number;
-  queued_ai_jobs: number;
-}
-
-export interface LibraryPerson {
-  id: string;
-  space_id: string;
-  kind: "person" | "pet";
-  name: string;
-  cover_item_id?: string;
-  item_count: number;
-  version: number;
-  created_at: string;
-  updated_at: string;
-  lifecycle_state: "active" | "merged" | "deleted";
-  merged_into_id?: string;
 }
 
 export interface LibraryEditVersion {

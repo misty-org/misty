@@ -1,6 +1,7 @@
 const prefix = "Continue the request above.";
 
 const events: [RegExp, (match: RegExpMatchArray) => string][] = [
+  [/^Resume the open items/, () => "Resumed the open items"],
   [/^(.+) is now connected\.$/, (m) => `Connected ${m[1]}`],
   [/^The user approved [“"](.+)[”"]\.$/, (m) => `Approved “${m[1]}”`],
   [/^The user's screen is attached/, () => "Shared your screen"],

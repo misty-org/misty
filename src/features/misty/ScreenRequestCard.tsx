@@ -1,4 +1,4 @@
-import { AppWindow, PanelsTopLeft } from "lucide-react";
+import { AppWindow } from "lucide-react";
 import type { ScreenRequest } from "@/features/ai-surface/types";
 import { Button } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "@/features/agents";
@@ -89,14 +89,6 @@ export function ScreenRequestCard({
           <>
             <Button size="sm" variant="primary" disabled={working} onClick={() => choose("window")}>
               <AppWindow className="size-3.5" /> New tab
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={working}
-              onClick={() => choose("separate")}
-            >
-              <PanelsTopLeft className="size-3.5" /> Separate window
             </Button>
             <Button
               size="sm"

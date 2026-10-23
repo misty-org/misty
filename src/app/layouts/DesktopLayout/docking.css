@@ -1,4 +1,6 @@
-/* Dock shell, rails, tab strips and drawers, in cascade order. */
+/* Dock shell, tab sidebar, tab rows, drawers and panes, in cascade order. */
 @import "./docking-shell.css";
 @import "./docking-tabs.css";
+@import "./docking-tab-rows.css";
 @import "./docking-drawers.css";
+@import "./docking-panes.css";

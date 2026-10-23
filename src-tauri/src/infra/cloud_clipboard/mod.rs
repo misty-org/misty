@@ -1,4 +1,4 @@
-//! The shared clipboard (docs/design/clipboard/BRIEF.md): what a person copies
+//! The shared clipboard (docs/sync/clipboard.md): what a person copies
 //! reaches their account's other added devices through sync, as a small ring
 //! of sealed clips. Each clip is compressed and sealed on the device with a key
 //! derived from the vault root; the server only ever holds ciphertext.
@@ -6,6 +6,7 @@
 
 mod clip;
 mod ring;
+mod views;
 
 use std::{
     path::{Path, PathBuf},
@@ -21,8 +22,9 @@ use tauri::{AppHandle, Emitter};
 use crate::domain::clipboard::{
     ClipboardImage, ClipboardPayload, ClipboardPayloadKind, SharedClipboardClient,
 };
-use crate::infra::device_trust;
+use crate::infra::devices::trust;
 use clip::Clip;
+use views::{fresh, payload, summary, unique_path};
 
 /// Clips older than this are never shown or pasted.
 const CLIP_LIFETIME_MS: i64 = 24 * 60 * 60 * 1000;
@@ -198,7 +200,7 @@ impl SharedClipboardClient for CloudClipboard {
         let Some(session) = self.inner.session() else {
             return false;
         };
-        if !device_trust::effective_policy().clipboard {
+        if !trust::effective_policy().clipboard {
             return false;
         }
         let inner = self.inner.clone();
@@ -266,78 +268,4 @@ impl Inner {
     fn handler(&self) -> Option<ClipHandler> {
         self.handler.read().ok().and_then(|handler| handler.clone())
     }
-}
-
-fn fresh(clip: &Clip, now: i64) -> bool {
-    now - clip.header.created_unix_ms < CLIP_LIFETIME_MS
-}
-
-fn summary(clip: &Clip, session: Option<&ring::Session>) -> ClipSummary {
-    let header = &clip.header;
-    let preview = match header.kind {
-        ClipboardPayloadKind::Text | ClipboardPayloadKind::Html => {
-            header.text.chars().take(200).collect()
-        }
-        ClipboardPayloadKind::Image => "Image".into(),
-        _ => String::new(),
-    };
-    ClipSummary {
-        clip_id: header.clip_id.clone(),
-        device_id: header.device_id.clone(),
-        device_name: header.device_name.clone(),
-        from_this_device: session.is_some_and(|session| session.device_id == header.device_id),
-        kind: header.kind,
-        preview,
-        file_names: header.file_names.clone(),
-        size: (header.text.len() + header.html.len() + clip.image.len()) as u64,
-        created_at: header.created_unix_ms,
-    }
-}
-
-fn payload(clip: &Clip) -> ClipboardPayload {
-    let header = &clip.header;
-    ClipboardPayload {
-        kind: header.kind,
-        payload_id: header.clip_id.clone(),
-        source_device_id: header.device_id.clone(),
-        source_device_name: header.device_name.clone(),
-        revision: header.revision,
-        created_unix_ms: header.created_unix_ms,
-        text: header.text.clone(),
-        html: header.html.clone(),
-        images: header
-            .image
-            .iter()
-            .map(|image| ClipboardImage {
-                mime_type: image.mime_type.clone(),
-                blob_id: header.clip_id.clone(),
-                checksum: String::new(),
-                size_bytes: clip.image.len() as u64,
-                width: image.width,
-                height: image.height,
-                bytes: clip.image.clone(),
-            })
-            .collect(),
-        ..ClipboardPayload::default()
-    }
-}
-
-fn unique_path(directory: &Path, name: &str) -> PathBuf {
-    let candidate = directory.join(name);
-    if !candidate.exists() {
-        return candidate;
-    }
-    let path = Path::new(name);
-    let stem = path
-        .file_stem()
-        .map(|stem| stem.to_string_lossy().into_owned())
-        .unwrap_or_else(|| name.to_owned());
-    let extension = path
-        .extension()
-        .map(|extension| format!(".{}", extension.to_string_lossy()))
-        .unwrap_or_default();
-    (2..)
-        .map(|index| directory.join(format!("{stem} {index}{extension}")))
-        .find(|candidate| !candidate.exists())
-        .expect("an unused name")
 }

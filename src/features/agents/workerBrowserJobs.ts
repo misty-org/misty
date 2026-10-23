@@ -71,7 +71,7 @@ export function jobConfirmKinds(config: unknown): string[] | undefined {
  * The run's Ask or Auto and the person's remembered page grants, as the server
  * put them in the job. Anything malformed reads as no grants: every kind asks.
  */
-export function jobGrantSet(config: unknown) {
+function jobGrantSet(config: unknown) {
   const value =
     config && typeof config === "object" ? (config as { grantSet?: unknown }).grantSet : undefined;
   if (!value || typeof value !== "object") return undefined;

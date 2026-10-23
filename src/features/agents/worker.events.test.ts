@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   event: undefined as undefined | ((event: { topic: string }) => void),
   remove: vi.fn(),
 }));
-vi.mock("@/api/accountEvents", () => ({
+vi.mock("@/api/account-events", () => ({
   subscribeAccountEvents: (_account: string, event: typeof mocks.event) => {
     mocks.event = event;
     return mocks.remove;

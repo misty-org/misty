@@ -1,6 +1,6 @@
 import { useShortcutHandler } from "@/features/shortcuts";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
-import { useBrowserRuntimeStore } from "./browserRuntime";
+import { useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
 import { translatePageWithMisty } from "./translatePage";
 import { useReaderMode } from "./useReaderMode";
 

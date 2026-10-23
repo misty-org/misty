@@ -1,6 +1,5 @@
-import { Pressable } from "@/shared/ui";
+import { Portal, Pressable } from "@/shared/ui";
 import { useCallback, useRef, type RefObject } from "react";
-import { createPortal } from "react-dom";
 import { CloseGlyph, MaximizeGlyph, MinimizeGlyph, RestoreGlyph } from "./RestoreGlyph";
 import * as styles from "./styles";
 import { useNativeMaximizeButton } from "./useNativeMaximizeButton";
@@ -9,6 +8,8 @@ import { useNativeMaximizeButton } from "./useNativeMaximizeButton";
 export const windowsCaptionSlotId = "misty-windows-caption-slot";
 
 export function WindowsTitlebarControls(props: {
+  /** Signed-out pages: the usual minimize, maximize, close order in the top-right corner. */
+  standard?: boolean;
   /** The sidebar header's slot, when the buttons sit inside it instead of over the window. */
   slot: HTMLElement | null;
   controlsRef: RefObject<HTMLDivElement | null>;
@@ -21,6 +22,7 @@ export function WindowsTitlebarControls(props: {
   cancelSnapLayouts: () => void;
 }) {
   const {
+    standard = false,
     slot,
     controlsRef,
     scale,
@@ -33,7 +35,9 @@ export function WindowsTitlebarControls(props: {
   } = props;
   const button = slot
     ? styles.windowsInlineControlButtonClass
-    : styles.windowsTitlebarControlButtonClass;
+    : standard
+      ? styles.windowsStandardControlButtonClass
+      : styles.windowsTitlebarControlButtonClass;
   const maximizeRef = useRef<HTMLButtonElement>(null);
   const toggleMaximize = useCallback(() => {
     cancelSnapLayouts();
@@ -42,45 +46,88 @@ export function WindowsTitlebarControls(props: {
   // Windows sees this button as the window's own, so Snap Layouts opens under it; the pointer
   // there then reaches the page as these events instead.
   const maximizeHovered = useNativeMaximizeButton(maximizeRef, true, toggleMaximize);
-  const closeButton = slot
-    ? `${styles.windowsInlineControlButtonClass} hover:bg-charcoal-active hover:text-cream-bright`
-    : styles.windowsTitlebarCloseButtonClass;
+  const closeButton = `${button} hover:bg-charcoal-active hover:text-cream-bright`;
   const controls = (
     <div
       ref={controlsRef}
-      className={slot ? styles.windowsInlineControlsClass : styles.windowsTitlebarControlsClass}
+      className={
+        slot
+          ? styles.windowsInlineControlsClass
+          : standard
+            ? styles.windowsStandardControlsClass
+            : styles.windowsTitlebarControlsClass
+      }
       data-misty-window-drag-block="true"
-      style={slot ? undefined : { transform: `scale(${scale})`, transformOrigin: "top left" }}
+      style={
+        slot
+          ? undefined
+          : { transform: `scale(${scale})`, transformOrigin: standard ? "top right" : "top left" }
+      }
     >
-      <Pressable
-        aria-label="Close window"
-        className={closeButton}
-        title="Close"
-        onClick={closeTitlebarWindow}
-      >
-        <CloseGlyph />
-      </Pressable>
-      <Pressable
-        ref={maximizeRef}
-        className={`${button} data-[hover]:bg-charcoal-hover data-[hover]:text-cream`}
-        data-hover={maximizeHovered ? "" : undefined}
-        aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
-        title={isWindowMaximized ? "Restore" : "Maximize"}
-        onPointerEnter={showSnapLayoutsSoon}
-        onPointerLeave={cancelSnapLayouts}
-        onClick={toggleMaximize}
-      >
-        {isWindowMaximized ? <RestoreGlyph /> : <MaximizeGlyph />}
-      </Pressable>
-      <Pressable
-        aria-label="Minimize window"
-        className={button}
-        title="Minimize"
-        onClick={minimizeTitlebarWindow}
-      >
-        <MinimizeGlyph />
-      </Pressable>
+      {standard && !slot ? (
+        <>
+          <Pressable
+            aria-label="Minimize window"
+            className={button}
+            title="Minimize"
+            onClick={minimizeTitlebarWindow}
+          >
+            <MinimizeGlyph />
+          </Pressable>
+          <Pressable
+            ref={maximizeRef}
+            className={`${button} data-[hover]:bg-charcoal-hover data-[hover]:text-cream`}
+            data-hover={maximizeHovered ? "" : undefined}
+            aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+            title={isWindowMaximized ? "Restore" : "Maximize"}
+            onPointerEnter={showSnapLayoutsSoon}
+            onPointerLeave={cancelSnapLayouts}
+            onClick={toggleMaximize}
+          >
+            {isWindowMaximized ? <RestoreGlyph /> : <MaximizeGlyph />}
+          </Pressable>
+          <Pressable
+            aria-label="Close window"
+            className={closeButton}
+            title="Close"
+            onClick={closeTitlebarWindow}
+          >
+            <CloseGlyph />
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Pressable
+            aria-label="Close window"
+            className={closeButton}
+            title="Close"
+            onClick={closeTitlebarWindow}
+          >
+            <CloseGlyph />
+          </Pressable>
+          <Pressable
+            ref={maximizeRef}
+            className={`${button} data-[hover]:bg-charcoal-hover data-[hover]:text-cream`}
+            data-hover={maximizeHovered ? "" : undefined}
+            aria-label={isWindowMaximized ? "Restore window" : "Maximize window"}
+            title={isWindowMaximized ? "Restore" : "Maximize"}
+            onPointerEnter={showSnapLayoutsSoon}
+            onPointerLeave={cancelSnapLayouts}
+            onClick={toggleMaximize}
+          >
+            {isWindowMaximized ? <RestoreGlyph /> : <MaximizeGlyph />}
+          </Pressable>
+          <Pressable
+            aria-label="Minimize window"
+            className={button}
+            title="Minimize"
+            onClick={minimizeTitlebarWindow}
+          >
+            <MinimizeGlyph />
+          </Pressable>
+        </>
+      )}
     </div>
   );
-  return slot ? createPortal(controls, slot) : controls;
+  return slot ? <Portal container={slot}>{controls}</Portal> : controls;
 }
