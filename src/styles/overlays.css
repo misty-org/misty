@@ -67,6 +67,16 @@
     animation: none;
   }
 }
+/* The opening screen fades away over the window it opened, as the traffic lights fade in. */
+.misty-loading-screen-leaving {
+  pointer-events: none;
+  animation: misty-overlay-fade-out 450ms ease-in-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .misty-loading-screen-leaving {
+    animation-duration: 1ms;
+  }
+}
 @keyframes misty-overlay-fade-in {
   from {
     opacity: 0;

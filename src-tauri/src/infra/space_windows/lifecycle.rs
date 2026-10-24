@@ -34,6 +34,16 @@ fn build_window<R: Runtime>(app: &AppHandle<R>, label: &str, title: &str) -> Res
         .title(title)
         .build()
         .map_err(|error| error.to_string())?;
+    // The traffic lights wait hidden until the layout places them, so they never show in
+    // AppKit's spot first, however the window comes to be shown.
+    #[cfg(target_os = "macos")]
+    if let Some(view) = app.get_webview(label) {
+        let _ = view.with_webview(|view| unsafe {
+            crate::platform::plugins::mac_traffic_lights::hold_traffic_lights(
+                view.ns_window() as cocoa::base::id
+            );
+        });
+    }
     #[cfg(windows)]
     if let Some(view) = app.get_webview(label) {
         crate::infra::browser_process_ended::watch_page_process(&view);
@@ -43,6 +53,11 @@ fn build_window<R: Runtime>(app: &AppHandle<R>, label: &str, title: &str) -> Res
 }
 
 fn focus<R: Runtime>(window: &Window<R>) {
+    // A new window shows itself once its first frame is ready (`reveal_main_window`), which
+    // also brings it forward; showing it sooner shows an empty window.
+    if !crate::platform::plugins::mac_rounded_corners::window_revealed(window.label()) {
+        return;
+    }
     let _ = window.show();
     let _ = window.unminimize();
     let _ = window.set_focus();

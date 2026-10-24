@@ -25,18 +25,25 @@ export const trafficLightOffsetDefault: TrafficLightOffset = {
   y: 0,
 };
 let trafficLightOffset = trafficLightOffsetDefault;
+let pendingWindowStyle: Promise<void> | null = null;
 
-/** `offset`, when given, becomes the new position; omitted, the current one is kept. */
+/** `offset`, when given, becomes the new position; omitted, the current one is kept. Calls made
+ * in one React commit (the shell and the sidebar both place the buttons) go out as one, with the
+ * last offset, so the buttons never stop at an earlier caller's spot on the way. */
 export function enableModernWindowStyle(
   window: unknown,
   offset?: TrafficLightOffset,
 ): Promise<void> {
   if (offset) trafficLightOffset = offset;
-  return invoke("enable_modern_window_style", {
-    window,
-    offsetX: trafficLightOffset.x,
-    offsetY: trafficLightOffset.y,
+  pendingWindowStyle ??= Promise.resolve().then(() => {
+    pendingWindowStyle = null;
+    return invoke("enable_modern_window_style", {
+      window,
+      offsetX: trafficLightOffset.x,
+      offsetY: trafficLightOffset.y,
+    });
   });
+  return pendingWindowStyle;
 }
 
 /** They slide `distance` points and fade over `durationMs`, as the sidebar beside them does. */

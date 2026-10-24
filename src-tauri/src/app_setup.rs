@@ -14,6 +14,8 @@ use tauri::Manager;
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     crate::platform::plugins::mac_pip_observer::install(app.handle());
+    #[cfg(target_os = "macos")]
+    crate::platform::plugins::mac_traffic_lights::install();
     // Debug-only: the browser benchmark runs its tasks in Misty's own
     // tabs when asked to; see browser/eval_bridge/mod.rs.
     #[cfg(all(desktop, debug_assertions))]

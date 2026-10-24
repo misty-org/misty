@@ -61,33 +61,43 @@ export function AppFrameLayout() {
     !incognito &&
     (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === profileId && recovery.ready));
 
-  // Keep hook order stable as identity changes, and let account transitions
-  // finish before showing the window.
-  if (transitioning && !isAuthRoute) return <LoadingScreen fullScreen label="Restoring account" />;
-
   // First run shows the welcome once, before the shell mounts: the shell sends a bare "/"
   // straight to the active tab, which would skip it. Invite links go through.
-  if (!user && !welcomed && !isAuthRoute && !isInviteRoute)
-    return <Navigate to={routes.welcome} replace />;
+  const showWelcome = !user && !welcomed && !isAuthRoute && !isInviteRoute;
+  // Account transitions finish before the shell shows. Misty is a full browser without an
+  // account, so nothing here sends anyone to sign in; the window waits only for its
+  // profile's saved windows and tabs.
+  const loadingLabel =
+    transitioning && !isAuthRoute
+      ? "Restoring account"
+      : showWelcome
+        ? null
+        : !isAuthRoute &&
+            !incognito &&
+            nativeWorkspaceRecoveryEnabled() &&
+            (recovery.accountId !== profileId || (!recovery.ready && !recovery.usable))
+          ? "Restoring workspace"
+          : !layoutReady
+            ? "Opening Misty"
+            : null;
+  // Keep hook order stable as identity changes: every hook runs before the returns below.
+  const [leavingLabel, clearLeaving] = useLeavingLoadingScreen(loadingLabel);
 
-  // Misty is a full browser without an account, so nothing here sends anyone to sign in;
-  // the window waits only for its profile's saved windows and tabs.
-  if (
-    !isAuthRoute &&
-    !incognito &&
-    nativeWorkspaceRecoveryEnabled() &&
-    (recovery.accountId !== profileId || (!recovery.ready && !recovery.usable))
-  ) {
-    return <LoadingScreen fullScreen label="Restoring workspace" />;
-  }
+  if (loadingLabel) return <LoadingScreen fullScreen label={loadingLabel} />;
+  if (showWelcome) return <Navigate to={routes.welcome} replace />;
 
-  if (!layoutReady) return <LoadingScreen fullScreen label="Opening Misty" />;
+  const leavingScreen = leavingLabel ? (
+    <LoadingScreen fullScreen label={leavingLabel} leaving onLeft={clearLeaving} />
+  ) : null;
 
   if (isAuthRoute) {
     return (
-      <Suspense fallback={null}>
-        <DesktopLayout getRouteId={desktopRouteIdFromPath} />
-      </Suspense>
+      <>
+        <Suspense fallback={null}>
+          <DesktopLayout getRouteId={desktopRouteIdFromPath} />
+        </Suspense>
+        {leavingScreen}
+      </>
     );
   }
 
@@ -114,6 +124,18 @@ export function AppFrameLayout() {
         key={`sync-sleep:${user?.id ?? "anonymous"}`}
         accountId={syncAllowed ? (user?.id ?? "") : ""}
       />
+      {leavingScreen}
     </>
   );
+}
+
+/** The loading screen the shell just replaced, kept while it fades out over the shell. */
+function useLeavingLoadingScreen(loadingLabel: string | null) {
+  const [shown, setShown] = useState(loadingLabel);
+  const [leaving, setLeaving] = useState<string | null>(null);
+  if (shown !== loadingLabel) {
+    setShown(loadingLabel);
+    setLeaving(loadingLabel ? null : shown);
+  }
+  return [leaving, () => setLeaving(null)] as const;
 }

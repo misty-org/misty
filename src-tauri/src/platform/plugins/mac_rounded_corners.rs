@@ -14,7 +14,9 @@ use cocoa::{
 use objc::{msg_send, sel, sel_impl};
 
 #[cfg(target_os = "macos")]
-use super::mac_traffic_lights::position_traffic_lights;
+use super::mac_traffic_lights::{
+    hold_traffic_lights, position_traffic_lights, release_traffic_lights_later,
+};
 
 #[cfg(target_os = "macos")]
 #[link(name = "QuartzCore", kind = "framework")]
@@ -44,7 +46,8 @@ pub fn enable_modern_window_style<R: Runtime>(
                 unsafe {
                     let ns_window = webview.ns_window() as id;
                     configure_main_renderer_resize(webview.inner() as id);
-                    apply_modern_window_style(
+                    apply_modern_window_style(ns_window);
+                    position_traffic_lights(
                         ns_window,
                         offset_x.unwrap_or(-4.0),
                         offset_y.unwrap_or(0.0),
@@ -67,7 +70,7 @@ pub fn enable_modern_window_style<R: Runtime>(
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn apply_modern_window_style(ns_window: id, offset_x: f64, offset_y: f64) {
+unsafe fn apply_modern_window_style(ns_window: id) {
     ns_window.setTitlebarAppearsTransparent_(cocoa::base::YES);
     ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
     ns_window.setMovable_(cocoa::base::YES);
@@ -82,10 +85,6 @@ unsafe fn apply_modern_window_style(ns_window: id, offset_x: f64, offset_y: f64)
     collection_behavior
         .insert(NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenPrimary);
     ns_window.setCollectionBehavior_(collection_behavior);
-
-    let ox = offset_x;
-    let oy = offset_y;
-    position_traffic_lights(ns_window, ox, oy);
 }
 
 /// With Tauri's `unstable` multi-webview feature, Wry builds the main view
@@ -142,6 +141,17 @@ fn mark_ready(label: &str) {
     }
 }
 
+/// Whether a window has shown its first frame. Until then only its own reveal shows it.
+pub fn window_revealed(label: &str) -> bool {
+    #[cfg(any(target_os = "macos", windows))]
+    return window_ready(label);
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = label;
+        true
+    }
+}
+
 /// A closed window reveals itself again when its Space reopens.
 pub fn forget_window(label: &str) {
     #[cfg(any(target_os = "macos", windows))]
@@ -161,7 +171,8 @@ pub fn main_window_ready() -> bool {
 
 /// Completes window preparation after React, fonts, and saved zoom are ready.
 /// The window starts hidden so its first frame already has the theme's
-/// background (and, on macOS, positioned traffic lights).
+/// background. On macOS the traffic lights stay hidden until the layout,
+/// which mounts after the opening screen, places them.
 #[tauri::command]
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     // The main window can already contain embedded provider views on reload.
@@ -178,18 +189,22 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
         let (send, receive) = tokio::sync::oneshot::channel();
         webview
             .with_webview(move |webview| unsafe {
+                let mut held = false;
                 if !window_ready(&label) {
                     let ns_window = webview.ns_window() as id;
                     configure_main_renderer_resize(webview.inner() as id);
-                    apply_modern_window_style(ns_window, -1.0, 0.0);
+                    apply_modern_window_style(ns_window);
+                    held = hold_traffic_lights(ns_window);
                     let _: () = msg_send![ns_window, displayIfNeeded];
                     mark_ready(&label);
                     ns_window.makeKeyAndOrderFront_(nil);
                 }
-                let _ = send.send(());
+                let _ = send.send(held);
             })
             .map_err(|error| error.to_string())?;
-        receive.await.map_err(|error| error.to_string())?;
+        if receive.await.map_err(|error| error.to_string())? {
+            release_traffic_lights_later(webview);
+        }
     }
     #[cfg(windows)]
     {
