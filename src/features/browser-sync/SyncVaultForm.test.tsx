@@ -67,14 +67,16 @@ describe("sync vault setup and unlock", () => {
       }),
     );
   });
-  it("shows native failures and retains the form for a safe retry", async () => {
+  it("explains a failed unlock in plain words and retains the form for a safe retry", async () => {
     const h = mount(false);
     h.onUnlock.mockRejectedValueOnce(new Error("Could not unlock this vault"));
     fill("Sync password", password);
     fill("Sync secret", secret);
     fireEvent.click(screen.getByRole("button", { name: "Unlock sync" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain("Could not unlock"),
+      expect(screen.getByRole("alert").textContent).toBe(
+        "Sync could not be opened with those details. Check the password and secret, then try again.",
+      ),
     );
     expect((screen.getByLabelText("Sync password") as HTMLInputElement).value).toBe(password);
     expect(h.onUnlock).toHaveBeenCalledWith({ password, syncSecret: secret, remember: true });

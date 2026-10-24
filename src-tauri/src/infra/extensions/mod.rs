@@ -34,6 +34,12 @@ use std::{
 use tauri::Manager;
 use tokio::sync::Mutex;
 
+mod origins;
+use origins::*;
+pub(crate) use origins::is_extension_url;
+mod package_dirs;
+use package_dirs::*;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtensionFailure {
@@ -179,147 +185,6 @@ fn lifecycle() -> &'static Mutex<()> {
 fn identity(value: &str) -> String {
     hex::encode(Sha256::digest(value.as_bytes()))
 }
-/// Extension page hosts, with the Spaces that run each extension. The same
-/// extension keeps one host in every Space; each Space's controller serves it.
-fn origins() -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
-    static ORIGINS: OnceLock<
-        std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>>,
-    > = OnceLock::new();
-    ORIGINS.get_or_init(Default::default)
-}
-fn allow_origin(space: &str, host: String) {
-    if let Ok(mut origins) = origins().write() {
-        origins.entry(host).or_default().insert(space.to_owned());
-    }
-}
-fn drop_origin(space: &str, host: &str) {
-    if let Ok(mut origins) = origins().write() {
-        if let Some(spaces) = origins.get_mut(host) {
-            spaces.remove(space);
-            if spaces.is_empty() {
-                origins.remove(host);
-            }
-        }
-    }
-}
-fn drop_space_origins(space: &str) {
-    if let Ok(mut origins) = origins().write() {
-        origins.retain(|_, spaces| {
-            spaces.remove(space);
-            !spaces.is_empty()
-        });
-    }
-}
-/// An installation's extension page host, for its account origin.
-fn installation_origin(account: &str, guid: &str) -> String {
-    uuid_for(&format!("{account}:{guid}"))
-}
-pub(crate) fn is_extension_url(url: &url::Url) -> bool {
-    url.scheme() == EXTENSION_SCHEME
-        && url.port().is_none()
-        && url.username().is_empty()
-        && url.password().is_none()
-        && url
-            .host_str()
-            .is_some_and(|host| origins().read().is_ok_and(|o| o.contains_key(host)))
-}
-fn uuid_for(value: &str) -> String {
-    let hash = Sha256::digest(value.as_bytes());
-    uuid::Uuid::from_bytes(hash[..16].try_into().unwrap()).to_string()
-}
-/// The extension controller a Space's host uses. The personal Space keeps the
-/// account's controller from before Spaces, and with it every extension's storage.
-fn controller_id(account: &str, space: &str) -> String {
-    if space == crate::infra::space_windows::PERSONAL {
-        uuid_for(account)
-    } else {
-        uuid_for(&format!("{account}:space:{space}"))
-    }
-}
-fn account_root(app: &tauri::AppHandle, account: &str) -> Result<PathBuf, String> {
-    Ok(app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("extensions")
-        .join(identity(account)))
-}
-/// A Space's packages: `extensions/<account>/<space>`.
-fn root(app: &tauri::AppHandle, account: &str, space: &str) -> Result<PathBuf, String> {
-    if !crate::infra::space_windows::valid_key(space) {
-        return Err("Unknown Space.".into());
-    }
-    Ok(account_root(app, account)?.join(space))
-}
-#[derive(Default, Serialize, Deserialize)]
-struct PackageSelection {
-    current: String,
-    previous: Option<String>,
-}
-fn selected_package(root: &Path, previous: bool) -> Result<PathBuf, String> {
-    let selection: PackageSelection = serde_json::from_slice(
-        &std::fs::read(root.join("selection.json")).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
-    let version = if previous {
-        selection
-            .previous
-            .ok_or("No previous package is available.")?
-    } else {
-        selection.current
-    };
-    if version.len() != 64 || !version.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("Invalid package selection.".into());
-    }
-    Ok(root.join("versions").join(version))
-}
-fn read_review(root: &Path) -> Result<package::Review, String> {
-    serde_json::from_slice(&std::fs::read(root.join("review.json")).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())
-}
-
-fn prune_versions(root: &Path) {
-    let Ok(current) = selected_package(root, false) else {
-        return;
-    };
-    let previous = selected_package(root, true).ok();
-    let Ok(entries) = std::fs::read_dir(root.join("versions")) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if path != current
-            && previous.as_ref() != Some(&path)
-            && name.len() == 64
-            && name.bytes().all(|v| v.is_ascii_hexdigit())
-            && entry.file_type().is_ok_and(|v| v.is_dir())
-        {
-            let _ = std::fs::remove_dir_all(path);
-        }
-    }
-}
-
-fn valid_installation(value: &Installation) -> bool {
-    let identity = match catalog::Store::of(&value.id) {
-        Some(catalog::Store::Chrome) => value.guid == value.id,
-        Some(catalog::Store::Firefox) => !catalog::is_chrome_id(&value.guid),
-        None => false,
-    };
-    identity
-        && !value.guid.is_empty()
-        && value.guid.len() <= 256
-        && value.name.len() <= 512
-        && uuid::Uuid::parse_str(&value.generation).is_ok()
-        && value.permissions.len() <= 256
-        && value.hosts.len() <= 2048
-        && value
-            .permissions
-            .iter()
-            .chain(&value.hosts)
-            .all(|v| !v.contains('\0') && v.len() <= 8192)
-}
-
 pub async fn close_account() {
     CLOSING.store(true, std::sync::atomic::Ordering::Release);
     advance_epoch();

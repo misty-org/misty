@@ -1,21 +1,6 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
-#import <objc/message.h>
-#import "MistyAgentRing.h"
-
-// One mist view for the display, a page and a window. Two inner fogs: a bright
-// one gray close to the edge and a wide darker-gray one that still reads on white
-// pages. Each is the shadow of a shape that lies entirely outside the bounds,
-// so only the shadow falls inward; the view clips to its own rounded corners.
-@interface MistyAgentMistView : NSView
-@property(nonatomic, strong) CAShapeLayer *near;
-@property(nonatomic, strong) CAShapeLayer *wide;
-// Set for a window or the display; a page mist follows its page's own corners.
-@property(nonatomic, strong) NSNumber *radius;
-- (void)build;
-- (void)fit;
-- (void)breathe;
-@end
+#import "MistyAgentRingInternal.h"
 
 static NSHashTable<MistyAgentMistView *> *mists;
 static BOOL mistWaiting;
@@ -112,7 +97,7 @@ static void breathe(CALayer *layer, NSString *key, id from, id to, CFTimeInterva
 }
 @end
 
-static MistyAgentMistView *mistIn(NSView *host, NSNumber *radius) {
+MistyAgentMistView *MistyAgentMistIn(NSView *host, NSNumber *radius) {
   MistyAgentMistView *mist = [[MistyAgentMistView alloc] initWithFrame:host.bounds];
   mist.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   mist.radius = radius;
@@ -123,7 +108,7 @@ static MistyAgentMistView *mistIn(NSView *host, NSNumber *radius) {
 }
 
 // Fades a mist's container in; the mist view itself keeps its waiting alpha.
-static void fadeIn(id target, CGFloat alpha) {
+void MistyAgentRingFadeIn(id target, CGFloat alpha) {
   [target setAlphaValue:0];
   [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
     context.duration = 0.2;
@@ -131,7 +116,7 @@ static void fadeIn(id target, CGFloat alpha) {
   }];
 }
 
-static NSPanel *ringPanel(NSRect frame) {
+NSPanel *MistyAgentRingPanel(NSRect frame) {
   NSPanel *panel = [[NSPanel alloc] initWithContentRect:frame
     styleMask:NSWindowStyleMaskBorderless | NSWindowStyleMaskNonactivatingPanel backing:NSBackingStoreBuffered defer:NO];
   panel.title = MistyAgentRingTitle;
@@ -157,7 +142,7 @@ static NSRect cocoaRect(CGRect rect) {
   return NSMakeRect(rect.origin.x, top - CGRectGetMaxY(rect), rect.size.width, rect.size.height);
 }
 
-static void onMain(void (^work)(void)) {
+void MistyAgentRingOnMain(void (^work)(void)) {
   if (NSThread.isMainThread) work(); else dispatch_async(dispatch_get_main_queue(), work);
 }
 
@@ -170,7 +155,7 @@ static NSRect pulseFrame(CGPoint point) {
 
 // Made with the frame, before capture starts, so the stream can leave it out.
 static void makePulsePanel(CGPoint point) {
-  pulsePanel = ringPanel(pulseFrame(point));
+  pulsePanel = MistyAgentRingPanel(pulseFrame(point));
   CALayer *ring = [CALayer layer];
   ring.frame = CGRectInset(pulsePanel.contentView.layer.bounds, 4, 4);
   ring.cornerRadius = ring.frame.size.width / 2;
@@ -186,22 +171,22 @@ static void makePulsePanel(CGPoint point) {
 }
 
 void misty_agent_ring_show(CGRect display) {
-  onMain(^{
+  MistyAgentRingOnMain(^{
     NSRect frame = cocoaRect(display);
     BOOL fresh = !framePanel;
     if (fresh) {
-      framePanel = ringPanel(frame);
-      mistIn(framePanel.contentView, @0);
+      framePanel = MistyAgentRingPanel(frame);
+      MistyAgentMistIn(framePanel.contentView, @0);
     }
     [framePanel setFrame:frame display:YES];
     [framePanel orderFrontRegardless];
     if (!pulsePanel) makePulsePanel(CGPointMake(CGRectGetMidX(display), CGRectGetMidY(display)));
-    if (fresh) fadeIn(framePanel, 1);
+    if (fresh) MistyAgentRingFadeIn(framePanel, 1);
   });
 }
 
 void misty_agent_ring_pulse(CGPoint point) {
-  onMain(^{
+  MistyAgentRingOnMain(^{
     if (!pulsePanel) makePulsePanel(point);
     [pulsePanel setFrame:pulseFrame(point) display:YES];
     [pulsePanel orderFrontRegardless];
@@ -225,7 +210,7 @@ void misty_agent_ring_pulse(CGPoint point) {
 }
 
 void misty_agent_ring_hide(void) {
-  onMain(^{
+  MistyAgentRingOnMain(^{
     [framePanel orderOut:nil]; framePanel = nil;
     [pulsePanel orderOut:nil]; pulsePanel = nil;
   });
@@ -233,7 +218,7 @@ void misty_agent_ring_hide(void) {
 
 void misty_agent_page_ring(void *view, bool active) {
   NSView *page = (__bridge NSView *)view;
-  onMain(^{
+  MistyAgentRingOnMain(^{
     MistyAgentMistView *mist = nil;
     for (NSView *subview in page.subviews)
       if ([subview isKindOfClass:MistyAgentMistView.class]) mist = (MistyAgentMistView *)subview;
@@ -241,68 +226,14 @@ void misty_agent_page_ring(void *view, bool active) {
       [mist removeFromSuperview];
       return;
     }
-    if (!mist) fadeIn(mistIn(page, nil), mistWaiting ? mistWaitingAlpha : mistActingAlpha);
+    if (!mist) MistyAgentRingFadeIn(MistyAgentMistIn(page, nil), mistWaiting ? mistWaitingAlpha : mistActingAlpha);
     else [mist fit];
   });
 }
 
-static NSPanel *windowRingPanel;
-static MistyAgentMistView *windowMist;
-static id windowRingObserver;
-
-// The window's own corner radius, which varies by macOS version and style.
-static CGFloat windowCornerRadius(NSWindow *window) {
-  if (window.styleMask & NSWindowStyleMaskFullScreen) return 0;
-  SEL selector = NSSelectorFromString(@"_cornerRadius");
-  if (![window respondsToSelector:selector]) return 10;
-  return ((CGFloat (*)(id, SEL))objc_msgSend)(window, selector);
-}
-
-static void fitWindowRing(NSWindow *window) {
-  [windowRingPanel setFrame:window.frame display:YES];
-  windowMist.radius = @(windowCornerRadius(window));
-  [windowMist fit];
-}
-
-void misty_agent_window_ring(void *view, bool active) {
-  NSView *anchor = (__bridge NSView *)view;
-  onMain(^{
-    NSWindow *window = anchor.window;
-    if (!active || !window) {
-      if (windowRingObserver) [NSNotificationCenter.defaultCenter removeObserver:windowRingObserver];
-      windowRingObserver = nil;
-      [windowRingPanel.parentWindow removeChildWindow:windowRingPanel];
-      [windowRingPanel orderOut:nil];
-      windowRingPanel = nil;
-      windowMist = nil;
-      return;
-    }
-    if (windowRingPanel.parentWindow == window) {
-      fitWindowRing(window);
-      return;
-    }
-    if (windowRingPanel) misty_agent_window_ring(view, false);
-    windowRingPanel = ringPanel(window.frame);
-    // Above the window it covers, not above other apps.
-    windowRingPanel.level = window.level;
-    windowRingPanel.collectionBehavior = NSWindowCollectionBehaviorFullScreenAuxiliary |
-      NSWindowCollectionBehaviorIgnoresCycle;
-    windowMist = mistIn(windowRingPanel.contentView, @(windowCornerRadius(window)));
-    [window addChildWindow:windowRingPanel ordered:NSWindowAbove];
-    fitWindowRing(window);
-    __weak NSWindow *weakWindow = window;
-    windowRingObserver = [NSNotificationCenter.defaultCenter
-      addObserverForName:NSWindowDidResizeNotification object:window queue:NSOperationQueue.mainQueue
-      usingBlock:^(NSNotification *note) {
-        (void)note;
-        if (weakWindow) fitWindowRing(weakWindow);
-      }];
-    fadeIn(windowRingPanel.contentView, 1);
-  });
-}
 
 void misty_agent_mist_waiting(bool waiting) {
-  onMain(^{
+  MistyAgentRingOnMain(^{
     mistWaiting = waiting;
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
       context.duration = 0.3;

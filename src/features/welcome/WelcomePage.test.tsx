@@ -1,37 +1,47 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+
+vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
+vi.mock("./WelcomeNav", () => ({ WelcomeNav: () => null }));
+
+import { useSetupStore } from "@/features/setup/useSetupStore";
 import { WelcomePage } from "./WelcomePage";
 
-vi.mock("@/features/workspace", () => ({ MistyBrandIcon: () => <span /> }));
-
-function SignInProbe() {
-  const location = useLocation();
-  return <p>Sign in from {(location.state as { from?: string } | null)?.from}</p>;
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>;
 }
 
-const renderWelcome = (state?: unknown) =>
+function renderAt(state?: object) {
   render(
     <MemoryRouter initialEntries={[{ pathname: "/welcome", state }]}>
       <Routes>
         <Route path="/welcome" element={<WelcomePage />} />
-        <Route path="/signin" element={<SignInProbe />} />
-        <Route path="/browser" element={<p>Browser page</p>} />
+        <Route path="*" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );
+}
 
+beforeEach(() => useSetupStore.setState({ welcomed: false }));
 afterEach(cleanup);
 
-it("shows the name and tagline, and Sign in opens sign in", () => {
-  renderWelcome({ from: "/browser" });
-  expect(screen.getByRole("heading").textContent).toContain("The agentic browser workspace");
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(screen.getByText("Sign in from /browser")).toBeTruthy();
+it("starts browsing without an account and doesn't show again", () => {
+  renderAt();
+  expect(screen.getByText(/No account needed/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Start browsing" }));
+  expect(screen.getByTestId("where").textContent).toBe("/browser");
+  expect(useSetupStore.getState().welcomed).toBe(true);
 });
 
-it("offers Back when adding an account", () => {
-  renderWelcome({ from: "/browser", addingAccount: true });
-  fireEvent.click(screen.getByRole("button", { name: "Back" }));
-  expect(screen.getByText("Browser page")).toBeTruthy();
+it("offers Sign in beside Start browsing", () => {
+  renderAt();
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(screen.getByTestId("where").textContent).toBe("/signin");
+});
+
+it("keeps Sign in and Create account when adding an account", () => {
+  renderAt({ addingAccount: true });
+  expect(screen.queryByRole("button", { name: "Start browsing" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
 });

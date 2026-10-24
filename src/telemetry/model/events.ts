@@ -93,5 +93,7 @@ export interface TelemetryClient {
   setErrorReportingEnabled(enabled: boolean): void;
   isAnalyticsEnabled(): boolean;
   isErrorReportingEnabled(): boolean;
+  /** Nothing is sent while nobody is signed in, whatever the preferences say. */
+  setAccountPresent(present: boolean): void;
   flush(): Promise<void>;
 }

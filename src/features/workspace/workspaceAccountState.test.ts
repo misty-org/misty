@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { allLayoutViews } from "./layoutTabs";
 import {
+  adoptAccountWorkspace,
+  liveWorkspace,
   saveAccountWorkspace,
   restoreAccountWorkspace,
   removeAccountWorkspace,
@@ -78,4 +80,42 @@ it("backs up each legacy account before migration and removes its backup on acco
   removeAccountWorkspace("legacy-owner");
   expect(localStorage.getItem(key)).toBeNull();
   expect(localStorage.getItem(workspaceRecoveryKey(key))).toBeNull();
+});
+
+describe("workspace adoption across sign-in", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useWorkspaceStore.persist.clearStorage();
+    useWorkspaceStore.getState().reset();
+  });
+
+  it("carries the windows on screen into the account that signs in, and back on sign-out", () => {
+    const titles = () =>
+      allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.title);
+    useWorkspaceStore.getState().openSurface({
+      surfaceId: "browser",
+      groupKey: "tool:browser",
+      title: "Browsed signed out",
+      route: "/browser",
+      forceNew: true,
+    });
+    // Signing in: the live windows are captured, account state resets, the account adopts them.
+    const live = liveWorkspace();
+    resetWorkspaceAccountState();
+    adoptAccountWorkspace("user-a", live);
+    expect(titles()).toContain("Browsed signed out");
+
+    // They are the account's now: restoring the account brings them back.
+    resetWorkspaceAccountState();
+    restoreAccountWorkspace("user-a");
+    expect(titles()).toContain("Browsed signed out");
+
+    // Signing out hands them to the local profile.
+    const signedIn = liveWorkspace();
+    resetWorkspaceAccountState();
+    adoptAccountWorkspace("local", signedIn);
+    resetWorkspaceAccountState();
+    restoreAccountWorkspace("local");
+    expect(titles()).toContain("Browsed signed out");
+  });
 });

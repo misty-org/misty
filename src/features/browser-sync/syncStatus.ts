@@ -118,10 +118,7 @@ export function selectSyncStatus(input: SyncStatusInput): SyncStatus {
   const session = input.session?.account_id === input.accountId ? input.session : null;
   if (!session && input.vault?.remote === false && input.vault?.local === false)
     return {
-      ...neutral(
-        "Set up sync",
-        "Create a sync vault to share this workspace across your devices.",
-      ),
+      ...neutral("Set up sync", "Create a sync vault to share this workspace across your devices."),
       action: actions.setup,
     };
   if (!session && input.issue === setupRequiredIssue)

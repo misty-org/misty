@@ -1,26 +1,21 @@
 import { Avatar, AvatarFallback, Button, IconButton, Pressable } from "@/shared/ui";
 import { Trash2, UserPlus } from "lucide-react";
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { Navigate, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { routes } from "@/features/app-shell";
 import { useAuth } from "./AuthContext";
 import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import AuthCard from "./components/AuthCard";
-import AuthField from "./components/AuthField";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
-import AuthSubmitButton from "./components/AuthSubmitButton";
 import ForgotPasswordForm from "./components/ForgotPasswordForm";
-import GoogleSignInButton from "./components/GoogleSignInButton";
+import SignInForm from "./components/SignInForm";
 import type { SavedAccountSession } from "./store/accountVault";
-import { accountSignIn } from "./store/useAccountStore";
 
 export default function SignIn() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { accounts, user, transitioning, authenticateAccount, resumeAccount, removeAccount } =
-    useAuth();
+  const { accounts, user, transitioning, resumeAccount, removeAccount } = useAuth();
   const routeState = location.state as {
     from?: string;
     addingAccount?: boolean;
@@ -40,29 +35,12 @@ export default function SignIn() {
   const back = () =>
     user ? navigate(from, { replace: true }) : navigate(routes.welcome, { replace: true });
   const [email, setEmail] = useState(reauthenticateEmail);
-  const [password, setPassword] = useState("");
   const [error, setError] = useState(
     reauthenticateEmail
       ? `Your saved sign-in for ${reauthenticateEmail} has expired. Sign in again to switch to it.`
       : "",
   );
-  const [loading, setLoading] = useState(false);
   const [busyAccountId, setBusyAccountId] = useState("");
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      await authenticateAccount(() => accountSignIn(email, password));
-      navigate(from, { replace: true });
-    } catch (signInError) {
-      setError(signInError instanceof Error ? signInError.message : "Could not sign in.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleSelect(account: SavedAccountSession) {
     if (busyAccountId) return;
@@ -74,7 +52,6 @@ export default function SignIn() {
     } catch (resumeError) {
       if (resumeError instanceof SavedAccountSessionUnavailableError) {
         setEmail(account.email);
-        setPassword("");
         setMode("login");
         setError(
           `Your saved sign-in for ${account.email} is no longer available. Please sign in again.`,
@@ -163,7 +140,6 @@ export default function SignIn() {
               onClick={() => {
                 setError("");
                 setEmail("");
-                setPassword("");
                 setMode("login");
               }}
             >
@@ -221,61 +197,14 @@ export default function SignIn() {
           </NavLink>
         }
       >
-        <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
-          <AuthField
-            id="signin-email"
-            label="Email"
-            type="email"
-            value={email}
-            autoComplete="email"
-            placeholder="you@example.com"
-            required
-            disabled={loading || transitioning}
-            onChange={setEmail}
-          />
-          <div className="flex flex-col gap-2">
-            <AuthField
-              id="signin-password"
-              label="Password"
-              type="password"
-              value={password}
-              autoComplete="current-password"
-              placeholder="••••••••"
-              required
-              disabled={loading || transitioning}
-              onChange={setPassword}
-            />
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto self-start p-0 text-cream"
-              onClick={() => {
-                setError("");
-                setMode("forgot");
-              }}
-            >
-              Forgot your password?
-            </Button>
-          </div>
-          {error ? <AuthMessage tone="error" message={error} /> : null}
-          <AuthSubmitButton
-            idleLabel="Sign In"
-            loadingLabel="Signing in..."
-            loading={loading}
-            disabled={transitioning}
-          />
-          <div className="flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
-            <span className="h-px flex-1 bg-charcoal-border" />
-            or
-            <span className="h-px flex-1 bg-charcoal-border" />
-          </div>
-          <GoogleSignInButton
-            disabled={loading || transitioning}
-            onBusy={setLoading}
-            onError={setError}
-            onSuccess={() => navigate(from, { replace: true })}
-          />
-        </form>
+        <SignInForm
+          email={email}
+          onEmailChange={setEmail}
+          error={error}
+          onErrorChange={setError}
+          onSuccess={() => navigate(from, { replace: true })}
+          onForgot={() => setMode("forgot")}
+        />
       </AuthCard>
     </AuthShell>
   );

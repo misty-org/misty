@@ -18,25 +18,34 @@ import type { SettingsContentProps } from "@/features/settings/settingsTypes";
 import { ResetSyncRow, SyncAccountSettings } from "./SyncAccountSettings";
 import { SyncStatusView } from "./SyncStatusView";
 import { useSyncController } from "./useSyncController";
-import { SyncRestoreSettings } from "@/features/settings/sections/SyncRestoreSettings";
+import { SyncRestoreSettings } from "@/features/settings";
 import { DeviceWebsiteDataList } from "./DeviceWebsiteDataList";
 import { deviceRows, publishingDeviceId } from "./deviceControl";
 import { SyncDeviceList } from "./SyncDeviceList";
+import { SignedOutSyncSettings } from "./SignedOutSyncSettings";
 
 /** Sync opens as a short wizard; the settings list keeps only its entry point. */
 export function BrowserSyncSettings(props: SettingsContentProps) {
+  const { user } = useAuth();
+  // Sync needs an account; signed out the page offers one instead.
+  if (!user) return <SignedOutSyncSettings />;
+  return <AccountSyncSettings {...props} />;
+}
+
+function AccountSyncSettings(props: SettingsContentProps) {
   const { user } = useAuth();
   const controller = useSyncController(user?.id ?? "");
   const session = controller.session;
   const publisherId = session ? publishingDeviceId(session) : null;
   const publisher =
-    session && deviceRows(session, user?.username).find((device) => device.device_id === publisherId);
+    session &&
+    deviceRows(session, user?.username).find((device) => device.device_id === publisherId);
   const canResetVault = Boolean(
     controller.accountId &&
-      controller.desktop &&
-      !controller.reenroll &&
-      controller.vault &&
-      (controller.vault.local || controller.vault.remote === true),
+    controller.desktop &&
+    !controller.reenroll &&
+    controller.vault &&
+    (controller.vault.local || controller.vault.remote === true),
   );
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<0 | 1>(0);
@@ -84,75 +93,77 @@ export function BrowserSyncSettings(props: SettingsContentProps) {
                   />
                 ) : null}
                 <div className="pt-2">
-                  <SyncAccountSettings controller={controller} showDelete={false} compact />
+                  <SyncAccountSettings
+                    controller={controller}
+                    showDelete={!controller.session}
+                    compact
+                  />
                 </div>
               </>
+            ) : session ? (
+              <>
+                <Section
+                  title="Timing"
+                  description="Choose how quickly changes are sent and how often Misty checks for updates."
+                  density="compact"
+                >
+                  <Row
+                    label="Sync frequency"
+                    description="Live sends changes promptly; Less often reduces network activity."
+                    density="compact"
+                  >
+                    <ChoiceControl
+                      value={stringSetting(props.document, "sync", "sync_frequency", "balanced")}
+                      disabled={props.working}
+                      options={[
+                        { value: "live", label: "Live" },
+                        { value: "balanced", label: "Balanced" },
+                        { value: "saver", label: "Less often" },
+                      ]}
+                      onValueChange={(value) =>
+                        props.onSettingChange("sync", "sync_frequency", value)
+                      }
+                    />
+                  </Row>
+                </Section>
+                <SyncRestoreSettings {...props} compact />
+                <Section
+                  title="Workspace devices"
+                  description="Devices connected to this workspace."
+                  density="compact"
+                >
+                  <SyncDeviceList key={session.session_id} session={session} />
+                </Section>
+                <Section
+                  title="Website sign-ins"
+                  description="Sync cookies and sign-in keys so websites can recognize you on another device. Some sites may ask you to sign in again."
+                  density="compact"
+                >
+                  <Row
+                    label="Publishing from"
+                    description="The device currently sharing website sign-ins for this workspace."
+                    density="compact"
+                  >
+                    <span className="text-sm text-cream-muted">
+                      {session.supports_cookie_handoff === false
+                        ? "Not supported on this device"
+                        : (publisher?.name ?? "Waiting for a publishing device")}
+                    </span>
+                  </Row>
+                  <DeviceWebsiteDataList session={session} />
+                </Section>
+                {canResetVault ? (
+                  <Section title="Recovery" density="compact">
+                    <ResetSyncRow controller={controller} />
+                  </Section>
+                ) : null}
+              </>
             ) : (
-              session ? (
-                <>
-                  <Section
-                    title="Timing"
-                    description="Choose how quickly changes are sent and how often Misty checks for updates."
-                    density="compact"
-                  >
-                    <Row
-                      label="Sync frequency"
-                      description="Live sends changes promptly; Less often reduces network activity."
-                      density="compact"
-                    >
-                      <ChoiceControl
-                        value={stringSetting(props.document, "sync", "sync_frequency", "balanced")}
-                        disabled={props.working}
-                        options={[
-                          { value: "live", label: "Live" },
-                          { value: "balanced", label: "Balanced" },
-                          { value: "saver", label: "Less often" },
-                        ]}
-                        onValueChange={(value) =>
-                          props.onSettingChange("sync", "sync_frequency", value)
-                        }
-                      />
-                    </Row>
-                  </Section>
-                  <SyncRestoreSettings {...props} compact />
-                  <Section
-                    title="Workspace devices"
-                    description="Devices connected to this workspace."
-                    density="compact"
-                  >
-                    <SyncDeviceList key={session.session_id} session={session} />
-                  </Section>
-                  <Section
-                    title="Website sign-ins"
-                    description="Sync cookies and sign-in keys so websites can recognize you on another device. Some sites may ask you to sign in again."
-                    density="compact"
-                  >
-                    <Row
-                      label="Publishing from"
-                      description="The device currently sharing website sign-ins for this workspace."
-                      density="compact"
-                    >
-                      <span className="text-sm text-cream-muted">
-                        {session.supports_cookie_handoff === false
-                          ? "Not supported on this device"
-                          : (publisher?.name ?? "Waiting for a publishing device")}
-                      </span>
-                    </Row>
-                    <DeviceWebsiteDataList session={session} />
-                  </Section>
-                  {canResetVault ? (
-                    <Section title="Recovery" density="compact">
-                      <ResetSyncRow controller={controller} />
-                    </Section>
-                  ) : null}
-                </>
-              ) : (
-                <SyncStatusView
-                  status={controller.status}
-                  busy={controller.busy}
-                  onAction={() => void controller.retry()}
-                />
-              )
+              <SyncStatusView
+                status={controller.status}
+                busy={controller.busy}
+                onAction={() => void controller.retry()}
+              />
             )}
           </div>
           <DialogFooter className="px-6 pb-5 pt-2">

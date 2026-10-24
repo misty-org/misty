@@ -1,4 +1,10 @@
-import { SavedAccountSessionUnavailableError, useAuth, useUserStore } from "@/features/auth";
+import {
+  openSignInSheet,
+  openSignOutSheet,
+  SavedAccountSessionUnavailableError,
+  useAuth,
+  useUserStore,
+} from "@/features/auth";
 import { reportSystemError } from "@/features/support/systemErrors";
 import { routes } from "@/features/app-shell";
 import { AccountUsagePanel } from "@/features/spaces";
@@ -46,7 +52,7 @@ function ProfileMenuItems(props: {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
-  const { user, accounts, transitioning, switchAccount, logout } = useAuth();
+  const { user, accounts, transitioning, switchAccount } = useAuth();
   const me = useUserStore(
     useShallow((state) => ({
       id: state.me?.id,
@@ -72,9 +78,7 @@ function ProfileMenuItems(props: {
       if (error instanceof SavedAccountSessionUnavailableError) {
         // The account stays listed; its session just needs a password again.
         const email = accounts.find((saved) => saved.id === accountId)?.email ?? "";
-        navigate("/signin", {
-          state: { from: currentPath, addingAccount: true, reauthenticateEmail: email },
-        });
+        openSignInSheet("expired", email);
         return;
       }
       setSwitchError("The account could not be switched. Try selecting it again.");
@@ -88,15 +92,10 @@ function ProfileMenuItems(props: {
     }
   };
 
+  // Signing out asks first: it keeps browsing, with an option to remove this device's data.
   const signOut = () => {
     props.onClose();
-    void logout().catch((error: unknown) =>
-      reportSystemError({
-        scope: "account:sign-out",
-        title: "Could not sign out",
-        error,
-      }),
-    );
+    openSignOutSheet();
   };
 
   return (
@@ -114,7 +113,7 @@ function ProfileMenuItems(props: {
         />
       ) : null}
       {!account ? (
-        <MenuItem icon={<LogIn />} label="Sign in" onSelect={() => navigate(routes.signIn)} />
+        <MenuItem icon={<LogIn />} label="Sign in" onSelect={() => openSignInSheet("account")} />
       ) : (
         <>
           <MenuItem
@@ -180,7 +179,12 @@ function ProfileMenuItems(props: {
               }
             />
           </MenuSubmenu>
-          <MenuItem icon={<LogOut />} label="Log out" disabled={transitioning} onSelect={signOut} />
+          <MenuItem
+            icon={<LogOut />}
+            label="Sign out…"
+            disabled={transitioning}
+            onSelect={signOut}
+          />
         </>
       )}
     </>

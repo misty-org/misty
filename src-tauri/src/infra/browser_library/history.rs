@@ -6,6 +6,11 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use url::Url;
 
+mod suggest;
+pub use suggest::*;
+mod removal;
+pub use removal::*;
+
 const MAX_QUERY_LIMIT: i64 = 500;
 /// A reload or a redirect back to the same page is not a new visit.
 const REPEAT_VISIT_WINDOW_MS: i64 = 30_000;
@@ -162,196 +167,8 @@ fn browser_history_query_blocking(
     Ok(rows)
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserHistorySuggestion {
-    url: String,
-    title: String,
-    visits: i64,
-    typed_visits: i64,
-    last_visited_at: i64,
-}
-
-/// Empty text asks for the person's top pages; only recent visits count then.
-const TOP_PAGES_WINDOW_MS: i64 = 90 * 86_400_000;
-
-/// Address bar suggestions: pages matching the typed text, ranked by visits
-/// (typed visits count triple) decayed by age. Empty text returns top pages.
-fn browser_history_suggest_blocking(
-    app: AppHandle,
-    request: BrowserHistoryQueryRequest,
-) -> Result<Vec<BrowserHistorySuggestion>, String> {
-    let search = text(&request.text, 200);
-    let now = now_ms();
-    let since = if search.is_empty() {
-        now - TOP_PAGES_WINDOW_MS
-    } else {
-        0
-    };
-    let connection = library(&app)?;
-    let mut statement = connection
-        .prepare(
-            "SELECT url, (SELECT title FROM visits latest WHERE latest.profile_id = ?1 AND latest.url = visits.url
-                          ORDER BY visited_at DESC LIMIT 1),
-                    COUNT(*) AS count, SUM(typed) AS typed_count, MAX(visited_at) AS last
-             FROM visits
-             WHERE profile_id = ?1 AND visited_at >= ?5
-               AND (url LIKE ?2 ESCAPE '\\' OR title LIKE ?2 ESCAPE '\\')
-             GROUP BY url
-             ORDER BY ((COUNT(*) + 2.0 * SUM(typed)) * 1.0) / (1 + (?3 - MAX(visited_at)) / 86400000.0) DESC
-             LIMIT ?4",
-        )
-        .map_err(|error| error.to_string())?;
-    let rows = statement
-        .query_map(
-            params![
-                profile_key(request.profile_id),
-                like_pattern(&search),
-                now,
-                request.limit.unwrap_or(5).clamp(1, 20),
-                since,
-            ],
-            |row| {
-                Ok(BrowserHistorySuggestion {
-                    url: row.get(0)?,
-                    title: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
-                    visits: row.get(2)?,
-                    typed_visits: row.get(3)?,
-                    last_visited_at: row.get(4)?,
-                })
-            },
-        )
-        .map_err(|error| error.to_string())?
-        .filter_map(Result::ok)
-        .collect();
-    Ok(rows)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserHistoryDeleteRequest {
-    #[serde(default)]
-    pub ids: Vec<i64>,
-}
-
-fn browser_history_delete_blocking(
-    app: AppHandle,
-    request: BrowserHistoryDeleteRequest,
-) -> Result<(), String> {
-    let connection = library(&app)?;
-    for id in request.ids {
-        mark_dirty(&connection, "id = ?1", params![id])?;
-        connection
-            .execute("DELETE FROM visits WHERE id = ?1", params![id])
-            .map_err(|error| error.to_string())?;
-    }
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserHistoryForgetRequest {
-    pub profile_id: Option<String>,
-    pub url: String,
-}
-
-/// Removes every visit to one page, as when a suggestion is deleted from the address bar.
-fn browser_history_forget_blocking(
-    app: AppHandle,
-    request: BrowserHistoryForgetRequest,
-) -> Result<(), String> {
-    let Some(url) = history_url(&request.url) else {
-        return Ok(());
-    };
-    let connection = library(&app)?;
-    let profile = profile_key(request.profile_id);
-    mark_dirty(
-        &connection,
-        "profile_id = ?1 AND url = ?2",
-        params![profile, url],
-    )?;
-    connection
-        .execute(
-            "DELETE FROM visits WHERE profile_id = ?1 AND url = ?2",
-            params![profile, url],
-        )
-        .map_err(|error| error.to_string())?;
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserHistoryClearRequest {
-    /// Every profile when absent.
-    pub profile_id: Option<String>,
-    /// Visits at or after this time (ms); everything when absent.
-    pub since: Option<i64>,
-}
-
-fn browser_history_clear_blocking(
-    app: AppHandle,
-    request: BrowserHistoryClearRequest,
-) -> Result<(), String> {
-    let since = request.since.unwrap_or(0);
-    let connection = library(&app)?;
-    match &request.profile_id {
-        Some(profile) => mark_dirty(
-            &connection,
-            "profile_id = ?1 AND visited_at >= ?2",
-            params![profile_key(Some(profile.clone())), since],
-        ),
-        None => mark_dirty(&connection, "visited_at >= ?1", params![since]),
-    }?;
-    match request.profile_id {
-        Some(profile) => connection.execute(
-            "DELETE FROM visits WHERE profile_id = ?1 AND visited_at >= ?2",
-            params![profile_key(Some(profile)), since],
-        ),
-        None => connection.execute("DELETE FROM visits WHERE visited_at >= ?1", params![since]),
-    }
-    .map_err(|error| error.to_string())?;
-    Ok(())
-}
-
-/// Records the hours of visits about to be deleted, so their synced batches
-/// are rewritten without them (on every device, not just this one).
-fn mark_dirty(
-    connection: &rusqlite::Connection,
-    filter: &str,
-    values: impl rusqlite::Params,
-) -> Result<(), String> {
-    connection
-        .execute(
-            &format!(
-                "INSERT OR IGNORE INTO history_dirty(origin, hour)
-                 SELECT DISTINCT origin, visited_at / 3600000 FROM visits WHERE {filter}"
-            ),
-            values,
-        )
-        .map(|_| ())
-        .map_err(|error| error.to_string())
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn history_url_keeps_only_web_pages_without_credentials() {
-        assert_eq!(
-            history_url("https://user:secret@example.com/path?q=1").as_deref(),
-            Some("https://example.com/path?q=1")
-        );
-        assert_eq!(history_url("about:blank"), None);
-        assert_eq!(history_url("misty://history"), None);
-        assert_eq!(history_url("file:///etc/passwd"), None);
-    }
-
-    #[test]
-    fn like_pattern_escapes_wildcards() {
-        assert_eq!(like_pattern("50%_off"), "%50\\%\\_off%");
-    }
-}
+mod tests;
 
 // Commands run on the main thread unless they are async, and the main thread
 // also delivers keystrokes. A history query over a large imported library held

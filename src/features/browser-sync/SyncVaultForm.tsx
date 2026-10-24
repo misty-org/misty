@@ -65,7 +65,9 @@ export function SyncVaultForm(props: {
       setSecret("");
       setSaved(false);
     } catch {
-      setError("Sync could not be opened with those details. Check the password and secret, then try again.");
+      setError(
+        "Sync could not be opened with those details. Check the password and secret, then try again.",
+      );
     } finally {
       setBusy(false);
     }

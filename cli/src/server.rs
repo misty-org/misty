@@ -38,6 +38,8 @@ mod tunnel;
 pub use tunnel::*;
 mod worker;
 pub use worker::*;
+mod worker_validation;
+use worker_validation::*;
 mod secrets;
 use secrets::*;
 mod r2;

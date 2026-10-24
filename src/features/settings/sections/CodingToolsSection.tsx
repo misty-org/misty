@@ -14,8 +14,7 @@ function useDeviceSetting(id: string) {
   const store = useSettingsStore();
   const ready = useDevicePreferences((state) => state.ready);
   const section = store.settings?.document[definition.section] as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
   return {
     label: definition.label,
     value: String(fromLegacy(definition, section?.[definition.key]) || "none"),

@@ -122,6 +122,12 @@ mod title_probe;
 use title_probe::*;
 mod view_close;
 pub use view_close::*;
+mod account_views;
+pub(crate) use account_views::*;
+mod agent_tab_close;
+pub use agent_tab_close::*;
+mod window_pages;
+pub use window_pages::*;
 mod agent;
 pub use agent::*;
 mod agent_grants;
@@ -130,46 +136,12 @@ mod agent_actions;
 use agent_actions::*;
 mod agent_support;
 pub(crate) use agent_support::*;
-
-#[tauri::command]
-pub fn browser_context_menu_select(
-    app: AppHandle,
-    webview: Webview,
-    key: String,
-    action: String,
-) -> Result<(), String> {
-    context_menu::select(&app, &webview, &key, &action)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BrowserContextMenuAtRequest {
-    pub id: String,
-    /// Fractions of the page's width and height.
-    pub x: f64,
-    pub y: f64,
-}
-
-/// Replays a right-click that landed on the renderer while it covered a page.
-#[tauri::command]
-pub fn browser_webview_context_menu_at(
-    caller: Webview,
-    app: AppHandle,
-    request: BrowserContextMenuAtRequest,
-) -> Result<(), String> {
-    if caller.label().starts_with("misty-browser-")
-        || !request.x.is_finite()
-        || !request.y.is_finite()
-    {
-        return Err("Browser menu is unavailable".into());
-    }
-    with_webview(&app, &request.id, |webview| {
-        if webview.window().label() != caller.window().label() {
-            return Err("Browser menu is unavailable".into());
-        }
-        context_menu::right_click(&webview, request.x, request.y)
-    })
-}
+mod menu_commands;
+pub use menu_commands::*;
+mod profile_data;
+pub(super) use profile_data::*;
+mod session;
+pub use session::*;
 
 #[cfg(windows)]
 use std::sync::atomic::AtomicU32;
@@ -250,123 +222,6 @@ pub(super) fn browser_owner_label(app: &AppHandle, id: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Where a tab's site permissions live: its profile's store, or its incognito
-/// session's.
-pub(super) fn session_permission_scope(
-    app: &AppHandle,
-    id: &str,
-) -> Option<kiri::engine::StoreScope> {
-    let state = app.try_state::<BrowserSessionState>()?;
-    let sessions = state.sessions.lock().ok()?;
-    let session = sessions.get(id)?;
-    if session.private {
-        return Some(kiri::engine::StoreScope::Temporary(0));
-    }
-    super::site_settings::permissions::profile_key(session.profile_id.as_deref())
-        .ok()
-        .map(kiri::engine::StoreScope::Persistent)
-}
-
-pub struct BrowserSessionState {
-    context_menu: Mutex<HashMap<String, context_menu::PendingMenu>>,
-    pending_popups: Mutex<HashSet<String>>,
-    sessions: Mutex<HashMap<String, BrowserSession>>,
-    reserved_downloads: Mutex<HashSet<PathBuf>>,
-    pub(super) shortcut_bindings: Mutex<Vec<BrowserShortcutBinding>>,
-    pub(super) shortcut_tokens: Mutex<HashMap<String, String>>,
-}
-
-impl Default for BrowserSessionState {
-    fn default() -> Self {
-        Self {
-            context_menu: Mutex::default(),
-            pending_popups: Mutex::default(),
-            sessions: Mutex::default(),
-            reserved_downloads: Mutex::default(),
-            shortcut_bindings: Mutex::new(super::browser_shortcuts::default_shortcut_bindings()),
-            shortcut_tokens: Mutex::default(),
-        }
-    }
-}
-
-#[derive(Default)]
-struct BrowserSession {
-    agent_input_locked: bool,
-    // An agent's tab while its run goes on: the ring stays even when the person has taken it
-    // over and the lock is off (docs/design/agent-browser/BRIEF.md).
-    agent_ring: bool,
-    workspace_tab_id: Option<String>,
-    // Native auxiliary windows stay attached to this live integration view.
-    popup_parent: Option<String>,
-    origin_space_id: Option<String>,
-    zoom_factor: Option<f64>,
-    profile_id: Option<String>,
-    // Only this logical identity is included in renderer/agent observations.
-    logical_profile_id: Option<String>,
-    profile_provider: Option<String>,
-    provider_id: Option<String>,
-    oauth_callback: Option<(super::browser_provider::OAuthCallback, std::time::Instant)>,
-    scope_id: String,
-    grants: HashMap<String, BrowserGrant>,
-    snapshot_generation: u64,
-    snapshot_extension: Option<String>,
-    element_targets: HashMap<String, String>,
-    downloads: Vec<BrowserDownload>,
-    pending_agent_download: Option<PendingAgentDownload>,
-    /// Private tabs keep no download list and share one throwaway data store.
-    private: bool,
-    /// The agent run a tab works for, when an agent opened it in the person's window
-    /// (docs/design/agent-browser/BRIEF.md): the benchmark pictures each run's own tabs.
-    agent_run_id: Option<String>,
-}
-
-impl BrowserSession {
-    fn context_profile_id(&self) -> Option<&str> {
-        self.logical_profile_id
-            .as_deref()
-            .or(self.profile_id.as_deref())
-    }
-}
-
-#[derive(Clone)]
-struct BrowserGrant {
-    agent_id: String,
-    capabilities: HashSet<String>,
-    expires_at: DateTime<Utc>,
-}
-
-#[derive(Clone)]
-struct PendingAgentDownload {
-    grant_id: String,
-    agent_id: String,
-    task_id: Option<String>,
-    expires_at: DateTime<Utc>,
-    popup_id: Option<String>,
-}
-
-#[cfg(any(target_os = "macos", windows, test))]
-fn popup_download_authority(
-    source: &BrowserSession,
-    popup_id: &str,
-) -> Option<(String, String, String)> {
-    let pending = source.pending_agent_download.as_ref()?;
-    let grant = source.grants.get(&pending.grant_id)?;
-    let now = Utc::now();
-    if pending.popup_id.as_deref() != Some(popup_id)
-        || pending.expires_at <= now
-        || grant.expires_at <= now
-        || grant.agent_id != pending.agent_id
-        || !grant.capabilities.contains("browser.click")
-    {
-        return None;
-    }
-    Some((
-        source.scope_id.clone(),
-        pending.agent_id.clone(),
-        pending.task_id.clone()?,
-    ))
-}
-
 fn webview_label(id: &str) -> Result<String, String> {
     let valid = !id.is_empty()
         && id.len() <= 96
@@ -406,64 +261,8 @@ fn external_url(raw: &str) -> Result<Url, String> {
     Err("Misty Browser supports only http and https pages.".to_owned())
 }
 
-pub(super) fn browser_data_directory(
-    app: &AppHandle,
-    profile: Option<&str>,
-) -> Result<PathBuf, String> {
-    browser_profile_identifier(profile)?;
-    let home = super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
-    let path = super::browser_profile::webview_home(&home, profile)?;
-    #[cfg(target_os = "macos")]
-    {
-        // WebKit picks the store's folder; the profile's `webview` links to it.
-        let library = dirs::home_dir()
-            .ok_or("The home folder is unavailable.")?
-            .join("Library");
-        super::browser_profile::link_webview_data(
-            &home,
-            &library,
-            &app.config().identifier,
-            profile,
-        )?;
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = app;
-        std::fs::create_dir_all(&path).map_err(|error| error.to_string())?;
-    }
-    Ok(path)
-}
-
-/// Points a view at its profile's data directory. WebView2 needs every view
-/// of one directory to create its environment with the same options, so
-/// extension support is switched on here, for all of them.
-pub(super) fn with_browser_data(
-    builder: tauri::WebviewBuilder<tauri::Wry>,
-    app: &AppHandle,
-    profile: Option<&str>,
-) -> Result<tauri::WebviewBuilder<tauri::Wry>, String> {
-    let builder = builder.data_directory(browser_data_directory(app, profile)?);
-    #[cfg(windows)]
-    let builder = builder.browser_extensions_enabled(true);
-    Ok(builder)
-}
-
 mod bounds;
 use bounds::{logical_bounds, set_webview_bounds_if_changed};
-
-fn register_session(state: &BrowserSessionState, id: &str, scope_id: &str) -> Result<(), String> {
-    let mut sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Browser state is unavailable.")?;
-    let session = sessions.entry(id.to_owned()).or_default();
-    if !scope_id.trim().is_empty() {
-        session.scope_id = scope_id.trim().to_owned();
-    } else if session.scope_id.is_empty() {
-        session.scope_id = format!("browser-{id}");
-    }
-    Ok(())
-}
 
 fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<(), String> {
     webview
@@ -479,19 +278,3 @@ mod tests;
 
 pub(crate) mod profile_cleanup;
 pub(crate) mod retired_profiles;
-
-#[tauri::command]
-pub fn browser_runtime_for_scope(
-    state: State<'_, BrowserSessionState>,
-    scope_id: String,
-) -> Result<String, String> {
-    let sessions = state
-        .sessions
-        .lock()
-        .map_err(|_| "Browser state unavailable")?;
-    sessions
-        .iter()
-        .find(|(_, session)| session.scope_id == scope_id)
-        .map(|(id, _)| id.clone())
-        .ok_or_else(|| "browser_context_closed".into())
-}

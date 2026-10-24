@@ -65,7 +65,7 @@ describe("saved website permissions", () => {
       container.querySelector('button[aria-label="Reset permissions for https://example.com"]'),
     ).toBeNull();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      "stopping capture timed out",
+      "Site permissions could not be reset.",
     );
     expect(container.textContent).not.toContain("Camera: Block");
   });

@@ -1,5 +1,6 @@
 //! The threads a running companion keeps: shortcut and audio events, and the cursor sampler.
 use super::*;
+use base64::{engine::general_purpose::STANDARD, Engine};
 
 pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let (tx, rx) = mpsc::channel();

@@ -35,7 +35,7 @@ const stepCopy: Record<SetupStep, { title: string; description: string }> = {
 };
 
 /**
- * First-run setup after sign-in, in place of a walkthrough: importing from another browser (desktop
+ * First-run setup after the welcome, signed in or not, in place of a walkthrough: importing from another browser (desktop
  * app only) and which side the tabs sit on. The tab side applies immediately and stays in Settings.
  */
 export function FirstRunSetup() {
@@ -44,7 +44,7 @@ export function FirstRunSetup() {
   const step = useSetupStore((state) => state.step);
   const setStep = useSetupStore((state) => state.setStep);
   const finishSetup = useSetupStore((state) => state.finishSetup);
-  const visible = isOpen && !transitioning && Boolean(user?.id);
+  const visible = isOpen && !transitioning;
   // Importing reads other browsers on this computer, so it needs the native app.
   const steps: SetupStep[] = hasTauriInternals() ? ["import", "tabs"] : ["tabs"];
   const index = Math.max(0, steps.indexOf(step));

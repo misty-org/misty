@@ -110,9 +110,16 @@ async function mount() {
     render(<BrowserSyncSettings {...props} />);
   });
 }
-it("groups every sync concern on one page and explains the publisher", async () => {
+/** Moves the wizard from connecting to managing a connected workspace. */
+async function manage() {
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Continue" })));
+}
+it("opens the sync wizard and groups each concern on the manage step", async () => {
   await mount();
-  for (const name of ["Sync", "Workspace devices", "Website sign-ins", "Sync account"])
+  expect(screen.getByRole("dialog", { name: "Sync" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Vault access" })).toBeTruthy();
+  await manage();
+  for (const name of ["Timing", "Workspace devices", "Website sign-ins"])
     expect(screen.getByRole("region", { name })).toBeTruthy();
   expect(
     screen.getByText("Publishing from").closest("[data-setting-label]")?.textContent,
@@ -134,6 +141,7 @@ it("writes restore preferences through the settings callback and disables depend
 });
 it("writes labeled mode changes and waits for server confirmation", async () => {
   await mount();
+  await manage();
   await act(async () =>
     fireEvent.click(screen.getByRole("switch", { name: "Full sync for Office" })),
   );
@@ -159,6 +167,7 @@ it("confirms opening another device's tabs without taking its sign-in lease", as
   };
   useBrowserSyncStore.setState({ session: twoWorkspaces() });
   await mount();
+  await manage();
   await act(async () =>
     fireEvent.click(screen.getByRole("button", { name: /Open tabs from .* here/ })),
   );
@@ -173,6 +182,7 @@ it("confirms opening another device's tabs without taking its sign-in lease", as
 });
 it("absorbs device names into inline rename", async () => {
   await mount();
+  await manage();
   fireEvent.click(screen.getByRole("button", { name: "Rename Office" }));
   const input = screen.getByRole("textbox", { name: "Name for Office" });
   fireEvent.change(input, { target: { value: "Studio" } });
@@ -191,8 +201,8 @@ it("only offers creation after the server confirms vault absence", async () => {
   mocks.availability.mockResolvedValue({ local: false, remote: false });
   await mount();
   expect(screen.getByRole("button", { name: "Create sync vault" })).toBeTruthy();
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Set up sync" })));
-  expect(document.activeElement).toBe(screen.getByLabelText("Sync password"));
+  expect(screen.getByLabelText("Sync password")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
 });
 it("locks sync and prevents background auto-unlock; forgetting removes the saved key", async () => {
   await mount();
@@ -217,10 +227,11 @@ it("deletes a locked vault after confirmation, then offers to create a new one",
   expect(screen.getByRole("button", { name: "Create sync vault" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Delete vault" })).toBeNull();
 });
-it("keeps the vault and shows why when deleting fails", async () => {
+it("keeps the vault and shows why when resetting fails", async () => {
   mocks.deleteVault.mockRejectedValue(new Error("Could not reach the sync server."));
   await mount();
-  fireEvent.click(screen.getByRole("button", { name: "Delete vault" }));
+  await manage();
+  fireEvent.click(screen.getByRole("button", { name: "Reset sync…" }));
   const dialog = screen.getByRole("alertdialog");
   await act(async () =>
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete vault" })),

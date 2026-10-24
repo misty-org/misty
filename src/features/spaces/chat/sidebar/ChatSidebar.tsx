@@ -3,6 +3,7 @@ import type { MouseEvent } from "react";
 import { useState, type ReactNode } from "react";
 import type { SpaceConversation } from "@/api/spaces/dto/entities";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -92,20 +93,22 @@ export function ChatSidebar(props: {
       {props.selectedIds.length ? (
         <div className="mx-1 mb-2 flex items-center gap-2 rounded-lg bg-charcoal-card px-2 py-1.5">
           <span className="text-xs">{props.selectedIds.length} selected</span>
-          <button
-            type="button"
-            className="ml-auto rounded px-2 py-1 text-xs hover:bg-charcoal-hover"
+          <Button
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
             onClick={() => props.onDeleteMany(props.selectedIds)}
           >
             Delete
-          </button>
-          <button
-            type="button"
-            className="rounded px-2 py-1 text-xs text-cream-muted hover:bg-charcoal-hover"
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-cream-muted"
             onClick={props.onClearSelection}
           >
             Clear
-          </button>
+          </Button>
         </div>
       ) : null}
       <Section

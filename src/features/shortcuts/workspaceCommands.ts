@@ -15,6 +15,14 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
+  command("workspace.new_space", "New Space", {
+    description: "Make a Space for another part of your life, with its own tabs and sign-ins.",
+    category: "Windows",
+    scope: "workspace",
+    aliases: ["create space", "add space", "profile"],
+    allowInEditable: true,
+    nativeMenu: true,
+  }),
   command("workspace.new_incognito_window", "New incognito window", {
     description:
       "Browse in this Space without saving history, cookies or site data. Its incognito windows share one session until the last one closes.",

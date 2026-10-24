@@ -27,7 +27,6 @@ export function AdvancedSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-
     </>
   );
 }

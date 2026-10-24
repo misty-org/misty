@@ -112,10 +112,19 @@ export interface AuthContextValue {
   setUser: (user: AuthUser | null) => Promise<void>;
   accounts: SavedAccountSession[];
   transitioning: boolean;
+  /** The server rejected the account's session. Browsing carries on; sync and agents wait
+   * until the person signs in again. */
+  sessionExpired: boolean;
+  /** Keys the app's page tree. It stays the same when signing in adopts the local profile or
+   * signing out returns to it, so the window keeps its pages; switching between two accounts
+   * changes it and starts the app over. */
+  outletKey: string;
   refreshUser: () => Promise<AuthUser | null>;
   authenticateAccount: (request: () => Promise<AuthUser>) => Promise<AuthUser>;
   switchAccount: (accountId: string) => Promise<void>;
   resumeAccount: (accountId: string) => Promise<void>;
   removeAccount: (accountId: string) => Promise<void>;
-  logout: () => Promise<void>;
+  /** Signs out and keeps browsing on the local profile; `removeData` erases this device's
+   * browsing data instead of keeping it. */
+  logout: (options?: { removeData?: boolean }) => Promise<void>;
 }

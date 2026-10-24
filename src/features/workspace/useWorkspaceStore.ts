@@ -186,6 +186,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 );
 
 export {
+  adoptAccountWorkspace,
+  liveWorkspace,
   saveAccountWorkspace,
   restoreAccountWorkspace,
   removeAccountWorkspace,

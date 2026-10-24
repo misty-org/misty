@@ -1,48 +1,34 @@
 import { admissionInput } from "../src/admission-input.js";
 import { type ModelMessage } from "ai";
-import { FatalError, getWorkflowMetadata, sleep } from "workflow";
+import { FatalError } from "workflow";
 import { browserReinspectionInstruction } from "../src/browser-reinspection.js";
 import { summarizeOlderSteps } from "../src/context/compaction-step.js";
 import { closingAnswer } from "../src/closing-answer.js";
-import { DocumentIds } from "../src/document-ids.js";
 import { contextWindow, messageBytes } from "../src/context/context-compaction.js";
 import { condense, oldToolResults, periodicSummary, staleSnapshots, SUMMARY_EVERY_TURNS, summarizedSteps, workingSet } from "../src/context/condenser.js";
-import type { RuntimeIdentity } from "../src/control-plane.js";
-import { activateRuntime, admitModelTurn, checkpoint, complete, fetchContext, fetchExecutionBudget, takeSteering } from "../src/control-plane-steps.js";
-import { MISTY_HARNESS_VERSION, type HarnessCompletion, type HarnessExecution } from "../src/harness.js";
+import { admitModelTurn, fetchExecutionBudget, takeSteering } from "../src/control-plane-steps.js";
+import type { HarnessCompletion } from "../src/harness.js";
 import { discoverRemoteMCPTools } from "../src/mcp-runtime.js";
-import { accumulateModelUsage, modelTimeout, modelTurnLimit } from "../src/model-budget.js";
+import { accumulateModelUsage, modelTurnLimit } from "../src/model-budget.js";
 import { initialMessages } from "../src/model-input.js";
-import { withCacheBreakpoint } from "../src/context/prompt-cache.js";
 import { runBrowserReplay, validReplay } from "../src/browser-replay.js";
-import { classifyRuntimeError, providerOutage } from "../src/runtime-errors.js";
+import { classifyRuntimeError } from "../src/runtime-errors.js";
 import { serialToolLifecycle } from "../src/serial-tool-lifecycle.js";
 import { screenJoined } from "../src/screen-session.js";
 import { Ledger, ledgerFromPrompt } from "../src/ledger.js";
 import { ledgerNote, requirementsLedger, worthLedger } from "../src/requirements-review.js";
 import { contextParts } from "../src/context/working-set.js";
 import { finalTaskCompletion, finishMissingNote, isProgressNote, progressNoteNudge } from "../src/task-completion.js";
-import { runTeachTurn } from "../src/teach-turn.js";
-import { executeTool } from "../src/tool-calls.js";
-import { rejectedWithoutEffect } from "../src/tool-execution.js";
 import { toolState } from "../src/toolsets.js";
 import { finalText, incompleteToolResultText } from "../src/tool-outcomes.js";
-import type { SpaceTaskContext } from "../src/types.js";
 import type { AgentRun } from "./agent-run.js";
 import { verifyFinish } from "./finish-review.js";
+import { streamTurn } from "./model-stream.js";
 import { pushOpenedPages } from "./page-state.js";
 import { endRun } from "./run-ending.js";
+import { startRun, type SpaceTaskWorkflowInput } from "./run-start.js";
 import { assembleTools } from "./run-tools.js";
 import { logContextBreakdown, logToolChange, paceTurn, waitOutTakeover, type Pacing } from "./turn-pacing.js";
-
-/** How long a run waits out each provider outage before trying the same turn again. */
-const OUTAGE_WAITS = ["30s", "60s", "120s", "240s"] as const;
-
-interface SpaceTaskWorkflowInput {
-  adapterVersion?: typeof MISTY_HARNESS_VERSION;
-  mistyRunId: string;
-  controlPlaneURL: string;
-}
 
 /**
  * One durable agent run. The model sees every tool in the run's catalog under
@@ -53,46 +39,9 @@ const usageWrapUpInstruction = "Usage note from Misty: this account just reached
 
 export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
   "use workflow";
-  if (input.adapterVersion && input.adapterVersion !== MISTY_HARNESS_VERSION) throw new FatalError("harness_version_unavailable");
-  const identity: RuntimeIdentity = { mistyRunId: input.mistyRunId, runtimeRunId: getWorkflowMetadata().workflowRunId, controlPlaneURL: input.controlPlaneURL };
-  const rejected = new Set<string>();
-  const documents = new DocumentIds();
-  const execution: HarnessExecution = {
-    executeCapability: async (callId, name, value) => {
-      try {
-        const input = documents.repair(name, value);
-        const output = await executeTool(identity, callId, name, input);
-        documents.note(input, output);
-        return output;
-      } catch (error) {
-        if (rejectedWithoutEffect(error)) rejected.add(callId);
-        throw error;
-      }
-    },
-    checkpoint: (event) => checkpoint(identity, event),
-    complete: (result) => complete(identity, result),
-  };
-  await activateRuntime(identity);
-  let context: SpaceTaskContext;
-  try {
-    context = await fetchContext(identity);
-  } catch (error) {
-    const failure = classifyRuntimeError(error);
-    await execution.complete({ status: "failed", text: "", error_code: failure.code, error_message: failure.message });
-    throw error;
-  }
-  if (context.teach) {
-    // A lesson step: one streamed call, no tools (src/teach-turn.ts).
-    try {
-      const completion = await runTeachTurn(identity, context);
-      await execution.complete(completion);
-      return { mistyRunId: input.mistyRunId, text: completion.text, steps: 1, incomplete: completion.status !== "success" };
-    } catch (error) {
-      const failure = classifyRuntimeError(error);
-      await execution.complete({ status: "failed", text: "", error_code: failure.code, error_message: failure.message });
-      throw new FatalError(failure.message);
-    }
-  }
+  const started = await startRun(input);
+  if (started.kind === "done") return started.result;
+  const { identity, context, execution, rejected, documents } = started;
   const mcpCatalog = await discoverRemoteMCPTools(identity);
 
   const run = {
@@ -214,22 +163,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
         wrappingUp = true;
         messages.push({ role: "user", content: usageWrapUpInstruction });
       }
-      // A provider outage (src/runtime-errors.ts) is waited out, 30 s doubling to 4 min, and the
-      // same turn tried again; the wait doesn't spend the run's time. Anything else still fails.
-      const streamTurn = async () => {
-        for (let outage = 0; ; outage++) {
-          try {
-            return await run.tools.agent.stream({ messages: withCacheBreakpoint(messages, context.model_id), ...shared, timeout: modelTimeout(budget, Date.now()) });
-          } catch (error) {
-            if (outage >= OUTAGE_WAITS.length || run.hookFailure || !providerOutage(error)) throw error;
-            console.log(`[misty-agent-runtime] provider_outage ${JSON.stringify({ run: identity.mistyRunId, turn: modelTurn, wait: OUTAGE_WAITS[outage] })}`);
-            const waitStarted = Date.now();
-            await sleep(OUTAGE_WAITS[outage]!);
-            pacing.pausedMs += Date.now() - waitStarted;
-          }
-        }
-      };
-      const current = await streamTurn();
+      const current = await streamTurn(run, messages, shared, budget, pacing, modelTurn);
       if (run.hookFailure) throw run.hookFailure;
       lastInputTokens = current.steps.at(-1)?.usage?.inputTokens ?? 0;
       result = { ...current, steps: [...(result?.steps ?? []), ...current.steps], totalUsage: accumulateModelUsage(result?.totalUsage, current.totalUsage) };

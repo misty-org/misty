@@ -73,16 +73,15 @@ func (s *Server) mountRequestMiddleware() {
 	s.Router.Use(RequestObservabilityMiddleware)
 	s.Router.Use(middleware.Recoverer)
 	// The abuse guard runs first: a blocked caller is rejected before any
-	// routing or handler work. The API rate limiter separately throttles each
-	// route, and only requests that exceed the overall ceiling escalate to a
-	// persisted caller block.
+	// routing or handler work, and repeated per-route rejections escalate
+	// into a block through the shared guard.
 	// Blocks are persisted so a restart or a second instance still honours
 	// them; the per-request counters stay in memory for speed.
 	abuseGuard := api.NewAbuseGuard(api.DefaultAbusePolicy()).
 		WithStore(context.Background(), s.Database)
 	s.AbuseGuard = abuseGuard
 	s.Router.Use(abuseGuard.Middleware)
-	s.Router.Use(api.NewAPIRateLimiter().Middleware)
+	s.Router.Use(api.NewAPIRateLimiter().WithAbuseGuard(abuseGuard).Middleware)
 	s.Metrics = metrics.New()
 	s.registerDomainGauges(s.Metrics)
 	s.Router.Use(s.Metrics.Middleware)

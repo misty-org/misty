@@ -7,6 +7,11 @@ use tauri::{AppHandle, Manager, Webview};
 #[cfg(windows)]
 use super::native_input_windows as windows;
 
+#[cfg(windows)]
+mod windows_dispatch;
+#[cfg(windows)]
+use windows_dispatch::dispatch_windows;
+
 /// The modifiers that make a key a browser or system shortcut: Command on
 /// macOS; Control (and the Windows key) elsewhere.
 const COMMAND_MODIFIERS: &[&str] = if cfg!(target_os = "macos") {
@@ -256,166 +261,5 @@ pub(super) async fn dispatch(
     }
 }
 
-/// Windows: trusted input through the DevTools protocol, rechecked against
-/// the grant before it lands.
-#[cfg(windows)]
-async fn dispatch_windows(
-    app: &AppHandle,
-    webview: Webview,
-    request: &BrowserAgentExecuteRequest,
-    input: &Value,
-    origin: &str,
-    observed: &Value,
-    generation: u64,
-) -> Result<Value, String> {
-    validate(input)?;
-    let window = webview.window();
-    if !window.is_visible().unwrap_or(false) || window.is_minimized().unwrap_or(true) {
-        return Err("The granted browser must be visible before native input.".into());
-    }
-    let (width, height) = crate::infra::webview2::css_viewport(&webview)
-        .await
-        .map_err(String::from)?;
-    let observed_size = (
-        observed["viewport"]["width"].as_f64().unwrap_or(0.0),
-        observed["viewport"]["height"].as_f64().unwrap_or(0.0),
-    );
-    if (width - observed_size.0).abs() > 2.0 || (height - observed_size.1).abs() > 2.0 {
-        return Err("browser_snapshot_stale: browser viewport resized before native input".into());
-    }
-    let target = cursor_target(input);
-    if let Some(script) = cursor_script(input, &observed["viewport"]) {
-        // Let the user watch the cursor arrive before the input lands.
-        let _ = webview.eval(script);
-        tokio::time::sleep(std::time::Duration::from_millis(
-            super::page_agent::CURSOR_GLIDE_MS,
-        ))
-        .await;
-    }
-    let authorize: windows::Authorize = {
-        let app = app.clone();
-        let view = webview.clone();
-        let expected_origin = origin.to_owned();
-        let request = BrowserAgentExecuteRequest {
-            scope_id: request.scope_id.clone(),
-            agent_id: request.agent_id.clone(),
-            grant_id: request.grant_id.clone(),
-            operation: request.operation.clone(),
-            input: request.input.clone(),
-            site_blocks: request.site_blocks.clone(),
-            confirm_kinds: request.confirm_kinds.clone(),
-            grant_set: request.grant_set.clone(),
-        };
-        std::sync::Arc::new(move || {
-            authorize_native_input(&app, &view, &request, &expected_origin, generation)
-        })
-    };
-    let editable = observed["editable"].as_bool().unwrap_or(false);
-    let mut result = windows::act(&webview, authorize, input, (width, height), editable).await?;
-    if let (Some((x, y)), Some(object)) = (target, result.as_object_mut()) {
-        object.insert("cursor".into(), json!({"x": x, "y": y}));
-    }
-    Ok(result)
-}
-
-/// The agent still owns the task, the page has not navigated or changed since
-/// it was observed, and its origin is the one the agent saw.
-#[cfg(windows)]
-fn authorize_native_input(
-    app: &AppHandle,
-    view: &Webview,
-    request: &BrowserAgentExecuteRequest,
-    expected_origin: &str,
-    generation: u64,
-) -> Result<(), String> {
-    super::super::agents::workspace::authorize_scope(
-        app,
-        &request.scope_id,
-        &request.agent_id,
-        request.input["__mistyTaskId"].as_str().unwrap_or(""),
-    )?;
-    let state = app.state::<BrowserSessionState>();
-    let (id, _) = super::resolve_agent_webview(app, &state, request)?;
-    let current_generation = state
-        .sessions
-        .lock()
-        .map_err(|_| "Browser state unavailable")?
-        .get(&id)
-        .map(|session| session.snapshot_generation);
-    if current_generation != Some(generation) {
-        return Err(
-            "browser_snapshot_stale: browser navigated or observation changed before native input"
-                .into(),
-        );
-    }
-    if super::browser_page_origin(&view.url().map_err(|e| e.to_string())?) != expected_origin {
-        return Err("browser_snapshot_stale: browser origin changed before native input".into());
-    }
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_agent_cursor_follows_pointer_actions_only() {
-        let viewport = json!({"width": 1000, "height": 500});
-        let click = json!({"kind": "click", "x": 0.25, "y": 0.5});
-        assert_eq!(cursor_target(&click), Some((0.25, 0.5)));
-        assert!(cursor_script(&click, &viewport)
-            .unwrap()
-            .contains("move(250.0,250.0,{hold:true})"));
-        let drag = json!({"kind": "drag", "fromX": 0.1, "fromY": 0.2, "toX": 0.9, "toY": 0.8});
-        assert_eq!(cursor_target(&drag), Some((0.9, 0.8)));
-        assert!(cursor_script(&drag, &viewport)
-            .unwrap()
-            .contains("move(100.0,100.0,"));
-        for input in [
-            json!({"kind": "type", "text": "hi"}),
-            json!({"kind": "key", "key": "Enter"}),
-        ] {
-            assert_eq!(cursor_target(&input), None);
-            assert_eq!(cursor_script(&input, &viewport), None);
-        }
-        assert_eq!(cursor_script(&click, &json!({})), None);
-    }
-    #[test]
-    fn input_bounds_and_key_names_are_enforced() {
-        for input in [
-            json!({"kind":"drag","fromX":0.1,"fromY":0.2,"toX":0.8,"toY":0.9}),
-            json!({"kind":"key","key":"a","modifiers":["Meta"]}),
-            json!({"kind":"click","x":0.5,"y":0.5,"clickCount":2}),
-            json!({"kind":"type","text":"house"}),
-        ] {
-            assert!(validate(&input).is_ok());
-        }
-        // Control is the command key off macOS: the same limits apply.
-        #[cfg(not(target_os = "macos"))]
-        {
-            assert!(validate(&json!({"kind":"key","key":"a","modifiers":["Control"]})).is_ok());
-            assert!(
-                validate(&json!({"kind":"key","key":"z","modifiers":["Control","Shift"]})).is_ok()
-            );
-            for key in ["w", "l", "c", "v", "t", "n", "q"] {
-                assert!(
-                    validate(&json!({"kind":"key","key":key,"modifiers":["Control"]})).is_err()
-                );
-            }
-        }
-        for input in [
-            json!({"kind":"drag","fromX":0.1,"fromY":0.2,"toX":1.1,"toY":0.9}),
-            json!({"kind":"key","key":"Shell"}),
-            json!({"kind":"key","key":"q","modifiers":["Meta"]}),
-            json!({"kind":"key","key":"l","modifiers":["Meta"]}),
-            json!({"kind":"key","key":"c","modifiers":["Meta"]}),
-            json!({"kind":"key","key":"v","modifiers":["Meta"]}),
-            json!({"kind":"key","key":"x","modifiers":["Meta"]}),
-            json!({"kind":"key","key":"a","modifiers":["Unknown"]}),
-            json!({"kind":"click","x":0.5,"y":0.5,"clickCount":3}),
-            json!({"kind":"scroll","x":0.5,"y":0.5,"deltaX":0,"deltaY":2001}),
-        ] {
-            assert!(validate(&input).is_err());
-        }
-    }
-}
+mod tests;

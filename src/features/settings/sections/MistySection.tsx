@@ -11,16 +11,15 @@ import {
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import type { AiSurfaceId } from "@/features/ai-surface/types";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
 import { ChoiceControl, SwitchControl } from "../SettingsControls";
-import { settingsDisabledControlClass } from "../settingsConstants";
 import type { SettingsContentProps } from "../settingsTypes";
 import { MistyBriefingsSection } from "./MistyBriefingsSection";
+import { MistyRememberedSection } from "./MistyRememberedSection";
 import { defaultRecap, managedSurfaces } from "./mistySettingsConfig";
 
 export function MistySection(_props: SettingsContentProps & { page?: "misty" | "memory" }) {
@@ -196,59 +195,15 @@ export function MistySection(_props: SettingsContentProps & { page?: "misty" | "
 
       {memoryPage && (
         <>
-          <SettingsSectionBlock
-            title="Remembered details"
-            description={
-              "Misty starts with what you're looking at and the context you attach. Content from pages, mail, " +
-              "files, chat and extensions is treated as untrusted data and can't grant capabilities. " +
-              "Forgetting a detail removes it from future conversations."
+          <MistyRememberedSection
+            settings={settings}
+            working={working}
+            memories={memories}
+            onMemoryEnabledChange={(value) =>
+              void updateSettings(true, settings?.retention_days ?? 30, value)
             }
-          >
-            <SettingsRow
-              label="Remembered context"
-              description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
-              muted={!settings || !settings.enabled}
-            >
-              <SwitchControl
-                checked={settings?.memory_enabled ?? false}
-                disabled={!settings || working || !settings.enabled}
-                onChange={(value) =>
-                  void updateSettings(true, settings?.retention_days ?? 30, value)
-                }
-              />
-            </SettingsRow>
-            {memories.length === 0 ? (
-              <p className="py-2 text-[13px] text-cream-muted">
-                Misty remembers a detail only when you ask it to.
-              </p>
-            ) : (
-              memories.map((memory) => (
-                <SettingsRow
-                  key={memory.id}
-                  label={memory.content}
-                  description={`${
-                    memory.kind === "instruction"
-                      ? "Standing instruction"
-                      : memory.kind === "preference"
-                        ? "Preference"
-                        : "Detail"
-                  } · ${memory.space_id ? "used only in its Space" : "available across Misty"}`}
-                >
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className={settingsDisabledControlClass}
-                    disabled={working}
-                    aria-label={`Forget ${memory.content}`}
-                    onClick={() => void forgetMemory(memory.id)}
-                  >
-                    Forget
-                  </Button>
-                </SettingsRow>
-              ))
-            )}
-          </SettingsSectionBlock>
+            onForget={(memoryId) => void forgetMemory(memoryId)}
+          />
         </>
       )}
       {!memoryPage && (

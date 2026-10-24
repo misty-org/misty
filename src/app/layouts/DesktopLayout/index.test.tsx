@@ -16,7 +16,12 @@ vi.mock("@/features/auth", () => ({
     user: mocks.user,
     refreshUser: vi.fn().mockResolvedValue(mocks.user),
   }),
+  openSignInSheet: vi.fn(),
+  openSignOutSheet: vi.fn(),
+  SignInSheet: () => null,
+  SignOutSheet: () => null,
 }));
+vi.mock("@/features/passwords/DevicePasswordsMerge", () => ({ DevicePasswordsMerge: () => null }));
 
 vi.mock("@/features/workspace", () => ({
   useWindowDockingLayout: () => ({ navigation: "right", tabs: "left" }),

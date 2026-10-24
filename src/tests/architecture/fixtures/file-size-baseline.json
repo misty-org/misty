@@ -1,11 +1,6 @@
 {
-  "src-tauri/src/infra/website_data/cookie_store_macos.rs": 521,
-  "src-tauri/src/infra/browser_macos.rs": 555,
-  "src-tauri/src/infra/browser_sync/device_signin/mod.rs": 711,
-  "src-tauri/src/infra/cursor_companion/host/mod.rs": 572,
   "src/features/agents/companion/CursorCompanionController.test.tsx": 562,
   "src/features/auth/AuthContext.test.tsx": 715,
   "src/features/misty/globalMistyState.test.ts": 543,
-  "src/features/workspace/useWorkspaceStore.test.ts": 619,
-  "src-tauri/src/infra/browser/scripts/mod.rs": 537
+  "src/features/workspace/useWorkspaceStore.test.ts": 619
 }

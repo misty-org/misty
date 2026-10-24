@@ -1,4 +1,3 @@
-import { create } from "zustand";
 import { deploymentStorageKey, resolveApiBase } from "@/api/deployment/api";
 import { readApiSessionGeneration } from "@/api/client/session";
 import {
@@ -6,7 +5,6 @@ import {
   recoveryKey,
   registerRecoveryFlush,
   type NativeRecoveryStorage,
-  type RecoverySaveStatus,
 } from "@/features/browser-sync/recovery";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
@@ -15,37 +13,18 @@ import { workspaceStoreStorageKey, legacyWorkspaceCandidate } from "./workspaceR
 import { mergeRecoveredWorkspace } from "./mergeRecoveredWorkspace";
 import type { WorkspaceStore } from "./useWorkspaceStore";
 import { initialWorkspaceWindow } from "./windows";
-import { collectUnrestoredViews, type UnrestoredView } from "./workspaceMigrations";
+import { collectUnrestoredViews } from "./workspaceMigrations";
 import { SaveRetryBackoff } from "./saveRetryBackoff";
 import { spaceWindow } from "./spaceWindow";
 import type { WorkspaceLayout, WorkspaceScopeKey } from "./model";
+import { readRecoveredSpaceLayout } from "./recoveredSpaceLayout";
+import { spaceRecoveryKey, WorkspaceRecoveryWriter } from "./workspaceRecoveryWriter";
+import { closedRecoveryState, useWorkspaceRecoveryState } from "./workspaceRecoveryState";
 
-/** A window saves its tabs under the Space it shows. The personal Space keeps the record
- * from before Spaces had windows, so its tabs come back. */
-function spaceRecoveryKey(space: { personal: boolean; key: string }) {
-  return space.personal ? "workspace" : `workspace:space:${space.key}`;
-}
+export { useWorkspaceRecoveryState };
+
 /** The record this window opened with. */
 const key = spaceRecoveryKey(spaceWindow());
-const noSaves: RecoverySaveStatus = { pending: [], failed: [] };
-const closedRecoveryState = {
-  accountId: null,
-  ready: false,
-  usable: false,
-  issue: null,
-  saves: noSaves,
-  notRestored: [],
-};
-/** `issue` means this device cannot save at all. Per-item results live in
- * `saves` (waiting in the pending file, or refused) and `notRestored`. */
-export const useWorkspaceRecoveryState = create<{
-  accountId: string | null;
-  ready: boolean;
-  usable: boolean;
-  issue: string | null;
-  saves: RecoverySaveStatus;
-  notRestored: UnrestoredView[];
-}>(() => ({ ...closedRecoveryState }));
 let temporary:
   | {
       accountId: string;
@@ -129,46 +108,17 @@ export function continueWithTemporaryWorkspace(accountId: string, error: unknown
   useWorkspaceRecoveryState.setState({ accountId, usable: true, issue: failure(error) });
 }
 
-/** Snapshot at the end of a burst, not on every resize frame. The recovery store
- * retains the exact failed write for a retry before accepting the newest value. */
-class WorkspaceRecoveryWriter {
-  private timer?: ReturnType<typeof setTimeout>;
-  private since?: number;
-  constructor(
-    private storage: NativeRecoveryStorage,
-    private capture: () => string,
-    private failed: (error: unknown) => void,
-    private saved: () => void = () => undefined,
-  ) {}
-  changed() {
-    this.since ??= Date.now();
-    clearTimeout(this.timer);
-    this.timer = setTimeout(
-      () => {
-        void this.flush().then(this.saved, this.failed);
-      },
-      Math.max(0, Math.min(400, 2000 - (Date.now() - this.since))),
-    );
-  }
-  /** `retry` also re-attempts saves native refused before; background saves
-   * leave those alone until their value changes. */
-  async flush(retry = false) {
-    this.cancel();
-    this.storage.setItem(spaceRecoveryKey(spaceWindow()), this.capture());
-    await (retry ? this.storage.retry() : this.storage.flush());
-  }
-  cancel() {
-    clearTimeout(this.timer);
-    this.timer = undefined;
-    this.since = undefined;
-  }
-}
-
-export function restoreNativeWorkspace(accountId: string): Promise<void> {
+/**
+ * Opens a profile's saved windows and tabs. `keepLive` keeps what the window shows now and
+ * saves it as that profile's instead: signing in adopts the local profile's tabs, and signing
+ * out hands them back (docs/design/no-account-browsing/BRIEF.md). A record the profile had
+ * is archived first, never lost.
+ */
+export function restoreNativeWorkspace(accountId: string, keepLive = false): Promise<void> {
   if (owner?.accountId === accountId) return owner.flush();
   const generation = readApiSessionGeneration();
   if (opening?.accountId === accountId && opening.generation === generation) return opening.task;
-  const task = restore(accountId, generation);
+  const task = restore(accountId, generation, keepLive);
   opening = { accountId, generation, task };
   void task
     .finally(() => {
@@ -177,7 +127,7 @@ export function restoreNativeWorkspace(accountId: string): Promise<void> {
     .catch(() => undefined);
   return task;
 }
-async function restore(accountId: string, generation: number) {
+async function restore(accountId: string, generation: number, keepLive: boolean) {
   if (owner) throw new Error("Save and close the previous workspace before changing accounts.");
   if (temporary && temporary.accountId !== accountId)
     throw new Error("Save and close the previous workspace before changing accounts.");
@@ -260,7 +210,13 @@ async function restore(accountId: string, generation: number) {
       });
     }
     if (!valid()) return;
-    if (temporary?.accountId === accountId) {
+    if (keepLive) {
+      // The live windows and tabs become this profile's; its old record stays archived above.
+      syncBaseline = undefined;
+      useWorkspaceRecoveryState.setState({ notRestored: [] });
+      temporary?.unregister();
+      temporary = undefined;
+    } else if (temporary?.accountId === accountId) {
       const live = useWorkspaceStore.getState();
       const changed =
         JSON.stringify(partialWorkspaceStore(live)) !== JSON.stringify(temporary.baseline);
@@ -342,25 +298,9 @@ async function restore(accountId: string, generation: number) {
  * The tabs a Space last had on this device, for a window switching to a Space it
  * hasn't shown yet. `undefined` when nothing was saved or recovery isn't open.
  */
-export async function recoveredSpaceLayout(
+export function recoveredSpaceLayout(
   space: { personal: boolean; key: string },
   scope: WorkspaceScopeKey,
 ): Promise<WorkspaceLayout | undefined> {
-  const storage = owner?.storage;
-  if (!storage) return undefined;
-  const record = spaceRecoveryKey(space);
-  try {
-    await storage.load(record);
-    const raw = storage.getItem(record);
-    if (raw === null) return undefined;
-    const parsed = JSON.parse(raw);
-    const envelope = typeof parsed?.version === "number" && parsed.state;
-    const state = migrateWorkspaceStore(
-      envelope ? parsed.state : parsed,
-      envelope ? parsed.version : 11,
-    );
-    return state.layoutsByScope?.[scope] ?? undefined;
-  } catch {
-    return undefined;
-  }
+  return readRecoveredSpaceLayout(owner?.storage, space, scope);
 }

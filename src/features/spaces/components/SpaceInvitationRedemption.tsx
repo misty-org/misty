@@ -1,8 +1,8 @@
 import { Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { useAuth } from "@/features/auth";
+import { openSignInSheet, useAuth } from "@/features/auth";
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitationPreview } from "@/api/spaces/dto/entities";
 import { Button, Card, Spinner } from "@/shared/ui";
@@ -17,7 +17,6 @@ export function SpaceInvitationRedemption() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
-  const returnPath = `/invite/${encodeURIComponent(token)}`;
 
   useEffect(() => {
     let active = true;
@@ -36,6 +35,12 @@ export function SpaceInvitationRedemption() {
       active = false;
     };
   }, [token]);
+
+  // An invite link is one of the few things that asks for an account: the sign-in sheet
+  // opens over the window, and the invitation waits here to be accepted after.
+  useEffect(() => {
+    if (!user) openSignInSheet("invite");
+  }, [user, token]);
 
   const join = async () => {
     if (!user || joining) return;
@@ -77,16 +82,9 @@ export function SpaceInvitationRedemption() {
                 <p className="m-0 text-xs text-cream-muted">Signed in as {user.email}</p>
               </div>
             ) : (
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <Button asChild>
-                  <Link to="/signin" state={{ from: returnPath }}>
-                    Sign in
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to="/register" state={{ from: returnPath }}>
-                    Create account
-                  </Link>
+              <div className="mt-5 grid gap-2">
+                <Button type="button" onClick={() => openSignInSheet("invite")}>
+                  Sign in to join
                 </Button>
               </div>
             )}

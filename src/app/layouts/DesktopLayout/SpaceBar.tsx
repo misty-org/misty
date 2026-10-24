@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useAuth } from "@/features/auth";
 import { SpaceRow } from "@/features/spaces";
 import {
   browserRuntimeResumeEvent,
@@ -40,7 +41,12 @@ export function SpaceBar(props: { gridColumn: number }) {
   const timer = useRef<number | undefined>(undefined);
   const revealedRef = useRef(false);
   const pointerInside = useRef(false);
-  const open = !autoHide || revealed;
+  const { user } = useAuth();
+  // Everything in the bar needs an account, so signed out it isn't drawn and the page takes
+  // its height; it slides in once someone signs in.
+  const signedIn = Boolean(user);
+  const edgeReveal = autoHide && signedIn;
+  const open = signedIn && (!autoHide || revealed);
   revealedRef.current = revealed;
 
   // The page grows to its tucked-away size while the bar waits to leave, so the strip it uncovers
@@ -97,7 +103,7 @@ export function SpaceBar(props: { gridColumn: number }) {
   }, [autoHide, cancelTimer]);
 
   useEffect(() => {
-    if (!autoHide) return;
+    if (!edgeReveal) return;
     const move = (x: number, y: number) => {
       const bounds = row.current?.getBoundingClientRect();
       if (!bounds) return;
@@ -150,7 +156,7 @@ export function SpaceBar(props: { gridColumn: number }) {
       setBrowserPointerTrackingEnabled(false);
       pointerInside.current = false;
     };
-  }, [autoHide, cancelTimer, hideSoon]);
+  }, [edgeReveal, cancelTimer, hideSoon]);
 
   // The bar's height is animated here, not by a CSS transition: at a constant speed, in whole
   // physical pixels. The native page follows the row a frame behind, and the gap it leaves is
@@ -213,10 +219,10 @@ export function SpaceBar(props: { gridColumn: number }) {
         height: open ? openHeight : closedHeight,
       }}
       data-space-bar={open ? "open" : "hidden"}
-      onFocusCapture={autoHide ? reveal : undefined}
-      onBlurCapture={autoHide ? hideSoon : undefined}
+      onFocusCapture={edgeReveal ? reveal : undefined}
+      onBlurCapture={edgeReveal ? hideSoon : undefined}
     >
-      {autoHide ? (
+      {edgeReveal ? (
         // The handle lies over the page's top margin, above the page panel and the sidebar's
         // drag band. It stays mounted, fading out while the bar is out, so nothing pops in over
         // the bar as it slides away; it moves the window like the band beneath it.
@@ -249,7 +255,7 @@ export function SpaceBar(props: { gridColumn: number }) {
           // strip does; the buttons inside keep their own presses.
           data-misty-window-titlebar-region="true"
         >
-          <SpaceRow alignment={alignment} />
+          {signedIn ? <SpaceRow alignment={alignment} /> : null}
         </div>
       </div>
     </div>

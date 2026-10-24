@@ -1,4 +1,4 @@
-import { useAuth } from "@/features/auth";
+import { openSignInSheet, useAuth } from "@/features/auth";
 import { Button, EmptyState, PermissionState } from "@/shared/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -107,7 +107,11 @@ export function SpaceSectionView(props: {
         action={
           <Button
             type="button"
-            onClick={() => navigate("/signin", { state: { from: returnPath } })}
+            onClick={() =>
+              accounts.length > 0
+                ? navigate("/signin", { state: { from: returnPath } })
+                : openSignInSheet("space")
+            }
           >
             {accounts.length > 0 ? "Switch account" : "Log in"}
           </Button>

@@ -13,11 +13,12 @@ import {
 } from "../components/DesktopSettingsUI";
 import { SettingsNote } from "../SettingsControls";
 
-/** Saved sign-ins, sealed in the sync vault. A password is read only when you ask for it. */
+/** Saved sign-ins, sealed in the sync vault, or in this device's local vault while nobody is
+ * signed in. A password is read only when you ask for it. */
 export function PasswordsSettings() {
   const { user } = useAuth();
   const sync = useSyncController(user?.id ?? "");
-  const unlocked = Boolean(sync.session);
+  const unlocked = !user || Boolean(sync.session);
   const [logins, setLogins] = useState<SavedLogin[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);

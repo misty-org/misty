@@ -9,6 +9,9 @@ use tauri::{
 #[cfg(target_os = "macos")]
 use super::shortcuts::ShortcutsSnapshot;
 
+mod items;
+use items::command_item;
+
 pub const SHORTCUT_MENU_PREFIX: &str = "shortcut.";
 pub const SHORTCUT_MENU_EVENT: &str = "misty://shortcut-command";
 /// Menu items that open a Space's window: `space.open.<key>`.
@@ -119,6 +122,22 @@ pub fn refresh(app: &AppHandle, snapshot: &ShortcutsSnapshot) -> tauri::Result<(
     Ok(())
 }
 
+/// A menu item for a renderer command that has no keyboard shortcut.
+#[cfg(target_os = "macos")]
+fn plain_command_item<R: Runtime>(
+    manager: &AppHandle<R>,
+    command_id: &str,
+    label: &str,
+) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(
+        manager,
+        format!("{SHORTCUT_MENU_PREFIX}{command_id}"),
+        label,
+        true,
+        None::<&str>,
+    )
+}
+
 #[cfg(target_os = "macos")]
 fn build_menu<R: Runtime>(
     manager: &AppHandle<R>,
@@ -149,6 +168,10 @@ fn build_menu<R: Runtime>(
                 "Settings…",
                 "Cmd+Comma",
             )?,
+            &PredefinedMenuItem::separator(manager)?,
+            // Misty works without an account; these are the only way in or out from the menu.
+            &plain_command_item(manager, "account.sign_in", "Sign In…")?,
+            &plain_command_item(manager, "account.sign_out", "Sign Out…")?,
             &PredefinedMenuItem::separator(manager)?,
             &PredefinedMenuItem::services(manager, None)?,
             &PredefinedMenuItem::separator(manager)?,
@@ -211,6 +234,7 @@ fn build_menu<R: Runtime>(
                 "Open Space…",
                 "Cmd+Shift+N",
             )?,
+            &plain_command_item(manager, "workspace.new_space", "New Space…")?,
             &command_item(
                 manager,
                 snapshot,
@@ -265,103 +289,6 @@ fn build_menu<R: Runtime>(
     Menu::with_items(manager, &[&application, &edit, &view, &window])
 }
 
-#[cfg(target_os = "macos")]
-fn command_item<R: Runtime, M: Manager<R>>(
-    manager: &M,
-    snapshot: Option<&ShortcutsSnapshot>,
-    command_id: &str,
-    label: &str,
-    default: &str,
-) -> tauri::Result<MenuItem<R>> {
-    // These global shortcuts intentionally overlap focused-tool commands
-    // (Code uses Cmd+K for Inline AI and Cmd+Shift+P for its command palette).
-    // Giving AppKit ownership of the accelerators would bypass the renderer's
-    // scope-aware dispatcher and always run the global command. Keep the menu
-    // items clickable, but let the renderer/browser forwarding layer own the
-    // keystrokes so the focused tool can shadow them correctly.
-    let accelerator = (!renderer_owned_accelerator(command_id))
-        .then(|| effective_primary(snapshot, command_id, default))
-        .flatten()
-        .map(|binding| native_accelerator(&binding));
-    let item = MenuItem::with_id(
-        manager,
-        format!("{SHORTCUT_MENU_PREFIX}{command_id}"),
-        label,
-        true,
-        accelerator.as_deref(),
-    );
-    if item.is_err() && accelerator.is_some() {
-        return MenuItem::with_id(
-            manager,
-            format!("{SHORTCUT_MENU_PREFIX}{command_id}"),
-            label,
-            true,
-            None::<&str>,
-        );
-    }
-    item
-}
-
-fn renderer_owned_accelerator(command_id: &str) -> bool {
-    matches!(
-        command_id,
-        "search.toggle" | "app.command_palette" | "app.zoom_in" | "app.zoom_out" | "app.zoom_reset"
-    )
-}
-
-#[cfg(target_os = "macos")]
-fn native_accelerator(binding: &str) -> String {
-    let mut tokens = binding
-        .split('+')
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    match tokens.last().map(String::as_str) {
-        Some("LeftBracket") => {
-            *tokens.last_mut().expect("accelerator always has a key") = "BracketLeft".to_owned()
-        }
-        Some("RightBracket") => {
-            *tokens.last_mut().expect("accelerator always has a key") = "BracketRight".to_owned()
-        }
-        Some("Plus") => {
-            *tokens.last_mut().expect("accelerator always has a key") = "Equal".to_owned();
-            if !tokens
-                .iter()
-                .any(|token| token.eq_ignore_ascii_case("shift"))
-            {
-                let key = tokens.pop().expect("accelerator always has a key");
-                tokens.push("Shift".to_owned());
-                tokens.push(key);
-            }
-        }
-        Some("Grave") => {
-            *tokens.last_mut().expect("accelerator always has a key") = "Backquote".to_owned()
-        }
-        _ => {}
-    }
-    tokens.join("+")
-}
-
-#[cfg(target_os = "macos")]
-fn effective_primary(
-    snapshot: Option<&ShortcutsSnapshot>,
-    command_id: &str,
-    default: &str,
-) -> Option<String> {
-    let Some(entry) = snapshot.and_then(|snapshot| {
-        snapshot
-            .overrides
-            .iter()
-            .find(|entry| entry.command_id == command_id)
-    }) else {
-        return Some(default.to_owned());
-    };
-    match &entry.primary {
-        None => Some(default.to_owned()),
-        Some(None) => None,
-        Some(Some(value)) => Some(value.clone()),
-    }
-}
-
 /// Forwards native menu choices to the central renderer dispatcher.
 #[cfg(target_os = "macos")]
 pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
@@ -377,34 +304,4 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) -> bool {
     // A menu choice acts in the window the person used last, incognito included.
     space_windows::emit_to_focused(app, SHORTCUT_MENU_EVENT, command_id);
     true
-}
-
-#[cfg(all(test, target_os = "macos"))]
-mod tests {
-    use super::native_accelerator;
-
-    #[test]
-    fn canonical_shortcut_keys_are_translated_for_muda() {
-        assert_eq!(native_accelerator("Cmd+Plus"), "Cmd+Shift+Equal");
-        assert_eq!(native_accelerator("Cmd+Grave"), "Cmd+Backquote");
-        assert_eq!(
-            native_accelerator("Cmd+Shift+RightBracket"),
-            "Cmd+Shift+BracketRight"
-        );
-    }
-}
-
-#[cfg(test)]
-mod renderer_accelerator_tests {
-    use super::renderer_owned_accelerator;
-
-    #[test]
-    fn contextual_shortcuts_stay_owned_by_the_renderer() {
-        assert!(renderer_owned_accelerator("search.toggle"));
-        assert!(renderer_owned_accelerator("app.command_palette"));
-        assert!(renderer_owned_accelerator("app.zoom_in"));
-        assert!(renderer_owned_accelerator("app.zoom_out"));
-        assert!(renderer_owned_accelerator("app.zoom_reset"));
-        assert!(!renderer_owned_accelerator("app.open_settings"));
-    }
 }

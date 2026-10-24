@@ -4,9 +4,7 @@ import { blockIfUnsaved, useSettingsStore, type SettingsSection } from "@/featur
 import { useCallback, useEffect, useState } from "react";
 
 /** Settings overlay open state, its window events and the account hand-off. */
-export function useSettingsOverlay(options: {
-  refreshUser: () => Promise<unknown>;
-}) {
+export function useSettingsOverlay(options: { refreshUser: () => Promise<unknown> }) {
   const { refreshUser } = options;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const refreshUserAfterSettings = useCallback(() => {

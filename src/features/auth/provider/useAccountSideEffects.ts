@@ -1,10 +1,10 @@
 import { apiSessionInvalidEvent, readApiAuthToken } from "@/api/client/session";
-import { restoreAccountWorkspace } from "@/features/workspace";
+import { isLocalProfile, profileIdFor, restoreAccountWorkspace } from "@/features/workspace";
 import { continueWithTemporaryWorkspace } from "@/features/workspace/nativeWorkspaceRecovery";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { analytics } from "@/telemetry/client";
 import { TelemetryIdentityManager } from "@/telemetry/identity";
-import { setAnalyticsAuthenticationState } from "@/telemetry/lifecycle";
+import { setAnalyticsAuthenticationState, setTelemetryAccountPresent } from "@/telemetry/lifecycle";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   assertAccountIdentity,
@@ -14,7 +14,6 @@ import {
   writeStoredUser,
   type AuthUser,
 } from "../authSession";
-import { restoreSavedSession } from "../sessionRecovery";
 import { accountFetchMe } from "../store/useAccountStore";
 import {
   listSavedAccountSessions,
@@ -23,29 +22,27 @@ import {
 } from "../store/useAuthTokenStore";
 import { useUserStore } from "../store/useUserStore";
 import type { AccountOperation, AccountStateSetters, SetAccounts } from "./providerTypes";
-import type { useDeactivateToChooser } from "./useDeactivateToChooser";
 
-type DeactivateToChooser = ReturnType<typeof useDeactivateToChooser>;
-
-/** Restores the native account workspace for the active account on launch. */
+/** Restores the native workspace on launch: the active account's, or the local profile's
+ * while nobody is signed in. */
 export function useNativeWorkspaceRecovery(
   activeUserId: string | undefined,
   accountOperationActive: MutableRefObject<boolean>,
 ) {
   useEffect(() => {
-    if (!nativeWorkspaceRecoveryEnabled() || !activeUserId || accountOperationActive.current)
-      return;
-    const accountId = activeUserId;
+    if (!nativeWorkspaceRecoveryEnabled() || accountOperationActive.current) return;
+    const profileId = profileIdFor(activeUserId);
     let canceled = false;
     void (async () => {
       // This restores the OS-held account cookies without requiring a network
       // response. Local layout recovery also works while sync is locked/offline.
-      await readApiAuthToken();
+      // The local profile has no account cookies.
+      if (!isLocalProfile(profileId)) await readApiAuthToken();
       if (canceled || accountOperationActive.current) return;
-      await restoreAccountWorkspace(accountId);
+      await restoreAccountWorkspace(profileId);
     })().catch((error) => {
       if (!canceled && !accountOperationActive.current)
-        continueWithTemporaryWorkspace(accountId, error);
+        continueWithTemporaryWorkspace(profileId, error);
     });
     return () => {
       canceled = true;
@@ -57,6 +54,8 @@ export function useNativeWorkspaceRecovery(
 export function useTelemetryIdentitySync(activeUser: AuthUser | null) {
   const verifiedAccountId = useUserStore((state) => state.me?.id);
   const [telemetryIdentity] = useState(() => new TelemetryIdentityManager(analytics));
+  // Without an account nothing is sent at all.
+  useEffect(() => setTelemetryAccountPresent(Boolean(activeUser)), [activeUser]);
   useEffect(() => {
     // Saved display metadata is not proof that the new server cookies work.
     // Wait for /me before issuing authenticated telemetry requests.
@@ -90,12 +89,13 @@ export function useSavedAccountListSync(activeUser: AuthUser | null, setAccounts
   }, [activeUser, setAccounts]);
 }
 
-/** Verifies the restored identity against /me once, signing out to the chooser if its token is dead. */
+/** Verifies the restored identity against /me once. A dead token no longer signs anyone
+ * out: browsing carries on, and the account asks to be signed in again. */
 export function useStartupSessionValidation(
   activeUser: AuthUser | null,
-  { accountOperationActive, beginAccountOperation, finishAccountOperation }: AccountOperation,
-  { setUserState, setAccounts }: AccountStateSetters,
-  deactivateToChooser: DeactivateToChooser,
+  { accountOperationActive }: AccountOperation,
+  { setUserState }: AccountStateSetters,
+  markSessionExpired: () => void,
 ) {
   const startupValidationCompleted = useRef(false);
   useEffect(() => {
@@ -127,21 +127,10 @@ export function useStartupSessionValidation(
           return;
         }
         startupValidationCompleted.current = true;
-        beginAccountOperation();
-        try {
-          // The restored account's token is no longer valid. Rather than silently
-          // switching to a different saved account, send the user to the chooser
-          // where they can pick another account or re-sign-in to this one.
-          await deactivateToChooser();
-        } catch {
-          // A transient persistence failure must not strand the user; keep the
-          // account active so the next launch can retry validation.
-          await restoreSavedSession(activeUser.id);
-          setUserState(activeUser);
-          setAccounts(listSavedAccountSessions());
-        } finally {
-          finishAccountOperation();
-        }
+        // The restored account's token is no longer valid. Rather than signing out or
+        // switching to another saved account, keep the window as it is; the account row
+        // offers to sign in again.
+        markSessionExpired();
       }
     })();
     return () => {
@@ -149,25 +138,18 @@ export function useStartupSessionValidation(
     };
     // Validate only the first restored identity. Sign-in and account switching
     // already fetch /me before setting the user.
-  }, [
-    activeUser,
-    accountOperationActive,
-    beginAccountOperation,
-    finishAccountOperation,
-    deactivateToChooser,
-    setUserState,
-    setAccounts,
-  ]);
+  }, [activeUser, accountOperationActive, markSessionExpired, setUserState]);
 }
 
-/** On any API 401, re-checks /me and signs out to the chooser only if the session is truly invalid. */
+/** On any API 401, re-checks /me and marks the session expired only if it truly is. */
 export function useInvalidSessionHandling(
   activeUser: AuthUser | null,
-  { accountOperationActive, beginAccountOperation, finishAccountOperation }: AccountOperation,
-  deactivateToChooser: DeactivateToChooser,
+  sessionExpired: boolean,
+  { accountOperationActive }: AccountOperation,
+  markSessionExpired: () => void,
 ) {
   useEffect(() => {
-    if (!activeUser) return;
+    if (!activeUser || sessionExpired) return;
     let canceled = false;
     let validating = false;
     const handleInvalidSession = () => {
@@ -176,7 +158,7 @@ export function useInvalidSessionHandling(
       const generation = readAccountSessionGeneration();
       // A delayed or resource-specific 401 is not proof that the current
       // account is signed out. Coalesce failures and validate before changing
-      // identity or navigating; /me can itself emit this event.
+      // anything; /me can itself emit this event.
       void (async () => {
         try {
           const me = await accountFetchMe();
@@ -190,13 +172,8 @@ export function useInvalidSessionHandling(
             !isInvalidAccountSessionError(error)
           )
             return;
-          beginAccountOperation();
-          try {
-            await deactivateToChooser();
-          } finally {
-            // Deactivation cleans up this effect; still release the transition.
-            finishAccountOperation();
-          }
+          // Browsing carries on; sync and agents wait until the person signs in again.
+          markSessionExpired();
         } finally {
           validating = false;
         }
@@ -207,11 +184,5 @@ export function useInvalidSessionHandling(
       canceled = true;
       window.removeEventListener(apiSessionInvalidEvent, handleInvalidSession);
     };
-  }, [
-    activeUser,
-    accountOperationActive,
-    beginAccountOperation,
-    deactivateToChooser,
-    finishAccountOperation,
-  ]);
+  }, [activeUser, sessionExpired, accountOperationActive, markSessionExpired]);
 }

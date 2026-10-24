@@ -2,7 +2,7 @@
 
 The one place for where Misty is going and what's being built. Decided
 2026-10-11. Pricing (plans and meters) lives in the billing repo
-(`misty-billing`, `docs/pricing-v2.md`). Competitor facts and parity IDs C1–C15
+(`misty-billing`, `docs/pricing-v2.md`). Competitor facts and parity IDs C1–C18
 are in [ai-browser-comparison.md](ai-browser-comparison.md). Everything else here supersedes earlier direction notes.
 
 ## Where Misty stands
@@ -24,6 +24,11 @@ major model built in.
 
 ## Decisions
 - **Consumer only.** No team plans, no enterprise (SOC 2, SSO, SCIM, MDM).
+- **Open-source desktop app (2026-10-23).** The browser is published as open
+  source to earn the trust Zen, Helium and Brave have. Sync, the agent runtime
+  and Spaces stay proprietary, as do the server and billing. Spaces are the
+  lead against Arc's and Zen's tab sets. Parity C16 (browse with no account),
+  C17 (the split and the license) and C18 (Arc import before 2026-12-22).
 - **Pricing as in pricing-v2 (billing repo):** Basic free, Pro $12, Max $20, Ultra $100,
   Ultra+ $200. No top-ups.
 - **No bring-your-own-AI.** Every model runs on Misty's keys through the

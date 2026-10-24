@@ -64,8 +64,8 @@ export function RootLayout(props: {
   );
 }
 function AuthenticatedTreeOutlet() {
-  const { user } = useAuth();
-  return <Outlet key={user?.id ?? "anonymous"} />;
+  const { outletKey } = useAuth();
+  return <Outlet key={outletKey} />;
 }
 function AppZoomIndicator(props: { visible: boolean; percent: number }) {
   return (

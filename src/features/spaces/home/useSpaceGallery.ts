@@ -45,17 +45,19 @@ export function useSpaceGallery(
     }
     const controller = new AbortController();
     void Promise.allSettled([
-      spacesApi
-        .conversations(spaceId)
-        .then((r) =>
-          r.conversations.map((conversation) => ({
-            ...chatItem(spaceId, conversation, me),
-            ...(isSpaceOwner ||
-            conversation.created_by_user_id === me ||
-            conversation.kind === "direct"
-              ? { remove: () => spacesApi.deleteOrClearConversation(spaceId, conversation.id), removeLabel: "Delete" }
-              : {}),
-          }))),
+      spacesApi.conversations(spaceId).then((r) =>
+        r.conversations.map((conversation) => ({
+          ...chatItem(spaceId, conversation, me),
+          ...(isSpaceOwner ||
+          conversation.created_by_user_id === me ||
+          conversation.kind === "direct"
+            ? {
+                remove: () => spacesApi.deleteOrClearConversation(spaceId, conversation.id),
+                removeLabel: "Delete",
+              }
+            : {}),
+        })),
+      ),
       notesApi.list(spaceId).then((r) =>
         r.notes.map((note) => ({
           ...noteItem(spaceId, note),
@@ -64,38 +66,37 @@ export function useSpaceGallery(
             : {}),
         })),
       ),
-      drawingsApi
-        .list(spaceId)
-        .then((r) =>
-          r.drawings
-            .filter((drawing) => drawing.lifecycle_state === "active")
-            .map((drawing) => ({
-              ...drawingItem(spaceId, drawing),
-              ...(drawing.can_delete
-                ? { remove: () => drawingsApi.remove(spaceId, drawing.id), removeLabel: "Delete" }
-                : {}),
-            })),
-        ),
+      drawingsApi.list(spaceId).then((r) =>
+        r.drawings
+          .filter((drawing) => drawing.lifecycle_state === "active")
+          .map((drawing) => ({
+            ...drawingItem(spaceId, drawing),
+            ...(drawing.can_delete
+              ? { remove: () => drawingsApi.remove(spaceId, drawing.id), removeLabel: "Delete" }
+              : {}),
+          })),
+      ),
       spacesApi
         .libraryItems(spaceId, { limit: FILE_LIMIT, sort: "recently-added", direction: "desc" })
         .then((r) =>
           r.items.map((item) => ({
             ...libraryGalleryItem(spaceId, item),
             ...(canEditLibrary
-              ? { remove: () => spacesApi.trashLibraryItem(spaceId, item.id), removeLabel: "Move to Trash" }
+              ? {
+                  remove: () => spacesApi.trashLibraryItem(spaceId, item.id),
+                  removeLabel: "Move to Trash",
+                }
               : {}),
           })),
         ),
-      codeProjectsApi
-        .list(spaceId, controller.signal)
-        .then((r) =>
-          r.projects.map((project) => ({
-            ...codeItem(spaceId, project),
-            ...(isSpaceOwner || project.owner_user_id === me
-              ? { remove: () => codeProjectsApi.unlink(spaceId, project.id), removeLabel: "Unlink" }
-              : {}),
-          })),
-        ),
+      codeProjectsApi.list(spaceId, controller.signal).then((r) =>
+        r.projects.map((project) => ({
+          ...codeItem(spaceId, project),
+          ...(isSpaceOwner || project.owner_user_id === me
+            ? { remove: () => codeProjectsApi.unlink(spaceId, project.id), removeLabel: "Unlink" }
+            : {}),
+        })),
+      ),
     ]).then((results) => {
       if (!live) return;
       const names = ["chats", "notes", "drawings", "files", "code projects"];

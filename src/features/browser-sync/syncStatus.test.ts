@@ -3,6 +3,7 @@ import { selectSyncStatus, syncIssues, type SyncStatusInput } from "./syncStatus
 import { syncSession } from "./syncStatus.testFixtures";
 const base: SyncStatusInput = {
   accountId: "a",
+  desktop: true,
   session: syncSession(),
   recovery: { accountId: "a", ready: true, issue: null },
 };

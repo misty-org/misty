@@ -14,7 +14,6 @@ use aes_gcm::{
     Aes256Gcm, KeyInit, Nonce,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -29,53 +28,8 @@ use super::{
 };
 use misty_browser_sync::crypto::VaultRoot;
 
-/// Six digits over the whole exchange, shown on both devices.
-pub(crate) fn comparison_code(transcript: &[u8]) -> String {
-    let digest = Sha256::digest(transcript);
-    let value = u32::from_be_bytes([digest[0], digest[1], digest[2], digest[3]]) % 1_000_000;
-    format!("{value:06}")
-}
-
-pub(crate) fn transcript(
-    account_id: &str,
-    request_id: &str,
-    request_payload: &str,
-    approver_x25519: &str,
-    approver_nonce: &str,
-    requester_nonce: &str,
-) -> Vec<u8> {
-    serde_json::to_vec(&(
-        "misty.device.sas.v1",
-        account_id,
-        request_id,
-        request_payload,
-        approver_x25519,
-        approver_nonce,
-        requester_nonce,
-    ))
-    .unwrap_or_default()
-}
-
-pub(crate) fn seal_key(
-    secret: &StaticSecret,
-    peer_public: &[u8; 32],
-    transcript: &[u8],
-) -> Zeroizing<[u8; 32]> {
-    let shared = Zeroizing::new(
-        secret
-            .diffie_hellman(&XPublic::from(*peer_public))
-            .to_bytes(),
-    );
-    let mut key = Zeroizing::new([0u8; 32]);
-    let salt = Sha256::digest(transcript);
-    let _ = Hkdf::<Sha256>::new(Some(&salt), shared.as_ref())
-        .expand(b"misty.device.root-seal.v1", key.as_mut());
-    key
-}
-
-pub(crate) fn decode32(value: &str) -> Option<[u8; 32]> {
-    STANDARD.decode(value).ok()?.try_into().ok()
-}
+mod exchange;
+pub(crate) use exchange::{comparison_code, decode32, seal_key, transcript};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -326,47 +280,4 @@ pub(crate) fn forget_request(request_id: &str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn both_devices_derive_the_same_code_and_seal_key_from_one_exchange() {
-        let requester = StaticSecret::from(random32());
-        let approver = StaticSecret::from(random32());
-        let requester_public = *XPublic::from(&requester).as_bytes();
-        let approver_public = *XPublic::from(&approver).as_bytes();
-        let script = transcript(
-            "acct",
-            "admission_1",
-            "payload",
-            &STANDARD.encode(approver_public),
-            "a",
-            "r",
-        );
-        assert_eq!(
-            seal_key(&approver, &requester_public, &script).as_ref(),
-            seal_key(&requester, &approver_public, &script).as_ref()
-        );
-        let code = comparison_code(&script);
-        assert_eq!(code.len(), 6);
-        assert!(code.bytes().all(|b| b.is_ascii_digit()));
-        // Any substituted part changes the code and the key.
-        let swapped = transcript(
-            "acct",
-            "admission_1",
-            "other payload",
-            &STANDARD.encode(approver_public),
-            "a",
-            "r",
-        );
-        assert_ne!(
-            seal_key(&approver, &requester_public, &script).as_ref(),
-            seal_key(&approver, &requester_public, &swapped).as_ref()
-        );
-        let intruder = StaticSecret::from(random32());
-        assert_ne!(
-            seal_key(&intruder, &requester_public, &script).as_ref(),
-            seal_key(&requester, &approver_public, &script).as_ref()
-        );
-    }
-}
+mod tests;

@@ -1,17 +1,15 @@
-import { SpaceChatPicker } from "@/features/chat-composer/SpaceChatPicker";
 import type { MistyPickerSource } from "@/features/picker";
 import { useAuth } from "@/features/auth";
 import { useNativeSessionStore } from "@/features/native-session";
 import { useSpaceChatDraft } from "@/features/chat-composer/useSpaceChatDraft";
 import { useWorkspaceViewTitle } from "@/features/workspace";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { conversationName } from "./sidebar/conversationGroups";
-import { ChatReadOnlyNotice } from "./components/ChatReadOnlyNotice";
-import { SpaceChatComposer } from "./components/SpaceChatComposer";
+import { SpaceChatComposerArea } from "./components/SpaceChatComposerArea";
 import { SpaceChatThread } from "./components/SpaceChatThread";
 import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
@@ -116,13 +114,6 @@ export function SpaceChat({
     canBrowseLibrary: access.canWriteMessages,
     openPicker,
   });
-  const mentionNames = useMemo(
-    () => [
-      ...scope.members.map((member) => member.name),
-      ...(agents ?? []).map((agent) => agent.agent_name),
-    ],
-    [agents, scope.members],
-  );
   const actions = useSpaceChatMessageActions({
     spaceId,
     conversationId,
@@ -257,44 +248,23 @@ export function SpaceChat({
           }}
         />
 
-        {access.canWriteMessages ? (
-          <SpaceChatComposer
-            draft={draft}
-            suggestions={suggestions}
-            input={input}
-            isConversation={Boolean(conversationId)}
-            canUploadAttachments={access.canWriteMessages}
-            canBrowseLibrary={access.canWriteMessages}
-            mentionNames={mentionNames}
-            typingLabel={typing.label}
-            onTypingInput={typing.onTextInput}
-            replyToSenderName={
-              scope.messages.find((item) => item.id === draft.replyToMessageId)?.sender_name ??
-              "message"
-            }
-            onSubmit={(event) => {
-              typing.stop();
-              void actions.submit(event);
-            }}
-            onOpenPicker={openPicker}
-          />
-        ) : (
-          <ChatReadOnlyNotice />
-        )}
-
-        {pickerOpen ? (
-          <SpaceChatPicker
-            spaceId={spaceId}
-            source={pickerSource}
-            selectedLibraryIds={draft.selectedLibraryIds}
-            pendingAttachmentCount={draft.pendingAttachments.length}
-            canBrowseLibrary={access.canWriteMessages}
-            canUploadAttachments={access.canWriteMessages}
-            onClose={() => setPickerOpen(false)}
-            onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
-            onChooseLibraryItems={draft.setSelectedLibraryIds}
-          />
-        ) : null}
+        <SpaceChatComposerArea
+          spaceId={spaceId}
+          canWrite={access.canWriteMessages}
+          isConversation={Boolean(conversationId)}
+          draft={draft}
+          suggestions={suggestions}
+          input={input}
+          typing={typing}
+          members={scope.members}
+          agents={agents}
+          messages={scope.messages}
+          pickerOpen={pickerOpen}
+          pickerSource={pickerSource}
+          onOpenPicker={openPicker}
+          onClosePicker={() => setPickerOpen(false)}
+          onSubmit={(event) => void actions.submit(event)}
+        />
 
         <DeleteMessageDialog
           open={Boolean(messageToDelete)}

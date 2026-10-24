@@ -3,7 +3,11 @@ import { runInNewContext } from 'node:vm';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const source = readFileSync(new URL('../../src-tauri/src/infra/browser/scripts/mod.rs', import.meta.url), 'utf8');
+const part = (name) => readFileSync(new URL(`../../src-tauri/src/infra/browser/scripts/${name}`, import.meta.url), 'utf8');
+// BROWSER_VIEWPORT_SCRIPT in browser/scripts/mod.rs, with its media and window-drag parts.
+const source = `\n${part('viewport.js')}`
+  .replace('__MISTY_MEDIA_PLACEHOLDER__', () => part('media.js'))
+  .replace('__MISTY_WINDOW_DRAG_PLACEHOLDER__', () => part('window_drag.js'));
 const handler = source.slice(source.indexOf('  const handleLinkClick ='), source.indexOf("  document.addEventListener('pointerover'"));
 
 function click(overrides = {}, target = '_blank', href = '/channels/server/thread') {
@@ -48,7 +52,7 @@ const sender = readFileSync(new URL('../../kiri/src/channel/macos.rs', import.me
 
 // The script as WebKit renders it: host messages use Kiri's captured native channel.
 function rendered(tracking) {
-  return source.match(/const BROWSER_VIEWPORT_SCRIPT: &str = r#"([\s\S]*?)"#;/)[1]
+  return source
     .replace('__KIRI_HOST_SENDER_PLACEHOLDER__', sender)
     .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
     .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')

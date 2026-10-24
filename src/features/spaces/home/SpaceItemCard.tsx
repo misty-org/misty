@@ -3,7 +3,7 @@ import { Pressable, TooltipHint, cn, itemToneClass } from "@/shared/ui";
 import type { ItemVisibility } from "@/api/spaces/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { editedLabel, type GalleryItem } from "./galleryItems";
-import { GalleryPreview, kindIcon } from "./galleryPreview";
+import { GalleryPreview, kindIcon } from "./GalleryPreview";
 import type { MouseEvent } from "react";
 
 /**

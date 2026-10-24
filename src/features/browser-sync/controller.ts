@@ -1,35 +1,8 @@
-import type { WorkspaceWindow } from "@/features/workspace/model";
-import { sameValue, workspaceChanges } from "./changes";
-import {
-  groupsSynced,
-  localGroups,
-  localSelection,
-  navigationRecords,
-  projectionContent,
-  type WorkspaceSource,
-} from "./controllerSnapshot";
-import type { EditJournal } from "./editJournal";
+import { sameValue } from "./changes";
+import { WorkspaceCapture, type Ports } from "./controllerCapture";
+import { groupsSynced, localGroups, localSelection, projectionContent } from "./controllerSnapshot";
 import { activeDeviceEpoch, type NativeSyncView } from "./native";
-import { recordChanges } from "./recordChanges";
-import type { SharedRecord, WorkspaceChange } from "./model";
 import { projectWorkspace } from "./projection";
-
-interface Ports {
-  source: WorkspaceSource;
-  journal: EditJournal;
-  read(): Promise<NativeSyncView | null>;
-  publish(
-    sessionId: string,
-    operationId: string,
-    changes: WorkspaceChange[],
-    activeEpoch: string,
-  ): Promise<string>;
-  state(view: NativeSyncView, preserveIssue?: boolean): void;
-  error(error: unknown): void;
-  locked?(): void;
-  closed?(): void;
-  captureDelayMs?: number;
-}
 
 /** A newly enrolled device has no document yet. Wait for authenticated replay
  * before treating an empty local snapshot as an empty remote workspace. Cached
@@ -46,27 +19,18 @@ export function canProjectWorkspace(view: NativeSyncView): boolean {
 
 /** One bridge per visible account. Native remains the durable authority; this
  * bridge captures user deltas and suppresses capture during incoming projection. */
-export class WorkspaceSyncController {
-  private active = true;
-  private applying = false;
+export class WorkspaceSyncController extends WorkspaceCapture {
   private running = false;
   private dirty = false;
-  private captureBlocked = false;
-  private previous: WorkspaceWindow[] = [];
-  private previousNavigation: SharedRecord[] = [];
   private unsubscribe: () => void;
-  private captureTimer?: ReturnType<typeof setTimeout>;
-  private captureDeadline?: ReturnType<typeof setTimeout>;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private failures = 0;
   /** An edit is on its way to native, so a failure now retries it. */
   private publishing = false;
   private projectedContent: unknown;
   private scheduled = false;
-  constructor(
-    private current: NativeSyncView,
-    private ports: Ports,
-  ) {
+  constructor(current: NativeSyncView, ports: Ports) {
+    super(current, ports);
     if (!canProjectWorkspace(current))
       throw new Error("Waiting for the server workspace before starting device sync");
     this.rememberSource();
@@ -102,29 +66,6 @@ export class WorkspaceSyncController {
     this.flushCapture();
     await this.ports.journal.flush();
   }
-  private scheduleCapture(): void {
-    if (!this.active || this.applying) return;
-    if (!activeDeviceEpoch(this.current)) {
-      this.capture();
-      return;
-    }
-    const delay = this.ports.captureDelayMs ?? 0;
-    if (!delay) {
-      this.capture();
-      return;
-    }
-    clearTimeout(this.captureTimer);
-    this.captureTimer = setTimeout(() => this.flushCapture(), delay);
-    this.captureDeadline ??= setTimeout(() => this.flushCapture(), 2_000);
-  }
-  private flushCapture(): void {
-    if (!this.captureTimer && !this.captureDeadline) return;
-    clearTimeout(this.captureTimer);
-    clearTimeout(this.captureDeadline);
-    this.captureTimer = undefined;
-    this.captureDeadline = undefined;
-    this.capture();
-  }
   /** Native notifications arrive in bursts (another machine opening many
    * tabs). Notifications in one tick share a pump, and any arriving while it
    * reads are folded into its next pass: one projection per burst. */
@@ -139,45 +80,6 @@ export class WorkspaceSyncController {
       if (this.active && !this.running) void this.pump();
     });
   }
-  private capture(refresh = true): void {
-    if (!this.active || this.applying) return;
-    const source = this.ports.source.read();
-    const epoch = activeDeviceEpoch(this.current);
-    if (!epoch) {
-      this.rememberSource();
-      this.captureBlocked = false;
-      return;
-    }
-    try {
-      const edit = workspaceChanges(this.previous, source.windows, this.current.profile_id);
-      const navigation = navigationRecords(source, groupsSynced(this.current));
-      const changes = [...edit.changes, ...recordChanges(this.previousNavigation, navigation)];
-      if (changes.length) this.ports.journal.append(changes, epoch);
-      if (edit.remapped.size) {
-        this.applying = true;
-        try {
-          this.ports.source.write({
-            windows: edit.windows,
-            activeWindowId: edit.remapped.get(source.activeWindowId) ?? source.activeWindowId,
-            folders: source.folders ?? [],
-            bookmarks: source.bookmarks ?? [],
-            recoveryViewIds: [],
-          });
-        } finally {
-          this.applying = false;
-        }
-      }
-      this.previous = this.ports.source.read().windows;
-      this.previousNavigation = navigation;
-      this.captureBlocked = false;
-      if (refresh && changes.length) this.refresh();
-    } catch (error) {
-      // Do not erase the user's visible edit. The existing workspace backup
-      // retains it, and the error remains actionable rather than claiming sync.
-      this.captureBlocked = true;
-      this.ports.error(error);
-    }
-  }
   private matches(view: NativeSyncView): boolean {
     return (
       view.deployment === this.current.deployment &&
@@ -189,31 +91,6 @@ export class WorkspaceSyncController {
   private unselectedEmpty(view: NativeSyncView): boolean {
     return !view.workspace.active_device && !view.workspace.records.length;
   }
-  private seed(): boolean {
-    const view = this.current;
-    const epoch = activeDeviceEpoch(view);
-    if (
-      !epoch ||
-      view.workspace.records.length ||
-      view.pending_operation_ids.length ||
-      this.ports.journal.pending.length
-    )
-      return false;
-    const source = this.ports.source.read();
-    const changes = [
-      ...workspaceChanges([], source.windows, view.profile_id).changes,
-      ...recordChanges([], navigationRecords(source, groupsSynced(this.current))),
-    ];
-    if (!changes.length) return false;
-    this.ports.journal.append(changes, epoch);
-    return true;
-  }
-  private rememberSource(): void {
-    const source = this.ports.source.read();
-    this.previous = source.windows;
-    this.previousNavigation = navigationRecords(source, groupsSynced(this.current));
-  }
-  /** Sends the journal's edits in order. False when the controller stopped meanwhile. */
   private async publishJournal(): Promise<boolean> {
     // A reconnection may have a new session ID but the same durable device.
     // Drain the stable journal before applying a projection to the renderer.

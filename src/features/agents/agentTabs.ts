@@ -7,12 +7,14 @@ import {
   finishTaskViews,
   removeBrowserTab,
   updateBrowserTab,
-  useAgentBrowser,
   viewOfTab,
   type AgentBrowserTab,
 } from "./agentBrowser/agentBrowserStore";
 import { followAgentPages } from "./agentBrowser/agentPageEvents";
 import { livePagesAllowed, pressureLevel, resetMemoryPressure } from "./agentTabPressure";
+import { agentPageBounds, restoredAgentTabs, type AgentTab } from "./agentTabRecords";
+
+export { agentPageBounds, type AgentTab };
 
 /**
  * An agent's tabs in the person's window, which sleep (docs/design/agent-browser/BRIEF.md,
@@ -27,46 +29,13 @@ import { livePagesAllowed, pressureLevel, resetMemoryPressure } from "./agentTab
  * Under memory pressure (system_memory_pressure) fewer pages stay live: idle tabs sleep at once,
  * and a wake first puts the page left longest to sleep, so views take turns instead of failing.
  */
-export interface AgentTab {
-  scopeId: string;
-  /** The live page's id, or "" while the tab sleeps. */
-  viewId: string;
-  taskId: string;
-  runId: string;
-  url: string;
-  title: string;
-  lastUsed: number;
-  /** Jobs running on it now; a tab in use never sleeps. */
-  busy: number;
-  /** The person added it in the agent browser for the agent to use; the agent never closes it. */
-  byPerson?: boolean;
-}
 
 const CHECK_MS = 5_000;
 /** Sleeping tabs remembered, newest kept; each is a few hundred bytes. */
 const KEEP_ASLEEP = 500;
 
-const tabs = new Map<string, AgentTab>();
+const tabs = restoredAgentTabs();
 
-// After a reload the store (agentBrowserStore.ts) brings its tabs back asleep; the records the
-// pages are opened from are rebuilt from them, so showing one opens its address again.
-for (const chat of Object.values(useAgentBrowser.getState().chats))
-  for (const view of chat.views)
-    for (const scopeId of view.tabs) {
-      const tab = useAgentBrowser.getState().tabs[scopeId];
-      if (tab)
-        tabs.set(scopeId, {
-          scopeId,
-          viewId: "",
-          taskId: view.taskId,
-          runId: "",
-          url: tab.url,
-          title: tab.title,
-          lastUsed: 0,
-          busy: 0,
-          ...(scopeId.startsWith("person-") ? { byPerson: true } : {}),
-        });
-    }
 /** One sleep or wake at a time per tab. */
 const pending = new Map<string, Promise<unknown>>();
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -92,14 +61,6 @@ const serial = <T>(scopeId: string, work: () => Promise<T>): Promise<T> => {
   );
   return next;
 };
-
-/** The size a hidden agent page renders at: about the person's page area. */
-export const agentPageBounds = () => ({
-  x: 0,
-  y: 64,
-  width: Math.max(200, window.innerWidth - 440),
-  height: Math.max(300, window.innerHeight - 128),
-});
 
 /**
  * A page an agent opened, in a chat's view: the main agent's (`view.id` its task) or a

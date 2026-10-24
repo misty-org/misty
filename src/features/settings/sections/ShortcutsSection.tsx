@@ -262,9 +262,7 @@ export function ShortcutsSection(props: SettingsContentProps) {
         {!snapshot ? (
           <SkeletonList label="Shortcuts" rows={8} leading="none" lines={1} trailing />
         ) : shown.length === 0 ? (
-          <p className="py-2 text-sm text-cream-muted">
-            No matching commands.
-          </p>
+          <p className="py-2 text-sm text-cream-muted">No matching commands.</p>
         ) : (
           shown.map((definition) => {
             const binding = bindingsById.get(definition.id);

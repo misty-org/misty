@@ -114,14 +114,15 @@ export function SpaceCode({
         ) : undefined,
     };
   });
-  const selection = useRangeSelection(items.filter((item) => item.selectable).map((item) => item.id));
+  const selection = useRangeSelection(
+    items.filter((item) => item.selectable).map((item) => item.id),
+  );
   const deleteSelected = async () => {
-    if (bulkDeleting || !selection.selectedIds.length) return;
-    if (
-      !(await confirmAction(
-        `Unlink ${selection.selectedIds.length} selected ${selection.selectedIds.length === 1 ? "project" : "projects"} from this Space? Their files stay on their owners' computers.`,
-      ))
-    ) return;
+    const count = selection.selectedIds.length;
+    if (bulkDeleting || !count) return;
+    const noun = count === 1 ? "project" : "projects";
+    const question = `Unlink ${count} selected ${noun} from this Space?`;
+    if (!(await confirmAction(`${question} Their files stay on their owners' computers.`))) return;
     setBulkDeleting(true);
     setBulkError("");
     try {
@@ -174,7 +175,11 @@ export function SpaceCode({
         onClear={selection.clear}
         onDelete={() => void deleteSelected()}
       />
-      {bulkError && <p role="alert" className="text-sm text-cream-muted">{bulkError}</p>}
+      {bulkError && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {bulkError}
+        </p>
+      )}
       {!code.projects ? (
         <CollectionSkeleton label="Projects" view="list" />
       ) : items.length ? (

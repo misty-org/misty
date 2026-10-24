@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@/features/auth";
+import { profileIdFor } from "@/features/workspace/profileId";
 import { useTabArchiveStore } from "@/features/workspace/tabArchive";
 import { IconButton, ListRow, ListRowButton } from "@/shared/ui";
 import { InternalPageEmpty, SiteIcon } from "./InternalPageFrame";
@@ -12,7 +13,8 @@ function hostOf(url: string): string {
   }
 }
 
-/** Tabs closed for being idle, newest first, for this account. */
+/** Tabs closed for being idle, newest first, for this profile (the account, or the local
+ * one while signed out). */
 export function ArchivedTabsList(props: {
   text: string;
   navigate(url: string): void;
@@ -23,7 +25,7 @@ export function ArchivedTabsList(props: {
   const needle = props.text.trim().toLocaleLowerCase();
   const tabs = all.filter(
     (tab) =>
-      tab.accountId === user?.id &&
+      tab.accountId === profileIdFor(user?.id) &&
       (!needle || `${tab.title} ${tab.url}`.toLocaleLowerCase().includes(needle)),
   );
   if (!tabs.length)

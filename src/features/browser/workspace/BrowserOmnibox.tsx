@@ -15,9 +15,7 @@ export function BrowserOmnibox(
       (candidate) => candidate.id === state.layout.focusedPaneId,
     );
     const view = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
-    return view?.surfaceId === "browser"
-      ? parseBrowserViewState(view.state).url
-      : props.currentUrl;
+    return view?.surfaceId === "browser" ? parseBrowserViewState(view.state).url : props.currentUrl;
   });
 
   return (

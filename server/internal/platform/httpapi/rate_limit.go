@@ -35,6 +35,14 @@ type APIRateLimiter struct {
 	defaultWrite  RateLimitPolicy
 	RoutePolicies map[string]RateLimitPolicy
 	Limiters      map[string]*SlidingWindowLimiter
+	// abuse escalates repeated rejections into a temporary block.
+	abuse *AbuseGuard
+}
+
+// WithAbuseGuard wires rejections into the shared abuse guard.
+func (l *APIRateLimiter) WithAbuseGuard(guard *AbuseGuard) *APIRateLimiter {
+	l.abuse = guard
+	return l
 }
 
 func NewSlidingWindowLimiter(limit int, window time.Duration) *SlidingWindowLimiter {
@@ -181,6 +189,9 @@ func (l *APIRateLimiter) Middleware(next http.Handler) http.Handler {
 		allowed, retryAfter := limiter.Allow(key, l.Now())
 		if !allowed {
 			w.Header().Set("X-Misty-RateLimit-Scope", "route")
+			if l.abuse != nil {
+				l.abuse.RecordRejection(key)
+			}
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(retryAfter)))
 			http.Error(w, "too many requests", http.StatusTooManyRequests)
 			return

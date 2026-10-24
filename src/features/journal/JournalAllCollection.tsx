@@ -91,9 +91,12 @@ export function JournalAllCollection(props: {
     try {
       for (const item of selected) {
         await item!.remove!();
-        if (item!.kind === "drawing") closeDrawingCollaborationSession(props.spaceId, item!.id.slice(8));
+        if (item!.kind === "drawing")
+          closeDrawingCollaborationSession(props.spaceId, item!.id.slice(8));
         window.dispatchEvent(
-          new CustomEvent(`misty:space-${item!.kind}-event`, { detail: { space_id: props.spaceId } }),
+          new CustomEvent(`misty:space-${item!.kind}-event`, {
+            detail: { space_id: props.spaceId },
+          }),
         );
       }
       selection.clear();
@@ -148,7 +151,11 @@ export function JournalAllCollection(props: {
           {actions.error}
         </p>
       )}
-      {bulkError && <p role="alert" className="text-sm text-cream-muted">{bulkError}</p>}
+      {bulkError && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {bulkError}
+        </p>
+      )}
       <CollectionSelectionBar
         count={selection.selectedIds.length}
         busy={bulkBusy}

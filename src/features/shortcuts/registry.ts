@@ -44,6 +44,20 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
+  command("account.sign_in", "Sign in", {
+    description: "Sign in to sync, share Spaces and use agents. Browsing works without an account.",
+    category: "Misty",
+    aliases: ["log in", "account", "create account"],
+    allowInEditable: true,
+    nativeMenu: true,
+  }),
+  command("account.sign_out", "Sign out", {
+    description: "Sign out of Misty and keep browsing on this device.",
+    category: "Misty",
+    aliases: ["log out", "account"],
+    allowInEditable: true,
+    nativeMenu: true,
+  }),
   ...focusModeCommands,
   command("app.zoom_in", "Zoom in", {
     description: "Increase the app interface scale.",

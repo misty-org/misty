@@ -79,7 +79,9 @@ export function BrowserPermissionSettings() {
                   <>
                     Camera: {permissionLabels[entry.permissions.camera]} · Microphone:{" "}
                     {permissionLabels[entry.permissions.microphone]}
-                    {new Set(entries.map((other) => other.space)).size > 1 ? ` · ${entry.space}` : ""}
+                    {new Set(entries.map((other) => other.space)).size > 1
+                      ? ` · ${entry.space}`
+                      : ""}
                   </>
                 }
               >

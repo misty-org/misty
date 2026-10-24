@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/features/auth";
+import { openSignInSheet, useAuth } from "@/features/auth";
 import { useWorkspaceViewFocused } from "@/features/workspace/WorkspaceViewRouteScope";
 import type { WorkspaceView } from "@/features/workspace/core";
 import { SpaceOverviewProvider } from "./useSpaceOverview";
@@ -64,7 +64,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         <p className="text-sm text-cream-muted">
           Collaborate on projects with chat, planning, and shared materials.
         </p>
-        <Button onClick={() => navigate("/signin", { state: { from: tab.route } })}>Sign in</Button>
+        <Button onClick={() => openSignInSheet("space")}>Sign in</Button>
       </div>
     );
 

@@ -1,0 +1,146 @@
+//! The commands that bind a window or the desktop to a task, yield it to the
+//! person and mirror the island.
+use super::*;
+
+#[tauri::command]
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(unreachable_code))]
+pub fn agent_workspace_context(
+    app: AppHandle,
+    webview: Webview,
+    task_id: String,
+    context: Value,
+    start: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    if !unsafe { misty_autopilot_supported() } {
+        return Err("Misty window control requires macOS 14.4 or later".into());
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    return Err("Misty window control isn't available on this system".into());
+    if !crate::infra::space_windows::is_space_window(webview.label())
+        || context.to_string().len() > 32000
+    {
+        return Err("Invalid workspace context".into());
+    }
+    crate::infra::agents::workspace::authorize_window_task(
+        &app,
+        &task_id,
+        context["accountId"].as_str().unwrap_or(""),
+        context["spaceId"].as_str().unwrap_or(""),
+    )?;
+    let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
+    if start {
+        let desktop = context["desktopControl"] == true;
+        let ask = context["askBeforeControl"] == true;
+        *state = Session {
+            task: task_id.clone(),
+            context,
+            snapshot: None,
+        };
+        drop(state);
+        // Controlling the Misty window itself: ring the window. Desktop control
+        // rings the controlled display instead, once control begins.
+        #[cfg(target_os = "macos")]
+        let _ = webview.with_webview(move |platform| unsafe {
+            misty_agent_window_ring(platform.inner().cast(), !desktop);
+        });
+        DESKTOP_APP.get_or_init(|| app.clone());
+        #[cfg(windows)]
+        if desktop {
+            crate::infra::desktop_control_windows::prepare(&app, &task_id, ask);
+        }
+        #[cfg(not(any(target_os = "macos", windows)))]
+        let _ = (desktop, ask);
+        #[cfg(target_os = "macos")]
+        if desktop {
+            let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+            unsafe {
+                misty_desktop_prepare(task.as_ptr(), ask, desktop_stopped, desktop_island);
+            }
+        }
+    } else {
+        if state.task != task_id {
+            return Err("agent_task_paused".into());
+        }
+        if state.context != context {
+            state.snapshot = None;
+        }
+        state.context = context;
+    }
+    Ok(())
+}
+/// The task waits for the person (a sign-in, a challenge, a review): give back
+/// the window or desktop, its control ring and Misty's cursor, but keep the
+/// task so the run continues on the same screen. `yielded: false` takes the
+/// window back; the desktop is taken back by the next visual tool call.
+#[tauri::command]
+pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> Result<(), String> {
+    if !crate::infra::space_windows::is_space_window(webview.label()) {
+        return Ok(());
+    }
+    let desktop = {
+        let state = session().lock().map_err(|_| "workspace_unavailable")?;
+        if state.task != task_id {
+            return Ok(());
+        }
+        state.context["desktopControl"] == true
+    };
+    #[cfg(target_os = "macos")]
+    {
+        if desktop {
+            if yielded {
+                let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+                unsafe { misty_desktop_yield(task.as_ptr()) };
+            }
+        } else if yielded {
+            unsafe { misty_autopilot_hide_cursor() };
+        }
+        // The mist stays while the task waits for the person, thinner.
+        unsafe { misty_agent_mist_waiting(yielded) };
+    }
+    #[cfg(windows)]
+    if let Some(app) = DESKTOP_APP.get() {
+        if desktop {
+            if yielded {
+                crate::infra::desktop_control_windows::yield_control(&task_id);
+            }
+        } else if yielded {
+            crate::infra::desktop_overlays_windows::hide_pointer(app);
+        }
+        crate::infra::desktop_overlays_windows::set_mist_waiting(app, yielded);
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = (desktop, yielded);
+    Ok(())
+}
+/// What the in-app island shows, mirrored on the desktop island while Misty
+/// controls the desktop: `status`, `meta` and, while waiting, `waiting`.
+#[tauri::command]
+pub fn agent_control_island(
+    webview: Webview,
+    task_id: String,
+    island: Value,
+) -> Result<(), String> {
+    if !crate::infra::space_windows::is_space_window(webview.label())
+        || island.to_string().len() > 4000
+    {
+        return Err("Invalid control island update".into());
+    }
+    {
+        let state = session().lock().map_err(|_| "workspace_unavailable")?;
+        if state.task != task_id || state.context["desktopControl"] != true {
+            return Ok(());
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let task = std::ffi::CString::new(task_id).map_err(|e| e.to_string())?;
+        let json = std::ffi::CString::new(island.to_string()).map_err(|e| e.to_string())?;
+        unsafe { misty_desktop_island(task.as_ptr(), json.as_ptr()) };
+    }
+    #[cfg(windows)]
+    crate::infra::desktop_control_windows::island(&task_id, &island);
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = island;
+    Ok(())
+}

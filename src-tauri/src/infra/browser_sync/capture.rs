@@ -4,6 +4,9 @@ use super::super::website_data::budget::Limit;
 use super::*;
 use misty_browser_sync::store::BrowserCaptureState;
 
+mod observation;
+use observation::observe;
+
 pub(super) struct CaptureView {
     pub(super) physical: String,
     pub(super) view: tauri::Webview,
@@ -157,35 +160,7 @@ impl CaptureRetry {
 }
 
 #[cfg(test)]
-mod retry_tests {
-    use super::*;
-    #[test]
-    fn repeated_restore_failures_back_off_and_success_resets_capture() {
-        let mut retry = CaptureRetry::default();
-        let mut now = std::time::Instant::now();
-        for seconds in [30, 60, 120, 240, 300, 300] {
-            assert!(retry.ready(now));
-            retry.finished(false, now);
-            assert!(!retry.ready(now + std::time::Duration::from_millis(1)));
-            now += std::time::Duration::from_secs(seconds);
-            assert!(retry.ready(now));
-        }
-        retry.finished(true, now);
-        assert!(retry.ready(now));
-        retry.finished(false, now);
-        assert!(retry.ready(now + std::time::Duration::from_secs(30)));
-    }
-
-    #[test]
-    fn cookie_failures_name_the_step_that_failed() {
-        let timeout = capture_issue(format!("{}: Timeout", collect::COOKIES_UNREADABLE));
-        assert!(timeout.contains("timed out"));
-        let profile = capture_issue(format!("{}: Profile", collect::COOKIES_UNREADABLE));
-        assert!(profile.contains("browser profile"));
-        let other = capture_issue(format!("{}: Unavailable", collect::COOKIES_UNREADABLE));
-        assert!(other.starts_with("Website cookies could not be read"));
-    }
-}
+mod retry_tests;
 // Only authored diagnostics cross into the renderer: every error on these
 // paths is fixed text or a sanitized `issue()`. Platform errors and website
 // storage/cookie values must never be included in status messages.
@@ -315,93 +290,4 @@ async fn reconcile(
         return Ok(None);
     }
     Ok(result)
-}
-
-async fn observe(
-    app: &tauri::AppHandle,
-    active: &mut Session,
-) -> Result<Option<&'static str>, String> {
-    let logical = default_profile_id(&active.scope)?;
-    let binding = active
-        .handle
-        .browser_profile_binding(logical.clone())
-        .await
-        .map_err(issue)?;
-    let Some(generation) = binding.active else {
-        return Ok(None);
-    };
-    if binding.staged.is_some() {
-        return Ok(Some(
-            "Browser sign-in state is waiting for native restoration.",
-        ));
-    }
-    if active
-        .capture_view
-        .as_ref()
-        .is_none_or(|view| view.physical != generation.physical_id)
-    {
-        active.capture_view = None;
-        active.capture_view = Some(CaptureView::open(app, &generation.physical_id)?);
-    }
-    let view = active
-        .capture_view
-        .as_ref()
-        .ok_or("Native cookie observer is unavailable")?;
-    let journal = active
-        .handle
-        .browser_import_journal(logical.clone())
-        .await
-        .map_err(issue)?;
-    let previous = journal
-        .applied
-        .as_ref()
-        .map(|receipt| receipt.credentials.as_slice())
-        .unwrap_or(&[]);
-    let collected = collect::collect(
-        app,
-        &view.view,
-        &generation.physical_id,
-        previous,
-        None,
-        Limit::SingleEvent,
-    )
-    .await?;
-    active.website_data.insert(
-        active.device_id.clone(),
-        device_data::DeviceWebsiteData::new(
-            &active.device_id,
-            device_data::DeviceDataState::Synced,
-            collected.coverage.report(),
-        ),
-    );
-    active.held = collected.held;
-    let state = active
-        .handle
-        .observe_browser_profile(logical.clone(), generation.id, collected.observations)
-        .await
-        .map_err(issue)?;
-    match state {
-        BrowserCaptureState::NeedsImport => Ok(Some(
-            "Incoming website sign-in changes are waiting for native restoration.",
-        )),
-        BrowserCaptureState::Queued => Ok(None),
-        BrowserCaptureState::Clean => {
-            let snapshot = active.handle.snapshot().await.map_err(issue)?;
-            let document: Document = serde_json::from_slice(&snapshot)
-                .map_err(|_| "Could not read the native workspace")?;
-            // This adapter cannot vouch for another profile or storage area.
-            if document
-                .credentials
-                .values()
-                .all(|record| record.profile_id == logical)
-            {
-                active
-                    .handle
-                    .imports_applied(document.sequence)
-                    .await
-                    .map_err(issue)?;
-            }
-            Ok(None)
-        }
-    }
 }

@@ -6,6 +6,7 @@ export type { SettingsSection } from "./settingsTypes";
 export * from "./store/appTheme";
 export { settingsBoolean } from "./store/preferences";
 export { PreferenceRow } from "./sections/PreferenceRow";
+export { SyncRestoreSettings } from "./sections/SyncRestoreSettings";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";
 /** Resolves the already loaded Settings page for callers that warm it on hover. */

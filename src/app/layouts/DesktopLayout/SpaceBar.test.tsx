@@ -10,6 +10,8 @@ const runtime = vi.hoisted(() => ({
 const settings = vi.hoisted(() => ({ autoHide: true }));
 vi.mock("@/features/webviews/browserRuntime", () => runtime);
 vi.mock("@/features/spaces", () => ({ SpaceRow: () => <button type="button">Space</button> }));
+// The bar belongs to a signed-in window; signed out it isn't drawn.
+vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
 vi.mock("./useSpaceBarAutoHide", () => ({
   useSpaceBarAutoHide: () => settings.autoHide,
   useSpaceBarAlignment: () => "left",

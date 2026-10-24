@@ -10,17 +10,13 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { cn } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
-import { useBrowserToolbarSlot } from "./browserToolbarSlot";
 import { BrowserDownloadsButton } from "./BrowserDownloadsButton";
 import { BrowserFindBar } from "./BrowserFindBar";
-import { BrowserMenu } from "./BrowserMenu";
-import { BrowserMenuLeadRows } from "./BrowserMenuLeadRows";
 import { BrowserMenuTools } from "./BrowserMenuTools";
 import { BrowserAgentsButton, BrowserMistyButton } from "./BrowserMistyPanel";
 import { BrowserNavigationButtons } from "./BrowserNavigationButtons";
 import { BrowserOmnibox } from "./BrowserOmnibox";
-import { BrowserLibraryMenus } from "./BrowserLibraryMenus";
-import { BrowserPaneLayoutMenu, BrowserPaneLayoutSubmenu } from "./BrowserPaneLayoutMenu";
+import { BrowserPaneLayoutMenu } from "./BrowserPaneLayoutMenu";
 import { useBrowserChromeSlot } from "./browserChromeSlot";
 import {
   browserRuntimeCreated,
@@ -36,6 +32,7 @@ import { BrowserSidebarChrome } from "./BrowserSidebarChrome";
 import { BrowserTabBadges } from "./BrowserTabBadges";
 import { BrowserSiteInfo } from "./BrowserSiteInfo";
 import { BrowserToolbar } from "./BrowserToolbar";
+import { BrowserWorkspaceMenu } from "./BrowserWorkspaceMenu";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 import { useBrowserViewport } from "./browserViewport";
 import { useBrowserMenuCommands } from "./useBrowserMenuCommands";
@@ -46,6 +43,7 @@ import { useBrowserOnlineStatus } from "./useBrowserOnlineStatus";
 import { useBrowserPageCommands } from "./useBrowserPageCommands";
 import { useBrowserPagePreview } from "./useBrowserPagePreview";
 import { useBrowserReadingTools } from "./useBrowserReadingTools";
+import { useBrowserToolbarPlacement } from "./useBrowserToolbarPlacement";
 import { useBrowserWebviewGeometry } from "./useBrowserWebviewGeometry";
 import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
 export function BrowserWorkspace(props: { tab?: WorkspaceView }) {
@@ -158,20 +156,7 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
     ) : null;
   const paneLayout = <BrowserPaneLayoutMenu tabId={tab.id} />;
   const chrome = useBrowserChromeSlot();
-  const { nav: navSlot, top: topSlot } = useBrowserToolbarSlot();
-  const paneFocused = useWorkspaceStore((store) =>
-    dockLeaves(store.layout.root).some(
-      (pane) => pane.id === store.layout.focusedPaneId && pane.activeViewId === tab.id,
-    ),
-  );
-  // The focused pane's toolbar lives in the tab sidebar. Without one (focus mode) the page
-  // keeps its own toolbar row.
-  const sidebar = Boolean(topSlot);
-  const claimsNav = paneFocused && sidebar && Boolean(navSlot);
-  useEffect(
-    () => (claimsNav ? useBrowserToolbarSlot.getState().claimNav() : undefined),
-    [claimsNav],
-  );
+  const { paneFocused, sidebar } = useBrowserToolbarPlacement(tab.id);
   const navButtons = (
     <BrowserNavigationButtons
       canGoBack={history.index > 0}
@@ -185,42 +170,31 @@ function ActiveBrowserWorkspace({ tab }: { tab: WorkspaceView }) {
   );
   const badges = <BrowserTabBadges agentOwned={Boolean(state.agentOwned)} />;
   const moreAnchor = useRef<HTMLDivElement | null>(null);
-  const browserMenu = (sidebarMenu: boolean) => (
-    <BrowserMenu
-      toolsIcon={sidebarMenu}
-      library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
-      layout={sidebarMenu ? undefined : <BrowserPaneLayoutSubmenu tabId={tab.id} />}
-      account={chrome?.accountItems}
-      lead={
-        sidebarMenu ? (
-          <BrowserMenuLeadRows
-            tabId={tab.id}
-            runtimeId={browserRuntimeId(tab)}
-            url={state.url}
-            agentOwned={Boolean(state.agentOwned)}
-            onBookmark={page.commands.bookmark}
-            anchor={() => moreAnchor.current}
-          />
-        ) : undefined
-      }
+  const menuTools = (
+    <BrowserMenuTools
+      annotating={annotationsActive}
+      onAnnotatingChange={setAnnotationsActive}
+      viewport={viewport}
+      onViewportChange={setViewport}
+      viewportSizes={sizes}
+      onViewportSizeChange={setSize}
       nativeRuntime={nativeRuntime}
+      mistyPage={mistyPage}
+      mistyPageLoading={mistyPageLoading}
+      onAttachPage={() => void attachPageToMisty()}
+    />
+  );
+  const browserMenu = (sidebarMenu: boolean) => (
+    <BrowserWorkspaceMenu
+      sidebarMenu={sidebarMenu}
       tab={tab}
       url={state.url}
+      agentOwned={Boolean(state.agentOwned)}
+      nativeRuntime={nativeRuntime}
       commands={page.commands}
-      tools={
-        <BrowserMenuTools
-          annotating={annotationsActive}
-          onAnnotatingChange={setAnnotationsActive}
-          viewport={viewport}
-          onViewportChange={setViewport}
-          viewportSizes={sizes}
-          onViewportSizeChange={setSize}
-          nativeRuntime={nativeRuntime}
-          mistyPage={mistyPage}
-          mistyPageLoading={mistyPageLoading}
-          onAttachPage={() => void attachPageToMisty()}
-        />
-      }
+      account={chrome?.accountItems}
+      anchor={moreAnchor}
+      tools={menuTools}
     />
   );
   const sidebarTrailing = (

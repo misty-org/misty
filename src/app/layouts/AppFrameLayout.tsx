@@ -12,12 +12,14 @@ import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth";
-import { isAuthPath } from "@/features/app-shell";
+import { isAuthPath, routes } from "@/features/app-shell";
+import { useSetupStore } from "@/features/setup/useSetupStore";
 import { desktopRouteIdFromPath } from "../routing/navigation";
 import { ConnectedDevicesProvider } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
 import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
+import { profileIdFor } from "@/features/workspace/profileId";
 
 // Let the initial Misty flight finish before revealing the app, even when its
 // code is already cached. Load the layout alongside account/workspace restore so
@@ -46,30 +48,35 @@ export function AppFrameLayout() {
   const location = useLocation();
   const isAuthRoute = isAuthPath(location.pathname);
   const isInviteRoute = location.pathname.startsWith("/invite/");
-  useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? (user?.id ?? "") : "");
+  const welcomed = useSetupStore((state) => state.welcomed);
+  // Browsing data belongs to the signed-in account, or to the local profile with none.
+  const profileId = profileIdFor(user?.id);
+  useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? profileId : "");
   // An incognito window keeps nothing and never syncs. Any other window syncs the tabs
   // of the Space it shows, through that Space's vault; switching restarts the bridge.
+  // Sync needs an account.
   const { incognito, key: spaceKey } = useSpaceWindowStore((state) => state.identity);
   const syncAllowed =
+    Boolean(user) &&
     !incognito &&
-    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === user?.id && recovery.ready));
+    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === profileId && recovery.ready));
 
   // Keep hook order stable as identity changes, and let account transitions
-  // finish before deciding that the user needs to sign in.
+  // finish before showing the window.
   if (transitioning && !isAuthRoute) return <LoadingScreen fullScreen label="Restoring account" />;
 
-  if (!user && !isAuthRoute && !isInviteRoute) {
-    return (
-      <Navigate to="/signin" state={{ from: `${location.pathname}${location.search}` }} replace />
-    );
-  }
+  // First run shows the welcome once, before the shell mounts: the shell sends a bare "/"
+  // straight to the active tab, which would skip it. Invite links go through.
+  if (!user && !welcomed && !isAuthRoute && !isInviteRoute)
+    return <Navigate to={routes.welcome} replace />;
 
+  // Misty is a full browser without an account, so nothing here sends anyone to sign in;
+  // the window waits only for its profile's saved windows and tabs.
   if (
     !isAuthRoute &&
-    user &&
     !incognito &&
     nativeWorkspaceRecoveryEnabled() &&
-    (recovery.accountId !== user.id || (!recovery.ready && !recovery.usable))
+    (recovery.accountId !== profileId || (!recovery.ready && !recovery.usable))
   ) {
     return <LoadingScreen fullScreen label="Restoring workspace" />;
   }
@@ -101,7 +108,7 @@ export function AppFrameLayout() {
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />
       {incognito ? null : <AgentExecutionSurface />}
-      <UpdateNotices accountId={user?.id ?? ""} />
+      <UpdateNotices profileId={profileId} />
       <UnsavedQuitGuard />
       <BrowserSyncSleepOverlay
         key={`sync-sleep:${user?.id ?? "anonymous"}`}

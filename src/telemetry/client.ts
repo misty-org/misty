@@ -31,6 +31,8 @@ export class PostHogTelemetryClient implements TelemetryClient {
     TELEMETRY_DEFAULTS.analyticsEnabled,
   );
   private errorEnabled = readBoolean(errorPreferenceKey, TELEMETRY_DEFAULTS.errorReportingEnabled);
+  // Browsing without an account sends nothing (docs/design/no-account-browsing/BRIEF.md).
+  private accountPresent = false;
   private pendingIdentity: { userId: string; properties: SafeUserProperties } | null = null;
   // Identity and repeated errors are sent once: re-applying settings or an
   // error thrown in a loop must not resend the same payload.
@@ -73,7 +75,7 @@ export class PostHogTelemetryClient implements TelemetryClient {
     posthog.register({ $geoip_disable: true });
     this.instance = posthog;
     this.syncOptState();
-    if (this.pendingIdentity && this.analyticsEnabled) this.sendIdentity();
+    if (this.pendingIdentity && this.analyticsEnabled && this.accountPresent) this.sendIdentity();
   }
 
   private sendIdentity(): void {
@@ -89,7 +91,7 @@ export class PostHogTelemetryClient implements TelemetryClient {
   identify(userId: string, properties: SafeUserProperties = {}): void {
     if (!userId) return;
     this.pendingIdentity = { userId, properties };
-    if (!this.analyticsEnabled) return;
+    if (!this.analyticsEnabled || !this.accountPresent) return;
     this.sendIdentity();
   }
   resetIdentity(): void {
@@ -99,13 +101,13 @@ export class PostHogTelemetryClient implements TelemetryClient {
   }
 
   track<E extends AnalyticsEventName>(event: E, properties: AnalyticsEventProperties[E]): void {
-    if (!this.analyticsEnabled) return;
+    if (!this.analyticsEnabled || !this.accountPresent) return;
     if (!this.instance) return;
     this.instance.capture(event, redactRecord(properties as unknown as Record<string, unknown>));
   }
 
   captureException(error: unknown, context: SafeErrorContext = {}): void {
-    if (!this.errorEnabled || !this.instance) return;
+    if (!this.errorEnabled || !this.accountPresent || !this.instance) return;
     const redacted = redactedError(error);
     const key = `${redacted.name}:${redacted.message}:${(redacted.stack ?? "").slice(0, 500)}`;
     const now = Date.now();
@@ -127,7 +129,7 @@ export class PostHogTelemetryClient implements TelemetryClient {
     this.analyticsEnabled = enabled;
     writeBoolean(analyticsPreferenceKey, enabled);
     this.syncOptState();
-    if (enabled) this.sendIdentity();
+    if (enabled && this.accountPresent) this.sendIdentity();
   }
   setErrorReportingEnabled(enabled: boolean): void {
     this.errorEnabled = enabled;
@@ -140,12 +142,18 @@ export class PostHogTelemetryClient implements TelemetryClient {
   isErrorReportingEnabled(): boolean {
     return this.errorEnabled;
   }
+  setAccountPresent(present: boolean): void {
+    if (this.accountPresent === present) return;
+    this.accountPresent = present;
+    this.syncOptState();
+    if (present && this.analyticsEnabled) this.sendIdentity();
+  }
   async flush(): Promise<void> {
     await this.instance?.shutdown(2_000);
   }
   private syncOptState(): void {
     if (!this.instance) return;
-    if (this.analyticsEnabled || this.errorEnabled) {
+    if (this.accountPresent && (this.analyticsEnabled || this.errorEnabled)) {
       this.instance.opt_in_capturing({ captureEventName: false });
     } else {
       this.instance.opt_out_capturing();
@@ -167,6 +175,7 @@ export class NoopTelemetryClient implements TelemetryClient {
   isErrorReportingEnabled(): boolean {
     return false;
   }
+  setAccountPresent(_present: boolean): void {}
   async flush(): Promise<void> {}
 }
 

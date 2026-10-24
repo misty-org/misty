@@ -59,6 +59,7 @@ export * from "./display/ListRow";
 export * from "./display/Table";
 
 // feedback
+export * from "./feedback/FlyingMisty";
 export * from "./feedback/LoadingScreen";
 export * from "./feedback/Notification";
 export * from "./feedback/Progress";

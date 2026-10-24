@@ -58,7 +58,9 @@ export function DrawingCollection(props: {
   });
   const drawings = refinement.items;
   const selection = useRangeSelection(
-    drawings.filter((drawing) => !props.readOnly && drawing.can_delete).map((drawing) => drawing.id),
+    drawings
+      .filter((drawing) => !props.readOnly && drawing.can_delete)
+      .map((drawing) => drawing.id),
   );
   return (
     <CollectionPage>
@@ -100,7 +102,11 @@ export function DrawingCollection(props: {
         onClear={selection.clear}
         onDelete={() => props.onDeleteMany(selection.selectedIds)}
       />
-      {props.bulkError && <p role="alert" className="text-sm text-cream-muted">{props.bulkError}</p>}
+      {props.bulkError && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {props.bulkError}
+        </p>
+      )}
       {
         <CollectionItems
           columnSetId="drawings"

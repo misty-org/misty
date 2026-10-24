@@ -3,6 +3,14 @@ use super::{
     BROWSER_VIEWPORT_SCRIPT,
 };
 
+/// The viewport script with its media and window-drag parts, before the
+/// runtime placeholders are filled.
+fn viewport() -> String {
+    BROWSER_VIEWPORT_SCRIPT
+        .replace("__MISTY_MEDIA_PLACEHOLDER__", include_str!("media.js"))
+        .replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", include_str!("window_drag.js"))
+}
+
 #[test]
 fn captions_run_in_every_frame_without_the_tab_token() {
     let captions = browser_captions_script();
@@ -13,17 +21,17 @@ fn captions_run_in_every_frame_without_the_tab_token() {
     assert!(!captions.contains("shortcutToken"));
     assert!(!captions.contains("PLACEHOLDER"));
     // The top document reads frames' captions; YouTube is no longer read only there.
-    assert!(BROWSER_VIEWPORT_SCRIPT.contains("window.__mistyFramedMedia"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("prefetchCaptions"));
+    assert!(viewport().contains("window.__mistyFramedMedia"));
+    assert!(!viewport().contains("prefetchCaptions"));
 }
 
 #[test]
 fn pointer_reporting_uses_no_page_dom_mutation_or_remote_desktop_ipc() {
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-cursor:"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.createElement('a')"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("__TAURI_INTERNALS__"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("misty-pointer:"));
-    assert!(BROWSER_VIEWPORT_SCRIPT.contains("sendToHost(shortcutToken)"));
+    assert!(!viewport().contains("misty-cursor:"));
+    assert!(!viewport().contains("document.createElement('a')"));
+    assert!(!viewport().contains("__TAURI_INTERNALS__"));
+    assert!(!viewport().contains("misty-pointer:"));
+    assert!(viewport().contains("sendToHost(shortcutToken)"));
 }
 
 #[test]
@@ -58,9 +66,9 @@ fn shortcut_token_is_embedded_as_json_without_becoming_a_window_global() {
 
 #[test]
 fn forwarded_shortcuts_use_the_renderer_canonical_key_names() {
-    assert!(BROWSER_VIEWPORT_SCRIPT.contains("Period: 'Period'"));
-    assert!(BROWSER_VIEWPORT_SCRIPT.contains("NumpadAdd: 'Plus'"));
-    assert!(BROWSER_VIEWPORT_SCRIPT.contains("event.shiftKey && key !== 'Plus'"));
+    assert!(viewport().contains("Period: 'Period'"));
+    assert!(viewport().contains("NumpadAdd: 'Plus'"));
+    assert!(viewport().contains("event.shiftKey && key !== 'Plus'"));
 }
 
 #[test]
@@ -82,9 +90,9 @@ fn pointer_tracking_can_be_enabled_for_an_active_companion() {
 
 #[test]
 fn embedded_pages_keep_their_native_focus_behavior() {
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("patchFocus"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("userInteracted"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("document.activeElement.blur()"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("report('default')"));
-    assert!(!BROWSER_VIEWPORT_SCRIPT.contains("HTMLElement.prototype.click ="));
+    assert!(!viewport().contains("patchFocus"));
+    assert!(!viewport().contains("userInteracted"));
+    assert!(!viewport().contains("document.activeElement.blur()"));
+    assert!(!viewport().contains("report('default')"));
+    assert!(!viewport().contains("HTMLElement.prototype.click ="));
 }

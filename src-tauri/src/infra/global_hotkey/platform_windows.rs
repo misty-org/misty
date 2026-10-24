@@ -28,6 +28,11 @@ pub(crate) fn apply(modifiers: &mut Modifiers, vk: u16, scan: u32, down: bool) -
     true
 }
 
+/// A low-level keyboard hook needs no permission on Windows.
+pub(crate) fn access_granted() -> bool {
+    true
+}
+
 pub(crate) fn current_modifiers() -> Modifiers {
     let down = |vk: u16| unsafe { GetAsyncKeyState(vk as i32) } as u16 & 0x8000 != 0;
     Modifiers {

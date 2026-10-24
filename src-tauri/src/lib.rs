@@ -20,7 +20,11 @@ pub fn run() {
     // The credential store lives in the same database as every other store, so both must
     // resolve the same data root (tests and development profiles can move it).
     if let Some(home) = infra::paths::misty_home_dir() {
-        let _ = misty_credential_store::configure_root(home.join(".local").join("data"));
+        let data = home.join(".local").join("data");
+        // The store only adopts a folder that exists; on a fresh data root it would
+        // otherwise fall back to ~/.misty and split secrets from the data they unlock.
+        let _ = std::fs::create_dir_all(&data);
+        let _ = misty_credential_store::configure_root(data);
     }
     // Use one TLS provider for backend calls and updates.
     let _ = rustls::crypto::ring::default_provider().install_default();

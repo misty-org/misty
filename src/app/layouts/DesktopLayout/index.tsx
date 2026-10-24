@@ -3,8 +3,9 @@ import { CapturePanel, DictationController } from "@/features/voice";
 import { RecallRecorderMount } from "@/features/recall";
 import { ScreenMemoryMount } from "@/features/screen-memory";
 import { type AppTab } from "@/features/app-shell";
-import { useAuth } from "@/features/auth";
+import { openSignInSheet, SignInSheet, SignOutSheet, useAuth } from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
+import { DevicePasswordsMerge } from "@/features/passwords/DevicePasswordsMerge";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
 import { ExtensionInstallRequest } from "@/features/extensions/ExtensionInstallRequest";
 import { SpaceImportRequest } from "@/features/browser-import/SpaceImportRequest";
@@ -41,6 +42,7 @@ import { useDesktopShortcuts } from "./useDesktopShortcuts";
 import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useOtherWindowsHiddenWhileAddingAccount, useSignedOutWindow } from "./useSignedOutWindow";
+import { useSignedOutHotkeys } from "./useSignedOutHotkeys";
 import { useStrayBrowserPages } from "./useStrayBrowserPages";
 import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
@@ -61,7 +63,7 @@ export type {
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useExtensionsRuntime();
   useStrayBrowserPages();
-  const { user, refreshUser, transitioning } = useAuth();
+  const { user, refreshUser, transitioning, sessionExpired } = useAuth();
   const { location, navigate, lastAppRoute, lastNonSettingsRouteRef, routeId } =
     useDesktopBootstrap({ getRouteId: props.getRouteId });
   const {
@@ -99,7 +101,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     lastNonSettingsRouteRef,
     openSettingsOverlay,
   });
-  useDesktopShortcuts({ navigate, openSettingsOverlay });
+  useDesktopShortcuts({ navigate, openSettingsOverlay, signedIn: Boolean(user) });
 
   useEffect(() => {
     setBrowserWebviewsSuspended(profileOpen || settingsOpen, "shell-overlay");
@@ -132,6 +134,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     appZoom,
   });
   useSignedOutWindow(isAuthRoute);
+  useSignedOutHotkeys(!user && !isAuthRoute);
   // Over the window's corner only where no sidebar can hold them: sign-in, or a page that
   // shows no sidebar. A collapsed sidebar takes them away with it.
   const floatingCaption = isAuthRoute || !sidebarCollapsed;
@@ -139,7 +142,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
   // The window takes its Space's color, which tints everything around the content region.
-  const windowChrome = useSpaceWindowStore((state) => windowChromeBackground(state.space?.color));
+  // Signed out a window shows no Space, so it keeps the plain chrome.
+  const spaceChrome = useSpaceWindowStore((state) => windowChromeBackground(state.space?.color));
+  const windowChrome = user ? spaceChrome : undefined;
   useEffect(() => {
     const shell = shellRef.current;
     if (windowChrome && !isAuthRoute)
@@ -152,10 +157,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     useSettingsStore.getState().setActiveSection("sync");
     openSettingsOverlay();
   };
-  // Sync is a button next to Settings, under the tabs.
-  const syncButton = (
-    <BrowserSyncBadge key={user?.id} accountId={user?.id ?? ""} onOpenSettings={openSyncSettings} />
-  );
+  // Sync is a button next to Settings, under the tabs. It needs an account, so it isn't
+  // shown while nobody is signed in.
+  const syncButton = user ? (
+    <BrowserSyncBadge key={user.id} accountId={user.id} onOpenSettings={openSyncSettings} />
+  ) : null;
   const stripAccount = !isAuthRoute ? (
     <AccountIsland
       open={profileOpen}
@@ -169,6 +175,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       onOpenAccountSettings={openAccountSettings}
       settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
       onSettingsClick={openSettingsOverlay}
+      signedOut={!user}
+      sessionExpired={sessionExpired}
+      onSignIn={(again) =>
+        again ? openSignInSheet("expired", user?.email) : openSignInSheet("account")
+      }
       sync={syncButton}
     />
   ) : null;
@@ -277,6 +288,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         </section>
 
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
+        {!isAuthRoute ? <SignInSheet /> : null}
+        {!isAuthRoute && user ? <SignOutSheet /> : null}
+        {!isAuthRoute && user ? <DevicePasswordsMerge key={user.id} accountId={user.id} /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays
             settingsOpen={settingsOpen}

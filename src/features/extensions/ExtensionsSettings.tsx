@@ -62,7 +62,9 @@ export function ExtensionsSettings() {
         </DesktopSettingsNotice>
       )}
       {(failure || runtime.error) && (
-        <DesktopSettingsNotice>{failure || "Extensions could not be loaded. Try again."}</DesktopSettingsNotice>
+        <DesktopSettingsNotice>
+          {failure || "Extensions could not be loaded. Try again."}
+        </DesktopSettingsNotice>
       )}
       <DesktopSettingsSection
         title="Extensions"

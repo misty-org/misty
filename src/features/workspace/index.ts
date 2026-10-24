@@ -4,6 +4,7 @@ export * from "./layoutTabs";
 export * from "./MistyBrandIcon";
 export * from "./model";
 export * from "./paneNavigation";
+export * from "./profileId";
 export * from "./spaceWindow";
 export * from "./routeSurface";
 export { useWindowDockingLayout } from "./useWindowDockingLayout";

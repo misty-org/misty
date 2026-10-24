@@ -1,3 +1,4 @@
+use super::migration::SETTINGS_SCHEMA_VERSION;
 use super::*;
 use serde_json::json;
 

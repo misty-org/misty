@@ -4,6 +4,9 @@
 use super::model::{title, web_address, BookmarkNode, BookmarkRoots, Limits, MAX_DEPTH};
 use std::collections::HashMap;
 
+mod writer;
+pub use writer::write;
+
 /// Toolbar folders named by browsers that do not mark them.
 const BAR_NAMES: [&str; 7] = [
     "bookmarks bar",
@@ -253,142 +256,5 @@ fn decode(text: &str) -> String {
     out.trim().to_owned()
 }
 
-fn escape(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-/// Writes the file the way Chrome does, so every browser reads it back:
-/// the bar as the marked toolbar folder, Other bookmarks at the top level and
-/// Mobile bookmarks as a folder.
-pub fn write(roots: &BookmarkRoots) -> String {
-    let mut out = String::from(
-        "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<!-- This is an automatically generated file.\n     It will be read and overwritten.\n     DO NOT EDIT! -->\n<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>\n",
-    );
-    folder(
-        &mut out,
-        1,
-        "Bookmarks bar",
-        None,
-        " PERSONAL_TOOLBAR_FOLDER=\"true\"",
-        &roots.bar,
-    );
-    nodes(&mut out, 1, &roots.other);
-    if !roots.mobile.is_empty() {
-        folder(&mut out, 1, "Mobile bookmarks", None, "", &roots.mobile);
-    }
-    out.push_str("</DL><p>\n");
-    out
-}
-
-fn date(added_at: Option<i64>) -> String {
-    added_at
-        .map(|ms| format!(" ADD_DATE=\"{}\"", ms / 1000))
-        .unwrap_or_default()
-}
-
-fn folder(
-    out: &mut String,
-    depth: usize,
-    name: &str,
-    added_at: Option<i64>,
-    marker: &str,
-    children: &[BookmarkNode],
-) {
-    let pad = "    ".repeat(depth);
-    out.push_str(&format!(
-        "{pad}<DT><H3{}{marker}>{}</H3>\n{pad}<DL><p>\n",
-        date(added_at),
-        escape(name)
-    ));
-    nodes(out, depth + 1, children);
-    out.push_str(&format!("{pad}</DL><p>\n"));
-}
-
-fn nodes(out: &mut String, depth: usize, children: &[BookmarkNode]) {
-    let pad = "    ".repeat(depth);
-    for node in children {
-        match node {
-            BookmarkNode::Folder {
-                title,
-                added_at,
-                children,
-            } => folder(out, depth, title, *added_at, "", children),
-            BookmarkNode::Link {
-                title,
-                url,
-                added_at,
-            } => out.push_str(&format!(
-                "{pad}<DT><A HREF=\"{}\"{}>{}</A>\n",
-                escape(url),
-                date(*added_at),
-                escape(title)
-            )),
-        }
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const FIREFOX: &str = r#"<!DOCTYPE NETSCAPE-Bookmark-file-1>
-<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Bookmarks</TITLE>
-<H1>Bookmarks Menu</H1>
-<DL><p>
-    <DT><A HREF="https://menu.example/" ADD_DATE="1700000000">Menu &amp; more</A>
-    <HR>
-    <DT><H3 ADD_DATE="1700000000" PERSONAL_TOOLBAR_FOLDER="true">Bookmarks Toolbar</H3>
-    <DL><p>
-        <DT><A HREF="https://bar.example/">Bar</A>
-        <DT><H3>Work</H3>
-        <DL><p>
-            <DT><A HREF="https://work.example/?a=1&amp;b=2" ICON="data:image/png;base64,AA">Work</A>
-            <DT><A HREF="javascript:alert(1)">Bookmarklet</A>
-        </DL><p>
-    </DL><p>
-    <DT><H3 UNFILED_FOLDER="true">Other Bookmarks</H3>
-    <DL><p>
-        <DT><A HREF="https://other.example/">Other</A>
-    </DL><p>
-</DL>"#;
-
-    #[test]
-    fn reads_firefox_exports_into_the_three_roots() {
-        let (roots, skipped) = parse(FIREFOX).unwrap();
-        assert_eq!(skipped, 1);
-        assert_eq!(roots.bar.len(), 2);
-        assert_eq!(roots.other.len(), 2);
-        assert!(
-            matches!(&roots.other[0], BookmarkNode::Link { title, added_at: Some(1_700_000_000_000), .. } if title == "Menu & more")
-        );
-        let BookmarkNode::Folder { children, .. } = &roots.bar[1] else {
-            panic!()
-        };
-        assert!(
-            matches!(&children[0], BookmarkNode::Link { url, .. } if url == "https://work.example/?a=1&b=2")
-        );
-    }
-
-    #[test]
-    fn round_trips_through_its_own_export() {
-        let (roots, _) = parse(FIREFOX).unwrap();
-        let mut with_mobile = roots.clone();
-        with_mobile.mobile.push(BookmarkNode::Link {
-            title: "Phone \"quoted\" <tag>".into(),
-            url: "https://phone.example/".into(),
-            added_at: Some(1_700_000_000_000),
-        });
-        let (again, skipped) = parse(&write(&with_mobile)).unwrap();
-        assert_eq!(skipped, 0);
-        assert_eq!(again, with_mobile);
-    }
-
-    #[test]
-    fn rejects_files_that_are_not_bookmarks() {
-        assert!(parse("<html><body>Hello</body></html>").is_err());
-    }
-}
+mod tests;

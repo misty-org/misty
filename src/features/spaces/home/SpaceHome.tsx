@@ -22,7 +22,7 @@ import { closeDrawingCollaborationSession, notifyDrawingListChanged } from "@/fe
 import { preloadSpaceSection } from "../SpaceSectionView";
 import { useSpaceItemCreator } from "../useSpaceItemCreator";
 import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "./galleryItems";
-import { GalleryPreview, kindIcon } from "./galleryPreview";
+import { GalleryPreview, kindIcon } from "./GalleryPreview";
 import { readHomePreference, writeHomePreference } from "./homePreferences";
 import { MakeSomethingNew } from "./MakeSomethingNew";
 import { SpaceItemCard } from "./SpaceItemCard";
@@ -98,12 +98,10 @@ export function SpaceHome({ space }: { space: Space }) {
         : removalLabels.length === 1 && removalLabels[0] === "Move to Trash"
           ? `Move ${selected.length} selected ${selected.length === 1 ? "file" : "files"} to Trash?`
           : removalLabels.length === 1 && removalLabels[0] === "Unlink"
-            ? `Unlink ${selected.length} selected ${selected.length === 1 ? "project" : "projects"} from this Space? Their files stay on their owners' computers.`
+            ? `Unlink ${selected.length} selected ${selected.length === 1 ? "project" : "projects"} ` +
+              "from this Space? Their files stay on their owners' computers."
             : `Remove ${selected.length} selected items? Files will move to Trash, projects will be unlinked, and other items will be deleted.`;
-    if (
-      !(await confirmAction(confirmation))
-    )
-      return;
+    if (!(await confirmAction(confirmation))) return;
     setDeleting(true);
     setDeleteError("");
     try {
@@ -113,7 +111,8 @@ export function SpaceHome({ space }: { space: Space }) {
           closeDrawingCollaborationSession(space.id, item!.key.slice("drawing:".length));
           notifyDrawingListChanged(space.id);
         }
-        const eventKind = item!.kind === "chat" ? "conversation" : item!.kind === "file" ? "library" : item!.kind;
+        const eventKind =
+          item!.kind === "chat" ? "conversation" : item!.kind === "file" ? "library" : item!.kind;
         window.dispatchEvent(
           new CustomEvent(`misty:space-${eventKind}-event`, { detail: { space_id: space.id } }),
         );
@@ -187,7 +186,11 @@ export function SpaceHome({ space }: { space: Space }) {
         onClear={selection.clear}
         onDelete={() => void deleteSelected()}
       />
-      {deleteError && <p role="alert" className="text-sm text-cream-muted">{deleteError}</p>}
+      {deleteError && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {deleteError}
+        </p>
+      )}
       {openError && (
         <p role="alert" className="text-sm text-cream">
           {openError}

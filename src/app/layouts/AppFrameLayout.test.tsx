@@ -1,7 +1,10 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The layout waits for Misty's opening flight, a timer started when the module loads.
+vi.hoisted(() => vi.useFakeTimers({ toFake: ["setTimeout"] }));
 
 const mocks = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
@@ -53,7 +56,13 @@ vi.mock("@/features/connected-devices", () => ({
 }));
 
 import { AppFrameLayout } from "./AppFrameLayout";
+
+beforeAll(async () => {
+  await vi.advanceTimersByTimeAsync(2_000);
+  vi.useRealTimers();
+});
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
+import { useSetupStore } from "@/features/setup/useSetupStore";
 
 function LocationProbe() {
   const location = useLocation();
@@ -79,6 +88,8 @@ describe("AppFrameLayout", () => {
     mocks.user = null;
     mocks.transitioning = false;
     mocks.nativeRecovery = false;
+    // Past the first-run welcome, as every later launch is.
+    useSetupStore.setState({ welcomed: true });
     useWorkspaceRecoveryState.setState({
       accountId: null,
       ready: false,
@@ -95,16 +106,17 @@ describe("AppFrameLayout", () => {
     container.remove();
   });
 
-  it("blocks unauthenticated users and redirects /spaces to /signin with target state", async () => {
+  it("shows the welcome once, on first run, before the window", async () => {
     mocks.user = null;
+    useSetupStore.setState({ welcomed: false });
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces?tab=overview"]}>
+        <MemoryRouter initialEntries={["/"]}>
           <Routes>
-            <Route path="/signin" element={<LocationProbe />} />
+            <Route path="/welcome" element={<LocationProbe />} />
             <Route element={<AppFrameLayout />}>
-              <Route path="/spaces" element={<div>Spaces content</div>} />
+              <Route path="/" element={<div>Browser content</div>} />
             </Route>
           </Routes>
         </MemoryRouter>,
@@ -112,13 +124,52 @@ describe("AppFrameLayout", () => {
     });
 
     expect(container.querySelector('[data-testid="location-probe"]')?.textContent).toContain(
-      "/signin",
+      "/welcome",
     );
-    expect(container.querySelector('[data-testid="location-state"]')?.textContent).toContain(
-      "/spaces?tab=overview",
-    );
-    expect(container.textContent).not.toContain("Spaces content");
     expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+  });
+
+  it("lets signed-out people browse instead of sending them to sign in", async () => {
+    mocks.user = null;
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <Routes>
+            <Route path="/signin" element={<LocationProbe />} />
+            <Route element={<AppFrameLayout />}>
+              <Route path="/browser" element={<div>Browser content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(container.querySelector('[data-testid="location-probe"]')).toBeNull();
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
+  });
+
+  it("waits for the local profile's saved tabs while signed out", async () => {
+    mocks.user = null;
+    mocks.nativeRecovery = true;
+
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/browser"]}>
+          <Routes>
+            <Route element={<AppFrameLayout />}>
+              <Route path="/browser" element={<div>Browser content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
+
+    await act(async () => {
+      useWorkspaceRecoveryState.setState({ accountId: "local", ready: true, usable: true });
+    });
+    expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
   });
 
   it("keeps the route and hook order stable while an account transition restores identity", async () => {

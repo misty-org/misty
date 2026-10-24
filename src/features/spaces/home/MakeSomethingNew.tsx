@@ -4,7 +4,7 @@ import { spacesApi } from "@/api/spaces/api";
 import { useCodingIncluded } from "@/features/agents";
 import { FileInput, Pressable, cn } from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
-import { MakeArt } from "./makeArt";
+import { MakeArt } from "./MakeArt";
 
 type Tile = { id: SpaceCreateKind; label: string };
 
@@ -57,13 +57,7 @@ export function MakeSomethingNew({
     setError("");
     setBusy(tile.id);
     try {
-      await createSpaceItem(
-        spaceId,
-        tile.id,
-        navigate,
-        () => picker.current?.click(),
-        onCreated,
-      );
+      await createSpaceItem(spaceId, tile.id, navigate, () => picker.current?.click(), onCreated);
     } catch {
       setError(`Couldn't make a new ${tile.label.toLowerCase()}. Try again.`);
     } finally {

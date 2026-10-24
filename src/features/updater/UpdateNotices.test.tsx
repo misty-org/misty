@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it("does not read the retired app catalog or respond to app update notices", async () => {
-  render(<UpdateNotices accountId="account" />);
+  render(<UpdateNotices profileId="account" />);
   await waitFor(() => expect(mocks.check).toHaveBeenCalledTimes(1));
   act(() =>
     window.dispatchEvent(
@@ -34,7 +34,7 @@ it("still checks for Misty releases and opens update settings", async () => {
   const openSettings = vi.fn();
   window.addEventListener("misty:open-settings", openSettings);
   try {
-    render(<UpdateNotices accountId="account" />);
+    render(<UpdateNotices profileId="account" />);
     expect((await screen.findByRole("status")).textContent).toContain("Misty 2.0.0 is available");
     expect(close).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "View release" }));
@@ -48,7 +48,7 @@ it("still checks for Misty releases and opens update settings", async () => {
 });
 it("preserves unsaved-work notices independently of update checks", () => {
   mocks.enabled = false;
-  render(<UpdateNotices accountId="account" />);
+  render(<UpdateNotices profileId="account" />);
   act(() =>
     window.dispatchEvent(
       new CustomEvent("misty:workspace-notice", {
@@ -63,9 +63,9 @@ it("preserves unsaved-work notices independently of update checks", () => {
   expect(mocks.check).not.toHaveBeenCalled();
 });
 it("does not check without an account or outside the native app", () => {
-  const view = render(<UpdateNotices accountId="" />);
+  const view = render(<UpdateNotices profileId="" />);
   expect(mocks.check).not.toHaveBeenCalled();
   mocks.native = false;
-  view.rerender(<UpdateNotices accountId="account" />);
+  view.rerender(<UpdateNotices profileId="account" />);
   expect(mocks.check).not.toHaveBeenCalled();
 });

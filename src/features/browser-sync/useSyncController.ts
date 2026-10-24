@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { openSignInSheet } from "@/features/auth";
 import {
   isApiSessionTransitioning,
   readApiAuthToken,
@@ -126,7 +127,7 @@ export function useSyncController(accountId: string) {
       const result = await retrySync(accountId, status.action?.kind, !desktop);
       if (!valid()) return;
       if (result === "sign-in") {
-        window.location.assign("/signin");
+        openSignInSheet("expired");
         return;
       }
       if (result === "credentials" || result === "setup") {

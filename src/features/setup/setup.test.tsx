@@ -80,3 +80,9 @@ it("treats accounts that finished the old walkthrough as already set up", async 
   await useSetupStore.persist.rehydrate();
   expect(isSetupCompletedForAccount(useSetupStore.getState(), "account-1")).toBe(true);
 });
+
+it("counts setup done without an account for whoever signs in", () => {
+  useSetupStore.getState().finishSetup(null);
+  expect(isSetupCompletedForAccount(useSetupStore.getState(), null)).toBe(true);
+  expect(isSetupCompletedForAccount(useSetupStore.getState(), "account-2")).toBe(true);
+});

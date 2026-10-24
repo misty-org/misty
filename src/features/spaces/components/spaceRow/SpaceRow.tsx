@@ -1,12 +1,7 @@
-import {
-  Bot,
-  House,
-  Library,
-  MessagesSquare,
-  UsersRound,
-} from "lucide-react";
+import { Bot, House, Library, MessagesSquare, UsersRound } from "lucide-react";
 import { useCallback, useState } from "react";
 import { showAgentsPanel, useMistyPanelStore } from "@/features/agents";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import {
   appIcon,
@@ -42,6 +37,13 @@ function AgentsPanelButton() {
       <AgentsIcon {...toolbarIconProps} className="size-4" />
     </IconButton>
   );
+}
+
+/** Spaces › New Space… in the app menu and the command palette open the same dialog as the
+ * Space menu's New Space. Signed out, the shell asks to sign in instead. */
+function NewSpaceShortcut({ create }: { create: () => void }) {
+  useShortcutHandler("workspace.new_space", create);
+  return null;
 }
 
 /** Opens one of the Space's pages in the focused pane. */
@@ -123,37 +125,40 @@ export function SpaceRow({
         >
           <GlobalCreateSpaceDialog>
             {(create) => (
-              <DropdownMenu onOpenChange={() => setError("")}>
-                <DropdownMenuTrigger asChild>
-                  <Pressable
-                    aria-label={`${name}, Space menu`}
-                    className={
-                      "flex h-8 max-w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-sm " +
-                      "text-cream-bright hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover"
-                    }
+              <>
+                <NewSpaceShortcut create={create} />
+                <DropdownMenu onOpenChange={() => setError("")}>
+                  <DropdownMenuTrigger asChild>
+                    <Pressable
+                      aria-label={`${name}, Space menu`}
+                      className={
+                        "flex h-8 max-w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-sm " +
+                        "text-cream-bright hover:bg-charcoal-hover data-[state=open]:bg-charcoal-hover"
+                      }
+                    >
+                      <SpaceAvatar
+                        space={space}
+                        className="size-5 shrink-0 rounded-md"
+                        fallbackClassName="text-[9px] font-semibold"
+                      />
+                      <span className="min-w-0 truncate font-medium">{name}</span>
+                      <MenuChevron className="size-5 text-cream-muted" />
+                    </Pressable>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    side="bottom"
+                    align="start"
+                    className="w-56 max-w-[calc(100vw-16px)]"
                   >
-                    <SpaceAvatar
+                    <SpaceMenuItems
                       space={space}
-                      className="size-5 shrink-0 rounded-md"
-                      fallbackClassName="text-[9px] font-semibold"
+                      onDialog={setDialog}
+                      onCreate={create}
+                      onError={setError}
                     />
-                    <span className="min-w-0 truncate font-medium">{name}</span>
-                    <MenuChevron className="size-5 text-cream-muted" />
-                  </Pressable>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  side="bottom"
-                  align="start"
-                  className="w-56 max-w-[calc(100vw-16px)]"
-                >
-                  <SpaceMenuItems
-                    space={space}
-                    onDialog={setDialog}
-                    onCreate={create}
-                    onError={setError}
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             )}
           </GlobalCreateSpaceDialog>
           <SpaceMembersPopover

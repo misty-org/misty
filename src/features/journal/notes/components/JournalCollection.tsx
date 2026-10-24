@@ -130,7 +130,11 @@ export function JournalCollection(props: {
         onClear={selection.clear}
         onDelete={() => props.onDeleteMany?.(selection.selectedIds)}
       />
-      {props.bulkError && <p role="alert" className="text-sm text-cream-muted">{props.bulkError}</p>}
+      {props.bulkError && (
+        <p role="alert" className="text-sm text-cream-muted">
+          {props.bulkError}
+        </p>
+      )}
       {props.error && (
         <div className="flex items-center gap-3 text-sm text-cream-muted" role="alert">
           Notes couldn’t load.

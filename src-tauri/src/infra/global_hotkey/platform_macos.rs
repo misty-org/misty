@@ -54,6 +54,11 @@ pub(crate) fn modifiers_from_flags(flags: u64) -> Modifiers {
     }
 }
 
+/// Whether Input Monitoring is already granted, without asking for it.
+pub(crate) fn access_granted() -> bool {
+    unsafe { CGPreflightListenEventAccess() }
+}
+
 pub(crate) fn current_modifiers() -> Modifiers {
     // kCGEventSourceStateCombinedSessionState
     modifiers_from_flags(unsafe { CGEventSourceFlagsState(0) })

@@ -1,5 +1,5 @@
 import { cn } from "../utils";
-import { FlyingMisty } from "@/features/welcome/FlyingMisty";
+import { FlyingMisty } from "./FlyingMisty";
 import { Skeleton, SkeletonList } from "./Skeleton";
 
 /** Loading surface for initial loads and route transitions. */

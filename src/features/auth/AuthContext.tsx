@@ -1,5 +1,6 @@
 import { useNativeSessionStore } from "@/features/native-session";
-import { useMemo, useState, type ReactNode } from "react";
+import { profileIdFor } from "@/features/workspace/profileId";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { readInitialUser, type AuthUser } from "./authSession";
 import type { SavedAccountSession } from "./store/accountVault";
 import { useAccountListActions } from "./provider/useAccountListActions";
@@ -27,6 +28,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(() => readInitialUser());
   const [accounts, setAccounts] = useState<SavedAccountSession[]>(() => listSavedAccountSessions());
   const activeUser = user ?? nativeUser;
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const markSessionExpired = useCallback(() => setSessionExpired(true), []);
+  // Any new identity, or the same one signed in again, carries a working session.
+  useEffect(() => setSessionExpired(false), [user]);
+  // Signing in from the local profile adopts it and signing out returns to it, so the window
+  // keeps its pages; only switching between two accounts starts the app over.
+  const [outletKey, setOutletKey] = useState(() => profileIdFor(activeUser?.id));
+  const previousUserId = useRef(activeUser?.id);
+  useEffect(() => {
+    const previous = previousUserId.current;
+    const next = activeUser?.id;
+    previousUserId.current = next;
+    if (previous && next && previous !== next) setOutletKey(next);
+  }, [activeUser?.id]);
   const operation = useAccountOperation();
   const { transitioning, accountOperationActive } = operation;
   const setters = { setUserState, setAccounts };
@@ -39,14 +54,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useTelemetryIdentitySync(activeUser);
   useStoredUserPersistence(activeUser);
   useSavedAccountListSync(activeUser, setAccounts);
-  useStartupSessionValidation(activeUser, operation, setters, deactivateToChooser);
-  useInvalidSessionHandling(activeUser, operation, deactivateToChooser);
+  useStartupSessionValidation(activeUser, operation, setters, markSessionExpired);
+  useInvalidSessionHandling(activeUser, sessionExpired, operation, markSessionExpired);
   const logout = useLogout(operation, deactivateToChooser);
   const fields = {
     user: activeUser,
     setUser,
     accounts,
     transitioning,
+    sessionExpired,
+    outletKey,
     refreshUser,
     authenticateAccount,
     switchAccount,

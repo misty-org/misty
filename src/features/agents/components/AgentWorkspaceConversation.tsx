@@ -6,7 +6,6 @@ import { MistyFolderWork } from "@/features/misty/MistyFolderWork";
 import { useGlobalMistyAttachments } from "@/features/misty/useGlobalMistyAttachments";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button } from "@/shared/ui";
 import { useEffect, useRef, useState, type Ref, type ReactNode } from "react";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useShallow } from "zustand/react/shallow";
@@ -17,15 +16,15 @@ import {
   conversationInvocationIds,
 } from "./AgentComposeNotices";
 import { AgentConversationComposer } from "./AgentConversationComposer";
-import { AgentConversationView } from "./AgentConversationView";
+import { AgentConversationTranscript } from "./AgentConversationTranscript";
 import { steerRunningTask, submitWorkspaceMessage } from "./conversationSend";
 import { useConversationTurnActions } from "./useConversationTurnActions";
 import { useConversationVoice, type AgentVoiceControl } from "./useConversationVoice";
 import { useDraftStatus } from "./useDraftStatus";
+import { useFollowLatestMessage } from "./useFollowLatestMessage";
 import { replyPrompt } from "./replyQuote";
 import { AgentControlBar } from "../workspace/AgentControlBar";
 import { usePermissionMode } from "../collaboration/permissionMode";
-import { AgentPlanCard } from "../collaboration/AgentPlanCard";
 import { AgentQuestionCard } from "../collaboration/AgentQuestionCard";
 import { WaitingForYouCard } from "@/features/agent-interventions/WaitingForYouCard";
 import { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
@@ -114,15 +113,7 @@ export function AgentWorkspaceConversation({
     if (accountId && !store.working && !store.conversations.length && !store.conversationsLoading)
       void store.loadConversations();
   }, [accountId]);
-  useEffect(() => {
-    const view = scrollRef.current;
-    if (
-      conversation?.messages.length &&
-      view &&
-      view.scrollHeight - view.scrollTop - view.clientHeight < 220
-    )
-      view.scrollTop = view.scrollHeight;
-  }, [conversation?.messages, state.working]);
+  useFollowLatestMessage(scrollRef, conversation?.messages, state.working);
   const prepare = () =>
     useMistyStore.setState({
       selectedAgentId: agent?.id,
@@ -223,38 +214,24 @@ export function AgentWorkspaceConversation({
       aria-label={`${agent?.name || "Misty"} conversation`}
     >
       <div className="agent-conversation-scroll" ref={scrollRef}>
-        {conversation?.messages.length ? (
-          <>
-            <AgentConversationView
-              conversation={conversation}
-              working={shownWorking}
-              onRetry={retryPrompt}
-              onResume={resumeLedger}
-              onLedgerChange={changeLedger}
-              onEdit={editPrompt}
-              onReply={replyTo}
-            />
-            {proposedPlan && (
-              <div className="agent-plan-slot">
-                <AgentPlanCard
-                  plan={proposedPlan}
-                  history={collaboration.state?.planHistory}
-                  working={shownWorking}
-                  onRun={(prompt) => void send(prompt, "")}
-                  onKeepPlanning={() => textareaRef.current?.focus()}
-                />
-              </div>
-            )}
-          </>
-        ) : emptyContent ? (
-          emptyContent
-        ) : !agent && !state.conversationsLoading ? (
-          <div className="agent-empty-state">
-            <Button variant="secondary" onClick={onCreate}>
-              Create an agent
-            </Button>
-          </div>
-        ) : null}
+        <AgentConversationTranscript
+          view={{
+            conversation,
+            working: shownWorking,
+            onRetry: retryPrompt,
+            onResume: resumeLedger,
+            onLedgerChange: changeLedger,
+            onEdit: editPrompt,
+            onReply: replyTo,
+          }}
+          plan={proposedPlan}
+          planHistory={collaboration.state?.planHistory}
+          onRunPlan={(prompt) => void send(prompt, "")}
+          onKeepPlanning={() => textareaRef.current?.focus()}
+          emptyContent={emptyContent}
+          showCreate={!agent && !state.conversationsLoading}
+          onCreate={onCreate}
+        />
       </div>
       <div className="agent-compose-area">
         <AgentComposeError

@@ -8,6 +8,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+mod commands;
+pub use commands::*;
+
 static CLIENTS: OnceLock<Mutex<HashMap<String, Arc<AccountClient>>>> = OnceLock::new();
 
 pub(in crate::infra) struct AccountClient {
@@ -234,25 +237,6 @@ pub(super) fn activate(url: &url::Url, client: Arc<AccountClient>) -> Result<(),
         .insert(url.origin().ascii_serialization(), client);
     Ok(())
 }
-#[tauri::command]
-pub async fn auth_cookie_capture(
-    api_base: String,
-    account_id: Option<String>,
-) -> Result<String, String> {
-    let url = server(&api_base)?;
-    let client = current(&url)?;
-    let saved = client
-        .snapshot(&url)?
-        .ok_or("Misty session cookies are unavailable. Sign in again.")?;
-    if account_id
-        .as_deref()
-        .is_some_and(|expected| expected != saved.account_id)
-    {
-        return Err("Session account changed during sign-in".into());
-    }
-    client.persist(&url)?;
-    Ok(saved.account_id)
-}
 fn has_active_account(url: &url::Url, account: Option<&str>) -> bool {
     account.filter(|id| !id.is_empty()).is_some_and(|account| {
         current(url).is_ok_and(|client| {
@@ -279,163 +263,5 @@ fn restore_preserves_scope(
         })
 }
 
-#[tauri::command]
-pub async fn auth_cookie_restore(
-    app: tauri::AppHandle,
-    api_base: String,
-    account_id: Option<String>,
-) -> Result<bool, String> {
-    let url = server(&api_base)?;
-    super::super::browser_sync::change_account_if(
-        Some(&app),
-        |scope| !restore_preserves_scope(&url, account_id.as_deref(), scope),
-        || {
-            // Additional renderers restore the same account at startup. Keep
-            // its current jar/refresh lock and native task leases intact. This
-            // check and the account-change decision share the lifecycle barrier.
-            if has_active_account(&url, account_id.as_deref()) {
-                return Ok(true);
-            }
-            activate(&url, AccountClient::new()?)?;
-            let Some(account_id) = account_id.as_deref().filter(|id| !id.is_empty()) else {
-                return Ok(false);
-            };
-            let Some(value) =
-                credential_io(|| misty_credential_store::account::load(&key(&url, &account_id)))?
-            else {
-                return Ok(false);
-            };
-            let value = zeroize::Zeroizing::new(value);
-            let Some(client) = AccountClient::restore(&url, &account_id, &value)? else {
-                return Ok(false);
-            };
-            activate(&url, client)?;
-            Ok(true)
-        },
-    )
-    .await
-}
-#[tauri::command]
-pub async fn auth_cookie_forget(
-    app: tauri::AppHandle,
-    api_base: String,
-    account_id: String,
-) -> Result<(), String> {
-    let url = server(&api_base)?;
-    super::super::browser_sync::change_account_if(
-        Some(&app),
-        |scope| {
-            scope.is_some_and(|scope| {
-                scope.account_id == account_id
-                    && scope.deployment == url.as_str().trim_end_matches('/')
-            }) || current(&url)
-                .is_ok_and(|client| client.require_account(&url, &account_id).is_ok())
-        },
-        || credential_io(|| misty_credential_store::account::delete(&key(&url, &account_id))),
-    )
-    .await
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    fn token(user: &str, kind: &str, exp: u64) -> String {
-        format!(
-            "header.{}.signature",
-            URL_SAFE_NO_PAD.encode(
-                serde_json::to_vec(&serde_json::json!({"sub":user,"token_use":kind,"exp":exp}))
-                    .unwrap()
-            )
-        )
-    }
-    #[test]
-    fn restores_cookie_scope_and_expiry_without_exposing_credentials() {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        let url = server("https://api.misty.test/v1").unwrap();
-        let saved = SavedCookies {
-            account_id: "ada".into(),
-            origin: url.origin().ascii_serialization(),
-            access: Some(token("ada", "access", now() - 1)),
-            refresh: token("ada", "refresh", now() + 3600),
-        };
-        let raw = serde_json::to_string(&saved).unwrap();
-        let client = AccountClient::restore(&url, "ada", &raw).unwrap().unwrap();
-        let snapshot = client.snapshot(&url).unwrap().unwrap();
-        assert!(client.require_account(&url, "ada").is_ok());
-        assert!(client.require_account(&url, "grace").is_err());
-        assert!(snapshot.access.is_none());
-        assert_eq!(snapshot.account_id, "ada");
-        assert!(client
-            .jar
-            .cookies(&server("https://other.test/v1").unwrap())
-            .is_none());
-        assert!(client
-            .jar
-            .cookies(&server("http://api.misty.test/v1").unwrap())
-            .is_none());
-        assert!(AccountClient::restore(&url, "grace", &raw).is_err());
-        assert!(
-            AccountClient::restore(&server("https://other.test/v1").unwrap(), "ada", &raw).is_err()
-        );
-    }
-    #[test]
-    fn same_account_restore_retains_live_jar_but_never_matches_other_or_expired_accounts() {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        let url = server("https://worker-restore.misty.test/v1").unwrap();
-        let client = AccountClient::new().unwrap();
-        client.add(
-            &url,
-            "misty_refresh",
-            &token("ada", "refresh", now() + 3600),
-            now() + 3600,
-        );
-        activate(&url, client.clone()).unwrap();
-        assert!(has_active_account(&url, Some("ada")));
-        let mut scope = misty_browser_sync::crypto::VaultScope {
-            deployment: url.as_str().trim_end_matches('/').into(),
-            account_id: "ada".into(),
-            vault_id: "test-vault".into(),
-        };
-        assert!(restore_preserves_scope(&url, Some("ada"), None));
-        assert!(restore_preserves_scope(&url, Some("ada"), Some(&scope)));
-        scope.account_id = "grace".into();
-        assert!(!restore_preserves_scope(&url, Some("ada"), Some(&scope)));
-        scope.account_id = "ada".into();
-        scope.deployment = "https://other.test/v1".into();
-        assert!(!restore_preserves_scope(&url, Some("ada"), Some(&scope)));
-        assert!(Arc::ptr_eq(&client, &current(&url).unwrap()));
-        assert!(!has_active_account(&url, Some("grace")));
-        assert!(!has_active_account(&url, None));
-        assert!(!has_active_account(&url, Some("")));
-        assert!(!has_active_account(
-            &server("https://another-worker.misty.test/v1").unwrap(),
-            Some("ada")
-        ));
-        client.add(
-            &url,
-            "misty_refresh",
-            &token("ada", "refresh", now() - 1),
-            now() + 3600,
-        );
-        assert!(!has_active_account(&url, Some("ada")));
-    }
-    #[test]
-    fn rejects_expired_refresh_and_swapped_token_types() {
-        let url = server("http://localhost:8081/v1").unwrap();
-        let mut saved = SavedCookies {
-            account_id: "ada".into(),
-            origin: url.origin().ascii_serialization(),
-            access: None,
-            refresh: token("ada", "refresh", now() - 1),
-        };
-        assert!(
-            AccountClient::restore(&url, "ada", &serde_json::to_string(&saved).unwrap())
-                .unwrap()
-                .is_none()
-        );
-        saved.refresh = token("ada", "access", now() + 3600);
-        assert!(
-            AccountClient::restore(&url, "ada", &serde_json::to_string(&saved).unwrap()).is_err()
-        );
-    }
-}
+mod tests;

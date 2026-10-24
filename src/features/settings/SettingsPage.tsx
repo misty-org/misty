@@ -1,8 +1,5 @@
 import { DesktopSettingsFrame } from "./components/DesktopSettingsUI";
-import {
-  canonicalSettingsSection,
-  settingsRegistry,
-} from "./settingsRegistry";
+import { canonicalSettingsSection, settingsRegistry } from "./settingsRegistry";
 
 export { canonicalSettingsSection, settingsRegistry };
 export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
@@ -25,9 +22,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       title="Settings"
     >
       <div className="flex min-h-[calc(100dvh-7rem)] items-center justify-center text-center">
-        <p className="text-[15px] leading-6 text-cream-muted">
-          settings development in progress
-        </p>
+        <p className="text-[15px] leading-6 text-cream-muted">settings development in progress</p>
       </div>
     </DesktopSettingsFrame>
   );
