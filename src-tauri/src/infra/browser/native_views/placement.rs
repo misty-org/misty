@@ -2,7 +2,10 @@
 use super::*;
 
 #[cfg(target_os = "macos")]
-pub(in crate::infra::browser) fn position_macos_webview(webview: &Webview, reveal: bool) -> Result<(), String> {
+pub(in crate::infra::browser) fn position_macos_webview(
+    webview: &Webview,
+    reveal: bool,
+) -> Result<(), String> {
     use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
     let own_renderer = renderer(webview.window().label());
     webview

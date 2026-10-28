@@ -77,8 +77,10 @@ async fn clear_webkit_website_data(
             "WKWebsiteDataTypeFetchCache",
         ]);
     }
-    super::super::super::browser_macos::clear_browser_website_data(app, identifier, data_types, since)
-        .await
+    super::super::super::browser_macos::clear_browser_website_data(
+        app, identifier, data_types, since,
+    )
+    .await
 }
 
 /// Clears through a hidden page in the profile: WebView2 removes data only

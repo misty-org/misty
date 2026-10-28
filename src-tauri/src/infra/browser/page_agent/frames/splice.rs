@@ -36,7 +36,10 @@ fn clip(text: &str, max: usize) -> &str {
 /// Puts each frame's tree under the iframe line that shows it, matching by origin and
 /// then by order; frames no line claims go at the end. Frames add at most
 /// FRAME_TREES_CHARS in all.
-pub(in crate::infra::browser::page_agent) fn splice_trees(tree: &str, frames: &[FrameRead]) -> String {
+pub(in crate::infra::browser::page_agent) fn splice_trees(
+    tree: &str,
+    frames: &[FrameRead],
+) -> String {
     let mut used = vec![false; frames.len()];
     let mut budget = FRAME_TREES_CHARS;
     let mut out: Vec<String> = Vec::new();
@@ -105,7 +108,10 @@ pub(in crate::infra::browser::page_agent) fn splice_trees(tree: &str, frames: &[
 }
 
 /// The top document's skills followed by the frames' that it lacks.
-pub(in crate::infra::browser::page_agent) fn merge_skills(skills: &Value, frames: &[FrameRead]) -> Value {
+pub(in crate::infra::browser::page_agent) fn merge_skills(
+    skills: &Value,
+    frames: &[FrameRead],
+) -> Value {
     let mut merged = skills.as_array().cloned().unwrap_or_default();
     for skill in frames.iter().flat_map(|frame| frame.skills.iter()) {
         if !merged.iter().any(|seen| seen["id"] == skill["id"]) {
@@ -116,7 +122,10 @@ pub(in crate::infra::browser::page_agent) fn merge_skills(skills: &Value, frames
 }
 
 /// The page's Markdown followed by each frame's, labeled with where it comes from.
-pub(in crate::infra::browser::page_agent) fn append_markdown(markdown: &str, frames: &[FrameRead]) -> String {
+pub(in crate::infra::browser::page_agent) fn append_markdown(
+    markdown: &str,
+    frames: &[FrameRead],
+) -> String {
     let mut out = markdown.to_owned();
     for frame in frames {
         out.push_str(&format!(

@@ -45,7 +45,9 @@ use crate::infra::browser_pointer_guard_macos::{
 };
 
 #[cfg(target_os = "macos")]
-pub(in crate::infra) fn configure_main_webview_pointer_guard(webview: &Webview) -> Result<(), String> {
+pub(in crate::infra) fn configure_main_webview_pointer_guard(
+    webview: &Webview,
+) -> Result<(), String> {
     use objc2_app_kit::NSView;
     webview
         .with_webview(|platform_webview| unsafe {
@@ -123,7 +125,9 @@ pub(in crate::infra) fn refresh_browser_cursor_ownership(webview: &Webview) -> R
 }
 
 #[cfg(target_os = "macos")]
-pub(in crate::infra) fn unregister_browser_cursor_ownership(webview: &Webview) -> Result<(), String> {
+pub(in crate::infra) fn unregister_browser_cursor_ownership(
+    webview: &Webview,
+) -> Result<(), String> {
     use objc2_app_kit::NSView;
     webview
         .with_webview(|platform_webview| unsafe {
@@ -163,7 +167,9 @@ pub(in crate::infra) fn refresh_browser_cursor_ownership(_webview: &Webview) -> 
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(in crate::infra) fn unregister_browser_cursor_ownership(_webview: &Webview) -> Result<(), String> {
+pub(in crate::infra) fn unregister_browser_cursor_ownership(
+    _webview: &Webview,
+) -> Result<(), String> {
     Ok(())
 }
 

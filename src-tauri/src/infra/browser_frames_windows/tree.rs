@@ -20,7 +20,10 @@ fn walk<'a>(node: &'a Value, out: &mut Vec<&'a Value>) {
 /// The top document's loader and its cross-origin frame documents, from the tab's frame
 /// tree and those of its frame sessions. A frame runs in the session whose tree holds it,
 /// not the tab's.
-pub(super) fn cross_origin_frames(top: &Value, sessions: &[(String, Value)]) -> Option<(String, Vec<Found>)> {
+pub(super) fn cross_origin_frames(
+    top: &Value,
+    sessions: &[(String, Value)],
+) -> Option<(String, Vec<Found>)> {
     let root = &top["frameTree"];
     let document = root["frame"]["loaderId"].as_str()?.to_owned();
     let top_origin = root["frame"]["securityOrigin"].as_str().unwrap_or("null");

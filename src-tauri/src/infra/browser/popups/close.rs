@@ -8,12 +8,7 @@ pub(super) fn expire_unadopted(app: &AppHandle, id: String, label: String, agent
     tauri::async_runtime::spawn(async move {
         // Export popups may spend time generating a file before it downloads.
         // Keep the view alive through the source's bounded download wait.
-        tokio::time::sleep(Duration::from_secs(if agent_download {
-            100
-        } else {
-            30
-        }))
-        .await;
+        tokio::time::sleep(Duration::from_secs(if agent_download { 100 } else { 30 })).await;
         let state = cleanup_app.state::<BrowserSessionState>();
         let pending = state
             .pending_popups
@@ -50,7 +45,11 @@ fn close_from_page(app: AppHandle, id: String) {
 
 /// WebView2 reports `window.close()` as WindowCloseRequested.
 #[cfg(windows)]
-pub(super) fn install_close_handler(app: &AppHandle, webview: &Webview, id: &str) -> Result<(), String> {
+pub(super) fn install_close_handler(
+    app: &AppHandle,
+    webview: &Webview,
+    id: &str,
+) -> Result<(), String> {
     use webview2_com::WindowCloseRequestedEventHandler;
     let app = app.clone();
     let id = id.to_owned();
@@ -111,7 +110,11 @@ extern "C" fn webview_did_close(
     }
 }
 #[cfg(target_os = "macos")]
-pub(super) fn install_close_handler(app: &AppHandle, webview: &Webview, id: &str) -> Result<(), String> {
+pub(super) fn install_close_handler(
+    app: &AppHandle,
+    webview: &Webview,
+    id: &str,
+) -> Result<(), String> {
     use objc::{msg_send, sel, sel_impl};
     let app = app.clone();
     let id = id.to_owned();

@@ -60,8 +60,7 @@ fn run() {
             let detail = super::super::catalog::latest(key).await?;
             let bytes = super::super::catalog::bytes(&detail.download_url, 64 << 20).await?;
             let unpacked = root.path().join(format!("pkg-{key}"));
-            let review =
-                super::super::package::extract(&bytes, detail, &unpacked, "probe".into())?;
+            let review = super::super::package::extract(&bytes, detail, &unpacked, "probe".into())?;
             let runtime_dir = unpacked.join("runtime");
             let original = read_manifest(&runtime_dir)?;
             let origin = format!("probe-origin-{key}");
@@ -165,14 +164,15 @@ fn run() {
                 }
                 if let Some(popup) = popup {
                     let (send, navigated) = mpsc::channel();
-                    let handler = NavigationCompletedEventHandler::create(Box::new(move |_, args| {
-                        let mut ok = BOOL::default();
-                        if let Some(args) = args {
-                            unsafe { args.IsSuccess(&mut ok) }?;
-                        }
-                        let _ = send.send(ok.as_bool());
-                        Ok(())
-                    }));
+                    let handler =
+                        NavigationCompletedEventHandler::create(Box::new(move |_, args| {
+                            let mut ok = BOOL::default();
+                            if let Some(args) = args {
+                                unsafe { args.IsSuccess(&mut ok) }?;
+                            }
+                            let _ = send.send(ok.as_bool());
+                            Ok(())
+                        }));
                     let mut token = Default::default();
                     unsafe { core.add_NavigationCompleted(&handler, &mut token) }.unwrap();
                     let url = format!(

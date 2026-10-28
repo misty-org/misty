@@ -201,7 +201,10 @@ pub async fn browser_downloads_remove(
     Ok(())
 }
 
-pub(super) fn remove_local(app: &AppHandle, request: &BrowserDownloadsRemoveRequest) -> Result<(), String> {
+pub(super) fn remove_local(
+    app: &AppHandle,
+    request: &BrowserDownloadsRemoveRequest,
+) -> Result<(), String> {
     let connection = library(app)?;
     if request.ids.is_empty() {
         connection

@@ -3,7 +3,8 @@ use super::*;
 
 /// Extension page hosts, with the Spaces that run each extension. The same
 /// extension keeps one host in every Space; each Space's controller serves it.
-pub(super) fn origins() -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
+pub(super) fn origins(
+) -> &'static std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>> {
     static ORIGINS: OnceLock<
         std::sync::RwLock<BTreeMap<String, std::collections::BTreeSet<String>>>,
     > = OnceLock::new();

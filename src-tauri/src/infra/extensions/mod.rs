@@ -35,8 +35,8 @@ use tauri::Manager;
 use tokio::sync::Mutex;
 
 mod origins;
-use origins::*;
 pub(crate) use origins::is_extension_url;
+use origins::*;
 mod package_dirs;
 use package_dirs::*;
 

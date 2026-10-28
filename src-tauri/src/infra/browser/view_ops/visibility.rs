@@ -18,7 +18,12 @@ pub fn browser_webview_show(
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
     let space = super::super::super::extensions::native::page_space(&app, &request.id);
-    super::super::super::extensions::native::tab_event(&app, space.as_deref(), &request.id, "activate");
+    super::super::super::extensions::native::tab_event(
+        &app,
+        space.as_deref(),
+        &request.id,
+        "activate",
+    );
     with_webview(&app, &request.id, |webview| {
         if detached_from(&caller, &webview) {
             return Ok(());

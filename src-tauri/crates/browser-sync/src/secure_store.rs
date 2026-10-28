@@ -113,7 +113,9 @@ mod platform {
         }
         (0..text.len())
             .step_by(2)
-            .map(|index| u8::from_str_radix(&text[index..index + 2], 16).map_err(|_| Error::Invalid))
+            .map(|index| {
+                u8::from_str_radix(&text[index..index + 2], 16).map_err(|_| Error::Invalid)
+            })
             .collect::<Result<Vec<u8>>>()
             .map(Zeroizing::new)
     }
@@ -170,7 +172,10 @@ mod tests {
     fn roots_round_trip_through_hex() {
         let bytes: Vec<u8> = (0u8..33).collect();
         let text = platform::__encode_for_test(&bytes);
-        assert_eq!(platform::__decode_for_test(&text).unwrap().as_slice(), &bytes[..]);
+        assert_eq!(
+            platform::__decode_for_test(&text).unwrap().as_slice(),
+            &bytes[..]
+        );
         assert!(platform::__decode_for_test("zz").is_err());
         assert!(platform::__decode_for_test("abc").is_err());
     }

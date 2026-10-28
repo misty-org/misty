@@ -34,7 +34,9 @@ pub(super) async fn page_calls_reach_kiri_and_nothing_else(app: &AppHandle) -> R
     Ok(())
 }
 
-pub(super) async fn host_channel_authenticates_misty_scripts(app: &AppHandle) -> Result<(), String> {
+pub(super) async fn host_channel_authenticates_misty_scripts(
+    app: &AppHandle,
+) -> Result<(), String> {
     let token = shortcut_token_for(&app.state::<BrowserSessionState>(), ID)?;
     let (focus, focus_listener) = counter(app, "misty://browser-focus");
     let (stopped, stopped_listener) = counter(app, "misty://browser-stopped");
@@ -81,7 +83,10 @@ pub(super) async fn host_channel_authenticates_misty_scripts(app: &AppHandle) ->
     Ok(())
 }
 
-pub(super) async fn context_menu_copies_through_kiri(app: &AppHandle, url: &Url) -> Result<(), String> {
+pub(super) async fn context_menu_copies_through_kiri(
+    app: &AppHandle,
+    url: &Url,
+) -> Result<(), String> {
     let token = shortcut_token_for(&app.state::<BrowserSessionState>(), ID)?;
     let menu: Arc<std::sync::Mutex<Option<String>>> = Arc::default();
     let shown = menu.clone();
@@ -174,7 +179,9 @@ pub(super) async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), S
 
 /// Runs Kiri's macOS authenticator for real. Unsigned for the passkey
 /// entitlement, the system must refuse it and Kiri must say so without hanging.
-pub(super) async fn passkey_path_reaches_authentication_services(app: &AppHandle) -> Result<(), String> {
+pub(super) async fn passkey_path_reaches_authentication_services(
+    app: &AppHandle,
+) -> Result<(), String> {
     use kiri::capabilities::webauthn::{macos, WebAuthn};
     struct ProbeHost(AppHandle);
     impl kiri::Host for ProbeHost {

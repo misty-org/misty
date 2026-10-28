@@ -97,7 +97,9 @@ pub async fn browser_webview_create(
     record_request(&state, &request, &profile_lease.logical_profile_id)?;
     let shortcut_token = shortcut_token_for(&state, &request.id)?;
     if let Some(webview) = app.get_webview(&label) {
-        return adopt_existing(&app, &state, &window, webview, &request, &space, position, size);
+        return adopt_existing(
+            &app, &state, &window, webview, &request, &space, position, size,
+        );
     }
 
     let page_app = app.clone();

@@ -35,7 +35,9 @@ impl Default for BrowserSessionState {
             pending_popups: Mutex::default(),
             sessions: Mutex::default(),
             reserved_downloads: Mutex::default(),
-            shortcut_bindings: Mutex::new(crate::infra::browser_shortcuts::default_shortcut_bindings()),
+            shortcut_bindings: Mutex::new(
+                crate::infra::browser_shortcuts::default_shortcut_bindings(),
+            ),
             shortcut_tokens: Mutex::default(),
         }
     }
@@ -57,7 +59,10 @@ pub(super) struct BrowserSession {
     pub(super) logical_profile_id: Option<String>,
     pub(super) profile_provider: Option<String>,
     pub(super) provider_id: Option<String>,
-    pub(super) oauth_callback: Option<(crate::infra::browser_provider::OAuthCallback, std::time::Instant)>,
+    pub(super) oauth_callback: Option<(
+        crate::infra::browser_provider::OAuthCallback,
+        std::time::Instant,
+    )>,
     pub(super) scope_id: String,
     pub(super) grants: HashMap<String, BrowserGrant>,
     pub(super) snapshot_generation: u64,
@@ -119,7 +124,11 @@ pub(super) fn popup_download_authority(
     ))
 }
 
-pub(super) fn register_session(state: &BrowserSessionState, id: &str, scope_id: &str) -> Result<(), String> {
+pub(super) fn register_session(
+    state: &BrowserSessionState,
+    id: &str,
+    scope_id: &str,
+) -> Result<(), String> {
     let mut sessions = state
         .sessions
         .lock()

@@ -7,7 +7,8 @@ pub(in crate::infra) fn browser_data_directory(
     profile: Option<&str>,
 ) -> Result<PathBuf, String> {
     browser_profile_identifier(profile)?;
-    let home = crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
+    let home =
+        crate::infra::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
     let path = crate::infra::browser_profile::webview_home(&home, profile)?;
     #[cfg(target_os = "macos")]
     {

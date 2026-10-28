@@ -18,10 +18,10 @@ use std::{sync::Mutex, time::Duration};
 use tauri::Webview;
 
 mod convert;
-use convert::{export_cookie, skip};
-pub(crate) use convert::{import_cookie, representable};
 #[cfg(test)]
 use convert::equal;
+use convert::{export_cookie, skip};
+pub(crate) use convert::{import_cookie, representable};
 
 const COOKIE_LIMIT: usize = 20_000;
 /// Foundation drops an explicit SameSite=None and reports nil, which WebKit
@@ -70,7 +70,6 @@ unsafe fn cookie_store(
     }
     Ok(store.httpCookieStore())
 }
-
 
 /// Reads raw engine cookies without leaking them into JS, events, or logs.
 /// A cookie that cannot be represented exactly is skipped and reported, never

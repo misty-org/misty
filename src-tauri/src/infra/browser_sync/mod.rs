@@ -27,12 +27,12 @@ use tokio::{
 };
 use zeroize::Zeroizing;
 
+mod account_credentials;
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
 #[cfg(any(target_os = "macos", windows))]
 mod collect;
 mod control_advertisement;
-mod account_credentials;
 mod device_data;
 #[cfg(any(target_os = "macos", windows))]
 mod device_signin;
@@ -42,8 +42,8 @@ mod workspaces;
 
 mod account;
 mod database;
-mod local_vault;
 mod database_legacy;
+mod local_vault;
 mod os_version;
 mod profile;
 mod profile_selection;
@@ -66,6 +66,15 @@ pub(crate) use account::{
     __cmd__browser_sync_set_frequency, __tauri_command_name_browser_sync_set_frequency,
 };
 pub(super) use account::{change_account, change_account_if};
+pub(crate) use account_credentials::{
+    __cmd__account_check_password, __cmd__account_login_credential,
+    __cmd__browser_sync_use_account_password, __tauri_command_name_account_check_password,
+    __tauri_command_name_account_login_credential,
+    __tauri_command_name_browser_sync_use_account_password,
+};
+pub use account_credentials::{
+    account_check_password, account_login_credential, browser_sync_use_account_password,
+};
 pub(super) use database::lock_database;
 pub(crate) use database::{
     __cmd__browser_sync_availability, __cmd__browser_sync_delete_vault,
@@ -108,15 +117,6 @@ pub(crate) use vault_open::{
     __tauri_command_name_browser_sync_connect, __tauri_command_name_browser_sync_setup,
 };
 pub use vault_open::{browser_sync_connect, browser_sync_setup};
-pub(crate) use account_credentials::{
-    __cmd__account_check_password, __cmd__account_login_credential,
-    __cmd__browser_sync_use_account_password, __tauri_command_name_account_check_password,
-    __tauri_command_name_account_login_credential,
-    __tauri_command_name_browser_sync_use_account_password,
-};
-pub use account_credentials::{
-    account_check_password, account_login_credential, browser_sync_use_account_password,
-};
 use view::view;
 pub(crate) use view::{
     __cmd__browser_sync_account_feed, __cmd__browser_sync_state,

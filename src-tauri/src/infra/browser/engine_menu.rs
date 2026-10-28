@@ -45,6 +45,5 @@ fn suppressed(webview: &Webview, renderer: bool) -> bool {
         return true;
     }
     let window = webview.window().label().to_owned();
-    context_menu::menu_pending(webview.app_handle(), &window)
-        || super::renderer(&window).overlay
+    context_menu::menu_pending(webview.app_handle(), &window) || super::renderer(&window).overlay
 }

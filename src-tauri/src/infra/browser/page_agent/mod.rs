@@ -17,11 +17,11 @@ mod batch;
 mod consent;
 pub(crate) use consent::answer_consent_after_load;
 use consent::decline_consent;
+mod execute;
 #[cfg(any(target_os = "macos", windows))]
 mod frames;
 #[cfg(all(test, windows))]
 mod frames_probe_windows;
-mod execute;
 pub(super) use execute::execute;
 use execute::poll;
 mod navigation;

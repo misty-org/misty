@@ -143,7 +143,11 @@ async fn wait_for(view: &Webview, input: &Value) -> Result<Value, String> {
     poll(view, &condition, timeout).await
 }
 
-pub(super) async fn poll(view: &Webview, condition: &Value, timeout_ms: u64) -> Result<Value, String> {
+pub(super) async fn poll(
+    view: &Webview,
+    condition: &Value,
+    timeout_ms: u64,
+) -> Result<Value, String> {
     let started = Instant::now();
     loop {
         let check = call(view, "waitCheck", condition.clone(), false).await?;

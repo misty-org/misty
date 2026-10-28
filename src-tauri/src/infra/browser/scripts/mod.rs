@@ -13,7 +13,10 @@ pub(super) fn browser_viewport_script(
     let bindings_json = serde_json::to_string(bindings).unwrap_or_else(|_| "[]".to_owned());
     BROWSER_VIEWPORT_SCRIPT
         .replace("__MISTY_MEDIA_PLACEHOLDER__", include_str!("media.js"))
-        .replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", include_str!("window_drag.js"))
+        .replace(
+            "__MISTY_WINDOW_DRAG_PLACEHOLDER__",
+            include_str!("window_drag.js"),
+        )
         .replace(
             "__KIRI_HOST_SENDER_PLACEHOLDER__",
             kiri::channel::sender_script(),

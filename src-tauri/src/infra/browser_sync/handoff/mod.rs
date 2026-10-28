@@ -3,10 +3,10 @@
 use super::*;
 
 mod capture;
-#[cfg(test)]
-use capture::initial_capture;
 #[cfg(any(target_os = "macos", windows))]
 pub(super) use capture::capture_current;
+#[cfg(test)]
+use capture::initial_capture;
 mod restore;
 #[cfg(all(test, any(target_os = "macos", windows)))]
 use restore::check_restore_mode;

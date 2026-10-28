@@ -74,7 +74,9 @@ pub(super) async fn open_vault_with(
     // when the server's copy carries a transition signed by this vault's root.
     let rotated = match (&cached, password.is_some() && provided_root.is_none()) {
         (Some(pinned), true) => match api.vault().await {
-            Ok(Some(remote)) if pinned.is_rotation(&remote) && pinned.check_remote(&remote).is_ok() => {
+            Ok(Some(remote))
+                if pinned.is_rotation(&remote) && pinned.check_remote(&remote).is_ok() =>
+            {
                 Some(remote)
             }
             _ => None,

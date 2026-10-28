@@ -2,7 +2,8 @@
 use super::*;
 
 /// Reading another profile's store is never skipped past: it aborts capture.
-pub(in crate::infra::website_data) const PROFILE_UNVERIFIED: &str = "Website profile could not be verified";
+pub(in crate::infra::website_data) const PROFILE_UNVERIFIED: &str =
+    "Website profile could not be verified";
 
 pub(in crate::infra::website_data) async fn evaluate(
     view: &Webview,
@@ -58,9 +59,10 @@ pub(super) async fn evaluate_request(
     let request = serde_json::to_string(&request).map_err(|_| "Invalid website storage request")?;
     let script = SCRIPT.replace("__MISTY_STORAGE_REQUEST__", &request);
     #[cfg(target_os = "macos")]
-    let raw = super::super::super::browser_macos::evaluate_browser_async_javascript(view.clone(), script)
-        .await
-        .map_err(|_| "This website's storage could not be transferred")?;
+    let raw =
+        super::super::super::browser_macos::evaluate_browser_async_javascript(view.clone(), script)
+            .await
+            .map_err(|_| "This website's storage could not be transferred")?;
     #[cfg(windows)]
     let raw = super::super::cookie_store::evaluate_storage(view, physical, script)
         .await

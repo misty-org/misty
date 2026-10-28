@@ -146,7 +146,10 @@ pub struct VaultAvailability {
 }
 
 fn account_password(vault: &Vault) -> Option<bool> {
-    vault.key_envelope.as_ref().map(|wrapper| wrapper.is_account())
+    vault
+        .key_envelope
+        .as_ref()
+        .map(|wrapper| wrapper.is_account())
 }
 
 /// Local metadata can be inspected without fetching or decrypting credentials.
@@ -161,7 +164,13 @@ pub async fn browser_sync_availability(
     let current = personal_session().await;
     let api = account_api(&api_base, &account_id)?;
     // The server's copy, when reachable, says which wrapper opens the vault now.
-    let server_kind = || async { api.vault().await.ok().flatten().and_then(|v| account_password(&v)) };
+    let server_kind = || async {
+        api.vault()
+            .await
+            .ok()
+            .flatten()
+            .and_then(|v| account_password(&v))
+    };
     if current.as_ref().is_some_and(|active| {
         active.scope.deployment == api.deployment() && active.scope.account_id == account_id
     }) {

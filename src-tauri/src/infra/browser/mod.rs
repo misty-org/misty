@@ -65,9 +65,9 @@ pub(super) use corner_scrollbars::install as install_corner_scrollbars;
 
 #[cfg(target_os = "macos")]
 mod attachment_download_macos;
+pub(crate) mod creation_guard;
 #[cfg(any(target_os = "macos", windows))]
 mod popups;
-pub(crate) mod creation_guard;
 #[cfg(any(target_os = "macos", windows))]
 use popups::provider_popup;
 

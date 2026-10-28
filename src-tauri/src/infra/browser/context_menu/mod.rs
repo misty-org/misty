@@ -4,10 +4,10 @@ use sha2::{Digest, Sha256};
 mod page_signals;
 mod right_click;
 mod selection;
-pub(super) use selection::select;
+pub(super) use right_click::right_click;
 #[cfg(test)]
 use selection::menu_action_allowed;
-pub(super) use right_click::right_click;
+pub(super) use selection::select;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

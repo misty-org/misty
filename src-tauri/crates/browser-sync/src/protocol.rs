@@ -106,7 +106,11 @@ pub struct KeyTransition {
 }
 
 impl KeyTransition {
-    pub fn signing_bytes(vault_id: &str, generation: u64, envelope: &KeyEnvelope) -> Result<Vec<u8>> {
+    pub fn signing_bytes(
+        vault_id: &str,
+        generation: u64,
+        envelope: &KeyEnvelope,
+    ) -> Result<Vec<u8>> {
         if !valid_id(vault_id) || !counter(generation) {
             return Err(Error::Invalid);
         }

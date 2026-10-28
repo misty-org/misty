@@ -34,24 +34,149 @@ pub const MAX_BYTES: usize = 1024;
 /// symbol swaps, are one of these or one repeated. This is a heuristic floor,
 /// not a strength meter.
 const COMMON: &[&str] = &[
-    "password", "passphrase", "mypassword", "yourpassword", "changeme", "default", "secret",
-    "qwerty", "qwertyuiop", "qwertyuiopasdfghjkl", "asdfghjkl", "asdfghjklzxcvbnm", "zxcvbnm",
-    "abc", "abcd", "abcdef", "abcdefgh", "abcdefghijkl", "iloveyou", "letmein", "welcome",
-    "admin", "administrator", "login", "master", "monkey", "dragon", "sunshine", "princess",
-    "football", "baseball", "basketball", "soccer", "hockey", "superman", "batman", "trustno",
-    "shadow", "michael", "jennifer", "jordan", "hunter", "ranger", "thomas", "charlie",
-    "freedom", "whatever", "mustang", "starwars", "computer", "internet", "test", "testing",
-    "guest", "hello", "helloworld", "killer", "pokemon", "summer", "winter", "spring", "autumn",
-    "ashley", "nicole", "jessica", "daniel", "matthew", "andrew", "michelle", "bailey",
-    "liverpool", "chelsea", "arsenal", "cheese", "cookie", "chocolate", "purple", "orange",
-    "yellow", "silver", "golden", "diamond", "flower", "butterfly", "rainbow", "misty",
-    "mistybrowser", "browser", "sync", "syncpassword", "googlepassword", "facebook", "twitter",
-    "instagram", "amazon", "apple", "microsoft", "windows", "linux", "ubuntu", "minecraft",
-    "fortnite", "roblox", "steam", "gamer", "gaming", "love", "lovely", "family", "forever",
-    "friends", "harley", "access", "baby", "boomer", "cowboy", "cricket", "dallas", "eagles",
-    "falcon", "ginger", "heather", "iceman", "jasmine", "kitten", "lakers", "maggie",
-    "nascar", "oliver", "peanut", "qazwsx", "rabbit", "samantha", "tigger", "united",
-    "victoria", "walter", "xavier", "yankees", "zaq", "zxcvbn", "1qaz2wsx", "qazwsxedc",
+    "password",
+    "passphrase",
+    "mypassword",
+    "yourpassword",
+    "changeme",
+    "default",
+    "secret",
+    "qwerty",
+    "qwertyuiop",
+    "qwertyuiopasdfghjkl",
+    "asdfghjkl",
+    "asdfghjklzxcvbnm",
+    "zxcvbnm",
+    "abc",
+    "abcd",
+    "abcdef",
+    "abcdefgh",
+    "abcdefghijkl",
+    "iloveyou",
+    "letmein",
+    "welcome",
+    "admin",
+    "administrator",
+    "login",
+    "master",
+    "monkey",
+    "dragon",
+    "sunshine",
+    "princess",
+    "football",
+    "baseball",
+    "basketball",
+    "soccer",
+    "hockey",
+    "superman",
+    "batman",
+    "trustno",
+    "shadow",
+    "michael",
+    "jennifer",
+    "jordan",
+    "hunter",
+    "ranger",
+    "thomas",
+    "charlie",
+    "freedom",
+    "whatever",
+    "mustang",
+    "starwars",
+    "computer",
+    "internet",
+    "test",
+    "testing",
+    "guest",
+    "hello",
+    "helloworld",
+    "killer",
+    "pokemon",
+    "summer",
+    "winter",
+    "spring",
+    "autumn",
+    "ashley",
+    "nicole",
+    "jessica",
+    "daniel",
+    "matthew",
+    "andrew",
+    "michelle",
+    "bailey",
+    "liverpool",
+    "chelsea",
+    "arsenal",
+    "cheese",
+    "cookie",
+    "chocolate",
+    "purple",
+    "orange",
+    "yellow",
+    "silver",
+    "golden",
+    "diamond",
+    "flower",
+    "butterfly",
+    "rainbow",
+    "misty",
+    "mistybrowser",
+    "browser",
+    "sync",
+    "syncpassword",
+    "googlepassword",
+    "facebook",
+    "twitter",
+    "instagram",
+    "amazon",
+    "apple",
+    "microsoft",
+    "windows",
+    "linux",
+    "ubuntu",
+    "minecraft",
+    "fortnite",
+    "roblox",
+    "steam",
+    "gamer",
+    "gaming",
+    "love",
+    "lovely",
+    "family",
+    "forever",
+    "friends",
+    "harley",
+    "access",
+    "baby",
+    "boomer",
+    "cowboy",
+    "cricket",
+    "dallas",
+    "eagles",
+    "falcon",
+    "ginger",
+    "heather",
+    "iceman",
+    "jasmine",
+    "kitten",
+    "lakers",
+    "maggie",
+    "nascar",
+    "oliver",
+    "peanut",
+    "qazwsx",
+    "rabbit",
+    "samantha",
+    "tigger",
+    "united",
+    "victoria",
+    "walter",
+    "xavier",
+    "yankees",
+    "zaq",
+    "zxcvbn",
+    "1qaz2wsx",
+    "qazwsxedc",
 ];
 
 /// The letters of a password as written, and again after undoing the usual
@@ -86,7 +211,10 @@ fn is_common(letters: &str) -> bool {
             || (letters.len() > word.len()
                 && letters.len() % word.len() == 0
                 && letters.starts_with(word)
-                && letters.as_bytes().chunks(word.len()).all(|c| c == word.as_bytes()))
+                && letters
+                    .as_bytes()
+                    .chunks(word.len())
+                    .all(|c| c == word.as_bytes()))
     })
 }
 
@@ -123,7 +251,10 @@ pub fn check(password: &str, email: &str) -> Result<(), PasswordIssue> {
     if distinct.len() <= 3 || sequential(&lower) {
         return Err(PasswordIssue::TooSimple);
     }
-    if candidates(password).iter().any(|letters| is_common(letters)) {
+    if candidates(password)
+        .iter()
+        .any(|letters| is_common(letters))
+    {
         return Err(PasswordIssue::TooCommon);
     }
     let local = email.trim().to_lowercase();
@@ -145,8 +276,18 @@ mod tests {
         // Twelve bytes, but four characters.
         assert_eq!(check("密码密码", email), Err(PasswordIssue::TooShort));
         assert_eq!(check(&"a".repeat(1025), email), Err(PasswordIssue::TooLong));
-        for simple in ["aaaaaaaaaaaa", "121212121212", "123456789012", "abcdefghijkl", "210987654321"] {
-            assert_eq!(check(simple, email), Err(PasswordIssue::TooSimple), "{simple}");
+        for simple in [
+            "aaaaaaaaaaaa",
+            "121212121212",
+            "123456789012",
+            "abcdefghijkl",
+            "210987654321",
+        ] {
+            assert_eq!(
+                check(simple, email),
+                Err(PasswordIssue::TooSimple),
+                "{simple}"
+            );
         }
         for common in [
             "password1234",
@@ -158,7 +299,11 @@ mod tests {
             "Welcome12345!",
             "letmein123456",
         ] {
-            assert_eq!(check(common, email), Err(PasswordIssue::TooCommon), "{common}");
+            assert_eq!(
+                check(common, email),
+                Err(PasswordIssue::TooCommon),
+                "{common}"
+            );
         }
         assert_eq!(
             check("my-person-secret-1", email),

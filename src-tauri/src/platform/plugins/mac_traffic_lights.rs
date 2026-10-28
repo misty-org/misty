@@ -273,7 +273,10 @@ pub fn install() {
             "NSWindowWillExitFullScreenNotification",
             &*leaving as *const _ as id,
         );
-        observe("NSWindowDidExitFullScreenNotification", &*left as *const _ as id);
+        observe(
+            "NSWindowDidExitFullScreenNotification",
+            &*left as *const _ as id,
+        );
         observe(
             "NSWindowDidFailToExitFullScreenNotification",
             &*stayed as *const _ as id,

@@ -9,7 +9,9 @@ pub(super) fn new_window(
     features: tauri::webview::NewWindowFeatures,
 ) -> NewWindowResponse<tauri::Wry> {
     #[cfg(any(target_os = "macos", windows))]
-    if let Some(response) = provider_popup(popup_app, popup_id, &url, features) { return response; }
+    if let Some(response) = provider_popup(popup_app, popup_id, &url, features) {
+        return response;
+    }
     // An agent's own hidden tab has no person to show a new tab to (a "New document"
     // button, a target=_blank link): the page opens in place, where the agent's next
     // look finds it, instead of in a tab the agent never sees.
@@ -17,7 +19,9 @@ pub(super) fn new_window(
         if let Ok(label) = webview_label(popup_id) {
             if let Some(view) = popup_app.get_webview(&label) {
                 let url = url.clone();
-                tauri::async_runtime::spawn(async move { let _ = view.navigate(url); });
+                tauri::async_runtime::spawn(async move {
+                    let _ = view.navigate(url);
+                });
             }
         }
         return NewWindowResponse::Deny;
@@ -47,29 +51,54 @@ pub(super) fn page_load(
     payload: tauri::webview::PageLoadPayload<'_>,
 ) {
     crate::infra::extensions::native::tab_event(page_app, Some(page_space), page_id, "updated");
-    if restoring_tab_session && payload.url().as_str() == "about:blank" { return; }
+    if restoring_tab_session && payload.url().as_str() == "about:blank" {
+        return;
+    }
     #[cfg(any(target_os = "macos", windows))]
-    if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) { crate::infra::website_data::session_storage::clear(&webview); }
-    let locked = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions|sessions.get(page_id).map(|session|session.agent_input_locked)).unwrap_or(false);
-    let _ = apply_agent_input_lock(&webview,locked);
+    if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+        crate::infra::website_data::session_storage::clear(&webview);
+    }
+    let locked = page_app
+        .state::<BrowserSessionState>()
+        .sessions
+        .lock()
+        .ok()
+        .and_then(|sessions| {
+            sessions
+                .get(page_id)
+                .map(|session| session.agent_input_locked)
+        })
+        .unwrap_or(false);
+    let _ = apply_agent_input_lock(&webview, locked);
     // An agent's page answers its cookie banner as it loads (browser_page/mod.rs).
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
-        && page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions| sessions.get(page_id).map(agent_controls_page)).unwrap_or(false)
+        && page_app
+            .state::<BrowserSessionState>()
+            .sessions
+            .lock()
+            .ok()
+            .and_then(|sessions| sessions.get(page_id).map(agent_controls_page))
+            .unwrap_or(false)
     {
         crate::infra::browser::page_agent::answer_consent_after_load(webview.clone());
     }
     #[cfg(not(target_os = "macos"))]
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
-        let controlled = page_app.state::<BrowserSessionState>().sessions.lock().ok().and_then(|sessions| sessions.get(page_id).map(agent_controls_page)).unwrap_or(false);
-        if controlled { draw_agent_ring(&webview, true); }
+        let controlled = page_app
+            .state::<BrowserSessionState>()
+            .sessions
+            .lock()
+            .ok()
+            .and_then(|sessions| sessions.get(page_id).map(agent_controls_page))
+            .unwrap_or(false);
+        if controlled {
+            draw_agent_ring(&webview, true);
+        }
     }
-    let _ = apply_browser_pointer_tracking(
-        &webview,
-        renderer(webview.window().label()).tracking,
-    );
+    let _ = apply_browser_pointer_tracking(&webview, renderer(webview.window().label()).tracking);
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
-                // Apply saved zoom before the page paints. Applying it at load
-                // completion resizes the page and scrollbar after render.
+        // Apply saved zoom before the page paints. Applying it at load
+        // completion resizes the page and scrollbar after render.
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             if let Ok(mut sessions) = state.sessions.lock() {
                 if let Some(session) = sessions.get_mut(page_id) {
@@ -86,7 +115,9 @@ pub(super) fn page_load(
         tauri::webview::PageLoadEvent::Started => "started",
         tauri::webview::PageLoadEvent::Finished => "finished",
     };
-    let _ = webview.eval(browser_status_update_script(&json!({ "loading": phase == "started" })));
+    let _ = webview.eval(browser_status_update_script(
+        &json!({ "loading": phase == "started" }),
+    ));
     let generation = next_load_generation(page_id);
     if phase == "started" {
         watch_load(page_app, page_id, generation);
