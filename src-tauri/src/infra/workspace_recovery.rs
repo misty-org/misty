@@ -46,13 +46,20 @@ fn main_only(view: &tauri::Webview) -> Result<(), String> {
 /// device, so it opens without an account session (docs/browser/no-account.md).
 const LOCAL_PROFILE: &str = "local";
 
-/// The deployment a profile's recovery is filed under. A signed-in account must still hold
-/// this device's session; the local profile has none to check.
+/// The deployment a profile's recovery is filed under. Recovery is this device's own data,
+/// sealed with a key in the OS keychain, so it does not ask the server: an account whose
+/// session expired keeps its windows and tabs while it waits to sign in again
+/// (docs/browser/no-account.md). The local profile has no deployment.
 fn recovery_deployment(api_base: &str, account: &str) -> Result<String, String> {
     if account == LOCAL_PROFILE {
         return Ok(LOCAL_PROFILE.to_owned());
     }
-    Ok(super::browser_sync::account_api(api_base, account)?.deployment())
+    let http = reqwest::Client::builder()
+        .build()
+        .map_err(|_| "Could not validate recovery identity")?;
+    Ok(misty_browser_sync::transport::SyncApi::new(api_base, http)
+        .map_err(error)?
+        .deployment())
 }
 fn error(_: misty_browser_sync::Error) -> String {
     "Could not save or recover the local workspace. Existing data has been preserved.".into()
@@ -124,16 +131,7 @@ pub async fn browser_recovery_forget(
         let _lifetime = lifetime;
         // This command serves the saved-account chooser after its cookie entry
         // was removed. It can forget only an inactive local recovery identity.
-        let deployment = if account_id == LOCAL_PROFILE {
-            LOCAL_PROFILE.to_owned()
-        } else {
-            let http = reqwest::Client::builder()
-                .build()
-                .map_err(|_| "Could not validate recovery identity")?;
-            misty_browser_sync::transport::SyncApi::new(&api_base, http)
-                .map_err(error)?
-                .deployment()
-        };
+        let deployment = recovery_deployment(&api_base, &account_id)?;
         let scope = VaultScope {
             deployment: deployment.clone(),
             account_id: account_id.clone(),
@@ -253,7 +251,6 @@ pub async fn browser_recovery_read(
             .as_ref()
             .filter(|v| v.id == session_id)
             .ok_or("The workspace account changed")?;
-        recovery_deployment(&active.deployment, &active.account)?;
         active.store.read(&key).map_err(error)
     })
     .await
@@ -279,7 +276,6 @@ pub async fn browser_recovery_write(
             .as_mut()
             .filter(|v| v.id == session_id)
             .ok_or("The workspace account changed")?;
-        recovery_deployment(&active.deployment, &active.account)?;
         let result = active.store.write(&key, revision, &value);
         if let Ok(mut unsaved) = UNSAVED.lock() {
             if result.is_ok() {
