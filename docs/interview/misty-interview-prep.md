@@ -433,6 +433,11 @@ so the later checks were driven through the app's stores.
   workspace. Verified: three tabs survive a clean quit and relaunch, and a rebuild-restart.
 - `b3b3fc2e4` The commit hook's Windows cross-check failed on `main`: two probe examples
   include `webview2.rs` by path and couldn't find its `page` module.
+- `4aefe8cc5`, `01c30cbfd` Formatting only: Prettier (14 files) and rustfmt (53 files) had
+  drifted on `main`, so `misty check app` stopped at its format steps.
+- `3025a8ef0` The production audit failed on advisories published since the lockfile was
+  last updated: DOMPurify (critical sanitizer bypass), undici, vite and zod. Patched releases
+  within the current majors; zod 4.6.7 pinned for `@midscene` through `overrides`.
 - `c084214aa` A race in the coding-tool push guard: the shared `pre-push` hook was rewritten
   in place, so a tool starting at the same moment could run an empty (passing) hook. It
   showed up as a flaky engine test. Now written and renamed into place.
@@ -449,7 +454,9 @@ so the later checks were driven through the app's stores.
   21–199 MB each). Page processes sit at about 0% CPU. No runaway processes.
 - A release build: `npm run tauri -- build --bundles app` builds in about 5 minutes, launches
   and idles at about 2% CPU.
-- Commit hooks green for the three commits. `misty check app`: see the final message.
+- Commit hooks green for every commit. Final `misty check app`: format, typecheck, lint,
+  1,849 frontend tests and the npm audit pass; the desktop crate's Rust tests pass except
+  the one known flaky test below.
 
 **Not verified or still flaky**
 - **Idle CPU of the debug app with 15 tabs is about 20%.** Samples show mostly waiting threads
@@ -469,7 +476,8 @@ so the later checks were driven through the app's stores.
 - Agents: not exercised (they need a signed-in session). Signed out or expired, the agent UI
   doesn't mount, so it can't disturb browsing. No gating was added.
 - Flaky test left alone: `infra::browser_sync::tests::account_replacement_waits_for_key_owner_and_releases_process_lock`
-  failed once, passed on the other runs (process-global state shared by parallel tests).
+  fails intermittently (twice tonight, including the final `misty check app`; passed in the
+  other runs). It shares process-global state with other parallel tests. Worth a proper fix.
 
 **Daily-driver build**
 ```bash
