@@ -3,7 +3,10 @@ import { readBoost, withBoost } from "./siteStyles";
 
 describe("site boosts", () => {
   it("writes and reads a font and size, keeping other CSS", () => {
-    const css = withBoost(".ad { display: none !important; }", { font: "Georgia, 'Times New Roman', serif", size: "112" });
+    const css = withBoost(".ad { display: none !important; }", {
+      font: "Georgia, 'Times New Roman', serif",
+      size: "112",
+    });
     expect(css).toContain(".ad { display: none !important; }");
     expect(readBoost(css)).toEqual({ font: "Georgia, 'Times New Roman', serif", size: "112" });
   });

@@ -19,7 +19,9 @@ const unauthorized = Object.assign(new Error("invalid credentials"), { status: 4
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.known.mockReturnValue(false);
-  mocks.derive.mockImplementation(async (_email: string, password: string) => `credential:${password}`);
+  mocks.derive.mockImplementation(
+    async (_email: string, password: string) => `credential:${password}`,
+  );
 });
 
 describe("changing the account password", () => {
@@ -31,7 +33,9 @@ describe("changing the account password", () => {
   });
 
   it("falls back to the current password as typed for an account the server holds that way", async () => {
-    mocks.changePassword.mockRejectedValueOnce(unauthorized).mockResolvedValueOnce({ status: "ok" });
+    mocks.changePassword
+      .mockRejectedValueOnce(unauthorized)
+      .mockResolvedValueOnce({ status: "ok" });
     await accountChangePassword("ada@example.test", "old", "new");
     expect(mocks.changePassword.mock.calls).toEqual([
       ["credential:old", "credential:new"],
@@ -42,7 +46,9 @@ describe("changing the account password", () => {
   it("never sends the current password in plain form for an account known to use credentials", async () => {
     mocks.known.mockReturnValue(true);
     mocks.changePassword.mockRejectedValue(unauthorized);
-    await expect(accountChangePassword("ada@example.test", "wrong", "new")).rejects.toBe(unauthorized);
+    await expect(accountChangePassword("ada@example.test", "wrong", "new")).rejects.toBe(
+      unauthorized,
+    );
     expect(mocks.changePassword).toHaveBeenCalledTimes(1);
     expect(mocks.changePassword).toHaveBeenCalledWith("credential:wrong", "credential:new");
   });
@@ -56,7 +62,9 @@ describe("changing the account password", () => {
 
   it("reports a wrong current password after both attempts", async () => {
     mocks.changePassword.mockRejectedValue(unauthorized);
-    await expect(accountChangePassword("ada@example.test", "wrong", "new")).rejects.toBe(unauthorized);
+    await expect(accountChangePassword("ada@example.test", "wrong", "new")).rejects.toBe(
+      unauthorized,
+    );
     expect(mocks.changePassword).toHaveBeenCalledTimes(2);
   });
 

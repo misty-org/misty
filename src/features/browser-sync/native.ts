@@ -167,8 +167,11 @@ export const unlockNativeSync = (
       : { ...account, email, password, syncSecret, remember, reenroll },
   );
 /** Re-seals the open vault under a Misty password the server has never seen in plain form. */
-export const resealSyncWithAccountPassword = (account: SyncAccount, email: string, password: string) =>
-  invoke<void>("browser_sync_use_account_password", { ...account, email, password });
+export const resealSyncWithAccountPassword = (
+  account: SyncAccount,
+  email: string,
+  password: string,
+) => invoke<void>("browser_sync_use_account_password", { ...account, email, password });
 export const lockNativeSync = (sessionId: string, forget = false) =>
   invoke<void>("browser_sync_lock", { sessionId, forget });
 export const forgetNativeSyncKey = (account: SyncAccount) =>

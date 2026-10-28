@@ -99,9 +99,7 @@ describe("server JWT cookie account contract", () => {
     });
 
     it("sends the credential derived on the device, not the password, and remembers the account", async () => {
-      mocks.nativeFetch.mockImplementation(
-        async () => new Response(JSON.stringify(user), json),
-      );
+      mocks.nativeFetch.mockImplementation(async () => new Response(JSON.stringify(user), json));
       const account = await import("./useAccountStore");
       const { isCredentialAccount } = await import("./accountCredential");
       await account.accountSignIn(user.email, "typed password");

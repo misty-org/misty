@@ -17,7 +17,11 @@ import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceTabStrip } from "./WorkspaceTabStrip";
 import { closePeek } from "@/features/workspace/peek";
-import { resetPinnedTabForView, useClearTabsShortcut, usePinTabShortcut } from "./usePinTabShortcut";
+import {
+  resetPinnedTabForView,
+  useClearTabsShortcut,
+  usePinTabShortcut,
+} from "./usePinTabShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { SpaceBar } from "./SpaceBar";
 import type { WorkspaceTab } from "@/features/workspace/model";

@@ -1,13 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { isAccountUnauthorizedError } from "@/api/account/api";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  Input,
-} from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input } from "@/shared/ui";
 
 /**
  * Chooses the Misty password that sync is encrypted with. The server is sent
