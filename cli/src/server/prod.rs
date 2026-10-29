@@ -15,9 +15,18 @@ pub fn production_check(workspace: &Workspace) -> Result<()> {
 
 pub fn production_up(workspace: &Workspace) -> Result<()> {
     production_check(workspace)?;
-    production_compose().arg("pull").run(&workspace.server)?;
+    // Published images are pulled; without them the stack builds from this checkout.
+    let published = environment::read(workspace, Target::Prod)?
+        .get("MISTY_API_IMAGE")
+        .is_some_and(|image| !image.trim().is_empty());
+    if published {
+        production_compose().arg("pull").run(&workspace.server)?;
+        return production_compose()
+            .args(["up", "--detach"])
+            .run(&workspace.server);
+    }
     production_compose()
-        .args(["up", "--detach"])
+        .args(["up", "--detach", "--build"])
         .run(&workspace.server)
 }
 

@@ -149,8 +149,6 @@ services:
         required: false
       - path: .env/dev/integrations/microsoft.env
         required: false
-      - path: .env/dev/integrations/billing.env
-        required: false
       - path: .env/dev/crypto/documents.env
         required: false
       - path: .env/dev/crypto/journal.env

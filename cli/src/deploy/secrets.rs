@@ -45,9 +45,10 @@ pub fn initialize_production_secrets(workspace: &Workspace) -> Result<()> {
         println!("  generated {name}");
     }
     println!(
-        "Production secrets are in server/.env/prod. Still to fill in: MISTY_API_IMAGE, \
-MISTY_AGENT_RUNTIME_IMAGE, MISTY_PUBLIC_API_URL (or run misty setup cloudflare --target prod), \
-R2_*, MISTY_BACKUP_*, and any integrations. Check with: misty env status prod"
+        "Production secrets are in server/.env/prod. Still to fill in: MISTY_PUBLIC_API_URL \
+(your HTTPS address, or run misty setup cloudflare --target prod). Optional: model keys for \
+the server itself, MISTY_LIBRARY_BACKEND=s3 with R2_* for object storage, MISTY_BACKUP_*, \
+published MISTY_API_IMAGE/MISTY_AGENT_RUNTIME_IMAGE and integrations. Check with: misty env status prod"
     );
     Ok(())
 }
