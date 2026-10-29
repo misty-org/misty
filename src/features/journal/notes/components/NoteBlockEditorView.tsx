@@ -38,10 +38,11 @@ function CollaborativeNoteEditor(
     spaceId: string;
   },
 ) {
-  const { session, error, notice } = props.runtime.useCollaborationRoom(
+  const { session, error, notice, localOnly } = props.runtime.useCollaborationRoom(
     props.spaceId,
     props.noteId,
   );
+  if (localOnly) return <MistyTipTapEditor {...props} />;
   if (error) {
     return (
       <>

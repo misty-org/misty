@@ -1,5 +1,6 @@
 import { accountScopeResetEvent } from "@/features/auth";
 import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
+import { createLocalOnlyProvider, isCollaborationOff } from "@/features/collaboration/localOnly";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
@@ -28,6 +29,14 @@ type SessionEntry = {
 
 const sessions = new Map<string, SessionEntry>();
 const sessionIdleMs = 5 * 60 * 1000;
+/** Stands in for a ticket when the server runs without live co-editing. */
+const localOnlyTicket: DrawingCollaborationTicket = {
+  ticket: "",
+  room: "",
+  url: "",
+  role: "editor",
+  expires_at: "",
+};
 
 export async function acquireDrawingSession(
   spaceId: string,
@@ -106,16 +115,24 @@ async function createSession(
   drawingId: string,
   key: string,
 ): Promise<DrawingCollaborationSession> {
-  const firstTicket = await drawingsApi.collaborationTicket(spaceId, drawingId);
+  const firstTicket = await drawingsApi
+    .collaborationTicket(spaceId, drawingId)
+    .catch((cause: unknown) => {
+      if (isCollaborationOff(cause)) return null;
+      throw cause;
+    });
   const doc = new Y.Doc();
-  const provider = createYjsProvider(firstTicket, doc, "drawing-room", () =>
-    drawingsApi.collaborationTicket(spaceId, drawingId),
-  );
+  // Without live co-editing the drawing is edited here only, with no other cursors.
+  const provider = firstTicket
+    ? createYjsProvider(firstTicket, doc, "drawing-room", () =>
+        drawingsApi.collaborationTicket(spaceId, drawingId),
+      )
+    : createLocalOnlyProvider(doc, "drawing-room");
   return {
     key,
     spaceId,
     drawingId,
-    ticket: firstTicket,
+    ticket: firstTicket ?? localOnlyTicket,
     doc,
     elements: doc.getMap<OrderedExcalidrawElement>("drawing:elements"),
     scene: doc.getMap("drawing:scene"),

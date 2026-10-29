@@ -76,7 +76,11 @@ export async function httpRequest(
       if (coolingDown) return coolingDown;
       const response = await cookieSessionFetch(input, init);
       recordRateLimit(input, init, response);
-      if ([502, 503, 504].includes(response.status)) {
+      // A JSON 503 is the server's own answer (a feature it runs without, say), not an outage.
+      const answered =
+        response.status === 503 &&
+        (response.headers.get("Content-Type") ?? "").includes("application/json");
+      if ([502, 503, 504].includes(response.status) && !answered) {
         const waitMs = retryAfterMs(response);
         // A server asking for more than a short pause is not retried here.
         if (isIdempotent && attempt < maxAttempts && waitMs <= 2_000 && !init.signal?.aborted) {

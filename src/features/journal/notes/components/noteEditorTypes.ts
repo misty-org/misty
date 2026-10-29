@@ -24,6 +24,8 @@ export interface NoteEditorRuntime {
     session: NoteEditorSession | null;
     error: string | null;
     notice: string | null;
+    /** Live co-editing is off on this server; edit without a collaboration session. */
+    localOnly?: boolean;
   };
   uploadAsset(input: UploadNoteAssetInput): Promise<string>;
   resolveAsset?(reference: string): Promise<JournalImageLease>;
