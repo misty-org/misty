@@ -16,6 +16,8 @@ use tauri::AppHandle;
 use super::{http::DeviceHttp, identity::DeviceIdentity, trust};
 
 const FRAME_LIMIT: usize = 64 << 10;
+/// Longer than the server's 30-second ping, as long as its 75-second read deadline.
+const SILENT_LIMIT: Duration = Duration::from_secs(75);
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -177,8 +179,11 @@ async fn session(
     let Ok(mut socket) = open_device_socket(&url, FRAME_LIMIT).await else {
         return Outcome::Retry;
     };
+    let mut heard = std::time::Instant::now();
     let challenge =
-        match tokio::time::timeout(Duration::from_secs(10), next_json(&mut socket)).await {
+        match tokio::time::timeout(Duration::from_secs(10), next_json(&mut socket, &mut heard))
+            .await
+        {
             Ok(Some(frame)) if frame["type"] == "challenge" => frame,
             _ => return Outcome::Retry,
         };
@@ -210,12 +215,18 @@ async fn session(
             return Outcome::Stopped;
         }
         // Wake now and then so a stopped channel closes its socket promptly.
-        let frame = match tokio::time::timeout(Duration::from_secs(5), next_json(&mut socket)).await
-        {
-            Ok(Some(frame)) => frame,
-            Ok(None) => return Outcome::Retry,
-            Err(_) => continue,
-        };
+        let frame =
+            match tokio::time::timeout(Duration::from_secs(5), next_json(&mut socket, &mut heard))
+                .await
+            {
+                Ok(Some(frame)) => frame,
+                Ok(None) => return Outcome::Retry,
+                // The server pings every 30 seconds. A socket that hears nothing for longer than the
+                // server's own read deadline is half open (the server restarted behind a proxy that
+                // kept this end up): connect again, or the device stays offline while it waits.
+                Err(_) if heard.elapsed() > SILENT_LIMIT => return Outcome::Retry,
+                Err(_) => continue,
+            };
         if handle_frame(config, snapshot, &frame) {
             return Outcome::Removed;
         }
@@ -276,12 +287,15 @@ fn handle_frame(
     false
 }
 
-async fn next_json<S>(socket: &mut S) -> Option<Value>
+/// The next JSON frame. Every message, pings included, counts as hearing from the server.
+async fn next_json<S>(socket: &mut S, heard: &mut std::time::Instant) -> Option<Value>
 where
     S: futures_util::Stream<Item = Result<SocketMessage, SocketError>> + Unpin,
 {
     loop {
-        match socket.next().await? {
+        let message = socket.next().await?;
+        *heard = std::time::Instant::now();
+        match message {
             Ok(SocketMessage::Text(text)) => {
                 if text.len() > FRAME_LIMIT {
                     return None;
