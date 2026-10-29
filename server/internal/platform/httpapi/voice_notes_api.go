@@ -7,9 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-	"github.com/kannachi323/misty/server/internal/agent"
-	"github.com/kannachi323/misty/server/internal/aimodels"
 	"github.com/kannachi323/misty/server/internal/modelruntime"
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
@@ -104,22 +101,10 @@ func (s *SpacesService) voiceNotes(ctx context.Context, user string, transcript 
 		size += len(turn.Text) + len(speaker) + 16
 	}
 	model := defaultRoleModel("voice-notes")
-	provider := aimodels.UsageProvider(model)
-	key := "voice-notes:" + uuid.NewString()
-	var reservation *agent.UsageReservation
-	if s.usageMeter != nil {
-		var err error
-		if reservation, err = agent.ReserveMeasuredUsage(s.usageMeter, user, key, provider, model, map[string]int64{"input_bytes": int64(size), "output_tokens": voiceNotesMaxOutput}, ""); err != nil {
-			return modelruntime.VoiceNotesResult{}, err
-		}
-	}
 	result, err := s.models.VoiceNotes(ctx, modelruntime.VoiceNotesRequest{
 		Route: modelruntime.Instance(), Model: model, Mode: mode, Title: transcript.Title, Turns: turns,
 		UserNotes: userNotes, Template: template, Language: firstNonEmpty(language, transcript.Language), MaxOutputTokens: voiceNotesMaxOutput,
 	})
-	if settleErr := agent.FinishMeteredCall(s.usageMeter, reservation, key+":settle", "voice_notes", provider, model, result.Usage, err); settleErr != nil && err == nil {
-		return result, settleErr
-	}
 	return result, err
 }
 

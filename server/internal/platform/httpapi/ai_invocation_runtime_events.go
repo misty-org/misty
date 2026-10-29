@@ -27,7 +27,7 @@ func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *
 		// measured accounting checkpoint; never restore task/device authority.
 		if strings.HasPrefix(body.NodeID, "model:") && body.State == "completed" {
 			if stopped, lookupErr := s.database.AIInvocationRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && aiInvocationTerminal(stopped.State) {
-				if _, settleErr := s.meterAIInvocationRuntimeModel(r.Context(), stopped, body.NodeID, body.State, body.Output); settleErr != nil {
+				if _, settleErr := s.admitAIInvocationRuntimeTurn(r.Context(), stopped, body.NodeID, body.State, body.Output); settleErr != nil {
 					writeAgentError(w, settleErr)
 					return
 				}
@@ -45,7 +45,7 @@ func (s *SpacesService) agentRuntimeEventAIInvocation(w http.ResponseWriter, r *
 	overLimit := false
 	if strings.HasPrefix(body.NodeID, "model:") {
 		var err error
-		if overLimit, err = s.meterAIInvocationRuntimeModel(r.Context(), record, body.NodeID, body.State, body.Output); err != nil {
+		if overLimit, err = s.admitAIInvocationRuntimeTurn(r.Context(), record, body.NodeID, body.State, body.Output); err != nil {
 			writeAgentError(w, err)
 			return
 		}

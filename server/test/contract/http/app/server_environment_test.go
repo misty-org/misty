@@ -12,7 +12,6 @@ import (
 func TestValidateProductionEnvironmentRejectsInvalidURLAndPort(t *testing.T) {
 	t.Setenv("MISTY_ENVIRONMENT", "production")
 	values := map[string]string{
-		"MISTY_BILLING_ADAPTER": "http", "MISTY_BILLING_URL": "https://billing.example.com/adapter", "MISTY_BILLING_SECRET": "01234567890123456789012345678901",
 		"R2_ENDPOINT":               "https://account.r2.cloudflarestorage.com",
 		"R2_BUCKET":                 "misty-production",
 		"R2_ACCESS_KEY":             "access",
@@ -67,24 +66,6 @@ func TestCreateServerConfiguresIndependentDevelopmentLibrary(t *testing.T) {
 	}
 	if server.Library == nil || server.LibraryStore == nil {
 		t.Fatal("CreateServer() did not configure the Space Library")
-	}
-}
-
-func TestValidateProductionEnvironmentRequiresBilling(t *testing.T) {
-	t.Setenv("MISTY_ENVIRONMENT", "production")
-	values := map[string]string{
-		"R2_ENDPOINT": "https://account.r2.cloudflarestorage.com", "R2_BUCKET": "misty-production",
-		"R2_ACCESS_KEY": "access", "R2_SECRET_KEY": "secret",
-		"DB_HOST": "postgres", "DB_USER": "misty_app", "DB_PASSWORD": "password", "DB_NAME": "misty",
-		"MISTY_PUBLIC_API_URL":      "https://misty.example.com/api",
-		"SPACE_LINK_ENCRYPTION_KEY": "01234567890123456789012345678901",
-		"MISTY_BILLING_ADAPTER":     "", "MISTY_BILLING_URL": "", "MISTY_BILLING_SECRET": "",
-	}
-	for key, value := range values {
-		t.Setenv(key, value)
-	}
-	if err := ValidateProductionEnvironment(); err == nil || !strings.Contains(err.Error(), "MISTY_BILLING_ADAPTER") {
-		t.Fatalf("production without billing error = %v, want MISTY_BILLING_ADAPTER rejection", err)
 	}
 }
 

@@ -105,10 +105,6 @@ func (monitor *healthMonitor) evaluate(ctx context.Context) (HealthSnapshot, int
 	// it keeps reporting while it is repointed at agent_gateway.
 	checks["agent_runtime"] = agentGatewayCheck
 	checks["email"] = environmentConfigurationCheck("MAILJET_API_KEY", "MAILJET_SECRET_KEY", "MAILJET_FROM_EMAIL")
-	checks["billing"] = HealthCheck{Status: "disabled", Mode: "configuration", Critical: false}
-	if strings.EqualFold(strings.TrimSpace(config.Getenv("MISTY_BILLING_ADAPTER")), "http") {
-		checks["billing"] = environmentConfigurationCheck("MISTY_BILLING_URL", "MISTY_BILLING_SECRET")
-	}
 
 	overall, status := SummarizeHealth(checks)
 	version := strings.TrimSpace(config.Getenv("MISTY_SERVER_VERSION"))

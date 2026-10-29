@@ -10,8 +10,7 @@ import (
 // live in accounts; this adapter only supplies the shared RLS transaction.
 func (db *Database) accountStore() accounts.Store {
 	return accounts.Store{Transaction: db.WithRLSContext, CreateIdentity: func(tx *sql.Tx, id, user string) error {
-		_, err := createLicenseTx(tx, id, user, TierBasic, LicenseStatusActive, nil)
-		return err
+		return createLicenseTx(tx, id, user)
 	}}
 }
 

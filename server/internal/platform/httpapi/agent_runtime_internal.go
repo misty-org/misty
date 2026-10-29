@@ -177,7 +177,7 @@ func (s *SpacesService) AgentRuntimeContext() http.HandlerFunc {
 		system += "\n\n" + agentExecutionGuidance + agentCapabilityGuidance(allowedTools, false) + "\n\nCurrent time: " + now.Format(time.RFC3339) + "; timezone: " + timezone + "."
 
 		_ = s.database.TouchPersonalAgentTaskRuntime(r.Context(), run.ID, body.RuntimeRunID, "reading_context", 5)
-		planned, forced := planRoutes(r.Context(), s.database, run.OwnerUserID, defaultAIRoutes(membership.ModelID, membership.ReasoningEffort))
+		planned, forced := runRoutes(r.Context(), s.database, run.OwnerUserID, defaultAIRoutes(membership.ModelID, membership.ReasoningEffort))
 		routes, routeErr := s.database.FreezeAIModelRoutes(r.Context(), run.OwnerUserID, run.ID, planned, nil, forced)
 		if routeErr != nil {
 			writeAIProviderError(w, routeErr)

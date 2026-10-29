@@ -13,7 +13,7 @@ import (
 )
 
 // screenModelRoute is the run's frozen vision route, which follows the
-// account's Seeing choice; billing meters screen calls against the same route.
+// account's Seeing choice.
 func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvocationRecord) (modelruntime.Route, string, error) {
 	route, err := s.database.AIModelRunRoute(ctx, record.UserID, record.ID, "vision")
 	if err != nil {
@@ -24,7 +24,7 @@ func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvoc
 	}
 	model := route.Model
 	if model == "" {
-		model = aiInvocationMeteredModel(record)
+		model = invocationRecordModel(record)
 	}
 	if model == "" {
 		return modelruntime.Route{}, "", errScreenModelUnconfigured

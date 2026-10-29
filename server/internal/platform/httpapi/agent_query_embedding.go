@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 )
 
@@ -19,8 +17,7 @@ func (s *SpacesService) agentQueryEmbedding(ctx context.Context, userID, query s
 	if model == "" {
 		return nil, false
 	}
-	digest := sha256.Sum256([]byte(userID + "\x00" + model + "\x00" + normalized))
-	analyzer := s.searchAnalyzer.WithBilling(s.database.BillingService(), userID, "agent-query:"+hex.EncodeToString(digest[:]))
+	analyzer := s.searchAnalyzer.WithAIAccount(userID)
 	vector, _, err := analyzer.EmbedQuery(ctx, normalized)
 	if err != nil || len(vector) != 768 {
 		return nil, false

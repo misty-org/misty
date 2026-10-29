@@ -144,7 +144,7 @@ func (c *Client) DaySummary(ctx context.Context, request DaySummaryRequest) (Day
 }
 
 // SpeechRequest speaks text for the voice pipeline. The runtime returns raw
-// 24 kHz 16-bit mono PCM; billing charges speech by input characters.
+// 24 kHz 16-bit mono PCM.
 type SpeechRequest struct {
 	Route Route  `json:"route"`
 	Model string `json:"model"`

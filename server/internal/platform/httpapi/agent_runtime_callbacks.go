@@ -39,7 +39,7 @@ func (s *SpacesService) AgentRuntimeEvent() http.HandlerFunc {
 		if err != nil {
 			if strings.HasPrefix(body.NodeID, "model:") && body.State == "completed" {
 				if stopped, lookupErr := s.database.PersonalAgentRuntimeRecord(r.Context(), chi.URLParam(r, "runID"), body.RuntimeRunID); lookupErr == nil && (stopped.State == "canceled" || stopped.State == "completed" || stopped.State == "completed_with_errors" || stopped.State == "failed") {
-					if _, settleErr := s.meterPersonalAgentRuntimeModel(r.Context(), stopped, body.NodeID, workflow.StepCompleted, body.Output); settleErr != nil {
+					if _, settleErr := s.admitPersonalAgentRuntimeTurn(r.Context(), stopped, body.NodeID, workflow.StepCompleted, body.Output); settleErr != nil {
 						writeAgentError(w, settleErr)
 						return
 					}
@@ -76,7 +76,7 @@ func (s *SpacesService) AgentRuntimeEvent() http.HandlerFunc {
 		overLimit := false
 		if strings.HasPrefix(body.NodeID, "model:") {
 			var err error
-			if overLimit, err = s.meterPersonalAgentRuntimeModel(r.Context(), run, body.NodeID, state, rawModelOutput); err != nil {
+			if overLimit, err = s.admitPersonalAgentRuntimeTurn(r.Context(), run, body.NodeID, state, rawModelOutput); err != nil {
 				writeAgentError(w, err)
 				return
 			}

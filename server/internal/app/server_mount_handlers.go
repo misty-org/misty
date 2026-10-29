@@ -140,7 +140,6 @@ func (s *Server) wireAIServices(deps *mountDeps) error {
 // handoff handlers, plus the health and instance handlers.
 func (s *Server) wireAccountHandlers(deps *mountDeps, passwordResetService *api.PasswordResetService, authHandoffService *api.AuthHandoffService) error {
 	verification := api.NewAccountVerification(s.Database, s.EmailSender)
-	s.Database.BillingService().Gate = verification.Gate
 	registerHandler := api.RegisterWithVerification(s.Database, s.Telemetry, verification)
 	loginHandler := api.Login(s.Database)
 	googleSignIn, err := api.NewGoogleSignInService(s.Database)
@@ -182,8 +181,7 @@ func (s *Server) wireBrowserSync(deps *mountDeps) {
 	deps.browserSync = browserSync
 	if s.AIAgent != nil {
 		browserSync.SetRestoreCompleter(func(ctx context.Context, userID, prompt string) (string, error) {
-			text, _, err := s.AIAgent.CompleteContext(ctx, userID, prompt, "assistant_ai")
-			return text, err
+			return s.AIAgent.CompleteContext(ctx, userID, prompt)
 		})
 	}
 }

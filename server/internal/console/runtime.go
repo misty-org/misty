@@ -126,30 +126,3 @@ func (s *Server) aiPage(r *http.Request) templ.Component {
 	}
 	return aiPage(view)
 }
-
-type billingView struct {
-	Billing db.ConsoleBilling
-	Check   *HealthCheck
-	Err     string
-}
-
-func (s *Server) billingPage(r *http.Request) templ.Component {
-	if s.db == nil {
-		return databaseUnavailable("Billing")
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
-	defer cancel()
-	view := billingView{}
-	if snapshot, err := s.health.Fetch(ctx); err == nil {
-		if check, ok := snapshot.Checks["billing"]; ok {
-			check.Name = "billing"
-			view.Check = &check
-		}
-	}
-	billing, err := s.db.ConsoleBilling(ctx)
-	view.Billing = billing
-	if err != nil {
-		view.Err = "Couldn't load billing state: " + err.Error()
-	}
-	return billingPage(view)
-}

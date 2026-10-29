@@ -21,7 +21,6 @@ func (stub instanceStoreStub) InstanceState(context.Context, string) (db.Instanc
 }
 
 func TestInstanceDescriptorIsHosted(t *testing.T) {
-	t.Setenv("MISTY_BILLING_ADAPTER", "http")
 	t.Setenv("MISTY_INSTANCE_NAME", "")
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/instance", nil)
@@ -40,7 +39,7 @@ func TestInstanceDescriptorIsHosted(t *testing.T) {
 	if descriptor.Deployment != "hosted" || descriptor.BootstrapRequired || descriptor.Registration != "open" || descriptor.Name != "Misty" {
 		t.Fatalf("descriptor = %#v", descriptor)
 	}
-	if !descriptor.Capabilities.HostedBilling || !descriptor.Capabilities.HostedIntegrations || !descriptor.Capabilities.HostedAI {
+	if !descriptor.Capabilities.HostedIntegrations || !descriptor.Capabilities.HostedAI {
 		t.Fatalf("hosted capabilities = %#v", descriptor.Capabilities)
 	}
 }

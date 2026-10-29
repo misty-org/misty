@@ -42,7 +42,6 @@ func Run() {
 	defer stopWorkers()
 	startWorkers(
 		workerContext,
-		WorkerFunc(func(ctx context.Context) { runBillingCompletions(ctx, server) }),
 		WorkerFunc(func(ctx context.Context) {
 			if server.AbuseGuard != nil {
 				server.AbuseGuard.Run(ctx, func(reason string) { server.Metrics.RecordWorkerWake("abuse-blocks", reason) })

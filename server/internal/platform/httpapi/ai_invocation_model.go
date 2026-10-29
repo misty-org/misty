@@ -113,7 +113,7 @@ func checkInvocationModelAvailable(w http.ResponseWriter, r *http.Request, body 
 // freezeInvocationRoutes plans the model routes for a newly created run and
 // freezes them on the record.
 func (s *AIService) freezeInvocationRoutes(w http.ResponseWriter, r *http.Request, userID, invocationID string, st *aiInvocationAdmitState) bool {
-	planned, forced := planRoutes(r.Context(), s.database, userID, defaultAIRoutes(st.modelID, st.reasoning))
+	planned, forced := runRoutes(r.Context(), s.database, userID, defaultAIRoutes(st.modelID, st.reasoning))
 	if _, routeErr := s.database.FreezeAIModelRoutes(r.Context(), userID, invocationID, planned, st.modelOverrides, forced); routeErr != nil {
 		writeAIProviderError(w, routeErr)
 		return false

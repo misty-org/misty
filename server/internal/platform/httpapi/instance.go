@@ -21,7 +21,6 @@ type InstanceCapabilities struct {
 	Library            bool   `json:"library"`
 	Notes              bool   `json:"notes"`
 	Drawings           bool   `json:"drawings"`
-	HostedBilling      bool   `json:"hosted_billing"`
 	HostedIntegrations bool   `json:"hosted_integrations"`
 	HostedAI           bool   `json:"hosted_ai"`
 	StorageBackend     string `json:"storage_backend"`
@@ -64,7 +63,6 @@ func Instance(store instanceStateStore) http.HandlerFunc {
 				Library:            true,
 				Notes:              true,
 				Drawings:           true,
-				HostedBilling:      strings.EqualFold(strings.TrimSpace(config.Getenv("MISTY_BILLING_ADAPTER")), "http"),
 				HostedIntegrations: true,
 				HostedAI:           true,
 				StorageBackend:     "s3",
