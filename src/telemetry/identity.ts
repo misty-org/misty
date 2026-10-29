@@ -13,7 +13,6 @@ export class TelemetryIdentityManager {
     if (this.currentUserId === user.id) return;
     this.client.identify(user.id, {
       ...(user.accountCreatedAt ? { account_created_at: user.accountCreatedAt } : {}),
-      ...(user.currentPlan ? { current_plan: user.currentPlan } : {}),
     });
     this.currentUserId = user.id;
   }
@@ -22,5 +21,4 @@ export class TelemetryIdentityManager {
 export interface TelemetryIdentityUser {
   id: string;
   accountCreatedAt?: string;
-  currentPlan?: string;
 }

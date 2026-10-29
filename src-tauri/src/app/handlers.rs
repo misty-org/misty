@@ -172,7 +172,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::infra::misty::check_system,
             crate::infra::misty::save_authenticated_user,
-            crate::infra::misty::save_verified_license,
             crate::infra::misty::sign_out_misty,
             #[cfg(desktop)]
             crate::infra::browser::browser_webview_create,

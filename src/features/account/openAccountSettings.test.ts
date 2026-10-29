@@ -27,11 +27,11 @@ describe("openAccountSettingsInBrowser", () => {
   });
 
   it("passes a requested account surface through", async () => {
-    await openAccountSettingsInBrowser("/settings/billing");
+    await openAccountSettingsInBrowser("/settings/privacy");
 
-    expect(mocks.mistyPublicPage).toHaveBeenCalledWith("/settings/billing");
+    expect(mocks.mistyPublicPage).toHaveBeenCalledWith("/settings/privacy");
     expect(mocks.openSystemExternalLink).toHaveBeenCalledWith(
-      "https://mistysys.com/settings/billing",
+      "https://mistysys.com/settings/privacy",
     );
   });
 

@@ -6,7 +6,7 @@ describe("telemetry identity", () => {
   it("identifies restored/login users once and resets on logout", () => {
     const client = new MockTelemetryClient();
     const identity = new TelemetryIdentityManager(client);
-    identity.sync({ id: "opaque-user-id", accountCreatedAt: "2026-01-01", currentPlan: "pro" });
+    identity.sync({ id: "opaque-user-id", accountCreatedAt: "2026-01-01" });
     identity.sync({ id: "opaque-user-id" });
     expect(client.identifiedUserId).toBe("opaque-user-id");
     identity.sync(null);

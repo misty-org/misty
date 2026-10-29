@@ -1,6 +1,5 @@
 use crate::app::runtime::MistyRuntime;
 use crate::infra::paths;
-use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -19,7 +18,6 @@ pub struct NativeSystemInfo {
     setup_path: String,
     installed_version: Option<String>,
     current_user: Option<CurrentUser>,
-    current_license: Option<CurrentLicense>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentUser {
@@ -28,36 +26,14 @@ pub struct CurrentUser {
     username: String,
     email: String,
 }
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct CurrentLicense {
-    tier: String,
-    status: String,
-    allows_use: bool,
-    expires_at: Option<String>,
-    trial_started_at: Option<String>,
-    license_device: Option<String>,
-    #[serde(default)]
-    verified_at: Option<String>,
-    #[serde(default)]
-    refresh_after: Option<String>,
-    #[serde(default)]
-    verified_until: Option<String>,
-    #[serde(default)]
-    needs_refresh: bool,
-    #[serde(default)]
-    verification_expired: bool,
-}
-
-const LICENSE_REFRESH_AFTER_DAYS: i64 = 7;
-const LICENSE_VERIFIED_DAYS: i64 = 14;
 /// The account this device last signed in with. The server owns the account; this only
-/// lets the app show who is signed in and whether the license was verified recently.
+/// lets the app show who is signed in. Records from earlier builds also carried a
+/// license; it is ignored on read and dropped on the next write.
 /// It lives in `misty.db` with everything else (sign-in already depends on that
 /// database, since the account's tokens are in it).
 #[derive(Default, Serialize, Deserialize)]
 struct StoredSession {
     user: Option<CurrentUser>,
-    license: Option<CurrentLicense>,
 }
 
 static SESSION_LOCK: Mutex<()> = Mutex::new(());
@@ -98,44 +74,9 @@ fn write_session(session: &StoredSession) -> Result<(), String> {
         .map_err(|error| format!("Could not save the Misty session: {error}"))
 }
 
-fn parse_time(value: Option<&str>) -> Option<DateTime<Utc>> {
-    value
-        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-        .map(|time| time.with_timezone(&Utc))
-}
-
-/// A license stamped as verified now, with when it should be rechecked and
-/// when it stops allowing use if it never is.
-fn verified_license(license: &CurrentLicense) -> CurrentLicense {
-    let verified_at = Utc::now();
-    let stamp = |time: DateTime<Utc>| Some(time.to_rfc3339_opts(SecondsFormat::Secs, true));
-    CurrentLicense {
-        verified_at: stamp(verified_at),
-        refresh_after: stamp(verified_at + chrono::Duration::days(LICENSE_REFRESH_AFTER_DAYS)),
-        verified_until: stamp(verified_at + chrono::Duration::days(LICENSE_VERIFIED_DAYS)),
-        needs_refresh: false,
-        verification_expired: false,
-        ..license.clone()
-    }
-}
-
-/// The stored license as the app sees it now: due for a recheck, or no longer
-/// allowing use because it went unverified for too long.
-fn license_now(mut license: CurrentLicense) -> CurrentLicense {
-    let now = Utc::now();
-    license.needs_refresh =
-        parse_time(license.refresh_after.as_deref()).is_none_or(|due| due <= now);
-    license.verification_expired =
-        parse_time(license.verified_until.as_deref()).is_some_and(|until| until <= now);
-    if license.verification_expired {
-        license.allows_use = false;
-    }
-    license
-}
-
 fn session_info() -> Result<NativeSystemInfo, String> {
     let stored = read_session();
-    build_system_info(stored.user, stored.license.map(license_now))
+    build_system_info(stored.user)
 }
 
 /// Async so the file work never runs on the UI thread.
@@ -159,53 +100,22 @@ pub async fn sign_out_misty(
     blocking(|| {
         let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
         write_session(&StoredSession::default())?;
-        build_system_info(None, None)
+        build_system_info(None)
     })
     .await
 }
 
 #[tauri::command]
-pub async fn save_authenticated_user(
-    user: CurrentUser,
-    license: Option<CurrentLicense>,
-) -> Result<NativeSystemInfo, String> {
+pub async fn save_authenticated_user(user: CurrentUser) -> Result<NativeSystemInfo, String> {
     blocking(move || {
-        let license = license.ok_or_else(|| "Misty license could not be verified.".to_string())?;
-        if !license_allows_local_use(&license) {
-            return Err("Misty license is not active for local use.".to_string());
-        }
         let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
-        write_session(&StoredSession {
-            user: Some(user),
-            license: Some(verified_license(&license)),
-        })?;
+        write_session(&StoredSession { user: Some(user) })?;
         session_info()
     })
     .await
 }
 
-#[tauri::command]
-pub async fn save_verified_license(license: CurrentLicense) -> Result<NativeSystemInfo, String> {
-    blocking(move || {
-        if !license_allows_local_use(&license) {
-            return Err("Misty license is not active for local use.".to_string());
-        }
-        let _guard = SESSION_LOCK.lock().map_err(|_| "Misty session is busy.")?;
-        let mut stored = read_session();
-        if stored.user.is_none() {
-            return Err("No signed in Misty user.".to_string());
-        }
-        stored.license = Some(verified_license(&license));
-        write_session(&stored)?;
-        session_info()
-    })
-    .await
-}
-
-fn build_system_info(
-    current_user: Option<CurrentUser>,
-    current_license: Option<CurrentLicense>,
-) -> Result<NativeSystemInfo, String> {
+fn build_system_info(current_user: Option<CurrentUser>) -> Result<NativeSystemInfo, String> {
     let home = misty_home_dir()?;
     let install_dir = misty_bin_dir()?;
     let legacy_install_dir = legacy_misty_bin_dir()?;
@@ -226,14 +136,7 @@ fn build_system_info(
         setup_path,
         installed_version,
         current_user,
-        current_license,
     })
-}
-
-fn license_allows_local_use(license: &CurrentLicense) -> bool {
-    matches!(license.tier.as_str(), "basic" | "personal" | "pro" | "max")
-        && matches!(license.status.as_str(), "active" | "trialing")
-        && license.allows_use
 }
 
 fn misty_home_dir() -> Result<PathBuf, String> {

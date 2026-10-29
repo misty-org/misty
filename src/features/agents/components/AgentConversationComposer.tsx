@@ -11,7 +11,6 @@ import { AgentModeMenu } from "../collaboration/AgentModeToggle";
 import { AgentProjectMenu } from "../collaboration/AgentProjectMenu";
 import type { usePermissionMode } from "../collaboration/permissionMode";
 import type { useCollaborationComposer } from "../collaboration/useCollaborationComposer";
-import { AgentUsageControl } from "../workspace/AgentUsageControl";
 import { ComposerStrip } from "./ComposerStrip";
 
 /** The conversation's message box, its voice and stop controls, and the strip beneath it. */
@@ -19,7 +18,6 @@ export function AgentConversationComposer({
   agent,
   accountId,
   conversationId,
-  modelId,
   draft,
   setDraft,
   textareaRef,
@@ -28,14 +26,12 @@ export function AgentConversationComposer({
   collaboration,
   permission,
   working,
-  showControlBar,
   send,
   reportError,
 }: {
   agent?: AgentProfile;
   accountId: string;
   conversationId?: string;
-  modelId?: string;
   draft: string;
   setDraft: Dispatch<SetStateAction<string>>;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -44,7 +40,6 @@ export function AgentConversationComposer({
   collaboration: ReturnType<typeof useCollaborationComposer>;
   permission: ReturnType<typeof usePermissionMode>;
   working: boolean;
-  showControlBar: boolean;
   send: () => void;
   reportError: (message: string) => void;
 }) {
@@ -52,8 +47,6 @@ export function AgentConversationComposer({
   return (
     <>
       <MistyComposer
-        hideUsageEstimate={showControlBar && Boolean(agent)}
-        modelId={modelId}
         layout="inline"
         value={draft}
         onChange={setDraft}
@@ -128,7 +121,6 @@ export function AgentConversationComposer({
           />
         }
         code={<AgentCodingToolMenu conversationId={conversationId} disabled={working} />}
-        usage={showControlBar && agent ? <AgentUsageControl working={working} /> : undefined}
       />
       {/* Working status belongs to the transcript, under the message that started it. */}
       {(voice.recording || voice.transcribing) && (

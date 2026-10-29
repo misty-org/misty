@@ -2,7 +2,7 @@
 //! default, else their fallback, when it is installed, signed in, under the
 //! usage cap they set and able to honor the run's mode. Nothing smarter. The
 //! choice and its inputs stay on the device; the server only checks the
-//! budget and the grants when it issues the lease.
+//! grants when it issues the lease.
 use super::{detect::EngineStatus, events::RateLimit, EngineId, LaunchMode};
 
 /// How far an engine can be trusted to ask before acting.

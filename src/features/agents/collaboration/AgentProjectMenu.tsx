@@ -10,8 +10,6 @@ import {
   DropdownMenuSeparator,
   MenuTrigger,
 } from "@/shared/ui";
-import { CodingUpgradeNote } from "../coding/CodingUpgradeNote";
-import { useCodingIncluded } from "../coding/useCodingIncluded";
 import type { AgentScope } from "../model/types";
 import { agentsDeviceSnapshot, chooseProject } from "../store/useAgentsStore";
 import { projectRemote } from "../store/projectGitHub";
@@ -28,7 +26,6 @@ const none = "none";
  * Only the chosen project travels with the chat; the next message uses a new
  * choice. Desktop only, since projects are folders on this computer; with another
  * device picked, its own shared folders apply instead and the menu steps aside.
- * Plans without coding see an upgrade note instead, and no project travels.
  */
 export function AgentProjectMenu({
   conversationId,
@@ -53,37 +50,15 @@ export function AgentProjectMenu({
         .catch(() => undefined),
     [],
   );
-  const included = useCodingIncluded(hasTauriInternals());
   useEffect(() => {
-    if (hasTauriInternals() && included !== false) void load();
-  }, [load, included]);
-  // A project chosen before the plan changed would only be refused on send.
-  useEffect(() => {
-    if (included === false && chosen) setProject(conversationId, null);
-  }, [included, chosen, conversationId, setProject]);
+    if (hasTauriInternals()) void load();
+  }, [load]);
   useEffect(() => {
     setRemote(null);
     if (chosen && hasTauriInternals())
       void projectRemote(chosen).then((found) => setRemote(found ?? ""));
   }, [chosen]);
   if (!hasTauriInternals()) return null;
-  if (included === false)
-    return (
-      <DropdownMenu>
-        <MenuTrigger
-          label="Project"
-          icon={<FolderOpen aria-hidden className="size-4 shrink-0" />}
-          value="Project"
-          title="Projects are part of Misty Pro and above"
-          chevron={false}
-          disabled={disabled}
-          className="agent-strip-chip max-w-40"
-        />
-        <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
-          <CodingUpgradeNote />
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
   const current = projects.find((project) => project.id === chosen);
   const canPublish = current?.kind === "project_folder" && current.available && remote === "";
   const add = async () => {

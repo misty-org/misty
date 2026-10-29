@@ -15,7 +15,6 @@ import {
   assertAccountIdentity,
   authUserFromMe,
   isInvalidAccountSessionError,
-  licenseFromMe,
   resetAccountScopedState,
   type AuthUser,
 } from "../authSession";
@@ -45,7 +44,6 @@ export function useAuthenticateAccount(
       // nobody is signed in again.
       const previousProfileId = profileIdFor(previousAccountId);
       const previousMe = useUserStore.getState().me;
-      const previousLicense = useNativeSessionStore.getState().status?.current_license ?? null;
       const fromLocal = !previousAccountId;
       let authenticated: AuthUser | null = null;
       // Signing in from the local profile happens over the browsing window, so a failed
@@ -67,7 +65,7 @@ export function useAuthenticateAccount(
           lastUsedAt: new Date().toISOString(),
         });
         await updateSavedAccountSession(nextUser);
-        await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        await saveAuthenticatedUser(nextUser);
         if (live) {
           await adoptAccountWorkspace(nextUser.id, live);
           // The tabs are the account's now; the local profile starts empty if it returns.
@@ -94,9 +92,7 @@ export function useAuthenticateAccount(
         let restoredPreviousAccount = false;
         if (await tryRestoreSavedSession(previousAccountId)) {
           try {
-            if (previousUser && previousLicense) {
-              await saveAuthenticatedUser(previousUser, previousLicense);
-            }
+            if (previousUser) await saveAuthenticatedUser(previousUser);
             await restoreAccountWorkspace(previousProfileId);
             if (previousMe?.id === previousAccountId) useUserStore.getState().setMe(previousMe);
             if (previousUser?.id === previousAccountId) setUserState(previousUser);

@@ -344,7 +344,7 @@ it("does not publish an old voice session error into a different conversation", 
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
   mocks.state.activeConversationId = "other";
-  act(() => mocks.conversationOptions!.onError(new Error("Billing admission denied")));
+  act(() => mocks.conversationOptions!.onError(new Error("Model admission denied")));
   expect(mocks.state.error).toBeNull();
   view.unmount();
 });

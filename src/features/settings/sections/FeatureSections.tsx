@@ -203,13 +203,13 @@ function AgentScopeList() {
     </Section>
   );
 }
-/** The way to the account on the website, which owns billing and account data. */
+/** The way to the account on the Misty server's website, which owns account data. */
 export function AboutSection() {
   return (
     <Section title="Account">
       <Row
-        label="Plan and billing"
-        description="Your plan, billing, invites and account data are managed on the Misty website."
+        label="Account"
+        description="Your profile, invites and account data are managed on your Misty server's website."
       >
         <Button variant="outline" size="sm" onClick={() => void openAccountSettingsInBrowser()}>
           Manage account

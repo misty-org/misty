@@ -1,7 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { spacesApi } from "@/api/spaces/api";
-import { useCodingIncluded } from "@/features/agents";
 import { FileInput, Pressable, cn } from "@/shared/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
 import { MakeArt } from "./MakeArt";
@@ -28,7 +27,6 @@ export function MakeSomethingNew({
   onCreated: () => void;
 }) {
   const navigate = useNavigate();
-  const coding = useCodingIncluded();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const picker = useRef<HTMLInputElement>(null);
@@ -88,11 +86,6 @@ export function MakeSomethingNew({
             </Frame>
             <span className="flex items-center gap-2 px-0.5 text-sm text-cream-bright">
               {tile.label}
-              {tile.id === "code" && coding === false && (
-                <span className="rounded border border-charcoal-border px-1.5 text-[10px] text-cream-muted">
-                  Pro
-                </span>
-              )}
             </span>
           </Pressable>
         ))}

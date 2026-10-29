@@ -95,11 +95,10 @@ fn setup(allow: bool) -> (ScriptedClaude, Launch, Arc<Host>, PathBuf) {
     )
 }
 
-fn meter(budget: u64) -> LeaseMeter {
+fn meter(expires_at: i64) -> LeaseMeter {
     LeaseMeter::new(Lease {
         invocation_id: "inv".into(),
-        token_budget: budget,
-        expires_at: 100,
+        expires_at,
         grant_version: 1,
         grants: vec![],
         signature: "s".into(),
@@ -124,7 +123,7 @@ async fn a_turn_asks_the_person_answers_the_tool_and_finishes() {
         &runner,
         &launch,
         context(&launch),
-        &mut meter(1_000),
+        &mut meter(100),
         host.as_ref(),
         stop,
     )
@@ -158,7 +157,7 @@ async fn a_no_from_the_person_reaches_the_tool_as_a_deny() {
         &runner,
         &launch,
         context(&launch),
-        &mut meter(1_000),
+        &mut meter(100),
         host.as_ref(),
         stop,
     )
@@ -170,7 +169,7 @@ async fn a_no_from_the_person_reaches_the_tool_as_a_deny() {
 }
 
 #[tokio::test]
-async fn a_spent_lease_stops_at_the_turn_boundary_and_blocks_the_next_turn() {
+async fn an_expired_lease_blocks_the_turn() {
     let (runner, launch, host, _) = setup(true);
     let mut spent = meter(10);
     let (_stop, stop) = tokio::sync::oneshot::channel();
@@ -184,7 +183,7 @@ async fn a_spent_lease_stops_at_the_turn_boundary_and_blocks_the_next_turn() {
     )
     .await
     .unwrap();
-    assert_eq!(outcome, Outcome::BudgetExhausted);
+    assert_eq!(outcome, Outcome::LeaseExpired);
     let (_stop, stop) = tokio::sync::oneshot::channel();
     assert_eq!(
         run_turn(
@@ -197,7 +196,7 @@ async fn a_spent_lease_stops_at_the_turn_boundary_and_blocks_the_next_turn() {
         )
         .await
         .unwrap(),
-        Outcome::BudgetExhausted
+        Outcome::LeaseExpired
     );
 }
 
@@ -213,7 +212,7 @@ async fn canceling_stops_the_tool() {
         &runner,
         &launch,
         context(&launch),
-        &mut meter(1_000),
+        &mut meter(100),
         host.as_ref(),
         stop,
     )

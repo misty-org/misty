@@ -22,9 +22,6 @@ const mocks = vi.hoisted(() => {
     username: accountA.username,
     email: accountA.email,
     created_at: "2026-01-01T00:00:00.000Z",
-    tier: "free",
-    status: "active",
-    allows_use: true,
   };
   const meB = {
     ...meA,
@@ -110,7 +107,6 @@ vi.mock("@/features/native-session", () => {
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
     status: {
       current_user: null,
-      current_license: null,
     },
   };
   return {
@@ -128,7 +124,6 @@ vi.mock("@/features/app-shell", () => {
     saveAuthenticatedUser: mocks.saveAuthenticatedUser,
     status: {
       current_user: null,
-      current_license: null,
     },
   };
   return {
@@ -337,7 +332,6 @@ describe("AuthProvider account switching", () => {
       ...mocks.meA,
       username: "updated-account",
       avatar_version: 3,
-      tier: "pro",
     };
     mocks.accountFetchMe.mockResolvedValueOnce(refreshedMe);
     await act(async () => {
@@ -348,7 +342,6 @@ describe("AuthProvider account switching", () => {
       id: mocks.accountA.id,
       username: "updated-account",
       avatarVersion: 3,
-      currentPlan: "pro",
     });
   });
   it("restores the active saved account before protected pages render", async () => {
@@ -611,7 +604,6 @@ describe("AuthProvider account switching", () => {
       expect.objectContaining({
         id: mocks.accountA.id,
       }),
-      expect.anything(),
     );
   });
   it("swaps verified account identity without reloading retired Spaces", async () => {
@@ -640,7 +632,6 @@ describe("AuthProvider account switching", () => {
       expect.objectContaining({
         id: mocks.accountB.id,
       }),
-      expect.anything(),
     );
     expect(mocks.spacesLoad).not.toHaveBeenCalled();
   });

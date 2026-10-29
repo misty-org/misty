@@ -12,9 +12,7 @@ import {
   MenuTrigger,
 } from "@/shared/ui";
 import { CodingToolIcon } from "../coding/CodingToolIcon";
-import { CodingUpgradeNote } from "../coding/CodingUpgradeNote";
 import { codingTools, detectCodingTools, type CodingToolStatus } from "../coding/codingTools";
-import { useCodingIncluded } from "../coding/useCodingIncluded";
 import { useConversationCodingTool } from "../store/useConversationCodingTool";
 
 const settingsDefault = "default";
@@ -30,7 +28,7 @@ function unavailable(status?: CodingToolStatus) {
  * The composer's coding tool for this conversation: the Settings default, or one of the
  * person's own coding tools. Tools that aren't installed or signed in on this computer are
  * listed but can't be picked. The choice is the conversation's, with or without a project.
- * Plans without coding see an upgrade note instead. Desktop only.
+ * Desktop only.
  */
 export function AgentCodingToolMenu({
   conversationId,
@@ -47,28 +45,10 @@ export function AgentCodingToolMenu({
       .then(setStatuses)
       .catch(() => undefined);
   };
-  const included = useCodingIncluded(hasTauriInternals());
   useEffect(() => {
     if (hasTauriInternals()) load();
   }, []);
   if (!hasTauriInternals()) return null;
-  if (included === false)
-    return (
-      <DropdownMenu>
-        <MenuTrigger
-          label="Code"
-          title="Coding is part of Misty Pro and above"
-          icon={<Code aria-hidden className="size-4 shrink-0" />}
-          chevron={false}
-          disabled={disabled}
-          className="agent-strip-chip"
-        />
-        <DropdownMenuContent align="start" className="w-64" data-misty-layer-portal>
-          <DropdownMenuLabel>Code</DropdownMenuLabel>
-          <CodingUpgradeNote />
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
   const current = codingTools.find((tool) => tool.id === chosen);
   return (
     <DropdownMenu onOpenChange={(open) => open && load()}>

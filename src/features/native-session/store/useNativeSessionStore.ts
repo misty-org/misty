@@ -1,10 +1,5 @@
-import type { AccountMeResponse } from "@/features/auth";
-import {
-  accountFetchMe,
-  isAccountSessionTransitioning,
-  readAccountSessionGeneration,
-} from "@/features/auth";
-import type { CurrentLicense, CurrentUser, NativeSession } from "../model/types";
+import { isAccountSessionTransitioning, readAccountSessionGeneration } from "@/features/auth";
+import type { CurrentUser, NativeSession } from "../model/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
@@ -25,29 +20,6 @@ function isCurrentSessionRequest(request: { sequence: number; accountGeneration:
   );
 }
 
-function licenseFromMe(me: AccountMeResponse): CurrentLicense {
-  return {
-    tier: me.tier,
-    status: me.status,
-    allows_use: me.allows_use,
-    expires_at: me.expires_at,
-    trial_started_at: me.trial_started_at,
-    email_verified: me.email_verified,
-    license_device: me.license_device || null,
-  };
-}
-
-async function refreshVerifiedLicenseIfDue(session: NativeSession): Promise<NativeSession> {
-  if (!session.current_user || !session.current_license?.needs_refresh) return session;
-  try {
-    const me = await accountFetchMe();
-    if (me.id !== session.current_user.id) return session;
-    return await invoke<NativeSession>("save_verified_license", { license: licenseFromMe(me) });
-  } catch {
-    return session;
-  }
-}
-
 export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
   status: null,
   systemError: "",
@@ -60,8 +32,7 @@ export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
         set({ status: null, systemError: "Misty requires the native app runtime." });
         return;
       }
-      let session = await invoke<NativeSession>("check_system");
-      if (session.current_user) session = await refreshVerifiedLicenseIfDue(session);
+      const session = await invoke<NativeSession>("check_system");
       if (!isCurrentSessionRequest(request)) return;
       set({ status: session, systemError: "" });
     } catch (error) {
@@ -74,22 +45,18 @@ export const useNativeSessionStore = create<NativeSessionStore>((set) => ({
     const request = beginSessionRequest();
     try {
       const session = await invoke<NativeSession>("check_system");
-      const refreshed = session.current_user ? await refreshVerifiedLicenseIfDue(session) : session;
       if (!isCurrentSessionRequest(request)) return;
-      set({ status: refreshed, systemError: "" });
+      set({ status: session, systemError: "" });
     } catch {
       /* the next refresh retries */
     }
   },
-  saveAuthenticatedUser: async (user, license) => {
+  saveAuthenticatedUser: async (user) => {
     if (!hasTauriInternals()) {
       set({ systemError: "Saving account state is only available in the Misty app." });
       return;
     }
-    const session = await invoke<NativeSession>("save_authenticated_user", {
-      user,
-      license: license ?? null,
-    });
+    const session = await invoke<NativeSession>("save_authenticated_user", { user });
     // Supersede any refresh that started while the native identity was committing.
     beginSessionRequest();
     set({ status: session, systemError: "" });
@@ -118,6 +85,6 @@ export type NativeSessionStore = {
   systemError: string;
   loadSystem: () => Promise<void>;
   refreshSession: () => Promise<void>;
-  saveAuthenticatedUser: (user: CurrentUser, license?: CurrentLicense | null) => Promise<void>;
+  saveAuthenticatedUser: (user: CurrentUser) => Promise<void>;
   signOut: () => Promise<void>;
 };

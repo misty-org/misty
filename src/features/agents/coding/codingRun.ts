@@ -6,7 +6,7 @@ import { appsApi } from "../apps/api";
 
 /**
  * Runs a coding task the server delegated to this device: picks the tool (the
- * person's default, then fallback), takes a budget lease per turn, runs turns
+ * person's default, then fallback), takes a lease per turn, runs turns
  * until the tool finishes, mirrors every event to the delegated run and gets
  * the person's answer to each permission question through the server's card.
  * The device job itself only starts the run.
@@ -20,7 +20,6 @@ interface CodingJob {
 interface Lease {
   invocation_id: string;
   lease_id: string;
-  token_budget: number;
   expires_at: number;
   grant_version: number;
   grants: string[];
@@ -215,13 +214,13 @@ async function runTurns(job: CodingJob, deviceId: string) {
       await posting;
       if (result.outcome === "finished" && input.mode !== "plan")
         await saveSnapshot(job.scopeId, runId, input.agentId, input.conversationId);
-      if (result.outcome !== "budget_exhausted") {
+      if (result.outcome !== "lease_expired") {
         if (result.outcome === "failed")
           await fail(result.message || "The coding tool stopped with an error.");
         if (result.outcome === "canceled") await fail("Stopped before the coding tool finished.");
         return;
       }
-      // A spent lease stops at the turn boundary; a new one continues the session.
+      // An expired lease stops at the turn boundary; a new one continues the session.
       current = await takeLease(runId, deviceId, engine, repo);
       task = "Continue where you left off.";
     }

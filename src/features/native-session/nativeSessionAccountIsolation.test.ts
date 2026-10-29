@@ -42,7 +42,7 @@ describe("native session account isolation", () => {
     const request = useNativeSessionStore.getState().loadSystem();
     await vi.waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("check_system"));
     mocks.generation += 1;
-    resolveSystem?.({ current_user: null, current_license: null });
+    resolveSystem?.({ current_user: null });
     await request;
 
     expect(useNativeSessionStore.getState().status).toBeNull();
@@ -55,25 +55,14 @@ describe("native session account isolation", () => {
         username: "account-b",
         email: "b@example.test",
       },
-      current_license: {
-        tier: "pro",
-        status: "active",
-        allows_use: true,
-        expires_at: null,
-        trial_started_at: null,
-        license_device: "Test Mac",
-      },
     };
     mocks.invoke.mockImplementation((command: string) => {
       if (command === "save_authenticated_user") return Promise.resolve(native);
       throw new Error(`Unexpected command: ${command}`);
     });
 
-    await useNativeSessionStore
-      .getState()
-      .saveAuthenticatedUser(native.current_user!, native.current_license!);
+    await useNativeSessionStore.getState().saveAuthenticatedUser(native.current_user!);
 
     expect(useNativeSessionStore.getState().status?.current_user?.id).toBe("account-b");
-    expect(useNativeSessionStore.getState().status?.current_license?.tier).toBe("pro");
   });
 });

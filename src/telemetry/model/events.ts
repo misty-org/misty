@@ -22,15 +22,6 @@ interface CommonServerProperties {
   server_version?: string;
 }
 
-interface SubscriptionProperties extends CommonServerProperties {
-  provider: "stripe" | "other";
-  plan_id: string;
-  billing_interval?: "monthly" | "yearly" | "lifetime" | "other";
-  currency?: string;
-  amount_minor?: number;
-  subscription_status: "trialing" | "active" | "past_due" | "canceled" | "expired";
-}
-
 export interface AnalyticsEventProperties {
   app_first_opened: CommonClientProperties & { install_id: string };
   app_session_started: CommonClientProperties & {
@@ -45,9 +36,6 @@ export interface AnalyticsEventProperties {
     release_channel?: ReleaseChannel;
   };
   onboarding_completed: CommonClientProperties & { install_id: string; onboarding_version: string };
-  subscription_started: SubscriptionProperties;
-  subscription_renewed: SubscriptionProperties;
-  subscription_canceled: SubscriptionProperties;
   ai_companion_dismissed: {
     surface: string;
     had_task: boolean;
@@ -63,7 +51,6 @@ export interface AnalyticsEventProperties {
 
 export interface SafeUserProperties {
   account_created_at?: string;
-  current_plan?: string;
   originating_platform?: Platform;
 }
 
@@ -71,7 +58,6 @@ export interface SafeErrorContext {
   operation?:
     | "authentication"
     | "onboarding"
-    | "subscription"
     | "file_operation"
     | "application_startup"
     | "background_task"
