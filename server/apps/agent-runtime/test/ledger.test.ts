@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModelMessage } from "ai";
-import { Ledger, ledgerFromPrompt, ledgerSuffix, withLedger } from "../src/ledger.js";
-import { finishIssues } from "../src/finish-verification.js";
+import { backed, Ledger, ledgerFromPrompt, ledgerSuffix, withLedger } from "../src/ledger.js";
+import { finishIssues, reportOnlyIssue } from "../src/finish-verification.js";
 
 const call = (name: string, input: unknown): ModelMessage => ({ role: "assistant", content: [{ type: "tool-call", toolCallId: "c", toolName: name, input }] });
 
@@ -56,5 +56,20 @@ describe("ledger", () => {
     }).join("\n");
     expect(check("completed")).toMatch(/1 part as not done \("Find A"\)/);
     expect(check("partial")).toBe("");
+  });
+
+  it("backs evidence written as a sentence around an address, and answer rows with the answer", () => {
+    const shown = JSON.stringify({ tabs: [{ url: "https://stockeldpark.co.uk/plan-your-day/tickets-prices/christmas-ticket-options/" }] }).toLowerCase();
+    expect(backed({ kind: "tab", ref: "https://stockeldpark.co.uk/plan-your-day/tickets-prices/christmas-ticket-options/ scrolled to Gold Package; kept()", summary: "" }, shown)).toBe(true);
+    expect(backed({ kind: "tab", ref: "https://www.yorkmaze.com/plan-a-visit/ kept", summary: "" }, shown)).toBe(false);
+    const ledger = new Ledger();
+    ledger.update({ rows: [{ requirement: "Compare the two", state: "done", evidence: { kind: "note", ref: "Final answer text below with comparison", summary: "" } }] });
+    expect(ledger.reconcile([], "x".repeat(250))).toEqual([]);
+    expect(ledger.reconcile([], "")).toHaveLength(1);
+  });
+
+  it("sends back an answer that reports the work instead of giving it", () => {
+    expect(reportOnlyIssue("Completed all 26 requirements. Delivered side-by-side comparison.")).toMatch(/describes the work/);
+    expect(reportOnlyIssue("## Stockeld Park vs Harrogate\n| | Stockeld | Funland |")).toBeUndefined();
   });
 });

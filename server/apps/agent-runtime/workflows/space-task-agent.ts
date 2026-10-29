@@ -49,7 +49,7 @@ export async function runSpaceTaskAgent(input: SpaceTaskWorkflowInput) {
     ledger: new Ledger(ledgerFromPrompt(context.prompt)),
     order: serialToolLifecycle(),
     limit: 0, modelTurn: 0, visibleTools: [], hookFailure: undefined,
-    verified: false, persisted: 0,
+    verified: false, persisted: 0, reportedOnly: 0,
   } as Omit<AgentRun, "tools"> as AgentRun;
   const { order } = run;
   let finishAsked = false;

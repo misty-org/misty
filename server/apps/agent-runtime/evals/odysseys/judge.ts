@@ -56,7 +56,7 @@ interface TaskVerdict {
 const judgeLanes = Math.max(1, Math.min(8, Number(process.env.MISTY_ODYSSEYS_JUDGE_LANES || 5)));
 
 /** Grades every rubric of one task; the last `maxImages` screenshots go to each call. */
-export async function judgeTask(model: string, task: OdysseysTask, steps: Step[], screenshots: string[], maxImages = 60): Promise<TaskVerdict> {
+export async function judgeTask(model: string, task: OdysseysTask, steps: Step[], screenshots: string[], maxImages = Number(process.env.MISTY_ODYSSEYS_JUDGE_IMAGES || 60)): Promise<TaskVerdict> {
   if (task.judge === "bu-v1") return judgeBu(model, task, steps, screenshots);
   const history = steps.map((step, index) => {
     const parts = [step.response.trim() ? `Response: ${step.response.trim()}` : "", step.action ? `Action: ${step.action}` : ""].filter(Boolean);
@@ -113,7 +113,7 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
           // longer each time and ask again, rather than grading the agent on the judge's outage.
           if (attempt < 5 && /judge_quiet|429|rate.?limit|quota|exhaust|overload|unavailable|50\d|fetch failed/i.test(String(error))) {
             if (fallbackModel && judge !== fallbackModel) {
-              process.stderr.write(`JUDGE_FALLBACK ${rubric.id}: ${judge} -> ${fallbackModel}\n`);
+              process.stderr.write(`JUDGE_FALLBACK ${rubric.id}: ${judge} -> ${fallbackModel} (${String(error).slice(0, 160)})\n`);
               judge = fallbackModel;
               return undefined;
             }

@@ -71,13 +71,18 @@ export class Ledger {
     return this.snapshot();
   }
 
-  /** Marks every row with evidence the run's own calls do not show as pending again. Returns them. */
-  reconcile(messages: ModelMessage[]): LedgerRow[] {
+  /**
+   * Marks every row with evidence the run's own calls do not show as pending again. Returns them.
+   * `answer` is the finish's summary: a row whose evidence is the answer itself (the comparison,
+   * the recommendation) is backed by a written answer.
+   */
+  reconcile(messages: ModelMessage[], answer = ""): LedgerRow[] {
     const shown = toolText(messages);
     const unbacked: LedgerRow[] = [];
     for (const row of this.rows) {
       if (row.state !== "done" || row.carried) continue;
       if (backed(row.evidence, shown)) continue;
+      if (row.evidence?.kind === "note" && answerEvidence.test(row.evidence.ref) && answer.trim().length >= 200) continue;
       row.state = "pending";
       row.reason = "Marked done without evidence this run shows.";
       unbacked.push({ ...row });
@@ -93,10 +98,23 @@ export class Ledger {
   }
 }
 
-/** Whether an evidence ref appears in what this run's tools were called with or returned. */
+/** Evidence that points at the run's own answer ("the final answer below"). */
+const answerEvidence = /\b(final )?(answer|summary|response|reply|comparison)\b/i;
+
+/**
+ * Whether an evidence ref appears in what this run's tools were called with or returned. A ref
+ * that names addresses among other words ("<url> scrolled to Gold Package; <url> kept") is backed
+ * when one of its addresses is: models write their evidence as a sentence, not one bare string.
+ */
 export function backed(evidence: LedgerEvidence | undefined, shown: string): boolean {
   if (!evidence) return false;
-  return shown.includes(evidence.ref.toLowerCase());
+  const ref = evidence.ref.toLowerCase();
+  if (shown.includes(ref)) return true;
+  const addresses = ref.match(/https?:\/\/[^\s;,)"']+/g) ?? [];
+  return addresses.some((address) => {
+    const bare = address.replace(/[/.]+$/, "").replace(/^https?:\/\/(www\.)?/, "");
+    return bare.length > 8 && shown.includes(bare);
+  });
 }
 
 /** Tool calls and results as lower-case text, leaving out the ledger's own calls. */
