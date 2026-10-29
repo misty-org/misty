@@ -118,6 +118,10 @@
         if (rect.width * rect.height >= area * 0.25) box = el;
       }
       if (!box) continue;
+      // A site drawn in a fixed app shell (10015.io) is not a popup over the page: it is the page.
+      // A box that holds the main content or most of the page's text is never closed or hidden.
+      const pageText = (document.body.innerText || "").length;
+      if (box.matches("main,[role=main]") || box.querySelector("main,[role=main]") || (pageText > 400 && (box.innerText || "").length > pageText * 0.6)) continue;
       // A backdrop with nothing to read or press: left by a banner that closed, or a scrim.
       if (!(box.innerText || "").trim() && !box.querySelector(CONTROLS + ",input,select,textarea,img,video,iframe,canvas"))
         return { box, close: null, name: "", empty: true };
