@@ -65,7 +65,7 @@ export async function judgeBu(model: string, task: OdysseysTask, steps: Step[], 
     return !seen.has(hash) && Boolean(seen.add(hash));
   }).slice(0, 10).reverse();
   const text = `\n<task>\n${truncate(task.prompt, 40_000) || "No task provided"}\n</task>\n\n<agent_trajectory>\n${truncate(history, 40_000) || "No agent trajectory provided"}\n</agent_trajectory>\n\n<final_result>\n${truncate(answer, 40_000) || "No final result provided"}\n</final_result>\n\n${pictures.length} screenshots from execution are attached.\n\nEvaluate this agent execution given the criteria and respond with the exact JSON structure requested.`;
-  const free = model.startsWith("nim/") || model.startsWith("gemini/");
+  const free = /^(nim|nvidia|gemini)\//.test(model);
   let reasoning = "";
   let success = false;
   let usage = { inputTokens: 0, outputTokens: 0 };

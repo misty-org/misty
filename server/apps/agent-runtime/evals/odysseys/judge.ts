@@ -70,7 +70,7 @@ export async function judgeTask(model: string, task: OdysseysTask, steps: Step[]
   // Each rubric item is judged on its own, as the original does; the calls run together,
   // except on a free model's rate limit (docs/agents/evals/free-model.md), where a few at a time
   // (judgeLanes) keep a 429 from being graded as a failed rubric.
-  const free = model.startsWith("nim/") || model.startsWith("gemini/");
+  const free = /^(nim|nvidia|gemini)\//.test(model);
   const fallbackModel = process.env.MISTY_ODYSSEYS_JUDGE_FALLBACK?.trim() ?? "";
   const judgeOne = async (rubric: OdysseysTask["rubrics"][number]): Promise<RubricResult> => {
     // The judge's model, until it fails for its own reasons (a free tier's 503s last for hours): then
