@@ -86,6 +86,17 @@ func LibraryStoreFromEnv() (api.LibraryObjectStore, error) {
 	return store, nil
 }
 
+// libraryStorageName names a Library store for /instance.
+func libraryStorageName(store api.LibraryObjectStore) string {
+	switch store.(type) {
+	case *api.S3LibraryObjectStore:
+		return "s3"
+	case *api.LocalLibraryObjectStore:
+		return "filesystem"
+	}
+	return "memory"
+}
+
 func firstConfigured(names ...string) string {
 	for _, name := range names {
 		if value := strings.TrimSpace(envconfig.Getenv(name)); value != "" {

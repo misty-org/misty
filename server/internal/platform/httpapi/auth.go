@@ -57,6 +57,13 @@ func RegisterWithVerification(database *db.Database, analytics telemetry.Client,
 			http.Error(w, "email already registered", http.StatusConflict)
 			return
 		}
+		if allowed, err := registrationAllowed(r.Context(), database); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		} else if !allowed {
+			writeRegistrationClosed(w)
+			return
+		}
 
 		user, err := database.CreateUserWithUsername(body.Username, body.Email, body.Password)
 		if err != nil {

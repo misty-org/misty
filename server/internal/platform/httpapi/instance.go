@@ -27,7 +27,8 @@ type InstanceCapabilities struct {
 }
 
 // InstanceDescriptor keeps the fields installed desktop apps already read.
-// Misty is hosted only, so deployment and registration are fixed.
+// Registration is "open" while this server takes new accounts and "closed"
+// once it does not (MISTY_REGISTRATION).
 type InstanceDescriptor struct {
 	ServerID          string               `json:"server_id"`
 	Name              string               `json:"name"`
@@ -40,7 +41,9 @@ type InstanceDescriptor struct {
 	Registration      string               `json:"registration"`
 }
 
-func Instance(store instanceStateStore) http.HandlerFunc {
+// Instance describes this server. storage is the Library backend in use:
+// "s3", "filesystem" or "memory".
+func Instance(store instanceStateStore, storage string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(config.Getenv("MISTY_INSTANCE_NAME"))
 		if name == "" {
@@ -59,15 +62,22 @@ func Instance(store instanceStateStore) http.HandlerFunc {
 			MinClientProtocol: InstanceProtocolVersion,
 			MaxClientProtocol: InstanceProtocolVersion,
 			Capabilities: InstanceCapabilities{
-				Collaboration:      true,
+				Collaboration:      collaborationEnabled(),
 				Library:            true,
 				Notes:              true,
 				Drawings:           true,
 				HostedIntegrations: true,
 				HostedAI:           true,
-				StorageBackend:     "s3",
+				StorageBackend:     storage,
 			},
-			Registration: "open",
+			Registration: instanceRegistration(r.Context(), store),
 		})
 	}
+}
+
+func instanceRegistration(ctx context.Context, store instanceStateStore) string {
+	if counter, ok := store.(accountCounter); ok {
+		return registrationState(ctx, counter)
+	}
+	return "open"
 }

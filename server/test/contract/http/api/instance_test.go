@@ -27,7 +27,7 @@ func TestInstanceDescriptorIsHosted(t *testing.T) {
 	api.Instance(instanceStoreStub{state: db.InstanceState{
 		ServerID:    "server_00000000-0000-0000-0000-000000000001",
 		DisplayName: "Misty",
-	}}).ServeHTTP(recorder, request)
+	}}, "s3").ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
@@ -47,7 +47,7 @@ func TestInstanceDescriptorIsHosted(t *testing.T) {
 func TestInstanceDescriptorReportsUnavailableStore(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/instance", nil)
-	api.Instance(instanceStoreStub{err: context.DeadlineExceeded}).ServeHTTP(recorder, request)
+	api.Instance(instanceStoreStub{err: context.DeadlineExceeded}, "s3").ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
 	}

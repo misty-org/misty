@@ -155,7 +155,7 @@ func (s *Server) wireAccountHandlers(deps *mountDeps, passwordResetService *api.
 	mintHandoffHandler := authHandoffService.Mint()
 	startHandoffHandler := authHandoffService.Start()
 	healthHandler := s.HealthMonitor.Handler()
-	instanceHandler := api.Instance(s.Database)
+	instanceHandler := api.Instance(s.Database, libraryStorageName(s.LibraryStore))
 
 	deps.verification = verification
 	deps.googleSignIn = googleSignIn

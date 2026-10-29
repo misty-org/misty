@@ -158,9 +158,12 @@ func CreateServer() (*Server, error) {
 		return nil, err
 	}
 	s.EmailSender = emailSender
+	// Invitation emails link to the operator's own invite page. Without
+	// MISTY_INVITATION_URL_BASE or MISTY_WEBSITE_URL, invitations still reach
+	// the invitee inside Misty but no email is sent.
 	invitationBaseURL := strings.TrimSpace(config.Getenv("MISTY_INVITATION_URL_BASE"))
-	if invitationBaseURL == "" {
-		invitationBaseURL = "https://mistysys.com/invite"
+	if website := strings.TrimRight(strings.TrimSpace(config.Getenv("MISTY_WEBSITE_URL")), "/"); invitationBaseURL == "" && website != "" {
+		invitationBaseURL = website + "/invite"
 	}
 	s.Spaces.SetInvitationSender(emailSender, invitationBaseURL)
 	s.HealthMonitor = NewHealthMonitor(s)

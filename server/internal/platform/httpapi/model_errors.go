@@ -16,6 +16,8 @@ func writeModelError(w http.ResponseWriter, err error) bool {
 	switch {
 	case errors.Is(err, errAIDisabled):
 		writeJSON(w, http.StatusForbidden, map[string]string{"code": "ai_disabled", "message": "AI is turned off for this account."})
+	case errors.Is(err, ErrCollaborationOff):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "collaboration_off", "message": "This server can't save notes and drawings."})
 	case errors.Is(err, errVoiceUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "voice_unavailable", "message": "Voice isn't available on this server."})
 	default:

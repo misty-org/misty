@@ -109,6 +109,7 @@ func TestProductionCORSRejectsLoopbackOrigins(t *testing.T) {
 
 func TestCORSAllowsAppOrigins(t *testing.T) {
 	configureJournalCollabForTest(t)
+	t.Setenv("MISTY_ALLOWED_ORIGINS", "https://web.misty.example")
 	t.Setenv("PASSWORD_RESET_URL", "http://localhost:5173/reset")
 	t.Setenv("PASSWORD_RESET_START_URL", "http://localhost:8080/auth/reset/start")
 	t.Setenv("MAILJET_API_KEY", "")
@@ -126,7 +127,7 @@ func TestCORSAllowsAppOrigins(t *testing.T) {
 	for _, origin := range []string{
 		"tauri://localhost",
 		"http://127.0.0.1:5174",
-		"https://apps.mistysys.com",
+		"https://web.misty.example",
 	} {
 		req := httptest.NewRequest(http.MethodOptions, "/api/login", nil)
 		req.Header.Set("Origin", origin)
