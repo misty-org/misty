@@ -1,4 +1,4 @@
-import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
 import { Button } from "@/shared/ui";
 import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";

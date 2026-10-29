@@ -1,5 +1,5 @@
 import { Button } from "@/shared/ui";
-import { openModelSettings } from "./modelKeys";
+import { openModelSettings } from "./models/modelKeys";
 
 /**
  * Whether an AI error is the server's `model_key_needed` answer: no agent model is set on

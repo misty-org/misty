@@ -1,4 +1,4 @@
-import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
 import { useEffect, useState } from "react";

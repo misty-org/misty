@@ -1,7 +1,7 @@
 import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
-import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
 import { Button, IconButton } from "@/shared/ui";
 
 /** The conversation's last error above the composer; a lost running task can reconnect. */

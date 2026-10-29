@@ -1,4 +1,4 @@
-import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";

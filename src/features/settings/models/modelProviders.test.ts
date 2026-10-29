@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsModelKey } from "./ModelKeyNeeded";
+import { needsModelKey } from "../ModelKeyNeeded";
 import { qualifiedModel } from "./modelProviders";
 
 describe("qualifiedModel", () => {

@@ -1,4 +1,4 @@
-import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/ModelKeyNeeded";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
