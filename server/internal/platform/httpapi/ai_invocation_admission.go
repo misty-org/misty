@@ -222,7 +222,7 @@ func (s *AIService) storeInvocationRecord(w http.ResponseWriter, r *http.Request
 	now := time.Now().UTC()
 	recordTrigger := body.Trigger
 	if scheduled != nil {
-		// Stored like the server's own scheduled runs, and billed the same way.
+		// Stored like the server's own scheduled runs, and run the same way.
 		recordTrigger = "schedule"
 	}
 	stored, created, err := s.database.CreateAIInvocationRecord(r.Context(), db.AIInvocationRecord{
