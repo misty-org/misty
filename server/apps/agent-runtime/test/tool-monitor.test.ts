@@ -94,6 +94,27 @@ describe("tool monitor", () => {
     }
   });
 
+  it("keeps the finish while a look is required, and one look satisfies it even when it fails", async () => {
+    const pages = modelCatalog([
+      { name: "browser.snapshot", description: "", inputSchema: schema, readOnly: true },
+      { name: "browser.steps", description: "", inputSchema: schema },
+    ], ["agent_finish"]);
+    const order = serialToolLifecycle();
+    const monitor = toolMonitor({ catalog: pages, order, rejected: new Set(), checkpoint: async () => {} });
+    const run = async (id: string, toolName: string, end: { success: boolean; output?: unknown; error?: unknown }, input: unknown = {}) => {
+      const toolCall = { toolCallId: id, toolName, input };
+      await monitor.onStart({ toolCall });
+      await monitor.onEnd({ toolCall, durationMs: 1, ...end });
+    };
+    await run("act", "browser_steps", { success: true, output: { status: "uncertain" } }, { steps: [{ action: "click", ref: "e4" }] });
+    const all = ["browser_snapshot", "browser_steps", "agent_finish"];
+    expect(monitor.activeTools(all)).toEqual(["browser_snapshot", "agent_finish"]);
+    order.resume();
+    await run("look", "browser_snapshot", { success: false, error: "The page shows no readable content." });
+    expect(monitor.requiredInspection).toBe("");
+    expect(monitor.activeTools(all)).toEqual(all);
+  });
+
   it("plans around an own tab that did not open, twice, but not the person's tab", async () => {
     const { order, monitor, call } = setup();
     for (const id of ["a", "b"]) {

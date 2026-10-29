@@ -3,6 +3,7 @@ import type { HarnessCheckpoint } from "./harness.js";
 import type { ModelCatalog } from "./model-tools.js";
 import { visibleErrorMessage } from "./runtime-errors.js";
 import type { serialToolLifecycle } from "./serial-tool-lifecycle.js";
+import { taskCompletionTool } from "./task-completion.js";
 import { classifyToolOutcome, toolFailureSignature, unconfirmedToolResultReason, type ToolOutcome } from "./tool-outcomes.js";
 
 interface ToolCall { toolCallId: string; toolName: string; input: unknown }
@@ -38,10 +39,10 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
   };
 
   const settle = (name: string, call: ToolCall, outcome: ToolOutcome, visible: string) => {
-    if (outcome.kind === "confirmed") {
-      if (name === requiredInspection) requiredInspection = "";
-      return;
-    }
+    // One look satisfies it, whatever it found: a look that fails (a blank or broken page) is
+    // what the next plan needs to know, and requiring it again left a run with only that tool.
+    if (name === requiredInspection) requiredInspection = "";
+    if (outcome.kind === "confirmed") return;
     if (outcome.kind === "handoff") {
       // Nothing failed: the conversation continues once the screen is attached.
       handoff ||= outcome.reason;
@@ -93,10 +94,10 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
     /** Set when the run ended to open a screen. */
     get handoff() { return handoff; },
     failures: () => failures,
-    /** Every tool, or only the observation a stale or consumed screen needs. */
+    /** Every tool, or the observation a stale or consumed screen needs and the finish. */
     activeTools(all: string[]): string[] {
       const inspection = requiredInspection && catalog.modelName(requiredInspection);
-      return inspection ? [inspection] : all;
+      return inspection ? all.filter((name) => name === inspection || name === taskCompletionTool) : all;
     },
     onStart: ({ toolCall }: { toolCall: ToolCall }) => order.start(toolCall.toolCallId, async () => {
       // Misty announces a read-only call itself when the call arrives, so a
