@@ -4,7 +4,7 @@ import { FatalError } from "workflow";
 import { citationInstructions } from "../src/citation-check.js";
 import { afterRefusal, unbackedCompletion } from "../src/finish-check.js";
 import { InstanceModel } from "../src/instance-model.js";
-import { ledgerInputSchema, ledgerInstructions, ledgerTool, withLedger } from "../src/ledger.js";
+import { ledgerInputSchema, ledgerInstructions, ledgerTool, recordRows, withLedger } from "../src/ledger.js";
 import { modelFamilyNote } from "../src/model-family.js";
 import { catalogTools, modelCatalog } from "../src/model-tools.js";
 import { withRuntimeInstructions } from "../src/context/prompt-cache.js";
@@ -42,8 +42,12 @@ export function assembleTools(run: AgentRun, descriptors: MCPRemoteTool[]) {
       inputSchema: ledgerInputSchema,
       execute: async (sent, options) => {
         guard(run, options.toolCallId);
-        const rows = ledger.update(sent);
-        return { status: "recorded", done: rows.filter((row) => row.state === "done").length, open: rows.filter((row) => row.state !== "done" && row.state !== "skipped").length };
+        // A part is done only with evidence (src/ledger.ts, recordRows).
+        const { rows, missing } = recordRows(ledger, sent);
+        return {
+          status: "recorded", done: rows.filter((row) => row.state === "done").length, open: rows.filter((row) => row.state !== "done" && row.state !== "skipped").length,
+          ...(missing.length && { not_done_without_evidence: missing.map((row) => row.requirement.slice(0, 80)), note: "Send these again as done with evidence: the address of a page you kept or read, a note you wrote, or a tool's receipt. For a part that is the answer itself, evidence { kind: \"note\", ref: \"final answer\" }." }),
+        };
       },
     }),
     [taskCompletionTool]: tool({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModelMessage } from "ai";
-import { backed, Ledger, ledgerFromPrompt, ledgerSuffix, withLedger } from "../src/ledger.js";
+import { backed, Ledger, recordRows, ledgerFromPrompt, ledgerSuffix, withLedger } from "../src/ledger.js";
 import { finishIssues, reportOnlyIssue } from "../src/finish-verification.js";
 
 const call = (name: string, input: unknown): ModelMessage => ({ role: "assistant", content: [{ type: "tool-call", toolCallId: "c", toolName: name, input }] });
@@ -74,5 +74,14 @@ describe("ledger", () => {
   it("sends back an answer that reports the work instead of giving it", () => {
     expect(reportOnlyIssue("Completed all 26 requirements. Delivered side-by-side comparison.")).toMatch(/describes the work/);
     expect(reportOnlyIssue("## Stockeld Park vs Harrogate\n| | Stockeld | Funland |")).toBeUndefined();
+  });
+
+  it("keeps a part done without evidence out of done, and tells the run", () => {
+    const ledger = new Ledger();
+    recordRows(ledger, { rows: [{ requirement: "Read A", state: "done", evidence: { kind: "tab", ref: "https://a.test", summary: "" } }] });
+    const { rows, missing } = recordRows(ledger, { rows: [{ requirement: "Read A", state: "done" }, { requirement: "Read B", state: "done" }] });
+    expect(missing.map((row) => row.requirement)).toEqual(["Read A", "Read B"]);
+    expect(rows.find((row) => row.requirement === "Read A")).toMatchObject({ state: "done", evidence: { ref: "https://a.test" } });
+    expect(rows.find((row) => row.requirement === "Read B")).toMatchObject({ state: "pending" });
   });
 });

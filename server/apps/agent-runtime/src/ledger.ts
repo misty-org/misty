@@ -98,6 +98,24 @@ export class Ledger {
   }
 }
 
+/**
+ * Records sent rows, except a part marked done without evidence: a known row keeps its state
+ * (and a done row its evidence), a new one starts pending, and the caller is told which, so the
+ * run supplies evidence now rather than learning at the finish that its run reads as partial.
+ */
+export function recordRows(ledger: Ledger, sent: z.infer<typeof ledgerInputSchema>) {
+  const known = ledger.snapshot();
+  const missing = sent.rows.filter((row) => row.state === "done" && !row.evidence);
+  const rows = ledger.update({
+    rows: sent.rows.flatMap((row) => {
+      if (row.state !== "done" || row.evidence) return [row];
+      const existing = known.some((item) => (row.id ? item.id === row.id : false) || item.requirement === row.requirement);
+      return existing ? [] : [{ ...row, state: "pending" as const }];
+    }),
+  });
+  return { rows, missing };
+}
+
 /** Evidence that points at the run's own answer ("the final answer below"). */
 const answerEvidence = /\b(final )?(answer|summary|response|reply|comparison)\b/i;
 
