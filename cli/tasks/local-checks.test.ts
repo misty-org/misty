@@ -16,8 +16,8 @@ test("change selection covers configuration, helper crates, and release tooling"
   assert.deepEqual(plan(["src/features/example.ts"]), ["frontend", "scripts"]);
   assert.deepEqual(plan(["src-tauri/services/peer-transport/Cargo.toml"]), ["rust-desktop"]);
   assert.deepEqual(plan(["cli/tasks/release/setup-keys.ts"]), ["scripts"]);
-  assert.deepEqual(plan(["server/internal/billingadapter/http.go"]), ["server"]);
-  assert.deepEqual(plan([".githooks/checks.sh"]), ["frontend", "server", "rust-cli", "rust-desktop", "scripts", "billing"]);
+  assert.deepEqual(plan(["server/internal/accounts/http.go"]), ["server"]);
+  assert.deepEqual(plan([".githooks/checks.sh"]), ["frontend", "server", "rust-cli", "rust-desktop", "scripts"]);
 });
 
 test("pre-commit refuses to validate unstaged code instead of the staged snapshot", () => {

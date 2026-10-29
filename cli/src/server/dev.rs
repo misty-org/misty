@@ -10,9 +10,6 @@ pub fn up(workspace: &Workspace, build: bool, verbose: bool) -> Result<()> {
     }
     validate_development_secrets(workspace)?;
     ports(workspace)?;
-    // The API meters every model turn through billing, so billing comes up first:
-    // its database, migrations and a rebuilt API, healthy before the server starts.
-    crate::billing::up(workspace, &workspace.server.join(".misty/logs/billing.log"))?;
     println!("Starting server containers…");
     let command = development_up_command(build);
     let log = workspace.server.join(".misty/logs/startup.log");
@@ -133,9 +130,7 @@ pub(crate) fn ensure_connected_devices_development_config(path: &Path) -> Result
 }
 
 pub fn down(workspace: &Workspace, volumes: bool) -> Result<()> {
-    development_down_command(volumes).run(&workspace.server)?;
-    // --volumes clears only the server's data; billing's database is kept.
-    crate::billing::down(workspace)
+    development_down_command(volumes).run(&workspace.server)
 }
 
 pub(super) fn development_up_command(build: bool) -> CommandSpec {

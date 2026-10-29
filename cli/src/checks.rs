@@ -111,9 +111,6 @@ pub fn server(workspace: &Workspace) -> Result<()> {
     if container_contract.is_file() {
         CommandSpec::new("./scripts/check-container-contract.sh").run(&workspace.server)?;
     }
-    CommandSpec::new("bash")
-        .arg("scripts/test-billing-contract.sh")
-        .run(&workspace.server)?;
 
     let worker = workspace.server.join("apps/journal-collab");
     CommandSpec::new(npm()).args(["ci"]).run(&worker)?;

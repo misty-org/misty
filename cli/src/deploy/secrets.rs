@@ -11,7 +11,7 @@ pub fn initialize_production_secrets(workspace: &Workspace) -> Result<()> {
             .get(name)
             .is_none_or(|value| value.trim().is_empty())
     };
-    let generated: [(&str, String); 15] = [
+    let generated: [(&str, String); 13] = [
         ("MISTY_ENVIRONMENT", "production".into()),
         ("TRUST_PROXY_HEADERS", "true".into()),
         ("DB_HOST", "postgres".into()),
@@ -24,8 +24,6 @@ pub fn initialize_production_secrets(workspace: &Workspace) -> Result<()> {
         ("MISTY_AUTH_SIGNING_KEY", base64_secret()),
         ("MISTY_AGENT_RUNTIME_CONTROL_SECRET", base64_secret()),
         ("SPACE_LINK_ENCRYPTION_KEY", base64_secret()),
-        ("MISTY_BILLING_ADAPTER", "http".into()),
-        ("MISTY_BILLING_SECRET", hex_secret()),
         ("MISTY_HOST_PORT", "8081".into()),
     ];
     let mut added = Vec::new();
@@ -46,14 +44,10 @@ pub fn initialize_production_secrets(workspace: &Workspace) -> Result<()> {
     for name in &added {
         println!("  generated {name}");
     }
-    let secret = environment::read(workspace, Target::Prod)?
-        .remove("MISTY_BILLING_SECRET")
-        .context("MISTY_BILLING_SECRET was not saved")?;
-    initialize_billing_environment(workspace, &secret)?;
     println!(
         "Production secrets are in server/.env/prod. Still to fill in: MISTY_API_IMAGE, \
 MISTY_AGENT_RUNTIME_IMAGE, MISTY_PUBLIC_API_URL (or run misty setup cloudflare --target prod), \
-MISTY_BILLING_URL, R2_*, MISTY_BACKUP_*, and any integrations. Check with: misty env status prod"
+R2_*, MISTY_BACKUP_*, and any integrations. Check with: misty env status prod"
     );
     Ok(())
 }
@@ -86,7 +80,6 @@ pub fn initialize_staging_secrets(workspace: &Workspace) -> Result<()> {
         ),
         ("MISTY_PUBLIC_API_URL", "http://api:8080/v1".to_owned()),
         ("MISTY_HOST_PORT", "8082".to_owned()),
-        ("MISTY_BILLING_ADAPTER", "none".to_owned()),
     ];
     let mut added = Vec::new();
     for (name, value) in generated {
@@ -105,71 +98,6 @@ pub fn initialize_staging_secrets(workspace: &Workspace) -> Result<()> {
     println!(
         "Initialized private staging configuration in {}. Add provider credentials only if the staging tests need them.",
         staging.display()
-    );
-    Ok(())
-}
-
-/// Writes misty-billing/.env/prod/billing.env beside this checkout, sharing the
-/// adapter secret, and adds only values that are missing.
-pub(super) fn initialize_billing_environment(workspace: &Workspace, secret: &str) -> Result<()> {
-    let billing = workspace.root.join("misty-billing");
-    if !billing.is_dir() {
-        println!("misty-billing is not checked out beside misty; create its .env/prod/billing.env by hand.");
-        return Ok(());
-    }
-    let path = billing.join(".env/prod/billing.env");
-    let mut contents = match fs::read_to_string(&path) {
-        Ok(contents) => contents,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => {
-            return Err(error).with_context(|| format!("could not read {}", path.display()))
-        }
-    };
-    let configured = |contents: &str, name: &str| {
-        contents
-            .lines()
-            .any(|line| line.trim_start().starts_with(&format!("{name}=")))
-    };
-    if configured(&contents, "MISTY_BILLING_SECRET")
-        && !contents
-            .lines()
-            .any(|line| line.trim() == format!("MISTY_BILLING_SECRET={secret}"))
-    {
-        bail!(
-            "{} has a different MISTY_BILLING_SECRET than server/.env/prod; make them match",
-            path.display()
-        );
-    }
-    let mut added = Vec::new();
-    for (name, value) in [
-        ("BILLING_OWNER_PASSWORD", hex_secret()),
-        ("BILLING_RUNTIME_PASSWORD", hex_secret()),
-        ("MISTY_BILLING_SECRET", secret.to_owned()),
-        ("MISTY_BILLING_IMAGE", String::new()),
-    ] {
-        if !configured(&contents, name) {
-            if !contents.is_empty() && !contents.ends_with('\n') {
-                contents.push('\n');
-            }
-            contents.push_str(&format!("{name}={value}\n"));
-            added.push(name);
-        }
-    }
-    if added.is_empty() {
-        return Ok(());
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(parent, fs::Permissions::from_mode(0o700))?;
-        }
-    }
-    write_private(&path, contents.as_bytes())?;
-    println!(
-        "  misty-billing/.env/prod/billing.env: added {}",
-        added.join(", ")
     );
     Ok(())
 }

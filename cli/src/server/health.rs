@@ -26,11 +26,7 @@ pub fn status(workspace: &Workspace) -> Result<()> {
         let status = if !health.is_empty() { health } else { state };
         println!("{service:<27} {status}");
     }
-    let billing = crate::billing::status(workspace).unwrap_or_default();
-    for (service, status) in &billing {
-        println!("{service:<27} {status}");
-    }
-    if rows.is_empty() && billing.is_empty() {
+    if rows.is_empty() {
         println!("No containers started. Run misty server up.");
     }
     Ok(())

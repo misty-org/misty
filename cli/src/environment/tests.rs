@@ -275,12 +275,6 @@ fn setup_is_idempotent_and_setting_values_stay_private() {
         ("MISTY_CLOUDFLARE_WORKER_HOST", "fixture.workers.dev"),
         ("MISTY_DEV_API_ORIGIN", "https://api.example.com"),
         ("MISTY_DEV_API_TUNNEL_HOSTNAME", "api.example.com"),
-        ("MISTY_BILLING_ADAPTER", "http"),
-        ("MISTY_BILLING_URL", "https://billing.example.com/adapter"),
-        (
-            "MISTY_BILLING_SECRET",
-            "fixture-billing-secret-32-bytes-long", // gitleaks:allow -- synthetic test fixture
-        ),
     ] {
         set(&workspace, Target::Dev, key, val).unwrap();
     }

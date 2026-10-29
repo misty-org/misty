@@ -130,14 +130,6 @@ pub(super) const FILES: &[FileSpec] = &[
         ],
     },
     FileSpec {
-        path: "integrations/billing.env",
-        names: &[
-            "MISTY_BILLING_ADAPTER",
-            "MISTY_BILLING_URL",
-            "MISTY_BILLING_SECRET",
-        ],
-    },
-    FileSpec {
         path: "composio.env",
         names: &["COMPOSIO_API_KEY"],
     },

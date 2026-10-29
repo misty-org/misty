@@ -2,7 +2,7 @@
 # Local checks for every commit and push (there is no GitHub CI).
 #   .githooks/checks.sh commit   suites touched by the staged changes
 #   .githooks/checks.sh push     every suite, on a clean tree
-#   .githooks/checks.sh all|frontend|scripts|server|rust-cli|rust-desktop|billing|secrets|plan
+#   .githooks/checks.sh all|frontend|scripts|server|rust-cli|rust-desktop|secrets|plan
 # Skip once with git commit/push --no-verify.
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
@@ -13,10 +13,6 @@ cd "$root"
 # checkout root, git finds the same repository without them.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 hooks="$root/.githooks"
-# misty-billing sits beside the main checkout. A linked worktree lives inside it
-# (.claude/worktrees/...), so find the main checkout through the shared git dir.
-main_root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
-export MISTY_BILLING_REPO="${MISTY_BILLING_REPO:-$(dirname "$main_root")/misty-billing}"
 
 frontend() { parallel frontend-typecheck frontend-lint frontend-unit frontend-dev-navigation; }
 frontend_typecheck() { npm run typecheck; }
@@ -25,17 +21,11 @@ frontend_unit() { MISTY_SHARED_CPU=1 npm test; }
 frontend_dev_navigation() { npm run test:dev-navigation; }
 # Injected page scripts, the git hooks and the build and release scripts (cli/tasks).
 scripts() { npm run test:scripts; }
-billing() {
-  local billing_root="$MISTY_BILLING_REPO"
-  [ -f "$billing_root/.githooks/checks.sh" ] || { echo "Billing checkout missing: $billing_root" >&2; return 1; }
-  (cd "$billing_root" && MISTY_SERVER_REPO="$root" bash .githooks/checks.sh go)
-}
-server() { parallel server-go billing-contract agent-runtime journal-collab; }
+server() { parallel server-go agent-runtime journal-collab; }
 server_go() {
   cargo run --quiet --locked --manifest-path "$root/cli/Cargo.toml" -- check go-sizes
   bash "$hooks/server-tests.sh"
 }
-billing_contract() { bash "$root/server/scripts/test-billing-contract.sh"; }
 agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
 journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
 rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
@@ -172,14 +162,14 @@ parallel() {
 }
 
 suites_for() { # paths on stdin -> suite names
-  local frontend=0 server=0 cli=0 desktop=0 scripts=0 billing=0 path
+  local frontend=0 server=0 cli=0 desktop=0 scripts=0 path
   while IFS= read -r path; do
     case "$path" in
       src/* | package.json | package-lock.json | tsconfig*.json | vite*.ts | vitest*.ts | .config/*) frontend=1; scripts=1 ;;
       server/*) server=1 ;;
       cli/tasks/*) scripts=1 ;;
       cli/*) cli=1 ;;
-      .githooks/*) frontend=1; server=1; cli=1; desktop=1; scripts=1; billing=1 ;;
+      .githooks/*) frontend=1; server=1; cli=1; desktop=1; scripts=1 ;;
       src-tauri/* | kiri/*) desktop=1 ;;
       rust-toolchain.toml) cli=1; desktop=1 ;;
     esac
@@ -189,11 +179,10 @@ suites_for() { # paths on stdin -> suite names
   ((cli)) && echo rust-cli
   ((desktop)) && echo rust-desktop
   ((scripts)) && echo scripts
-  ((billing)) && echo billing
   return 0
 }
 
-all=(frontend scripts server rust-cli rust-desktop billing)
+all=(frontend scripts server rust-cli rust-desktop)
 case "${1:-}" in
   plan) suites_for ;;
   commit)
@@ -218,6 +207,6 @@ case "${1:-}" in
     parallel secrets "${all[@]}"
     ;;
   all) parallel secrets "${all[@]}" ;;
-  frontend | scripts | server | rust-cli | rust-desktop | billing | secrets) run "$1" ;;
-  *) echo "Usage: .githooks/checks.sh commit|push|all|frontend|scripts|server|rust-cli|rust-desktop|billing|secrets|plan" >&2; exit 2 ;;
+  frontend | scripts | server | rust-cli | rust-desktop | secrets) run "$1" ;;
+  *) echo "Usage: .githooks/checks.sh commit|push|all|frontend|scripts|server|rust-cli|rust-desktop|secrets|plan" >&2; exit 2 ;;
 esac
