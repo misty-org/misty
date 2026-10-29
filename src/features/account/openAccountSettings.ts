@@ -3,17 +3,18 @@ import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 
 /**
- * Opens the account surface on the website in the system browser.
+ * Opens the account surface on the Misty server's website in the system browser.
  *
  * Account management deliberately lives on the website: a browser is the
  * better place to manage account data and settings.
  *
- * Uses the configured public website URL (controlled by Vite environment variables
- * such as MISTY_PUBLIC_URL / VITE_MISTY_PUBLIC_URL, defaulting to
- * http://localhost:5174 in dev and https://mistysys.com in production).
+ * The website is named at build time (MISTY_PUBLIC_URL / VITE_MISTY_PUBLIC_URL;
+ * http://localhost:5174 in development). A build that names none has no account website.
  */
 export async function openAccountSettingsInBrowser(
   path: AccountHandoffPath = "/settings",
 ): Promise<void> {
-  await openSystemExternalLink(mistyPublicPage(path));
+  const page = mistyPublicPage(path);
+  if (!page) throw new Error("This Misty server has no account website.");
+  await openSystemExternalLink(page);
 }

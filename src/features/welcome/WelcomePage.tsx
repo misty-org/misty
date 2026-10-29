@@ -1,5 +1,6 @@
 import { routes } from "@/features/app-shell";
 import { useSetupStore } from "@/features/setup/useSetupStore";
+import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { Button, FlyingMisty, Pressable } from "@/shared/ui";
 import "@fontsource/instrument-serif/400-italic.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -7,10 +8,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { WelcomeNav } from "./WelcomeNav";
 import "./welcome.css";
 
+/** The server website's terms and privacy pages; a build that names no website shows neither. */
 const legalLinks = [
-  { label: "Terms", href: "https://mistysys.com/terms" },
-  { label: "Privacy Policy", href: "https://mistysys.com/privacy" },
-];
+  { label: "Terms", href: mistyPublicPage("/terms") },
+  { label: "Privacy Policy", href: mistyPublicPage("/privacy") },
+].flatMap(({ label, href }) => (href ? [{ label, href }] : []));
 
 /** The first-run welcome: a floating bar with the logo and socials, then what Misty is, with
  * Start browsing ahead of Sign in. It shows once per device; adding an account reuses it. */
@@ -99,20 +101,22 @@ export function WelcomePage() {
         }
       >
         <span>© {new Date().getFullYear()} Misty</span>
-        <p className="leading-5">
-          By continuing you agree to our{" "}
-          {legalLinks.map(({ label, href }, index) => (
-            <span key={label}>
-              {index > 0 ? " and " : null}
-              <Pressable
-                className="underline underline-offset-2 hover:text-cream-bright"
-                onClick={() => void openUrl(href)}
-              >
-                {label}
-              </Pressable>
-            </span>
-          ))}
-        </p>
+        {legalLinks.length ? (
+          <p className="leading-5">
+            By continuing you agree to our{" "}
+            {legalLinks.map(({ label, href }, index) => (
+              <span key={label}>
+                {index > 0 ? " and " : null}
+                <Pressable
+                  className="underline underline-offset-2 hover:text-cream-bright"
+                  onClick={() => void openUrl(href)}
+                >
+                  {label}
+                </Pressable>
+              </span>
+            ))}
+          </p>
+        ) : null}
       </footer>
     </div>
   );
