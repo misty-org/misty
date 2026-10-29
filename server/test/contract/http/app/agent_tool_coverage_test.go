@@ -31,7 +31,7 @@ var agentRouteRules = []agentRouteRule{
 	{pattern: `^\S+ /devices(/|$)`, why: "adding, approving, naming and permitting devices is signed with device and vault keys agents never hold"},
 	{pattern: `^POST /me/screen-model/\{jobID\}$`, why: "the screen planner's model pass-through during browser.act"},
 	{pattern: `^POST /me/companion/refine-point/\{invocationID\}$`, why: "the desktop companion sharpens its own pointer from a screen crop"},
-	{pattern: `^\S+ /me/(deletion|export|avatar|profile|device|telemetry)$`, why: "account identity and security"},
+	{pattern: `^\S+ /me/(deletion|export|avatar|profile|device|telemetry|password)$`, why: "account identity and security"},
 	{pattern: `^POST /me/(email/verify|referral/claim)$`, why: "verifying the account's email and claiming a referral are the person's own account steps"},
 	{pattern: `^\S+ /(realtime|agent-voice)/`, why: "live session transports"},
 	{pattern: `^POST /me/voice/live/ticket$`, why: "a live transcription transport the person opens by speaking"},

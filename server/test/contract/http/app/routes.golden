@@ -775,6 +775,7 @@ PUT /api/me/avatar
 PUT /api/me/coding/engines
 PUT /api/me/conversations/{conversationID}/mode
 PUT /api/me/device
+PUT /api/me/password
 PUT /api/me/settings
 PUT /api/me/telemetry
 PUT /api/misty/agents/{agentID}
@@ -787,12 +788,14 @@ PUT /api/spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /api/spaces/{spaceID}/messages/{messageID}
 PUT /api/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /api/spaces/{spaceID}/nodes/{nodeID}
+PUT /api/sync/vault/key
 PUT /devices/{deviceID}/devices/{targetID}/name
 PUT /devices/{deviceID}/policy
 PUT /me/avatar
 PUT /me/coding/engines
 PUT /me/conversations/{conversationID}/mode
 PUT /me/device
+PUT /me/password
 PUT /me/settings
 PUT /me/telemetry
 PUT /misty/agents/{agentID}
@@ -805,6 +808,7 @@ PUT /spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /spaces/{spaceID}/messages/{messageID}
 PUT /spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /spaces/{spaceID}/nodes/{nodeID}
+PUT /sync/vault/key
 PUT /v1/ai/agent-methods/{methodID}
 PUT /v1/ai/agent-methods/{methodID}/schedule
 PUT /v1/ai/inbound-channels/{channel}
@@ -822,6 +826,7 @@ PUT /v1/me/avatar
 PUT /v1/me/coding/engines
 PUT /v1/me/conversations/{conversationID}/mode
 PUT /v1/me/device
+PUT /v1/me/password
 PUT /v1/me/settings
 PUT /v1/me/telemetry
 PUT /v1/misty/agents/{agentID}
@@ -834,3 +839,4 @@ PUT /v1/spaces/{spaceID}/library/uploads/{uploadID}/content
 PUT /v1/spaces/{spaceID}/messages/{messageID}
 PUT /v1/spaces/{spaceID}/messages/{messageID}/reactions/{emoji}
 PUT /v1/spaces/{spaceID}/nodes/{nodeID}
+PUT /v1/sync/vault/key
