@@ -18,13 +18,13 @@ Related: [agent architecture brief](architecture.md),
 
 The server does the minimum. Everything that touches pages, screens, files or code runs on the
 person's device; work that must happen while their devices are offline runs in an isolated
-Cloudflare Worker, never on the VPS.
+Cloudflare Worker, never on the server.
 
 | Piece | Runs on |
 |---|---|
-| Agent loop (durable run, model turns, compaction) | VPS, `server/apps/agent-runtime` (AI SDK on Vercel Workflow, `workflows/space-task-agent.ts`) |
-| `agent.gate`: admission and billing, the tool catalog and its rules, the action journal (`log.run`), the device job queue | VPS, the Go API and Postgres (`server/internal/platform/httpapi/`) |
-| Model calls, web search | The model gateway; `web.search` calls Serper directly from Go |
+| Agent loop (durable run, model turns, compaction) | Your server, `server/apps/agent-runtime` (AI SDK on Vercel Workflow, `workflows/space-task-agent.ts`) |
+| `agent.gate`: admission and model routing, the tool catalog and its rules, the action journal (`log.run`), the device job queue | Your server, the Go API and Postgres (`server/internal/platform/httpapi/`) |
+| Model calls, web search | The person's own provider and key ([byok.md](../byok.md)); `web.search` calls Serper directly from Go |
 | `web.fetch` | The person's device (`src-tauri/src/infra/agents/web_fetch.rs`); the Cloudflare Worker in `server/apps/web-fetch` when no device is online |
 | `browser_run` programs, the page layer, screen capture, desktop control | The person's device, inside the Misty app |
 | Coding | The person's device, through their own coding tools |
@@ -32,7 +32,7 @@ Cloudflare Worker, never on the VPS.
 ```
 request: agent.entry.composer | .cursor | .schedule | .email | .integration.<app>
   └─ Agent loop: small tool surface, prompt stable between compactions
-     ├─ browser_run ─ agent.gate (Go: catalog · policy · journal · billing)
+     ├─ browser_run ─ agent.gate (Go: catalog · policy · journal · model route)
      │    └─ Device: the program in a sandbox inside the Misty app (no network, files or globals)
      │         └─ Page API on the agent's own tabs only
      ├─ web_search · web_fetch · agent_delegate (sub-agents for breadth)
@@ -218,7 +218,7 @@ turns and 4 hours (`model-budget.ts`); plans stay below.
 
 The Odysseys campaign ([odysseys-campaign.md](evals/odysseys.md)) is the main measure, with
 three tiers: iterate on a free model judged by itself after every change; check on the dev split
-with Odysseys' official judge; report the house model and one frontier model on all 200 tasks.
+with Odysseys' official judge; report the eval model and one frontier model on all 200 tasks.
 The free judge's scores never go next to the leaderboard's. Per task: rubric, perfect, turns,
 tool calls, minutes and prompt-cache hit rate.
 
@@ -228,7 +228,7 @@ tool calls, minutes and prompt-cache hit rate.
 2. No router: every run starts in `agent.tool.answer` and moves up with `agent_tool_use`.
 3. Teach mode runs the tutor's fast lane, never the agent loop.
 4. The cursor captures every display on every request.
-5. `web.fetch` runs on the device, with a Worker fallback, never on the VPS.
+5. `web.fetch` runs on the device, with a Worker fallback, never on the server.
 6. Agent names never use UI labels; no aliases.
 7. No cloud browsers: all browsing is local, in the agent's own tabs.
 8. `browser_run` programs run on the person's computer, in a sandbox that can only use the page

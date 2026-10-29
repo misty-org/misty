@@ -145,7 +145,7 @@ indexed, so nothing that left the live context is lost:
 
 **Load and cost.**
 
-- Embedding runs at the AI Gateway, metered to the account; the server stores and queries only.
+- Embedding runs on the account's embedding model and key; the server stores and queries only.
 - Writes happen per compaction (a few per day for a heavy user), batched; the worker already caps
   each wake at 32 chunks under leases.
 - History search is exact search within one account through a btree on owner and source, not the

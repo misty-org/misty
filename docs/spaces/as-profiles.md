@@ -127,12 +127,10 @@ search vectors, as it keeps memory today.
 - **Learning happens on the server,** which sees a run's steps as it runs them.
 - Today's memory tables stay and gain a Space: each row belongs to one person in one Space.
 
-## Plans
+## Limits
 
-Every plan gets as many Spaces as it wants. Plans limit cloud storage and AI usage, not
-Spaces: ten small Spaces cost less than five gigabytes of files. A Space's vault, gallery
-and chat count toward its owner's storage like everything else
-(pricing lives in the billing repo).
+There are no plans and no Space limit: anyone can have as many Spaces as they want. A
+Space's vault, gallery and chat take room on its owner's server like everything else.
 
 ## Smaller decisions
 

@@ -62,7 +62,7 @@ Space rail or tool strip.
 - Trash is an ordinary collection for every member: there is no Library lock.
 - Code lists `space_code_projects`: each row shows the project, its owner, its
   GitHub repo and latest changes. Project files stay on the owner's device; the
-  others see the changes and the GitHub link. Coding is Pro and above.
+  others see the changes and the GitHub link. Coding is open to everyone.
 
 ## Navigation
 
