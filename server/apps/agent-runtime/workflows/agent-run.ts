@@ -22,7 +22,7 @@ export interface AgentRun {
   modelTurn: number;
   // Recomputed from the transcript before every model call.
   visibleTools: string[];
-  // The agent swallows errors thrown from its step hooks, so a failed settlement
+  // The agent swallows errors thrown from its step hooks, so a failed
   // checkpoint is held here and rethrown once the call returns.
   hookFailure: unknown;
   // A finish is verified once (src/finish-verification.ts); the next one stands.

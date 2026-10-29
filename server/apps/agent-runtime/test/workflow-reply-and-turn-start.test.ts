@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
-  refuseAdmission: false,
-  failSettlement: false,
+  refuseTurn: false,
+  failCheckpoint: false,
   streams: 0,
   completions: [] as Array<Record<string, unknown>>,
   content: [] as Array<Record<string, unknown>>,
@@ -22,10 +22,10 @@ vi.mock("../src/control-plane.js", () => ({
     if (operation === "steering") return { messages: [], closed: true };
     if (operation === "budget") return { version: 1, remaining_ms: 1_800_000, active: true, deadline: new Date(Date.now() + 1_800_000).toISOString() };
     if (operation === "events" && String(body.node_id).startsWith("model:")) {
-      if (body.state === "running" && fixture.refuseAdmission)
-        throw new ControlPlaneError(402, "billing_admission_denied: Your account or command budget cannot cover this request.", "billing_admission_denied");
-      if (body.state === "completed" && fixture.failSettlement)
-        throw new ControlPlaneError(409, "billing_request_conflict: no matching hold", "billing_request_conflict");
+      if (body.state === "running" && fixture.refuseTurn)
+        throw new ControlPlaneError(409, "agent_model_turn_limit: This run reached its model-turn limit.", "agent_model_turn_limit");
+      if (body.state === "completed" && fixture.failCheckpoint)
+        throw new ControlPlaneError(409, "run_state_conflict: the run changed", "run_state_conflict");
     }
     return { accepted: true };
   },
@@ -62,8 +62,8 @@ import { runSpaceTaskAgent } from "../workflows/space-task-agent.js";
 import { ControlPlaneError } from "../src/control-plane-error.js";
 
 beforeEach(() => {
-  fixture.refuseAdmission = false;
-  fixture.failSettlement = false;
+  fixture.refuseTurn = false;
+  fixture.failCheckpoint = false;
   fixture.streams = 0;
   fixture.completions = [];
   fixture.content = [{ type: "text", text: fixture.text }];
@@ -82,15 +82,15 @@ it("still requires a confirmed outcome once the run used a tool", async () => {
   expect(fixture.completions).toEqual([expect.objectContaining({ status: "incomplete", error_code: "task_outcome_unreported" })]);
 });
 
-it("stops before calling the model when billing refuses the turn, and says why", async () => {
-  fixture.refuseAdmission = true;
+it("stops before calling the model when Go refuses the turn, and says why", async () => {
+  fixture.refuseTurn = true;
   await run();
   expect(fixture.streams).toBe(0);
-  expect(fixture.completions).toEqual([expect.objectContaining({ status: "failed", error_code: "billing_admission_denied" })]);
+  expect(fixture.completions).toEqual([expect.objectContaining({ status: "failed", error_code: "agent_model_turn_limit" })]);
 });
 
-it("fails the run when the turn's usage cannot be settled, instead of carrying on unmetered", async () => {
-  fixture.failSettlement = true;
+it("fails the run when the turn's checkpoint can't be recorded", async () => {
+  fixture.failCheckpoint = true;
   await run();
   expect(fixture.completions).toEqual([expect.objectContaining({ status: "failed" })]);
   expect(fixture.completions[0]?.text).toBe("");

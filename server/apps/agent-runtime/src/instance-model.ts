@@ -1,6 +1,8 @@
 import type { LanguageModelV4, LanguageModelV4CallOptions } from "@ai-sdk/provider";
 import { WORKFLOW_DESERIALIZE, WORKFLOW_SERIALIZE } from "@workflow/serde";
 import { FatalError } from "workflow";
+import { ControlPlaneError } from "./control-plane-error.js";
+import { rethrowStepError } from "./runtime-errors.js";
 
 import type { RuntimeIdentity } from "./control-plane.js";
 
@@ -51,6 +53,8 @@ async function resolveStep(modelId: string, options: LanguageModelV4CallOptions,
     return await resolveRuntimeModel(modelId, options, identity, role);
   } catch (error) {
     if (error instanceof ModelSetupError) throw new FatalError(error.message);
+    // Go's own refusal of the route, such as model_key_needed, keeps its code.
+    if (error instanceof ControlPlaneError) rethrowStepError(error);
     throw error;
   }
 }

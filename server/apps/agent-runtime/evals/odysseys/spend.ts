@@ -1,4 +1,4 @@
-// What the Odysseys campaign spends on Misty's own Anthropic key, which the AI Gateway
+// What the Odysseys campaign spends on the instance's Anthropic key, which the AI Gateway
 // balance never sees. Each run's agent tokens come from the local billing ledger
 // (usage.ts), the judge's from its own calls; a ledger file keeps the total
 // across passes so the campaign stops at its cap (docs/agents/evals/odysseys.md).

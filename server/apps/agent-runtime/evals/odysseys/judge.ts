@@ -3,7 +3,7 @@
 // the trajectory's action history and every screenshot in order, and the same
 // success/failure parse. A rubric scores 1 when the trajectory satisfies it; a task is
 // perfect when every rubric does. Differences from the official runs are only the judge
-// model (MISTY_ODYSSEYS_JUDGE: a Claude model on Misty's own key, or a free `nim/` model, see
+// model (MISTY_ODYSSEYS_JUDGE: a Claude model on the instance's Anthropic key, or a free `nim/` model, see
 // docs/agents/evals/free-model.md) and a cap of 60 pictures
 // (the recorder skips unchanged ones, so long runs rarely reach it).
 import { readFileSync } from "node:fs";
