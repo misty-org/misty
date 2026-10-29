@@ -55,9 +55,6 @@ Caveats:
 - **Server** (`server/internal/agent/house_route.go`, `FreeEvalModel`): a development stack with
   `MISTY_ALLOW_MODEL_OVERRIDE=1` accepts `nim/` ids that aren't in the Gateway catalog. Production
   never does.
-- **Billing** (`misty-billing/compose.dev.yml`): the dev billing service prices the models in the
-  table above and GLM-5.3-Flash at zero, so the eval account never runs out of usage. Add
-  any other `nim/` model there before using it.
 - **Eval**: `spend.ts` counts `nim/` models as free. The judge grades rubrics one at a time on a
   `nim/` model, so a rate-limit 429 isn't graded as a failed rubric.
 - **Other server-side calls**: page extraction, screenshots and compaction go through the runtime on
@@ -70,8 +67,7 @@ Caveats:
 2. In `server/.env/dev/integrations/ai.env` add `NVIDIA_API_KEY=nvapi-…` and
    `MISTY_AI_LOW_MODEL=nim/z-ai/glm-5.3-flash`. In `server/.env/dev/runtime.env`, check
    `MISTY_ENVIRONMENT=development` and add `MISTY_ALLOW_MODEL_OVERRIDE=1`.
-3. Pull `misty-billing` as well, and restart its dev stack so the zero prices load.
-4. Check the model with the smoke check, from `server/apps/agent-runtime` (GLM-5.3-Flash is its
+3. Check the model with the smoke check, from `server/apps/agent-runtime` (GLM-5.3-Flash is its
    default; `MISTY_FREE_MODEL=nim/…` checks a fallback):
 
    ```bash
@@ -81,7 +77,7 @@ Caveats:
    All four checks must pass: a tool call, a screenshot from a tool, the 32,000-token output cap,
    and 20 screenshots in one message. If only the output cap fails, cap `maxOutputTokens` in the
    `nim/` branch of `model-provider.ts`; otherwise try the fallbacks in order.
-5. Run Odysseys as in its README, with `MISTY_ODYSSEYS_MODEL=nim/z-ai/glm-5.3-flash`,
+4. Run Odysseys as in its README, with `MISTY_ODYSSEYS_MODEL=nim/z-ai/glm-5.3-flash`,
    `MISTY_ODYSSEYS_JUDGE=nim/z-ai/glm-5.3-flash`, `MISTY_ODYSSEYS_PARALLEL=2`, and `NVIDIA_API_KEY`
    in the eval's shell. Agent and judge share one rate limit (about 40 requests a minute); on
    429s, drop to `MISTY_ODYSSEYS_PARALLEL=1`.
@@ -102,7 +98,7 @@ Paste this into Claude Code in the `misty` checkout on the Mac:
 > `server/apps/agent-runtime/evals/odysseys/README.md`. Paid model credit is nearly gone: use only
 > `nim/` models, and stop and tell me if anything would spend on Anthropic, OpenAI or the AI Gateway.
 >
-> 1. Pull `main` in `misty` and in `misty-billing`. Set up the free model as in the doc's Setup
+> 1. Pull `main` in `misty`. Set up the free model as in the doc's Setup
 >    section: I've put `NVIDIA_API_KEY` in `server/.env/dev/integrations/ai.env`; check that it,
 >    `MISTY_AI_LOW_MODEL`, `MISTY_ENVIRONMENT=development` and `MISTY_ALLOW_MODEL_OVERRIDE=1` are
 >    there without printing the key. Run `npm run eval:free-model` and stop if any check fails; if
