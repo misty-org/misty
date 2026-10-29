@@ -109,6 +109,9 @@ export function pageHost(state: ProgramState) {
   const targetOf = async (scopeId: string, target: unknown): Promise<Record<string, unknown>> => {
     if (target === undefined || target === null) return {};
     if (typeof target === "string" && /^e\d+$/.test(target)) return { ref: target };
+    // A whole line copied from read() or find() ('button "Search" [ref=e8]') names its ref.
+    const copied = typeof target === "string" ? ref.exec(target)?.[1] : undefined;
+    if (copied) return { ref: copied };
     if (typeof target === "object" && typeof (target as { role?: unknown }).role === "string") {
       const { role, name, index } = target as { role: string; name?: unknown; index?: unknown };
       return {

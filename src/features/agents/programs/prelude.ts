@@ -15,7 +15,13 @@ console.error = console.log;
 const log = console.log;
 
 class Tab {
-  constructor(info) { this.id = info.id; this.url = info.url || ""; this.title = info.title || ""; }
+  constructor(info) {
+    this.id = info.id; this.url = info.url || ""; this.title = info.title || "";
+    // A method a tab does not have names itself and the ones it does, instead of "not a function".
+    return new Proxy(this, {
+      get: (target, key) => (key in target || __plain(key) ? target[key] : __missing(key)),
+    });
+  }
   /** The page as an accessibility tree with refs: { url, title, tree }. */
   read(options) { return __call("read", Object.assign({ tab: this.id }, options)); }
   /** The page's text as markdown, clipped to maxChars (default 20000). */
@@ -68,13 +74,29 @@ const __tabMethods = [
   "read", "text", "find", "goto", "click", "type", "fill", "select", "check", "uncheck", "hover",
   "press", "scroll", "scrollTo", "waitFor", "keep",
 ];
+// Names small models bring from Playwright and Puppeteer, as the method that does the same here.
+const __tabAliases = {
+  navigate: "goto", snapshot: "read", content: "text", innerText: "text", getText: "text",
+  textContent: "text", waitForSelector: "waitFor",
+};
+Object.entries(__tabAliases).forEach(([alias, name]) => { Tab.prototype[alias] = function (...args) { return this[name](...args); }; });
+// A page that goto() or openTab() returned has loaded; these only wait a moment.
+Tab.prototype.waitForLoadState = Tab.prototype.waitForLoad = Tab.prototype.waitForNavigation = () => sleep(300);
+// Keys the language itself looks up (await, JSON, printing) stay plain properties.
+const __plain = (key) =>
+  typeof key !== "string" || ["then", "catch", "finally", "toJSON", "id", "url", "title", "constructor"].includes(key);
+const __missing = (key) => () => {
+  throw new TypeError("tab." + key + "() does not exist. A tab has: " + __tabMethods.join(", ") +
+    ". Scripts cannot run in the page; read() or text() give its content.");
+};
 // A tab that was not awaited ("getTab(id).text()") works as if it had been: its methods wait for
 // the tab first. A small model forgets the await, and "not a function" tells it nothing.
 const __tabPromise = (promise) => new Proxy(promise, {
   get: (target, key) => {
     if (key === "then" || key === "catch" || key === "finally") return target[key].bind(target);
-    if (__tabMethods.includes(key)) return (...args) => target.then((tab) => tab[key](...args));
-    return undefined;
+    if (__plain(key)) return undefined;
+    if (key in Tab.prototype) return (...args) => target.then((tab) => tab[key](...args));
+    return __missing(key);
   },
 });
 const openTab = (url) => __tabPromise((async () => new Tab(await __call("open", { url })))());

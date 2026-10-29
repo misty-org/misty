@@ -88,6 +88,29 @@ describe("browser_run sandbox", () => {
     });
   });
 
+  it("names a tab method that does not exist, and maps Playwright names onto real ones", async () => {
+    const calls: string[] = [];
+    const host = async (name: string, args: Record<string, unknown>) => {
+      calls.push(name);
+      if (name === "tab") return { id: "t", url: "https://cars.test", title: "Cars" };
+      if (name === "text") return { url: "https://cars.test", title: "Cars", text: "RAV4" };
+      return { ok: true, args };
+    };
+    const missing = await runInSandbox(programPrelude, `const t = await getTab("cars"); await t.evaluate("1");`, host, { deadline: deadline() });
+    expect(missing).toMatchObject({ ok: false });
+    expect(JSON.stringify(missing)).toMatch(/tab\.evaluate\(\) does not exist\. A tab has: read, text/);
+    const unawaited = await runInSandbox(programPrelude, `await getTab("cars").clickOn("Search");`, host, { deadline: deadline() });
+    expect(JSON.stringify(unawaited)).toMatch(/tab\.clickOn\(\) does not exist/);
+    const mapped = await runInSandbox(
+      programPrelude,
+      `const t = await getTab("cars"); await t.waitForLoadState(); await t.navigate("https://cars.test/used"); log(JSON.stringify(t)); return (await t.innerText()).text;`,
+      host,
+      { deadline: deadline() },
+    );
+    expect(mapped).toMatchObject({ ok: true, value: "RAV4" });
+    expect(calls).toContain("goto");
+  });
+
   it("lets a program name its own variables tabs and tab", async () => {
     const host = async (name: string) =>
       name === "tabs" ? [{ id: "a", url: "https://a.test", title: "A" }] : null;
