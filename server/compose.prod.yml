@@ -209,9 +209,41 @@ services:
       retries: 30
     networks: [edge, database]
 
+  # Optional: the collaboration Worker on this server instead of Cloudflare, in workerd
+  # (wrangler's local mode) with its Durable Objects persisted to a volume. Start it with
+  # `--profile collab`, publish 127.0.0.1:8787 over HTTPS on its own hostname and set
+  # PARTYKIT_HOST to that hostname (docs/cloudflare.md#run-it-on-your-own-server).
+  collab:
+    profiles: [collab]
+    image: ${MISTY_COLLAB_IMAGE:-misty-journal-collab:local}
+    build:
+      context: apps/journal-collab
+      dockerfile_inline: |
+        FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
+        WORKDIR /app
+        COPY package.json package-lock.json ./
+        RUN npm ci --no-audit --no-fund
+        COPY tsconfig.json wrangler.jsonc ./
+        COPY src ./src
+        ENV WRANGLER_SEND_METRICS=false CI=true
+        EXPOSE 8787
+        CMD ["npx", "wrangler", "dev", "--ip", "0.0.0.0", "--port", "8787", "--persist-to", "/data", "--var", "MISTY_INTERNAL_API_BASE:http://api:8080/v1"]
+    <<: *logging
+    restart: unless-stopped
+    volumes:
+      - collabdata:/data
+      - ./apps/journal-collab/.secrets/worker.prod.env:/app/.dev.vars:ro
+    ports:
+      - "127.0.0.1:${MISTY_COLLAB_HOST_PORT:-8787}:8787"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge]
+
 volumes:
   pgdata:
   librarydata:
+  collabdata:
 
 networks:
   edge:

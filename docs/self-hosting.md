@@ -17,11 +17,12 @@ charges you.
 | Go API (`server/`) | Your server, Docker | Accounts, encrypted sync, Spaces, files, agent tools |
 | Agent runtime (`server/apps/agent-runtime`) | Your server, Docker | Agent runs and every model call |
 | PostgreSQL with pgvector | Your server, Docker | The API's data and the runtime's workflow database |
-| Collaboration Worker (`server/apps/journal-collab`) | Your Cloudflare account, optional | Live co-editing of notes and drawings |
+| Collaboration Worker (`server/apps/journal-collab`) | Your Cloudflare account, or your server through the `collab` profile | Saving and co-editing notes and drawings |
 | web-fetch Worker (`server/apps/web-fetch`) | Your Cloudflare account, optional | `web.fetch` for runs with no device online |
 
-Without the Cloudflare Workers, notes and drawings still sync and agents still read pages through
-your devices. [cloudflare.md](cloudflare.md) covers deploying them to your own account.
+Without the collaboration Worker, notes and drawings are read-only, so most servers want it: on
+Cloudflare or on the same host ([cloudflare.md](cloudflare.md#run-it-on-your-own-server)). Without
+the web-fetch Worker, agents read pages through your online devices only.
 
 ## Requirements
 

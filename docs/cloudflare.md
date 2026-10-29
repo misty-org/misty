@@ -1,12 +1,12 @@
 # Cloudflare (optional)
 
-Two small parts of Misty run as Cloudflare Workers. Both are optional and deploy to your own
-Cloudflare account; Misty has none you depend on. The server, the agent runtime and PostgreSQL
-never need Cloudflare ([self-hosting.md](self-hosting.md)).
+Two small parts of Misty are Cloudflare Workers. Both deploy to your own Cloudflare account;
+Misty has none you depend on. The server, the agent runtime and PostgreSQL never need Cloudflare
+([self-hosting.md](self-hosting.md)).
 
 | Worker | Code | Without it |
 | --- | --- | --- |
-| Collaboration | `server/apps/journal-collab` | Notes and drawings sync between devices but nobody co-edits live |
+| Collaboration | `server/apps/journal-collab` | Notes and drawings open read-only: this Worker is what saves them. Run it on Cloudflare or [on your own server](#run-it-on-your-own-server) |
 | web-fetch | `server/apps/web-fetch` | Agents read pages only through one of your online devices |
 
 You also need a Cloudflare account for a Cloudflare Tunnel or R2 storage, if you choose either.
@@ -48,7 +48,35 @@ printf 'misty-journal-collab.YOUR-SUBDOMAIN.workers.dev' | misty env set prod PA
 misty server prod up
 ```
 
-Collaboration is on exactly when `PARTYKIT_HOST` is set. Remove it to turn collaboration off.
+Collaboration is on exactly when `PARTYKIT_HOST` is set. Without it, notes and drawings are
+read-only.
+
+### Run it on your own server
+
+The same Worker runs without Cloudflare in workerd, Cloudflare's open-source Workers runtime,
+through the `collab` profile of `compose.prod.yml`. Its Durable Objects are stored on the
+`collabdata` volume, and it calls the API inside the Compose network.
+
+```sh
+docker compose --file server/compose.prod.yml --profile collab up --detach collab
+```
+
+Run it through the CLI's environment like the rest of the stack (`misty server prod up` starts
+only the default services). The service reads the Worker's secrets from
+`server/apps/journal-collab/.secrets/worker.prod.env`, which `misty env init prod` generated, and
+listens on `127.0.0.1:8787` (`MISTY_COLLAB_HOST_PORT`). Publish it over HTTPS on its own hostname,
+for example with Caddy:
+
+```text
+collab.example.com {
+    reverse_proxy 127.0.0.1:8787
+}
+```
+
+Then set `PARTYKIT_HOST=collab.example.com` and run `misty server prod up`. The API and the
+desktop both reach the Worker at `https://` and `wss://` on that hostname. This mode is meant for
+a personal or small server: it runs the Worker through `wrangler dev`'s local runtime, not
+Cloudflare's network.
 
 ## web-fetch Worker
 
