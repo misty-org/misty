@@ -96,14 +96,13 @@ func (monitor *healthMonitor) evaluate(ctx context.Context) (HealthSnapshot, int
 	})
 
 	checks["public_api"] = PublicAPIConfigurationCheck()
-	agentGatewayCheck := environmentConfigurationCheck("AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN")
+	// Models run on each account's own keys, so the server only needs the runtime.
+	// An operator model (MISTY_AGENT_MODEL) is optional; a malformed one is reported.
+	agentRuntimeCheck := environmentConfigurationCheck("MISTY_AGENT_RUNTIME_URL", "MISTY_AGENT_RUNTIME_CONTROL_SECRET")
 	if _, err := config.AgentModel(); err != nil {
-		agentGatewayCheck = HealthCheck{Status: "unavailable", Mode: "configuration", Critical: false}
+		agentRuntimeCheck = HealthCheck{Status: "unavailable", Mode: "configuration", Critical: false, Message: "MISTY_AGENT_MODEL is malformed"}
 	}
-	checks["agent_gateway"] = agentGatewayCheck
-	// Pre-rename key, still emitted so any external dashboard or alert watching
-	// it keeps reporting while it is repointed at agent_gateway.
-	checks["agent_runtime"] = agentGatewayCheck
+	checks["agent_runtime"] = agentRuntimeCheck
 	checks["email"] = environmentConfigurationCheck("MAILJET_API_KEY", "MAILJET_SECRET_KEY", "MAILJET_FROM_EMAIL")
 
 	overall, status := SummarizeHealth(checks)

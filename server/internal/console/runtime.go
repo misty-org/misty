@@ -110,8 +110,8 @@ func (s *Server) aiPage(r *http.Request) templ.Component {
 	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
 	if snapshot, err := s.health.Fetch(ctx); err == nil {
-		if check, ok := snapshot.Checks["agent_gateway"]; ok {
-			check.Name = "agent_gateway"
+		if check, ok := snapshot.Checks["agent_runtime"]; ok {
+			check.Name = "agent_runtime"
 			view.Gateway = &check
 		}
 	}
