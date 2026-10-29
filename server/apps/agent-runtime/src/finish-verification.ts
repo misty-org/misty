@@ -5,7 +5,7 @@ import { earlyGiveUp } from "./persistence-check.js";
 import { brokenProofTabs, proofTabsRefusal } from "./proof-tabs.js";
 import { countRefusal } from "./count-check.js";
 import { researchUse, type ResearchTools } from "./research-budget.js";
-import { ledgerIssue, type LedgerRow } from "./ledger.js";
+import { ledgerIssue, openRowsIssue, type LedgerRow } from "./ledger.js";
 import type { TaskCompletion } from "./task-completion.js";
 
 // One verification turn before a finish stands (docs/agents/harness.md, Completion). Until October 20
@@ -32,6 +32,8 @@ export interface FinishCheck {
   readOnly: (name: string) => boolean;
   /** Rows the run marked done that its calls do not back (src/ledger.ts). */
   unbackedRows?: LedgerRow[];
+  /** The ledger's parts not yet done or skipped (src/ledger.ts, remaining). */
+  openRows?: TaskCompletion["remaining"];
 }
 
 /** Whether a finish may still be sent back: once, and only with turns left to act on it. */
@@ -62,6 +64,8 @@ export function finishFindings(check: FinishCheck): { issues: string[]; gaveUp: 
     issues.push(`Pages you kept as proof show an error or nothing: ${broken.join("; ")}. Open each page again from a search or the site's own links, keep() the working page, and close or replace the broken one.`);
   const unbackedLedger = ledgerIssue(check.unbackedRows ?? []);
   if (unbackedLedger) issues.push(unbackedLedger);
+  const openLedger = openRowsIssue(check.report, check.openRows ?? []);
+  if (openLedger) issues.push(openLedger);
   const counts = countRefusal(check.request, check.report.summary);
   if (counts) issues.push(counts);
   const giveUp = check.long ? earlyGiveUp(check.report, check.turn, check.limit) : undefined;

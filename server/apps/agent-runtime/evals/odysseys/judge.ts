@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { streamText } from "ai";
 import { RoutedModel } from "../../src/model-calls.js";
+import { judgeBu } from "./bu-bench.js";
 import type { Step } from "./recorder.js";
 import type { OdysseysTask } from "./tasks.js";
 
@@ -56,6 +57,7 @@ const judgeLanes = Math.max(1, Math.min(8, Number(process.env.MISTY_ODYSSEYS_JUD
 
 /** Grades every rubric of one task; the last `maxImages` screenshots go to each call. */
 export async function judgeTask(model: string, task: OdysseysTask, steps: Step[], screenshots: string[], maxImages = 60): Promise<TaskVerdict> {
+  if (task.judge === "bu-v1") return judgeBu(model, task, steps, screenshots);
   const history = steps.map((step, index) => {
     const parts = [step.response.trim() ? `Response: ${step.response.trim()}` : "", step.action ? `Action: ${step.action}` : ""].filter(Boolean);
     return parts.length ? `${index + 1}. ${parts.join("\n")}` : "";

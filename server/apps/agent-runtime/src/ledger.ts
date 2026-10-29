@@ -151,6 +151,14 @@ export function ledgerIssue(unbacked: LedgerRow[]): string | undefined {
     "If a part could not be done, mark it failed or blocked with the reason.";
 }
 
+/** A finish that says completed while its ledger still lists open parts: the report would read as
+ * unfinished (withLedger), so the run closes each row first, done with evidence or why not. */
+export function openRowsIssue(report: TaskCompletion, open: TaskCompletion["remaining"]): string | undefined {
+  if (report.outcome !== "completed" || !open.length) return undefined;
+  return `Your ${ledgerTool} list still shows ${open.length} part${open.length === 1 ? "" : "s"} as not done (${open.map((row) => `"${row.requirement.slice(0, 80)}"`).join("; ")}). ` +
+    `Update it in one ${ledgerTool} call: each part you did is done with its evidence (a kept page's address, a note you wrote, or a tool's receipt), and each you could not do is failed or skipped with the reason. Then finish.`;
+}
+
 /** The text with its ledger comment taken off, as a chat's history carries it. */
 export function stripLedger(text: string): string {
   const start = text.indexOf(marker);

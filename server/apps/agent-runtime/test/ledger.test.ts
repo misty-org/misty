@@ -46,4 +46,15 @@ describe("ledger", () => {
     });
     expect(issues.join("\n")).toMatch(/marked done/);
   });
+
+  it("sends a completed finish back while its ledger has open rows", () => {
+    const ledger = new Ledger();
+    ledger.update({ rows: [{ requirement: "Find A", state: "pending" }, { requirement: "Find B", state: "skipped", reason: "not asked" }] });
+    const check = (outcome: "completed" | "partial") => finishIssues({
+      request: "find A and B", report: { outcome, summary: "A is 1", remaining: [] }, messages: [], turn: 1, limit: 30, long: false,
+      research: {} as never, readOnly: () => false, openRows: ledger.remaining(),
+    }).join("\n");
+    expect(check("completed")).toMatch(/1 part as not done \("Find A"\)/);
+    expect(check("partial")).toBe("");
+  });
 });

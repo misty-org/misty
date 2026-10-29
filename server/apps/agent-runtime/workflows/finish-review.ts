@@ -30,7 +30,7 @@ export async function verifyFinish(run: AgentRun, report: TaskCompletion, messag
   }
   run.verified = true;
   const { issues, gaveUp } = finishFindings({
-    unbackedRows: unbacked,
+    unbackedRows: unbacked, openRows: run.ledger.remaining(),
     request: context.prompt, report, messages, turn: modelTurn, limit, long,
     research: researchTools, tabList: catalog.modelName("browser.tab.list"), program: catalog.modelName("browser.run"), readOnly: catalog.readOnly,
   });
