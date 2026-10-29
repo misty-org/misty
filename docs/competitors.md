@@ -65,9 +65,9 @@ Edge, Opera Neon, Vivaldi and Orion were not checked against their own sites and
 
 | | Misty | Comet | Polar | Aside | Dia | Brave |
 | --- | --- | --- | --- | --- | --- | --- |
-| Choose the model | ✓ paid plans | ✓ paid plans | ✗ mixes models for you | ✓ plus your own ChatGPT or Claude subscription, or an API key | ✗ GPT-5 for everything | ✓ more models on Premium |
-| Makers to choose from | About 30 through the AI Gateway (OpenAI, Anthropic, Google, xAI, DeepSeek, Mistral, Qwen, Moonshot…) | 8: Perplexity, OpenAI, Anthropic, Google, xAI, Moonshot, Z.ai, NVIDIA | — | Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Z.ai, Meta, Xiaomi, plus OpenRouter | — | Mistral (Mixtral), Anthropic, Meta, plus your own |
-| Flagship models on the first paid plan | ✓ | ✗ GPT-5.6 Sol and Claude Opus 5 are Max-only | — | ✓ GPT-5.6 Sol is Pro's default | — | ? |
+| Choose the model | ✓ any model, your own key | ✓ paid plans | ✗ mixes models for you | ✓ plus your own ChatGPT or Claude subscription, or an API key | ✗ GPT-5 for everything | ✓ more models on Premium |
+| Makers to choose from | Any: OpenAI, Anthropic, Google, OpenRouter, the AI Gateway, NVIDIA, Ollama or any OpenAI-compatible endpoint | 8: Perplexity, OpenAI, Anthropic, Google, xAI, Moonshot, Z.ai, NVIDIA | — | Anthropic, OpenAI, Google, xAI, DeepSeek, Moonshot, Z.ai, Meta, Xiaomi, plus OpenRouter | — | Mistral (Mixtral), Anthropic, Meta, plus your own |
+| Flagship models on the first paid plan | ✓ no plans; any model on your key | ✗ GPT-5.6 Sol and Claude Opus 5 are Max-only | — | ✓ GPT-5.6 Sol is Pro's default | — | ? |
 | A different model for thinking, seeing, listening and speaking | ✓ | ✗ | ✗ | ◐ a chosen model per sub-agent | ✗ | ? |
 | Ask several models at once and merge answers | ✗ | ✓ Model Council (Max) | ✗ | ? | ✗ | ? |
 | Run the agent on your own hardware | ✗ | ✓ Portable Computer (NVIDIA) | ✗ | ? home page shows an unexplained "Local" mode | ✗ | ✓ your own local or remote models |
@@ -84,7 +84,7 @@ Edge, Opera Neon, Vivaldi and Orion were not checked against their own sites and
 
 | | Misty | Comet | Polar | Aside | Dia | Zen | Arc | Helium | Brave |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Open source | ✗ the desktop app is planned (C17) | ? | ? | ? | ? | ✓ MPL-2.0 | ? | ✓ GPL-3.0 | ✓ MPL-2.0 |
+| Open source | ◐ MIT, everything including the server; repository not yet public (C17) | ? | ? | ? | ? | ✓ MPL-2.0 | ? | ✓ GPL-3.0 | ✓ MPL-2.0 |
 | Browse without an account | ✗ the welcome screen asks you to sign in first | ? | ? | ? | ? Arc import happens during sign-up | ✓ an account only for sync † | ? | ? no account mentioned; "No data collection" | ✓ even Leo needs no account; Premium does |
 | Vertical tabs | ✓ left or right | ? | ? | ? | ✓ Sidebar tabs | ? | ✓ | ✓ four layouts | ✓ |
 | Switchable tab sets (Spaces, Workspaces) | ✓ Spaces you share with people, with chat, notes, files, code and memory | ? | ? | ◐ Chromium profiles | ✓ Profiles (Arc's Spaces) | ✓ Workspaces with containers | ✓ Spaces, for one person | ? | ? |
@@ -103,17 +103,16 @@ Edge, Opera Neon, Vivaldi and Orion were not checked against their own sites and
 
 | | Misty | Comet | Polar | Aside | Dia | Zen | Arc | Helium | Brave |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Free plan | Every feature, one fast model | Browser and search; no browser agent | 3,000 credits, +100 a day | 500 credits a month, 3 routines, your own subscription | Browser only, no AI | The whole browser; donations | The whole browser, until 2026-12-22 | The whole browser; crowdfunded | The whole browser, Shields and Leo |
-| First paid plan | $12 Pro | Pro, $20 † | $20 | $20 Pro (20% off yearly) | Better Answers, $20 (the plans page also shows $10 on the card) | — | — | — | Leo Premium (no price on its page); Firewall + VPN |
-| Top individual plan | $200 Ultra+ | Max, $200 † | Pro+ / Max | $200 Max | Better Days, $100 | — | — | — | Brave Origin, $59.99 once |
+| Free plan | Free and open source: every feature, your own model keys | Browser and search; no browser agent | 3,000 credits, +100 a day | 500 credits a month, 3 routines, your own subscription | Browser only, no AI | The whole browser; donations | The whole browser, until 2026-12-22 | The whole browser; crowdfunded | The whole browser, Shields and Leo |
+| First paid plan | — | Pro, $20 † | $20 | $20 Pro (20% off yearly) | Better Answers, $20 (the plans page also shows $10 on the card) | — | — | — | Leo Premium (no price on its page); Firewall + VPN |
+| Top individual plan | — | Max, $200 † | Pro+ / Max | $200 Max | Better Days, $100 | — | — | — | Brave Origin, $59.99 once |
 
 ## What Misty can lead with
 
 - **Spaces are places you share, not tab sets.** Arc's Spaces (now Dia's Profiles) and Zen's Workspaces sort one person's tabs. A Misty Space has its people and their agents, a chat, notes, drawings, files, code and a memory, and every window takes its Space's color. This is the strongest lead against the browsers people love, and Arc users need a new home before 2026-12-22.
 - **Website sign-ins carry over between your computers.** Comet and Dia sync passwords and tabs, not sessions, and Helium has no sync. Recheck Polar, Aside, Zen and Brave before publishing; Aside's Enterprise plan gives agents company cookies and browser state.
-- **The agent is on the free plan.** Comet and Dia put their browser agent behind a paid plan; Polar gives daily credits and Aside 500 credits a month. Brave's Leo is free but isn't described acting on sites.
-- **A different model for each job**, from about 30 makers. Comet offers 8 makers and keeps its flagships for Max; Polar and Dia don't let you choose. Don't lead on maker count against Aside (about ten makers plus OpenRouter, a model per sub-agent, your own subscription or key) or Brave (your own local or remote models).
-- **Flagship models from $12.** Comet's top models need Max; Aside's Pro is $20.
+- **Free and open source, agent included.** Comet and Dia put their browser agent behind a paid plan; Polar gives daily credits and Aside 500 credits a month. Misty has no plans: the agent runs on your own model key, and you can run the whole stack yourself.
+- **A different model for each job**, from any provider on your own key, including local models. Comet offers 8 makers and keeps its flagships for Max; Polar and Dia don't let you choose. Aside (your own subscription or key) and Brave (your own local or remote models) also allow this, so don't lead on it alone.
 - **Agents that ask a teammate's agent**, inside a shared Space. Aside's tasks message each other only within one account.
 - **41 MB on the system engine** against 431–716 MB for Comet and Polar on Chromium.
 
@@ -136,13 +135,13 @@ Goal: Misty has everything the others have, so no public row shows Misty losing.
 | C7 | Create decks, docs and reports as files | Comet, Dia | Journal for notes; no file output | L | 7 |
 | C8 | Send the agent a task by email or Slack | Comet, Aside (Slack, Telegram, Discord) | Composio Gmail and Slack | M | 8 |
 | C9 | Ship the cross-device clipboard; confirm agents at the cursor | Misty-only rows | Built | S | 9 |
-| C10 | Some model choice on the free plan | — (lead, not parity) | One fast model on Basic | S | 10 |
+| C10 | Model choice for everyone | — (lead, not parity) | Done: bring your own key, any model per job (`docs/byok.md`) | S | done |
 | C12 | Chrome Web Store extensions | Comet, Dia, Aside, Arc, Helium, Brave (Zen takes Firefox add-ons) | In progress through Kiri | L | 12 |
 | C13 | Extensions on Windows | Comet, Dia, Aside, Zen, Arc, Helium, Brave | MV3 only on WebView2, with gaps (`windows-limits.md`) | L | 13 |
 | C14 | iPhone and Android | Comet, Brave, Arc (Arc Search) | No mobile client | XL | 14 |
-| C15 | Run the agent on your own hardware | Comet, Brave (your own models) | Browser work already runs on your device; models don't | XL | later |
+| C15 | Run the agent on your own hardware | Comet, Brave (your own models) | Browser work runs on your device; models can run on your own Ollama or any OpenAI-compatible server (`docs/byok.md`), and the server is self-hosted | XL | later |
 | C16 | Browse with no account; sign in only for sync, Spaces and AI | Zen, Brave | Approved brief `docs/browser/no-account.md`; all four phases written 2026-10-23, not yet built, tested or released | M | next |
-| C17 | Open-source desktop app; sync, the agent runtime and Spaces stay proprietary, with the server and billing | Zen, Helium, Brave | Kura is already open source. Sync (`src-tauri/crates/browser-sync`), the on-device agent (page agent, `browser_run`) and Spaces (`src/features/spaces`) live in the desktop app today, so they move behind a closed module before the rest is published. Pick a license and trademark policy; scrub secrets from history | L | next |
+| C17 | Open source | Zen, Helium, Brave | Decided 2026-10-29: everything is MIT and in this repository, including sync, the agent runtime, Spaces, the server and the Workers. No billing; self-hosted (`docs/self-hosting.md`). Going public waits on the history secrets scan | M | next |
 
 **Out of scope:** SOC 2 and other enterprise compliance, SSO, SCIM and MDM. Misty is not pursuing enterprise customers, so these never go on the chart or in the parity plan. Team plans are also out (2026-10-11): Misty is a consumer app, so the "Team plan" row stays off the website. C11 was removed, and C12–C17 keep their IDs. C18 (bringing over Arc's Spaces, pinned tabs and favorites) was dropped on 2026-10-23: Arc users get bookmarks, history, sign-ins and extensions through the normal Chromium import, and Arc's sidebar doesn't come across. Built-in ad blocking stays out (decided 2026-10-12): onboarding offers a store extension such as uBlock Origin Lite, and Misty ships no blocking code or lists of its own.
 
