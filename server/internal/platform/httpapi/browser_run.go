@@ -34,7 +34,8 @@ const browserRunDescription = "Run a short JavaScript program in your own browse
 	"note(object) records a finding; log(...) prints. A failed step throws with the real reason: catch it or let the program end there. " +
 	"Example: const t = await openTab(\"https://example.com\"); await t.type({role: \"searchbox\", name: \"\"}, \"joggers\", {submit: true}); " +
 	"await t.waitFor({text: \"results\"}); return (await t.text({maxChars: 6000})).text; " +
-	"A video is a source too (a tutorial's steps are in it): open its page, try { await t.click(\"Show transcript\"); } catch (e) {}, then read t.text() for the title, description and spoken steps, and summarize them."
+	"A video is a source too (a tutorial's steps are in it): open its page, try { await t.click(\"Show transcript\"); } catch (e) {}, then read t.text() for the title, description and spoken steps, and summarize them. " +
+	"A picture is a source too: when what you need is only in an image (a tier list, chart, menu or schedule posted as a picture), scrollTo it, then look at it with browser_visual on that tab (agent_tool_use browse offers it) and read it from the picture."
 
 func (s *SpacesService) browserRunRegistration() agenttools.Registration {
 	descriptor := screenDescriptor(browserRunTool, browserRunDescription,
