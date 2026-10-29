@@ -109,12 +109,19 @@ const answerEvidence = /\b(final )?(answer|summary|response|reply|comparison)\b/
 export function backed(evidence: LedgerEvidence | undefined, shown: string): boolean {
   if (!evidence) return false;
   const ref = evidence.ref.toLowerCase();
+  // Tool results arrive as JSON text, where & in an address reads \u0026.
+  shown = shown.replaceAll("\\u0026", "&");
   if (shown.includes(ref)) return true;
   const addresses = ref.match(/https?:\/\/[^\s;,)"']+/g) ?? [];
-  return addresses.some((address) => {
-    const bare = address.replace(/[/.]+$/, "").replace(/^https?:\/\/(www\.)?/, "");
-    return bare.length > 8 && shown.includes(bare);
-  });
+  if (addresses.length)
+    return addresses.some((address) => {
+      const bare = address.replace(/[/.]+$/, "").replace(/^https?:\/\/(www\.)?/, "");
+      return bare.length > 8 && shown.includes(bare);
+    });
+  // A described source ("Apple Support Communities threads; Reddit r/HomeKit") is backed when
+  // most of its words came back from this run's tools, as search results or page text.
+  const words = [...new Set(ref.match(/[a-z0-9][a-z0-9'-]{3,}/g) ?? [])];
+  return words.length >= 2 && words.filter((word) => shown.includes(word)).length >= Math.ceil(words.length * 0.6);
 }
 
 /** Tool calls and results as lower-case text, leaving out the ledger's own calls. */

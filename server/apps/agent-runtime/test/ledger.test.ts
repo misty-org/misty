@@ -62,6 +62,9 @@ describe("ledger", () => {
     const shown = JSON.stringify({ tabs: [{ url: "https://stockeldpark.co.uk/plan-your-day/tickets-prices/christmas-ticket-options/" }] }).toLowerCase();
     expect(backed({ kind: "tab", ref: "https://stockeldpark.co.uk/plan-your-day/tickets-prices/christmas-ticket-options/ scrolled to Gold Package; kept()", summary: "" }, shown)).toBe(true);
     expect(backed({ kind: "tab", ref: "https://www.yorkmaze.com/plan-a-visit/ kept", summary: "" }, shown)).toBe(false);
+    const searched = JSON.stringify({ results: [{ title: "HomePod plays Apple Music - Apple Support Communities", url: "https://discussions.apple.com/x?a=1&b=2" }, { title: "r/HomeKit on Reddit" }] }).toLowerCase();
+    expect(backed({ kind: "note", ref: "Apple Support Communities discussion threads; Reddit r/HomeKit", summary: "" }, searched)).toBe(true);
+    expect(backed({ kind: "note", ref: "Consumer Reports review of speakers", summary: "" }, searched)).toBe(false);
     const ledger = new Ledger();
     ledger.update({ rows: [{ requirement: "Compare the two", state: "done", evidence: { kind: "note", ref: "Final answer text below with comparison", summary: "" } }] });
     expect(ledger.reconcile([], "x".repeat(250))).toEqual([]);
