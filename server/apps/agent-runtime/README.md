@@ -98,8 +98,10 @@ logged.
   without them Workflow uses its local world.
 - `MISTY_AGENT_MODEL`: the instance's default agent model (`provider/model`).
 - The instance model keys in the table above, all optional.
-- `MISTY_RUNTIME_LIVE_TRANSCRIBE=1` turns on live transcription, which uses the
-  instance's `SONIOX_API_KEY`.
+- `MISTY_RUNTIME_LIVE_TRANSCRIBE=1` turns on live transcription. Its signed
+  ticket carries no key, so the relay asks Go for the session's route
+  (`POST /internal/voice/live/credential`, `{session_id, user}`) and uses the
+  account's Soniox key, or `SONIOX_API_KEY` for an `instance` route.
 
 `misty server up` runs this runtime, its Postgres world and the Go API in local
 containers (`server/compose.dev.yml`). Production runs the same image on the
