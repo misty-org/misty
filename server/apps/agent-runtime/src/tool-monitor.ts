@@ -53,7 +53,8 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
     // looked at again rather than ending the run. A consequential one still stops:
     // it may have sent, paid or deleted, and must never be planned a second time.
     if (outcome.kind === "stop" && uncertainPageAction(name, call.input)) {
-      const look = catalog.modelName("browser.snapshot") ? "browser.snapshot" : "browser.inspect";
+      // A program looks again with a program: runs that have browser_run do not see the step tools.
+      const look = name === "browser.run" ? "browser.run" : catalog.modelName("browser.snapshot") ? "browser.snapshot" : "browser.inspect";
       requireInspection(look);
       return;
     }
@@ -97,7 +98,8 @@ export function toolMonitor({ catalog, order, checkpoint, rejected }: ToolMonito
     /** Every tool, or the observation a stale or consumed screen needs and the finish. */
     activeTools(all: string[]): string[] {
       const inspection = requiredInspection && catalog.modelName(requiredInspection);
-      return inspection ? all.filter((name) => name === inspection || name === taskCompletionTool) : all;
+      // The look is offered even when the run's toolset hides it: filtering it out left only the finish.
+      return inspection ? [inspection, ...all.filter((name) => name === taskCompletionTool)] : all;
     },
     onStart: ({ toolCall }: { toolCall: ToolCall }) => order.start(toolCall.toolCallId, async () => {
       // Misty announces a read-only call itself when the call arrives, so a

@@ -113,6 +113,24 @@ describe("tool monitor", () => {
     await run("look", "browser_snapshot", { success: false, error: "The page shows no readable content." });
     expect(monitor.requiredInspection).toBe("");
     expect(monitor.activeTools(all)).toEqual(all);
+    // The look stays offered when the visible tools do not include it.
+    order.resume();
+    await run("act2", "browser_steps", { success: true, output: { status: "uncertain" } }, { steps: [{ action: "click", ref: "e5" }] });
+    expect(monitor.activeTools(["browser_run", "agent_finish"])).toEqual(["browser_snapshot", "agent_finish"]);
+  });
+
+  it("looks again with a program after an uncertain program", async () => {
+    const programs = modelCatalog([
+      { name: "browser.run", description: "", inputSchema: schema },
+      { name: "browser.snapshot", description: "", inputSchema: schema, readOnly: true },
+    ], ["agent_finish"]);
+    const order = serialToolLifecycle();
+    const monitor = toolMonitor({ catalog: programs, order, rejected: new Set(), checkpoint: async () => {} });
+    const toolCall = { toolCallId: "p", toolName: "browser_run", input: { code: "await t.click('Next')" } };
+    await monitor.onStart({ toolCall });
+    await monitor.onEnd({ toolCall, durationMs: 1, success: true, output: { status: "uncertain" } });
+    expect(monitor.requiredInspection).toBe("browser.run");
+    expect(monitor.activeTools(["browser_run", "agent_finish"])).toEqual(["browser_run", "agent_finish"]);
   });
 
   it("plans around an own tab that did not open, twice, but not the person's tab", async () => {
