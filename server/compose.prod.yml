@@ -110,9 +110,17 @@ services:
       MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS: ${MISTY_AGENT_RUNTIME_CONTROL_SECRET_PREVIOUS:-}
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       VERCEL_OIDC_TOKEN: ${VERCEL_OIDC_TOKEN:-}
       AI_GATEWAY_BASE_URL: ${AI_GATEWAY_BASE_URL:-}
       MISTY_AGENT_MODEL: ${MISTY_AGENT_MODEL:-}
+      # Server-side model keys, used only for accounts whose devices send none (docs/byok.md).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+      OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-}
       # Speaks the voice pipeline (ElevenLabs Flash).
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       # Transcribes recordings (Soniox); live transcription also needs the switch on.

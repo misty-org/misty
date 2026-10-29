@@ -100,6 +100,12 @@ services:
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-}
       MISTY_AGENT_MODEL: ${MISTY_AGENT_MODEL:-}
+      # Server-side model keys, used only for accounts whose devices send none (docs/byok.md).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OPENAI_COMPATIBLE_BASE_URL: ${OPENAI_COMPATIBLE_BASE_URL:-}
+      OPENAI_COMPATIBLE_API_KEY: ${OPENAI_COMPATIBLE_API_KEY:-}
       # Speaks the voice pipeline (ElevenLabs Flash).
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
       # Transcribes recordings (Soniox); live transcription also needs the switch on.
