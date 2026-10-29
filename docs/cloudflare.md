@@ -58,11 +58,11 @@ through the `collab` profile of `compose.prod.yml`. Its Durable Objects are stor
 `collabdata` volume, and it calls the API inside the Compose network.
 
 ```sh
-docker compose --file server/compose.prod.yml --profile collab up --detach collab
+printf collab | misty env set prod COMPOSE_PROFILES
+misty server prod up
 ```
 
-Run it through the CLI's environment like the rest of the stack (`misty server prod up` starts
-only the default services). The service reads the Worker's secrets from
+The service reads the Worker's secrets from
 `server/apps/journal-collab/.secrets/worker.prod.env`, which `misty env init prod` generated, and
 listens on `127.0.0.1:8787` (`MISTY_COLLAB_HOST_PORT`). Publish it over HTTPS on its own hostname,
 for example with Caddy:

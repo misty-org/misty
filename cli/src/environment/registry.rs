@@ -11,6 +11,9 @@ pub(super) const FILES: &[FileSpec] = &[
         path: "runtime.env",
         names: &[
             "AUTH_HANDOFF_START_URL",
+            // Optional Compose services, such as `collab` (docs/cloudflare.md).
+            "COMPOSE_PROFILES",
+            "MISTY_COLLAB_HOST_PORT",
             "MISTY_AGENT_RUNTIME_IMAGE",
             "MISTY_AGENT_RUNTIME_INTERNAL_API_URL",
             "MISTY_AGENT_RUNTIME_URL",

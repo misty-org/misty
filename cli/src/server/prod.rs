@@ -20,7 +20,9 @@ pub fn production_up(workspace: &Workspace) -> Result<()> {
         .get("MISTY_API_IMAGE")
         .is_some_and(|image| !image.trim().is_empty());
     if published {
-        production_compose().arg("pull").run(&workspace.server)?;
+        production_compose()
+            .args(["pull", "--ignore-buildable"])
+            .run(&workspace.server)?;
         return production_compose()
             .args(["up", "--detach"])
             .run(&workspace.server);
