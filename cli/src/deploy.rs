@@ -3,7 +3,6 @@
 //! starts the stack there from a clone of this repository.
 
 use std::{
-    fs,
     io::Write,
     path::Path,
     process::{Command, Stdio},
@@ -14,7 +13,6 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use rand::{rngs::OsRng, RngCore};
 
 use crate::{
-    artifacts::write_private,
     environment::{self, Target},
     server,
     workspace::Workspace,
