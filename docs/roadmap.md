@@ -1,40 +1,43 @@
 # Misty roadmap
 
 The one place for where Misty is going and what's being built. Decided
-2026-10-11. Pricing (plans and meters) lives in the billing repo
-(`misty-billing`, `docs/pricing-v2.md`). Competitor facts and parity IDs C1–C18
-are in [competitors.md](competitors.md). Everything else here supersedes earlier direction notes.
+2026-10-11; open source, self-hosted and bring-your-own-key since 2026-10-29. Competitor facts
+and parity IDs C1–C18 are in [competitors.md](competitors.md). Everything else here supersedes
+earlier direction notes.
 
 ## Where Misty stands
 Claude, Codex, Meta Muse, OpenAI Dots and xAI Grok Bot all automate work, so
 "Misty has an agent" is not a reason to choose Misty.
 
-**Positioning:** Misty is your browser, private and made your own, with every
-major model built in.
+**Positioning:** Misty is your browser, private and made your own, open source, with any model
+you bring.
 
 - **Browser first.** Customization, encrypted sync and sign-ins that follow you
   between computers come first and are never traded away. Misty must be worth
   using with no AI at all.
-- **Every major model, included.** About 30 makers through the AI Gateway, a
-  model per job, and flagships from Pro. People pay Misty for AI because Misty
-  does what the AI companies' apps do.
+- **Any model, on your own key.** Every major provider, OpenRouter, the AI Gateway or a local
+  model through Ollama, chosen per job in Settings → Models ([byok.md](byok.md)). Misty charges
+  nothing; your provider bills you.
 - **Agents work in your browser,** on your computer, signed in as you, and you
   can watch them. Against Muse, Dots and Grok Bot: their agents borrow a
   computer in the cloud; Misty's works in yours.
 
 ## Decisions
 - **Consumer only.** No team plans, no enterprise (SOC 2, SSO, SCIM, MDM).
-- **Open-source desktop app (2026-10-23).** The browser is published as open
-  source to earn the trust Zen, Helium and Brave have. Sync, the agent runtime
-  and Spaces stay proprietary, as do the server and billing. Spaces are the
-  lead against Arc's and Zen's tab sets. Parity C16 (browse with no account),
-  C17 (the split and the license) and C18 (Arc import before 2026-12-22).
-- **Pricing as in pricing-v2 (billing repo):** Basic free, Pro $12, Max $20, Ultra $100,
-  Ultra+ $200. No top-ups.
-- **No bring-your-own-AI.** Every model runs on Misty's keys through the
-  runtime's AI SDK.
-- **Unlimited sync on every plan.** Sync is never a plan limit; rate limits
-  handle abuse.
+- **Everything is open source (2026-10-29), MIT.** The desktop app, sync, the server, the agent
+  runtime, Spaces and the Cloudflare Workers all live in this repository. Spaces are the lead
+  against Arc's and Zen's tab sets. Parity C16 (browse with no account) and C17 (open source).
+  This replaces the 2026-10-23 split that kept sync, the runtime and Spaces proprietary.
+- **No billing.** No plans, prices, credits, usage limits or Stripe. Every feature is on for
+  everyone, coding included. Rate limits only protect a server from abuse.
+- **Bring your own keys (2026-10-29).** Each device keeps provider keys in the keychain and
+  chooses a model per job; a server may add its own models for its accounts. This replaces
+  "every model runs on Misty's keys" and the one house model.
+- **Self-hosted (2026-10-29).** There is no Misty-run service. People run the server, the agent
+  runtime and Postgres themselves ([self-hosting.md](self-hosting.md)); the collaboration and
+  web-fetch Workers deploy to their own Cloudflare account if they want them
+  ([cloudflare.md](cloudflare.md)). The browser needs no server at all.
+- **Unlimited sync.** Sync is never limited; rate limits handle abuse.
 - **No cloud browser.** Misty doesn't chase "runs while your laptop is off".
 - **No mobile during the beta.**
 - **No MCP server.** Misty doesn't host outside agents (built 2026-10-12, then
@@ -71,8 +74,8 @@ listings with ask/auto/off, the Agents page as a separate chat system).
   into any Space you're in, and an agent can be in many. When you leave, your
   agents leave too. Everyone keeps a personal Space, created at sign-up.
 - **Asking someone else's agent:** @mention it. The run starts at once, sees
-  only the Space, reads but never changes the agent's memory, and is billed to
-  whoever asked. No accept policy, no approvals; the usual pauses before paying
+  only the Space, reads but never changes the agent's memory, and runs on the
+  asker's model keys. No accept policy, no approvals; the usual pauses before paying
   or deleting go to the asker.
 - **One chat system.** Agent chats are DMs in your personal Space
   (`space_conversations`, same ids as before). Agents reply to each other in
@@ -81,7 +84,7 @@ listings with ask/auto/off, the Agents page as a separate chat system).
   live previews. They count against the agent owner's storage.
 - **Code projects stay local folders,** linked to a Space
   (`space_code_projects`); others see the changes and the GitHub link. Coding is
-  Pro and above.
+  open to everyone.
 
 ### Navigation
 The tab strip is the only bar; the rail, pills and launcher are gone. ⌘T opens
@@ -90,7 +93,7 @@ web, asks an agent (`!ask`, `@agent`) and jumps to any place, with ⌘⏎ for a
 split. No ⌘K, no Global Misty.
 
 ### Built
-- 2026-10-12: the first version (personal Spaces, @mention requests billed to
+- 2026-10-12: the first version (personal Spaces, @mention requests run for
   the asker, agent artifacts with provenance, code snapshots).
 - 2026-10-16: the simplification, in six phases on `worktree-spaces-simplified`
   (prune, agents as members, one chat system, previews and Code, navigation,
@@ -220,7 +223,7 @@ and what is left.
 - **Speech runs in the cloud, through Audeeo's pipeline.** Live audio goes to
   Soniox realtime with diarization, through a relay in the agent runtime. Files
   go through the AI SDK `transcribe` with the Soniox provider. Notes and
-  summaries go through the Gateway. Everything runs on Misty's keys.
+  summaries use the fast model. Everything runs on the person's own keys.
 - **Capture comes from `audeeo-core`**, extracted from Audeeo (branch
   `audeeo-core` there): one Rust crate for the mic, system audio and per-process
   audio, and one TS package for segments with speakers.
@@ -245,8 +248,11 @@ Phases, each behind a flag:
 ---
 
 ## Done
+**Open source, BYOK, self-hosted** (2026-10-29, branch `open-source`): billing and Stripe
+removed, keys per device ([byok.md](byok.md)), self-hosting and Cloudflare docs.
+
 **Unlimited sync** (2026-10-11, uncommitted):
-- Billing no longer limits `sync.transfer` or counts `sync_bytes` toward storage.
+- Nothing limits `sync.transfer` or counts `sync_bytes` toward storage.
 - The server stops reserving sync frames, and migration
   `20271012010000_unlimited_sync_storage` drops the browser-sync storage
   triggers.

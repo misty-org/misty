@@ -15,6 +15,8 @@ feature's `README.md`; it holds what the feature is, where its code lives and it
 | Extensions, WebAuthn, native web APIs | `docs/kiri/` |
 | Settings pages and storage | `docs/settings/` |
 | Any visible surface | `docs/ui/` |
+| Running a server, Cloudflare Workers | `docs/self-hosting.md`, `docs/cloudflare.md` |
+| Model keys and providers | `docs/byok.md` |
 | Where Misty is going | `docs/roadmap.md` |
 
 Unbuilt work is in `docs/plans/`. When you finish a feature, update its folder in the same
@@ -29,6 +31,11 @@ change; when a plan ships, fold it into the feature folder and delete the plan.
 - Never show "Loading…" text; first loads use skeletons shaped like the content.
 - Settings belong to the device (`misty.db`) and never sync.
 - Tabs live only in the tab sidebar.
+- Misty is open source (MIT) and self-hosted. There is no billing, no plan and no usage limit:
+  never add prices, plan gates, credits or payment code. Every feature is on for everyone.
+- Models run on keys the person brings (`docs/byok.md`). Keys stay on the device, in the
+  keychain, and reach the server only in the `X-Misty-Models` header; never store or log them.
+- Nothing points at a Misty-run service. Every server address comes from configuration.
 
 # Commits
 

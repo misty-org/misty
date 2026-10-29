@@ -1,9 +1,13 @@
 # Misty docs
 
-Misty is your browser, private and made your own, with every major model built in. Agents work
-in your browser, on your computer, signed in as you, and you can watch them. The browser comes
-first and has to be worth using with no AI at all. [roadmap.md](roadmap.md) says where Misty
-is going and why.
+Misty is your browser, private and made your own, open source, with any model you bring.
+Agents work in your browser, on your computer, signed in as you, and you can watch them. The
+browser comes first and has to be worth using with no AI at all. [roadmap.md](roadmap.md) says
+where Misty is going and why.
+
+Misty has no hosted service and no billing. [self-hosting.md](self-hosting.md) runs the server,
+[byok.md](byok.md) explains model keys and [cloudflare.md](cloudflare.md) deploys the optional
+Workers to your own Cloudflare account.
 
 ## Find a feature
 
