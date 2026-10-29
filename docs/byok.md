@@ -11,7 +11,7 @@ Settings → Models holds one key per provider and the model for each job:
 | --- | --- | --- |
 | Agent model | Thinking and seeing: agent runs, the companion, page reading | AI is off on this device, unless the server has its own models |
 | Fast model | Routing, dictation cleanup, voice notes, day summaries | The agent model |
-| Embedding model | Memory and Library search | Search falls back to text matching |
+| Embedding model | Memory and Library search by meaning | Agents can't search memory; search you type still matches words |
 | Transcription, speech | Voice | Voice is off |
 | Reasoning effort | How hard the agent model thinks | `low` |
 
@@ -72,7 +72,11 @@ On the server, an `openai/`, `anthropic/` or `google/` model with no key of its 
 `AI_GATEWAY_API_KEY` when that is set. A device's own keys always win, and never fall back to the
 server's. The server's models are used only for an account whose devices
 send none, and Settings → Models says when the server provides them. Anyone with an account on the
-server can then spend on those keys, so turn off open sign-up on a shared server you pay for.
+server can then spend on those keys. Production servers let only the first account register
+(`MISTY_REGISTRATION=first`); set `open` to let others sign up, or `closed` to stop new accounts.
+
+Three things still run only on the server's keys: the realtime voice conversation, speech-to-text
+in the voice pipeline (`ELEVENLABS_API_KEY`) and web search (`MISTY_SERPER_API_KEY`).
 
 ## Custom endpoints
 

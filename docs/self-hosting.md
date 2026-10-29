@@ -94,11 +94,19 @@ Point the app at your server with `MISTY_PUBLIC_API_URL` when you build it (`.en
 repository root, see the [README](../README.md#get-started)), then create the first account from
 the app's sign-in screen. Add your model keys in Settings → Models on each device.
 
+Only the first account can register on a production server. To let other people sign up, set
+`MISTY_REGISTRATION=open`; `closed` stops new accounts altogether. Existing accounts always sign
+in.
+
 ## Storage
 
-Library files (uploads, attachments, renditions) live on the `librarydata` volume under
+Library files (uploads, attachments, avatars, renditions) live on the `librarydata` volume under
 `/var/lib/misty/library` by default. To use S3-compatible storage instead (R2, S3, MinIO), set
 `MISTY_LIBRARY_BACKEND=s3` with `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY` and `R2_SECRET_KEY`.
+
+Two things need S3-compatible storage for now: images inside notes and drawings, which upload
+straight to the bucket, and account exports that include those images. On the volume, they answer
+that direct transfer is required.
 
 ## Optional settings
 
@@ -107,6 +115,9 @@ Set each with `misty env set prod NAME`; `misty env describe` lists every name a
 | Setting | What it turns on |
 | --- | --- |
 | `MISTY_AGENT_MODEL` and runtime keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …) | Server-side models for every account on this server, used when a device sends no keys ([byok.md](byok.md#server-keys)) |
+| `MISTY_REGISTRATION` | Who can sign up: `first` (production default), `open` or `closed` |
+| `MISTY_ALLOWED_ORIGINS` | Web origins allowed to call the API, if you run a website against it |
+| `MISTY_WEBSITE_URL` or `MISTY_INVITATION_URL_BASE` | Links in Space invitation emails; without either, no invitation email is sent |
 | `MISTY_SERPER_API_KEY` | `web.search` for agents (serper.dev) |
 | `MAILJET_*` | Email for password resets and verification |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google ([server/docs/google-sign-in.md](../server/docs/google-sign-in.md)) |
