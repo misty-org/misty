@@ -65,7 +65,7 @@ Server settings live in private files under `server/.env/<target>/`, and the CLI
 
 `misty setup server` generates the development keys and Worker secrets on first use and preserves them afterwards. `misty server worker generate-secrets --target production` creates the production Journal keys once and refuses to rotate them. Back up both halves of each key bundle together.
 
-`misty server up` starts billing first, then the server containers, and returns once they are healthy. Build output goes to `server/.misty/logs/`; `--verbose` prints it. `misty server down` keeps database volumes unless you pass `--volumes`. [server/README.md](../server/README.md) walks through the whole server setup.
+`misty server up` starts the server containers and returns once they are healthy. Build output goes to `server/.misty/logs/`; `--verbose` prints it. `misty server down` keeps database volumes unless you pass `--volumes`. [server/README.md](../server/README.md) walks through the whole server setup.
 
 ## Checks
 
@@ -102,21 +102,21 @@ misty release publish 0.2.0
 
 `start` targets the current OS unless you pass `--os macos`, `--os windows` or `--os macos,windows`. For both, build and upload the same commit on each OS, then verify and publish. macOS builds are universal and need both Apple Silicon and Intel Rust targets.
 
-`misty server release VERSION` tests the pushed commit, builds and pushes the server images, tags the commit and saves the image digests in `server/.env/prod`. `misty server prod push` and `misty server prod deploy` then copy the production environment to the VPS and start both stacks there.
+`misty server release VERSION` tests the pushed commit, builds and pushes the server images, tags the commit and saves the image digests in `server/.env/prod`. `misty server prod push` and `misty server prod deploy` then copy the production environment to your server and start the stack there ([docs/self-hosting.md](../docs/self-hosting.md)).
 
 ## Production Cloudflare Tunnel
 
-Run this from the checkout on the VPS. Production keeps its routing and connector token in `server/.env/prod/` and never touches development secrets or the Worker. Save the API token with `misty env set prod CLOUDFLARE_API_TOKEN`, then preview the plan:
+Run this from the checkout on your server. Production keeps its routing and connector token in `server/.env/prod/` and never touches development secrets or the Worker. Save the API token with `misty env set prod CLOUDFLARE_API_TOKEN`, then preview the plan:
 
 ```sh
 misty setup cloudflare --target prod \
   --account ACCOUNT_ID --zone ZONE_ID \
-  --hostname api.mistysys.com --tunnel-name misty-prod
+  --hostname misty.example.com --tunnel-name misty-prod
 ```
 
 Repeat with `--apply` to create or reuse the tunnel, configure its ingress, create the proxied DNS record and save the connector token and `MISTY_PUBLIC_API_URL`. Conflicting DNS records or ingress routes stop the run. The origin is `http://127.0.0.1:8081`, the loopback port production Compose binds; save a different `MISTY_HOST_PORT` with `misty env set prod MISTY_HOST_PORT` before provisioning to change it.
 
-Provisioning does not start the connector. Install `cloudflared` on the VPS host, start the API with `misty server prod up`, and check the connector from the checkout:
+Provisioning does not start the connector. Install `cloudflared` on the server, start the API with `misty server prod up`, and check the connector from the checkout:
 
 ```sh
 (
@@ -126,7 +126,7 @@ Provisioning does not start the connector. Install `cloudflared` on the VPS host
 )
 ```
 
-[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token) keeps the token out of command arguments. Run the connector under a service manager on the VPS host for production use, then verify with `curl --fail https://api.mistysys.com/health`.
+[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token) keeps the token out of command arguments. Run the connector under a service manager on the server for production use, then verify with `curl --fail https://misty.example.com/health`.
 
 ## Project tools
 
