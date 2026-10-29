@@ -69,6 +69,16 @@ export function pageHost(state: ProgramState) {
     if (typeof seen === "string" && seen) state.documents.set(scopeId, seen);
     // The tab's record follows the page, so tabs lists and the finish check see where it is now.
     const page = (output.page ?? output) as { url?: unknown; title?: unknown };
+    // Google answers searches from busy agents with a robot check. It is never solved: the run's
+    // web_search tool gives the same results, and their pages open directly.
+    if (
+      typeof page.url === "string" &&
+      /^https:\/\/(www\.)?google\.[a-z.]+\/sorry\//.test(page.url)
+    )
+      throw new Error(
+        "Google showed a robot check for this search. Don't try to pass it: use the web_search " +
+          "tool for Google's results, then open the result pages with openTab(url).",
+      );
     const tab = agentTab(scopeId);
     if (tab && typeof page.url === "string" && /^https?:/.test(page.url)) {
       tab.url = page.url;
