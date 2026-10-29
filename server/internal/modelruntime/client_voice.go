@@ -65,10 +65,10 @@ type DiarizedResult struct {
 	Turns             []Turn   `json:"turns"`
 }
 
-func (c *Client) TranscribeDiarized(ctx context.Context, model, mediaType string, audio []byte, languages []string, context *DiarizedContext) (DiarizedResult, error) {
+func (c *Client) TranscribeDiarized(ctx context.Context, route Route, model, mediaType string, audio []byte, languages []string, context *DiarizedContext) (DiarizedResult, error) {
 	var result DiarizedResult
 	err := c.post(ctx, "/v1/models/transcribe-diarized", DiarizedRequest{
-		Route: Instance(), Model: model, MediaType: mediaType, Audio: base64.StdEncoding.EncodeToString(audio), Languages: languages, Context: context,
+		Route: route, Model: model, MediaType: mediaType, Audio: base64.StdEncoding.EncodeToString(audio), Languages: languages, Context: context,
 	}, &result)
 	return result, err
 }

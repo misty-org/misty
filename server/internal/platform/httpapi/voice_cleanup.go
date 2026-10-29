@@ -36,6 +36,9 @@ func (s *AIService) VoiceCleanup() http.HandlerFunc {
 			}
 		}
 		text, err := s.runtime.CleanDictation(r.Context(), user, defaultRoleModel("dictation-cleanup"), agent.DictationCleanup{Text: body.Text, Style: body.Style, Dictionary: dictionary, Language: body.Language})
+		if err != nil && writeModelError(w, err) {
+			return
+		}
 		switch {
 		case errors.Is(err, modelruntime.ErrUnavailable):
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "cleanup_unavailable", "message": "Cleanup isn't available right now. Your words were typed as heard."})

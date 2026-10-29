@@ -75,7 +75,10 @@ func (s *SpacesService) daySummary(ctx context.Context, user, date, language str
 		items = append(items, modelruntime.DayItem{At: event.OccurredAt.In(zone).Format("15:04"), Kind: event.Kind, Title: truncateAgentRuntimeText(firstNonEmpty(event.Title, event.URL), 300), Site: event.Site, Excerpt: excerpt})
 		size += len(excerpt) + len(event.Title) + 32
 	}
-	model := defaultRoleModel("day-summary")
-	result, err := s.models.DaySummary(ctx, modelruntime.DaySummaryRequest{Route: modelruntime.Instance(), Model: model, Date: date, Items: items, Language: language, MaxOutputTokens: daySummaryMaxOutput})
+	route, model, err := roleRoute(ctx, s.database, user, "day-summary")
+	if err != nil {
+		return modelruntime.DaySummaryResult{}, err
+	}
+	result, err := s.models.DaySummary(ctx, modelruntime.DaySummaryRequest{Route: route, Model: model, Date: date, Items: items, Language: language, MaxOutputTokens: daySummaryMaxOutput})
 	return result, err
 }

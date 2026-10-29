@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"github.com/kannachi323/misty/server/internal/accounts"
 	"github.com/kannachi323/misty/server/internal/browsersync"
+	"github.com/kannachi323/misty/server/internal/byok"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 	"net/http"
 
@@ -85,6 +87,13 @@ func (s *Server) mountRequestMiddleware() {
 	s.Metrics = metrics.New()
 	s.registerDomainGauges(s.Metrics)
 	s.Router.Use(s.Metrics.Middleware)
+	// The account's model keys and choices (X-Misty-Models) go into the
+	// request and an in-memory store; the header is removed before any
+	// handler or log can see it.
+	s.Router.Use(byok.Default.Middleware(func(r *http.Request) string {
+		user, _ := accounts.SessionUserID(r)
+		return user
+	}))
 }
 
 // buildMountDeps constructs the services and handlers in the order the route

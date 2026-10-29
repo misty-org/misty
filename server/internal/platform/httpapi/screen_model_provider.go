@@ -29,13 +29,8 @@ func (s *SpacesService) screenModelRoute(ctx context.Context, record *db.AIInvoc
 	if model == "" {
 		return modelruntime.Route{}, "", errScreenModelUnconfigured
 	}
-	resolved := modelruntime.Instance()
-	if aimodels.DirectOpenAI(model) {
-		// OpenAI reasoning models spend output on reasoning first; keep it short
-		// like the server's own agent provider does.
-		resolved.Reasoning = "low"
-	}
-	return resolved, model, nil
+	resolved, err := modelruntime.RouteFor(ctx, record.UserID, model, shortReasoning(model))
+	return resolved, model, err
 }
 
 // screenModelMessages turns the planner's OpenAI-style chat messages into a

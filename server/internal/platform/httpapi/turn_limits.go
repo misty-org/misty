@@ -16,10 +16,11 @@ func fastModel() string { return envOr("MISTY_AI_FAST_MODEL", "openai/gpt-6-luna
 // 0 keeps the runtime's own default. Every account gets the same limit.
 const defaultTurnLimit = 0
 
-// runRoutes returns a run's default routes unchanged. The second result, the
-// models a run is forced onto, is always empty.
-func runRoutes(_ context.Context, _ *db.Database, _ string, defaults []aimodels.Route) ([]aimodels.Route, map[string]string) {
-	return defaults, nil
+// runRoutes is a run's routes: the defaults with the role models of user (the
+// account whose models run it) in place. The second result, the models a run
+// is forced onto, is always empty.
+func runRoutes(ctx context.Context, _ *db.Database, user string, defaults []aimodels.Route) ([]aimodels.Route, map[string]string) {
+	return accountRunRoutes(ctx, user, defaults), nil
 }
 
 // evalTurnLimit is the default turn limit, or a development eval's own (at most 200) where the

@@ -60,8 +60,11 @@ func (s *SpacesService) transcribeLibraryItem(ctx context.Context, user, spaceID
 	if !strings.HasPrefix(mime, "audio/") && !strings.HasPrefix(mime, "video/") {
 		return db.VoiceTranscript{}, voiceFileError("Only audio and video files can be transcribed.")
 	}
-	model := defaultRoleModel("diarized-transcription")
-	result, err := s.models.TranscribeDiarized(ctx, model, mime, audio, languageHints(language), nil)
+	route, model, err := roleRoute(ctx, s.database, user, "diarized-transcription")
+	if err != nil {
+		return db.VoiceTranscript{}, err
+	}
+	result, err := s.models.TranscribeDiarized(ctx, route, model, mime, audio, languageHints(language), nil)
 	if err != nil {
 		return db.VoiceTranscript{}, err
 	}

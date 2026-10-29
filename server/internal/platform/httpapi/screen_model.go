@@ -62,7 +62,7 @@ func (s *SpacesService) ScreenModel() http.HandlerFunc {
 			return
 		}
 		node := "model:screen:" + job.ID + ":" + strconv.Itoa(call)
-		if _, err := s.admitAIInvocationRuntimeTurn(r.Context(), record, node, "running", nil); err != nil {
+		if err := s.admitAIInvocationRuntimeTurn(r.Context(), record, node, "running"); err != nil {
 			writeAgentError(w, err)
 			return
 		}

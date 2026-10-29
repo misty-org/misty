@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kannachi323/misty/server/internal/aimodels"
+	"github.com/kannachi323/misty/server/internal/byok"
 	envconfig "github.com/kannachi323/misty/server/internal/platform/config"
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
@@ -103,9 +105,29 @@ func (s *AgentsService) liveVoiceAccess(ctx context.Context, user, device string
 	return err
 }
 
+// liveTranscriptionModel is the Soniox model a live session streams to: the
+// account's transcription model when it is a Soniox one, else the default.
+// The account needs its own Soniox key unless the operator has models.
+func liveTranscriptionModel(ctx context.Context, user string) (string, error) {
+	model := defaultRoleModel("live-transcription")
+	c := accountCredentials(ctx, user)
+	if c != nil {
+		if chosen := c.RoleModel("live-transcription"); byok.ProviderOf(chosen) == "soniox" {
+			model = chosen
+		}
+	}
+	if _, ok := c.CredentialFor(model); !ok && !aimodels.OperatorModels() {
+		return "", byok.ErrModelKeyNeeded
+	}
+	return model, nil
+}
+
 func (s *AgentsService) issueLiveTicket(ctx context.Context, user, device string, channels []string, language string, maxMS int64) (string, time.Time, error) {
 	session := uuid.NewString()
-	model := defaultRoleModel("live-transcription")
+	model, err := liveTranscriptionModel(ctx, user)
+	if err != nil {
+		return "", time.Time{}, err
+	}
 	now := time.Now()
 	// The session may stream for its whole length after connecting, so it
 	// stays open until then plus a margin.

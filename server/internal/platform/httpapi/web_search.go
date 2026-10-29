@@ -14,7 +14,7 @@ import (
 	"github.com/kannachi323/misty/server/internal/platform/config"
 )
 
-// Misty's own web search: one plain call to Serper on Misty's key, with no model
+// Misty's own web search: one plain call to Serper on the operator's key, with no model
 // in between, so research never asks anyone to sign in to a search service.
 // Results are snippets; web.fetch reads a page when the agent needs more.
 const (

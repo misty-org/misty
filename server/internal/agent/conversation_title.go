@@ -29,7 +29,7 @@ func ConversationTitleModel() string {
 
 // TitleConversation names a conversation from its opening message and, when
 // given, Misty's first reply. It returns "" when the model finds nothing to
-// name. The call counts toward the person's usage like any model call.
+// name. It runs on the account's fast model.
 func (s *Service) TitleConversation(ctx context.Context, userID, message, reply string) (string, error) {
 	if !s.models.Enabled() {
 		return "", modelruntime.ErrUnavailable
@@ -39,9 +39,12 @@ func (s *Service) TitleConversation(ctx context.Context, userID, message, reply 
 		prompt += "\n\nMisty: " + clipRunes(reply, conversationTitleMaxInput)
 	}
 	prompt += "\n\nWrite the title now."
-	model := ConversationTitleModel()
+	route, model, err := s.oneShotRoute(ctx, userID, "routing", ConversationTitleModel())
+	if err != nil {
+		return "", err
+	}
 	result, err := s.models.Text(ctx, modelruntime.TextRequest{
-		Route: modelruntime.Instance(), Model: model, System: conversationTitleSystem,
+		Route: route, Model: model, System: conversationTitleSystem,
 		Messages:        []modelruntime.Message{{Role: "user", Content: []modelruntime.Part{modelruntime.Text(prompt)}}},
 		MaxOutputTokens: conversationTitleMaxOutput,
 	})

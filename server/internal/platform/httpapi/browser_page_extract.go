@@ -45,16 +45,12 @@ func (s *SpacesService) browsingModelRoute(ctx context.Context, user, run, fallb
 	if model == "" {
 		model = fallback
 	}
-	resolved := modelruntime.Instance()
-	if aimodels.DirectOpenAI(model) {
-		// OpenAI reasoning models spend output on reasoning first; keep it short.
-		resolved.Reasoning = "low"
-	}
-	return resolved, model, nil
+	resolved, err := modelruntime.RouteFor(ctx, user, model, shortReasoning(model))
+	return resolved, model, err
 }
 
 // browserExtract runs the extraction model over page text the device read.
-// The call is billed on the run's browsing route and spends no agent turn.
+// The call runs on the run's browsing route and spends no agent turn.
 func (s *SpacesService) browserExtract(ctx context.Context, invocation agenttools.Invocation, jobID string, arguments, page json.RawMessage) (out json.RawMessage, err error) {
 	// The model sees a generic failure; the reason belongs in the server log.
 	defer func() {
@@ -92,7 +88,7 @@ func (s *SpacesService) browserExtract(ctx context.Context, invocation agenttool
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.admitAIInvocationRuntimeTurn(ctx, record, node, "running", nil); err != nil {
+		if err := s.admitAIInvocationRuntimeTurn(ctx, record, node, "running"); err != nil {
 			return nil, errors.Join(db.ErrAgentToolboxNotAttempted, err)
 		}
 		if route, model, err = s.browsingModelRoute(ctx, record.UserID, record.ID, invocationRecordModel(record)); err != nil {
@@ -103,7 +99,7 @@ func (s *SpacesService) browserExtract(ctx context.Context, invocation agenttool
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.admitPersonalAgentRuntimeTurn(ctx, run, node, workflow.StepRunning, nil); err != nil {
+		if err := s.admitPersonalAgentRuntimeTurn(ctx, run, node, workflow.StepRunning); err != nil {
 			return nil, errors.Join(db.ErrAgentToolboxNotAttempted, err)
 		}
 		if route, model, err = s.browsingModelRoute(ctx, invocation.UserID, run.ID, agent.InitialSelectedModelID); err != nil {

@@ -31,6 +31,18 @@ func (s *Service) advanceLocked(ctx context.Context, session *Session) error {
 		return ErrInvalidRequest("Agent request context is too large; start a new conversation")
 	}
 	selectedProvider := s.provider
+	if session.ModelID == "" && s.modelResolver != nil {
+		// The account's fast model and key, else the operator's.
+		config, err := s.modelResolver(ctx, session.UserID, "routing")
+		if err != nil {
+			return err
+		}
+		if config != nil {
+			if selectedProvider, err = accountCompletionProvider(s.models, config); err != nil {
+				return err
+			}
+		}
+	}
 	if session.ModelID != "" {
 		if !GatewayModelAvailable(ctx, session.ModelID) {
 			return ErrModelUnavailable

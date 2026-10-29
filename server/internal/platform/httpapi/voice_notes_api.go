@@ -100,9 +100,12 @@ func (s *SpacesService) voiceNotes(ctx context.Context, user string, transcript 
 		turns = append(turns, modelruntime.Turn{Speaker: speaker, Start: turn.Start, End: turn.End, Text: turn.Text})
 		size += len(turn.Text) + len(speaker) + 16
 	}
-	model := defaultRoleModel("voice-notes")
+	route, model, err := roleRoute(ctx, s.database, user, "voice-notes")
+	if err != nil {
+		return modelruntime.VoiceNotesResult{}, err
+	}
 	result, err := s.models.VoiceNotes(ctx, modelruntime.VoiceNotesRequest{
-		Route: modelruntime.Instance(), Model: model, Mode: mode, Title: transcript.Title, Turns: turns,
+		Route: route, Model: model, Mode: mode, Title: transcript.Title, Turns: turns,
 		UserNotes: userNotes, Template: template, Language: firstNonEmpty(language, transcript.Language), MaxOutputTokens: voiceNotesMaxOutput,
 	})
 	return result, err

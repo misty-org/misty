@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kannachi323/misty/server/internal/accounts"
+	"github.com/kannachi323/misty/server/internal/byok"
 	"github.com/kannachi323/misty/server/internal/platform/db"
 	"github.com/kannachi323/misty/server/internal/platform/security"
 	"github.com/kannachi323/misty/server/internal/platform/telemetry"
@@ -204,6 +205,8 @@ func Logout(database *db.Database) http.HandlerFunc {
 				http.Error(w, "could not revoke session", http.StatusServiceUnavailable)
 				return
 			}
+			// Signed-in devices send their keys again on their next request.
+			byok.Default.Forget(claims.Subject)
 		}
 		clearAuthCookies(w, r)
 

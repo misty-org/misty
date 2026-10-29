@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/kannachi323/misty/server/internal/aimodels"
 	"github.com/kannachi323/misty/server/internal/platform/config"
 	"github.com/kannachi323/misty/server/internal/platform/db"
 )
@@ -26,6 +27,12 @@ type InstanceCapabilities struct {
 	StorageBackend     string `json:"storage_backend"`
 }
 
+// InstanceModels says whether the server has models of its own. Without
+// them every account brings its own model keys (X-Misty-Models).
+type InstanceModels struct {
+	Operator bool `json:"operator"`
+}
+
 // InstanceDescriptor keeps the fields installed desktop apps already read.
 // Registration is "open" while this server takes new accounts and "closed"
 // once it does not (MISTY_REGISTRATION).
@@ -37,6 +44,7 @@ type InstanceDescriptor struct {
 	MinClientProtocol int                  `json:"min_client_protocol"`
 	MaxClientProtocol int                  `json:"max_client_protocol"`
 	Capabilities      InstanceCapabilities `json:"capabilities"`
+	Models            InstanceModels       `json:"models"`
 	BootstrapRequired bool                 `json:"bootstrap_required"`
 	Registration      string               `json:"registration"`
 }
@@ -67,9 +75,10 @@ func Instance(store instanceStateStore, storage string) http.HandlerFunc {
 				Notes:              true,
 				Drawings:           true,
 				HostedIntegrations: true,
-				HostedAI:           true,
+				HostedAI:           aimodels.OperatorModels(),
 				StorageBackend:     storage,
 			},
+			Models:       InstanceModels{Operator: strings.TrimSpace(config.Getenv("MISTY_AGENT_MODEL")) != ""},
 			Registration: instanceRegistration(r.Context(), store),
 		})
 	}

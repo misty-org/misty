@@ -93,7 +93,7 @@ func TestAgentMemberRequestToolsAndModelAccountPostgres(t *testing.T) {
 	if !hasToolboxTool(childToolbox, "note.search") || !hasToolboxTool(childToolbox, "memory.pref.list") || childInvocation.UserID != bob.ID || childInvocation.SpaceID != space.ID {
 		t.Fatalf("delegated invocation = %#v", childInvocation)
 	}
-	if _, err := service.admitPersonalAgentRuntimeTurn(ctx, child, "model:1", workflow.StepRunning, nil); err != nil {
+	if err := service.admitPersonalAgentRuntimeTurn(ctx, child, "model:1", workflow.StepRunning); err != nil {
 		t.Fatal(err)
 	}
 	// Work asked of another member's agent runs on the models of the member who asked.

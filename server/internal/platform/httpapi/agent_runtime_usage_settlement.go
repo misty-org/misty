@@ -20,21 +20,21 @@ func runModelUser(run *db.SpaceRun) string {
 }
 
 // admitPersonalAgentRuntimeTurn counts one model turn against the run's turn
-// limit. The bool is always false; the runtime contract still carries it.
-func (s *SpacesService) admitPersonalAgentRuntimeTurn(ctx context.Context, run *db.SpaceRun, nodeID string, state workflow.StepState, _ json.RawMessage) (bool, error) {
+// limit.
+func (s *SpacesService) admitPersonalAgentRuntimeTurn(ctx context.Context, run *db.SpaceRun, nodeID string, state workflow.StepState) error {
 	if state != workflow.StepRunning {
-		return false, nil
+		return nil
 	}
-	return false, s.database.ReserveAgentModelTurn(ctx, run.OwnerUserID, run.ID, run.RuntimeRunID, nodeID)
+	return s.database.ReserveAgentModelTurn(ctx, run.OwnerUserID, run.ID, run.RuntimeRunID, nodeID)
 }
 
 // admitAIInvocationRuntimeTurn counts one model turn of an invocation against
 // its turn limit.
-func (s *SpacesService) admitAIInvocationRuntimeTurn(ctx context.Context, record *db.AIInvocationRecord, nodeID string, state string, _ json.RawMessage) (bool, error) {
+func (s *SpacesService) admitAIInvocationRuntimeTurn(ctx context.Context, record *db.AIInvocationRecord, nodeID string, state string) error {
 	if record == nil || state != "running" {
-		return false, nil
+		return nil
 	}
-	return false, s.database.ReserveAgentModelTurn(ctx, record.UserID, record.ID, record.RuntimeRunID, nodeID)
+	return s.database.ReserveAgentModelTurn(ctx, record.UserID, record.ID, record.RuntimeRunID, nodeID)
 }
 
 // invocationRecordModel is the model an invocation asked for, else the default.
