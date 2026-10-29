@@ -87,9 +87,9 @@ tauri-plugin-deep-link = "2"
 percent-encoding = "2"
 
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
-# Microphone, system and per-process capture (github.com/kannachi323/audeeo,
-# crates/audeeo-core).
-audeeo-core = { git = "https://github.com/kannachi323/audeeo", rev = "2be9ad63e1c6c42c3ac42d641e79681e10531a97" }
+# Microphone, system and per-process capture, vendored from github.com/kannachi323/audeeo
+# (crates/audeeo-core, MIT) at rev 2be9ad63e1c6c42c3ac42d641e79681e10531a97.
+audeeo-core = { path = "vendor/audeeo-core" }
 xcap = "0.9"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
