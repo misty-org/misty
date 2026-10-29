@@ -1,6 +1,7 @@
 import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
 import { executeBrowserJob } from "../browserJobRun";
-import { agentTab, agentTabsForTask, keepAgentTab } from "../agentTabs";
+import { agentTab, agentTabsForTask, closeAgentTab, keepAgentTab } from "../agentTabs";
+import { removeHostedChildTab } from "../hostedSessionsState";
 import type { ClaimedWorkflowNodeJob } from "../workerBrowserJobs";
 import { unwrapSearchRedirect } from "./searchRedirect";
 
@@ -278,6 +279,17 @@ export function pageHost(state: ProgramState) {
         state.kept.add(scopeId);
         keepAgentTab(scopeId);
         return { kept: true };
+      }
+      case "close": {
+        // As screen_close does: a tab the run opened goes; its first tab stays and is navigated.
+        const scopeId = ownTab(args.tab);
+        if (!removeHostedChildTab(state.taskId(), scopeId))
+          throw new Error(
+            "This is your run's first tab, which stays open: use goto() to change its page.",
+          );
+        state.kept.delete(scopeId);
+        await closeAgentTab(scopeId);
+        return { closed: true };
       }
       case "note":
         if (state.notes.length >= 500) throw new Error("A program records at most 500 notes.");

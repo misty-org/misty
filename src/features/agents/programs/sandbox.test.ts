@@ -109,6 +109,8 @@ describe("browser_run sandbox", () => {
     );
     expect(mapped).toMatchObject({ ok: true, value: "RAV4" });
     expect(calls).toContain("goto");
+    await runInSandbox(programPrelude, `await getTab("cars").close();`, host, { deadline: deadline() });
+    expect(calls).toContain("close");
   });
 
   it("lets a program name its own variables tabs and tab", async () => {

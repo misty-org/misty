@@ -64,6 +64,8 @@ class Tab {
   }
   /** Marks this tab as a page the person asked to keep open: it stays awake and is shown at the end. */
   keep() { return __call("keep", { tab: this.id }); }
+  /** Closes a tab this run opened that it no longer needs (its first tab stays: goto() instead). */
+  close() { return __call("close", { tab: this.id }); }
   __act(action, target, options) { return __call("act", Object.assign({ tab: this.id, action, target }, options)); }
 }
 
@@ -72,7 +74,7 @@ class Tab {
 /** Opens a new tab of the agent's own at url and waits for it to load. */
 const __tabMethods = [
   "read", "text", "find", "goto", "click", "type", "fill", "select", "check", "uncheck", "hover",
-  "press", "scroll", "scrollTo", "waitFor", "keep",
+  "press", "scroll", "scrollTo", "waitFor", "keep", "close",
 ];
 // Names small models bring from Playwright and Puppeteer, as the method that does the same here.
 const __tabAliases = {
