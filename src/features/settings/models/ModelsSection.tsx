@@ -66,9 +66,11 @@ export function ModelsSection() {
           <ModelTextRow
             id={selected.baseUrlSetting}
             label="Base URL"
-            description={`Where your ${selected.label} server listens, reachable from your Misty server.`}
+            description="Your server calls this address, not this device."
             placeholder={
-              selected.id === "ollama" ? "http://localhost:11434/v1" : "http://localhost:8000/v1"
+              selected.id === "ollama"
+                ? "http://host.docker.internal:11434/v1"
+                : "http://host.docker.internal:8000/v1"
             }
           />
         ) : null}

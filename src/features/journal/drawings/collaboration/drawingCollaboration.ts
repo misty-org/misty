@@ -17,6 +17,9 @@ export interface DrawingCollaborationSession {
   scene: Y.Map<unknown>;
   files: Y.Map<DrawingAssetReference>;
   provider: YProvider;
+  /** Collaboration is off on this server: nothing can be saved, so the drawing is read-only. */
+  localOnly?: boolean;
+  role?: DrawingCollaborationTicket["role"];
 }
 
 type SessionEntry = {
@@ -29,12 +32,12 @@ type SessionEntry = {
 
 const sessions = new Map<string, SessionEntry>();
 const sessionIdleMs = 5 * 60 * 1000;
-/** Stands in for a ticket when the server runs without live co-editing. */
+/** Stands in for a ticket when the server runs without live co-editing: view only. */
 const localOnlyTicket: DrawingCollaborationTicket = {
   ticket: "",
   room: "",
   url: "",
-  role: "editor",
+  role: "viewer",
   expires_at: "",
 };
 
@@ -122,7 +125,7 @@ async function createSession(
       throw cause;
     });
   const doc = new Y.Doc();
-  // Without live co-editing the drawing is edited here only, with no other cursors.
+  // Without collaboration nothing can be saved, so the drawing opens read-only.
   const provider = firstTicket
     ? createYjsProvider(firstTicket, doc, "drawing-room", () =>
         drawingsApi.collaborationTicket(spaceId, drawingId),
@@ -138,6 +141,7 @@ async function createSession(
     scene: doc.getMap("drawing:scene"),
     files: doc.getMap<DrawingAssetReference>("drawing:files"),
     provider,
+    ...(firstTicket ? {} : { localOnly: true, role: localOnlyTicket.role }),
   };
 }
 

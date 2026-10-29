@@ -23,7 +23,7 @@ fn carries_each_role_with_only_the_providers_it_names() {
         "embedding_model": "openai/text-embedding-3-small",
         "fast_model": "",
         "reasoning": "high",
-        "ollama_base_url": "http://localhost:11434/v1",
+        "ollama_base_url": "http://host.docker.internal:11434/v1",
     });
     let decoded = decode(&encode(&settings, &keys).unwrap());
     assert_eq!(
@@ -69,13 +69,13 @@ fn local_providers_need_an_address_not_a_key() {
     let settings = json!({
         "agent_model": "ollama/qwen3:14b",
         "fast_model": "openai-compatible/llama-4",
-        "ollama_base_url": "http://localhost:11434/v1/",
+        "ollama_base_url": "http://host.docker.internal:11434/v1/",
         "openai_compatible_base_url": "ftp://example.test",
     });
     let decoded = decode(&encode(&settings, &keys).unwrap());
     assert_eq!(
         decoded["providers"],
-        json!({ "ollama": { "baseURL": "http://localhost:11434/v1" } })
+        json!({ "ollama": { "baseURL": "http://host.docker.internal:11434/v1" } })
     );
     assert_eq!(decoded["models"], json!({ "agent": "ollama/qwen3:14b" }));
 }
