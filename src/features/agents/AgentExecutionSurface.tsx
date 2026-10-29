@@ -1,3 +1,4 @@
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -113,9 +114,10 @@ export function AgentExecutionSurface() {
           </div>
         </div>
         {error && (
-          <p role="alert" className="px-4 pb-3 text-sm text-cream-muted">
-            {error}
-          </p>
+          <div role="alert" className="flex items-center gap-3 px-4 pb-3 text-sm text-cream-muted">
+            <p className="m-0">{error}</p>
+            {needsModelKey(error) && <ModelKeyNeededButton />}
+          </div>
         )}
       </ViewportLayer>
       <AgentControlIsland />

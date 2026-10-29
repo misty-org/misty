@@ -1,3 +1,4 @@
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
 import { Button } from "@/shared/ui";
 import { AgentWorkspaceConversation } from "./components/AgentWorkspaceConversation";
 import { AgentConversationHeading } from "./page/AgentConversationHeading";
@@ -39,9 +40,13 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
             {error && (
               <div role="alert" className="agents-notice">
                 <p>{error}</p>
-                <Button variant="outline" size="sm" onClick={() => void load(user?.id ?? "")}>
-                  Retry
-                </Button>
+                {needsModelKey(error) ? (
+                  <ModelKeyNeededButton />
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => void load(user?.id ?? "")}>
+                    Retry
+                  </Button>
+                )}
               </div>
             )}
             <AgentConversationHeading

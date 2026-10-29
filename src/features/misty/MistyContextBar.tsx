@@ -1,3 +1,4 @@
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
 import { useAiSurfaceStore } from "@/features/ai-surface/store";
 import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
 import { useEffect, useState } from "react";
@@ -226,9 +227,10 @@ export function MistyContextBar() {
       )}
       {notice && <p role="status">{notice}</p>}
       {error && (
-        <p role="status" className="mt-1">
-          {error}
-        </p>
+        <div role="status" className="mt-1 flex items-center gap-2">
+          <p className="m-0">{error}</p>
+          {needsModelKey(error) && <ModelKeyNeededButton />}
+        </div>
       )}
     </div>
   );

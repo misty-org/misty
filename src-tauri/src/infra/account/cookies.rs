@@ -97,6 +97,11 @@ impl AccountClient {
         }
         Ok(())
     }
+    /// Whether this jar holds a Misty session for `url`, i.e. it is the account server
+    /// the person signed in to.
+    pub(in crate::infra) fn signed_in(&self, url: &url::Url) -> bool {
+        self.snapshot(url).is_ok_and(|saved| saved.is_some())
+    }
     fn snapshot(&self, url: &url::Url) -> Result<Option<SavedCookies>, String> {
         let header = self.jar.cookies(url);
         let text = header.as_ref().and_then(|h| h.to_str().ok()).unwrap_or("");

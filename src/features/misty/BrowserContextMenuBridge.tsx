@@ -1,3 +1,4 @@
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
@@ -268,6 +269,7 @@ export function BrowserContextMenuBridge() {
           className="fixed right-4 top-16 layer-menu max-w-sm rounded-md bg-charcoal-card p-3 text-sm text-cream shadow-md ring-1 ring-cream/10"
         >
           <p>{error}</p>
+          {needsModelKey(error) && <ModelKeyNeededButton onOpen={() => setError(null)} />}
           <Button
             variant="ghost"
             size="sm"

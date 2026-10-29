@@ -1,6 +1,7 @@
 import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "@/features/misty/types";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { ModelKeyNeededButton, needsModelKey } from "@/features/settings/models/ModelKeyNeeded";
 import { Button, IconButton } from "@/shared/ui";
 
 /** The conversation's last error above the composer; a lost running task can reconnect. */
@@ -17,6 +18,7 @@ export function AgentComposeError({
   return (
     <div role="alert" className="agent-compose-error">
       <p>{error}</p>
+      {needsModelKey(error) && <ModelKeyNeededButton />}
       {reconnect && (
         <Button
           variant="outline"

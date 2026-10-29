@@ -22,3 +22,5 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 }
 export { blockIfUnsaved, useDevicePreferences } from "./devicePreferences/store";
 export { resolveSetting } from "./devicePreferences/model";
+export { ModelKeyNeededButton, needsModelKey } from "./models/ModelKeyNeeded";
+export { openModelSettings } from "./models/modelKeys";

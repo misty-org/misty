@@ -12,7 +12,9 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 }
 
 /// The renderer's door to Misty's credential store (encrypted rows in `misty.db`).
-/// Despite the name, it never talks to an operating-system keychain itself.
+/// Despite the name, it never talks to an operating-system keychain itself. It reaches
+/// only the account vault's own slot: device keys, model provider keys and every other
+/// secret in the store stay out of the renderer's reach.
 pub struct Keystore<R: Runtime>(AppHandle<R>);
 impl<R: Runtime> Keystore<R> {
     pub fn store(&self, payload: StoreRequest) -> crate::Result<()> {
@@ -20,11 +22,20 @@ impl<R: Runtime> Keystore<R> {
         Ok(())
     }
     pub fn retrieve(&self, payload: RetrieveRequest) -> crate::Result<RetrieveResponse> {
-        let value = misty_credential_store::load(&payload.service, &payload.user)?;
+        if !vault_slot(&payload.service, &payload.user) {
+            return Ok(RetrieveResponse::default());
+        }
+        let value = misty_credential_store::load(TOKEN_SERVICE, TOKEN_USER)?;
         Ok(RetrieveResponse { value })
     }
     pub fn remove(&self, payload: RemoveRequest) -> crate::Result<()> {
-        misty_credential_store::delete(&payload.service, &payload.user)?;
+        if vault_slot(&payload.service, &payload.user) {
+            misty_credential_store::delete(TOKEN_SERVICE, TOKEN_USER)?;
+        }
         Ok(())
     }
+}
+
+fn vault_slot(service: &str, user: &str) -> bool {
+    service == TOKEN_SERVICE && user == TOKEN_USER
 }

@@ -1,5 +1,6 @@
 import {
   Blocks,
+  Cpu,
   Globe,
   History,
   KeyRound,
@@ -16,10 +17,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { ModelsSection } from "./models/ModelsSection";
 import type { SettingOwnership } from "./devicePreferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
-/** Pages are intentionally empty while the Settings surface is being rebuilt. */
+/** Most pages are empty while the Settings surface is being rebuilt; Models is the first back. */
 export type SettingsArea =
   | "general"
   | "appearance"
@@ -34,7 +36,8 @@ export type SettingsArea =
   | "cursor"
   | "apps"
   | "permissions"
-  | "memory";
+  | "memory"
+  | "models";
 
 export interface SettingsAreaInfo {
   label: string;
@@ -56,10 +59,12 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   apps: { label: "Apps", icon: Blocks },
   permissions: { label: "Permissions", icon: ShieldCheck },
   memory: { label: "Memory", icon: History },
+  models: { label: "Models", icon: Cpu },
 };
 
-/** The app currently has no Settings pages or sidebar groups. */
-export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [];
+export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
+  { label: "Agents", areas: ["models"] },
+];
 
 export interface SettingsRegistryEntry {
   id: SettingsSection;
@@ -70,7 +75,9 @@ export interface SettingsRegistryEntry {
   native?: boolean;
 }
 
-export const settingsRegistry: readonly SettingsRegistryEntry[] = [];
+export const settingsRegistry: readonly SettingsRegistryEntry[] = [
+  { id: "models", label: "Models", area: "models", Component: ModelsSection, owner: "device" },
+];
 
 /** Pages that no longer exist on their own resolve to where their settings now live. */
 export function canonicalSettingsSection(section: SettingsSection): SettingsSection {
@@ -78,7 +85,6 @@ export function canonicalSettingsSection(section: SettingsSection): SettingsSect
     (
       {
         advanced: "diagnostics",
-        "agents-usage": "about",
         layout: "appearance",
         agents: "agents-defaults",
         support: "about",

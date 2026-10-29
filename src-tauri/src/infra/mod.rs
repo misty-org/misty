@@ -51,6 +51,7 @@ pub mod misty_context;
 #[cfg(windows)]
 pub mod misty_context_windows;
 pub mod misty_home;
+pub mod models;
 pub mod native_clipboard;
 pub mod navigation_names;
 pub mod paths;
