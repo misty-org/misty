@@ -10,7 +10,7 @@ Misty is a desktop browser workspace. Tabs live in Spaces, pages open in split p
 
 Misty is in development, and its everyday browser features and cross-device sync are still being built and verified. It runs as a native Tauri app on macOS and Windows, using each system's own webview.
 
-Misty is free and open source. There is no hosted service and nothing to pay for: browse with no account at all, or run your own server for sync, Spaces and agents ([docs/self-hosting.md](docs/self-hosting.md)). Agents run on model keys you bring from any major provider, OpenRouter or a local Ollama ([docs/byok.md](docs/byok.md)). The collaboration and web-fetch Workers are optional and deploy to your own Cloudflare account ([docs/cloudflare.md](docs/cloudflare.md)).
+Misty is free and open source under the AGPL-3.0. There is no hosted service and nothing to pay for: browse with no account at all, or run your own server for sync, Spaces and agents ([docs/self-hosting.md](docs/self-hosting.md)). Agents run on model keys you bring from any major provider, OpenRouter or a local Ollama ([docs/byok.md](docs/byok.md)). The collaboration and web-fetch Workers are optional and deploy to your own Cloudflare account ([docs/cloudflare.md](docs/cloudflare.md)).
 
 ## Repository layout
 
@@ -87,4 +87,11 @@ On macOS the desktop suite also checks the Windows build through [cargo-xwin](ht
 
 ## License
 
-Misty is released under the [MIT License](LICENSE).
+Copyright (C) 2026 Matthew Chen.
+
+Misty is free software: you can redistribute it and modify it under the terms of the
+[GNU Affero General Public License](LICENSE), version 3 or (at your option) any later version.
+If you share a changed Misty, or run a changed Misty server that other people use over a network,
+you must offer them the source of your changes under the same license. Misty comes with no
+warranty; see the license for details. Code adapted from other projects keeps its own license
+next to it (for example `src-tauri/vendor/`).

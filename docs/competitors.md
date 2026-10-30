@@ -84,7 +84,7 @@ Edge, Opera Neon, Vivaldi and Orion were not checked against their own sites and
 
 | | Misty | Comet | Polar | Aside | Dia | Zen | Arc | Helium | Brave |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Open source | ◐ MIT, everything including the server; repository not yet public (C17) | ? | ? | ? | ? | ✓ MPL-2.0 | ? | ✓ GPL-3.0 | ✓ MPL-2.0 |
+| Open source | ◐ AGPL-3.0, everything including the server; repository not yet public (C17) | ? | ? | ? | ? | ✓ MPL-2.0 | ? | ✓ GPL-3.0 | ✓ MPL-2.0 |
 | Browse without an account | ✗ the welcome screen asks you to sign in first | ? | ? | ? | ? Arc import happens during sign-up | ✓ an account only for sync † | ? | ? no account mentioned; "No data collection" | ✓ even Leo needs no account; Premium does |
 | Vertical tabs | ✓ left or right | ? | ? | ? | ✓ Sidebar tabs | ? | ✓ | ✓ four layouts | ✓ |
 | Switchable tab sets (Spaces, Workspaces) | ✓ Spaces you share with people, with chat, notes, files, code and memory | ? | ? | ◐ Chromium profiles | ✓ Profiles (Arc's Spaces) | ✓ Workspaces with containers | ✓ Spaces, for one person | ? | ? |
@@ -141,7 +141,7 @@ Goal: Misty has everything the others have, so no public row shows Misty losing.
 | C14 | iPhone and Android | Comet, Brave, Arc (Arc Search) | No mobile client | XL | 14 |
 | C15 | Run the agent on your own hardware | Comet, Brave (your own models) | Browser work runs on your device; models can run on your own Ollama or any OpenAI-compatible server (`docs/byok.md`), and the server is self-hosted | XL | later |
 | C16 | Browse with no account; sign in only for sync, Spaces and AI | Zen, Brave | Approved brief `docs/browser/no-account.md`; all four phases written 2026-10-23, not yet built, tested or released | M | next |
-| C17 | Open source | Zen, Helium, Brave | Decided 2026-10-29: everything is MIT and in this repository, including sync, the agent runtime, Spaces, the server and the Workers. No billing; self-hosted (`docs/self-hosting.md`). Going public waits on the history secrets scan | M | next |
+| C17 | Open source | Zen, Helium, Brave | Decided 2026-10-29: everything is AGPL-3.0-or-later and in this repository, including sync, the agent runtime, Spaces, the server and the Workers. No billing; self-hosted (`docs/self-hosting.md`). Going public waits on the history secrets scan | M | next |
 
 **Out of scope:** SOC 2 and other enterprise compliance, SSO, SCIM and MDM. Misty is not pursuing enterprise customers, so these never go on the chart or in the parity plan. Team plans are also out (2026-10-11): Misty is a consumer app, so the "Team plan" row stays off the website. C11 was removed, and C12–C17 keep their IDs. C18 (bringing over Arc's Spaces, pinned tabs and favorites) was dropped on 2026-10-23: Arc users get bookmarks, history, sign-ins and extensions through the normal Chromium import, and Arc's sidebar doesn't come across. Built-in ad blocking stays out (decided 2026-10-12): onboarding offers a store extension such as uBlock Origin Lite, and Misty ships no blocking code or lists of its own.
 

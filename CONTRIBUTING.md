@@ -38,6 +38,13 @@ before changing a surface.
   descriptions.
 - Never change a database migration that has already run; add a new one.
 
+## License
+
+Misty is licensed under the [GNU AGPL-3.0-or-later](LICENSE). By opening a pull request you agree
+that your contribution is licensed under the same terms. New files from other projects keep their
+license and copyright notice next to them, and must be compatible with the AGPL (MIT, BSD, Apache-2.0,
+MPL-2.0 and LGPL are; proprietary and "non-commercial" licenses are not).
+
 ## Security
 
 Report vulnerabilities privately, as [SECURITY.md](SECURITY.md) describes, not in a public issue.

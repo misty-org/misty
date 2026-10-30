@@ -24,7 +24,9 @@ you bring.
 
 ## Decisions
 - **Consumer only.** No team plans, no enterprise (SOC 2, SSO, SCIM, MDM).
-- **Everything is open source (2026-10-29), MIT.** The desktop app, sync, the server, the agent
+- **Everything is open source (2026-10-29) under the AGPL-3.0-or-later.** Copyleft by choice:
+  anyone who shares a changed Misty, or runs a changed server for others, must publish their
+  changes. The desktop app, sync, the server, the agent
   runtime, Spaces and the Cloudflare Workers all live in this repository. Spaces are the lead
   against Arc's and Zen's tab sets. Parity C16 (browse with no account) and C17 (open source).
   This replaces the 2026-10-23 split that kept sync, the runtime and Spaces proprietary.

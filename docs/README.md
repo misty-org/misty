@@ -5,7 +5,7 @@ Agents work in your browser, on your computer, signed in as you, and you can wat
 browser comes first and has to be worth using with no AI at all. [roadmap.md](roadmap.md) says
 where Misty is going and why.
 
-Misty has no hosted service and no billing. [self-hosting.md](self-hosting.md) runs the server,
+Misty is open source under the AGPL-3.0, with no hosted service and no billing. [self-hosting.md](self-hosting.md) runs the server,
 [byok.md](byok.md) explains model keys and [cloudflare.md](cloudflare.md) deploys the optional
 Workers to your own Cloudflare account.
 

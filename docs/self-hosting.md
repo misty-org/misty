@@ -1,6 +1,6 @@
 # Self-hosting
 
-Misty is open source (MIT) and has no hosted service. The browser works without any server:
+Misty is open source under the AGPL-3.0 and has no hosted service. The browser works without any server:
 signed out, it keeps everything on your computer ([browser/no-account.md](browser/no-account.md)).
 Sync between devices, Spaces and agents need a Misty server, and you run that server yourself on
 your own computer, a VPS, or any platform that runs Docker containers.
@@ -132,6 +132,13 @@ Set each with `misty env set prod NAME`; `misty env describe` lists every name a
 `server/.env/prod/` into the environment before calling `docker compose`, and checks them first.
 If you manage configuration another way (a platform's secret store, Kubernetes), provide the same
 variables to the `api` and `agent-runtime` services; `misty env describe` is the list.
+
+## Changing the server
+
+The AGPL covers servers. If you change Misty's server, agent runtime or Workers and other people
+use your server, you must offer them the source of your changed version under the AGPL, for
+example with a link on your sign-in page or in your server's description. Running Misty unchanged,
+or changed only for yourself, needs nothing extra.
 
 ## Development stack
 

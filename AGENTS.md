@@ -31,7 +31,9 @@ change; when a plan ships, fold it into the feature folder and delete the plan.
 - Never show "Loading…" text; first loads use skeletons shaped like the content.
 - Settings belong to the device (`misty.db`) and never sync.
 - Tabs live only in the tab sidebar.
-- Misty is open source (MIT) and self-hosted. There is no billing, no plan and no usage limit:
+- Misty is open source under the AGPL-3.0-or-later (copyleft) and self-hosted. Add dependencies only
+  under AGPL-compatible licenses (MIT, BSD, Apache-2.0, MPL-2.0, LGPL), never proprietary or
+  non-commercial ones. There is no billing, no plan and no usage limit:
   never add prices, plan gates, credits or payment code. Every feature is on for everyone.
 - Models run on keys the person brings (`docs/byok.md`). Keys stay on the device, in the
   keychain, and reach the server only in the `X-Misty-Models` header; never store or log them.

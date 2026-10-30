@@ -2,6 +2,7 @@
 name = "misty-windows-files"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 publish = false
 
 # File access relative to an open folder on Windows, never following a link:
