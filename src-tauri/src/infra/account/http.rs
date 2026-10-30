@@ -1,4 +1,6 @@
-//! Streaming HTTP for account requests. Only the native cookie jar sees JWTs.
+//! Streaming HTTP for account requests. Only the native cookie jar sees JWTs, and only
+//! this layer adds the device's model keys (`X-Misty-Models`); the renderer can neither
+//! set nor read that header.
 use super::cookies::{self, AccountClient};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -94,13 +96,28 @@ pub async fn auth_http_start(
     for (name, value) in headers {
         if matches!(
             name.to_ascii_lowercase().as_str(),
-            "cookie" | "authorization" | "host" | "content-length" | "connection" | "user-agent"
+            "cookie"
+                | "authorization"
+                | "host"
+                | "content-length"
+                | "connection"
+                | "user-agent"
+                | crate::infra::models::header::HEADER
         ) {
             continue;
         }
         builder = builder.header(&name, &value);
     }
     builder = builder.header("X-Misty-CSRF", "1");
+    // Keys go only to the server this jar is signed in to, never with a sign-in attempt.
+    if !login && client.signed_in(&url) {
+        if let Some(models) = crate::infra::models::current_header(&app).await {
+            if let Ok(mut value) = reqwest::header::HeaderValue::from_str(&models) {
+                value.set_sensitive(true);
+                builder = builder.header(crate::infra::models::header::HEADER, value);
+            }
+        }
+    }
     if has_body {
         let total = body.len() as u64;
         let stream = async_stream::stream! {

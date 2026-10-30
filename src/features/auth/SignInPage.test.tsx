@@ -302,7 +302,11 @@ describe("SignInPage", () => {
   it("sends the password in plain form only when asked, after a refused credential sign-in", async () => {
     mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
     mocks.accountSignIn.mockRejectedValueOnce(new mocks.CredentialSignInRefused());
-    mocks.accountSignIn.mockResolvedValueOnce({ id: "acc-1", email: "a@example.com", username: "A" });
+    mocks.accountSignIn.mockResolvedValueOnce({
+      id: "acc-1",
+      email: "a@example.com",
+      username: "A",
+    });
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
@@ -311,8 +315,14 @@ describe("SignInPage", () => {
       );
     });
     await act(async () => {
-      setInputValue(container.querySelector<HTMLInputElement>('input[type="email"]')!, "a@example.com");
-      setInputValue(container.querySelector<HTMLInputElement>('input[type="password"]')!, "reset password");
+      setInputValue(
+        container.querySelector<HTMLInputElement>('input[type="email"]')!,
+        "a@example.com",
+      );
+      setInputValue(
+        container.querySelector<HTMLInputElement>('input[type="password"]')!,
+        "reset password",
+      );
     });
     await act(async () => {
       container

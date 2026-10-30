@@ -76,7 +76,16 @@ impl SettingsService {
 
     pub async fn save(&self, request: SaveSettingsRequest) -> ApiResult<SettingsSnapshot> {
         let store = self.store.clone();
-        blocking(move || save_settings(&store, request.document)).await
+        let saved = blocking(move || save_settings(&store, request.document)).await;
+        // Model choices are settings; the next account request rebuilds its header.
+        crate::infra::models::invalidate();
+        saved
+    }
+
+    /// The saved sections-and-keys document, read without importing or normalizing.
+    pub async fn document(&self) -> ApiResult<Value> {
+        let store = self.store.clone();
+        blocking(move || load_settings_document(&store)).await
     }
 }
 

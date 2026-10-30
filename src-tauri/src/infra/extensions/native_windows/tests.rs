@@ -315,11 +315,26 @@ fn staged_extensions_leave_out_mistys_own_folders() {
     // reports "Access is denied", so staging must not copy it (or the other __misty_ ones).
     let package = tempfile::tempdir().unwrap();
     let root = tempfile::tempdir().unwrap();
-    std::fs::write(package.path().join("manifest.json"), r#"{"manifest_version":3}"#).unwrap();
+    std::fs::write(
+        package.path().join("manifest.json"),
+        r#"{"manifest_version":3}"#,
+    )
+    .unwrap();
     std::fs::create_dir(package.path().join("_locales")).unwrap();
     std::fs::create_dir(package.path().join("_metadata")).unwrap();
-    std::fs::write(package.path().join("_metadata").join("verified_contents.json"), "{}").unwrap();
-    for folder in ["__misty_sync__", "__misty_compat__", "__misty_user_scripts__"] {
+    std::fs::write(
+        package
+            .path()
+            .join("_metadata")
+            .join("verified_contents.json"),
+        "{}",
+    )
+    .unwrap();
+    for folder in [
+        "__misty_sync__",
+        "__misty_compat__",
+        "__misty_user_scripts__",
+    ] {
         std::fs::create_dir(package.path().join(folder)).unwrap();
         std::fs::write(package.path().join(folder).join("bridge.js"), "//").unwrap();
     }
@@ -329,7 +344,11 @@ fn staged_extensions_leave_out_mistys_own_folders() {
     // The store's own reserved folders and the extension's files stay.
     assert!(staged.join("_locales").is_dir() && staged.join("_metadata").is_dir());
     assert!(staged.join("js").join("background.js").is_file());
-    for folder in ["__misty_sync__", "__misty_compat__", "__misty_user_scripts__"] {
+    for folder in [
+        "__misty_sync__",
+        "__misty_compat__",
+        "__misty_user_scripts__",
+    ] {
         assert!(!staged.join(folder).exists(), "{folder} was copied");
     }
 }
@@ -338,12 +357,19 @@ fn staged_extensions_leave_out_mistys_own_folders() {
 fn a_removed_extensions_pages_stop_being_allowed() {
     use super::super::{allow_origin, drop_origin, installation_host, is_extension_url};
     let host = installation_host("account", "guid-for-the-test");
-    assert_eq!(host.len(), 32, "a Chromium extension ID, not the origin uuid");
+    assert_eq!(
+        host.len(),
+        32,
+        "a Chromium extension ID, not the origin uuid"
+    );
     let url = url::Url::parse(&format!("chrome-extension://{host}/popup.html")).unwrap();
     assert!(!is_extension_url(&url));
     allow_origin("space-for-the-test", host.clone());
     assert!(is_extension_url(&url));
     // Dropping uses the same key, so removing the extension closes its pages to the browser.
-    drop_origin("space-for-the-test", &installation_host("account", "guid-for-the-test"));
+    drop_origin(
+        "space-for-the-test",
+        &installation_host("account", "guid-for-the-test"),
+    );
     assert!(!is_extension_url(&url));
 }

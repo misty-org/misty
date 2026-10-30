@@ -58,7 +58,10 @@ pub fn fold(desired: &mut Desired, protected: usize) -> usize {
     let mut groups: Vec<(u64, Vec<Option<Change>>)> = Vec::new();
     let mut at = start;
     for batch in &desired.batches[first..] {
-        let changes = desired.changes[at..at + batch.len].iter().cloned().map(Some);
+        let changes = desired.changes[at..at + batch.len]
+            .iter()
+            .cloned()
+            .map(Some);
         at += batch.len;
         match groups.last_mut() {
             Some((base, group)) if *base == batch.base => group.extend(changes),
@@ -84,10 +87,12 @@ pub fn fold(desired: &mut Desired, protected: usize) -> usize {
                 }
                 (Change::Patch { fields, .. }, Some((pg, pi))) => match &mut groups[pg].1[pi] {
                     Some(Change::Delete { .. }) => false,
-                    Some(Change::Patch { fields: earlier, .. })
-                        if pg == g
-                            && move_field(key.0)
-                                .is_none_or(|f| !(earlier.contains_key(f) && fields.contains_key(f))) =>
+                    Some(Change::Patch {
+                        fields: earlier, ..
+                    }) if pg == g
+                        && move_field(key.0).is_none_or(|f| {
+                            !(earlier.contains_key(f) && fields.contains_key(f))
+                        }) =>
                     {
                         earlier.extend(fields.clone());
                         false
@@ -205,9 +210,15 @@ mod tests {
         assert_eq!(fold(&mut desired, 1), 1);
         assert_eq!(
             desired.batches,
-            vec![Batch { len: 1, base: 1 }, Batch { len: 1, base: 1 }, Batch { len: 1, base: 2 }]
+            vec![
+                Batch { len: 1, base: 1 },
+                Batch { len: 1, base: 1 },
+                Batch { len: 1, base: 2 }
+            ]
         );
-        assert!(matches!(&desired.changes[2], Change::Patch { fields, .. } if fields["title"] == "d"));
+        assert!(
+            matches!(&desired.changes[2], Change::Patch { fields, .. } if fields["title"] == "d")
+        );
     }
 
     #[test]
@@ -260,7 +271,10 @@ mod tests {
             let original = queue(batches);
             let mut folded = original.clone();
             fold(&mut folded, 0);
-            assert!(rebased(&records, &original, &tombstones) == rebased(&records, &folded, &tombstones));
+            assert!(
+                rebased(&records, &original, &tombstones)
+                    == rebased(&records, &folded, &tombstones)
+            );
         }
     }
 }

@@ -7,7 +7,6 @@ import {
 } from "@/features/auth";
 import { reportSystemError } from "@/features/support/systemErrors";
 import { routes } from "@/features/app-shell";
-import { AccountUsagePanel } from "@/features/spaces";
 import { useNativeSessionStore } from "@/features/native-session";
 import {
   DropdownMenuContent,
@@ -20,7 +19,6 @@ import { ShortcutText } from "@/features/shortcuts/runtime";
 import {
   Check,
   ExternalLink,
-  Gauge,
   LogIn,
   LogOut,
   Plus,
@@ -127,11 +125,6 @@ function ProfileMenuItems(props: {
             shortcut={<ExternalLink className="size-3.5" aria-hidden="true" />}
             onSelect={props.onOpenAccountSettings}
           />
-          <MenuSubmenu icon={<Gauge />} label="Usage" width="xl">
-            <div className="px-2 py-1.5">
-              <AccountUsagePanel />
-            </div>
-          </MenuSubmenu>
           <MenuSubmenu
             icon={<Repeat2 />}
             label="Switch accounts"

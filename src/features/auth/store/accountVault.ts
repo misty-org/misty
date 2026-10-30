@@ -3,7 +3,6 @@ export interface SavedAccountSession {
   username: string;
   email: string;
   accountCreatedAt?: string;
-  currentPlan?: string;
   lastUsedAt: string;
 }
 
@@ -85,7 +84,6 @@ function readLegacyAccount(): Omit<SavedAccountSession, "lastUsedAt"> | null {
       username: value.username || usernameFromEmail(value.email),
       email: value.email,
       accountCreatedAt: value.accountCreatedAt,
-      currentPlan: value.currentPlan,
     };
   } catch {
     return null;

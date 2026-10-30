@@ -22,42 +22,6 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         );
     }
 
-    let billing = values
-        .get("MISTY_BILLING_ADAPTER")
-        .map(|s| s.trim())
-        .unwrap_or("none");
-    if target == Target::Prod && billing != "http" {
-        bail!("Production requires MISTY_BILLING_ADAPTER=http");
-    }
-    if !matches!(billing, "" | "none" | "null" | "http") {
-        bail!("Unknown MISTY_BILLING_ADAPTER mode");
-    }
-    if billing == "http" {
-        let raw = values
-            .get("MISTY_BILLING_URL")
-            .context("MISTY_BILLING_URL is required")?;
-        let url = url::Url::parse(raw).context("Invalid MISTY_BILLING_URL")?;
-        let local = target == Target::Dev
-            && matches!(
-                url.host_str(),
-                Some("127.0.0.1" | "localhost" | "[::1]" | "host.docker.internal")
-            );
-        if (url.scheme() != "https" && !(url.scheme() == "http" && local))
-            || url.host_str().is_none()
-            || !url.username().is_empty()
-            || url.password().is_some()
-            || url.query().is_some()
-            || url.fragment().is_some()
-        {
-            bail!("Billing URL requires HTTPS, except for the local development host");
-        }
-        if values
-            .get("MISTY_BILLING_SECRET")
-            .is_none_or(|secret| secret.len() < 32)
-        {
-            bail!("MISTY_BILLING_SECRET must contain at least 32 bytes");
-        }
-    }
     if target == Target::Dev {
         {
             let name = "MISTY_DEV_API_ORIGIN";

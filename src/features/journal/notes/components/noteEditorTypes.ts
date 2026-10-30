@@ -24,6 +24,8 @@ export interface NoteEditorRuntime {
     session: NoteEditorSession | null;
     error: string | null;
     notice: string | null;
+    /** Collaboration is off on this server: nothing can be saved, so the note is read-only. */
+    localOnly?: boolean;
   };
   uploadAsset(input: UploadNoteAssetInput): Promise<string>;
   resolveAsset?(reference: string): Promise<JournalImageLease>;
@@ -51,6 +53,8 @@ export interface NoteBlockEditorProps {
   }>;
   onOpenNote?: (noteId: string) => void;
   aiContext?: AiContextReference;
+  /** Why the note can't be edited, shown inline and as the error for AI edits. */
+  readOnlyReason?: string;
 }
 export type NoteAiSelection = {
   snapshot: AiSelectionSnapshot;

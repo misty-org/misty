@@ -10,8 +10,7 @@ pub(super) struct Server {
 
 #[derive(Debug, Subcommand)]
 pub(super) enum ServerCommand {
-    /// Start every local service (billing first, migrated and rebuilt, then the
-    /// server's containers), wait for readiness, and return with a status summary.
+    /// Start every local service, wait for readiness, and return with a status summary.
     Up {
         #[arg(long)]
         no_build: bool,
@@ -27,9 +26,9 @@ pub(super) enum ServerCommand {
     /// Deploy the development collaboration Worker explicitly.
     Deploy,
     Url,
-    /// Stop every local service, billing included.
+    /// Stop every local service.
     Down {
-        /// Also delete the server's data volumes. Billing's database is never deleted here.
+        /// Also delete the server's data volumes.
         #[arg(long)]
         volumes: bool,
     },
@@ -80,13 +79,13 @@ pub(super) enum ProdCommand {
         volumes: bool,
     },
     Logs,
-    /// Encrypt both databases with age and upload them to the backup bucket.
+    /// Encrypt the database with age and upload it to the backup bucket.
     Backup,
-    /// Copy this computer's server/.env/prod (and misty-billing/.env/prod) to the VPS.
+    /// Copy this computer's server/.env/prod to your server.
     Push(DeployTarget),
-    /// Push the production environment, then update and start both stacks on the VPS.
+    /// Push the production environment, then update and start the stack on your server.
     Deploy(DeployTarget),
-    /// Replace both databases with a backup from the bucket.
+    /// Replace the database with a backup from the bucket.
     Restore {
         /// Backup timestamp such as 20271003T020000Z, or `latest`.
         backup: String,
@@ -124,9 +123,6 @@ pub(super) struct DeployTarget {
     /// Misty checkout on the VPS, relative to the SSH user's home.
     #[arg(long, default_value = "misty")]
     pub(super) dir: String,
-    /// Directory for billing's deploy files on the VPS, relative to the SSH user's home.
-    #[arg(long, default_value = "misty-billing")]
-    pub(super) billing_dir: String,
 }
 
 impl DeployTarget {
@@ -137,7 +133,7 @@ impl DeployTarget {
                 anyhow::anyhow!("pass --host or set MISTY_DEPLOY_HOST in misty/cli/.env/common.env")
             })?,
         };
-        deploy::Remote::new(&host, &self.dir, &self.billing_dir)
+        deploy::Remote::new(&host, &self.dir)
     }
 }
 

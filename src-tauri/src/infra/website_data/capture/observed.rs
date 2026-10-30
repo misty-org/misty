@@ -29,7 +29,8 @@ pub(super) fn observed() -> &'static Mutex<ObservedCache> {
 }
 
 // sessionStorage belongs to one tab and holds no lasting sign-in; not read.
-pub(super) const FIELDS: [(&str, &str); 2] = [("local", "local_storage"), ("indexed", "indexed_db")];
+pub(super) const FIELDS: [(&str, &str); 2] =
+    [("local", "local_storage"), ("indexed", "indexed_db")];
 
 pub(super) fn cache_key(origin: &str, field: &str) -> String {
     format!("{origin}\u{0}{field}")
@@ -52,7 +53,12 @@ pub(super) fn read_request(cache: &ObservedCache, origin: &str, now: Instant) ->
 
 /// Restores unchanged areas from the cache and records freshly exported ones,
 /// so the page report looks exactly like a full export.
-pub(super) fn merge_observed(cache: &mut ObservedCache, value: &mut Value, origin: &str, now: Instant) {
+pub(super) fn merge_observed(
+    cache: &mut ObservedCache,
+    value: &mut Value,
+    origin: &str,
+    now: Instant,
+) {
     let unchanged: BTreeSet<String> =
         serde_json::from_value(value["unchanged"].clone()).unwrap_or_default();
     for (field, kind) in FIELDS {

@@ -66,13 +66,6 @@
   min-width: 0;
   margin: 6px 4px 0;
 }
-.agent-composer-strip-end {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  margin-left: auto;
-}
 .agent-composer-strip .agent-strip-chip {
   height: 28px;
   gap: 6px;
@@ -84,9 +77,6 @@
 .agent-composer-strip .agent-strip-chip:is(:hover, [data-state="open"]) {
   color: var(--color-cream);
   background: var(--color-charcoal-hover);
-}
-.agent-composer-strip-end .agent-strip-chip:first-child {
-  color: var(--color-cream);
 }
 /* In a narrow composer (the Misty panel) every chip shows only its icon; each keeps its name
    for assistive technology, its tooltip and its menu. */

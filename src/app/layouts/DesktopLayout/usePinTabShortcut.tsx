@@ -62,7 +62,9 @@ export function useClearTabsShortcut() {
     useCallback(() => {
       const state = useWorkspaceStore.getState();
       const activeId = state.layout.activeTabId;
-      const doomed = layoutTabs(state.layout).filter((tab) => tab.id !== activeId && !tab.pinnedUrl);
+      const doomed = layoutTabs(state.layout).filter(
+        (tab) => tab.id !== activeId && !tab.pinnedUrl,
+      );
       for (const tab of doomed) state.closeTab(tab.id);
       return true;
     }, []),

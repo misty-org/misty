@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PenLine } from "lucide-react";
 import { drawingsApi } from "@/api/drawings/api";
+import { collaborationOffMessage, isCollaborationOff } from "@/features/collaboration/localOnly";
 import { Button, Skeleton } from "@/shared/ui";
 import { useWorkspaceStore, workspaceSurfaceFromRoute } from "@/features/workspace";
 import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
@@ -58,6 +59,20 @@ export function SketchBlock({ source }: { source: string }) {
         spaceId,
         sketch.header.title || "Drawing from Misty",
       );
+      // Without collaboration the server can't keep the sketch: say so rather than open an
+      // empty drawing.
+      const saved = await drawingsApi.collaborationTicket(spaceId, drawing.id).then(
+        () => true,
+        (cause: unknown) => {
+          if (!isCollaborationOff(cause)) return true;
+          void drawingsApi.remove(spaceId, drawing.id).catch(() => undefined);
+          return false;
+        },
+      );
+      if (!saved) {
+        setNotice(collaborationOffMessage);
+        return;
+      }
       const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
       const { seedDrawing } = await import("@/features/journal/drawings/components/useDrawingSeed");
       seedDrawing(

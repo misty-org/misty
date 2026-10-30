@@ -4,14 +4,13 @@ import { normalizeMistyPublicUrl } from "./mistyPublicUrl";
 
 describe("normalizeMistyPublicUrl", () => {
   it("uses the configured website without a trailing slash", () => {
-    expect(normalizeMistyPublicUrl(" https://dev.mistysys.com/ ")).toBe("https://dev.mistysys.com");
+    expect(normalizeMistyPublicUrl(" https://misty.example/ ")).toBe("https://misty.example");
   });
 
-  it("falls back when the configured website is unsafe", () => {
-    expect(normalizeMistyPublicUrl("javascript:alert(1)")).toBe("https://mistysys.com");
-    expect(normalizeMistyPublicUrl("https://user:password@mistysys.com")).toBe(
-      "https://mistysys.com",
-    );
+  it("has no website when none is configured or the configured one is unsafe", () => {
+    expect(normalizeMistyPublicUrl(undefined)).toBe("");
+    expect(normalizeMistyPublicUrl("javascript:alert(1)")).toBe("");
+    expect(normalizeMistyPublicUrl("https://user:password@misty.example")).toBe("");
   });
 
   it("respects custom fallback when provided", () => {

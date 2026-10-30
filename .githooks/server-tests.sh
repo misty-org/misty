@@ -30,10 +30,7 @@ done
 export DB_HOST=127.0.0.1 DB_PORT=$port DB_USER=misty DB_PASSWORD=$password DB_NAME=misty_test DB_SSLMODE=disable
 export TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=$port TEST_DB_USER=misty TEST_DB_PASSWORD=$password
 export TEST_DB_NAME=misty_test TEST_DB_SSLMODE=disable
-export STRIPE_WEBHOOK_SECRET=whsec_local_test_secret_123 MISTY_ENVIRONMENT=
-# The test kit fills unset variables from server/.env/dev. Pin the ones that
-# change behavior so local runs match a clean environment.
-export MISTY_BILLING_ADAPTER=none MISTY_BILLING_URL= MISTY_BILLING_SECRET=
+export MISTY_ENVIRONMENT=
 
 bin="$PWD/.misty/bin"
 [ -x "$bin/goose" ] || GOBIN="$bin" go install \

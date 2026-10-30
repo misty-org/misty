@@ -43,7 +43,8 @@ Misty now does the same.
 
 ## What stays on the server
 
-- Billing and usage, the AI Gateway route and the run queue with its device jobs.
+- The model route (the account's keys from its devices, or the server's own) and the run
+  queue with its device jobs.
 - Composio connections, agent memory, Space chat, and Mentions replies posted into Space
   chat.
 - Files and artifacts, and attachments a turn sent to the model. These stay until the chat

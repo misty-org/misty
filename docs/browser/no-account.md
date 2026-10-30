@@ -75,8 +75,8 @@ The sheet never appears on its own: no timed prompts, no banners, no badge on th
 | Saved passwords and autofill | Space Home, Chat, People, Memory and the memory tree |
 | Extensions from the Chrome and Firefox stores | Agents, the companion, dictation, capture, recall, screen memory |
 | Search engines and `!bangs`, site permissions | Cloud clipboard, connected devices |
-| Browser import (bookmarks, history, settings, sign-ins, extensions) | Journal and Library items kept on Misty's servers |
-| Incognito windows, night light, every device setting | Billing and plans (on the website) |
+| Browser import (bookmarks, history, settings, sign-ins, extensions) | Journal and Library items kept on your Misty server |
+| Incognito windows, night light, every device setting | |
 | App updates | |
 
 ### Signing in

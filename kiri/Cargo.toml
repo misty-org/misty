@@ -2,7 +2,7 @@
 name = "kiri"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 description = "Misty's native web platform layer: web APIs the OS webviews leave out, supplied from Rust."
 publish = false
 # Tauri derives the plugin's ACL identifier from this; it must match the package name.

@@ -211,11 +211,12 @@ async fn replace(
     target: Vec<CredentialRecord>,
 ) -> Result<(), String> {
     let observer = capture::CaptureView::open(app, &binding.physical_id)?;
-    let mut backend = super::super::super::website_data::storage_restore::BrowserProfile::for_generation(
-        observer.view.clone(),
-        logical.into(),
-        binding.physical_id.clone(),
-    );
+    let mut backend =
+        super::super::super::website_data::storage_restore::BrowserProfile::for_generation(
+            observer.view.clone(),
+            logical.into(),
+            binding.physical_id.clone(),
+        );
     backend.preflight(&target).await.map_err(engine)?;
     backend.apply(&target).await.map_err(engine)?;
     let observed = backend.readback(&target).await.map_err(engine)?;

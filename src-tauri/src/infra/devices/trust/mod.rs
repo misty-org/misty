@@ -21,8 +21,8 @@ mod list;
 #[cfg(test)]
 pub use list::current_list;
 pub use list::{
-    apply_server_list, effective_policy, forget_after_removal, list_version,
-    own_policy, self_admitted, store_own_policy, verify_job_grant, ListOutcome,
+    apply_server_list, effective_policy, forget_after_removal, list_version, own_policy,
+    self_admitted, store_own_policy, verify_job_grant, ListOutcome,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

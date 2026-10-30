@@ -56,7 +56,6 @@ impl SessionHost for Host {
 fn meter() -> LeaseMeter {
     LeaseMeter::new(Lease {
         invocation_id: "run".into(),
-        token_budget: 1_000,
         expires_at: 100,
         grant_version: 1,
         grants: vec![],

@@ -124,7 +124,7 @@ pub struct TurnRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnResult {
-    /// finished, canceled, budget_exhausted or failed.
+    /// finished, canceled, lease_expired or failed.
     pub outcome: &'static str,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub message: String,
@@ -200,8 +200,8 @@ pub async fn coding_run_turn(
             outcome: "canceled",
             message: String::new(),
         },
-        Ok(Outcome::BudgetExhausted) => TurnResult {
-            outcome: "budget_exhausted",
+        Ok(Outcome::LeaseExpired) => TurnResult {
+            outcome: "lease_expired",
             message: String::new(),
         },
         Ok(Outcome::Failed(message)) => TurnResult {

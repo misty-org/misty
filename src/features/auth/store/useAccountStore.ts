@@ -168,7 +168,12 @@ export async function accountRegister(
     const problem = await passwordProblem(email, password);
     if (problem) throw new Error(problem);
   }
-  const body = { username, email, password: credential ?? password, credential: Boolean(credential) };
+  const body = {
+    username,
+    email,
+    password: credential ?? password,
+    credential: Boolean(credential),
+  };
   const user = await persistLogin(await accountApi.register(body), "Registration");
   if (credential) markCredentialAccount(user.id, email);
   return user;

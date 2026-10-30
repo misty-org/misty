@@ -26,7 +26,7 @@ Rename uses a focused shared dialog; Delete asks for confirmation and explains t
 
 The message box is one row (attach, text, voice, send; `MistyComposer layout="inline"`), with its controls in one quiet strip beneath it (`components/ComposerStrip.tsx`). Chips are labeled, have no chevrons, and brighten on hover or while their menu is open. Menus carry no helper copy.
 
-- **Order:** Project, Mode and Code on the left, the usage ring at the far end. There is no model or thinking choice.
+- **Order:** Project, Mode and Code, left to right. Models and reasoning effort are chosen in Settings › Models, not in the composer.
 - **Project:** projects on this computer only. Coding is independent of it.
 - **Mode:** Manual, Auto, Plan and Teach as checkmarked choices, then Goal. Shift+Tab switches modes. Plan gives the composer a dashed frame and a "Plan with…" placeholder.
 - **Code:** the conversation's coding tool, with or without a project: Settings default, then each tool with its logo (`CodingToolIcon`). Tools not installed or signed in are listed but can't be picked, with the reason in words. "Manage tools" opens Settings › Coding tools.

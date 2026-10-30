@@ -24,9 +24,7 @@ use crate::{
 pub(crate) use storage::device_id;
 #[cfg(test)]
 use storage::strip_verbatim_prefixes;
-use storage::{
-    device_snapshot_sync, import_legacy, scoped_file_path_sync,
-};
+use storage::{device_snapshot_sync, import_legacy, scoped_file_path_sync};
 
 /// A folder's canonical path as it is stored and compared: on Windows without
 /// the `\\?\` prefix canonicalizing adds, so every path here has one form.

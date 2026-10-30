@@ -17,11 +17,11 @@
 mod lifecycle;
 mod package;
 mod profile;
-mod toolbar;
 #[cfg(test)]
 mod store_probe;
 #[cfg(test)]
 mod tests;
+mod toolbar;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -34,11 +34,11 @@ use serde_json::{json, Value};
 use tauri::{Manager, Webview};
 use tokio::sync::Mutex;
 
+use lifecycle::{load, reconcile, remove_extension, unload, unload_all};
 use package::{
     action_of, crx_id, granted_manifest, icon, inside, key, localized, prune, read_manifest, stage,
     staged_crx, strings, validate,
 };
-use lifecycle::{load, reconcile, remove_extension, unload, unload_all};
 use profile::{add, inspect, remove, set_enabled};
 use toolbar::{actions, invoke, options};
 

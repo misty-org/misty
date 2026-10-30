@@ -1,7 +1,7 @@
 //! Runs one turn of a coding tool: starts it in the project, feeds it the task,
 //! reads what it prints, answers its permission questions through the bridge
 //! (asking the person through the server when the bridge says so), mirrors its
-//! events and stops it when the run is canceled or its budget runs out.
+//! events and stops it when the run is canceled or its lease expires.
 use std::{future::Future, pin::Pin, process::Stdio};
 
 use tokio::{
@@ -38,8 +38,8 @@ pub trait SessionHost: Send + Sync {
 pub enum Outcome {
     Finished,
     Canceled,
-    /// Stopped at a turn boundary: the lease is spent or expired.
-    BudgetExhausted,
+    /// Stopped at a turn boundary: the lease expired.
+    LeaseExpired,
     Failed(String),
 }
 
@@ -70,13 +70,13 @@ pub async fn answer_permission(
 #[derive(Default)]
 pub struct TurnTracker {
     pub finished: bool,
-    pub exhausted: bool,
+    pub expired: bool,
     pub failure: Option<String>,
 }
 
 impl TurnTracker {
-    /// Answers the permission questions among a step's events, records usage
-    /// against the lease and the turn's end, then mirrors the events. Returns
+    /// Answers the permission questions among a step's events, checks the
+    /// lease at each usage report and records the turn's end, then mirrors the events. Returns
     /// each question with the answer to send back in the tool's protocol.
     pub async fn absorb(
         &mut self,
@@ -93,9 +93,9 @@ impl TurnTracker {
                     let (allow, reason) = answer_permission(host, context, request).await;
                     answers.push((request.clone(), allow, reason));
                 }
-                RunnerEvent::Usage(usage) => {
-                    if !meter.record(usage, host.now()) {
-                        self.exhausted = true;
+                RunnerEvent::Usage(_) => {
+                    if !meter.valid(host.now()) {
+                        self.expired = true;
                     }
                 }
                 RunnerEvent::Done { .. } => self.finished = true,
@@ -114,8 +114,8 @@ impl TurnTracker {
             Outcome::Canceled
         } else if let Some(message) = self.failure {
             Outcome::Failed(message)
-        } else if self.exhausted {
-            Outcome::BudgetExhausted
+        } else if self.expired {
+            Outcome::LeaseExpired
         } else if self.finished {
             Outcome::Finished
         } else {
@@ -133,7 +133,7 @@ pub async fn run_turn(
     mut stop: oneshot::Receiver<()>,
 ) -> Result<Outcome, RunnerError> {
     if !meter.valid(host.now()) {
-        return Ok(Outcome::BudgetExhausted);
+        return Ok(Outcome::LeaseExpired);
     }
     context.lease_valid = true;
     let spec = runner.build_command(launch)?;

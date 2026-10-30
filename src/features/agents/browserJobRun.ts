@@ -26,12 +26,46 @@ export function browserExecutionControl(
   };
 }
 
+const blank = (url: unknown) => typeof url !== "string" || url === "" || url === "about:blank";
+const pageUrl = (output: Record<string, unknown>) =>
+  (output.page as { url?: unknown } | undefined)?.url ?? output.url;
+
 /**
  * One browser operation in a tab, as a device job runs it: the tab wakes if it sleeps, a
  * run-bound grant names this operation alone, and the native side runs it under the job's
  * lease. A browser_run program's page calls take the same path (programs/runProgram.ts).
+ *
+ * A look (snapshot, find) at an agent tab that answers about:blank while the tab last showed a
+ * real page caught it between documents (a wake, a reload). That says nothing about the page:
+ * look once more, then open the address the tab last showed and look again. Without this a run
+ * read "about:blank" for twenty turns while its tab showed the site.
  */
 export async function executeBrowserJob(
+  job: ClaimedWorkflowNodeJob["job"],
+  signal: AbortSignal,
+  leaseExpiresAt: string | null | undefined,
+): Promise<Record<string, unknown>> {
+  let output = await executeOnce(job, signal, leaseExpiresAt);
+  const known = agentTab(job.scopeId)?.url;
+  if (!["browser.snapshot", "browser.find"].includes(job.operation) || blank(known)) return output;
+  if (!blank(pageUrl(output))) return output;
+  await new Promise((done) => setTimeout(done, 1_500));
+  output = await executeOnce({ ...job, id: `${job.id}.again` }, signal, leaseExpiresAt);
+  if (!blank(pageUrl(output))) return output;
+  await executeOnce(
+    {
+      ...job,
+      id: `${job.id}.reopen`,
+      operation: "browser.navigate",
+      input: { scopeId: job.scopeId, url: known },
+    },
+    signal,
+    leaseExpiresAt,
+  );
+  return executeOnce({ ...job, id: `${job.id}.reopened` }, signal, leaseExpiresAt);
+}
+
+async function executeOnce(
   job: ClaimedWorkflowNodeJob["job"],
   signal: AbortSignal,
   leaseExpiresAt: string | null | undefined,

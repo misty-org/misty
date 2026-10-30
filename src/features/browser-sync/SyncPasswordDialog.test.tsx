@@ -50,7 +50,10 @@ describe("choosing the sync password", () => {
   });
 
   it("shows why it failed and keeps what was typed", async () => {
-    const h = mount(false, vi.fn(async () => Promise.reject(new Error("That password is too common."))));
+    const h = mount(
+      false,
+      vi.fn(async () => Promise.reject(new Error("That password is too common."))),
+    );
     fill("Current password", "the old one");
     fill("New password", "password1234");
     fill("Confirm new password", "password1234");
@@ -64,7 +67,10 @@ describe("choosing the sync password", () => {
 
   it("says plainly when the current password is wrong", async () => {
     const wrong = new AccountApiError("invalid credentials", 401);
-    mount(false, vi.fn(async () => Promise.reject(wrong)));
+    mount(
+      false,
+      vi.fn(async () => Promise.reject(wrong)),
+    );
     fill("Current password", "wrong");
     fill("New password", "a brand new password");
     fill("Confirm new password", "a brand new password");

@@ -64,11 +64,21 @@ fn parent_record(record: &ViewRecord) -> Option<(Kind, String)> {
                 .to_owned(),
         )),
         Kind::Bookmark => Some((Kind::Folder, field(record, "group_id")?.to_owned())),
-        Kind::Window | Kind::Folder | Kind::TabGroup | Kind::SavedTabGroup | Kind::HistoryBatch | Kind::ExtensionSyncKey | Kind::ExtensionRemoval | Kind::Login | Kind::SpaceSites
-        | Kind::Extension | Kind::SitePermission | Kind::SearchDefault | Kind::SearchEngine
-        | Kind::SearchBang | Kind::Download => {
-            None
-        }
+        Kind::Window
+        | Kind::Folder
+        | Kind::TabGroup
+        | Kind::SavedTabGroup
+        | Kind::HistoryBatch
+        | Kind::ExtensionSyncKey
+        | Kind::ExtensionRemoval
+        | Kind::Login
+        | Kind::SpaceSites
+        | Kind::Extension
+        | Kind::SitePermission
+        | Kind::SearchDefault
+        | Kind::SearchEngine
+        | Kind::SearchBang
+        | Kind::Download => None,
     }
 }
 

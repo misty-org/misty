@@ -18,7 +18,7 @@ pub struct BridgeContext {
     /// Remembered actions for this project and its remote: project.edit,
     /// project.install, git.push. Empty when the grant set is missing or stale.
     pub grants: Vec<String>,
-    /// The budget lease is current; without it nothing but reads continues.
+    /// The lease is current; without it nothing but reads continues.
     pub lease_valid: bool,
 }
 
@@ -64,8 +64,7 @@ pub fn decide(request: &PermissionRequest, context: &BridgeContext) -> Decision 
     if !context.lease_valid {
         return Decision::Deny {
             reason:
-                "Misty's budget for this run is used up or expired. Stop and report what is left."
-                    .into(),
+                "Misty's lease for this run expired. Stop and report what is left.".into(),
         };
     }
     let action = grant_action(request.kind).unwrap_or("project.edit");

@@ -155,6 +155,7 @@ async function applyNoteArtifact(
   props: NoteBlockEditorProps,
   artifact: AiArtifact,
 ) {
+  if (props.readOnlyReason) throw new Error(props.readOnlyReason);
   if (!canApplyNoteArtifact(editor, props, artifact)) {
     throw new Error("The note selection changed. Ask your agent to regenerate this draft.");
   }

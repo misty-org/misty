@@ -93,7 +93,8 @@ fn authorize_native_input(
                 .into(),
         );
     }
-    if super::super::browser_page_origin(&view.url().map_err(|e| e.to_string())?) != expected_origin {
+    if super::super::browser_page_origin(&view.url().map_err(|e| e.to_string())?) != expected_origin
+    {
         return Err("browser_snapshot_stale: browser origin changed before native input".into());
     }
     Ok(())

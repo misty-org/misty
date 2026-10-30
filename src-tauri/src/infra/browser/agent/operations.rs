@@ -48,8 +48,7 @@ pub(super) async fn visual_browser(
     #[cfg(windows)]
     let capture = super::super::capture_windows::capture(view).await?;
     #[cfg(not(any(target_os = "macos", windows)))]
-    let capture: Value =
-        return Err("Visual browser inspection requires macOS or Windows".into());
+    let capture: Value = return Err("Visual browser inspection requires macOS or Windows".into());
     observed["image"] = capture;
     observed["viewport"] = json!({"width":size.width,"height":size.height});
     Ok(observed)
@@ -99,11 +98,8 @@ pub(super) async fn type_browser(
     .await?;
     resolve_agent_webview(app, state, request)?;
     if result.get("ok").and_then(Value::as_bool) != Some(true) {
-        if result.get("errorCode").and_then(Value::as_str) == Some("browser_snapshot_stale")
-        {
-            return Err(
-                "browser_snapshot_stale: inspected content changed before dispatch".into(),
-            );
+        if result.get("errorCode").and_then(Value::as_str) == Some("browser_snapshot_stale") {
+            return Err("browser_snapshot_stale: inspected content changed before dispatch".into());
         }
         return Err(result
             .get("error")
@@ -138,9 +134,7 @@ pub(super) async fn request_browser(
         .input
         .get("path")
         .and_then(Value::as_str)
-        .filter(|path| {
-            path.starts_with('/') && !path.starts_with("//") && path.len() <= 2048
-        })
+        .filter(|path| path.starts_with('/') && !path.starts_with("//") && path.len() <= 2048)
         .ok_or("A relative provider path is required.")?;
     {
         let sessions = state

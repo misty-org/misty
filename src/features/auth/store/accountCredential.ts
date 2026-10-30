@@ -21,7 +21,9 @@ function readMarked(): Record<string, string> {
     const value = raw ? JSON.parse(raw) : null;
     if (!value || typeof value !== "object") return {};
     return Object.fromEntries(
-      Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+      Object.entries(value).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
     );
   } catch {
     return {};
@@ -48,7 +50,10 @@ export function credentialEmail(accountId: string | null | undefined): string | 
 
 export function markCredentialAccount(accountId: string, email: string): void {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ ...readMarked(), [accountId]: email.trim() }));
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({ ...readMarked(), [accountId]: email.trim() }),
+    );
   } catch {
     // Without storage the account is simply asked again.
   }

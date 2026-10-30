@@ -1,4 +1,3 @@
-import { CommandUsageEstimate } from "./CommandUsageEstimate";
 import {
   cn,
   DropdownMenu,
@@ -19,7 +18,6 @@ import type { MistyImageAttachment } from "./types";
 
 export function MistyComposer(props: {
   value: string;
-  modelId?: string;
   onChange: (value: string) => void;
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   attachments: MistyImageAttachment[];
@@ -41,7 +39,6 @@ export function MistyComposer(props: {
   /** "inline": the box is one row (attach, text, voice, send); Stop replaces Send while a reply runs. */
   layout?: "default" | "conversation" | "inline";
   /** The surface shows usage itself (the Agents control bar), so the footer omits it. */
-  hideUsageEstimate?: boolean;
   className?: string;
   onError?: (message: string) => void;
 }) {
@@ -76,9 +73,8 @@ export function MistyComposer(props: {
   const canSend = Boolean(
     props.value.trim() || props.attachments.some((item) => item.state === "ready"),
   );
-  const showEstimate = !props.busy && !props.hideUsageEstimate;
   // An empty footer would still add its bottom padding under the input row.
-  const hasFooter = Boolean(props.modelControl || showEstimate);
+  const hasFooter = Boolean(props.modelControl);
   const send = (
     <MessageComposerSend
       label="Send to Misty"
@@ -241,14 +237,7 @@ export function MistyComposer(props: {
           {props.leadingControl}
         </>
       }
-      footer={
-        hasFooter && (
-          <div className="flex min-w-0 flex-col gap-2">
-            {props.modelControl}
-            {showEstimate && <CommandUsageEstimate text={props.value} model={props.modelId} />}
-          </div>
-        )
-      }
+      footer={hasFooter && <div className="flex min-w-0 flex-col gap-2">{props.modelControl}</div>}
       // A conversation keeps send (or Stop) inside the text box; the rest of its toolbar
       // sits beneath the box.
       overlay={

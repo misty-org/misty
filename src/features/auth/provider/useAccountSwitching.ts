@@ -7,7 +7,6 @@ import {
   assertAccountIdentity,
   authUserFromMe,
   isInvalidAccountSessionError,
-  licenseFromMe,
   resetAccountScopedState,
   type AuthUser,
 } from "../authSession";
@@ -50,7 +49,7 @@ export function useAccountSwitching(
         // and native identity. A failed write can then safely reactivate the
         // previous token without leaving the two account identities crossed.
         await updateSavedAccountSession(nextUser);
-        await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        await saveAuthenticatedUser(nextUser);
         await restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);
@@ -108,7 +107,7 @@ export function useAccountSwitching(
         assertAccountIdentity(me, saved.id);
         const nextUser = authUserFromMe(me, saved);
         await updateSavedAccountSession(nextUser);
-        await saveAuthenticatedUser(nextUser, licenseFromMe(me));
+        await saveAuthenticatedUser(nextUser);
         await restoreAccountWorkspace(nextUser.id);
         useUserStore.getState().setMe(me);
         setUserState(nextUser);

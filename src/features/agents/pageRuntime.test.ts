@@ -160,6 +160,22 @@ describe("agent page runtime", () => {
     expect(prepare(/textbox "Message"/, "key", "Tab").consequence).toBe("");
   });
 
+  it("lets a plain link named buy open its page, but still asks about a delete link", () => {
+    const page = load(`
+      <a href="https://store.test/stamps">Buy Christmas Forever Stamps Now</a>
+      <a href="https://store.test/account/remove">Delete account</a>
+      <button>Buy now</button>`);
+    const { tree: text, documentId } = snapshot(page);
+    const prepare = (line: RegExp) => {
+      const ref = refFor(text, line);
+      document.elementFromPoint = vi.fn(() => findByRef(page, ref));
+      return page.call("prepare", { documentId, ref, action: "click" });
+    };
+    expect(prepare(/link "Buy Christmas/)).toMatchObject({ consequence: "", consequenceKind: "" });
+    expect(prepare(/link "Delete account"/).consequenceKind).toBe("delete");
+    expect(prepare(/button "Buy now"/).consequenceKind).toBe("payment");
+  });
+
   it("finds a covered target and names what covers it", () => {
     const page = load(
       `<button>Buy now</button><div id="cookie" role="dialog" aria-label="Cookies">Accept</div>`,
