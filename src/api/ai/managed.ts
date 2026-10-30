@@ -1,5 +1,4 @@
 import { httpRequest } from "@/api/client/http";
-import { usageLimitText } from "@/api/client/usage-limits";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,
@@ -12,14 +11,12 @@ import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
 
 interface ManagedAiErrorPayload {
   code?: string;
-  reason?: string;
   message?: string;
-  reset_at?: string;
-  /** Which usage limit refused the request, and when it refills. */
-  limit?: string;
-  resets_at?: string;
   retry_after_seconds?: number;
 }
+
+/** What AI surfaces say when no model key is set; they pair it with a button to Settings › Models. */
+export const modelKeyNeededMessage = "Add a model key in Settings → Models.";
 
 export class ManagedAiRequestError extends Error {
   constructor(
@@ -69,24 +66,8 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
     )
       notifyApiSessionInvalid();
     const payload = parseManagedAiError(text);
-    if (payload?.code === "hosted_ai_limit_reached") {
-      const reset = payload.reset_at ? new Date(payload.reset_at).toLocaleDateString() : "Monday";
-      const message =
-        payload.reason === "space_ai_limit_reached"
-          ? `This Space’s weekly hosted AI allowance is used. Its owner must upgrade their plan, or try again after the reset on ${reset}.`
-          : `Your personal weekly hosted AI allowance is used. Try again after the reset on ${reset}, or upgrade your plan from Account settings.`;
-      throw new ManagedAiRequestError(message, response.status, payload.code);
-    }
-    if (payload?.code === "usage_limit_reached" || payload?.code === "email_unverified") {
-      throw new ManagedAiRequestError(
-        usageLimitText(
-          payload.limit,
-          payload.resets_at,
-          payload.message?.trim() || "An AI usage limit was reached.",
-        ),
-        response.status,
-        payload.code,
-      );
+    if (payload?.code === "model_key_needed") {
+      throw new ManagedAiRequestError(modelKeyNeededMessage, response.status, payload.code);
     }
     if (payload?.code === "rate_limited") {
       const retryAfter = payload.retry_after_seconds ?? retryAfterHeader(response);

@@ -33,7 +33,7 @@ export type SettingsSection =
   | "agents-permissions"
   | "agents-coding"
   | "agents-companion"
-  | "agents-usage"
+  | "models"
   | "voice"
   | "recall"
   | "account"

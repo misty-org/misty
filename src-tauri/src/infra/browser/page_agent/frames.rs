@@ -16,9 +16,9 @@ use std::{
 use tauri::Webview;
 
 mod splice;
-pub(super) use splice::{append_markdown, merge_skills, splice_trees};
 #[cfg(test)]
 use splice::shown_url;
+pub(super) use splice::{append_markdown, merge_skills, splice_trees};
 
 /// Frames read per call, newest first, and how much each and all may add.
 const MAX_FRAMES: usize = 6;

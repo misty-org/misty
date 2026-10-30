@@ -44,6 +44,26 @@ pub(super) async fn run_step_checked(
     };
     let prepared = prepare(view, frame, document, step, gate, key).await?;
     if prepared["ok"] != true {
+        // A link that stays covered after its popup was closed (a sticky video, a chat bubble)
+        // goes where it points, as a person would by opening it: the click cannot reach it.
+        if let (true, None, Some(href)) = (
+            step.action == "click" && prepared["errorCode"] == "browser_target_covered",
+            frame,
+            prepared["href"]
+                .as_str()
+                .filter(|href| href.starts_with("http")),
+        ) {
+            let script = format!(
+                "location.assign({})",
+                serde_json::to_string(href).unwrap_or_default()
+            );
+            if view.eval(script).is_ok() {
+                return Ok(
+                    json!({"ok": true, "attempted": true, "input": "link", "navigated": href,
+                    "note": format!("{} The click could not reach it, so its address was opened.", prepared["error"].as_str().unwrap_or(""))}),
+                );
+            }
+        }
         return Ok(prepared);
     }
     let kind = prepared["consequenceKind"].as_str().unwrap_or("");

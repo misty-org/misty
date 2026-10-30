@@ -25,12 +25,6 @@ pub struct Usage {
     pub model: String,
 }
 
-impl Usage {
-    pub fn total(&self) -> u64 {
-        self.input + self.output + self.cache_write + self.cache_read
-    }
-}
-
 /// What a permission question is about, as Misty's rules see it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

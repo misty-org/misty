@@ -1,4 +1,5 @@
 import { journalDocumentStatusMessage, parseJournalDocumentStatus } from "@/features/journal";
+import { isCollaborationOff } from "@/features/collaboration/localOnly";
 import { useEffect, useState } from "react";
 import {
   acquireNoteCollaborationSession,
@@ -10,6 +11,8 @@ export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
   const [session, setSession] = useState<NoteCollaborationSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The server runs without live co-editing: the editor works on this device alone.
+  const [localOnly, setLocalOnly] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -17,6 +20,7 @@ export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
     setSession(null);
     setError(null);
     setNotice(null);
+    setLocalOnly(false);
 
     acquireNoteCollaborationSession(spaceId, noteId)
       .then((nextSession) => {
@@ -31,7 +35,8 @@ export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
       })
       .catch((cause) => {
         if (!active) return;
-        setError(cause instanceof Error ? cause.message : "Could not connect to this note.");
+        if (isCollaborationOff(cause)) setLocalOnly(true);
+        else setError(cause instanceof Error ? cause.message : "Could not connect to this note.");
       });
 
     return () => {
@@ -41,5 +46,5 @@ export function useNoteCollaborationRoom(spaceId: string, noteId: string) {
     };
   }, [noteId, spaceId]);
 
-  return { session, error, notice };
+  return { session, error, notice, localOnly };
 }

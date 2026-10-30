@@ -76,7 +76,8 @@ export function useSyncController(accountId: string) {
   useEffect(() => {
     if (!hasTauriInternals() || !accountId) return;
     let active = true;
-    void accountApi.me()
+    void accountApi
+      .me()
       .then((me) => {
         if (!active) return;
         setProvider(me.provider === "google" ? "google" : "misty");
@@ -245,7 +246,12 @@ export function useSyncController(accountId: string) {
    * `current`. The account counts as safe for new vaults only after both steps.
    */
   const changePassword = async (current: string, next: string) => {
-    if (!vault || !email || isApiSessionTransitioning() || vault.generation !== readApiSessionGeneration())
+    if (
+      !vault ||
+      !email ||
+      isApiSessionTransitioning() ||
+      vault.generation !== readApiSessionGeneration()
+    )
       throw new Error("Your account changed. Reopen sync.");
     // A vault that exists must be open to be re-sealed; no vault yet needs nothing to open.
     if (!session && (vault.local || vault.remote === true))

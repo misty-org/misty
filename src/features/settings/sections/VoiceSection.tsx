@@ -90,7 +90,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="AI cleanup"
-          description="Fixes punctuation and drops filler words before typing, in the style you pick. Uses your AI allowance."
+          description="Fixes punctuation and drops filler words before typing, in the style you pick. Uses your fast model."
           muted={!voice.dictation}
         >
           <ChoiceControl

@@ -557,8 +557,8 @@ encrypted (decided 2026-10-17). Needs only Spaces, which exist, so it can start 
 - **Capture in the window's Space.** `src/features/recall/api.ts` and `httpapi/memory_api.go` send
   the Space of the window the moment came from; incognito windows send nothing.
 - **Embedding search.** Memory search is by meaning; there is no full-text search. The server
-  embeds each record's text through the runtime's AI SDK (Misty's keys, billed to the owner as
-  background work) and keeps the text and vectors in `memory_chunks(space_id, owner_user_id, branch,
+  embeds each record's text through the runtime's AI SDK (the owner's embedding model and key,
+  as background work) and keeps the text and vectors in `memory_chunks(space_id, owner_user_id, branch,
   record_id, chunk, text, embedding vector(768))` on the existing pgvector setup, with an HNSW index.
   If the retrieval path in `ai_retrieval.go` (`ai_retrieval_chunks`) has no other callers, fold it into
   this table instead of keeping both.

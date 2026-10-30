@@ -93,7 +93,10 @@
         describe: P.describe(args.consequenceOf || el), scrolled, locator: P.locatorOf(args.consequenceOf || el),
       };
     }
-    return fail(`${P.describe(el)} is covered by ${P.describe(blocker) || "another element"}. Close or scroll past it first.`, { errorCode: "browser_target_covered" });
+    // A covered link still names where it goes: the step can open that address instead.
+    const link = el.closest?.("a[href]");
+    const href = link && /^https?:/.test(link.href) ? link.href : undefined;
+    return fail(`${P.describe(el)} is covered by ${P.describe(blocker) || "another element"}. Close or scroll past it first.`, { errorCode: "browser_target_covered", href });
   };
 
   const unlocked = (view, action) => {

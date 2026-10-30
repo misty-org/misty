@@ -260,9 +260,20 @@
   const paymentForm = (form) => !!form && !!form.querySelector('[autocomplete^="cc-"],input[name*="card" i][name*="number" i]');
 
   /** Why acting on el would have consequences for other people or money, or "". */
+  // A link that only goes to another page ("Buy stamps now" on a shop's front page) opens the
+  // product; paying takes a later checkout button, which is still asked about. Delete, send and
+  // post stay asked about on links too: some sites do those with a plain link.
+  const navigationLink = (el) => {
+    const link = el.closest?.("a[href]");
+    const href = link?.getAttribute("href") || "";
+    return Boolean(link) && !link.hasAttribute("download") && /^https?:/.test(link.href) && !href.startsWith("#") && !(el.form || el.closest?.("form"));
+  };
+  const linkOnly = (el, name) => navigationLink(el) && kindOfName(name) === "payment";
+
   P.consequence = (el, action) => {
     if (!el) return "";
     const name = P.name(el);
+    if (action !== "key" && linkOnly(el, name)) return "";
     const form = el.form || el.closest?.("form");
     if (action === "key") {
       // Enter in a field submits its form the way its default button would.
@@ -299,6 +310,7 @@
       const submit = form.querySelector('button:not([type]),button[type=submit],input[type=submit],input[type=image]');
       return submit ? kindOfName(P.name(submit)) : "";
     }
+    if (linkOnly(el, P.name(el))) return "";
     const named = kindOfName(P.name(el));
     if (named) return named;
     const submits = el.matches?.('button:not([type]),button[type=submit],input[type=submit],input[type=image]') && form;

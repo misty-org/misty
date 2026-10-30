@@ -277,7 +277,6 @@ export function AgentWorkspaceConversation({
           agent={agent}
           accountId={accountId}
           conversationId={conversation?.id}
-          modelId={conversation?.modelId}
           draft={draft}
           setDraft={setDraft}
           textareaRef={textareaRef}
@@ -286,7 +285,6 @@ export function AgentWorkspaceConversation({
           collaboration={collaboration}
           permission={permission}
           working={state.working}
-          showControlBar={showControlBar}
           send={() => void send()}
           reportError={reportError}
         />

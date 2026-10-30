@@ -8,7 +8,10 @@ use super::{
 fn viewport() -> String {
     BROWSER_VIEWPORT_SCRIPT
         .replace("__MISTY_MEDIA_PLACEHOLDER__", include_str!("media.js"))
-        .replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", include_str!("window_drag.js"))
+        .replace(
+            "__MISTY_WINDOW_DRAG_PLACEHOLDER__",
+            include_str!("window_drag.js"),
+        )
 }
 
 #[test]

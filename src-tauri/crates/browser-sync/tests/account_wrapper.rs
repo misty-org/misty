@@ -64,9 +64,12 @@ fn the_login_credential_is_stable_and_depends_on_the_whole_password() {
 
 #[test]
 fn the_same_text_in_another_unicode_form_gives_the_same_keys() {
-    let composed =
-        AccountKeys::derive(DEPLOYMENT, "j\u{e9}r\u{f4}me@example.test", "caf\u{e9} au lait 2026")
-            .unwrap();
+    let composed = AccountKeys::derive(
+        DEPLOYMENT,
+        "j\u{e9}r\u{f4}me@example.test",
+        "caf\u{e9} au lait 2026",
+    )
+    .unwrap();
     let decomposed = AccountKeys::derive(
         DEPLOYMENT,
         "je\u{301}ro\u{302}me@example.test",
@@ -121,7 +124,9 @@ fn the_account_wrapper_opens_only_with_the_same_password_and_vault() {
     };
     assert!(VaultRoot::unlock_account(&moved, &wrapper, &keys(), &public).is_err());
     // A legacy wrapper is not an account wrapper.
-    let legacy = root.wrap(&scope, PASSWORD, &generate_sync_secret()).unwrap();
+    let legacy = root
+        .wrap(&scope, PASSWORD, &generate_sync_secret())
+        .unwrap();
     assert!(!legacy.is_account());
     assert!(VaultRoot::unlock_account(&scope, &legacy, &keys(), &public).is_err());
 }
@@ -143,7 +148,9 @@ fn a_key_transition_covers_one_vault_one_wrapper_and_one_generation() {
     let public = root.public_key().unwrap();
     let wrapper = root.wrap_account(&scope, &keys()).unwrap();
     let transition = root.sign_key_transition(&scope, 1, &wrapper).unwrap();
-    transition.verify(&public, &scope.vault_id, &wrapper).unwrap();
+    transition
+        .verify(&public, &scope.vault_id, &wrapper)
+        .unwrap();
 
     // Another wrapper, vault, generation or signer does not verify.
     let other_wrapper = root.wrap_account(&scope, &keys()).unwrap();
@@ -168,7 +175,9 @@ fn a_key_transition_covers_one_vault_one_wrapper_and_one_generation() {
 fn a_device_adopts_a_new_wrapper_only_with_a_root_signed_higher_generation() {
     let scope = scope();
     let root = VaultRoot::generate();
-    let legacy = root.wrap(&scope, PASSWORD, &generate_sync_secret()).unwrap();
+    let legacy = root
+        .wrap(&scope, PASSWORD, &generate_sync_secret())
+        .unwrap();
     let pinned = cached(vault_with(&scope, &root, legacy));
 
     let account = root.wrap_account(&scope, &keys()).unwrap();
@@ -189,7 +198,10 @@ fn a_device_adopts_a_new_wrapper_only_with_a_root_signed_higher_generation() {
         key_transition: None,
         ..pinned.vault.clone()
     };
-    assert!(matches!(pinned.check_remote(&unsigned), Err(Error::Recovery)));
+    assert!(matches!(
+        pinned.check_remote(&unsigned),
+        Err(Error::Recovery)
+    ));
     let forged = Vault {
         key_transition: Some(KeyTransition {
             generation: 1,
@@ -212,12 +224,17 @@ fn a_device_adopts_a_new_wrapper_only_with_a_root_signed_higher_generation() {
     let same_generation = root.wrap_account(&scope, &keys()).unwrap();
     let replay = Vault {
         key_envelope: Some(same_generation.clone()),
-        key_transition: Some(root.sign_key_transition(&scope, 1, &same_generation).unwrap()),
+        key_transition: Some(
+            root.sign_key_transition(&scope, 1, &same_generation)
+                .unwrap(),
+        ),
         ..rotated.clone()
     };
     assert!(adopted.check_remote(&replay).is_err());
     // A rotation back to a legacy wrapper is not allowed either.
-    let back = root.wrap(&scope, PASSWORD, &generate_sync_secret()).unwrap();
+    let back = root
+        .wrap(&scope, PASSWORD, &generate_sync_secret())
+        .unwrap();
     let downgrade = Vault {
         key_envelope: Some(back.clone()),
         key_transition: Some(root.sign_key_transition(&scope, 1, &back).unwrap()),

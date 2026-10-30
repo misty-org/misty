@@ -44,12 +44,16 @@ export function DropdownControl(props: {
   label?: string;
   options: { value: string; label: string; disabled?: boolean }[];
   disabled?: boolean;
+  className?: string;
   onValueChange(value: string): void;
 }) {
   const label = useSettingsControlLabel("Setting");
   return (
     <Select value={props.value} disabled={props.disabled} onValueChange={props.onValueChange}>
-      <SelectTrigger aria-label={props.label ?? label} className="w-[200px] max-w-full">
+      <SelectTrigger
+        aria-label={props.label ?? label}
+        className={cn("w-[200px] max-w-full", props.className)}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

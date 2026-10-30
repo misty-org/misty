@@ -105,13 +105,9 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
   const reason = quotaReason(fallback) ?? code;
   const quotaMessages: Record<string, string> = {
     personal_storage_limit_reached:
-      "Your personal storage is full. Free some of your contributions or upgrade your plan. Existing files remain available.",
+      "Your personal storage is full. Free some of your contributions to add more. Existing files remain available.",
     space_storage_limit_reached:
-      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
-    personal_ai_limit_reached:
-      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
-    space_ai_limit_reached:
-      "Your account’s weekly AI allowance is used. Wait for it to reset or upgrade your plan.",
+      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
   };
   if (reason && quotaMessages[reason]) return quotaMessages[reason];
   const messages: Record<string, string> = {
@@ -121,17 +117,16 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     not_found: "That Space item no longer exists.",
     space_limit_reached: "This account has reached its Space limit.",
     space_ownership_limit_reached:
-      "You have reached your plan’s owned Space limit. Delete an owned Space permanently or upgrade your plan before creating another.",
+      "You have reached this server’s owned Space limit. Delete an owned Space permanently before creating another.",
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
     owner_storage_quota_exceeded:
-      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
+      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
     space_storage_quota_exceeded:
-      "Your account’s cloud storage is full. Free some storage or upgrade your plan. Existing files remain available.",
+      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
     storage_limit_reached:
-      "Your account’s cloud storage is full. Free some storage or review your account usage.",
-    hosted_ai_limit_reached:
-      "AI usage is unavailable. Review your account allowance and command budget before trying again.",
+      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
+    model_key_needed: "Add a model key in Settings → Models.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
@@ -140,7 +135,8 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     space_node_limit_reached: "This Space has reached its 5,000-item limit.",
     version_conflict: "Someone else changed this item. Reload it before saving again.",
     offline_reference_only: "Spaces are unavailable while Misty reconnects.",
-    agent_model_unavailable: "This Agent’s selected model is unavailable. Choose another model.",
+    agent_model_unavailable:
+      "The model chosen in Settings › Models is unavailable. Choose another one there.",
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
     invite_expired: "That invitation has expired.",

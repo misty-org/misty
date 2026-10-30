@@ -41,13 +41,14 @@ own history.
    file. It isn't a meetings feature.
 4. **Speech runs in the cloud, through Audeeo's pipeline.**
    - Live audio goes to Soniox realtime, with speaker diarization, through a relay in
-     the agent runtime on Misty's keys.
+     the agent runtime, on the account's Soniox key or the server's.
    - Files and the final pass go through the AI SDK `transcribe` with the Soniox
      provider.
-   - Notes, summaries and cleanup go through the AI Gateway. There is no local speech
-     model and no BYOK.
+   - Notes, summaries and cleanup use the account's fast model on its own key
+     ([byok.md](../byok.md)). There is no local speech model.
 5. **Results are cloud items.**
-   - Text becomes Notes, Journal and Library items in Postgres; media goes to R2.
+   - Text becomes Notes, Journal and Library items in Postgres; media goes to the
+     server's Library storage (its volume, or S3/R2).
    - Everything exports to local files.
    - Text is kept until you delete it, and recordings count toward storage.
 6. **Two channels, never mixed.** The microphone and system audio are separate streams
@@ -85,9 +86,8 @@ There is no "Loading…" text. The pill appears on key-down, before the network 
 ready: the microphone's first audio waits in the renderer while the ticket and socket
 open (up to 30 s), then goes first.
 
-No warm ticket is held between dictations. Each ticket reserves its audio allowance
-until it settles, so an unused warm ticket would hold billing for its whole window.
-The pre-roll covers the ticket's round trip instead. Saying "Hey <agent name>, …" at the start sends the rest to
+No warm ticket is held between dictations; the pre-roll covers the ticket's round
+trip instead. Saying "Hey <agent name>, …" at the start sends the rest to
 that agent instead of typing it, and the pill says where it went.
 
 Insertion:
@@ -201,7 +201,7 @@ audeeo-core ──16 kHz PCM, per channel──▶ runtime /v1/live/transcribe �
 global_hotkey (down/up)                     voice usage settled on close)
 voice/dictation → insert (page | paste)
                                           runtime /v1/models/transcribe-diarized ──▶ Soniox async
-                                          runtime voice-notes, day-summary (Gateway)
+                                          runtime voice-notes, day-summary (fast model)
 recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memory_events
                                                                   ─▶ ai_retrieval (memory_*)
 ```
@@ -209,9 +209,8 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
 Memory indexing, as built:
 - A trigger on `memory_events` writes each event that has text as a **private**
   retrieval document (owner only, no Space).
-- The existing embedding worker embeds private documents and bills their owner. Its
-  billing operation is `library.embedding`; a separate `memory` operation needs a
-  `misty-billing` change and is a follow-up.
+- The existing embedding worker embeds private documents with their owner's embedding
+  model.
 - A second trigger takes the event off `memory_backlog` once its embedding lands.
 - General retrieval search (global search, `search.all` and the context broker) excludes
   `memory_*` documents. Only the gated `recall.*` tools search them.
@@ -222,12 +221,10 @@ Memory indexing, as built:
 - Device settings live in the `recall` section of the settings document. Agent
   preferences already use the name "memory".
 
-- **`audeeo-core`** lives in the owner's Audeeo repo (branch `audeeo-core`):
-  - the Rust crate `crates/audeeo-core`
-  - the TS package `packages/core`, published as `@audeeo/core`
-
-  Misty pins the crate by git rev and vendors the built TS package under
-  `vendor/audeeo-core`, recording its rev.
+- **`audeeo-core`** comes from the Audeeo repo (github.com/kannachi323/audeeo, MIT):
+  - the Rust crate is vendored at `src-tauri/vendor/audeeo-core`, recording its rev
+  - the TS segment code is adapted into `src/features/voice/transcript/` and the runtime's
+    `src/live/`, each with its license
 - **Live relay.** The runtime opens one `@soniox/node` `RealtimeSttSession` per channel.
   Each session runs with diarization, endpoint detection, language identification and
   context (the personal dictionary, the page title and attendees). It maps tokens into
@@ -240,8 +237,6 @@ Memory indexing, as built:
   - The ticket is `v1.<claims>.<hmac>`, signed with the runtime control secret under
     the `misty-live-ticket` domain. Its claims are session, user, device, channels,
     limit, model and a one-minute expiry.
-  - The billing reservation is taken when the ticket is issued and recorded in
-    `voice_live_sessions`.
   - The runtime verifies the ticket statelessly and spends the session id. On close
     it posts the measured audio to `/internal/voice/live/settle`, which settles
     exactly once.
@@ -275,14 +270,6 @@ Memory indexing, as built:
    It only runs when both channels are open; mic-only dictation doesn't need it.
 3. **Quota numbers.** Every number is configurable on the server, and these are the
    defaults:
-   - **Voice price basis:** live and file voice are billed as the existing
-     `agent.voice.transcription` operation, by `audio_ms`.
-     - `misty-billing` prices it with `MISTY_AGENT_TRANSCRIPTION_MINUTE_MICROUSD`
-       (6000, which is above Soniox's roughly $0.002 a minute).
-     - A Soniox-specific rate is a follow-up in `misty-billing`.
-   - **Weekly voice minutes per plan:** `MISTY_VOICE_WEEKLY_MINUTES`, a rolling seven
-     days, defaulting to `basic=120,pro=600,max=1200,ultra=6000,ultra_plus=12000`.
-     Voice also counts toward the weekly AI limit; whichever runs out first stops it.
    - **Per ticket:** `MISTY_VOICE_LIVE_TICKET_MINUTES` (15) per channel. The relay
      stops at the limit and keeps what was heard.
    - **Memory backlog cap:** `MISTY_RECALL_BACKLOG_CAP=2000` events waiting to embed.

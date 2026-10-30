@@ -161,7 +161,7 @@ pub async fn run_hosted_turn(
     stop: oneshot::Receiver<()>,
 ) -> Result<Outcome, RunnerError> {
     if !meter.valid(host.now()) {
-        return Ok(Outcome::BudgetExhausted);
+        return Ok(Outcome::LeaseExpired);
     }
     let port = free_port().ok_or(RunnerError::Invalid("no free port for the coding tool"))?;
     let spec = runner.server(launch, port)?;

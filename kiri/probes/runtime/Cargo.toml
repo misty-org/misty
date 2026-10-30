@@ -2,6 +2,7 @@
 name = "kiri-runtime-probe"
 version = "0.1.0"
 edition = "2021"
+license = "AGPL-3.0-or-later"
 publish = false
 
 # A minimal Tauri app that runs Kiri's engine code for real on Linux

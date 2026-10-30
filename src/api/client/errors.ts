@@ -1,4 +1,3 @@
-import { usageLimitText } from "./usage-limits";
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -20,6 +19,7 @@ function apiErrorMessage(code: string | undefined, fallback: string): string {
     account_changed: "Wait for the account switch to finish.",
     invalid_request: "Misty could not validate that request.",
     internal_error: "Misty could not complete that request. Try again in a moment.",
+    model_key_needed: "Add a model key in Settings → Models.",
     mail_provider_mailbox_unavailable:
       "This Microsoft account has no Outlook mailbox. Use it in Files for OneDrive, or connect an Outlook.com or Microsoft 365 mailbox.",
     mail_provider_authorization_failed: "Reconnect this email account.",
@@ -53,8 +53,6 @@ export function decodeApiError(text: string): { code?: string; message: string }
       code?: unknown;
       message?: unknown;
       error?: unknown;
-      limit?: unknown;
-      resets_at?: unknown;
     };
     const code = typeof decoded.code === "string" ? decoded.code : undefined;
     const message =
@@ -63,16 +61,6 @@ export function decodeApiError(text: string): { code?: string; message: string }
         : typeof decoded.error === "string"
           ? decoded.error
           : "";
-    if (code === "usage_limit_reached") {
-      return {
-        code,
-        message: usageLimitText(
-          typeof decoded.limit === "string" ? decoded.limit : undefined,
-          typeof decoded.resets_at === "string" ? decoded.resets_at : undefined,
-          message,
-        ),
-      };
-    }
     return { code, message: apiErrorMessage(code, message) };
   } catch {
     return { message: apiErrorMessage(undefined, text) };

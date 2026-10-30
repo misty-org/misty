@@ -85,7 +85,11 @@ pub(super) async fn evaluate(
     reply(Err("The page did not answer.".into()))
 }
 
-pub(super) async fn close(AxumState(bridge): AxumState<Bridge>, headers: HeaderMap, body: Bytes) -> Response {
+pub(super) async fn close(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let body = match request::<Scoped>(&bridge, &headers, &body) {
         Ok(body) => body,
         Err(response) => return response,

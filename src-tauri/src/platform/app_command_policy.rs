@@ -33,6 +33,8 @@ pub fn allows(label: &str, command: &str) -> bool {
         || command.starts_with("api_cache_")
         // Reads other browsers' profiles, sign-ins included.
         || command.starts_with("browser_import_")
+        // Saves and removes the device's model provider keys.
+        || command.starts_with("model_keys_")
     {
         return space_windows::is_space_window(label);
     }
@@ -110,6 +112,9 @@ mod tests {
             "browser_recovery_read",
             "browser_recovery_write",
             "browser_recovery_forget",
+            "model_keys_saved",
+            "model_keys_save",
+            "model_keys_remove",
         ] {
             assert!(allows("window-1", command));
             for label in [

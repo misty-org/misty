@@ -54,11 +54,18 @@ fn refusing_hooks() -> Option<PathBuf> {
     let dir = std::env::temp_dir().join("misty-refuse-push-hooks");
     let hook = dir.join("pre-push");
     std::fs::create_dir_all(&dir).ok()?;
-    std::fs::write(&hook, "#!/bin/sh\necho 'Misty: pushing needs your approval. Remember pushing for this project in Misty first.' >&2\nexit 1\n").ok()?;
+    // Written beside the hook and renamed over it, so a tool starting at the same moment never
+    // runs a half-written (empty, so passing) hook.
+    let staged = dir.join(format!("pre-push.{}", uuid::Uuid::new_v4()));
+    std::fs::write(&staged, "#!/bin/sh\necho 'Misty: pushing needs your approval. Remember pushing for this project in Misty first.' >&2\nexit 1\n").ok()?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).ok()?;
+        std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).ok()?;
+    }
+    if std::fs::rename(&staged, &hook).is_err() {
+        let _ = std::fs::remove_file(&staged);
+        return None;
     }
     Some(dir)
 }

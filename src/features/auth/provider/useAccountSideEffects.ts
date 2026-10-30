@@ -115,7 +115,6 @@ export function useStartupSessionValidation(
           username: me.username,
           email: me.email,
           accountCreatedAt: me.created_at,
-          currentPlan: me.tier,
         }));
       } catch (error) {
         if (

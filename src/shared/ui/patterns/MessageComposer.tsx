@@ -96,7 +96,7 @@ export const MessageComposer = forwardRef<
         {actions && <div className="mb-[3px] flex shrink-0 items-center gap-1">{actions}</div>}
       </div>
       {footer && (
-        // Footer parts may render nothing (no model yet, no draft to estimate); an empty
+        // Footer parts may render nothing (no model yet); an empty
         // row would still pad the bottom of the composer.
         <div className="flex min-w-0 flex-wrap items-center gap-2 px-3 pb-2 text-xs text-cream-muted empty:hidden [&:has(>:only-child:empty)]:hidden">
           {footer}

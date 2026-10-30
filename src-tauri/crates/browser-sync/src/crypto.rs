@@ -120,7 +120,11 @@ fn decrypt(
         .map_err(|_| Error::Unlock)
 }
 
-fn legacy_wrapping_key(password: &str, secret: &str, salt: &[u8; 16]) -> Result<Zeroizing<[u8; 32]>> {
+fn legacy_wrapping_key(
+    password: &str,
+    secret: &str,
+    salt: &[u8; 16],
+) -> Result<Zeroizing<[u8; 32]>> {
     if !(12..=1024).contains(&password.len()) {
         return Err(Error::Invalid);
     }

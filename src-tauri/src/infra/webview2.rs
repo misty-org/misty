@@ -20,6 +20,8 @@ use windows::core::{HSTRING, PWSTR};
 use windows::Win32::System::Com::CoTaskMemFree;
 use zeroize::Zeroizing;
 
+// Spelled out so the Windows probes in examples/, which include this file by path, find it too.
+#[path = "webview2/page.rs"]
 mod page;
 pub(crate) use page::{click, css_viewport, evaluate, evaluate_in_session, MouseButton};
 

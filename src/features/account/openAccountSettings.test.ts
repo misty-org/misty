@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   openSystemExternalLink: vi.fn(),
-  mistyPublicPage: vi.fn((path: string) => `https://mistysys.com${path}`),
+  mistyPublicPage: vi.fn((path: string): string | null => `https://misty.example${path}`),
 }));
 
 vi.mock("@/shared/platform/mistyPublicUrl", () => ({
@@ -23,16 +23,22 @@ describe("openAccountSettingsInBrowser", () => {
     await openAccountSettingsInBrowser();
 
     expect(mocks.mistyPublicPage).toHaveBeenCalledWith("/settings");
-    expect(mocks.openSystemExternalLink).toHaveBeenCalledWith("https://mistysys.com/settings");
+    expect(mocks.openSystemExternalLink).toHaveBeenCalledWith("https://misty.example/settings");
   });
 
   it("passes a requested account surface through", async () => {
-    await openAccountSettingsInBrowser("/settings/billing");
+    await openAccountSettingsInBrowser("/settings/privacy");
 
-    expect(mocks.mistyPublicPage).toHaveBeenCalledWith("/settings/billing");
+    expect(mocks.mistyPublicPage).toHaveBeenCalledWith("/settings/privacy");
     expect(mocks.openSystemExternalLink).toHaveBeenCalledWith(
-      "https://mistysys.com/settings/billing",
+      "https://misty.example/settings/privacy",
     );
+  });
+
+  it("refuses when this build names no account website", async () => {
+    mocks.mistyPublicPage.mockReturnValueOnce(null);
+    await expect(openAccountSettingsInBrowser()).rejects.toThrow("no account website");
+    expect(mocks.openSystemExternalLink).not.toHaveBeenCalled();
   });
 
   it("propagates failures so the caller can surface them", async () => {

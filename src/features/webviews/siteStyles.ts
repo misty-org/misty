@@ -71,8 +71,12 @@ export interface Boost {
 
 export function readBoost(css: string): Boost {
   const block = css.match(boostBlock)?.[0] ?? "";
-  const font = boostFonts.find((option) => option.value && block.includes(`font-family: ${option.value} `));
-  const size = boostSizes.find((option) => option.value && block.includes(`font-size: ${option.value}%`));
+  const font = boostFonts.find(
+    (option) => option.value && block.includes(`font-family: ${option.value} `),
+  );
+  const size = boostSizes.find(
+    (option) => option.value && block.includes(`font-size: ${option.value}%`),
+  );
   return { font: font?.value ?? "", size: size?.value ?? "" };
 }
 

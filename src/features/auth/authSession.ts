@@ -2,7 +2,6 @@ import { deploymentStorageKey, readDeploymentStorageItem } from "@/api/deploymen
 import { clearSystemErrors } from "@/features/support/systemErrors";
 import { resetAiSurfaceAccountState } from "@/features/ai-surface";
 import { useAppRouteMemoryStore } from "@/features/app-shell";
-import type { CurrentLicense } from "@/features/native-session";
 import { resetNotesAccountState } from "@/features/journal/notes";
 import { resetSpacesAccountState } from "@/features/spaces";
 import { resetWorkspaceAccountState } from "@/features/workspace";
@@ -35,7 +34,6 @@ export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSess
     email: me.email || fallback.email,
     avatarVersion: me.avatar_version,
     accountCreatedAt: me.created_at || fallback.accountCreatedAt,
-    currentPlan: me.tier || fallback.currentPlan,
   };
 }
 export function assertAccountIdentity(me: AccountMeResponse, expectedAccountId: string): void {
@@ -51,17 +49,6 @@ class AccountIdentityMismatchError extends Error {
   constructor() {
     super("The saved Misty session did not match the expected account.");
   }
-}
-export function licenseFromMe(me: AccountMeResponse): CurrentLicense {
-  return {
-    tier: me.tier,
-    status: me.status,
-    allows_use: me.allows_use,
-    expires_at: me.expires_at,
-    trial_started_at: me.trial_started_at,
-    email_verified: me.email_verified,
-    license_device: me.license_device || null,
-  };
 }
 function readStoredUser(): AuthUser | null {
   try {
@@ -105,7 +92,6 @@ export interface AuthUser {
   email: string;
   avatarVersion?: number;
   accountCreatedAt?: string;
-  currentPlan?: string;
 }
 export interface AuthContextValue {
   user: AuthUser | null;

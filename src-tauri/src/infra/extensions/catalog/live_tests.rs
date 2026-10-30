@@ -22,39 +22,39 @@ async fn store_package_intake() {
     }
 }
 
-    /// Which APIs WebView2 does not offer extensions (`native_windows::LIMITED`)
-    /// each Chrome Web Store extension asks for, from its live package.
-    #[cfg(windows)]
-    #[tokio::test]
-    #[ignore = "Downloads current public store packages; run explicitly for Windows compatibility intake"]
-    async fn windows_limited_apis_for_chrome_store_extensions() {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        for key in [
-            "ddkjiahejlhfcafbddmgiahcphecmpfh", // uBlock Origin Lite
-            "nngceckbapebfimnlniiiahkandclblb", // Bitwarden
-            "aeblfdkhhhdcdjpifhhbdiojplfjncoa", // 1Password
-            "eimadpbcbfnmbkopoojfekhnkhdbieeh", // Dark Reader
-        ] {
-            let outcome = async {
-                let detail = latest(key).await?;
-                let bytes = bytes(&detail.download_url, 64 * 1024 * 1024).await?;
-                let root = tempfile::tempdir().map_err(|e| e.to_string())?;
-                super::super::package::extract(&bytes, detail, root.path(), "intake".into())
+/// Which APIs WebView2 does not offer extensions (`native_windows::LIMITED`)
+/// each Chrome Web Store extension asks for, from its live package.
+#[cfg(windows)]
+#[tokio::test]
+#[ignore = "Downloads current public store packages; run explicitly for Windows compatibility intake"]
+async fn windows_limited_apis_for_chrome_store_extensions() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    for key in [
+        "ddkjiahejlhfcafbddmgiahcphecmpfh", // uBlock Origin Lite
+        "nngceckbapebfimnlniiiahkandclblb", // Bitwarden
+        "aeblfdkhhhdcdjpifhhbdiojplfjncoa", // 1Password
+        "eimadpbcbfnmbkopoojfekhnkhdbieeh", // Dark Reader
+    ] {
+        let outcome = async {
+            let detail = latest(key).await?;
+            let bytes = bytes(&detail.download_url, 64 * 1024 * 1024).await?;
+            let root = tempfile::tempdir().map_err(|e| e.to_string())?;
+            super::super::package::extract(&bytes, detail, root.path(), "intake".into())
+        }
+        .await;
+        match outcome {
+            Ok(review) => {
+                let limited: Vec<_> = review
+                    .permissions
+                    .iter()
+                    .filter(|p| super::super::native_windows::LIMITED.contains(&p.as_str()))
+                    .collect();
+                println!(
+                    "{} {}: permissions {:?}; limited on Windows: {:?}",
+                    review.entry.name, review.entry.version, review.permissions, limited
+                );
             }
-            .await;
-            match outcome {
-                Ok(review) => {
-                    let limited: Vec<_> = review
-                        .permissions
-                        .iter()
-                        .filter(|p| super::super::native_windows::LIMITED.contains(&p.as_str()))
-                        .collect();
-                    println!(
-                        "{} {}: permissions {:?}; limited on Windows: {:?}",
-                        review.entry.name, review.entry.version, review.permissions, limited
-                    );
-                }
-                Err(error) => println!("{key}: could not fetch or verify: {error}"),
-            }
+            Err(error) => println!("{key}: could not fetch or verify: {error}"),
         }
     }
+}

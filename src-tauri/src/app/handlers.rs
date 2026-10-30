@@ -60,6 +60,9 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::infra::account::http::auth_http_start,
             crate::infra::account::http::auth_http_read,
             crate::infra::account::http::auth_http_cancel,
+            crate::infra::models::model_keys_saved,
+            crate::infra::models::model_keys_save,
+            crate::infra::models::model_keys_remove,
             crate::infra::misty_context::misty_workspace_focused,
             crate::infra::misty_context::misty_screen_status,
             crate::infra::misty_context::misty_screen_capture,
@@ -172,7 +175,6 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             #[cfg(desktop)]
             crate::infra::misty::check_system,
             crate::infra::misty::save_authenticated_user,
-            crate::infra::misty::save_verified_license,
             crate::infra::misty::sign_out_misty,
             #[cfg(desktop)]
             crate::infra::browser::browser_webview_create,

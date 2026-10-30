@@ -41,7 +41,8 @@ export default defineConfig(({ command, mode }) => {
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const isDev =
     command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
-  const defaultPublicUrl = isDev ? "http://localhost:5174" : "https://mistysys.com";
+  // The server's website is named per build; a release that names none links to no website.
+  const defaultPublicUrl = isDev ? "http://localhost:5174" : "";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
   const uploadSourceMaps = Boolean(
     command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",

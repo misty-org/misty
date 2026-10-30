@@ -133,7 +133,9 @@ export function SyncVaultForm(props: {
           <Input
             aria-label={legacy ? "Sync password" : "Misty password"}
             type="password"
-            autoComplete={props.create && props.confirmPassword ? "new-password" : "current-password"}
+            autoComplete={
+              props.create && props.confirmPassword ? "new-password" : "current-password"
+            }
             value={password}
             maxLength={1024}
             disabled={busy}

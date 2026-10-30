@@ -1,6 +1,7 @@
 import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
 import { executeBrowserJob } from "../browserJobRun";
-import { agentTab, agentTabsForTask, keepAgentTab } from "../agentTabs";
+import { agentTab, agentTabsForTask, closeAgentTab, keepAgentTab } from "../agentTabs";
+import { removeHostedChildTab } from "../hostedSessionsState";
 import type { ClaimedWorkflowNodeJob } from "../workerBrowserJobs";
 import { unwrapSearchRedirect } from "./searchRedirect";
 
@@ -68,6 +69,16 @@ export function pageHost(state: ProgramState) {
     if (typeof seen === "string" && seen) state.documents.set(scopeId, seen);
     // The tab's record follows the page, so tabs lists and the finish check see where it is now.
     const page = (output.page ?? output) as { url?: unknown; title?: unknown };
+    // Google answers searches from busy agents with a robot check. It is never solved: the run's
+    // web_search tool gives the same results, and their pages open directly.
+    if (
+      typeof page.url === "string" &&
+      /^https:\/\/(www\.)?google\.[a-z.]+\/sorry\//.test(page.url)
+    )
+      throw new Error(
+        "Google showed a robot check for this search. Don't try to pass it: use the web_search " +
+          "tool for Google's results, then open the result pages with openTab(url).",
+      );
     const tab = agentTab(scopeId);
     if (tab && typeof page.url === "string" && /^https?:/.test(page.url)) {
       tab.url = page.url;
@@ -109,6 +120,9 @@ export function pageHost(state: ProgramState) {
   const targetOf = async (scopeId: string, target: unknown): Promise<Record<string, unknown>> => {
     if (target === undefined || target === null) return {};
     if (typeof target === "string" && /^e\d+$/.test(target)) return { ref: target };
+    // A whole line copied from read() or find() ('button "Search" [ref=e8]') names its ref.
+    const copied = typeof target === "string" ? ref.exec(target)?.[1] : undefined;
+    if (copied) return { ref: copied };
     if (typeof target === "object" && typeof (target as { role?: unknown }).role === "string") {
       const { role, name, index } = target as { role: string; name?: unknown; index?: unknown };
       return {
@@ -275,6 +289,17 @@ export function pageHost(state: ProgramState) {
         state.kept.add(scopeId);
         keepAgentTab(scopeId);
         return { kept: true };
+      }
+      case "close": {
+        // As screen_close does: a tab the run opened goes; its first tab stays and is navigated.
+        const scopeId = ownTab(args.tab);
+        if (!removeHostedChildTab(state.taskId(), scopeId))
+          throw new Error(
+            "This is your run's first tab, which stays open: use goto() to change its page.",
+          );
+        state.kept.delete(scopeId);
+        await closeAgentTab(scopeId);
+        return { closed: true };
       }
       case "note":
         if (state.notes.length >= 500) throw new Error("A program records at most 500 notes.");

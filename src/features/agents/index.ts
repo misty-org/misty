@@ -27,15 +27,8 @@ export { settleProgress, withAnswer, withToolEvent } from "./progress/progressTi
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
 export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
 export type { AgentGrant } from "./grants/api";
-export {
-  codingAllowance,
-  codingToolStatusText,
-  codingTools,
-  detectCodingTools,
-} from "./coding/codingTools";
-export type { CodingAllowance, CodingToolStatus } from "./coding/codingTools";
-export { CodingUpgradeNote } from "./coding/CodingUpgradeNote";
-export { useCodingIncluded } from "./coding/useCodingIncluded";
+export { codingToolStatusText, codingTools, detectCodingTools } from "./coding/codingTools";
+export type { CodingToolStatus } from "./coding/codingTools";
 // Dictation hands "Hey <agent>, …" to an agent through the cursor session.
 export { useCompanionState } from "./companion/companionState";
 export { routeLocalFollowup, useLocalExecution } from "./localExecution";

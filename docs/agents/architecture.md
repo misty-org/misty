@@ -36,7 +36,7 @@ and the approval policy below.
 5. **Composio for apps, Midscene for screens.** Misty does not write per-app
    integrations or click logic.
 6. **Misty owns the platform:** its own data tools, the device adapter, the
-   policy gate, the action journal and billing.
+   policy gate and the action journal.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ browser work is programs against the agent's own tabs, and a run starts with a s
 Composer (one input, no modes)
   └─ Agent loop (Vercel Workflow): small tool surface, prompt stable between compactions,
      │  transcript summarized every 20 turns, a turn that only narrates goes back
-     ├─ browser_run ─ Capability gateway (Go: catalog · policy/approvals · journal · billing)
+     ├─ browser_run ─ Capability gateway (Go: catalog · policy/approvals · journal)
      │    └─ Device: the program in a sandbox inside the Misty app (no network, files or globals)
      │         └─ Page API: open · read · text · find · click · type · fill · goto · wait · keep
      │              └─ The agent's own tabs only (page layer, native input, consent and popup
@@ -187,9 +187,9 @@ Each phase leaves the product working.
   job, repeat. Leases, Stop and takeover apply to every action. It returns what
   happened, where the cursor stopped and the final screenshot.
 - Model calls go to `POST /me/screen-model/{jobID}`, a thin pass-through that
-  accepts calls only while that act job runs, uses the run's model through the
-  AI Gateway, caps output, and meters
-  each call to the run without spending its agent turns. Inference stays at the
+  accepts calls only while that act job runs, uses the run's model on the
+  account's own key, caps output, and records
+  each call on the run without spending its agent turns. Inference stays at the
   provider; neither the server nor the Mac runs a model.
 - The agent cursor is Misty's in-page pointer, separate from the user's.
   Native input glides it to each target before acting and leaves it in place,
@@ -204,7 +204,7 @@ Each phase leaves the product working.
   dependency and the pinned SDK execution path were removed once no run could
   grant native input directly.
 - Screen calls use the run's frozen *vision* route, which defaults to the run's
-  model and follows the account's Seeing choice; billing meters the same route.
+  model and follows the account's Seeing choice.
 - Midscene's Node-only helpers get browser stubs in the desktop build
   (`src/shared/platform/nodeShims`); reports and caches are not written.
 - Scope at first: Misty's own windows. Other Mac apps came next (below).
@@ -560,6 +560,22 @@ The first live run on October 4, 2026 found and fixed:
   (`misty_ask_conversations.model_override`). It beats the account's Thinking
   choice, is frozen into each run like every route, and falls back with a
   notice if the Gateway retires it.
+
+### Bring your own keys, no billing (October 29, 2026)
+
+Supersedes "Misty's own keys" above and the house model.
+
+- Misty is open source and self-hosted, with no billing. Every model call runs on a key the
+  person brings ([byok.md](../byok.md)): each device keeps provider keys in the keychain and a
+  model per job (agent, fast, embedding, transcription, speech) in its own settings.
+- The native layer sends them to the person's own server in the `X-Misty-Models` header. Go keeps
+  the account's latest copy in memory only, picks each role's model from it at admission, and
+  hands the credential to the runtime with the call (one-shot calls) or from the `model-provider`
+  route (agent runs). The runtime never writes it to workflow history, logs or errors.
+- A server may set its own `MISTY_AGENT_MODEL` and provider keys for accounts whose devices send
+  none. With neither, AI answers 409 `model_key_needed`.
+- Admission, holds, reservations, usage ceilings, plan tiers and the billing service are gone.
+  Model IDs are any `provider/model`; there is no catalog to validate against.
 
 ### Schedules belong to workflows (October 5, 2026)
 

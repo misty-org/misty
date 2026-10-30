@@ -6,7 +6,7 @@ use serde_json::json;
 
 use super::{
     bridge::{classify_command, decide, inside, BridgeContext, Decision},
-    events::{ActionKind, PermissionRequest, Usage},
+    events::{ActionKind, PermissionRequest},
     lease::{Lease, LeaseMeter},
     registry, runner_for, EngineId, Launch, LaunchMode, BYPASS_MARKERS,
 };
@@ -169,35 +169,14 @@ fn commands_are_classified_by_what_they_do() {
 }
 
 #[test]
-fn a_lease_stops_the_next_turn_once_spent_or_expired() {
+fn a_lease_stops_the_next_turn_once_expired() {
     let lease = Lease {
         invocation_id: "inv".into(),
-        token_budget: 1_000,
         expires_at: 100,
         grant_version: 1,
         grants: vec![],
         signature: "s".into(),
     };
-    let mut meter = LeaseMeter::new(lease.clone());
-    assert!(meter.valid(10));
-    assert!(meter.record(
-        &Usage {
-            input: 400,
-            output: 100,
-            ..Default::default()
-        },
-        10
-    ));
-    assert!(!meter.record(
-        &Usage {
-            input: 400,
-            output: 100,
-            cache_read: 50,
-            ..Default::default()
-        },
-        10
-    ));
-    assert!(!meter.valid(10));
     let fresh = LeaseMeter::new(lease);
     assert!(fresh.valid(10));
     assert!(!fresh.valid(100), "an expired lease is not valid");

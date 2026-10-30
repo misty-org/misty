@@ -10,8 +10,8 @@
 mod baseline_migration;
 use baseline_migration::migrated_baseline;
 mod loading;
-pub(super) use loading::reconcile;
 use loading::baseline;
+pub(super) use loading::reconcile;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
@@ -261,7 +261,6 @@ pub(super) async fn finish(
     }
     result
 }
-
 
 mod publishing;
 #[cfg(test)]

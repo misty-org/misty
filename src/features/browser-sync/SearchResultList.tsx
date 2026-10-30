@@ -1,3 +1,4 @@
+import { mistyPublicHost } from "@/shared/platform/mistyPublicUrl";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Search, Star } from "lucide-react";
 import { BrandIcon, brandIconAsset, cn } from "@/shared/ui";
@@ -40,7 +41,8 @@ function ItemIcon({ item }: { item: SearchListItem }) {
 
   const host = urlObj?.host.toLowerCase() ?? "";
   const isLocalhost = host.startsWith("localhost") || host.startsWith("127.0.0.1");
-  const isMisty = host.includes("mistysys.com") || host.includes("misty.local");
+  const mistyHost = mistyPublicHost();
+  const isMisty = (mistyHost && host === mistyHost) || host.includes("misty.local");
   const isOpenAi = host.includes("chatgpt.com") || host.includes("openai.com");
   const isYouTube = [host, match.faviconUrl ?? ""].some((value) =>
     /youtube\.com|youtu\.be/.test(value.toLowerCase()),

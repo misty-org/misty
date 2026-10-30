@@ -3,6 +3,7 @@ import type {
   AiSelectionSnapshot,
   AiSurfaceAdapter,
 } from "@/features/ai-surface/types";
+import { collaborationOffMessage } from "@/features/collaboration/collaborationOff";
 import { JournalAttribution } from "@/features/journal";
 import { EmptyState, Skeleton } from "@/shared/ui";
 import { Suspense, useMemo, useState } from "react";
@@ -108,6 +109,7 @@ export function DrawingWorkspace(props: {
       ],
       canApply: (artifact) => Boolean(applicablePatch(artifact)),
       applyArtifact: async (artifact) => {
+        if (room.session?.localOnly) throw new Error(collaborationOffMessage);
         const patch = applicablePatch(artifact);
         if (!patch || !aiController)
           throw new Error(
@@ -116,7 +118,7 @@ export function DrawingWorkspace(props: {
         aiController.apply(patch);
       },
     };
-  }, [aiController, aiSnapshot, props.drawing]);
+  }, [aiController, aiSnapshot, props.drawing, room.session?.localOnly]);
 
   return (
     <div className="relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-charcoal-bg">
@@ -132,6 +134,11 @@ export function DrawingWorkspace(props: {
           href="https://excalidraw.com/"
           className="absolute right-3 top-3 z-20 shadow-sm"
         />
+        {room.session?.localOnly ? (
+          <p className="absolute inset-x-0 top-3 z-30 m-0 mx-auto w-fit max-w-xl px-3 text-sm text-cream-muted">
+            {collaborationOffMessage}
+          </p>
+        ) : null}
         {room.notice ? (
           <div
             className={[

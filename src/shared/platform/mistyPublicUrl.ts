@@ -1,11 +1,9 @@
-const defaultMistyPublicUrl = "https://mistysys.com";
 const devMistyPublicUrl = "http://localhost:5174";
 
-export function normalizeMistyPublicUrl(
-  value: string | null | undefined,
-  fallback = defaultMistyPublicUrl,
-): string {
-  const candidate = value?.trim() || fallback;
+/** A safe http(s) origin without a trailing slash, else `fallback` (none by default). */
+export function normalizeMistyPublicUrl(value: string | null | undefined, fallback = ""): string {
+  const candidate = value?.trim();
+  if (!candidate) return fallback;
   try {
     const url = new URL(candidate);
     if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) {
@@ -17,12 +15,18 @@ export function normalizeMistyPublicUrl(
   }
 }
 
-const defaultResolvedPublicUrl = import.meta.env.DEV ? devMistyPublicUrl : defaultMistyPublicUrl;
-
+/** The Misty server's website, named at build time (VITE_MISTY_PUBLIC_URL); none by default. */
 const mistyPublicUrl = normalizeMistyPublicUrl(
-  import.meta.env.VITE_MISTY_PUBLIC_URL || defaultResolvedPublicUrl,
+  import.meta.env.VITE_MISTY_PUBLIC_URL,
+  import.meta.env.DEV ? devMistyPublicUrl : "",
 );
 
-export function mistyPublicPage(path: string): string {
-  return new URL(path, `${mistyPublicUrl}/`).href;
+/** A page on that website, or null when this build names none. */
+export function mistyPublicPage(path: string): string | null {
+  return mistyPublicUrl ? new URL(path, `${mistyPublicUrl}/`).href : null;
+}
+
+/** The website's host, or "" when this build names none. */
+export function mistyPublicHost(): string {
+  return mistyPublicUrl ? new URL(mistyPublicUrl).host : "";
 }

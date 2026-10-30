@@ -1,6 +1,6 @@
 //! Coding tools as runners. Each engine adapter knows how to start its tool,
 //! read what it prints and answer its permission questions; everything around
-//! that (the process registry, permission bridge and budget lease) is shared.
+//! that (the process registry, permission bridge and lease) is shared.
 pub mod acp;
 pub mod acp_engines;
 pub mod bridge;
