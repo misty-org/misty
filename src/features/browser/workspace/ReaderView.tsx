@@ -18,8 +18,8 @@ export function ReaderView(props: { article: ReaderArticle; onClose(): void }) {
           Exit reader
         </Button>
       </div>
-      <article className="mx-auto max-w-[680px] px-6 pb-16 text-[17px] leading-[1.7]">
-        <p className="text-xs uppercase tracking-wide text-cream-muted">{article.site}</p>
+      <article className="mx-auto max-w-[680px] px-6 pb-16 text-lg leading-[1.7]">
+        <p className="text-sm text-cream-muted">{article.site}</p>
         <h1 className="mt-2 text-3xl font-semibold leading-tight text-cream-bright">
           {article.title}
         </h1>

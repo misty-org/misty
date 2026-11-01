@@ -35,7 +35,6 @@ export const useMistyStore = create<MistyState>((set, get) => ({
       handoff: undefined,
       thinkingMode: "normal",
       thinkingModeExplicit: false,
-      pendingModelOverride: undefined,
       invocationId: undefined,
       invocationConversationId: undefined,
       pendingArtifact: undefined,

@@ -18,17 +18,8 @@ export function ScreenCaptureSettings(props: SettingsContentProps) {
   const set = (key: string, value: string | number) =>
     props.onSettingChange("screen_memory", key, value);
   return (
-    <SettingsSectionBlock
-      title="Screen capture"
-      description={
-        "Start capture from the Memory icon in the Space bar. While it runs, Misty reads the words " +
-        "on the window in front and keeps the text, not a picture. It never starts by itself."
-      }
-    >
-      <SettingsRow
-        label="Stop when I'm away"
-        description="A session ends after this long without keyboard or mouse use. Misty asks about starting again when you return."
-      >
+    <SettingsSectionBlock title="Screen capture">
+      <SettingsRow label="Stop when I'm away" description="Ends a session after this long idle.">
         <ChoiceControl
           value={String(screen.idleMinutes)}
           options={IDLE_MINUTE_CHOICES.map((minutes) => ({
@@ -39,10 +30,7 @@ export function ScreenCaptureSettings(props: SettingsContentProps) {
           onValueChange={(value) => set("idle_minutes", Number(value))}
         />
       </SettingsRow>
-      <SettingsRow
-        label="Keep screen memories"
-        description="Older captures are forgotten when you start a session."
-      >
+      <SettingsRow label="Keep screen memories">
         <ChoiceControl
           value={String(screen.keepDays)}
           options={KEEP_DAY_CHOICES.map((days) => ({ value: String(days), label: `${days} days` }))}
@@ -52,7 +40,7 @@ export function ScreenCaptureSettings(props: SettingsContentProps) {
       </SettingsRow>
       <SettingsRow
         label="Apps capture skips"
-        description="One app per line. Password managers, private windows and sign-in pages are always skipped."
+        description="One per line. Password managers are always skipped."
         stacked
       >
         <TextAreaControl

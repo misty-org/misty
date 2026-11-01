@@ -93,7 +93,7 @@ const buttonVariants = cva(
           "[&_svg:not([class*='size-'])]:size-3",
         ],
         sm: [
-          "h-8 gap-1 px-2.5 text-[13px] in-data-[slot=button-group]:rounded-md",
+          "h-8 gap-1 px-2.5 text-ui in-data-[slot=button-group]:rounded-md",
           "has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
         ],
         lg: "h-10 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",

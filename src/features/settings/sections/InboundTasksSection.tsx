@@ -54,20 +54,14 @@ export function InboundTasksSection() {
       ? "This connection needs attention. Reconnect it in Agents › Integrations."
       : fallback;
   return (
-    <DesktopSettingsSection
-      title="Tasks by email and Slack"
-      description={
-        "Start a task without opening Misty. It runs like any task you give Misty, on your " +
-        "plan, and the answer comes back in the same thread. Only messages you wrote start tasks."
-      }
-    >
+    <DesktopSettingsSection title="Tasks from email and Slack">
       <DesktopSettingsRow
         label="Email"
         description={note(
           gmail,
           gmail?.enabled && gmail.identity.task_address
-            ? `Forward an email to ${gmail.identity.task_address}, with a note saying what to do. Uses your connected Gmail.`
-            : "Forward an email to your own address with +misty added. Needs Gmail connected in Agents › Integrations.",
+            ? `Forward an email to ${gmail.identity.task_address}.`
+            : "Forward to your address with +misty. Needs Gmail connected.",
         )}
       >
         <SwitchControl
@@ -80,8 +74,7 @@ export function InboundTasksSection() {
         label="Slack"
         description={note(
           slack,
-          "Write @misty in any message you send, and the answer posts in its thread. Others in the channel can read it. " +
-            "Needs Slack connected in Agents › Integrations.",
+          "Write @misty in a message; the answer posts in its thread. Needs Slack connected.",
         )}
       >
         <SwitchControl

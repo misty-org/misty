@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   resetLayout: vi.fn(),
 }));
 
-vi.mock("@/telemetry/metadata", () => ({
+vi.mock("./clientMetadata", () => ({
   clientMetadata: vi.fn(async () => ({
     app_version: "0.1.0",
     platform: "macos",

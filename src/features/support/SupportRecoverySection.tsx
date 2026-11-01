@@ -1,4 +1,4 @@
-import { clientMetadata } from "@/telemetry/metadata";
+import { clientMetadata } from "./clientMetadata";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
 import { Button } from "@/shared/ui";
 import {
@@ -202,7 +202,7 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
             </Button>
           </div>
           <div className="flex gap-2 text-xs leading-5 text-cream-muted">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-sage-fg" />
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-cream-muted" />
             <p className="m-0">
               Diagnostics are created locally and redacted. Misty never uploads or attaches the
               bundle automatically.

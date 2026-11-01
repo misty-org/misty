@@ -112,13 +112,13 @@ describe("JWT cookie transport", () => {
     const spaces = await cookieSessionFetch("https://misty.example/v1/spaces", {});
     expect(spaces.status).toBe(401);
     await cookieSessionFetch("https://misty.example/v1/login", { method: "POST", body: "{}" });
-    await cookieSessionFetch("https://misty.example/v1/auth/forgot", {
+    await cookieSessionFetch("https://misty.example/v1/setup-keys/redeem", {
       method: "POST",
       body: "{}",
     });
     expect(native.fetch.mock.calls.map(([url]) => url)).toEqual([
       "https://misty.example/v1/login",
-      "https://misty.example/v1/auth/forgot",
+      "https://misty.example/v1/setup-keys/redeem",
     ]);
   });
 
@@ -232,7 +232,7 @@ describe("JWT cookie transport", () => {
       );
     const { cookieSessionFetch } = await import("./cookie-session");
     await cookieSessionFetch("https://misty.example/v1/me", {});
-    await cookieSessionFetch("https://misty.example/v1/me/telemetry", { method: "PUT" });
+    await cookieSessionFetch("https://misty.example/v1/me/avatar", { method: "PUT" });
     expect(fetch.mock.calls.filter(([url]) => String(url).endsWith("/auth/refresh"))).toHaveLength(
       1,
     );

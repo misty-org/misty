@@ -19,8 +19,10 @@ const edgeZone = 6;
 const barHeight = 36;
 /** The slide's length. The page below keeps its full size and moves its top edge with it. */
 const slideMs = 150;
-const openHeight = `calc(var(--pane-frame, 6px) + ${barHeight}px)`;
-const closedHeight = "0px";
+const openHeight = `calc(var(--shell-edge, 6px) + ${barHeight}px)`;
+/** Tucked away it keeps the edge less the page's gap, so the page still sits the window edge
+ * below the top. */
+const closedHeight = "calc(var(--shell-edge, 6px) - var(--shell-gap, 4px))";
 
 /**
  * The Space bar above the browser area in vertical layouts: the Space with its menu, and its
@@ -228,7 +230,7 @@ export function SpaceBar(props: { gridColumn: number }) {
         // the bar as it slides away; it moves the window like the band beneath it.
         <div
           aria-hidden="true"
-          className={`absolute inset-x-0 top-0 z-20 flex h-[var(--pane-frame,6px)] justify-center transition-opacity ease-out motion-reduce:transition-none ${
+          className={`absolute inset-x-0 top-0 z-20 flex h-[var(--shell-edge,6px)] justify-center transition-opacity ease-out motion-reduce:transition-none ${
             open ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
           style={{ transitionDuration: `${slideMs}ms` }}
@@ -245,7 +247,7 @@ export function SpaceBar(props: { gridColumn: number }) {
         <div
           ref={bar}
           className={
-            "mx-[var(--pane-frame,6px)] mt-[var(--pane-frame,6px)] shrink-0 overflow-hidden " +
+            "misty-space-bar-card shrink-0 overflow-hidden " +
             "rounded-lg border border-charcoal-border bg-[var(--workspace-tab-surface)]"
           }
           style={{ height: barHeight }}

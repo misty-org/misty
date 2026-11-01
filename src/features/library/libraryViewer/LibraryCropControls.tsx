@@ -18,9 +18,7 @@ export function LibraryCropControls({
 }) {
   return (
     <div className="mt-4">
-      <p className="m-0 text-[10px] font-medium capitalize text-cream-muted">
-        Crop &amp; Straighten
-      </p>
+      <p className="m-0 text-3xs font-medium capitalize text-cream-muted">Crop &amp; Straighten</p>
       <LibraryEditRange
         label="Straighten"
         value={draft.straighten}

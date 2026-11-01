@@ -12,13 +12,13 @@ describe.each(tabSides)("tabs on the %s", (tabs) => {
       `${dockingMetrics.titlebar}px 0px minmax(0, 1fr) 0px`,
     );
   });
-  it("makes the page a rounded pane with an even margin on every edge", () => {
+  it("keeps the window edge on the page's outer sides and the gap toward the sidebar", () => {
     const { frame } = dockingGeometry(layout);
-    for (const edge of ["top", "right", "bottom", "left"] as const)
-      expect(frame[`--pane-seam-${edge}`]).toBe(`${dockingMetrics.paneMargin}px`);
-    expect(frame["--pane-corner-top-left"]).toBe(
-      `${dockingMetrics.paneMargin + dockingMetrics.paneRadius}px`,
-    );
+    const { gap, edge, paneRadius } = dockingMetrics;
+    const seams = { top: gap, bottom: edge, [tabs]: gap, [layout.navigation]: edge };
+    for (const side of ["top", "right", "bottom", "left"] as const)
+      expect(frame[`--pane-seam-${side}`]).toBe(`${seams[side]}px`);
+    expect(frame[`--pane-corner-bottom-${tabs}`]).toBe(`${edge + paneRadius}px`);
     expect(frame["--pane-seam-color"]).toBe("transparent");
   });
 });

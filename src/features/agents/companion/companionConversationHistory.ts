@@ -39,3 +39,25 @@ export function mergeVoiceTurn(
     messages,
   };
 }
+
+/** The last turns of a chat as JSON data for the voice: what was asked, answered and done. */
+export function voiceContext(conversation: GlobalAiConversation | undefined): string {
+  if (!conversation) return "[]";
+  const rows: Array<{ user: string; assistant: string; state: string; invocation_id: string }> = [];
+  for (const message of conversation.messages) {
+    if (message.role === "user")
+      rows.push({
+        user: message.content.slice(0, 1600),
+        assistant: "",
+        state: message.state ?? "",
+        invocation_id: "",
+      });
+    else if (rows.length) {
+      const row = rows[rows.length - 1]!;
+      row.assistant = message.content.slice(0, 2400);
+      row.state = message.state ?? row.state;
+      row.invocation_id = message.invocationId ?? "";
+    }
+  }
+  return JSON.stringify(rows.slice(-8));
+}

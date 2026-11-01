@@ -4,7 +4,8 @@ import { create } from "zustand";
  * What asked for an account. Misty works as a full browser without one; the sign-in sheet
  * opens only for these, and its title says which (docs/browser/no-account.md).
  */
-export type SignInReason = "account" | "sync" | "space" | "invite" | "agents" | "expired";
+export type SignInReason =
+  "account" | "sync" | "space" | "invite" | "agents" | "expired" | "setup" | "password";
 
 export const signInReasonCopy: Record<SignInReason, { title: string; description: string }> = {
   account: {
@@ -29,7 +30,16 @@ export const signInReasonCopy: Record<SignInReason, { title: string; description
   agents: {
     title: "Sign in to use agents",
     description:
-      "Agents run on Misty's servers, so they need an account. Browsing stays free and works without one.",
+      "Agents run on this computer, and their chats and tools need a Misty account. Browsing works without one.",
+  },
+  setup: {
+    title: "Set up Misty",
+    description:
+      "Misty works as a browser on its own. A Misty server adds sync, Spaces and agents.",
+  },
+  password: {
+    title: "Choose a password",
+    description: "You'll use it to sign in on your other computers. Sync starts once it's set.",
   },
   expired: {
     title: "Sign in again",

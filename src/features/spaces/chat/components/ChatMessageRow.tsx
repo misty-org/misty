@@ -134,7 +134,7 @@ function ChatMessageRowView({
           {compact ? (
             <time
               className={
-                "pt-1 text-[10px] tabular-nums text-cream-muted opacity-0 " +
+                "pt-1 text-3xs tabular-nums text-cream-muted opacity-0 " +
                 "group-hover/chat-message:opacity-100 group-focus-within/chat-message:opacity-100"
               }
             >
@@ -167,12 +167,12 @@ function ChatMessageRowView({
               onSubmit={(event: FormEvent, target) => props.onSaveEdited(event, target)}
             />
           ) : (
-            <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-6 text-cream/90">
+            <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-md leading-6 text-cream/90">
               {message.content.map((span, index) => (
                 <MessageContent key={index} span={span} highlightPlainMentions={agentAuthored} />
               ))}
               {message.edited_at ? (
-                <span className="ml-1 text-[10px] text-cream-muted">(edited)</span>
+                <span className="ml-1 text-3xs text-cream-muted">(edited)</span>
               ) : null}
             </p>
           )}
@@ -193,10 +193,7 @@ function ChatMessageRowView({
           {transcriptRequestId ? <AgentTranscriptButton requestId={transcriptRequestId} /> : null}
 
           {message.local_delivery_state === "failed" ? (
-            <div
-              className="mt-1 flex items-center gap-1.5 text-[11px] text-cream-muted"
-              role="alert"
-            >
+            <div className="mt-1 flex items-center gap-1.5 text-2xs text-cream-muted" role="alert">
               <CircleAlert className="size-3" aria-hidden="true" />
               Message couldn’t be sent.
               {props.onRetry && (

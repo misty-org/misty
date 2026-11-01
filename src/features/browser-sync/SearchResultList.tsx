@@ -68,10 +68,10 @@ function ItemIcon({ item }: { item: SearchListItem }) {
   } else if (isLocalhost) {
     content = <span className="size-4 shrink-0" aria-hidden="true" />;
   } else if (match.kind === "search" || match.kind === "suggestion") {
-    content = <Search size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
+    content = <Search size={14} className="shrink-0 text-cream-muted" aria-hidden="true" />;
   } else {
     const Icon = omniboxMatchIcon(match);
-    content = <Icon size={14} className="shrink-0 text-zinc-400" aria-hidden="true" />;
+    content = <Icon size={14} className="shrink-0 text-cream-muted" aria-hidden="true" />;
   }
 
   return (
@@ -80,7 +80,7 @@ function ItemIcon({ item }: { item: SearchListItem }) {
       {isBookmarked && (
         <Star
           size={9}
-          className="absolute -bottom-1 -right-1 fill-zinc-300 stroke-[1.5] text-zinc-300"
+          className="absolute -bottom-1 -right-1 fill-cream stroke-[1.5] text-cream"
           aria-hidden="true"
         />
       )}
@@ -99,9 +99,9 @@ function Row(props: { item: SearchListItem }) {
     <>
       <ItemIcon item={item} />
       <div className="flex min-w-0 flex-1 items-center text-sm">
-        <span className="truncate font-normal text-zinc-100">{title}</span>
+        <span className="truncate font-normal text-cream-bright">{title}</span>
         {detail && (
-          <span className="ml-3 min-w-0 truncate text-xs font-normal text-zinc-500 sm:text-sm">
+          <span className="ml-3 min-w-0 truncate text-xs font-normal text-cream-muted sm:text-sm">
             {detail}
           </span>
         )}
@@ -142,8 +142,8 @@ export function SearchResultList(props: {
               className={cn(
                 "group flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 index === props.activeIndex
-                  ? "bg-white/[0.08] text-white"
-                  : "text-zinc-200 hover:bg-white/[0.04]",
+                  ? "bg-control-active text-cream-bright"
+                  : "text-cream hover:bg-control-hover",
               )}
             >
               <Row item={item} />

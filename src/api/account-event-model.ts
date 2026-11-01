@@ -14,6 +14,7 @@ export function validEvent(value: unknown): value is AccountEvent {
       "runs",
       "invocations",
       "jobs",
+      "runtime",
       "agents",
       "interventions",
       "workflows",

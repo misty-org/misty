@@ -19,8 +19,13 @@ const layers = [
   "tooltip",
 ];
 
+// The type scale's added steps (theme.css) are font sizes, not text colors. Without this,
+// `cn("text-ui", "text-cream")` would drop the size as a conflicting color.
 const twMerge = extendTailwindMerge({
-  extend: { classGroups: { z: [{ layer: layers }] } },
+  extend: {
+    classGroups: { z: [{ layer: layers }] },
+    theme: { text: ["3xs", "2xs", "ui", "md"] },
+  },
 });
 
 export function cn(...inputs: ClassValue[]) {

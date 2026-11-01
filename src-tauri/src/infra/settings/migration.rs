@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 10;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 11;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read.
 /// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
@@ -66,6 +66,9 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     // extension tools search path had no reader.
     ("advanced", "mount_path"),
     ("advanced", "extension_tools_path"),
+    // Schema 11: Misty sends no usage analytics or crash reports (PostHog was removed).
+    ("privacy", "anonymous_usage_analytics_enabled"),
+    ("privacy", "anonymous_error_reporting_enabled"),
 ];
 
 /// Removes retired keys from an existing settings file.
@@ -114,7 +117,12 @@ mod tests {
             "appearance": { "custom_fonts": ["Inter"], "theme_index": 1, "compact_mode_enabled": true },
             "shortcuts": { "keymap_index": 2 },
             "advanced": { "server_address": "localhost:50051" },
-            "privacy": { "data_stays_local": true, "anonymous_usage_analytics_enabled": true },
+            "privacy": {
+                "data_stays_local": true,
+                "anonymous_usage_analytics_enabled": true,
+                "anonymous_error_reporting_enabled": true,
+                "page_state_restore": false
+            },
             "search": { "automatic_image_discovery_enabled": false },
             "account": { "email": "someone@example.com" },
             "ai": { "api_key": "sk-secret" }
@@ -142,12 +150,13 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(true)
         );
+        // Schema 11: the analytics and crash report switches went with PostHog.
+        let privacy = root.get("privacy").and_then(Value::as_object).unwrap();
+        assert!(!privacy.contains_key("anonymous_usage_analytics_enabled"));
+        assert!(!privacy.contains_key("anonymous_error_reporting_enabled"));
         assert_eq!(
-            root.get("privacy")
-                .and_then(Value::as_object)
-                .and_then(|privacy| privacy.get("anonymous_usage_analytics_enabled"))
-                .and_then(Value::as_bool),
-            Some(true)
+            privacy.get("page_state_restore").and_then(Value::as_bool),
+            Some(false)
         );
     }
 

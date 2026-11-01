@@ -36,7 +36,7 @@ export function CodingToolsSection() {
   if (!hasTauriInternals()) return null;
 
   return (
-    <Section title="Routing">
+    <Section title="Coding tools">
       <Row label={defaultTool.label} description="Agents hand coding to this tool first.">
         <DropdownControl
           value={defaultTool.value}
@@ -45,10 +45,7 @@ export function CodingToolsSection() {
           onValueChange={defaultTool.set}
         />
       </Row>
-      <Row
-        label={fallback.label}
-        description="Used when the default is missing, signed out, at its limit or can’t work in the chat’s mode."
-      >
+      <Row label={fallback.label} description="When the default can’t take the task.">
         <DropdownControl
           value={fallback.value}
           disabled={fallback.disabled}
@@ -56,10 +53,7 @@ export function CodingToolsSection() {
           onValueChange={fallback.set}
         />
       </Row>
-      <Row
-        label={cap.label}
-        description="Agents stop using a tool once it has used this much of its own weekly limit."
-      >
+      <Row label={cap.label} description="Of each tool’s own weekly limit.">
         <DropdownControl
           value={cap.value}
           disabled={cap.disabled}

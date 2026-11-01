@@ -1,9 +1,11 @@
+import { apiBaseFor, useServerChoice } from "@/api/deployment/serverChoice";
 import { routes } from "@/features/app-shell";
+import { openSignInSheet } from "@/features/auth/serverSetup";
 import { useSetupStore } from "@/features/setup/useSetupStore";
 import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
 import { Button, FlyingMisty, Pressable } from "@/shared/ui";
-import "@fontsource/instrument-serif/400-italic.css";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WelcomeNav } from "./WelcomeNav";
 import "./welcome.css";
@@ -28,6 +30,20 @@ export function WelcomePage() {
     finishWelcome();
     navigate(routes.browser, { replace: true });
   };
+  // With no server chosen on this device, the setup wizard opens over the welcome once, and
+  // Sign in goes through it.
+  const { loaded, choice } = useServerChoice();
+  const serverSet = apiBaseFor(choice) !== "";
+  const offered = useRef(false);
+  useEffect(() => {
+    if (!loaded || choice !== null || addingAccount || offered.current) return;
+    offered.current = true;
+    openSignInSheet("setup");
+  }, [loaded, choice, addingAccount]);
+  const signIn = () =>
+    serverSet && choice !== null
+      ? navigate(routes.signIn, { state: location.state })
+      : openSignInSheet("setup");
 
   return (
     <div className="relative grid h-full min-h-0 place-items-center bg-window-chrome px-6 pb-16 pt-36 text-center">
@@ -42,16 +58,7 @@ export function WelcomePage() {
       <div className="misty-page-in relative z-10 flex flex-col items-center gap-[0.85em] text-[clamp(2.25rem,4.5vw,3.5rem)]">
         <h1 className="text-[1em] font-medium leading-[1.25] tracking-[-0.035em] text-cream-bright">
           Welcome to Misty
-          <span className="block font-normal text-cream-muted">
-            The{" "}
-            <mark className="misty-welcome-marker" data-tone="yellow">
-              agentic
-            </mark>{" "}
-            browser{" "}
-            <mark className="misty-welcome-marker" data-tone="blue">
-              workspace
-            </mark>
-          </span>
+          <span className="block font-normal text-cream-muted">The agentic browser workspace</span>
         </h1>
         {addingAccount ? (
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -78,12 +85,7 @@ export function WelcomePage() {
               <Button variant="primary" className="px-7" size="lg" onClick={startBrowsing}>
                 Start browsing
               </Button>
-              <Button
-                variant="outline"
-                className="px-7"
-                size="lg"
-                onClick={() => navigate(routes.signIn, { state: location.state })}
-              >
+              <Button variant="outline" className="px-7" size="lg" onClick={signIn}>
                 Sign in
               </Button>
             </div>

@@ -90,7 +90,7 @@ export function AddThisDevice() {
         </Row>
         {approval?.code && !approval.admitted ? (
           <div className="py-3">
-            <p className="text-[13px] text-cream-muted">Your other device must show this code:</p>
+            <p className="text-ui text-cream-muted">Your other device must show this code:</p>
             <p className="mt-1 font-mono text-2xl tracking-[0.3em] text-cream" aria-live="polite">
               {approval.code.slice(0, 3)} {approval.code.slice(3)}
             </p>

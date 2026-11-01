@@ -1,6 +1,11 @@
 import { openAccountSettingsInBrowser } from "@/features/account";
 import { useAppStore } from "@/features/app-shell";
-import { blockIfUnsaved, useSettingsStore, type SettingsSection } from "@/features/settings";
+import {
+  blockIfUnsaved,
+  openSettingsEvent,
+  useSettingsStore,
+  type OpenSettingsDetail,
+} from "@/features/settings";
 import { useCallback, useEffect, useState } from "react";
 
 /** Settings overlay open state, its window events and the account hand-off. */
@@ -39,19 +44,19 @@ export function useSettingsOverlay(options: { refreshUser: () => Promise<unknown
 
   useEffect(() => {
     const handleOpenSettings = (event: Event) => {
-      const section = (event as CustomEvent<{ section?: SettingsSection }>).detail?.section;
-      if (section) {
-        useSettingsStore.getState().setActiveSection(section);
+      const detail = (event as CustomEvent<OpenSettingsDetail | null>).detail;
+      if (detail?.section) {
+        useSettingsStore.getState().setActiveSection(detail.section, detail.focus);
       }
       openSettingsOverlay();
     };
     const handleCloseSettings = () => {
       closeSettingsOverlay();
     };
-    window.addEventListener("misty:open-settings", handleOpenSettings);
+    window.addEventListener(openSettingsEvent, handleOpenSettings);
     window.addEventListener("misty:close-settings", handleCloseSettings);
     return () => {
-      window.removeEventListener("misty:open-settings", handleOpenSettings);
+      window.removeEventListener(openSettingsEvent, handleOpenSettings);
       window.removeEventListener("misty:close-settings", handleCloseSettings);
     };
   }, [closeSettingsOverlay, openSettingsOverlay]);

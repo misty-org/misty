@@ -59,19 +59,10 @@ export function ScreenLocationSection() {
     }
   };
   return (
-    <DesktopSettingsSection
-      title="Screens"
-      description={
-        "Agents open a browser only when a task needs one, and look at your screen only " +
-        "when you ask about it. Pause or stop them at any time."
-      }
-    >
+    <DesktopSettingsSection title="Screens">
       <DesktopSettingsRow
         label="Where Misty opens new screens"
-        description={
-          "A new tab opens beside your work, or Misty asks first. " +
-          "Saying where in your request, such as this tab or my whole screen, always wins."
-        }
+        description="Saying where in your request always wins."
       >
         <ChoiceControl
           value={location ?? "window"}
@@ -82,10 +73,7 @@ export function ScreenLocationSection() {
       </DesktopSettingsRow>
       <DesktopSettingsRow
         label="Keep computers awake"
-        description={
-          "While an agent works on one of your computers, it won’t go to sleep. " +
-          "The display can still turn off."
-        }
+        description="While an agent works. The display can still turn off."
       >
         <SwitchControl
           checked={keepAwake ?? true}

@@ -1,4 +1,6 @@
 import { apiRequest } from "@/api/client";
+import { queryEmbeddingHeaders } from "@/api/device-embeddings";
+import { deviceModelCall } from "@/api/device-models";
 import { windowSpaceId } from "./windowSpace";
 
 export type MemoryKind = "page" | "voice" | "recording" | "note" | "screen";
@@ -25,6 +27,12 @@ export interface MemoryStatus {
   cap: number;
   full: boolean;
   message?: string;
+}
+
+interface DaySummary {
+  markdown: string;
+  topics: string[];
+  count: number;
 }
 
 const post = (body: unknown) => ({ method: "POST", body: JSON.stringify(body) });
@@ -55,7 +63,7 @@ export const memoryApi = {
       "/me/memory/events",
       post({ ...event, space_id: event.space_id ?? windowSpaceId() }),
     ),
-  events: (query: {
+  events: async (query: {
     from?: string;
     to?: string;
     site?: string;
@@ -66,15 +74,26 @@ export const memoryApi = {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries({ ...query, space_id: windowSpaceId() }))
       if (value !== undefined && value !== "") params.set(key, String(value));
-    return apiRequest<{ events: MemoryEvent[] }>(`/me/memory/events?${params}`);
+    // Search by meaning carries its vector from this computer's embedding model.
+    const headers = query.q ? await queryEmbeddingHeaders(query.q) : {};
+    return apiRequest<{ events: MemoryEvent[] }>(`/me/memory/events?${params}`, { headers });
   },
   forget: (scope: { all?: boolean; site?: string; from?: string; to?: string }) =>
     apiRequest<{ forgotten: number }>("/me/memory/forget", post(inSpace(scope))),
   status: () => apiRequest<MemoryStatus>("/me/memory/status"),
-  daySummary: (body: { date: string; time_zone: string; language?: string }) =>
-    apiRequest<{ markdown: string; topics: string[]; count: number }>(
+  /** The server gathers the day's moments; this computer's fast model writes the summary. */
+  daySummary: async (body: { date: string; time_zone: string; language?: string }) => {
+    const day = await apiRequest<DaySummary & { on_device?: boolean; items?: unknown[] }>(
       "/me/memory/day-summary",
       post(inSpace(body)),
-    ),
+    );
+    if (!day.on_device) return day;
+    const written = await deviceModelCall<{ markdown: string; topics: string[] }>("day-summary", {
+      date: body.date,
+      items: day.items,
+      language: body.language || undefined,
+    });
+    return { markdown: written.markdown, topics: written.topics, count: day.count };
+  },
   exportPath: "/me/memory/export",
 };

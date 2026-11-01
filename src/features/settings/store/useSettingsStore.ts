@@ -42,6 +42,7 @@ async function saveLocalDocument(document: Record<string, unknown>): Promise<Set
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   activeSection: "general",
+  focusTarget: { label: "", request: 0 },
   settings: null,
   launchOnLogin: null,
   shortcuts: null,
@@ -87,7 +88,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     return settingsLoad;
   },
 
-  setActiveSection: (activeSection) => set({ activeSection }),
+  setActiveSection: (activeSection, focus) =>
+    set((state) => ({
+      activeSection,
+      focusTarget: {
+        label: focus || `page:${activeSection}`,
+        request: state.focusTarget.request + 1,
+      },
+    })),
 
   // In-memory only, so controls and runtime behavior change on the same frame as the edit.
   previewPreferenceValues: (values) => {
@@ -204,6 +212,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
 export interface SettingsStore {
   activeSection: SettingsSection;
+  /** The row (its label) or block (`page:<id>`) to bring into view once its page shows. */
+  focusTarget: { label: string; request: number };
   settings: SettingsSnapshot | null;
   launchOnLogin: LaunchOnLoginSnapshot | null;
   shortcuts: ShortcutsSnapshot | null;
@@ -211,7 +221,7 @@ export interface SettingsStore {
   working: boolean;
   error: string | null;
   message: string | null;
-  setActiveSection: (section: SettingsSection) => void;
+  setActiveSection: (section: SettingsSection, focus?: string) => void;
   load: () => Promise<void>;
   previewPreferenceValues: (values: PreferenceValues) => void;
   applyPreferenceValues: (values: PreferenceValues, valid?: () => boolean) => Promise<void>;

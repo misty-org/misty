@@ -1,0 +1,92 @@
+import { describe, expect, it } from "vitest";
+import { settingsRedirects } from "@/features/browser/internal/SettingsRedirectPage";
+import { settingDefinitions } from "./devicePreferences/registry";
+import {
+  canonicalSettingsSection,
+  preferenceSection,
+  preferencesWithoutRows,
+  settingsAreaEntry,
+  settingsAreas,
+  settingsGroups,
+  settingsPage,
+  settingsRegistry,
+} from "./settingsRegistry";
+import { settingsSections, type SettingsSection } from "./settingsTypes";
+
+const areas = settingsGroups.flatMap((group) => group.areas);
+const blockIds = new Set(settingsRegistry.map((entry) => entry.id));
+
+describe("settings registry", () => {
+  it("keeps a short list of one-word pages, each with its own icon", () => {
+    expect(areas.length).toBeLessThanOrEqual(13);
+    expect(new Set(areas).size).toBe(areas.length);
+    expect(Object.keys(settingsAreas).sort()).toEqual([...areas].sort());
+    const labels = areas.map((area) => settingsAreas[area].label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(new Set(areas.map((area) => settingsAreas[area].icon)).size).toBe(areas.length);
+    for (const label of labels) expect(label).toMatch(/^[A-Z][a-z]+$/);
+  });
+
+  it("names groups by feature and never echoes a group in its pages", () => {
+    expect(settingsGroups.map((group) => group.label)).toEqual(["Settings", "Browser", "Agents"]);
+    for (const group of settingsGroups)
+      for (const area of group.areas)
+        expect(settingsAreas[area].label.toLowerCase()).not.toContain(group.label.toLowerCase());
+    for (const entry of settingsRegistry) {
+      expect(entry.label).not.toContain("&");
+      expect(entry.label).not.toMatch(/\band\b/);
+    }
+  });
+
+  it("gives every page blocks, adjacent and with unique ids", () => {
+    expect(blockIds.size).toBe(settingsRegistry.length);
+    for (const area of areas) expect(settingsAreaEntry(area)).toBeDefined();
+    const order = settingsRegistry.map((entry) => entry.area);
+    const seen = new Set<string>();
+    order.forEach((area, index) => {
+      if (index > 0 && order[index - 1] !== area) expect(seen.has(area)).toBe(false);
+      seen.add(area);
+    });
+  });
+});
+
+describe("settings routing", () => {
+  it("resolves every section id, retired or not, to a block that exists", () => {
+    for (const section of settingsSections)
+      expect(blockIds.has(canonicalSettingsSection(section)), section).toBe(true);
+  });
+
+  it("sends retired pages to where their settings live now", () => {
+    expect(settingsPage("diagnostics")?.area).toBe("advanced");
+    expect(settingsPage("browser")?.area).toBe("general");
+    expect(settingsPage("search")?.id).toBe("browser-links");
+    expect(settingsPage("browser-handoff")?.id).toBe("sync");
+    expect(settingsPage("account")?.id).toBe("about");
+  });
+
+  it("lands every “manage it in Settings” link on the page that holds it", () => {
+    const links: Record<string, [SettingsSection, string]> = {
+      "misty://extensions": [settingsRedirects.extensions.section, "extensions"],
+      "misty://passwords": [settingsRedirects.passwords.section, "passwords"],
+      "misty://settings": [settingsRedirects.settings.section, "general"],
+      "browser menu": ["general", "general"],
+      "update notice": ["updates", "general"],
+      "clipboard devices": ["devices", "sync"],
+      "coding tools": ["agents-coding", "conversations"],
+      "extensions toolbar": ["browser-extensions", "extensions"],
+      "passwords sync": ["sync", "sync"],
+    };
+    for (const [link, [section, area]] of Object.entries(links))
+      expect(settingsPage(section)?.area, link).toBe(area);
+  });
+
+  it("shows every searchable preference on a page that exists", () => {
+    for (const definition of settingDefinitions) {
+      if (preferencesWithoutRows.has(definition.id)) continue;
+      const section = preferenceSection(definition.id, definition.page);
+      expect(blockIds.has(section), `${definition.id} → ${section}`).toBe(true);
+    }
+    expect(preferenceSection("app.diagnostics.framePacing", "about")).toBe("advanced");
+    expect(preferenceSection("browser.searchSuggestions", "search")).toBe("browser-links");
+  });
+});

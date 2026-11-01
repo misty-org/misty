@@ -22,7 +22,7 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
         );
     }
 
-    if target == Target::Dev {
+    {
         {
             let name = "MISTY_DEV_API_ORIGIN";
             let value = values.get(name).context("missing API origin")?;
@@ -49,40 +49,6 @@ pub fn validate(workspace: &Workspace, target: Target) -> Result<()> {
             if port.parse::<u16>().ok().is_none_or(|p| p == 0) {
                 bail!("MISTY_HOST_PORT must be a port between 1 and 65535");
             }
-        }
-    }
-    if target == Target::Prod {
-        let placeholders = values
-            .iter()
-            .filter(|(_, value)| is_placeholder(value))
-            .map(|(name, _)| name.as_str())
-            .collect::<Vec<_>>();
-        if !placeholders.is_empty() {
-            bail!(
-                "prod environment contains placeholder values: {}",
-                placeholders.join(", ")
-            );
-        }
-    }
-    if target == Target::Staging {
-        if values.get("MISTY_ENVIRONMENT").map(String::as_str) != Some("staging") {
-            bail!("staging environment must set MISTY_ENVIRONMENT=staging");
-        }
-        if let Some(port) = values.get("MISTY_HOST_PORT") {
-            if port.parse::<u16>().ok().is_none_or(|p| p == 0) {
-                bail!("MISTY_HOST_PORT must be a port between 1 and 65535");
-            }
-        }
-        let placeholders = values
-            .iter()
-            .filter(|(_, value)| is_placeholder(value))
-            .map(|(name, _)| name.as_str())
-            .collect::<Vec<_>>();
-        if !placeholders.is_empty() {
-            bail!(
-                "staging environment contains placeholder values: {}",
-                placeholders.join(", ")
-            );
         }
     }
     Ok(())
@@ -126,14 +92,4 @@ pub fn status(workspace: &Workspace, target: Target) -> Result<()> {
         );
     }
     Ok(())
-}
-
-fn is_placeholder(value: &str) -> bool {
-    let value = value.trim();
-    let lower = value.to_ascii_lowercase();
-    !value.is_empty()
-        && ((value.starts_with('<') && value.ends_with('>'))
-            || lower.contains("replace-me")
-            || lower.contains("replace-with")
-            || matches!(lower.as_str(), "todo" | "tbd" | "changeme"))
 }

@@ -1,3 +1,5 @@
+import { accountLimitMessage } from "@/api/client/accountLimits";
+
 /** Turns account API responses into payloads or readable errors. */
 export class AccountApiError extends Error {
   name = "AccountApiError";
@@ -22,7 +24,9 @@ export async function parseResponse<T>(
     const message =
       typeof payload === "string"
         ? payload.trim()
-        : responseMessage(payload) || responseError(payload);
+        : accountLimitMessage(responseCode(payload)) ||
+          responseMessage(payload) ||
+          responseError(payload);
     const requestUrl = response.url || url;
     const fallback = `${method} ${requestUrl} failed: ${response.status} ${response.statusText || "HTTP error"}`;
     const errorMessage = message || fallback;
@@ -94,6 +98,11 @@ function firstJsonValueText(value: string): string | null {
     }
   }
   return null;
+}
+function responseCode(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const code = (payload as { code?: unknown }).code;
+  return typeof code === "string" ? code : "";
 }
 function responseMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";

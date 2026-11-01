@@ -6,54 +6,40 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
 use url::Url;
 
+/// What a release compiles into the app. There is no built-in server: the person picks one in
+/// the setup wizard, so only the website's address is fixed at build time.
 pub(super) fn public_environment() -> Result<BTreeMap<String, String>> {
-    let api = validate_https_url("MISTY_RELEASE_API_URL", &required("MISTY_RELEASE_API_URL")?)?;
     let web = validate_https_url("MISTY_RELEASE_WEB_URL", &required("MISTY_RELEASE_WEB_URL")?)?;
-    let origins = csp_origins(
-        "TAURI_CSP_CONNECT_SOURCES",
-        &required("TAURI_CSP_CONNECT_SOURCES")?,
-        &["https", "wss"],
-    )?;
-    if !origins.contains(&Url::parse(&api)?.origin().ascii_serialization()) {
-        bail!("TAURI_CSP_CONNECT_SOURCES must include the release API origin");
-    }
-    Ok(BTreeMap::from([
-        ("MISTY_PUBLIC_API_URL".into(), api),
-        ("MISTY_PUBLIC_URL".into(), web),
-    ]))
+    Ok(BTreeMap::from([("MISTY_PUBLIC_URL".into(), web)]))
+}
+
+/// The release Content Security Policy. The server is chosen in the app, never at build time,
+/// and the renderer reaches it, its storage and its collaboration Worker directly (the Spaces
+/// socket, note collaboration, signed downloads), so any `https:` and `wss:` origin may be
+/// reached, as in development. Plain `http:` and `ws:` stay closed except the agent runtime's
+/// live relay on this computer. Account cookies live in Rust, never in the WebView, and only the
+/// app's own scripts run (`script-src 'self'`).
+pub(super) fn csp() -> String {
+    [
+        "default-src 'self' customprotocol: asset:",
+        // ws://127.0.0.1 is the live transcription relay of the agent runtime on this computer.
+        "connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost ws://127.0.0.1:* https: wss:",
+        "frame-src 'self' asset: http://asset.localhost customprotocol: misty-extension: http://misty-extension.localhost",
+        "img-src 'self' asset: http://asset.localhost blob: data: https:",
+        "media-src 'self' blob: asset: http://asset.localhost",
+        "font-src 'self' data:",
+        "style-src 'self' 'unsafe-inline'",
+        "script-src 'self'",
+        "worker-src 'self' blob:",
+    ]
+    .join("; ")
 }
 
 pub fn build() -> Result<Value> {
     let public_key = normalize_public_key(&required("TAURI_UPDATER_PUBLIC_KEY")?)?;
     // The feed always lives on the public repository's latest release.
     let endpoint = super::model::updater_endpoint();
-    let connect = csp_origins(
-        "TAURI_CSP_CONNECT_SOURCES",
-        &required("TAURI_CSP_CONNECT_SOURCES")?,
-        &["https", "wss"],
-    )?;
-    let images = csp_origins(
-        "TAURI_CSP_IMAGE_SOURCES",
-        &required("TAURI_CSP_IMAGE_SOURCES")?,
-        &["https"],
-    )?;
-    let csp = [
-        "default-src 'self' customprotocol: asset:".to_owned(),
-        format!(
-            "connect-src 'self' ipc: asset: http://asset.localhost http://ipc.localhost {}",
-            connect.join(" ")
-        ),
-        "frame-src 'self' asset: http://asset.localhost customprotocol: misty-extension: http://misty-extension.localhost".to_owned(),
-        format!(
-            "img-src 'self' asset: http://asset.localhost blob: data: {}",
-            images.join(" ")
-        ),
-        "font-src 'self' data:".to_owned(),
-        "style-src 'self' 'unsafe-inline'".to_owned(),
-        "script-src 'self'".to_owned(),
-        "worker-src 'self' blob:".to_owned(),
-    ]
-    .join("; ");
+    let csp = csp();
 
     let mut windows = json!({});
     if let Ok(thumbprint) = env::var("WINDOWS_CERTIFICATE_THUMBPRINT") {
@@ -76,7 +62,9 @@ pub fn build() -> Result<Value> {
         "app": { "security": { "csp": csp } },
         "bundle": {
             "createUpdaterArtifacts": true,
-            "windows": windows
+            "windows": windows,
+            "resources": super::runtime::bundle_settings()["resources"],
+            "externalBin": super::runtime::bundle_settings()["externalBin"]
         },
         "plugins": {
             "updater": {
@@ -137,36 +125,51 @@ fn validate_https_url(name: &str, raw: &str) -> Result<String> {
     Ok(raw.to_owned())
 }
 
-fn csp_origins(name: &str, raw: &str, protocols: &[&str]) -> Result<Vec<String>> {
-    raw.split(|character: char| character.is_whitespace() || character == ',')
-        .filter(|value| !value.is_empty())
-        .map(|value| {
-            if value.contains('*') {
-                bail!("{name} cannot contain wildcard sources");
-            }
-            let parsed = Url::parse(value).with_context(|| format!("{name} has an invalid URL"))?;
-            if !protocols.contains(&parsed.scheme())
-                || !parsed.username().is_empty()
-                || parsed.password().is_some()
-                || !matches!(parsed.path(), "" | "/")
-                || parsed.query().is_some()
-                || parsed.fragment().is_some()
-            {
-                bail!("{name} entries must be approved origins without paths or credentials");
-            }
-            Ok(parsed.origin().ascii_serialization())
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn directive<'a>(csp: &'a str, name: &str) -> Vec<&'a str> {
+        csp.split(';')
+            .map(str::trim)
+            .find(|part| part.split_whitespace().next() == Some(name))
+            .map(|part| part.split_whitespace().skip(1).collect())
+            .unwrap_or_default()
+    }
+
     #[test]
-    fn csp_sources_reject_paths_and_wildcards() {
-        assert!(csp_origins("TEST", "https://api.mistysys.com", &["https"]).is_ok());
-        assert!(csp_origins("TEST", "https://api.mistysys.com/path", &["https"]).is_err());
-        assert!(csp_origins("TEST", "https://*.mistysys.com", &["https"]).is_err());
+    fn a_release_reaches_any_https_server_and_the_local_relay() {
+        let csp = csp();
+        let connect = directive(&csp, "connect-src");
+        for source in ["https:", "wss:", "ws://127.0.0.1:*", "ipc:"] {
+            assert!(connect.contains(&source), "connect-src lacks {source}");
+        }
+        assert!(directive(&csp, "img-src").contains(&"https:"));
+    }
+
+    #[test]
+    fn a_release_keeps_plain_http_and_outside_scripts_closed() {
+        let csp = csp();
+        let connect = directive(&csp, "connect-src");
+        assert!(!connect
+            .iter()
+            .any(|source| matches!(*source, "http:" | "ws:" | "*")));
+        assert!(!connect
+            .iter()
+            .any(|source| source.starts_with("http://localhost")
+                || source.starts_with("ws://localhost")));
+        assert_eq!(directive(&csp, "script-src"), vec!["'self'"]);
+        assert!(!csp.contains("unsafe-eval"));
+    }
+
+    #[test]
+    fn a_release_has_no_built_in_server() {
+        std::env::set_var("MISTY_RELEASE_WEB_URL", "https://mistysys.com");
+        std::env::remove_var("MISTY_RELEASE_API_URL");
+        let environment = public_environment().unwrap();
+        assert_eq!(
+            environment.keys().collect::<Vec<_>>(),
+            vec!["MISTY_PUBLIC_URL"]
+        );
     }
 }

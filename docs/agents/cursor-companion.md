@@ -80,7 +80,8 @@ aloud, and it handed over the answer. Teach mode is a hands-on tutor instead.
 - **In Agents.** Lessons have their own section under a plain "Lessons" header in the agent's
   sidebar: in progress, paused, then finished, with progress as text ("Paused · 2 of 4"). A lesson
   chat shows its objectives in the shared status table above the transcript.
-- **Looking things up.** A lesson turn may call `web_search` and `web_fetch`, and nothing else:
+- **Looking things up.** A lesson turn may call `web_search` (when the device has a search key)
+  and `web_fetch`, and nothing else:
   up to four lookups while planning a lesson, one on a step, so steps stay fast. It says one short
   sentence before a lookup, offers at most one reference link from what it found, and never acts.
 - **Courses.** A broad topic ("teach me React") becomes a course of three to six lessons
@@ -130,9 +131,8 @@ indexed, so nothing that left the live context is lost:
   compacted turn is one chunk of text: your message, the reply, and where you were (app name,
   window title, URL). Screenshots are never embedded or indexed. Lexical search uses the existing
   generated `tsvector`; meaning search uses a vector from the account's embedding model.
-- **Writing.** Rows are written in the compaction's transaction; the existing embedding worker
-  (`runAIEmbeddingProcessing`) embeds them later, in batches, billed to the account like Smart
-  Library. Turns still in the live context are never indexed; they're already in context.
+- **Writing.** Rows are written in the compaction's transaction; the owner's desktop embeds them
+  later on the device's embedding model (`DeviceEmbeddingWorker`, [runtime.md](runtime.md)). Turns still in the live context are never indexed; they're already in context.
 - **Recall by the agent.** A `history.search` tool (query, optional app and date filters) returns
   dated snippets with links to the original turns. The agent calls it when a request points at the
   past ("the site I had open yesterday"); nothing is retrieved automatically on every turn. It
@@ -241,7 +241,8 @@ carousel and the *Separate window* screen location on October 19, 2026.
 4. **Searchable history.** Compaction at the session's threshold writes the raw turns into the
    retrieval index; `history.search` for agents; search with jump-to-message for you.
 5. **Accessibility reading** for other apps (macOS).
-6. **Measure.** Pointing by element against pointing by coordinates (`evals/pointing`), and
+6. **Measure.** Pointing by element against pointing by coordinates (the pointing eval, removed
+   October 31, 2026, to rebuild on the desktop runtime), and
    `npm run trace` timing before and after. Baseline, October 10: 30/30 hits on 30 web-page
    fixtures with coordinates (`openai/gpt-6-luna`); native-app fixtures still to capture.
 

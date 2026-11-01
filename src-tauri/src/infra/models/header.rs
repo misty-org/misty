@@ -1,16 +1,10 @@
-//! The `X-Misty-Models` header: this device's model choices and provider keys, as
-//! base64url (no padding) of UTF-8 JSON. Built here and only here; the renderer never
-//! sees it and the value is never logged.
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+//! This device's model choices and provider keys, and its web search key, as the JSON the
+//! agent runtime on this computer takes (docs/agents/runtime.md). Built here and only here;
+//! the renderer never sees it, it is never logged, and it never leaves the computer.
 use serde_json::{json, Map, Value};
 
-pub const HEADER: &str = "x-misty-models";
-
-/// The largest header the server accepts.
-pub const MAX_HEADER_BYTES: usize = 16 * 1024;
-
 /// Every provider a key can be saved for.
-pub const PROVIDERS: [&str; 10] = [
+pub const PROVIDERS: [&str; 12] = [
     "openai",
     "anthropic",
     "google",
@@ -18,7 +12,10 @@ pub const PROVIDERS: [&str; 10] = [
     "gateway",
     "nvidia",
     "ollama",
+    "ollama-cloud",
     "openai-compatible",
+    // Signed in, not keyed: its short-lived access token is put in the runtime's document only.
+    "chatgpt",
     "elevenlabs",
     "soniox",
 ];
@@ -32,12 +29,27 @@ pub const ROLES: [(&str, &str); 5] = [
     ("speech", "speech_model"),
 ];
 
+/// The web search providers a key can be saved for. The runtime runs `web.search` on the one
+/// the device setting `search_provider` names (Decodo when unset), with its saved key.
+pub const SEARCH_PROVIDERS: [&str; 2] = ["decodo", "serper"];
+
 const REASONING: [&str; 6] = ["none", "minimal", "low", "medium", "high", "xhigh"];
 const DEFAULT_REASONING: &str = "low";
 const MAX_MODEL_ID: usize = 200;
 
 pub fn is_provider(id: &str) -> bool {
     PROVIDERS.contains(&id)
+}
+
+/// The search provider and key for `web.search`, when the chosen provider has a key.
+fn search(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
+    let provider = text(settings, "search_provider")
+        .filter(|provider| SEARCH_PROVIDERS.contains(provider))
+        .unwrap_or(SEARCH_PROVIDERS[0]);
+    let api_key = key(provider)
+        .map(|key| key.trim().to_owned())
+        .filter(|key| !key.is_empty())?;
+    Some(json!({ "provider": provider, "apiKey": api_key }))
 }
 
 /// The device setting that holds a provider's base URL, for providers that take one.
@@ -76,10 +88,9 @@ fn base_url(settings: &Value, provider: &str) -> Option<String> {
     usable.then(|| raw.trim_end_matches('/').to_owned())
 }
 
-/// The header value for this device's `models` settings section, reading each referenced
-/// provider's key through `key`. None when no agent model has a usable provider, or when
-/// the result would be larger than the server accepts.
-pub fn encode(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<String> {
+/// This device's model choices and the keys they need. None when no agent model has a usable
+/// provider.
+pub fn document(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<Value> {
     let mut providers = Map::new();
     let mut models = Map::new();
     for (role, setting) in ROLES {
@@ -122,12 +133,14 @@ pub fn encode(settings: &Value, key: &dyn Fn(&str) -> Option<String>) -> Option<
     let reasoning = text(settings, "reasoning")
         .filter(|value| REASONING.contains(value))
         .unwrap_or(DEFAULT_REASONING);
-    let document = json!({
+    let mut document = json!({
         "version": 1,
         "providers": providers,
         "models": models,
         "reasoning": reasoning,
     });
-    let encoded = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&document).ok()?);
-    (encoded.len() <= MAX_HEADER_BYTES).then_some(encoded)
+    if let Some(search) = search(settings, key) {
+        document["search"] = search;
+    }
+    Some(document)
 }

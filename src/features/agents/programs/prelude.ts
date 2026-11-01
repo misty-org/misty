@@ -62,8 +62,12 @@ class Tab {
     }
     return __call("wait", Object.assign({ tab: this.id }, condition));
   }
-  /** Marks this tab as a page the person asked to keep open: it stays awake and is shown at the end. */
-  keep() { return __call("keep", { tab: this.id }); }
+  /** Marks this tab as a page the person asked to keep open: it stays awake and is shown at the
+   * end. With text, that text is scrolled into view first, so the picture shows the evidence. */
+  async keep(text) {
+    if (text) { try { await this.scrollTo(text); } catch (error) { /* kept as it stands */ } }
+    return __call("keep", { tab: this.id });
+  }
   /** Closes a tab this run opened that it no longer needs (its first tab stays: goto() instead). */
   close() { return __call("close", { tab: this.id }); }
   __act(action, target, options) { return __call("act", Object.assign({ tab: this.id, action, target }, options)); }

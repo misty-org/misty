@@ -33,7 +33,7 @@ export function SettingsSaveBar() {
         warned && "misty-shake",
       )}
     >
-      <p className="m-0 text-[15px] leading-6 text-cream">
+      <p className="m-0 text-md leading-6 text-cream">
         {warned ? "Save or cancel your changes before leaving." : "You have unsaved changes."}
       </p>
       <div className="flex shrink-0 items-center gap-2">

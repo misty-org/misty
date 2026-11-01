@@ -1,3 +1,4 @@
+import { noteAccountResponse } from "./accountLimits";
 import { nativeAccountFetch } from "./native-account-fetch";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -132,19 +133,16 @@ function assertGeneration(generation: number): void {
   if (readApiSessionGeneration() !== generation) throw new Error("The active account changed.");
 }
 
-// Routes that work without a session, used by sign-in, registration and
-// password reset while no account is active.
+// Routes that work without a session, used by sign-in and registration while
+// no account is active.
 const signedOutPaths = new Set([
   "/login",
   "/register",
-  "/auth/forgot",
   "/auth/google",
   "/auth/google/complete",
-  "/auth/reset",
-  "/auth/reset/start",
-  "/auth/reset/validate",
   "/instance",
   "/health",
+  "/setup-keys/redeem",
 ]);
 
 export async function cookieSessionFetch(
@@ -227,13 +225,16 @@ export async function cookieSessionFetch(
   return send();
 }
 
-function accountFetch(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
+async function accountFetch(input: RequestInfo | URL, init: RequestInit): Promise<Response> {
   // Desktop account cookies live in Rust, not the WebView. Login, normal
   // requests, refresh and retries must all use that same cookie jar. Scoped
   // app credentials and explicitly anonymous requests must never inherit it.
   const usesAccountCookies =
     init.credentials !== "omit" && !new Headers(init.headers).has("Authorization");
-  return hasTauriInternals() && usesAccountCookies
+  const response = await (hasTauriInternals() && usesAccountCookies
     ? nativeAccountFetch(input, init)
-    : fetch(input, init);
+    : fetch(input, init));
+  // A suspended account is told so wherever it is signed in (accountLimits.ts).
+  noteAccountResponse(input, response);
+  return response;
 }

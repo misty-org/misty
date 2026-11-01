@@ -51,14 +51,8 @@ export function VoiceSection(props: SettingsContentProps) {
   const dictationOff = props.working || !voice.dictation;
   return (
     <>
-      <SettingsSectionBlock
-        title="Dictation"
-        description="Hold a key, speak, and let go: your words are typed wherever you're typing, in Misty or any other app."
-      >
-        <SettingsRow
-          label="Dictation"
-          description="The microphone opens only while you hold the shortcut or lock it hands-free."
-        >
+      <SettingsSectionBlock title="Dictation">
+        <SettingsRow label="Dictation" description="Hold a key and speak to type in any app.">
           <SwitchControl
             checked={voice.dictation}
             disabled={props.working}
@@ -67,7 +61,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Dictation shortcut"
-          description="Hold to talk, release to type. Control + Option stays the agent at your cursor."
+
           muted={!voice.dictation}
         >
           <DropdownControl
@@ -79,7 +73,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Hands-free double-tap"
-          description="Double-tap the shortcut to keep listening until you tap it again."
+          description="Double-tap to keep listening."
           muted={!voice.dictation}
         >
           <SwitchControl
@@ -110,9 +104,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Hand off to agents by name"
-          description={
-            'Starting with "Hey" and an agent\'s name sends the rest to that agent instead of typing it.'
-          }
+          description={'"Hey" and an agent’s name sends the rest to that agent.'}
           muted={!voice.dictation}
         >
           <SwitchControl
@@ -122,14 +114,8 @@ export function VoiceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-      <SettingsSectionBlock
-        title="Speech"
-        description="Applies to dictation and captures. Speech is transcribed in the cloud on Misty's service."
-      >
-        <SettingsRow
-          label="Language"
-          description="Detect automatically, or pin the language you speak for better accuracy."
-        >
+      <SettingsSectionBlock title="Speech">
+        <SettingsRow label="Language">
           <DropdownControl
             value={voice.language}
             options={languages}
@@ -139,7 +125,7 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Personal dictionary"
-          description="Names and terms to spell your way, one per line. They're sent with your speech as context."
+          description="Names and terms, one per line."
           stacked
         >
           <TextAreaControl
@@ -151,14 +137,8 @@ export function VoiceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-      <SettingsSectionBlock
-        title="Captures"
-        description="Turning speech you hear into notes: a tab, system audio, the microphone or a file."
-      >
-        <SettingsRow
-          label="Default sources"
-          description="Which audio a new capture starts with. You can change it each time."
-        >
+      <SettingsSectionBlock title="Captures">
+        <SettingsRow label="Default sources">
           <DropdownControl
             value={voice.captureSources}
             options={sources}
@@ -166,10 +146,7 @@ export function VoiceSection(props: SettingsContentProps) {
             onValueChange={(value) => set("capture_sources", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Keep recordings"
-          description="Keep the audio with the transcript. Recordings count toward your storage; otherwise only the text is kept."
-        >
+        <SettingsRow label="Keep recordings" description="Recordings count toward your storage.">
           <SwitchControl
             checked={voice.keepRecordings}
             disabled={props.working}

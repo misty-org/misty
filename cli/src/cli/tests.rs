@@ -6,7 +6,6 @@ fn parses_the_stable_command_surface() {
         vec!["misty", "doctor"],
         vec!["misty", "tool", "vite", "build", "--mode", "desktop"],
         vec!["misty", "env", "init", "dev"],
-        vec!["misty", "env", "check", "prod"],
         vec!["misty", "env", "status", "dev"],
         vec!["misty", "home", "generate"],
         vec!["misty", "home", "generate", "--destination", "/tmp/.misty"],
@@ -26,29 +25,8 @@ fn parses_the_stable_command_surface() {
         vec!["misty", "server", "up", "--no-build"],
         vec!["misty", "server", "url"],
         vec!["misty", "server", "down", "--volumes"],
-        vec!["misty", "server", "prod", "check"],
-        vec!["misty", "server", "prod", "up"],
-        vec!["misty", "server", "prod", "down", "--volumes"],
-        vec!["misty", "server", "prod", "logs"],
         vec!["misty", "server", "image", "build", "--tag", "local"],
         vec!["misty", "server", "worker", "generate-secrets"],
-        vec![
-            "misty",
-            "server",
-            "worker",
-            "generate-secrets",
-            "--target",
-            "production",
-        ],
-        vec![
-            "misty",
-            "server",
-            "worker",
-            "deploy",
-            "--target",
-            "production",
-            "--dry-run",
-        ],
         vec!["misty", "server", "r2", "configure-cors", "--apply"],
         vec!["misty", "release", "start", "0.1.0"],
         vec!["misty", "release", "start", "0.1.0", "--os", "macos"],
@@ -56,6 +34,24 @@ fn parses_the_stable_command_surface() {
         vec!["misty", "release", "verify", "0.1.0", "--dry-run"],
     ] {
         Cli::try_parse_from(arguments).unwrap();
+    }
+    // Deployment is server/compose.yml's job, never the CLI's.
+    for arguments in [
+        vec!["misty", "env", "init", "prod"],
+        vec!["misty", "server", "prod", "up"],
+        vec!["misty", "server", "staging", "up"],
+        vec!["misty", "server", "release", "0.1.0"],
+        vec![
+            "misty",
+            "server",
+            "worker",
+            "deploy",
+            "--target",
+            "production",
+        ],
+        vec!["misty", "setup", "cloudflare", "--target", "prod"],
+    ] {
+        assert!(Cli::try_parse_from(arguments).is_err());
     }
 }
 

@@ -57,10 +57,10 @@ export function NewDrawingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[380px]">
         <DialogHeader>
-          <DialogTitle className="text-[14px]">New drawing</DialogTitle>
+          <DialogTitle className="text-sm">New drawing</DialogTitle>
         </DialogHeader>
         <div className="space-y-1.5">
-          <Label htmlFor="new-drawing-title" className="text-[11px]">
+          <Label htmlFor="new-drawing-title" className="text-2xs">
             Title
           </Label>
           <Input
@@ -68,7 +68,7 @@ export function NewDrawingDialog({
             value={title}
             autoFocus
             placeholder="Untitled drawing"
-            className="h-8 text-[13px]"
+            className="h-8 text-ui"
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void submit();

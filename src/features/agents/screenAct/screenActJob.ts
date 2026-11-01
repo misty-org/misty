@@ -102,7 +102,7 @@ export async function runScreenAct(
         },
       }),
   });
-  const model = screenModelClient(job.id);
+  const model = screenModelClient();
   const finish = (status: ScreenActResult["status"], summary: string): ScreenActResult => ({
     status,
     summary: summary.slice(0, 800),

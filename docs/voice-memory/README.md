@@ -194,14 +194,17 @@ As built in Phase 4 (revision 2):
 
 ## Architecture
 
+Every model call here runs on the runtime on the person's own computer, on the device's keys
+([agents/runtime.md](../agents/runtime.md)); the server only stores what comes back.
+
 ```
-desktop (Tauri)                                   cloud
-audeeo-core ──16 kHz PCM, per channel──▶ runtime /v1/live/transcribe ──▶ Soniox realtime
-  Mic | System | Processes(pids)          (ticket from Go /me/voice/live/ticket,
-global_hotkey (down/up)                     voice usage settled on close)
+desktop (Tauri)                                   providers
+audeeo-core ──16 kHz PCM, per channel──▶ local runtime /v1/live/transcribe ──▶ Soniox realtime
+  Mic | System | Processes(pids)          (ticket minted by Rust with the launch secret)
+global_hotkey (down/up)
 voice/dictation → insert (page | paste)
-                                          runtime /v1/models/transcribe-diarized ──▶ Soniox async
-                                          runtime voice-notes, day-summary (fast model)
+                                          local runtime /v1/device/transcribe-diarized ──▶ Soniox async
+                                          local runtime voice-notes, day-summary (fast model)
 recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memory_events
                                                                   ─▶ ai_retrieval (memory_*)
 ```
@@ -209,8 +212,8 @@ recall recorder (page_read.js, privacy) ─▶ Go /me/memory/events ─▶ memor
 Memory indexing, as built:
 - A trigger on `memory_events` writes each event that has text as a **private**
   retrieval document (owner only, no Space).
-- The existing embedding worker embeds private documents with their owner's embedding
-  model.
+- The owner's desktop embeds private documents on the device's embedding model
+  (`DeviceEmbeddingWorker`); the server has no embedding worker.
 - A second trigger takes the event off `memory_backlog` once its embedding lands.
 - General retrieval search (global search, `search.all` and the context broker) excludes
   `memory_*` documents. Only the gated `recall.*` tools search them.
@@ -229,22 +232,19 @@ Memory indexing, as built:
   Each session runs with diarization, endpoint detection, language identification and
   context (the personal dictionary, the page title and attendees). It maps tokens into
   `@audeeo/core` segments.
-- **The relay needs a long-lived process.** WebSockets can't be held by Vercel
-  functions, so the relay runs on the Docker (node-server) deployment of the runtime.
-  The route is off unless `MISTY_RUNTIME_LIVE_TRANSCRIBE=1` and a Soniox key is set.
-- **Tickets.** `POST /me/voice/live/ticket` returns a ticket, the relay URL
-  (`MISTY_VOICE_LIVE_URL`) and the session's audio limit.
-  - The ticket is `v1.<claims>.<hmac>`, signed with the runtime control secret under
-    the `misty-live-ticket` domain. Its claims are session, user, device, channels,
-    limit, model and a one-minute expiry.
-  - The runtime verifies the ticket statelessly and spends the session id. On close
-    it posts the measured audio to `/internal/voice/live/settle`, which settles
-    exactly once.
+- **The relay runs on this computer.** It is a WebSocket route of the local runtime and
+  needs a Soniox key on the device.
+- **Tickets.** Rust mints a one-time ticket with the runtime's launch secret
+  (`src-tauri/src/infra/agent_runtime/live.rs`, `agent_runtime_live_ticket`).
+  - The ticket is `v1.<claims>.<hmac>` under the `misty-live-ticket` domain. Its claims are
+    session, device, channels, limit, model and a one-minute expiry.
+  - The runtime verifies the ticket statelessly and spends the session id. The server takes
+    no part in it.
 - **Wire format.** Binary frames are one channel byte (0 for mic, 1 for system)
   followed by 16 kHz PCM16. Text frames are `start` (language and context) and
   `finish`. The relay sends `ready`, `segment`, `limit`, `error` and `finished`.
-- **Senses.** `live-transcription` and `diarized-transcription` join `aimodels/config.go`.
-  The model ids live in the role defaults, never in callers.
+- **Models.** Live and diarized transcription run on Soniox's realtime and async models, on
+  the device's Soniox key.
 
 ## Open questions, decided
 
@@ -306,18 +306,17 @@ These are requested at first use, not at install:
 | `recall.search {query, from?, to?, kind?, site?}` | read for the owner's own agents; `recall.read` otherwise |
 | `recall.timeline {from, to}` | same as `recall.search` |
 | `recall.forget {range \| site}` | permission, never rememberable |
-| `voice.transcribe {source: tab \| file \| library_item}` | scope-implied for file and Library; permission for live tab or system audio |
-| `voice.to_notes {transcript_id, template?}` | scope-implied |
-
-Long jobs publish to the live checklist. No tool opens the microphone.
+No tool opens the microphone. The server's `voice.transcribe` and `voice.to_notes` tools are
+gone with its model path: transcribing a file and writing a Note from it happen on the
+person's desktop, from the Library and the transcript.
 
 ## Flags
 
 Each phase ships off by default:
 - Desktop `publicBetaAvailability` keys: `voiceDictation`, `voiceNotes`, `recall`,
   `captureSessions`.
-- Server env: `MISTY_VOICE_LIVE`, `MISTY_RECALL`, `MISTY_CAPTURE_SESSIONS`.
-- Runtime: `MISTY_RUNTIME_LIVE_TRANSCRIBE`.
+- Server env: `MISTY_RECALL`, `MISTY_CAPTURE_SESSIONS`.
+- Runtime: `MISTY_RUNTIME_LIVE_TRANSCRIBE`, which the app sets when it starts the runtime.
 
 ## Tests
 
@@ -346,8 +345,9 @@ The plan assumed the cursor agent worked like this:
 - it sends that request
 - it speaks the reply through a separate text-to-speech call
 
-It doesn't. The companion runs OpenAI realtime speech-to-speech over one socket
-(`/agent-voice/realtime`):
+It didn't. The companion ran OpenAI realtime speech-to-speech over one socket
+(the server's `/agent-voice/realtime`, removed October 31, 2026; the spoken conversation now
+runs at the local runtime's `/v1/device/voice`, [agents/runtime.md](../agents/runtime.md)):
 - Speech is committed as an audio turn. The model's own tools (`show_on_screen`,
   `start_task`) start the work.
 - Replies, including task results read back with `task.read`, are spoken as streamed

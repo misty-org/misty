@@ -39,7 +39,6 @@ export async function submitWorkspaceMessage(
     {
       executionMode: "user",
       interactionMode: companion.mode,
-      model: companion.model,
       ...(resume ? { ...continuationScreen(conversationId), continuation: true } : {}),
     },
   );

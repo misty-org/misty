@@ -132,6 +132,15 @@ impl WorkspaceSync {
                 );
                 Ok(())
             }
+            // A closing account is read-only until it is deleted or resumed: keep
+            // every queued edit and offer it again later.
+            (Some(workspace), "account_closing") => {
+                let (_, op, _, _) = self.inflight.remove(&workspace).expect("present");
+                store.finish_workspace_op(&workspace, &op.operation_id)?;
+                self.batch
+                    .hold(&workspace, Duration::from_secs(600), Instant::now());
+                Ok(())
+            }
             // A structurally rejected op can never succeed as built. Drop its
             // oldest edit and retry the rest: repeated rejections isolate the
             // bad edit, and every other queued edit still reaches the server.

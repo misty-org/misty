@@ -72,7 +72,6 @@ export function createMistyConversationActions(
         handoff: undefined,
         targets: [],
         selectedSpaceId: "",
-        pendingModelOverride: undefined,
         activeConversationId,
         panel: get().panel === "closed" ? "closed" : "answer",
         query: "",

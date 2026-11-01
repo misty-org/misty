@@ -78,14 +78,9 @@ export default function RegisterForm(props: { onSuccess: () => void }) {
       {error ? <AuthMessage tone="error" message={error} /> : null}
       <AuthSubmitButton
         idleLabel="Create account"
-        loadingLabel="Creating account..."
+        loadingLabel="Creating account…"
         loading={loading}
       />
-      <div className="flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
-        <span className="h-px flex-1 bg-charcoal-border" />
-        or
-        <span className="h-px flex-1 bg-charcoal-border" />
-      </div>
       <GoogleSignInButton
         disabled={loading}
         onBusy={setLoading}

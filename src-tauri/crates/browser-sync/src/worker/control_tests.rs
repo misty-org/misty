@@ -133,3 +133,48 @@ fn remote_activation_claims_once_and_ignores_expired_or_independent_requests() {
     }
     assert!(worker.store.pending(true, 10).unwrap().is_empty());
 }
+
+#[test]
+fn a_full_account_says_so_until_a_write_goes_through() {
+    let directory = tempfile::tempdir().unwrap();
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let api = SyncApi::new("http://127.0.0.1", reqwest::Client::new()).unwrap();
+    let scope = VaultScope {
+        deployment: api.deployment(),
+        account_id: "fixture".into(),
+        vault_id: uuid::Uuid::new_v4().to_string(),
+    };
+    let root = VaultRoot::generate();
+    let key = DeviceKey::generate();
+    let grant = root
+        .grant(&scope, &uuid::Uuid::new_v4().to_string(), 1, &key)
+        .unwrap();
+    let store = Store::initialize(
+        &directory.path().join("sync.sqlite"),
+        scope.clone(),
+        grant,
+        &root,
+        &key,
+        &crate::document::Document::default().encode().unwrap(),
+    )
+    .unwrap();
+    let (worker, handle) =
+        Worker::new(api, scope, root, key, store, crate::document::reduce).unwrap();
+    worker.report(Phase::Ready, None).unwrap();
+    worker.storage_full(true).unwrap();
+    assert_eq!(
+        handle.status.borrow().issue,
+        Some(super::collections::STORAGE_FULL)
+    );
+    // Another issue is never cleared by a write that went through.
+    worker
+        .report(Phase::Attention, Some("fixture_failure"))
+        .unwrap();
+    worker.storage_full(false).unwrap();
+    assert_eq!(handle.status.borrow().issue, Some("fixture_failure"));
+    worker
+        .report(Phase::Ready, Some(super::collections::STORAGE_FULL))
+        .unwrap();
+    worker.storage_full(false).unwrap();
+    assert_eq!(handle.status.borrow().issue, None);
+}

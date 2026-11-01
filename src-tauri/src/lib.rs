@@ -8,7 +8,6 @@ mod error;
 mod infra;
 mod platform;
 mod shell_plugins;
-mod telemetry;
 mod voice;
 
 pub fn run() {
@@ -28,7 +27,6 @@ pub fn run() {
     }
     // Use one TLS provider for backend calls and updates.
     let _ = rustls::crypto::ring::default_provider().install_default();
-    telemetry::initialize();
     app::plugins::register(tauri::Builder::default())
         .setup(app_setup::setup)
         .invoke_handler(app::handlers::invoke_handler())

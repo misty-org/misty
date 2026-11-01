@@ -1,146 +1,241 @@
 # Self-hosting
 
-Misty is open source under the AGPL-3.0 and has no hosted service. The browser works without any server:
-signed out, it keeps everything on your computer ([browser/no-account.md](browser/no-account.md)).
-Sync between devices, Spaces and agents need a Misty server, and you run that server yourself on
-your own computer, a VPS, or any platform that runs Docker containers.
+Misty is open source under the AGPL-3.0. The browser works without any server: signed out, it
+keeps everything on your computer ([browser/no-account.md](browser/no-account.md)). Sync between
+devices, Spaces and agents need a Misty server, and you run that server yourself from one Compose
+file, `server/compose.yml`.
 
-Models run on your own keys. Each device keeps its keys and model choices in Settings → Models
-([byok.md](byok.md)). There is no billing, no plan and no usage limit beyond what your provider
-charges you.
+A server never calls a model and never searches the web. Agents, every model call and web search
+run on your desktop, on the model keys and the search key each device keeps in Settings → Models
+([byok.md](byok.md)), so agents need one of your desktops online.
+
+Nothing on a server is optional. Every server uses Cloudflare (a Tunnel for its address, R2 for
+files and backups, and two Workers), Composio for connected apps and Google sign-in. You bring an
+account and key for each; the server never runs without one.
+
+The server sends no email, so there is no mail provider to set up. Where a hosted service would
+email, Misty gives you a link to pass on: a sign-in link for a new account or a forgotten
+password (the console's **Sign-in link**), and an invitation link when someone is invited to a
+Space. Problems the `alerts` service finds show in the console and in the app of the server's
+owner.
 
 ## What runs where
 
-| Part | Where | Needed for |
+| Part | Where | What it does |
 | --- | --- | --- |
-| Desktop app | Your computer | Everything; browsing needs nothing else |
-| Go API (`server/`) | Your server, Docker | Accounts, encrypted sync, Spaces, files, agent tools |
-| Agent runtime (`server/apps/agent-runtime`) | Your server, Docker | Agent runs and every model call |
-| PostgreSQL with pgvector | Your server, Docker | The API's data and the runtime's workflow database |
-| Collaboration Worker (`server/apps/journal-collab`) | Your Cloudflare account, or your server through the `collab` profile | Saving and co-editing notes and drawings |
-| web-fetch Worker (`server/apps/web-fetch`) | Your Cloudflare account, optional | `web.fetch` for runs with no device online |
+| Desktop app | Your computer | The browser, and every agent and model call |
+| `setup` | Your server, once per start | Generates secrets, checks them against your data, provisions Cloudflare |
+| `postgres` | Your server | The API's data (PostgreSQL with pgvector) |
+| `migrate` | Your server, once per start | Applies database migrations and the API role's grants |
+| `api` | Your server | Accounts, encrypted sync, Spaces, files, agent tools |
+| `cloudflared` | Your server | Publishes the API at `https://MISTY_HOSTNAME` through the Tunnel |
+| `backups` | Your server | Encrypted database backups to R2 every night at 03:00 UTC |
+| `alerts` | Your server | Records an open alert when the server is down or failing, and clears it when it recovers |
+| `console` | Your server, `127.0.0.1:7070` only | The operator console |
+| Collaboration Worker (`server/apps/journal-collab`) | Your Cloudflare account | Saves and co-edits notes and drawings |
+| web-fetch Worker (`server/apps/web-fetch`) | Your Cloudflare account | Reads public pages for agent runs when no device is online |
 
-Without the collaboration Worker, notes and drawings are read-only, so most servers want it: on
-Cloudflare or on the same host ([cloudflare.md](cloudflare.md#run-it-on-your-own-server)). Without
-the web-fetch Worker, agents read pages through your online devices only.
+The setup container deploys both Workers on every start that changes them. You never run
+Wrangler or the `misty` CLI to deploy; the CLI is for working on Misty itself.
 
 ## Requirements
 
-- A Linux or macOS host with Docker Engine and Compose v2. 2 CPU cores and 4 GB of memory are
-  enough for one person; the agent runtime holds most of the memory.
-- Git and Rust (through rustup) to build the `misty` CLI, which generates the server's keys and
-  runs the stack. Everything else builds inside containers.
-- An HTTPS address for the API if any device other than the host connects to it: a domain with a
-  reverse proxy (Caddy, nginx, Traefik), a Cloudflare Tunnel, or Tailscale serve.
+- A Linux or macOS host with Docker Engine and Compose v2. 2 CPU cores and 2 GB of memory are
+  enough for a small server.
+- Git, to get the code. Everything else builds inside the containers.
+- A domain on Cloudflare, and accounts with Composio and Google Cloud.
 
-## Install
+## Configure
+
+Clone the repository and create the four files under `server/.env/`. They are private and ignored
+by Git; Misty never commits an env file, not even an example. Each is a plain `NAME=value` file.
 
 ```sh
 git clone https://github.com/misty-org/misty.git
-cd misty
-cargo install --path cli --locked
-misty env init prod
+cd misty/server
+mkdir -m 700 .env
 ```
 
-`misty env init prod` writes private files under `server/.env/prod/` with fresh database
-passwords, signing keys, the agent runtime secret, device keys and collaboration keys. Running it
-again keeps existing values. Keep an encrypted copy of `server/.env/prod/` somewhere safe: losing
-the signing keys signs every device out.
+### misty.env
 
-Set your public API address (it ends in `/v1`):
+| Name | Value |
+| --- | --- |
+| `MISTY_HOSTNAME` | The server's public hostname, such as `cloud.misty.example`. The API is `https://MISTY_HOSTNAME/v1` |
+| `MISTY_INSTANCE_NAME` | Optional: the name devices show for this server (default `Misty`) |
+| `MISTY_ALLOWED_ORIGINS` | Optional: comma-separated `https://` origins of websites you run against this API |
 
-```sh
-printf 'https://misty.example.com/v1' | misty env set prod MISTY_PUBLIC_API_URL
-misty env status prod
-misty server prod check
-```
+### cloudflare.env
 
-`misty env set` reads the value from stdin so it never lands in your shell history.
-`misty env status` shows which names are still missing, never their values.
+| Name | Value |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | An API token with the permissions in [cloudflare.md](cloudflare.md#api-token) |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID (32 hexadecimal characters) |
+| `CLOUDFLARE_ZONE_ID` | The ID of the zone `MISTY_HOSTNAME` belongs to |
+
+Turn on a workers.dev subdomain for the account first (Workers & Pages → Settings).
+
+### composio.env
+
+| Name | Value |
+| --- | --- |
+| `MISTY_COMPOSIO_API_KEY` | Your Composio project's API key ([server/deploy/composio/README.md](../server/deploy/composio/README.md)) |
+
+### google.env
+
+| Name | Value |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` | OAuth client ID of a Web application client |
+| `GOOGLE_CLIENT_SECRET` | Its client secret |
+
+Add `https://MISTY_HOSTNAME/v1/auth/google/callback` as an authorized redirect URI
+([server/docs/google-sign-in.md](../server/docs/google-sign-in.md)).
+
+There are no other settings to make. Model keys never go on the server: the API refuses to start
+if it finds one. Neither does a search key: each person adds one on their desktop for web search
+([byok.md](byok.md#web-search)). A `search.env` from an earlier server is no longer read and can be
+deleted.
 
 ## Start
 
 ```sh
-misty server prod up
-misty server prod logs
+docker compose up -d --build
+docker compose ps
 ```
 
-`up` builds the API and agent runtime images from your checkout, applies the database
-migrations, sets up the workflow database and starts everything. The API listens on
-`127.0.0.1:8081` (`MISTY_HOST_PORT`); PostgreSQL and the agent runtime have no host ports. Check
-`http://127.0.0.1:8081/health`, then publish the API over HTTPS.
+On the first start the setup container generates every secret into the `secrets` volume (database
+passwords, signing keys, device and collaboration keys, the agent runtime secret the server derives
+per-run keys from, the operator token, the backup key), creates or reuses the Cloudflare Tunnel and
+the DNS record for `MISTY_HOSTNAME`, the two R2 buckets and their credentials, and deploys both
+Workers. Every later start finds the same resources by name and never replaces a secret. Watch it
+with `docker compose logs setup`.
 
-To update, `git pull` and run `misty server prod up` again. Migrations run on every start.
+The API answers at `https://MISTY_HOSTNAME/health` once the tunnel connects, and on this computer
+at `http://127.0.0.1:8081/health` (`MISTY_HOST_PORT` in your shell changes the port). To update,
+`git pull` and run `docker compose up -d --build` again; migrations run on every start.
 
-## Publish the API over HTTPS
+## Secrets
 
-Any reverse proxy that forwards to `127.0.0.1:8081` works. With Caddy, which gets certificates on
-its own:
+The `secrets` volume is the only copy of the server's secrets. Losing it while keeping the
+database is the one state the stack refuses: setup stops with `secrets lost` instead of generating
+new keys that would sign everyone out and leave encrypted data unreadable. Keep a copy somewhere
+off the server:
 
-```text
-misty.example.com {
-    reverse_proxy 127.0.0.1:8081
-}
+```sh
+docker compose run --rm --no-deps --entrypoint tar setup -C /run/misty/secrets -czf - . > misty-secrets.tgz
 ```
 
-Set `TRUST_PROXY_HEADERS=true` when a proxy sits in front, so rate limits see the real client
-address. A Cloudflare Tunnel works too and needs no open ports:
-`misty setup cloudflare --target prod --account ACCOUNT_ID --zone ZONE_ID --hostname misty.example.com --apply`
-([cloudflare.md](cloudflare.md)).
+Store that file encrypted (a password manager or `age`), never next to the server.
+
+Rotate a secret with its previous value kept valid, then restart the stack:
+
+```sh
+docker compose run --rm setup rotate MISTY_AUTH_SIGNING_KEY
+docker compose up -d --force-recreate
+docker compose run --rm setup retire MISTY_AUTH_SIGNING_KEY   # later, once old sessions expired
+```
+
+| Rotates | With |
+| --- | --- |
+| `MISTY_AUTH_SIGNING_KEY`, `MISTY_AGENT_RUNTIME_CONTROL_SECRET`, `MISTY_OPERATOR_TOKEN`, `JOURNAL_COLLAB_CONTROL_SECRET`, `JOURNAL_COLLAB_PROJECTION_SECRET` | The old value in its `*_PREVIOUS` slot |
+| `MISTY_DEVICE_TICKET_PRIVATE_KEY`, `JOURNAL_COLLAB_TICKET_PRIVATE_KEY` | The old public key in `MISTY_DEVICE_TICKET_PREVIOUS_PUBLIC_KEYS` or `JOURNAL_COLLAB_TICKET_PUBLIC_KEY_PREVIOUS` |
+| `DB_PASSWORD`, `MISTY_METRICS_TOKEN`, `MISTY_WEB_FETCH_SECRET` | Nothing: the next start applies the new value everywhere |
+
+Secrets that protect stored data never rotate: the database superuser password, the Space link
+key, the device pairing pepper, the collaboration room salt, the document key and the backup key.
+Rotation never touches data; data is removed only with the whole stack
+(`docker compose down --volumes`, plus the R2 buckets).
+
+## Accounts
+
+The first account created on a fresh server registers itself from the app's sign-in screen and
+owns the server. After that, a new account comes only from an invitation: someone on the server
+invites an email address to a Space, and that address can then create its account. There is no
+setting for this.
+
+## Backups
+
+The `backups` service dumps the database every night at 03:00 UTC, encrypts the dump to the
+server's backup key with [age](https://age-encryption.org) and uploads it to the
+`misty-…-backups` bucket. That bucket has a 30-day lock, so no credential on the server can delete
+or overwrite a backup in that time, and backups expire a day after their lock ends.
+
+```sh
+docker compose exec backups misty-setup backup --now   # one now
+docker compose exec backups misty-setup backups        # list them
+docker compose run --rm --no-deps backups backup-key   # the age key, to keep a copy off the server
+```
+
+Restore onto a running stack:
+
+```sh
+docker compose stop api
+docker compose exec backups misty-setup restore latest   # or a name from the list
+docker compose up -d
+```
+
+Practise a restore on a spare server: a backup that has never been restored is not yet a backup.
+
+## Alerts
+
+The `alerts` service checks the server every minute. When one of these is seen on two checks in a
+row it records an open alert in the database (`server_alerts`), and it removes the alert when the
+problem clears:
+
+- the API doesn't answer `/health`, or a critical check (database, Library storage, realtime)
+  fails;
+- 5% or more of the last minute's requests (at least 20) failed with a server error, from
+  `/metrics`;
+- the database volume has less than 10% of its space free;
+- no backup was made in the last 26 hours (checked hourly).
+
+Open alerts show on the console's Overview and, as a quiet notice, in the Misty app of the
+server's owner (its first account), which reads them from `GET /v1/server/alerts` (owner only).
+Nothing is emailed. An alert open when the service restarts still clears when its problem has
+gone. It runs on the server it watches, so it can't report the whole machine going away, and an
+alert can't be recorded while the database itself is down (the console's health checks still show
+it); an outside uptime check on `https://MISTY_HOSTNAME/health` covers that. `docker compose logs
+alerts` shows what it found.
+
+## Operator console
+
+The console listens on `127.0.0.1:7070` on the server only (`MISTY_CONSOLE_PORT` changes the
+port). Its sign-in link is in its log:
+
+```sh
+docker compose logs console
+```
+
+From another computer, forward the port over SSH (`ssh -L 7070:127.0.0.1:7070 you@server`).
 
 ## Connect the desktop app
 
-Point the app at your server with `MISTY_PUBLIC_API_URL` when you build it (`.env` at the
-repository root, see the [README](../README.md#get-started)), then create the first account from
-the app's sign-in screen. Add your model keys in Settings → Models on each device.
+Open Misty, choose My own server in the setup wizard and enter `https://MISTY_HOSTNAME`, then
+create the first account. Each device picks its models in Settings → Models; the server never
+needs model keys ([byok.md](byok.md)).
 
-Only the first account can register on a production server. To let other people sign up, set
-`MISTY_REGISTRATION=open`; `closed` stops new accounts altogether. Existing accounts always sign
-in.
-
-## Storage
-
-Library files (uploads, attachments, avatars, renditions) live on the `librarydata` volume under
-`/var/lib/misty/library` by default. To use S3-compatible storage instead (R2, S3, MinIO), set
-`MISTY_LIBRARY_BACKEND=s3` with `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY` and `R2_SECRET_KEY`.
-
-Two things need S3-compatible storage for now: images inside notes and drawings, which upload
-straight to the bucket, and account exports that include those images. On the volume, they answer
-that direct transfer is required.
-
-## Optional settings
-
-Set each with `misty env set prod NAME`; `misty env describe` lists every name and its file.
-
-| Setting | What it turns on |
-| --- | --- |
-| `MISTY_AGENT_MODEL` and runtime keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …) | Server-side models for every account on this server, used when a device sends no keys ([byok.md](byok.md#server-keys)) |
-| `MISTY_REGISTRATION` | Who can sign up: `first` (production default), `open` or `closed` |
-| `MISTY_ALLOWED_ORIGINS` | Web origins allowed to call the API, if you run a website against it |
-| `MISTY_WEBSITE_URL` or `MISTY_INVITATION_URL_BASE` | Links in Space invitation emails; without either, no invitation email is sent |
-| `MISTY_SERPER_API_KEY` | `web.search` for agents (serper.dev) |
-| `MAILJET_*` | Email for password resets and verification |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Sign in with Google ([server/docs/google-sign-in.md](../server/docs/google-sign-in.md)) |
-| `MISTY_COMPOSIO_API_KEY` | Connected apps through your own Composio project |
-| `ELEVENLABS_API_KEY`, `SONIOX_API_KEY` | Server-side voice and transcription |
-| `MISTY_WEB_FETCH_URL`, `MISTY_WEB_FETCH_SECRET` | Page reading with no device online ([cloudflare.md](cloudflare.md#web-fetch-worker)) |
-| `MISTY_BACKUP_*` | Nightly encrypted backups ([server/deploy/README.md](../server/deploy/README.md#backups)) |
-
-## Without the CLI
-
-`server/compose.prod.yml` is a plain Compose file. The CLI only loads the files under
-`server/.env/prod/` into the environment before calling `docker compose`, and checks them first.
-If you manage configuration another way (a platform's secret store, Kubernetes), provide the same
-variables to the `api` and `agent-runtime` services; `misty env describe` is the list.
+The first account to register on a fresh server is its owner. After that, a person can sign up
+only with an open Space invitation to their email from someone who already has an account (the
+invite dialog gives the inviter a link to send), or through the operator account API
+([cloud/](cloud/README.md)), which the console uses. Customers › **Sign-in link** in the console
+makes a single-use link, `https://mistysys.com/setup#server=MISTY_HOSTNAME&key=…`, valid for seven
+days, that you send to the person yourself: a static page reads the server and key in the browser
+and opens Misty; the server itself serves only its API. The same link resets a forgotten password:
+it signs the person in and asks for a new one, and Misty's sign-in tells people who forgot theirs
+to ask you for a link. The operator API also closes an account: it becomes read-only and is
+deleted after the days you set unless resumed; tell the person yourself. The setup container
+generates the API's `MISTY_OPERATOR_TOKEN`. There is no setting for any of this. Existing
+accounts always sign in.
 
 ## Changing the server
 
-The AGPL covers servers. If you change Misty's server, agent runtime or Workers and other people
-use your server, you must offer them the source of your changed version under the AGPL, for
-example with a link on your sign-in page or in your server's description. Running Misty unchanged,
-or changed only for yourself, needs nothing extra.
+The AGPL covers servers. If you change Misty's server or Workers and other people use your server,
+you must offer them the source of your changed version under the AGPL, for example with a link on
+your sign-in page or in your server's description. Running Misty unchanged, or changed only for
+yourself, needs nothing extra.
 
 ## Development stack
 
 Working on Misty itself uses a different stack (`misty server up`, `server/compose.dev.yml`),
-which expects a Cloudflare tunnel and the collaboration Worker. See [server/README.md](../server/README.md).
+driven by the development-only `misty` CLI. See [server/README.md](../server/README.md).
+`server/deploy/setup/stack-test.sh` runs this production stack against a fake Cloudflare API on
+free ports and removes everything it made.

@@ -36,7 +36,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
             Original
           </Button>
         ) : !activeEdit ? (
-          <span className="text-[10px] text-cream-muted">Original selected</span>
+          <span className="text-3xs text-cream-muted">Original selected</span>
         ) : null}
       </div>
       {props.error ? (
@@ -62,7 +62,7 @@ export function LibraryVersionList(props: LibraryVersionListProps) {
                 Edit {version.version_number}
                 {version.is_current ? " · Current" : ""}
               </span>
-              <span className="mt-0.5 block text-[10px] text-cream-muted">
+              <span className="mt-0.5 block text-3xs text-cream-muted">
                 {libraryRenditionStatus(version)} · {formatTime(version.created_at)}
               </span>
             </Pressable>

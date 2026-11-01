@@ -1,21 +1,6 @@
 import { cachedRequest } from "@/api/cache/cached-request";
 import { apiRequest } from "@/api/client";
 
-interface FrontierModel {
-  id: string;
-  name: string;
-  provider_id: string;
-  provider_name: string;
-  capabilities: string[];
-  reasoning_levels: Array<"default" | "low" | "medium" | "high" | "xhigh">;
-}
-
-interface FrontierModelCatalog {
-  catalog_version: string;
-  default_model_id: string;
-  models: FrontierModel[];
-}
-
 export const assistantApi = {
   conversations: <T>(query = "", onCached?: (value: { conversations: T[] }) => void) =>
     cachedRequest<{ conversations: T[] }>(
@@ -61,7 +46,6 @@ export const assistantApi = {
       `/misty/conversations/${encodeURIComponent(conversationId)}`,
       { method: "PATCH", body: JSON.stringify({ read: true }) },
     ),
-  frontierModels: () => apiRequest<FrontierModelCatalog>("/ai/models"),
   complete: (prompt: string) =>
     apiRequest<{ text: string }>("/ai/complete", {
       method: "POST",

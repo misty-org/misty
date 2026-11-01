@@ -53,17 +53,7 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
             }
             EnvCommand::Init { target } => {
                 environment::init(&settings.workspace, target)?;
-                match target {
-                    environment::Target::Dev => {
-                        server::initialize_development_secrets(&settings.workspace)
-                    }
-                    environment::Target::Prod => {
-                        deploy::initialize_production_secrets(&settings.workspace)
-                    }
-                    environment::Target::Staging => {
-                        deploy::initialize_staging_secrets(&settings.workspace)
-                    }
-                }
+                server::initialize_development_secrets(&settings.workspace)
             }
             EnvCommand::Check { target } => environment::check(&settings.workspace, target),
             EnvCommand::Status { target } => environment::status(&settings.workspace, target),
@@ -139,51 +129,13 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 follow,
                 tail,
             } => server::logs(&settings.workspace, service.as_deref(), follow, tail),
-            ServerCommand::Release { version } => server::release(&settings.workspace, &version),
-            ServerCommand::Prod { command } => match command {
-                ProdCommand::Check => server::production_check(&settings.workspace),
-                ProdCommand::Up => server::production_up(&settings.workspace),
-                ProdCommand::Down { volumes } => {
-                    server::production_down(&settings.workspace, volumes)
-                }
-                ProdCommand::Logs => server::production_logs(&settings.workspace),
-                ProdCommand::Backup => server::production_backup(&settings.workspace),
-                ProdCommand::Push(target) => deploy::push(&settings.workspace, &target.remote()?),
-                ProdCommand::Deploy(target) => {
-                    deploy::deploy(&settings.workspace, &target.remote()?)
-                }
-                ProdCommand::Restore {
-                    backup,
-                    identity,
-                    yes,
-                } => server::production_restore(&settings.workspace, &backup, &identity, yes),
-            },
-            ServerCommand::Staging { command } => match command {
-                StagingCommand::Check => server::staging_check(&settings.workspace),
-                StagingCommand::Up => server::staging_up(&settings.workspace),
-                StagingCommand::Down { volumes } => {
-                    server::staging_down(&settings.workspace, volumes)
-                }
-                StagingCommand::Status => server::staging_status(&settings.workspace),
-                StagingCommand::Logs => server::staging_logs(&settings.workspace),
-            },
             ServerCommand::Image { command } => match command {
                 ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
             },
             ServerCommand::Worker { command } => match command {
-                WorkerCommand::GenerateSecrets { target } => match target {
-                    WorkerSecretTarget::Development => {
-                        server::generate_worker_secrets(&settings.workspace)
-                    }
-                    WorkerSecretTarget::Production => {
-                        server::generate_production_worker_secrets(&settings.workspace)
-                    }
-                },
-                WorkerCommand::Deploy { target, dry_run } => match target {
-                    WorkerDeployTarget::Production => {
-                        server::deploy_production_worker(&settings.workspace, dry_run)
-                    }
-                },
+                WorkerCommand::GenerateSecrets => {
+                    server::generate_worker_secrets(&settings.workspace)
+                }
             },
             ServerCommand::R2 { command } => match command {
                 R2Command::ConfigureCors { apply } => {
@@ -261,22 +213,8 @@ pub(super) fn load_command_environment(command: &Command, settings: &Settings) -
         }
     };
     crate::config::load_cli_environment(&settings.workspace, files)?;
-    if let Command::Server(server) = command {
-        let target = match &server.command {
-            ServerCommand::Prod { .. } => environment::Target::Prod,
-            ServerCommand::Staging { .. } => environment::Target::Staging,
-            ServerCommand::Worker {
-                command: WorkerCommand::GenerateSecrets { target },
-            } => match target {
-                WorkerSecretTarget::Development => environment::Target::Dev,
-                WorkerSecretTarget::Production => environment::Target::Prod,
-            },
-            ServerCommand::Worker {
-                command: WorkerCommand::Deploy { .. },
-            } => environment::Target::Prod,
-            _ => environment::Target::Dev,
-        };
-        environment::apply(&settings.workspace, target)?;
+    if let Command::Server(_) = command {
+        environment::apply(&settings.workspace, environment::Target::Dev)?;
     }
     Ok(())
 }

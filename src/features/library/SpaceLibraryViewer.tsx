@@ -132,7 +132,7 @@ function LibraryItemViewerContent(
             <DialogDescription className="sr-only">
               Preview and edit {item.display_name}.
             </DialogDescription>
-            <p className="m-0 mt-0.5 text-[10px] text-cream-muted">
+            <p className="m-0 mt-0.5 text-3xs text-cream-muted">
               {index + 1} of {items.length}
             </p>
           </div>

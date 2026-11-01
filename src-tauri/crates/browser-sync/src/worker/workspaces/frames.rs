@@ -134,6 +134,10 @@ where
         code: &str,
         retry_after: Option<Duration>,
     ) -> Result<()> {
+        // Record and favicon writes are refused once the account's storage is full.
+        if code == crate::worker::collections::STORAGE_FULL {
+            self.storage_full(true)?;
+        }
         if self.records_failed(request, code, retry_after) || self.clipboard.failed(request) {
             return Ok(());
         }

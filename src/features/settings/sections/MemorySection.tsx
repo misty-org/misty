@@ -65,13 +65,10 @@ export function MemorySection(props: SettingsContentProps) {
   };
   return (
     <>
-      <SettingsSectionBlock
-        title="Memory"
-        description="Misty can remember the pages you read and what you dictate, so you and your agents can find them later. Only you can see your Memory."
-      >
+      <SettingsSectionBlock title="Memory">
         <SettingsRow
           label="Remember pages I read"
-          description="A page is kept after a few seconds in front. Private windows, sign-in, banking, health and email pages are never kept."
+          description="Never private, sign-in, banking, health or email pages."
         >
           <SwitchControl
             checked={memory.enabled}
@@ -81,7 +78,7 @@ export function MemorySection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Pause"
-          description="Stop remembering for a while without turning Memory off."
+
           muted={!memory.enabled}
         >
           <ChoiceControl
@@ -106,7 +103,7 @@ export function MemorySection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Remember dictation"
-          description="Keep what you dictate, so you can find what you said."
+
           muted={!memory.enabled}
         >
           <SwitchControl
@@ -117,7 +114,7 @@ export function MemorySection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Sites Memory skips"
-          description="One site per line, such as example.com. Its subdomains are skipped too."
+          description="One per line. Covers subdomains."
           stacked
         >
           <TextAreaControl
@@ -135,14 +132,8 @@ export function MemorySection(props: SettingsContentProps) {
         )}
       </SettingsSectionBlock>
       <ScreenCaptureSettings {...props} />
-      <SettingsSectionBlock
-        title="Your Memory"
-        description="Forgetting removes the pages and words, and what agents could find in them."
-      >
-        <SettingsRow
-          label="Forget recent"
-          description="Remove what Memory kept in the last hour or today."
-        >
+      <SettingsSectionBlock title="Your Memory">
+        <SettingsRow label="Forget recent">
           <div className="flex gap-2">
             <Button size="sm" variant="ghost" onClick={() => void forget("hour")}>
               {confirming === "hour" ? "Forget the last hour?" : "Last hour"}
@@ -160,10 +151,7 @@ export function MemorySection(props: SettingsContentProps) {
             {confirming === "all" ? "Click again to forget everything" : "Forget everything"}
           </Button>
         </SettingsRow>
-        <SettingsRow
-          label="Export"
-          description="Download everything Memory kept, as a zip with a page per day."
-        >
+        <SettingsRow label="Export" description="A zip with a page per day.">
           <Button size="sm" variant="ghost" onClick={() => void exportAll()}>
             Export
           </Button>

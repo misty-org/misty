@@ -90,7 +90,7 @@ export function Notification({
         aria-hidden="true"
         className={cn(
           "mt-0.5 size-4 shrink-0 text-cream-muted",
-          tone === "success" && "text-sage-fg",
+          tone === "success" && "text-cream",
         )}
       />
       <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">

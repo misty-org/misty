@@ -115,6 +115,12 @@ mod tests {
             "model_keys_saved",
             "model_keys_save",
             "model_keys_remove",
+            "model_keys_add",
+            "model_keys_models",
+            "model_keys_openrouter_sign_in",
+            "model_keys_chatgpt_status",
+            "model_keys_chatgpt_sign_in",
+            "model_keys_chatgpt_sign_out",
         ] {
             assert!(allows("window-1", command));
             for label in [

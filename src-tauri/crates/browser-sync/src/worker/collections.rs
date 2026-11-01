@@ -21,6 +21,10 @@ const HINT_DEBOUNCE: Duration = Duration::from_secs(2);
 const SAFETY_PULL: Duration = Duration::from_secs(3600);
 const MAX_PUSH: usize = 200;
 
+/// The server's answer to a write that adds content once the account's storage is full. The
+/// writes stay on this device; the status says so until a later push goes through.
+pub(in crate::worker) const STORAGE_FULL: &str = "storage_limit_reached";
+
 mod exchange;
 mod views;
 mod writes;

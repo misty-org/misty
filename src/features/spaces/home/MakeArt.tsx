@@ -51,7 +51,7 @@ export function MakeArt({ kind }: { kind: "chat" | "note" | "drawing" | "file" |
   return (
     <span
       aria-hidden
-      className={`${sheet} flex w-[66%] flex-col gap-0.5 px-2 py-1.5 font-mono text-[9px] leading-snug`}
+      className={`${sheet} flex w-[66%] flex-col gap-0.5 px-2 py-1.5 font-mono text-3xs leading-snug`}
     >
       <span className="text-cream-muted/60">src/app.ts</span>
       <span className="text-cream-muted/90">+ export()</span>

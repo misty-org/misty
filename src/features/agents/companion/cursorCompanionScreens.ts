@@ -12,7 +12,6 @@ export function savedPresentation(accountId: string): Presentation {
   let show = true,
     ask = false,
     teach = false,
-    model = "",
     size = companionSizeDefault;
   try {
     const saved = JSON.parse(localStorage.getItem(`misty.cursor-companion:${accountId}`) || "{}");
@@ -20,7 +19,6 @@ export function savedPresentation(accountId: string): Presentation {
     ask = saved.ask === true;
     teach = saved.teach === true;
     size = normalizeCompanionSize(saved.size);
-    model = typeof saved.model === "string" ? saved.model : "";
   } catch {
     /* defaults */
   }
@@ -32,7 +30,6 @@ export function savedPresentation(accountId: string): Presentation {
     mode: "auto",
     ask,
     teach,
-    model,
     size,
   };
 }

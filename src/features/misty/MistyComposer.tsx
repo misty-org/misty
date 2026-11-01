@@ -145,7 +145,7 @@ export function MistyComposer(props: {
             {props.attachments.map((attachment) => (
               <div
                 key={attachment.id}
-                className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/20"
+                className="group relative size-16 shrink-0 overflow-hidden rounded-xl border border-charcoal-border bg-black/20"
               >
                 {attachment.mimeType.startsWith("image/") ? (
                   <img
@@ -164,7 +164,7 @@ export function MistyComposer(props: {
                 {attachment.state !== "ready" ? (
                   <div className="absolute inset-0 grid place-items-center bg-black/60">
                     {attachment.state === "failed" ? (
-                      <span className="text-[9px] text-cream">Failed</span>
+                      <span className="text-3xs text-cream">Failed</span>
                     ) : (
                       <Spinner label={false} className="text-white" />
                     )}

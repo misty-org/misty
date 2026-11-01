@@ -15,8 +15,6 @@ type MistySubmissionPresentation = "panel" | "workspace";
 export interface MistyState {
   thinkingMode?: ThinkingMode;
   thinkingModeExplicit?: boolean;
-  /** A model picked before the conversation exists; the first message carries it. */
-  pendingModelOverride?: string;
   selectedAgentId?: string;
   /** Where the current task works; set per task, never chosen up front. */
   executionMode?: "user" | "agent";
@@ -74,7 +72,6 @@ export interface MistyState {
       executionMode: "user" | "agent";
       turn?: number;
       interactionMode?: "team" | "auto";
-      model?: string;
       idempotencyKey?: string;
       methodVersionId?: string;
       methodInputs?: Record<string, string | number | boolean>;

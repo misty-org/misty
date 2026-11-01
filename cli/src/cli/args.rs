@@ -96,8 +96,7 @@ pub(super) enum EnvCommand {
     },
     /// List environment settings and the files that own them.
     Describe,
-    /// Create missing private files without overwriting configured values.
-    /// For prod, also generate any missing production secrets locally.
+    /// Create missing private development files without overwriting configured values.
     Init {
         #[arg(value_enum)]
         target: environment::Target,

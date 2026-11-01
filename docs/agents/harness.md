@@ -24,7 +24,7 @@ Cloudflare Worker, never on the server.
 |---|---|
 | Agent loop (durable run, model turns, compaction) | Your server, `server/apps/agent-runtime` (AI SDK on Vercel Workflow, `workflows/space-task-agent.ts`) |
 | `agent.gate`: admission and model routing, the tool catalog and its rules, the action journal (`log.run`), the device job queue | Your server, the Go API and Postgres (`server/internal/platform/httpapi/`) |
-| Model calls, web search | The person's own provider and key ([byok.md](../byok.md)); `web.search` calls Serper directly from Go |
+| Model calls, web search | The person's device, on their own provider and key ([byok.md](../byok.md)); `web.search` runs in the desktop runtime on the device's search key (Decodo or Serper), offered only when the device has one ([runtime.md](runtime.md#web-search)) |
 | `web.fetch` | The person's device (`src-tauri/src/infra/agents/web_fetch.rs`); the Cloudflare Worker in `server/apps/web-fetch` when no device is online |
 | `browser_run` programs, the page layer, screen capture, desktop control | The person's device, inside the Misty app |
 | Coding | The person's device, through their own coding tools |
@@ -35,7 +35,7 @@ request: agent.entry.composer | .cursor | .schedule | .email | .integration.<app
      ├─ browser_run ─ agent.gate (Go: catalog · policy · journal · model route)
      │    └─ Device: the program in a sandbox inside the Misty app (no network, files or globals)
      │         └─ Page API on the agent's own tabs only
-     ├─ web_search · web_fetch · agent_delegate (sub-agents for breadth)
+     ├─ web_search (on the device's search key) · web_fetch · agent_delegate (sub-agents for breadth)
      ├─ Misty data tools and connected apps (loaded when the request is about them)
      └─ Completion checks, then one verification turn
 ```

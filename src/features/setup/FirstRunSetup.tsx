@@ -28,7 +28,7 @@ const tabSideChoices: Array<{ value: TabSide; label: string }> = [
 const stepCopy: Record<SetupStep, { title: string; description: string }> = {
   import: {
     title: "Import from your browser",
-    description: "Bring bookmarks, history, settings and sign-ins into Misty, or skip this step.",
+    description: "Optional. Skip it if you are starting fresh.",
   },
   extensions: {
     title: "Add an ad blocker and a password manager",
@@ -122,7 +122,6 @@ export function FirstRunSetup() {
             </div>
           </div>
         ) : null}
-        <p className="mt-4 text-xs text-cream-muted">You can change these anytime in Settings.</p>
       </DialogContent>
     </Dialog>
   );

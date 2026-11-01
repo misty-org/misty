@@ -34,14 +34,6 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       s.change({ teach: control.teach });
       // Spoken turns cannot wait for a new chat, so the lesson chat is ready up front.
       if (control.teach) await lessonConversation();
-    } else if (
-      control.kind === "model" &&
-      (control.model === "" || s.state.models?.some((m) => m.id === control.model))
-    ) {
-      if (await s.interruptNative()) {
-        await writeDevicePreference("agents.companion.model", control.model);
-        s.change({ model: control.model });
-      }
     } else if (control.kind === "stop_audio") {
       const previous = s.turn;
       const next = s.nativeReady

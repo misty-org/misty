@@ -22,7 +22,6 @@ import {
 import type { SettingsContentProps } from "../settingsTypes";
 import { Input } from "@/shared/ui";
 import { validClockTime } from "../store/nightLight";
-import { MAX_PANE_DIM } from "@/features/workspace/paneFocus";
 import { normalizeDockingLayout } from "@/features/app-shell/dockingLayout";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/workspace";
 
@@ -35,10 +34,7 @@ export function AppearanceSection(props: SettingsContentProps) {
   return (
     <>
       <SettingsSectionBlock title="Theme">
-        <SettingsRow
-          label="Theme"
-          description="System follows your computer's light or dark appearance."
-        >
+        <SettingsRow label="Theme" description="System follows your computer.">
           <ChoiceControl
             value={stringSetting(props.document, "appearance", "theme_mode", "dark")}
             disabled={props.working}
@@ -50,10 +46,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             onValueChange={(value) => props.onSettingChange("appearance", "theme_mode", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Night light"
-          description="Warms the whole window and every page to ease your eyes in the evening."
-        >
+        <SettingsRow label="Night light" description="Warms the window and every page.">
           <ChoiceControl
             value={nightLight}
             disabled={props.working}
@@ -104,10 +97,7 @@ export function AppearanceSection(props: SettingsContentProps) {
 
       <SettingsSectionBlock title="Window">
         <WindowTabsRow />
-        <SettingsRow
-          label="Space bar alignment"
-          description="Where the Space, its pages and People sit along the Space bar."
-        >
+        <SettingsRow label="Space bar alignment">
           <ChoiceControl
             value={stringSetting(props.document, "appearance", "space_bar_alignment", "left")}
             disabled={props.working}
@@ -123,7 +113,7 @@ export function AppearanceSection(props: SettingsContentProps) {
         </SettingsRow>
         <SettingsRow
           label="Auto-hide the Space bar"
-          description="Tuck the Space bar away until you move the pointer to the top edge of the page. It makes room for itself when it returns."
+          description="Shows when the pointer reaches the top edge."
         >
           <SwitchControl
             checked={booleanSetting(props.document, "appearance", "space_bar_auto_hide", false)}
@@ -131,36 +121,7 @@ export function AppearanceSection(props: SettingsContentProps) {
             onChange={(value) => props.onSettingChange("appearance", "space_bar_auto_hide", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Dim inactive panes"
-          description="Keep the focused pane visually prominent."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "dim_inactive_panes", true)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "dim_inactive_panes", value)}
-          />
-        </SettingsRow>
-        {booleanSetting(props.document, "appearance", "dim_inactive_panes", true) ? (
-          <SettingsRow label="Dimming strength" indent>
-            <SliderControl
-              value={numberSetting(props.document, "appearance", "pane_dim_strength", 0.15)}
-              min={0}
-              max={MAX_PANE_DIM}
-              step={0.01}
-              disabled={props.working}
-              format={(value) => `${Math.round(value * 100)}%`}
-              onCommit={(value) => props.onSettingChange("appearance", "pane_dim_strength", value)}
-            />
-          </SettingsRow>
-        ) : null}
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Size">
-        <SettingsRow
-          label="App zoom"
-          description="Scales the whole interface. Use Cmd/Ctrl +, Cmd/Ctrl −, or Cmd/Ctrl 0."
-        >
+        <SettingsRow label="App zoom" description="Also Cmd or Ctrl with +, − and 0.">
           <SliderControl
             value={displayedAppZoom}
             min={appZoomMin}
@@ -174,16 +135,6 @@ export function AppearanceSection(props: SettingsContentProps) {
               setAppZoomDraft(null);
               props.onSettingChange("appearance", "app_zoom", appZoomRenderScale(value));
             }}
-          />
-        </SettingsRow>
-        <SettingsRow
-          label="Compact mode"
-          description="Reduce padding and spacing in file-heavy views."
-        >
-          <SwitchControl
-            checked={booleanSetting(props.document, "appearance", "compact_mode_enabled", false)}
-            disabled={props.working}
-            onChange={(value) => props.onSettingChange("appearance", "compact_mode_enabled", value)}
           />
         </SettingsRow>
       </SettingsSectionBlock>
@@ -215,10 +166,7 @@ function WindowTabsRow() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
   return (
-    <SettingsRow
-      label="Tabs"
-      description="Which side of this window the tab sidebar sits on. Each Space's window keeps its own."
-    >
+    <SettingsRow label="Tabs" description="For this window.">
       <ChoiceControl
         value={layout.tabs}
         disabled={false}

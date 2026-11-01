@@ -79,13 +79,6 @@ vi.mock("./companionConversation", () => ({
     close = mocks.conversationClose;
   },
 }));
-vi.mock("@/api/assistant/api", () => ({
-  assistantApi: {
-    frontierModels: async () => ({
-      models: [],
-    }),
-  },
-}));
 vi.mock("@/features/misty/useMistyStore", () => ({
   useMistyStore: {
     setState: (update: (state: typeof mocks.state) => Partial<typeof mocks.state>) =>

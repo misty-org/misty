@@ -44,12 +44,12 @@ describe("BrowserOfflinePage", () => {
     render(<BrowserOfflinePage url="https://example.com" onRetry={onRetry} />);
 
     const tipsButton = screen.getByRole("button", { name: /Troubleshooting tips/i });
-    expect(screen.queryByText(/Check Wi-Fi or Ethernet cables/i)).toBeNull();
+    expect(screen.queryByText(/Check your Wi-Fi or Ethernet connection/i)).toBeNull();
 
     fireEvent.click(tipsButton);
-    expect(screen.getByText(/Check Wi-Fi or Ethernet cables/i)).toBeDefined();
+    expect(screen.getByText(/Check your Wi-Fi or Ethernet connection/i)).toBeDefined();
 
     fireEvent.click(tipsButton);
-    expect(screen.queryByText(/Check Wi-Fi or Ethernet cables/i)).toBeNull();
+    expect(screen.queryByText(/Check your Wi-Fi or Ethernet connection/i)).toBeNull();
   });
 });

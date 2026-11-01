@@ -547,3 +547,27 @@ fn a_rate_limited_op_keeps_its_edits_and_waits_as_asked() {
     h.sync.flush();
     assert!(h.tick().is_empty());
 }
+
+#[test]
+fn a_closing_accounts_op_keeps_its_edits_and_waits() {
+    let mut h = harness();
+    h.sync
+        .apply_changes(&mut h.store, &h.root, window())
+        .unwrap();
+    let ops = h.tick();
+    assert_eq!(ops.len(), 1);
+    h.sync
+        .on_error(
+            &mut h.store,
+            &h.root,
+            None,
+            Some(&ops[0].operation_id),
+            "account_closing",
+            None,
+        )
+        .unwrap();
+    // Read-only, not rejected: the edit stays queued and is not resent at once.
+    let desired = h.store.workspace_desired(&h.root, DEVICE).unwrap().unwrap();
+    assert_eq!(desired.changes.len(), 1);
+    assert!(h.tick().is_empty());
+}

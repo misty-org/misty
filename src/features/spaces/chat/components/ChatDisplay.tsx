@@ -86,7 +86,7 @@ export function ChatDateDivider({ label }: { label: string }) {
   return (
     <div className="my-6 flex items-center gap-3 first:mt-0" role="separator" aria-label={label}>
       <span className="h-px flex-1 bg-charcoal-border" />
-      <span className="text-[11px] font-semibold text-cream-muted">{label}</span>
+      <span className="text-2xs font-semibold text-cream-muted">{label}</span>
       <span className="h-px flex-1 bg-charcoal-border" />
     </div>
   );

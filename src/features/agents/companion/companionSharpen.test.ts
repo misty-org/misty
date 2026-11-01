@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { refinePoint, snapPoint } from "./companionSharpen";
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), apiRequest: vi.fn() }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), deviceModelCall: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("@/api/client", () => ({ apiRequest: mocks.apiRequest }));
+vi.mock("@/api/device-models", () => ({ deviceModelCall: mocks.deviceModelCall }));
 afterEach(() => {
   mocks.invoke.mockReset();
-  mocks.apiRequest.mockReset();
+  mocks.deviceModelCall.mockReset();
   vi.useRealTimers();
 });
 
@@ -48,7 +48,7 @@ describe("refinePoint", () => {
       height: 560,
       region: { x: 360, y: 160, width: 280, height: 280 },
     });
-    mocks.apiRequest.mockResolvedValue({ found: true, x: 300, y: 260 });
+    mocks.deviceModelCall.mockResolvedValue({ found: true, x: 300, y: 260 });
     await expect(refinePoint(estimate, "invocation_1", 4)).resolves.toEqual({
       ...estimate,
       x: 510,
@@ -61,9 +61,9 @@ describe("refinePoint", () => {
       y: 300,
       size: 280,
     });
-    const [path, init] = mocks.apiRequest.mock.calls[0];
-    expect(path).toBe("/me/companion/refine-point/invocation_1");
-    expect(JSON.parse(init.body)).toEqual({
+    const [name, body] = mocks.deviceModelCall.mock.calls[0];
+    expect(name).toBe("refine-point");
+    expect(body).toEqual({
       image: {
         mime_type: "image/jpeg",
         data_url: "data:image/jpeg;base64,AA==",
@@ -82,11 +82,11 @@ describe("refinePoint", () => {
       height: 280,
       region: { x: 360, y: 160, width: 280, height: 280 },
     });
-    mocks.apiRequest.mockResolvedValue({ found: false, x: 0, y: 0 });
+    mocks.deviceModelCall.mockResolvedValue({ found: false, x: 0, y: 0 });
     await expect(refinePoint(estimate, "invocation_1", 4)).resolves.toBeUndefined();
     await expect(
       refinePoint({ ...estimate, label: " " }, "invocation_1", 4),
     ).resolves.toBeUndefined();
-    expect(mocks.apiRequest).toHaveBeenCalledOnce();
+    expect(mocks.deviceModelCall).toHaveBeenCalledOnce();
   });
 });

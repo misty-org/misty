@@ -106,7 +106,7 @@ export function SpaceMembersPopover({
         <div className="flex items-center justify-between border-b border-charcoal-border/60 px-2 py-2.5">
           <div className="min-w-0">
             <p className="m-0 truncate text-sm font-semibold">Team</p>
-            <p className="mb-0 mt-0.5 text-[11px] text-cream-muted">
+            <p className="mb-0 mt-0.5 text-2xs text-cream-muted">
               {members.length || space.member_count} teammates
               {agents?.length
                 ? ` and ${agents.length} agent${agents.length === 1 ? "" : "s"}`
@@ -115,7 +115,7 @@ export function SpaceMembersPopover({
             </p>
           </div>
           {onlineCount > 0 ? (
-            <span className="shrink-0 text-[11px] text-cream-muted">{onlineCount} online</span>
+            <span className="shrink-0 text-2xs text-cream-muted">{onlineCount} online</span>
           ) : null}
         </div>
 
@@ -172,7 +172,7 @@ function TeamRows({ members, agents }: { members: PresentMember[]; agents?: Spac
               <Avatar className={cn("size-7", member.presenceStatus === "offline" && "opacity-55")}>
                 <AvatarFallback
                   className={cn(
-                    "text-[9px] font-semibold",
+                    "text-3xs font-semibold",
                     avatarColorClass(member.user_id),
                     avatarInkClass,
                   )}
@@ -183,7 +183,7 @@ function TeamRows({ members, agents }: { members: PresentMember[]; agents?: Spac
               <PresenceDot status={member.presenceStatus} />
             </span>
             <span className="min-w-0 flex-1 truncate text-xs font-medium">{member.name}</span>
-            <span className="shrink-0 text-[10px] capitalize text-cream-muted">{member.role}</span>
+            <span className="shrink-0 text-3xs capitalize text-cream-muted">{member.role}</span>
           </div>
           {(byOwner.get(member.user_id) ?? []).map((agent) => (
             <SpaceAgentRow key={agent.agent_id} agent={agent} compact />

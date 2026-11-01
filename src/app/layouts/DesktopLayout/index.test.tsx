@@ -20,6 +20,8 @@ vi.mock("@/features/auth", () => ({
   openSignOutSheet: vi.fn(),
   SignInSheet: () => null,
   SignOutSheet: () => null,
+  AccountClosingNotice: () => null,
+  AccountSuspendedNotice: () => null,
 }));
 vi.mock("@/features/passwords/DevicePasswordsMerge", () => ({ DevicePasswordsMerge: () => null }));
 

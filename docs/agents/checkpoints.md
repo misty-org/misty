@@ -67,7 +67,7 @@ buttons (AGENTS.md agent-conversation rules), status stays text plus icon.
 "Start from here" on any turn resumes with the ledger as it stood at that turn. This is the existing rewind plus
 a ledger snapshot per assistant message, so no separate checkpoint store.
 
-### Evals (`server/apps/agent-runtime/evals/odysseys`)
+### Evals (to rebuild on the desktop runtime, see [evals/odysseys.md](evals/odysseys.md))
 
 - Save the ledger per case. A rerun after a fix resumes only failed and blocked rows.
 - A case counts as passed only when every row is `done` with evidence or intentionally `skipped` by the case.

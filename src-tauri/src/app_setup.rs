@@ -7,8 +7,7 @@ use crate::infra::browser::agent_control::BrowserExecutionState;
 use crate::infra::browser::BrowserSessionState;
 #[cfg(desktop)]
 use crate::infra::tray;
-use crate::telemetry::TelemetryReporter;
-use crate::{infra, telemetry, voice};
+use crate::{infra, voice};
 use tauri::Manager;
 
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -35,10 +34,9 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
     // Runs only in the primary instance, before any service opens a
     // file under ~/.misty. Services still create what they need, so a
-    // failure here is reported rather than blocking launch.
+    // failure here is logged rather than blocking launch.
     if let Err(error) = infra::misty_home::ensure_misty_home() {
-        telemetry::PostHogTelemetryReporter
-            .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
+        eprintln!("Could not prepare ~/.misty: {error}");
     }
     let runtime = MistyRuntime::new();
     // What this device trusts (vault root pin, device list, its own
@@ -79,8 +77,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     if let Err(error) = tray::setup(app) {
         let error = std::io::Error::other(error);
-        telemetry::PostHogTelemetryReporter
-            .capture_error(&error, telemetry::SafeOperation::ApplicationStartup);
+        eprintln!("Could not set up the tray: {error}");
         return Err(error.into());
     }
     #[cfg(target_os = "macos")]

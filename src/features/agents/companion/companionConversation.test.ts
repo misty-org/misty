@@ -7,14 +7,8 @@ const mocks = vi.hoisted(() => ({
   close: vi.fn(),
   tool: vi.fn(),
 }));
-vi.mock("@/api/agents/api", () => ({ agentsApi: { realtimeVoiceTicket: mocks.ticket } }));
-vi.mock("@/api/deployment/api", () => ({ resolveApiBase: async () => "https://fixture.test/v1" }));
-vi.mock("../store/useAgentsStore", () => ({
-  agentsDeviceSnapshot: async () => ({ device: { id: "local", status: "active" } }),
-}));
-vi.mock("../store/useAgentDeviceStore", () => ({
-  ensureServerAgentDevice: async () => ({ id: "server" }),
-}));
+// The socket comes from the agent runtime on this computer (agent_runtime_voice_ticket).
+vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.ticket }));
 vi.mock("./companionVoicePlayback", () => ({
   CompanionVoicePlayback: class {
     constructor(
@@ -60,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   Socket.all = [];
   vi.stubGlobal("WebSocket", Socket);
-  mocks.ticket.mockResolvedValue({ ticket: "one" });
+  mocks.ticket.mockResolvedValue({ url: "ws://127.0.0.1:4000/v1/device/voice?ticket=one" });
   mocks.tool.mockResolvedValue("task");
 });
 afterEach(() => {
@@ -84,6 +78,8 @@ async function fixture() {
     onError,
     onExpired: vi.fn(),
     tool: mocks.tool,
+    context: () => ({ history: "[]", task: "" }),
+    taskResult: () => "",
   });
   sessions.push(s);
   await tick();
@@ -206,6 +202,8 @@ it("cancels a rapid press released before connection setup without opening an in
     onError,
     onExpired: vi.fn(),
     tool: mocks.tool,
+    context: () => ({ history: "[]", task: "" }),
+    taskResult: () => "",
   });
   sessions.push(s);
   s.begin();

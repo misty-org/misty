@@ -136,7 +136,7 @@ export function CreateEditConversationDialog({
                 />
                 <span className="min-w-0">
                   <span className="block truncate text-cream">{member.name}</span>
-                  <span className="block truncate text-[9px] text-cream-muted">{member.email}</span>
+                  <span className="block truncate text-3xs text-cream-muted">{member.email}</span>
                 </span>
               </label>
             ))}
@@ -153,7 +153,7 @@ export function CreateEditConversationDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={!canSave}>
-              {saving ? "Saving..." : conversation ? "Save" : "Create"}
+              {saving ? "Saving…" : conversation ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </form>

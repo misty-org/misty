@@ -1,4 +1,7 @@
 export * from "./AuthContext";
+export { AccountClosingNotice } from "./AccountClosingNotice";
+export { AccountSuspendedNotice } from "./AccountSuspendedNotice";
+export { ServerAlertsNotice } from "./ServerAlertsNotice";
 export { bootstrapDemoSession } from "./demoSessionBootstrap";
 export * from "./hooks/useAccountAvatarUrl";
 export type { AccountMeResponse } from "@/api/account/types";
@@ -18,7 +21,7 @@ export {
   passwordProblem,
   unmarkCredentialAccount,
 } from "./store/accountCredential";
-export { accountChangePassword } from "./store/accountPassword";
+export { accountChangePassword, accountSetFirstPassword } from "./store/accountPassword";
 export * from "./store/useAuthTokenStore";
 export * from "./store/useUserStore";
 export { SignInSheet } from "./signInSheet/SignInSheet";

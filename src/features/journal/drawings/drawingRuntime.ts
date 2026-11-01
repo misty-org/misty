@@ -12,6 +12,4 @@ export interface DrawingSession {
   scene: Y.Map<unknown>;
   files: Y.Map<DrawingAssetReference>;
   provider: Pick<WebsocketProvider, "awareness" | "on" | "off" | "synced">;
-  /** Collaboration is off on this server: nothing can be saved, so the drawing is read-only. */
-  localOnly?: boolean;
 }

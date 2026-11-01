@@ -1,9 +1,9 @@
 import { Pressable } from "@/shared/ui";
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import { settingSearchEntries } from "../devicePreferences/registry";
 import {
+  preferenceSection,
+  preferencesWithoutRows,
   settingsAreaEntry,
-  settingsAreaIsNativeOnly,
   settingsAreas,
   settingsGroups,
   settingsPage,
@@ -21,29 +21,20 @@ export function searchSettings(query: string): SettingsSearchResult[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
   const rows = settingSearchEntries
-    .filter((d) => {
-      const page = settingsPage(d.page as SettingsSection);
-      return page && (hasTauriInternals() || !settingsAreaIsNativeOnly(page.area));
-    })
+    .filter((d) => !preferencesWithoutRows.has(d.id) && settingsPage(d.page as SettingsSection))
     .filter((d) =>
       `${d.label} ${d.id} ${d.page} ${d.keywords?.join(" ") ?? ""}`.toLowerCase().includes(needle),
     )
     .map((d) => ({
       key: d.id,
       label: d.label,
-      page: [
-        "browser.privacy.page_state_restore",
-        "browser.privacy.page_state_agent_restore",
-      ].includes(d.id)
-        ? ("sync" as const)
-        : (d.page as SettingsSection),
+      page: preferenceSection(d.id, d.page),
       focus: d.label,
     }));
   const pages = settingsGroups
     .flatMap((group) => group.areas)
     .filter((area) => settingsAreas[area].label.toLowerCase().includes(needle))
     .flatMap((area) => {
-      if (!hasTauriInternals() && settingsAreaIsNativeOnly(area)) return [];
       const entry = settingsAreaEntry(area);
       return entry
         ? [{ key: `page:${entry.id}`, label: settingsAreas[area].label, page: entry.id, focus: "" }]
@@ -82,13 +73,11 @@ export function SettingsSearchResults(props: {
             className="grid gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-charcoal-hover focus-visible:bg-charcoal-hover"
             onClick={() => props.onSelect(result)}
           >
-            <span className="truncate text-[14px] text-cream">
+            <span className="truncate text-sm text-cream">
               <Highlighted text={result.label} query={props.query} />
             </span>
             {result.focus ? (
-              <span className="truncate text-[11px] text-cream-muted">
-                {settingsPageTitle(page)}
-              </span>
+              <span className="truncate text-2xs text-cream-muted">{settingsPageTitle(page)}</span>
             ) : null}
           </Pressable>
         );

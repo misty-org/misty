@@ -56,7 +56,7 @@ it("reopens historical conversations and starts new personal work without their 
     "workspace",
     [],
     expect.objectContaining({ conversationId: "private" }),
-    { executionMode: "user", interactionMode: "auto", model: "" },
+    { executionMode: "user", interactionMode: "auto" },
   );
   await waitFor(() => expect(composer().value).toBe(""));
   fireEvent.click(screen.getByRole("button", { name: "New task" }));
@@ -72,7 +72,7 @@ it("reopens historical conversations and starts new personal work without their 
     "workspace",
     [],
     { conversationId: "", context: [] },
-    { executionMode: "user", interactionMode: "auto", model: "" },
+    { executionMode: "user", interactionMode: "auto" },
   );
   expect(useMistyStore.getState().selectedSpaceId).toBe("");
 });

@@ -1,15 +1,15 @@
 //! Bring-your-own-key models. Provider keys live in Misty's credential store (sealed rows
 //! whose master key is in the OS keychain), one entry per provider under
-//! `com.misty.models`; the model choices are device settings (section `models` of
+//! `com.misty.models`, and so do the web search keys (Decodo, Serper); the model choices are device settings (section `models` of
 //! `misty.db`). The renderer can save, replace or remove a key and learn which providers
-//! have one; it can never read a key back. Requests to the account server carry both as
-//! the `X-Misty-Models` header, added natively (see `account::http`).
+//! have one; it can never read a key back. Only the agent runtime on this computer gets
+//! them (`agent_runtime`), as a model document with a fresh ChatGPT access token when the
+//! person signed in with ChatGPT (`chatgpt`); no server ever does.
+pub mod catalog;
+pub mod chatgpt;
 pub mod header;
-
-use std::{
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+pub mod keys;
+pub mod oauth;
 
 use serde_json::Value;
 use tauri::Manager;
@@ -19,16 +19,10 @@ use crate::app::runtime::MistyRuntime;
 /// The credential-store service that holds one key per provider ID.
 pub const KEY_SERVICE: &str = "com.misty.models";
 const MAX_KEY_BYTES: usize = 4096;
-/// A built header is reused this long; saving a key or a setting clears it at once.
-const CACHE_TTL: Duration = Duration::from_secs(60);
 
-static CACHE: Mutex<Option<(Instant, Option<String>)>> = Mutex::new(None);
-
-/// Forgets the built header so the next request reads keys and settings again.
+/// Gives the agent runtime on this computer the new choices and keys.
 pub fn invalidate() {
-    if let Ok(mut cache) = CACHE.lock() {
-        *cache = None;
-    }
+    crate::infra::agent_runtime::models_changed();
 }
 
 fn load_key(provider: &str) -> Option<String> {
@@ -40,35 +34,46 @@ fn load_key(provider: &str) -> Option<String> {
 fn saved_providers() -> Vec<String> {
     header::PROVIDERS
         .iter()
+        .chain(header::SEARCH_PROVIDERS.iter())
         .filter(|provider| load_key(provider).is_some_and(|key| !key.is_empty()))
         .map(|provider| (*provider).to_owned())
         .collect()
 }
 
-/// The header for the next account request, or None when this device has no usable
-/// agent model. Reads the keychain off the async runtime.
-pub async fn current_header(app: &tauri::AppHandle) -> Option<String> {
-    if let Ok(cache) = CACHE.lock() {
-        if let Some((built, value)) = cache.as_ref() {
-            if built.elapsed() < CACHE_TTL {
-                return value.clone();
-            }
-        }
-    }
+/// This device's model choices and keys, for the agent runtime on this computer. None when
+/// no agent model has a usable provider.
+pub async fn current_document(app: &tauri::AppHandle) -> Option<Value> {
     let runtime = app.try_state::<MistyRuntime>()?;
     let document = runtime.settings.document().await.ok()?;
     let section = document.get("models").cloned().unwrap_or(Value::Null);
-    let value = tokio::task::spawn_blocking(move || header::encode(&section, &load_key))
-        .await
-        .ok()?;
-    if let Ok(mut cache) = CACHE.lock() {
-        *cache = Some((Instant::now(), value.clone()));
+    let uses_chatgpt = header::ROLES.iter().any(|(_, setting)| {
+        section
+            .get(*setting)
+            .and_then(Value::as_str)
+            .is_some_and(|model| model.trim().starts_with("chatgpt/"))
+    });
+    let chatgpt = if uses_chatgpt {
+        chatgpt::access_token().await
+    } else {
+        None
+    };
+    if let Some((_, expires_at)) = &chatgpt {
+        // The runtime holds this token; it gets the next one before this one runs out.
+        chatgpt::renew_before(*expires_at);
     }
-    value
+    let token = chatgpt.map(|(token, _)| token);
+    tokio::task::spawn_blocking(move || {
+        header::document(&section, &|provider| match provider {
+            "chatgpt" => token.clone(),
+            _ => load_key(provider),
+        })
+    })
+    .await
+    .ok()?
 }
 
 fn provider(id: &str) -> Result<&str, String> {
-    if header::is_provider(id) {
+    if header::is_provider(id) || header::SEARCH_PROVIDERS.contains(&id) {
         Ok(id)
     } else {
         Err("That model provider isn't supported.".into())
@@ -93,6 +98,9 @@ pub async fn model_keys_saved() -> Result<Vec<String>, String> {
 #[tauri::command]
 pub async fn model_keys_save(provider_id: String, key: String) -> Result<Vec<String>, String> {
     let provider_id = provider(&provider_id)?.to_owned();
+    if provider_id == "chatgpt" {
+        return Err("ChatGPT takes a sign-in, not a key.".into());
+    }
     let key = key.trim().to_owned();
     if key.is_empty() || key.len() > MAX_KEY_BYTES || key.chars().any(char::is_control) {
         return Err("That key doesn't look right. Paste it again.".into());

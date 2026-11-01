@@ -1,11 +1,6 @@
 import { clearApiCache } from "@/api/cache/api-cache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
-import {
-  accountApi,
-  AccountApiError,
-  configureAccountApi,
-  isAccountUnauthorizedError,
-} from "@/api/account/api";
+import { accountApi, AccountApiError, isAccountUnauthorizedError } from "@/api/account/api";
 import {
   deriveLoginCredential,
   isCredentialEmail,
@@ -14,8 +9,8 @@ import {
   unmarkCredentialAccount,
 } from "./accountCredential";
 import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
-import { configureTelemetryPreferencesSync } from "@/telemetry/lifecycle";
-import { analytics } from "@/telemetry/client";
+import { markPasswordPending } from "./pendingPassword";
+import { rememberPasswordReset } from "./passwordReset";
 import {
   beginGoogleSignInCodeWait,
   deliveredGoogleSignInCode,
@@ -26,8 +21,6 @@ import { saveAccountAuthToken } from "./useAuthTokenStore";
 
 export type { AccountAuthUser, AccountMeResponse } from "@/api/account/types";
 export { isAccountUnauthorizedError } from "@/api/account/api";
-
-configureAccountApi({ readAnalyticsEnabled: () => analytics.isAnalyticsEnabled() });
 
 function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {
   const id = data.user_id ?? data.id;
@@ -81,6 +74,21 @@ export async function accountSignIn(
   // holds the password itself: the server has seen it, so it must not seed keys.
   const user = await persistLogin(await accountApi.signIn(email, password), "Sign-in");
   unmarkCredentialAccount(user.id);
+  return user;
+}
+
+/**
+ * Signs in with a setup key from a sign-in link, which the server takes once in place of a
+ * password (`POST /setup-keys/redeem`, answered like `/login`). An account with no derived
+ * password yet is marked so the wizard asks for one, and sync waits for it (`pendingPassword.ts`).
+ * The answer's reset token lets the wizard choose a new password for an account that has one:
+ * that is how a forgotten password is reset (`passwordReset.ts`).
+ */
+export async function accountRedeemSetupKey(setupKey: string): Promise<AccountAuthUser> {
+  const data = await accountApi.redeemSetupKey(setupKey.trim());
+  const user = await persistLogin(data, "Setup key");
+  if (!data.credential_account) markPasswordPending(user.id, user.email);
+  rememberPasswordReset(user.id, data.password_reset_token);
   return user;
 }
 
@@ -152,10 +160,6 @@ export async function accountLogout(accountId: string): Promise<void> {
   }
 }
 
-export async function accountForgotPassword(email: string): Promise<void> {
-  await accountApi.forgotPassword(email);
-}
-
 export async function accountRegister(
   username: string,
   email: string,
@@ -186,12 +190,3 @@ export function accountFetchMe(): Promise<AccountMeResponse> {
 export function accountFetchAvatar(): Promise<Blob> {
   return accountApi.avatar();
 }
-
-function accountUpdateTelemetryPreferences(
-  analyticsEnabled: boolean,
-  errorReportingEnabled: boolean,
-): Promise<void> {
-  return accountApi.updateTelemetry(analyticsEnabled, errorReportingEnabled);
-}
-
-configureTelemetryPreferencesSync(accountUpdateTelemetryPreferences);

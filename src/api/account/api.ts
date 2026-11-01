@@ -7,7 +7,13 @@ import {
 import { resolveApiBase } from "@/api/deployment/api";
 import { desktopOs } from "@/shared/platform/desktopOs";
 import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
-import type { AccountHandoffPath, AccountMeResponse, LoginResponse } from "./types";
+import type {
+  AccountHandoffPath,
+  AccountMeResponse,
+  LoginResponse,
+  ServerAlert,
+  SetupKeyResponse,
+} from "./types";
 import {
   AccountApiError,
   errorMessage,
@@ -17,10 +23,6 @@ import {
 
 export { AccountApiError, isAccountUnauthorizedError } from "./responses";
 type AccountMethod = "GET" | "POST" | "PUT";
-let readAnalyticsEnabled = () => false;
-export function configureAccountApi(context: { readAnalyticsEnabled: () => boolean }): void {
-  readAnalyticsEnabled = context.readAnalyticsEnabled;
-}
 export const accountApi = {
   googleAvailable: () => requestJson<{ enabled: boolean }>("GET", "/auth/google"),
   beginGoogle: (reauthenticate = false, signal?: AbortSignal) =>
@@ -47,24 +49,27 @@ export const accountApi = {
       password,
     }),
   register: (body: unknown) => requestJson<LoginResponse>("POST", "/register", body),
-  /** Both values are opaque to the server: in the desktop app they are derived from the password on the device. */
-  changePassword: (currentPassword: string, newPassword: string) =>
+  /** A setup key from a sign-in link. Answers like `/login`, plus `password_reset_token`. */
+  redeemSetupKey: (setupKey: string) =>
+    requestJson<SetupKeyResponse>("POST", "/setup-keys/redeem", { setup_key: setupKey }),
+  /**
+   * Both values are opaque to the server: in the desktop app they are derived from the password
+   * on the device. `resetToken`, from a setup key's sign-in, stands in for the current password.
+   */
+  changePassword: (currentPassword: string, newPassword: string, resetToken?: string) =>
     requestJson<{ status: string }>("PUT", "/me/password", {
       current_password: currentPassword,
       new_password: newPassword,
       // The new value is derived on the device, so the server records it holds no plain password.
       credential: true,
+      ...(resetToken ? { reset_token: resetToken } : {}),
     }),
+  /** The alerts service's open problems; only the server's owner may read them. */
+  serverAlerts: () => requestJson<{ alerts: ServerAlert[] }>("GET", "/server/alerts"),
   logout: () =>
     requestJson<{
       status?: string;
     }>("POST", "/logout"),
-  forgotPassword: (email: string) =>
-    requestJson<{
-      message?: string;
-    }>("POST", "/auth/forgot", {
-      email,
-    }),
   me: () => requestJson<AccountMeResponse>("GET", "/me"),
   handoff: (path?: AccountHandoffPath) =>
     requestJson<{
@@ -82,11 +87,6 @@ export const accountApi = {
     const response = await accountAvatarRequest();
     return response.blob();
   },
-  updateTelemetry: (analyticsEnabled: boolean, errorReportingEnabled: boolean) =>
-    requestJson<void>("PUT", "/me/telemetry", {
-      analytics_enabled: analyticsEnabled,
-      error_reporting_enabled: errorReportingEnabled,
-    }),
   resolveBase: resolveApiBase,
 };
 async function requestJson<T>(
@@ -167,7 +167,6 @@ function requestHeaders(body: unknown, token: string | null): Headers | undefine
     import.meta.env.VITE_RELEASE_CHANNEL?.trim() ||
       (import.meta.env.DEV ? "development" : "production"),
   );
-  headers.set("X-Misty-Analytics-Enabled", String(readAnalyticsEnabled()));
   if (body !== undefined) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
   return headers;
@@ -176,7 +175,7 @@ function shouldAttachAuthToken(path: string): boolean {
   return ![
     "/login",
     "/register",
-    "/auth/forgot",
+    "/setup-keys/redeem",
     "/auth/google",
     "/auth/google/complete",
     "/logout",

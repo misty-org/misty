@@ -16,10 +16,9 @@ fn health_rejects_failed_migrations_and_unhealthy_services() {
         json!({"Service":"misty-api","State":"running","Health":"healthy"}),
         json!({"Service":"tunnel","State":"running","Health":"healthy"}),
         json!({"Service":"setup","State":"exited","ExitCode":0}),
-        json!({"Service":"agent-runtime","State":"running","Health":"healthy"}),
     ];
     assert!(validate_health(&rows).is_ok());
-    assert!(validate_health(&rows[..4]).is_err());
+    assert!(validate_health(&rows[..2]).is_err());
     rows[3]["ExitCode"] = json!(1);
     assert!(validate_health(&rows).is_err());
     rows[3]["ExitCode"] = json!(0);
@@ -87,146 +86,6 @@ fn development_server_configures_connected_devices_once() {
 
     assert!(!ensure_connected_devices_development_config(&path).unwrap());
     assert_eq!(fs::read_to_string(&path).unwrap(), first);
-}
-
-#[test]
-fn production_generation_replaces_only_placeholders_and_keeps_room_salt() {
-    let room_salt = STANDARD.encode([7_u8; 32]);
-    let contents = format!(
-        "MISTY_ENVIRONMENT=production\n\
-         {ROOM_SALT}={room_salt}\n\
-         {TICKET_PRIVATE_KEY}=<replace-private>\n\
-         {CONTROL_SECRET}=replace-with-control\n\
-         {PROJECTION_SECRET}=replace-me\n"
-    );
-    let secrets = JournalSecrets {
-        private: "private".to_owned(),
-        public: "public".to_owned(),
-        control: "control".to_owned(),
-        projection: "projection".to_owned(),
-    };
-    let updated = replace_production_secret_placeholders(
-        &contents,
-        std::path::Path::new(".env.prod"),
-        &secrets,
-    )
-    .unwrap();
-    assert!(updated.contains(&format!("{ROOM_SALT}={room_salt}\n")));
-    assert!(updated.contains(&format!("{TICKET_PRIVATE_KEY}=private\n")));
-    assert!(updated.contains(&format!("{CONTROL_SECRET}=control\n")));
-    assert!(updated.contains(&format!("{PROJECTION_SECRET}=projection\n")));
-}
-
-#[test]
-fn production_generation_refuses_existing_secrets() {
-    let contents = format!(
-        "{TICKET_PRIVATE_KEY}=already-configured\n\
-         {CONTROL_SECRET}=replace-me\n\
-         {PROJECTION_SECRET}=replace-me\n"
-    );
-    let secrets = JournalSecrets {
-        private: "private".to_owned(),
-        public: "public".to_owned(),
-        control: "control".to_owned(),
-        projection: "projection".to_owned(),
-    };
-    assert!(replace_production_secret_placeholders(
-        &contents,
-        std::path::Path::new(".env.prod"),
-        &secrets
-    )
-    .is_err());
-}
-
-#[test]
-fn production_generation_writes_a_matched_private_bundle_once() {
-    let temporary = tempfile::tempdir().unwrap();
-    let server = temporary.path().join("misty-server");
-    fs::create_dir_all(&server).unwrap();
-    let room_salt = STANDARD.encode([9_u8; 32]);
-    let production_path = server.join(".env/prod/crypto/journal.env");
-    fs::create_dir_all(production_path.parent().unwrap()).unwrap();
-    write_private(
-        &production_path,
-        format!(
-            "MISTY_ENVIRONMENT=production\n\
-             {ROOM_SALT}={room_salt}\n\
-             {TICKET_PRIVATE_KEY}=<replace-private>\n\
-             {CONTROL_SECRET}=replace-with-control\n\
-             {PROJECTION_SECRET}=replace-with-projection\n"
-        )
-        .as_bytes(),
-    )
-    .unwrap();
-    let workspace = Workspace {
-        root: temporary.path().to_path_buf(),
-        misty: temporary.path().join("app"),
-        server: server.clone(),
-        website: temporary.path().join("website"),
-        features: temporary.path().join("src/features"),
-        cli: temporary.path().join("cli"),
-    };
-
-    generate_production_worker_secrets(&workspace).unwrap();
-
-    let production = fs::read_to_string(&production_path).unwrap();
-    let worker =
-        fs::read_to_string(server.join("apps/journal-collab/.secrets/worker.prod.env")).unwrap();
-    assert!(production.contains(&format!("{ROOM_SALT}={room_salt}\n")));
-    assert!(!production.contains("replace-"));
-    assert!(!worker.contains(TICKET_PRIVATE_KEY));
-    assert!(worker.contains(TICKET_PUBLIC_KEY));
-    for name in [CONTROL_SECRET, PROJECTION_SECRET] {
-        assert_eq!(
-            environment_values(&production, name),
-            environment_values(&worker, name)
-        );
-    }
-    assert!(generate_production_worker_secrets(&workspace).is_err());
-    let production_values = read_environment(&production_path).unwrap();
-    let worker_path = server.join("apps/journal-collab/.secrets/worker.prod.env");
-    let worker_values = read_environment(&worker_path).unwrap();
-    validate_production_worker_bundle(
-        &production_values,
-        &production_path,
-        &worker_values,
-        &worker_path,
-    )
-    .unwrap();
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        assert_eq!(
-            fs::metadata(&production_path).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
-        assert_eq!(
-            fs::metadata(server.join("apps/journal-collab/.secrets/worker.prod.env"))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
-            0o600
-        );
-    }
-}
-
-#[test]
-fn production_deploy_command_never_displays_the_api_token() {
-    let command = production_worker_deploy_command(
-        Path::new("/workspace/wrangler"),
-        "cloudflare-secret-token",
-        "misty-journal-collab",
-        "https://mistysys.com/api",
-        Path::new("/workspace/worker.prod.env"),
-        true,
-        Some(Path::new("/tmp/output")),
-    );
-    let display = command.display();
-    assert!(!display.contains("cloudflare-secret-token"));
-    assert!(display.contains("--dry-run"));
-    assert!(display.contains("misty-journal-collab"));
 }
 
 #[test]

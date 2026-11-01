@@ -1,6 +1,5 @@
 import { accountScopeResetEvent } from "@/features/auth";
 import { createYjsProvider } from "@/features/collaboration/createYjsProvider";
-import { createLocalOnlyProvider, isCollaborationOff } from "@/features/collaboration/localOnly";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type YProvider from "y-partyserver/provider";
 import * as Y from "yjs";
@@ -17,8 +16,6 @@ export interface DrawingCollaborationSession {
   scene: Y.Map<unknown>;
   files: Y.Map<DrawingAssetReference>;
   provider: YProvider;
-  /** Collaboration is off on this server: nothing can be saved, so the drawing is read-only. */
-  localOnly?: boolean;
   role?: DrawingCollaborationTicket["role"];
 }
 
@@ -32,14 +29,6 @@ type SessionEntry = {
 
 const sessions = new Map<string, SessionEntry>();
 const sessionIdleMs = 5 * 60 * 1000;
-/** Stands in for a ticket when the server runs without live co-editing: view only. */
-const localOnlyTicket: DrawingCollaborationTicket = {
-  ticket: "",
-  room: "",
-  url: "",
-  role: "viewer",
-  expires_at: "",
-};
 
 export async function acquireDrawingSession(
   spaceId: string,
@@ -118,30 +107,21 @@ async function createSession(
   drawingId: string,
   key: string,
 ): Promise<DrawingCollaborationSession> {
-  const firstTicket = await drawingsApi
-    .collaborationTicket(spaceId, drawingId)
-    .catch((cause: unknown) => {
-      if (isCollaborationOff(cause)) return null;
-      throw cause;
-    });
+  const firstTicket = await drawingsApi.collaborationTicket(spaceId, drawingId);
   const doc = new Y.Doc();
-  // Without collaboration nothing can be saved, so the drawing opens read-only.
-  const provider = firstTicket
-    ? createYjsProvider(firstTicket, doc, "drawing-room", () =>
-        drawingsApi.collaborationTicket(spaceId, drawingId),
-      )
-    : createLocalOnlyProvider(doc, "drawing-room");
+  const provider = createYjsProvider(firstTicket, doc, "drawing-room", () =>
+    drawingsApi.collaborationTicket(spaceId, drawingId),
+  );
   return {
     key,
     spaceId,
     drawingId,
-    ticket: firstTicket ?? localOnlyTicket,
+    ticket: firstTicket,
     doc,
     elements: doc.getMap<OrderedExcalidrawElement>("drawing:elements"),
     scene: doc.getMap("drawing:scene"),
     files: doc.getMap<DrawingAssetReference>("drawing:files"),
     provider,
-    ...(firstTicket ? {} : { localOnly: true, role: localOnlyTicket.role }),
   };
 }
 

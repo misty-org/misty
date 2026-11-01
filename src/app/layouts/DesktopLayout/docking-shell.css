@@ -42,10 +42,19 @@
   min-height: 0;
   flex-direction: column;
   align-items: stretch;
-  padding: 5px var(--shell-gap, 8px);
+  /* The window edge on the three outer sides; the page's own margin is the gap beside it. */
+  padding: var(--shell-edge, 6px) 0 var(--shell-edge, 6px) var(--shell-edge, 6px);
 }
 .misty-workspace-tabs[data-tab-position="right"] {
   order: 2;
+  padding: var(--shell-edge, 6px) var(--shell-edge, 6px) var(--shell-edge, 6px) 0;
+}
+/* The Space bar card: the window edge above and on its outer side, the gap toward the sidebar. */
+.misty-space-bar-card {
+  margin: var(--shell-edge, 6px) var(--shell-edge, 6px) 0 var(--shell-gap, 4px);
+}
+[data-tab-position="right"] .misty-space-bar-card {
+  margin: var(--shell-edge, 6px) var(--shell-gap, 4px) 0 var(--shell-edge, 6px);
 }
 .misty-workspace-tab-list {
   scrollbar-width: none;
@@ -173,7 +182,7 @@
   ) !important;
 }
 .misty-workspace-tabs[data-window-chrome="true"] {
-  padding-top: calc(var(--shell-side-tab-inset, 5px) + var(--window-chrome-top, 0px));
+  padding-top: calc(var(--shell-side-tab-inset, 6px) + var(--window-chrome-top, 0px));
 }
 [data-workspace-titlebar-fallback] {
   display: none;

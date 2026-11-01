@@ -16,8 +16,8 @@ you bring.
   between computers come first and are never traded away. Misty must be worth
   using with no AI at all.
 - **Any model, on your own key.** Every major provider, OpenRouter, the AI Gateway or a local
-  model through Ollama, chosen per job in Settings → Models ([byok.md](byok.md)). Misty charges
-  nothing; your provider bills you.
+  model through Ollama, chosen per job in Settings → Models ([byok.md](byok.md)). Misty never
+  charges for AI; your provider bills you.
 - **Agents work in your browser,** on your computer, signed in as you, and you
   can watch them. Against Muse, Dots and Grok Bot: their agents borrow a
   computer in the cloud; Misty's works in yours.
@@ -30,16 +30,26 @@ you bring.
   runtime, Spaces and the Cloudflare Workers all live in this repository. Spaces are the lead
   against Arc's and Zen's tab sets. Parity C16 (browse with no account) and C17 (open source).
   This replaces the 2026-10-23 split that kept sync, the runtime and Spaces proprietary.
-- **No billing.** No plans, prices, credits, usage limits or Stripe. Every feature is on for
-  everyone, coding included. Rate limits only protect a server from abuse.
-- **Bring your own keys (2026-10-29).** Each device keeps provider keys in the keychain and
-  chooses a model per job; a server may add its own models for its accounts. This replaces
-  "every model runs on Misty's keys" and the one house model.
-- **Self-hosted (2026-10-29).** There is no Misty-run service. People run the server, the agent
-  runtime and Postgres themselves ([self-hosting.md](self-hosting.md)); the collaboration and
-  web-fetch Workers deploy to their own Cloudflare account if they want them
-  ([cloudflare.md](cloudflare.md)). The browser needs no server at all.
-- **Unlimited sync.** Sync is never limited; rate limits handle abuse.
+- **Two tiers (2026-10-30).** Free is every feature, set up yourself: your own server, Cloudflare
+  and Composio accounts and models. Without a server Free is the browser alone. Misty Cloud is
+  one shared server set up for you, about $10 a month, charging for storage, connected devices
+  and app actions, never for AI or web search ([cloud/](cloud/README.md)). Its Stripe side lives
+  in the private misty-billing service; the open repo holds only generic per-account limits.
+- **Models on the device (2026-10-31).** Agents and every model call run on the person's
+  computer, on the device's own models: Sign in with ChatGPT, OpenRouter, Ollama Cloud, a local
+  Ollama or keys ([byok.md](byok.md), [agents/runtime.md](agents/runtime.md)). The server never
+  calls a model or holds a key, and agents need that computer to be on.
+- **Web search on the device (2026-11-01).** `web.search` runs in the desktop runtime on a search
+  key the person keeps there, like a model key (Decodo or Serper, [byok.md](byok.md#web-search)).
+  The server holds no search key, makes no search call and counts no searches.
+- **Nothing is optional (2026-10-30).** Every server runs Cloudflare (Tunnel, R2, Workers),
+  Composio and Google sign-in, from one Compose file and four env files that its setup
+  container fills in ([self-hosting.md](self-hosting.md)). The CLI is for development only.
+- **The open server sends no email (2026-10-31).** It hands out links instead: sign-in links
+  (which also reset a forgotten password) and Space invitation links, and its alerts show in the
+  console and the owner's app. Misty Cloud's emails are sent by the private misty-billing
+  service ([cloud/](cloud/README.md)).
+- **Unlimited sync on your own server.** Rate limits only handle abuse; Misty Cloud caps storage by plan.
 - **No cloud browser.** Misty doesn't chase "runs while your laptop is off".
 - **No mobile during the beta.**
 - **No MCP server.** Misty doesn't host outside agents (built 2026-10-12, then

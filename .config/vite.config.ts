@@ -2,7 +2,6 @@ import { loadAppEnv, publicAppEnv, appEnvironmentUpdates } from "../cli/tasks/ap
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import posthog from "@posthog/rollup-plugin";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,44 +33,18 @@ export default defineConfig(({ command, mode }) => {
   const tauriDevHost = env.TAURI_DEV_HOST;
   const desktopDevPort = Number(env.MISTY_DESKTOP_DEV_PORT ?? 5173);
   const accountApiProxyTarget = env.MISTY_ACCOUNT_API_PROXY_TARGET?.trim();
-  const posthogToken = env.POSTHOG_PROJECT_TOKEN?.trim();
-  const posthogHost = env.POSTHOG_HOST?.trim();
-  const posthogProjectId = env.POSTHOG_PROJECT_ID?.trim();
-  const sourceMapKey = env.POSTHOG_API_KEY?.trim();
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const isDev =
     command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
   // The server's website is named per build; a release that names none links to no website.
   const defaultPublicUrl = isDev ? "http://localhost:5174" : "";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
-  const uploadSourceMaps = Boolean(
-    command === "build" && sourceMapKey && posthogProjectId && posthogHost && mode !== "test",
-  );
 
   return {
     root: resolve(process.cwd(), "src/app"),
     publicDir: false,
     envDir: false,
-    plugins: [
-      appEnvironmentUpdates(process.cwd()),
-      react(),
-      tailwindcss(),
-      ...(uploadSourceMaps
-        ? [
-            posthog({
-              personalApiKey: sourceMapKey!,
-              projectId: posthogProjectId,
-              host: posthogHost,
-              sourcemaps: {
-                enabled: true,
-                releaseName: "misty-desktop",
-                releaseVersion: process.env.MISTY_RELEASE_VERSION ?? "0.1.0",
-                deleteAfterUpload: true,
-              },
-            }),
-          ]
-        : []),
-    ],
+    plugins: [appEnvironmentUpdates(process.cwd()), react(), tailwindcss()],
     define: {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
@@ -80,8 +53,6 @@ export default defineConfig(({ command, mode }) => {
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
       ),
       ...publicAppEnv(env),
-      "import.meta.env.VITE_POSTHOG_PROJECT_TOKEN": JSON.stringify(posthogToken ?? ""),
-      "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost ?? ""),
       // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
       // Vite's internal alias keeps non-VITE server secrets out of the bundle.
       "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
@@ -133,7 +104,7 @@ export default defineConfig(({ command, mode }) => {
         },
       },
       assetsInlineLimit: 0,
-      sourcemap: uploadSourceMaps ? "hidden" : false,
+      sourcemap: false,
     },
     server: {
       fs: {

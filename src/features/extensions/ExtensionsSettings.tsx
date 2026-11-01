@@ -26,7 +26,10 @@ const storeDescriptions: Record<ExtensionStore, string> = {
   chrome: "Extensions made for Chrome.",
   firefox: "Extensions made for Firefox.",
 };
-const stores = offeredStores.map((store) => ({ store, description: storeDescriptions[store] }));
+// Read when rendering, not at import: the extensions store imports Settings, which imports this
+// page, so a module-level read could run before the store module has finished loading.
+const offeredStoreRows = () =>
+  offeredStores.map((store) => ({ store, description: storeDescriptions[store] }));
 
 /**
  * Settings › Browser › Extensions. People find extensions on the stores' own
@@ -70,9 +73,9 @@ export function ExtensionsSettings() {
       )}
       <DesktopSettingsSection
         title="Extensions"
-        description="Open a store, then choose Add to Misty on an extension's page. Extensions stay on this device."
+        description="Choose Add to Misty on an extension’s store page."
       >
-        {stores.map(({ store, description }) => (
+        {offeredStoreRows().map(({ store, description }) => (
           <DesktopSettingsRow key={store} label={storeNames[store]} description={description}>
             <Button variant="outline" onClick={() => openStorePage(storeHomes[store])}>
               Open
@@ -81,7 +84,7 @@ export function ExtensionsSettings() {
         ))}
         <PreferenceRow
           id="extensions.agent_access"
-          description="Agents can use the extensions you allow below, within their existing browser access."
+          description="Within their existing browser access."
         />
       </DesktopSettingsSection>
       {!runtime.ready && installed.length > 0 ? (

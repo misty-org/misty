@@ -87,7 +87,7 @@ export function BrowserSyncBadge({
                 aria-hidden
                 data-sync-issue-badge="true"
                 className={cn(
-                  "absolute right-px top-px grid size-2.5 place-items-center rounded-full bg-cream text-[7px] font-bold",
+                  "absolute right-px top-px grid size-3 place-items-center rounded-full bg-cream text-3xs font-bold",
                   "leading-none text-charcoal-bg ring-1 ring-charcoal-workspace",
                 )}
               >

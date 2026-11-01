@@ -1,6 +1,6 @@
 # misty
 
-`misty` is the development and release CLI for this repository. It finds the checkout from any directory inside it; set a fallback with `misty configure --workspace /path/to/misty-org`, which is saved in `~/.misty/cli/config.toml`.
+`misty` is the development and desktop release CLI for this repository. It never deploys a server: a server runs from `server/compose.yml` and its setup container ([docs/self-hosting.md](../docs/self-hosting.md)). It finds the checkout from any directory inside it; set a fallback with `misty configure --workspace /path/to/misty-org`, which is saved in `~/.misty/cli/config.toml`.
 
 ```sh
 cargo install --path cli --locked
@@ -16,10 +16,10 @@ misty doctor [all|server|desktop|cloudflare|release] [--json] [--fix]
 misty check app|scripts|server|go-sizes|website|features|cli|all
 
 misty env describe
-misty env init dev|staging|prod
-misty env set dev|staging|prod NAME     # reads the value from stdin
-misty env check dev|staging|prod
-misty env status dev|staging|prod
+misty env init dev
+misty env set dev NAME     # reads the value from stdin
+misty env check dev
+misty env status dev
 
 misty home generate [--destination PATH]
 misty home check [--path PATH]
@@ -36,10 +36,7 @@ misty server up [--no-build] [--verbose] [--gui]
 misty server status|url|deploy
 misty server logs [SERVICE] [--follow] [--tail 100]
 misty server down [--volumes]
-misty server prod check|up|down|logs|backup|push|deploy|restore
-misty server staging check|up|down|status|logs
-misty server release VERSION
-misty server worker generate-secrets|deploy
+misty server worker generate-secrets
 misty server r2 configure-cors [--apply]
 
 misty release check|start|build|upload|verify|publish VERSION
@@ -61,11 +58,11 @@ The desktop app keeps its data in `~/.misty` on every platform (`MISTY_DATA_ROOT
 
 ## Environment files
 
-Server settings live in private files under `server/.env/<target>/`, and the CLI's own settings in `cli/.env/common.env`, `release.env` and `cloudflare.env`. Every file must be readable only by you. Each setting has exactly one owning file: `misty env describe` lists them, `misty env set` writes a value to the right file, and `misty env check` rejects unknown settings, duplicates, insecure files and missing required values. Files are created only when they hold a value. Shell exports override file values for Compose interpolation.
+Development server settings live in private files under `server/.env/dev/`, and the CLI's own settings in `cli/.env/common.env`, `release.env` and `cloudflare.env`. Every file must be readable only by you. Each setting has exactly one owning file: `misty env describe` lists them, `misty env set` writes a value to the right file, and `misty env check` rejects unknown settings, duplicates, insecure files and missing required values. Files are created only when they hold a value. Shell exports override file values for Compose interpolation.
 
-`misty setup server` generates the development keys and Worker secrets on first use and preserves them afterwards. `misty server worker generate-secrets --target production` creates the production Journal keys once and refuses to rotate them. Back up both halves of each key bundle together.
+`misty setup server` generates the development keys and Worker secrets on first use and preserves them afterwards. Back up both halves of each key bundle together.
 
-`misty server up` starts the server containers and returns once they are healthy. Build output goes to `server/.misty/logs/`; `--verbose` prints it. `misty server down` keeps database volumes unless you pass `--volumes`. [server/README.md](../server/README.md) walks through the whole server setup.
+`misty server up` starts the development server containers (Postgres, the setup job, the API and its tunnel) and returns once they are healthy. They run no agent runtime and hold no model keys: agents and every model call run on the desktop, on its own keys ([docs/agents/runtime.md](../docs/agents/runtime.md)). Model key settings left in an older `integrations/ai.env` still load but are no longer read. Build output goes to `server/.misty/logs/`; `--verbose` prints it. `misty server down` keeps database volumes unless you pass `--volumes`. [server/README.md](../server/README.md) walks through the whole server setup.
 
 ## Checks
 
@@ -77,11 +74,8 @@ Releases build, sign and upload from your computer; GitHub holds the source, the
 
 | Setting | Purpose |
 | --- | --- |
-| `MISTY_RELEASE_API_URL` | Public HTTPS API URL compiled into the app, including `/v1` |
 | `MISTY_RELEASE_WEB_URL` | Public HTTPS website URL compiled into the app |
 | `TAURI_UPDATER_PUBLIC_KEY` | Public key matching the updater key |
-| `TAURI_CSP_CONNECT_SOURCES` | Approved HTTPS and WSS origins, including the API origin |
-| `TAURI_CSP_IMAGE_SOURCES` | Approved HTTPS image origins |
 | `TAURI_SIGNING_PRIVATE_KEY` | Absolute path to the local updater private key |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password for an encrypted key, if it has one |
 | `APPLE_SIGNING_IDENTITY` | Installed Developer ID Application certificate, on macOS |
@@ -100,33 +94,9 @@ misty release publish 0.2.0
 
 `start` runs every local check, tags the source and creates a draft. `build --upload` compiles, signs, notarizes and uploads verified assets to the draft. `verify` downloads the hosted files and checks their updater signatures, and `publish` makes the release public and latest, which is where installed apps look for `latest.json`. Published assets cannot be replaced, so a fix needs a new version.
 
+A release has no built-in server: people choose Misty Cloud, their own server or browsing only in the setup wizard. Its Content Security Policy (`cli/src/release/config.rs`) therefore lets the app reach any `https:` and `wss:` origin, as development does, plus the agent runtime's live relay on `ws://127.0.0.1`; plain `http:` stays closed and only the app's own scripts run.
+
 `start` targets the current OS unless you pass `--os macos`, `--os windows` or `--os macos,windows`. For both, build and upload the same commit on each OS, then verify and publish. macOS builds are universal and need both Apple Silicon and Intel Rust targets.
-
-`misty server release VERSION` tests the pushed commit, builds and pushes the server images, tags the commit and saves the image digests in `server/.env/prod`. `misty server prod push` and `misty server prod deploy` then copy the production environment to your server and start the stack there ([docs/self-hosting.md](../docs/self-hosting.md)).
-
-## Production Cloudflare Tunnel
-
-Run this from the checkout on your server. Production keeps its routing and connector token in `server/.env/prod/` and never touches development secrets or the Worker. Save the API token with `misty env set prod CLOUDFLARE_API_TOKEN`, then preview the plan:
-
-```sh
-misty setup cloudflare --target prod \
-  --account ACCOUNT_ID --zone ZONE_ID \
-  --hostname misty.example.com --tunnel-name misty-prod
-```
-
-Repeat with `--apply` to create or reuse the tunnel, configure its ingress, create the proxied DNS record and save the connector token and `MISTY_PUBLIC_API_URL`. Conflicting DNS records or ingress routes stop the run. The origin is `http://127.0.0.1:8081`, the loopback port production Compose binds; save a different `MISTY_HOST_PORT` with `misty env set prod MISTY_HOST_PORT` before provisioning to change it.
-
-Provisioning does not start the connector. Install `cloudflared` on the server, start the API with `misty server prod up`, and check the connector from the checkout:
-
-```sh
-(
-  . server/.env/prod/integrations/cloudflare.env
-  export TUNNEL_TOKEN="$CLOUDFLARE_TUNNEL_TOKEN"
-  exec cloudflared tunnel --no-autoupdate run
-)
-```
-
-[`TUNNEL_TOKEN`](https://developers.cloudflare.com/tunnel/reference/run-parameters/#token) keeps the token out of command arguments. Run the connector under a service manager on the server for production use, then verify with `curl --fail https://misty.example.com/health`.
 
 ## Project tools
 

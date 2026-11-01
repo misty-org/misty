@@ -1,22 +1,23 @@
 # Agents
 
 Misty's agents work in your browser, on your computer, signed in as you, while you watch.
-The model loop runs on the server runtime (`server/apps/agent-runtime`), every model call
-goes through its AI SDK on Misty's keys, and the pages are read and driven by the desktop app.
-Chats live on the device that started them.
+The model loop runs in the agent runtime on that computer (`server/apps/agent-runtime`, a
+helper process of the app), and every model call goes through its AI SDK on the device's own
+models and keys. The server never calls a model. Chats live on the device that started them.
 
 ## Read first
 
 | To learn about | Read |
 | --- | --- |
 | How the agent works today: loop, tools, what the model sees, how a run ends | [harness.md](harness.md) |
+| Where the runtime runs, how runs reach it, model calls on the device | [runtime.md](runtime.md) |
 | The approved architecture and its security invariants | [architecture.md](architecture.md) |
 | The agent browser beside a chat | [browser.md](browser.md) |
 | Where chats are stored and why | [chats-local.md](chats-local.md) |
 | The agent at your cursor, push-to-talk, Teach mode | [cursor-companion.md](cursor-companion.md) |
 | Resuming a run without redoing finished work | [checkpoints.md](checkpoints.md) |
 | Delegating code to installed coding tools | [coding-tools.md](coding-tools.md) |
-| Benchmarks: the Odysseys campaign and running evals without paid credit | [evals/odysseys.md](evals/odysseys.md), [evals/free-model.md](evals/free-model.md) |
+| Benchmarks: the Odysseys campaign, which ended October 31, 2026 | [evals/odysseys.md](evals/odysseys.md) |
 | Mockups (agent chat, cursor companion) | [mockups/](mockups/) |
 
 In flight: [agent browser actions](../plans/agent-browser-actions.md). Code lives in

@@ -60,6 +60,6 @@ describe("NavIsland CVA component", () => {
     const item = screen.getByRole("button", { name: "Small" });
     expect(item.className).toContain("h-5");
     expect(item.className).toContain("px-1.5");
-    expect(item.className).toContain("text-[11px]");
+    expect(item.className).toContain("text-2xs");
   });
 });

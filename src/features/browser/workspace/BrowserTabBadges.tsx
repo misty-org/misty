@@ -10,7 +10,7 @@ export function BrowserTabBadges(props: { agentOwned: boolean }) {
         <span
           className={cn(
             "flex shrink-0 items-center gap-1 rounded-md border border-cream/[0.08]",
-            "bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted",
+            "bg-cream/[0.045] px-2 py-1 text-3xs font-medium text-cream-muted",
           )}
           title="Private tab: no history, and cookies and site data are discarded when the last private tab closes"
         >
@@ -20,7 +20,7 @@ export function BrowserTabBadges(props: { agentOwned: boolean }) {
       ) : null}
       {props.agentOwned ? (
         <span
-          className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-[10px] font-medium text-cream-muted"
+          className="shrink-0 rounded-md border border-cream/[0.08] bg-cream/[0.045] px-2 py-1 text-3xs font-medium text-cream-muted"
           title="This browser tab is scoped to Misty's current work"
         >
           Misty

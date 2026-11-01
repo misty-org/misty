@@ -30,7 +30,7 @@ export function DirectMessageIntro({
           {initials(recipient.name)}
         </AvatarFallback>
       </Avatar>
-      <h2 className="mt-4 text-[28px] font-bold leading-tight tracking-tight text-cream">
+      <h2 className="mt-4 text-3xl font-bold leading-tight tracking-tight text-cream">
         {recipient.name}
       </h2>
       <p className="mt-0.5 text-lg font-semibold text-cream-muted">{recipient.name}</p>

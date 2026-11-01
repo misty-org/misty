@@ -1,11 +1,8 @@
-import { agentsApi } from "@/api/agents/api";
-import { resolveApiBase } from "@/api/deployment/api";
-import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
-import { agentsDeviceSnapshot } from "../store/useAgentsStore";
+import { invoke } from "@tauri-apps/api/core";
 
 export interface ConversationTool {
   callId: string;
-  name: "start_task" | "steer_task" | "cancel_task";
+  name: "start_task" | "steer_task" | "cancel_task" | "get_task_status";
   instruction: string;
   key: string;
   invocationId: string;
@@ -30,26 +27,12 @@ export function deferred() {
 }
 
 /**
- * Opens the voice conversation's socket for this device with a one-time ticket. `current`
- * throws once the session it was opened for has gone.
+ * Opens the voice conversation's socket on the agent runtime on this computer, which hears,
+ * answers and speaks on this device's own models (docs/agents/runtime.md). The address carries a
+ * one-time ticket. `current` throws once the session it was opened for has gone.
  */
-export async function openVoiceSocket(
-  conversationId: string,
-  signal: AbortSignal,
-  current: () => void,
-) {
-  const snapshot = await agentsDeviceSnapshot();
+export async function openVoiceSocket(current: () => void) {
+  const { url } = await invoke<{ url: string }>("agent_runtime_voice_ticket");
   current();
-  if (!snapshot.device || snapshot.device.status === "revoked")
-    throw new Error("This device is unavailable.");
-  const device = await ensureServerAgentDevice(snapshot.device);
-  current();
-  const { ticket } = await agentsApi.realtimeVoiceTicket(device.id, signal);
-  const base = await resolveApiBase();
-  current();
-  const url = new URL(`${base}/agent-voice/realtime`, window.location.href);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.searchParams.set("mode", "conversation");
-  url.searchParams.set("conversation", conversationId);
-  return new WebSocket(url, ["misty-voice-v1", `misty-voice-auth.${ticket}`]);
+  return new WebSocket(url);
 }

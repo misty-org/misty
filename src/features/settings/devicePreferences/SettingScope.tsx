@@ -3,6 +3,7 @@ import { resolveSetting } from "./model";
 import { settingDefinitions } from "./registry";
 import type { SettingOwnership } from "./registry";
 import { useDevicePreferences } from "./store";
+import { preferenceSection } from "../settingsRouting";
 export const SettingsPageScope = createContext<{ page: string; owner: SettingOwnership } | null>(
   null,
 );
@@ -11,10 +12,7 @@ export function useSettingReset(label: string): (() => void) | null {
   const page = useContext(SettingsPageScope);
   const store = useDevicePreferences();
   const definition = settingDefinitions.find(
-    (d) =>
-      d.label === label &&
-      (d.page === page?.page ||
-        (page?.page === "sync" && d.id.startsWith("browser.privacy.page_state"))),
+    (d) => d.label === label && page !== null && preferenceSection(d.id, d.page) === page.page,
   );
   if (!definition || !store.ready || !store.state) return null;
   if (resolveSetting(store.state, definition.id).value === definition.default) return null;

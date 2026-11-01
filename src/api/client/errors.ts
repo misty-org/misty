@@ -1,3 +1,5 @@
+import { accountLimitMessage } from "./accountLimits";
+
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -44,6 +46,8 @@ function apiErrorMessage(code: string | undefined, fallback: string): string {
       "Speech is temporarily rate limited. Your answer is saved in the conversation.",
     voice_speech_failed: "Misty could not generate speech for that response.",
   };
+  const limit = accountLimitMessage(code);
+  if (limit) return limit;
   return code && messages[code] ? messages[code] : fallback.trim() || "The Misty request failed.";
 }
 

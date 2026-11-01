@@ -74,7 +74,7 @@ export const fileListStyles = {
     "flex min-h-9 min-w-0 items-center justify-between gap-3 overflow-hidden",
     "border-t border-transparent bg-transparent px-3 py-1.5 text-xs",
     "text-cream-muted max-[720px]:min-h-8 max-[720px]:px-2.5 max-[720px]:py-0",
-    "max-[720px]:text-[11px]",
+    "max-[720px]:text-2xs",
   ),
   footerGroup: "flex min-w-0 items-center gap-2 overflow-hidden",
   footerItem: "min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",

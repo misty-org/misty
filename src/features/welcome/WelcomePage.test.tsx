@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("./WelcomeNav", () => ({ WelcomeNav: () => null }));
 
+import { useServerChoice } from "@/api/deployment/serverChoice";
+import { useSignInSheetStore } from "@/features/auth";
 import { useSetupStore } from "@/features/setup/useSetupStore";
 import { WelcomePage } from "./WelcomePage";
 
@@ -23,7 +25,14 @@ function renderAt(state?: object) {
   );
 }
 
-beforeEach(() => useSetupStore.setState({ welcomed: false }));
+beforeEach(() => {
+  useSetupStore.setState({ welcomed: false });
+  useSignInSheetStore.getState().close();
+  useServerChoice.setState({
+    loaded: true,
+    choice: { mode: "server", url: "https://misty.example.org/v1" },
+  });
+});
 afterEach(cleanup);
 
 it("starts browsing without an account and doesn't show again", () => {
@@ -38,6 +47,15 @@ it("offers Sign in beside Start browsing", () => {
   renderAt();
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   expect(screen.getByTestId("where").textContent).toBe("/signin");
+});
+
+it("opens the setup wizard once when this device has chosen no server", () => {
+  useServerChoice.setState({ loaded: true, choice: null });
+  renderAt();
+  expect(useSignInSheetStore.getState().reason).toBe("setup");
+  useSignInSheetStore.getState().close();
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(useSignInSheetStore.getState().reason).toBe("setup");
 });
 
 it("keeps Sign in and Create account when adding an account", () => {

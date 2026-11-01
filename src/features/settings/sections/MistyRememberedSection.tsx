@@ -22,17 +22,10 @@ export function MistyRememberedSection({
   onForget: (memoryId: string) => void;
 }) {
   return (
-    <SettingsSectionBlock
-      title="Remembered details"
-      description={
-        "Misty starts with what you're looking at and the context you attach. Content from pages, mail, " +
-        "files, chat and extensions is treated as untrusted data and can't grant capabilities. " +
-        "Forgetting a detail removes it from future conversations."
-      }
-    >
+    <SettingsSectionBlock title="Remembered details">
       <SettingsRow
         label="Remembered context"
-        description="Misty saves a detail only when you explicitly ask it to remember. Memories stay private to you, even when scoped to a Space."
+        description="Only what you ask Misty to remember. Private to you."
         muted={!settings || !settings.enabled}
       >
         <SwitchControl
@@ -42,7 +35,7 @@ export function MistyRememberedSection({
         />
       </SettingsRow>
       {memories.length === 0 ? (
-        <p className="py-2 text-[13px] text-cream-muted">
+        <p className="py-2 text-ui text-cream-muted">
           Misty remembers a detail only when you ask it to.
         </p>
       ) : (

@@ -1,4 +1,5 @@
-//! Arguments for `misty server` and its production, staging and Worker commands.
+//! Arguments for `misty server`, which runs the development stack. A server
+//! is deployed with server/compose.yml instead (docs/self-hosting.md).
 
 use super::*;
 
@@ -40,22 +41,6 @@ pub(super) enum ServerCommand {
         #[arg(long, default_value_t = 100)]
         tail: u32,
     },
-    /// Test, build and push the production images from this computer, tag the
-    /// commit, and save the image digests in server/.env/prod.
-    Release {
-        /// Release version, such as 0.1.0 (tagged server-v0.1.0).
-        version: String,
-    },
-    /// Operate the production Compose stack explicitly.
-    Prod {
-        #[command(subcommand)]
-        command: ProdCommand,
-    },
-    /// Operate the isolated staging Compose stack.
-    Staging {
-        #[command(subcommand)]
-        command: StagingCommand,
-    },
     Image {
         #[command(subcommand)]
         command: ImageCommand,
@@ -71,73 +56,6 @@ pub(super) enum ServerCommand {
 }
 
 #[derive(Debug, Subcommand)]
-pub(super) enum ProdCommand {
-    Check,
-    Up,
-    Down {
-        #[arg(long)]
-        volumes: bool,
-    },
-    Logs,
-    /// Encrypt the database with age and upload it to the backup bucket.
-    Backup,
-    /// Copy this computer's server/.env/prod to your server.
-    Push(DeployTarget),
-    /// Push the production environment, then update and start the stack on your server.
-    Deploy(DeployTarget),
-    /// Replace the database with a backup from the bucket.
-    Restore {
-        /// Backup timestamp such as 20271003T020000Z, or `latest`.
-        backup: String,
-        /// age identity file that decrypts the backup.
-        #[arg(long)]
-        identity: PathBuf,
-        /// Confirm that production data will be replaced.
-        #[arg(long)]
-        yes: bool,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub(super) enum StagingCommand {
-    /// Validate staging configuration and Compose expansion.
-    Check,
-    /// Build the current checkout and start staging on this host.
-    Up,
-    /// Stop staging. Data volumes are retained unless --volumes is supplied.
-    Down {
-        #[arg(long)]
-        volumes: bool,
-    },
-    /// Show staging container status.
-    Status,
-    /// Follow staging container logs.
-    Logs,
-}
-
-#[derive(Debug, Args)]
-pub(super) struct DeployTarget {
-    /// SSH destination such as misty@203.0.113.10; defaults to MISTY_DEPLOY_HOST.
-    #[arg(long)]
-    pub(super) host: Option<String>,
-    /// Misty checkout on the VPS, relative to the SSH user's home.
-    #[arg(long, default_value = "misty")]
-    pub(super) dir: String,
-}
-
-impl DeployTarget {
-    pub(super) fn remote(&self) -> Result<deploy::Remote> {
-        let host = match &self.host {
-            Some(host) => host.clone(),
-            None => std::env::var("MISTY_DEPLOY_HOST").map_err(|_| {
-                anyhow::anyhow!("pass --host or set MISTY_DEPLOY_HOST in misty/cli/.env/common.env")
-            })?,
-        };
-        deploy::Remote::new(&host, &self.dir)
-    }
-}
-
-#[derive(Debug, Subcommand)]
 pub(super) enum ImageCommand {
     Build {
         #[arg(long)]
@@ -147,27 +65,8 @@ pub(super) enum ImageCommand {
 
 #[derive(Debug, Subcommand)]
 pub(super) enum WorkerCommand {
-    GenerateSecrets {
-        #[arg(long, value_enum, default_value = "development")]
-        target: WorkerSecretTarget,
-    },
-    Deploy {
-        #[arg(long, value_enum)]
-        target: WorkerDeployTarget,
-        #[arg(long)]
-        dry_run: bool,
-    },
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub(super) enum WorkerSecretTarget {
-    Development,
-    Production,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub(super) enum WorkerDeployTarget {
-    Production,
+    /// Generate the development collaboration Worker's keys.
+    GenerateSecrets,
 }
 
 #[derive(Debug, Subcommand)]

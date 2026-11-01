@@ -58,8 +58,6 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
         root,
         "privacy",
         &[
-            ("anonymous_usage_analytics_enabled", json!(false)),
-            ("anonymous_error_reporting_enabled", json!(false)),
             ("page_state_restore", json!(true)),
             ("page_state_agent_restore", json!(true)),
             (

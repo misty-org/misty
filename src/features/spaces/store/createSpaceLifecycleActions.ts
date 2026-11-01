@@ -52,8 +52,9 @@ export function createSpaceLifecycleActions(
     invite: async (spaceId, email) => {
       set({ error: null });
       try {
-        await spacesApi.invite(spaceId, email);
+        const invitation = await spacesApi.invite(spaceId, email);
         await Promise.all([get().loadMembers(spaceId), get().load({ force: true })]);
+        return invitation.link ?? "";
       } catch (error) {
         set({ error: errorText(error) });
         throw error;

@@ -1,5 +1,7 @@
 //! Pulling collections from the server and pushing pending writes to it.
 use super::*;
+/// How long a collection whose writes were refused for storage waits before trying again.
+const STORAGE_FULL_WAIT: Duration = Duration::from_secs(600);
 
 impl<F> Worker<F>
 where
@@ -177,6 +179,8 @@ where
             self.collections.batch.retry(collection);
         }
         self.store.set_collection(&self.root, collection, &state)?;
+        // A write went through, so the account has room again.
+        self.storage_full(false)?;
         self.publish_sync_state()
     }
 
@@ -204,7 +208,23 @@ where
                 retry_after.unwrap_or(Duration::from_secs(5)),
                 std::time::Instant::now(),
             );
+        } else if code == STORAGE_FULL || code == "account_closing" {
+            // A closing account is read-only; its writes stay here and are offered again later.
+            self.collections
+                .batch
+                .hold(collection, STORAGE_FULL_WAIT, std::time::Instant::now());
         }
         true
+    }
+
+    /// Says on the status whether the server refused writes because the account's storage is
+    /// full. Another issue showing is left as it is.
+    pub(in crate::worker) fn storage_full(&self, full: bool) -> Result<()> {
+        let current = self.status.borrow().clone();
+        match (full, current.issue) {
+            (true, None) => self.report(current.phase, Some(STORAGE_FULL)),
+            (false, Some(STORAGE_FULL)) => self.report(current.phase, None),
+            _ => Ok(()),
+        }
     }
 }

@@ -74,7 +74,7 @@ export function DeviceSection({ peer, approvedBy }: { peer: DevicePeer; approved
 
   return (
     <div className="py-2">
-      <h3 className="pt-5 text-[15px] font-semibold leading-6 text-cream-bright">{peer.name}</h3>
+      <h3 className="pt-5 text-md font-semibold leading-6 text-cream-bright">{peer.name}</h3>
       <Row label="Status" description={`${added} · Last seen ${lastSeen(peer)}`}>
         <span className="flex items-center gap-2 text-sm text-cream">
           <PlatformIcon platform={peer.platform} />

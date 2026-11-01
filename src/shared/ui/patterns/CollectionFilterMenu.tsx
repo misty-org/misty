@@ -55,7 +55,7 @@ export function CollectionFilterMenu({
           {filterCount > 0 && (
             <Badge
               aria-hidden="true"
-              className="pointer-events-none absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 text-[10px] leading-none"
+              className="pointer-events-none absolute -right-1 -top-1 h-4 min-w-4 justify-center rounded-full px-1 text-3xs leading-none"
             >
               {filterCount}
             </Badge>

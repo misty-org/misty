@@ -40,11 +40,11 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className={cn("max-w-[380px]")}>
         <DialogHeader>
-          <DialogTitle className="text-[14px]">New note</DialogTitle>
+          <DialogTitle className="text-sm">New note</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-1.5">
-          <Label htmlFor="new-note-title" className="text-[11px]">
+          <Label htmlFor="new-note-title" className="text-2xs">
             Title
           </Label>
           <Input
@@ -52,7 +52,7 @@ export function NewNoteDialogView(props: NewNoteDialogProps) {
             value={title}
             autoFocus
             placeholder="Untitled note"
-            className={cn("h-8 text-[13px]")}
+            className={cn("h-8 text-ui")}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void submit();

@@ -7,17 +7,32 @@ export type { DesktopSettingsNavEntry, DesktopSettingsNavGroup } from "./Setting
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
+  // With no pages to list there is no sidebar: an empty column only reads as a missing nav.
+  const navigation = Boolean(
+    props.groups.length ||
+    props.navigationHeader ||
+    props.navigationOverride ||
+    props.navigationFooter,
+  );
   return (
     <div
       aria-label={props.ariaLabel}
       className={cn(
-        "grid min-h-0 min-w-0 grid-cols-[248px_1px_minmax(0,1fr)] overflow-hidden bg-charcoal-bg",
+        "grid min-h-0 min-w-0 overflow-hidden bg-charcoal-bg",
         overlay ? "h-full" : "h-screen",
-        "max-[900px]:grid-cols-[208px_1px_minmax(0,1fr)]",
-        "max-[680px]:grid-cols-[168px_1px_minmax(0,1fr)]",
+        navigation
+          ? [
+              "grid-cols-[248px_1px_minmax(0,1fr)]",
+              "max-[900px]:grid-cols-[208px_1px_minmax(0,1fr)]",
+              "max-[680px]:grid-cols-[168px_1px_minmax(0,1fr)]",
+            ]
+          : "grid-cols-[minmax(0,1fr)]",
       )}
     >
-      <aside className="flex min-h-0 flex-col overflow-hidden bg-charcoal-sidebar py-3 text-cream-muted">
+      <aside
+        hidden={!navigation}
+        className="flex min-h-0 flex-col overflow-hidden bg-charcoal-sidebar py-3 text-cream-muted"
+      >
         {props.navigationHeader ? (
           <div className="mb-3 shrink-0 px-3 max-[680px]:px-2">{props.navigationHeader}</div>
         ) : null}
@@ -34,7 +49,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         ) : null}
       </aside>
 
-      <div aria-hidden="true" className="bg-charcoal-border" />
+      {navigation ? <div aria-hidden="true" className="bg-charcoal-border" /> : null}
 
       <main className="relative flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
         {/* No title bar: section headers carry the page, as the sidebar already names the area. */}
@@ -60,7 +75,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         >
           <div
             className={cn(
-              "w-full max-w-[960px] px-10 pb-12 text-[15px] leading-6 max-[720px]:px-6",
+              "w-full max-w-[960px] px-10 pb-12 text-md leading-6 max-[720px]:px-6",
               overlay ? "pt-0" : "pt-9",
             )}
           >
@@ -95,13 +110,13 @@ export function DesktopSettingsSection(props: {
         <h2
           className={cn(
             "font-semibold text-cream-bright",
-            props.density === "compact" ? "text-base leading-6" : "text-[18px] leading-7",
+            props.density === "compact" ? "text-base leading-6" : "text-lg leading-7",
           )}
         >
           {props.title}
         </h2>
         {props.description ? (
-          <p className="mt-1 max-w-[680px] text-[15px] leading-6 text-cream-muted">
+          <p className="mt-1 max-w-[680px] text-md leading-6 text-cream-muted">
             {props.description}
           </p>
         ) : null}
@@ -146,14 +161,14 @@ export function DesktopSettingsRow(props: {
       <div className="grid min-w-0 gap-1">
         <span
           className={cn(
-            "text-[15px] font-medium leading-6",
+            "text-md font-medium leading-6",
             props.muted ? "text-cream-muted" : "text-cream-bright",
           )}
         >
           {props.label}
         </span>
         {props.description || reset ? (
-          <p className="max-w-[720px] text-[14px] leading-[22px] text-cream-muted">
+          <p className="max-w-[720px] text-sm leading-[22px] text-cream-muted">
             {props.description}
             {reset ? (
               <>
@@ -163,7 +178,7 @@ export function DesktopSettingsRow(props: {
                   variant="link"
                   aria-label={`Reset ${props.label} to default`}
                   className={cn(
-                    "inline h-auto border-0 p-0 align-baseline text-[14px] leading-[22px]",
+                    "inline h-auto border-0 p-0 align-baseline text-sm leading-[22px]",
                     "font-normal text-cream underline underline-offset-2 hover:text-cream-bright",
                   )}
                   onClick={reset}
@@ -194,7 +209,7 @@ export function DesktopSettingsNotice(props: { children: ReactNode; action?: Rea
   return (
     <div
       role="alert"
-      className="mb-5 flex min-w-0 items-center gap-2.5 px-0 py-2 text-[14px] leading-5 text-cream"
+      className="mb-5 flex min-w-0 items-center gap-2.5 px-0 py-2 text-sm leading-5 text-cream"
     >
       <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
       <span className="min-w-0 flex-1">{props.children}</span>

@@ -4,6 +4,13 @@ The goal, rules and loop for improving Misty's agent against Odysseys, the long-
 benchmark other AI browsers report on. Written October 17, 2026. The harness it measures is
 [agent-harness.md](../harness.md).
 
+The campaign ended on October 31, 2026. Its evals (Odysseys, free-model, voice and pointing)
+drove a server-side agent runtime, which was removed with them: agents and every model call now
+run on the person's desktop ([runtime.md](../runtime.md)). Evals need rebuilding on the desktop
+runtime, as the benchmark package in [agent browser actions](../../plans/agent-browser-actions.md)
+describes. The eval code is in git history. This page stays as the record of what the campaign
+found, which the harness code cites.
+
 ## Goal
 
 Pass as much of Odysseys as possible, accurately and fast, on Misty's house model (Haiku 5.5),
@@ -389,7 +396,7 @@ run, ignores `www.`, scheme and tracking differences, and also notes a call that
 six of the last eight pages on one site.
 
 The campaign's Anthropic credit is nearly spent, so later passes run on NVIDIA's free hosted models
-([free-model-evals.md](free-model.md)). Its scores compare only with passes on the same model:
+(`nim/` routes, agent and judge both `nim/z-ai/glm-5.3-flash`). Its scores compare only with passes on the same model:
 the first is batch 17's ten tasks before and after the change above, on the Mac.
 
 ### October 20, evening: one task at a time on Nemotron

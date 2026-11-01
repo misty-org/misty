@@ -32,7 +32,7 @@ const Slider = React.forwardRef<
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-white/10 data-[disabled]:opacity-50"
+        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-cream/15 data-[disabled]:opacity-50"
       >
         <SliderPrimitive.Range
           data-slot="slider-range"

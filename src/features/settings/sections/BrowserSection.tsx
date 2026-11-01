@@ -1,4 +1,3 @@
-import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -11,19 +10,19 @@ import {
   SwitchControl,
 } from "../SettingsControls";
 import type { SettingsContentProps } from "../settingsTypes";
-import { BrowserToolbarSettings } from "./BrowserToolbarSettings";
 import { DefaultBrowserRow } from "./DefaultBrowserRow";
 
 type BrowserSettingsProps = Pick<SettingsContentProps, "document" | "working" | "onSettingChange">;
 
-/** Browsing › Links: how links reach Misty and what pages show around them. */
+/** General › Browsing: the default browser, where outside links open and search suggestions.
+ * The search engine has no row while the engine table lists only Google. */
 export function BrowserLinksSettings(props: BrowserSettingsProps) {
   return (
-    <SettingsSectionBlock title="Links">
+    <SettingsSectionBlock title="Browsing">
       <DefaultBrowserRow />
       <SettingsRow
         label="Links from other apps"
-        description="Peek shows a link over the page you're on, so you can keep it as a tab or close it."
+        description="Peek opens a link over the current page."
       >
         <ChoiceControl
           value={stringSetting(props.document, "general", "browser_external_links", "tab")}
@@ -38,49 +37,8 @@ export function BrowserLinksSettings(props: BrowserSettingsProps) {
         />
       </SettingsRow>
       <SettingsRow
-        label="Link previews"
-        description={
-          "Show a card with a picture and title under links in replies and chats. Misty fetches " +
-          "each page from this device, without cookies or sign-ins, so the site sees your address."
-        }
-      >
-        <SwitchControl
-          checked={booleanSetting(props.document, "general", "browser_link_previews", true)}
-          disabled={props.working}
-          onChange={(value) => props.onSettingChange("general", "browser_link_previews", value)}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Link and loading status"
-        description="Show where a link goes, and when a page is loading, in the corner of the page."
-      >
-        <SwitchControl
-          checked={booleanSetting(props.document, "general", "browser_status_bubble", true)}
-          disabled={props.working}
-          onChange={(value) => props.onSettingChange("general", "browser_status_bubble", value)}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Mouse gestures"
-        description="Hold the right button and drag left to go back, right to go forward or up to reload."
-      >
-        <SwitchControl
-          checked={booleanSetting(props.document, "general", "browser_mouse_gestures", false)}
-          disabled={props.working}
-          onChange={(value) => props.onSettingChange("general", "browser_mouse_gestures", value)}
-        />
-      </SettingsRow>
-    </SettingsSectionBlock>
-  );
-}
-
-/** Search: where typed searches go and what the address bar suggests. */
-export function SearchSettings(props: BrowserSettingsProps) {
-  return (
-    <SettingsSectionBlock title="Search">
-      <SettingsRow
         label="Show search suggestions"
-        description="Send what you type in the address bar to your search engine to suggest searches and sites."
+        description="Sends what you type to your search engine."
       >
         <SwitchControl
           checked={booleanSetting(props.document, "general", "browser_search_suggestions", false)}
@@ -94,33 +52,23 @@ export function SearchSettings(props: BrowserSettingsProps) {
   );
 }
 
-/** Browsing › Downloads: where files from websites are saved. */
+/** General › Downloads: where files from websites are saved. */
 export function DownloadsSettings(props: BrowserSettingsProps) {
   return (
     <SettingsSectionBlock title="Downloads">
-      <SettingsRow
-        label="Download location"
-        description={
-          hasTauriInternals()
-            ? "Where files downloaded from websites are saved."
-            : "Choose a download folder in the native app. Web downloads follow your browser settings."
-        }
-      >
+      <SettingsRow label="Download location">
         <FilePathControl
           directory
           title="Choose a download folder"
           value={stringSetting(props.document, "general", "browser_download_directory", "")}
-          emptyLabel="Downloads folder"
-          disabled={props.working || !hasTauriInternals()}
+          emptyLabel="Downloads"
+          disabled={props.working}
           onChange={(value) =>
             props.onSettingChange("general", "browser_download_directory", value)
           }
         />
       </SettingsRow>
-      <SettingsRow
-        label="Ask where to save each file"
-        description="Choose a folder and name every time you download something."
-      >
+      <SettingsRow label="Ask where to save each file">
         <SwitchControl
           checked={booleanSetting(props.document, "general", "browser_download_prompt", false)}
           disabled={props.working}
@@ -129,9 +77,4 @@ export function DownloadsSettings(props: BrowserSettingsProps) {
       </SettingsRow>
     </SettingsSectionBlock>
   );
-}
-
-/** Browsing › Sites: how websites look and zoom, then the browser toolbar. */
-export function BrowserSitesSettings(props: BrowserSettingsProps) {
-  return <BrowserToolbarSettings {...props} />;
 }

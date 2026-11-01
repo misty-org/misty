@@ -87,7 +87,7 @@ export function LibraryEditPanel(props: LibraryEditPanelProps) {
         </Button>
       </div>
 
-      <label className="mt-4 grid gap-1.5 text-[10px] font-medium capitalize text-cream-muted">
+      <label className="mt-4 grid gap-1.5 text-3xs font-medium capitalize text-cream-muted">
         Filter
         <LibrarySelect
           value={draft.filter}

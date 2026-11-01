@@ -1,6 +1,4 @@
-import { analytics } from "@/telemetry/client";
 import { aiSurfaceApi } from "./api";
-import { aiSessionKey } from "./storeHelpers";
 import { failInvocation, makeSpeech, patchArtifact, scheduleHome } from "./storeRuntime";
 import type { MistyUndoReceipt } from "./types";
 
@@ -26,11 +24,6 @@ export function artifactActions(
             "",
         );
       }
-      analytics.track("ai_companion_artifact_decided", {
-        surface: adapter.surfaceId,
-        artifact_kind: artifact.kind,
-        decision,
-      });
       if (decision === "refine") {
         set((state) => ({
           companion: {
@@ -79,10 +72,6 @@ export function artifactActions(
           await aiSurfaceApi.completeArtifact(artifact.id, "applied");
         }
         await adapter.onArtifactApplied?.(response.artifact ?? artifact, response.result);
-        analytics.track("ai_companion_direct_effect", {
-          surface: adapter.surfaceId,
-          artifact_kind: artifact.kind,
-        });
         patchArtifact(set, get, accountId, paneId, artifact.id, { state: "applied" });
         let undo: MistyUndoReceipt | undefined;
         if (adapter.undoArtifact) {
@@ -125,13 +114,6 @@ export function artifactActions(
       const receipt = get().companion.undo;
       if (!receipt || Date.parse(receipt.expiresAt) < Date.now()) return;
       await undoCallbacks.get(receipt.id)?.();
-      const current = get().companion;
-      const registration =
-        current.accountId && current.paneId
-          ? get().registrations[aiSessionKey(current.accountId, current.paneId)]
-          : undefined;
-      if (registration)
-        analytics.track("ai_companion_undo", { surface: registration.adapter.surfaceId });
       undoCallbacks.delete(receipt.id);
       set((state) => ({
         companion: {

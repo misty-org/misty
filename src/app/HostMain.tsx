@@ -4,10 +4,8 @@ import {
   installExternalLinkRouting,
 } from "@/shared/platform/openExternalLink";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { analytics } from "@/telemetry/client";
-import { initializeAnalyticsLifecycle } from "@/telemetry/lifecycle";
-import { TelemetryErrorBoundary } from "@/telemetry/TelemetryErrorBoundary";
 import ReactDOM from "react-dom/client";
+import { AppErrorBoundary } from "./AppErrorBoundary";
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals())
     throw new Error("Misty Browser is unavailable outside the desktop app.");
@@ -33,13 +31,14 @@ async function bootstrap() {
   // loads beside them too, instead of when the first route renders.
   const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);
   void import("./layouts/DesktopLayout").catch(() => undefined);
+  // Every request goes to the server this device chose, so the choice is read first.
+  await (await import("@/api/deployment/serverChoice")).loadServerChoice();
   const { bootstrapDemoSession } = await import("@/features/auth");
   await bootstrapDemoSession();
-  void analytics.initialize().then(initializeAnalyticsLifecycle);
   const [{ App }] = await appModules;
   root.render(
-    <TelemetryErrorBoundary>
+    <AppErrorBoundary>
       <App />
-    </TelemetryErrorBoundary>,
+    </AppErrorBoundary>,
   );
 }

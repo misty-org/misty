@@ -30,10 +30,6 @@ export type CompanionControl =
       teach: boolean;
     }
   | {
-      kind: "model";
-      model: string;
-    }
-  | {
       kind: "stop" | "stop_audio";
     }
   | {
@@ -48,7 +44,6 @@ export const initialCompanionPresentation: Presentation = {
   enabled: false,
   mode: "auto", // Historical wire value; there is one interaction policy now.
   ask: false,
-  model: "",
 };
 interface CompanionState {
   accountId: string;

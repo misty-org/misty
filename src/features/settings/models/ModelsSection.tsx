@@ -2,11 +2,18 @@ import {
   DesktopSettingsNotice,
   DesktopSettingsSection as Section,
 } from "../components/DesktopSettingsUI";
+import { useState } from "react";
 import { ModelKeyRow } from "./ModelKeyRow";
 import { ModelDropdownRow, ModelTextRow, useModelSetting } from "./ModelChoiceRows";
-import { useOperatorModels, useSavedModelKeys } from "./modelKeys";
+import { useChatgptAccount, useProviderModels, type AddedKey } from "./modelAccounts";
+import { useSavedModelKeys } from "./modelKeys";
+import { ModelSignInRows } from "./ModelSignInRows";
+import { ModelTestRow } from "./ModelTestRow";
+import { WebSearchSection } from "./WebSearchSection";
 import {
+  defaultAgentModel,
   modelProviders,
+  modelSuggestions,
   providerById,
   qualifiedModel,
   reasoningLevels,
@@ -14,31 +21,53 @@ import {
 } from "./modelProviders";
 
 /**
- * Settings › Models: bring your own keys. Keys go to the keychain through the native app;
- * the model choices are device settings. Several providers can hold keys at once, so each
- * model names its provider (`anthropic/claude-sonnet-5-5`).
+ * Settings › Models. Agents run on this computer, on a model account you bring: Sign in with
+ * ChatGPT, OpenRouter's sign-in, or a key from any provider (its provider is found from the
+ * key). Keys and sign-ins go to the keychain through the native app; the model choices are
+ * device settings, and each model names its provider (`anthropic/claude-sonnet-5-5`). A web
+ * search key is kept the same way (WebSearchSection).
  */
 export function ModelsSection() {
   const keys = useSavedModelKeys();
-  const operator = useOperatorModels();
+  const chatgpt = useChatgptAccount();
   const provider = useModelSetting("models.provider");
+  const agent = useModelSetting("models.agent_model");
+  const [listRevision, setListRevision] = useState(0);
   const selected = providerById(provider.value) ?? modelProviders[0];
+  const ready = selected.signIn
+    ? Boolean(chatgpt.status?.planUsage)
+    : Boolean(selected.keyOptional || keys.saved?.includes(selected.id));
+  const listed = useProviderModels(selected.id, ready, listRevision);
   const suggest = (role: "agent" | "fast" | "embedding") =>
-    selected.suggestions[role].map((model) => `${selected.id}/${model}`);
+    modelSuggestions(selected, role, listed);
   const qualify = (value: string) => qualifiedModel(value, selected.id);
   const savedLabels = modelProviders
     .filter((item) => keys.saved?.includes(item.id))
     .map((item) => item.label);
+  // A new account's provider becomes the one shown, and gives the agent a model when it has none.
+  const adopt = (providerId: string, added?: AddedKey) => {
+    if (providerId !== provider.value) provider.set(providerId);
+    setListRevision((value) => value + 1);
+    const first = added ? defaultAgentModel(providerId, added.models) : "";
+    if (first && !agent.value) agent.set(first);
+  };
+  const saveKey = async (_providerId: string, key: string) => {
+    const added = await keys.add(key, selected.id);
+    if (added) adopt(added.provider, added);
+    return Boolean(added);
+  };
   return (
     <>
       {keys.error ? <DesktopSettingsNotice>{keys.error}</DesktopSettingsNotice> : null}
       <Section
+        title="Sign in"
+        description="Use a plan or account you already have. The sign-in stays on this device."
+      >
+        <ModelSignInRows keys={keys} chatgpt={chatgpt} onSignedIn={adopt} />
+      </Section>
+      <Section
         title="Provider"
-        description={
-          operator
-            ? "This Misty server provides its own models, so everything here is optional. Models you set here are used instead of the server’s."
-            : "Misty runs on your own keys. They stay in this device’s keychain and go only to your Misty server, with each AI request."
-        }
+        description="Keys stay in this device’s keychain and go only to the provider, from this computer."
       >
         <ModelDropdownRow
           id="models.provider"
@@ -50,27 +79,29 @@ export function ModelsSection() {
           }
           options={modelProviders.map((item) => ({ value: item.id, label: item.label }))}
         />
-        <ModelKeyRow
-          label="API key"
-          description={
-            selected.keyOptional
-              ? `${selected.label} works without a key unless your server asks for one.`
-              : `Your ${selected.label} key. It can’t be shown again once saved.`
-          }
-          providerId={selected.id}
-          saved={keys.saved}
-          onSave={keys.save}
-          onRemove={keys.remove}
-        />
+        {selected.signIn ? null : (
+          <ModelKeyRow
+            label="API key"
+            description={
+              selected.keyOptional
+                ? `${selected.label} works without a key unless it asks for one.`
+                : selected.keyPage
+                  ? `Paste a key from ${selected.keyPage.replace(/^https:\/\//, "")}. It can’t be shown again once saved.`
+                  : "Paste a key from any provider; Misty finds which one it’s for. It can’t be shown again once saved."
+            }
+            providerId={selected.id}
+            saved={keys.saved}
+            onSave={saveKey}
+            onRemove={keys.remove}
+          />
+        )}
         {selected.baseUrlSetting ? (
           <ModelTextRow
             id={selected.baseUrlSetting}
             label="Base URL"
-            description="Your server calls this address, not this device."
+            description="This computer calls this address, so a server on it or your network works."
             placeholder={
-              selected.id === "ollama"
-                ? "http://host.docker.internal:11434/v1"
-                : "http://host.docker.internal:8000/v1"
+              selected.id === "ollama" ? "http://127.0.0.1:11434/v1" : "http://127.0.0.1:8000/v1"
             }
           />
         ) : null}
@@ -87,6 +118,7 @@ export function ModelsSection() {
           suggestions={suggest("agent")}
           normalize={qualify}
         />
+        <ModelTestRow disabled={!agent.value} />
         <ModelTextRow
           id="models.fast_model"
           label="Fast model"
@@ -98,7 +130,7 @@ export function ModelsSection() {
         <ModelTextRow
           id="models.embedding_model"
           label="Embedding model"
-          description="Searches memory and the library. Optional; that search is off when empty."
+          description="Searches memory and the library. Optional; that search is off when empty. ChatGPT has none."
           placeholder="Off"
           suggestions={suggest("embedding")}
           normalize={qualify}
@@ -110,6 +142,7 @@ export function ModelsSection() {
           options={reasoningLevels}
         />
       </Section>
+      <WebSearchSection keys={keys} />
       <Section
         title="Voice"
         description="Optional keys for reading answers aloud and for dictation."

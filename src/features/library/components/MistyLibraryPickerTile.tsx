@@ -35,7 +35,7 @@ export function MistyLibraryPickerTile({
       </span>
       <span className="block min-w-0 px-2.5 py-2">
         <span className="block truncate text-xs font-medium">{item.display_name}</span>
-        <span className="mt-0.5 block truncate text-[11px] font-normal text-cream-muted">
+        <span className="mt-0.5 block truncate text-2xs font-normal text-cream-muted">
           {item.file.original_filename}
         </span>
       </span>

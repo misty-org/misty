@@ -42,7 +42,7 @@ function SortHeader({
         variant="ghost"
         size="none"
         justify="start"
-        className="group/sort min-h-8 w-full gap-1.5 rounded-sm px-2 py-1 text-[13px] text-inherit font-medium"
+        className="group/sort min-h-8 w-full gap-1.5 rounded-sm px-2 py-1 text-ui text-inherit font-medium"
         onClick={() =>
           onSort(selected && sort.descending ? null : { key: column.key, descending: selected })
         }
@@ -155,7 +155,7 @@ export function CollectionItemsTable({
                 {metadataColumns.map((column) => (
                   <TableCell
                     key={column.key}
-                    className="text-[13px] text-cream-muted whitespace-nowrap"
+                    className="text-ui text-cream-muted whitespace-nowrap"
                   >
                     {column.render(item)}
                   </TableCell>

@@ -2,8 +2,10 @@ import { cn } from "../utils";
 import { FlyingMisty } from "./FlyingMisty";
 import { Skeleton, SkeletonList } from "./Skeleton";
 
-/** Loading surface for initial loads and route transitions. A full-screen one that is `leaving`
- * stays over what replaced it while it fades out, then calls `onLeft`. */
+/** Loading surface for initial loads and route transitions. Full screen it is the startup
+ * splash: Misty flying over the window color, with no loading text (AGENTS.md); inline it is a
+ * skeleton. A full-screen one that is `leaving` stays over what replaced it while it fades out,
+ * then calls `onLeft`. */
 export function LoadingScreen({
   label = "Loading",
   className,
@@ -33,11 +35,8 @@ export function LoadingScreen({
       }}
     >
       {fullScreen ? (
-        <div className="relative grid size-full place-items-center px-6 text-center">
+        <div className="relative size-full">
           <FlyingMisty />
-          <p className="relative z-10 m-0 text-base font-medium text-cream">
-            A little quiet here...
-          </p>
         </div>
       ) : (
         <div className="mx-auto grid w-full max-w-2xl gap-6 px-6 py-10">

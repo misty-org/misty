@@ -101,13 +101,10 @@ export function PasswordsSettings() {
 
   if (!unlocked)
     return (
-      <SettingsSectionBlock
-        title="Logins"
-        description="Passwords are encrypted with your sync vault, which belongs to your account."
-      >
+      <SettingsSectionBlock title="Logins">
         <SettingsRow
           label="Unlock your sync vault"
-          description="Open the Sync wizard to connect this device before managing saved passwords."
+          description="Passwords are encrypted with your sync vault."
         >
           <Button
             variant="outline"
@@ -124,10 +121,7 @@ export function PasswordsSettings() {
     );
 
   return (
-    <SettingsSectionBlock
-      title="Logins"
-      description="Misty asks before saving a sign-in and offers it again on the site it belongs to."
-    >
+    <SettingsSectionBlock title="Logins">
       <div className="flex items-center gap-2 pb-3">
         <Input
           aria-label="Search passwords"

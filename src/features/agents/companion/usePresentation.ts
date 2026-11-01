@@ -9,7 +9,6 @@ const initial: Presentation = {
   phase: "idle",
   visible: false,
   mode: "team",
-  model: "",
 };
 
 export function usePresentation() {

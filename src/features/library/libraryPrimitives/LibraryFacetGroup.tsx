@@ -17,7 +17,7 @@ export function LibraryFacetGroup({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span className="mr-0.5 text-[10px] font-semibold capitalize text-cream-muted">{label}</span>
+      <span className="mr-0.5 text-3xs font-semibold capitalize text-cream-muted">{label}</span>
       {facets.slice(0, MAX_VISIBLE_FACETS).map((facet) => (
         <Button
           size="sm"

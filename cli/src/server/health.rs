@@ -17,7 +17,6 @@ pub fn status(workspace: &Workspace) -> Result<()> {
                 | "dev-init"
                 | "migrate"
                 | "database-permissions"
-                | "agent-runtime-setup"
                 | "cloudflare-deploy"
         );
         if is_job && state == "exited" && row["ExitCode"].as_i64() == Some(0) {
@@ -89,7 +88,7 @@ pub fn health(workspace: &Workspace) -> Result<()> {
     validate_health(&rows)
 }
 pub(super) fn validate_health(rows: &[serde_json::Value]) -> Result<()> {
-    for service in ["postgres", "agent-runtime", "misty-api", "tunnel"] {
+    for service in ["postgres", "misty-api", "tunnel"] {
         let row = rows
             .iter()
             .find(|row| row["Service"] == service)

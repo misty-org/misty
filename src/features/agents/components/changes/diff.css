@@ -5,7 +5,7 @@
 :root {
   --misty-diff-add: rgb(46 160 67);
   --misty-diff-del: rgb(218 54 51);
-  --misty-diff-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --misty-diff-mono: var(--font-mono);
 }
 
 .misty-diff {
@@ -28,7 +28,7 @@
   min-width: 0;
   padding: 7px 10px;
   color: var(--color-cream);
-  font-size: 12.5px;
+  font-size: 12px;
   text-align: left;
 }
 
@@ -67,7 +67,7 @@
 
 .misty-diff-status {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .misty-diff-counts {
@@ -75,7 +75,7 @@
   flex-shrink: 0;
   gap: 6px;
   font-family: var(--misty-diff-mono);
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .misty-diff-plus {

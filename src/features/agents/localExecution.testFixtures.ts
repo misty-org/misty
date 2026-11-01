@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   startAutopilot: vi.fn(),
   focus: vi.fn(),
   request: vi.fn(),
+  deviceCall: vi.fn(),
   cancel: vi.fn(),
   stream: vi.fn(),
   state: {
@@ -42,6 +43,7 @@ vi.mock("@/api/client", () => ({
   apiRequest: mocks.request,
   resolveRequiredApiBase: async () => "https://api.example.test",
 }));
+vi.mock("@/api/device-models", () => ({ deviceModelCall: mocks.deviceCall }));
 vi.mock("./taskArtifacts", () => ({ trackTaskArtifacts: async () => {} }));
 vi.mock("./store/useAgentsStore", () => ({ agentsDeviceSnapshot: mocks.deviceSnapshot }));
 vi.mock("./store/useAgentDeviceStore", () => ({

@@ -45,12 +45,12 @@ export const windowsTitlebarCloseButtonClass = `${windowsTitlebarControlButtonCl
 
 export const frameOverlayBaseClass = [
   "pointer-events-none fixed right-3 top-10 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto]",
-  "gap-x-3 gap-y-[3px] rounded-md border bg-charcoal-card px-2.5 py-2 text-[11px] leading-tight",
+  "gap-x-3 gap-y-[3px] rounded-md border bg-charcoal-card px-2.5 py-2 text-2xs leading-tight",
   "text-cream shadow-xl",
 ].join(" ");
 
 export const frameOverlayLevelClass: Record<FramePacingState["level"], string> = {
-  idle: "border-status-green",
-  light: "border-sage-fg",
-  heavy: "border-charcoal-active",
+  idle: "border-charcoal-border",
+  light: "border-cream-muted",
+  heavy: "border-cream-bright",
 };

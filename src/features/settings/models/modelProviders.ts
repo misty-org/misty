@@ -6,11 +6,22 @@ export interface ModelProvider {
   baseUrlSetting?: string;
   /** Works without a key, e.g. a local Ollama. */
   keyOptional?: boolean;
+  /** Takes a sign-in rather than a key (Sign in with ChatGPT). */
+  signIn?: boolean;
+  /** Where to get a key, when the provider has a page for it. */
+  keyPage?: string;
   /** Model IDs offered as suggestions for each role, without the provider prefix. */
   suggestions: { agent: string[]; fast: string[]; embedding: string[] };
 }
 
 export const modelProviders: ModelProvider[] = [
+  {
+    id: "chatgpt",
+    label: "ChatGPT",
+    signIn: true,
+    // ChatGPT names its models per account; the signed-in list replaces these.
+    suggestions: { agent: [], fast: [], embedding: [] },
+  },
   {
     id: "anthropic",
     label: "Anthropic",
@@ -77,6 +88,16 @@ export const modelProviders: ModelProvider[] = [
     },
   },
   {
+    id: "ollama-cloud",
+    label: "Ollama Cloud",
+    keyPage: "https://ollama.com/settings/keys",
+    suggestions: {
+      agent: ["gpt-oss:120b", "qwen3-coder:480b"],
+      fast: ["gpt-oss:20b"],
+      embedding: [],
+    },
+  },
+  {
     id: "openai-compatible",
     label: "OpenAI-compatible",
     baseUrlSetting: "models.openai_compatible_base_url",
@@ -124,3 +145,29 @@ export const reasoningLevels = [
   { value: "high", label: "High" },
   { value: "xhigh", label: "Extra high" },
 ];
+
+/**
+ * A sensible agent model from what a provider listed: the first of Misty's suggestions it
+ * offers, else the first model that isn't for embeddings. "" when it listed none.
+ */
+export function defaultAgentModel(
+  providerId: string,
+  listed: { id: string; embedding: boolean }[],
+): string {
+  const ids = new Set(listed.map((model) => model.id));
+  const suggested = providerById(providerId)?.suggestions.agent.map(
+    (model) => `${providerId}/${model}`,
+  );
+  return suggested?.find((id) => ids.has(id)) ?? listed.find((model) => !model.embedding)?.id ?? "";
+}
+
+/** Model suggestions for a role: what the provider listed, else Misty's own. */
+export function modelSuggestions(
+  provider: ModelProvider,
+  role: "agent" | "fast" | "embedding",
+  listed: { id: string; embedding: boolean }[] | null,
+): string[] {
+  const live = (listed ?? []).filter((model) => (role === "embedding") === model.embedding);
+  if (live.length) return live.map((model) => model.id);
+  return provider.suggestions[role].map((model) => `${provider.id}/${model}`);
+}

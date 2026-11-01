@@ -3,7 +3,15 @@ import { CapturePanel, DictationController } from "@/features/voice";
 import { RecallRecorderMount } from "@/features/recall";
 import { ScreenMemoryMount } from "@/features/screen-memory";
 import { type AppTab } from "@/features/app-shell";
-import { openSignInSheet, SignInSheet, SignOutSheet, useAuth } from "@/features/auth";
+import {
+  AccountClosingNotice,
+  AccountSuspendedNotice,
+  ServerAlertsNotice,
+  openSignInSheet,
+  SignInSheet,
+  SignOutSheet,
+  useAuth,
+} from "@/features/auth";
 import { useExtensionsRuntime } from "@/features/extensions/useExtensionsRuntime";
 import { DevicePasswordsMerge } from "@/features/passwords/DevicePasswordsMerge";
 import { ExtensionPermissionRequest } from "@/features/extensions/ExtensionPermissionRequest";
@@ -288,8 +296,12 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         </section>
 
         <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-        {!isAuthRoute ? <SignInSheet /> : null}
+        {/* Also the setup wizard, which the first-run welcome opens. */}
+        <SignInSheet />
         {!isAuthRoute && user ? <SignOutSheet /> : null}
+        <AccountSuspendedNotice />
+        <AccountClosingNotice />
+        {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
         {!isAuthRoute && user ? <DevicePasswordsMerge key={user.id} accountId={user.id} /> : null}
         {!isAuthRoute ? (
           <DesktopShellOverlays

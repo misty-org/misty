@@ -33,7 +33,7 @@ export function AddFilesJobList({
               <span className="block truncate text-xs font-medium" title={job.path}>
                 {job.name}
               </span>
-              <span className="block truncate text-[10px] text-cream-muted">
+              <span className="block truncate text-3xs text-cream-muted">
                 {stageLabel(job.stage)}
               </span>
               {job.error ? (

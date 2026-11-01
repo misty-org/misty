@@ -1,10 +1,4 @@
 {
-  "src/features/journal/components/JournalAttribution.tsx": [
-    {
-      "length": 307,
-      "hash": "b696271c03ef9587"
-    }
-  ],
   "src/features/spaces/chat/components/ChatReplyBanner.tsx": [
     {
       "length": 164,

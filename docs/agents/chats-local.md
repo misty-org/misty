@@ -3,8 +3,8 @@
 Approved October 19, 2026. This brief supersedes the agents-on-devices brief (since removed;
 its keep-awake rule moved to [devices/BRIEF.md](../sync/devices.md)) and the cross-device agent
 work in [devices/BRIEF.md](../sync/devices.md). It keeps the
-[agent architecture brief](architecture.md): the model loop stays on the
-server runtime, and every model call goes through its AI SDK on Misty's keys.
+[agent architecture brief](architecture.md). Since October 31, 2026 the model loop runs on the
+computer that keeps the chat, on its own models ([runtime.md](runtime.md)).
 
 ## Why
 
@@ -43,8 +43,7 @@ Misty now does the same.
 
 ## What stays on the server
 
-- The model route (the account's keys from its devices, or the server's own) and the run
-  queue with its device jobs.
+- The run queue with its device jobs and runtime deliveries. Model keys never reach it.
 - Composio connections, agent memory, Space chat, and Mentions replies posted into Space
   chat.
 - Files and artifacts, and attachments a turn sent to the model. These stay until the chat

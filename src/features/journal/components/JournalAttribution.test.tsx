@@ -28,7 +28,7 @@ describe("Journal branding", () => {
 
     const credit = container.querySelector("a");
     expect(credit?.textContent).not.toContain("Misty Journal");
-    expect(credit?.textContent).toContain("powered by Excalidraw");
+    expect(credit?.textContent).toContain("Powered by Excalidraw");
     expect(credit?.getAttribute("href")).toBe("https://excalidraw.com/");
   });
 });

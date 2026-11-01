@@ -1,4 +1,5 @@
 import { httpRequest } from "@/api/client/http";
+import { accountLimitMessage } from "@/api/client/accountLimits";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,
@@ -78,6 +79,8 @@ export async function managedAiRequest<T = unknown>(path: string, init?: Request
         retryAfter,
       );
     }
+    const limit = accountLimitMessage(payload?.code);
+    if (limit) throw new ManagedAiRequestError(limit, response.status, payload?.code);
     if (payload?.code === "request_canceled") {
       throw new ManagedAiRequestError("Agent request canceled.", response.status, payload.code);
     }

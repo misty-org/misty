@@ -6,7 +6,6 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { canonicalSettingsSection } from "./SettingsPage";
 import type * as SettingsStoreModule from "./store/useSettingsStore";
 
 /**
@@ -19,12 +18,15 @@ import type * as SettingsStoreModule from "./store/useSettingsStore";
  */
 
 // Import the registry so the test always mirrors the real nav list.
-import SettingsWorkspace, { settingsRegistry } from "./SettingsPage";
-import { settingsAreas, settingsGroups } from "./settingsRegistry";
-const SECTIONS: SettingsSection[] = settingsRegistry.map((entry) => entry.id);
+import SettingsWorkspace from "./SettingsPage";
+import { settingsAreaEntry, settingsGroups } from "./settingsRegistry";
+const PAGES: SettingsSection[] = settingsGroups.flatMap((group) =>
+  group.areas.map((area) => settingsAreaEntry(area)!.id),
+);
 const mocks = vi.hoisted(() => {
   const settingsState = {
     activeSection: "general" as SettingsSection,
+    focusTarget: { label: "", request: 0 },
     settings: {
       document: {} as Record<string, unknown>,
     },
@@ -104,60 +106,33 @@ vi.mock("@/api/assistant/api", () => ({
   },
 }));
 initializeHostAgentsRuntime();
-// Settings pages are empty while the surface is redesigned (settingsRegistry.tsx); the
-// redesign brings its own sidebar and replaces these checks.
-describe.skip("SettingsWorkspace", () => {
+describe("SettingsWorkspace", () => {
   let container: HTMLDivElement;
   let root: Root;
-  async function render(section: SettingsSection = "general", presentation: "page" = "page") {
+  async function render(section: SettingsSection = "general") {
     mocks.settingsState.activeSection = section;
     await act(async () => {
       root.render(
         <MemoryRouter>
-          <SettingsWorkspace presentation={presentation} />
+          <SettingsWorkspace presentation="page" />
         </MemoryRouter>,
       );
     });
   }
   beforeEach(() => {
-    (
-      globalThis as {
-        IS_REACT_ACT_ENVIRONMENT?: boolean;
-      }
-    ).IS_REACT_ACT_ENVIRONMENT = true;
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    mocks.settingsState.settings = {
-      document: {},
-    };
+    mocks.settingsState.settings = { document: {} };
     mocks.settingsState.setActiveSection.mockClear();
   });
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
   });
-  it("lists flat areas with unique icons and no Account footer or disclosures", async () => {
-    await render();
-    expect(
-      [...container.querySelectorAll("[data-settings-nav-parent]")].map((e) =>
-        e.getAttribute("data-settings-nav-parent"),
-      ),
-    ).toEqual([]);
-    expect(container.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
-    expect(
-      settingsRegistry.every((e) => !e.label.includes("&") && !e.label.includes(" and ")),
-    ).toBe(true);
-    expect(settingsRegistry.some((e) => e.id === "account" || e.id === "profiles")).toBe(false);
-    expect(container.querySelector('[aria-label^="Account settings"]')).toBeNull();
-  });
-  it.each(SECTIONS)("renders a functional or capability-gated %s page", async (section) => {
-    await render(section);
-    const main = container.querySelector("main")!;
-    expect(main.textContent!.length).toBeGreaterThan(30);
-    expect(main.textContent).not.toContain("Coming soon");
-  });
-  it("groups one-word pages under feature labels", async () => {
+
+  it("lists pages under feature groups, without disclosures or an Account footer", async () => {
     await render();
     const groups = [...container.querySelectorAll('nav [role="group"]')];
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
@@ -165,46 +140,46 @@ describe.skip("SettingsWorkspace", () => {
       "Browser",
       "Agents",
     ]);
-    for (const group of settingsGroups)
-      for (const area of group.areas) {
-        const label = settingsAreas[area].label;
-        expect(label.split(" ")).toHaveLength(1);
-        expect(label.toLowerCase()).not.toContain(group.label.toLowerCase());
-      }
-    expect(settingsRegistry.find((e) => e.id === "passwords")?.area).toBe("passwords");
-  });
-  it("renders every block of a page together without expanding navigation", async () => {
-    await render("general");
-    for (const id of ["general", "updates", "diagnostics", "about"])
-      expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
-    expect(container.querySelector('[data-settings-nav-entry="updates"]')).toBeNull();
-    // Dropdown controls report aria-expanded; navigation never discloses entries.
+    const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
+    expect(entries.map((entry) => entry.getAttribute("data-settings-nav-entry"))).toEqual(PAGES);
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe("General");
+    expect(container.querySelector('[aria-label^="Account settings"]')).toBeNull();
     expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
-  it("keeps system pages individually addressable", () => {
-    for (const id of ["sync", "devices", "privacy", "about", "updates", "diagnostics"])
-      expect(settingsRegistry.find((e) => e.id === id)).toBeDefined();
-    expect(settingsRegistry.find((e) => e.id === "diagnostics")?.area).toBe("general");
+
+  it.each(PAGES)("renders the %s page with content", async (section) => {
+    await render(section);
+    const main = container.querySelector("main")!;
+    expect(main.textContent!.length).toBeGreaterThan(20);
+    expect(main.textContent).not.toMatch(/coming soon|in progress|Loading…/i);
   });
-  it("sends retired pages to where their settings live now", () => {
-    expect(canonicalSettingsSection("advanced")).toBe("diagnostics");
-    expect(canonicalSettingsSection("server")).toBe("about");
-    expect(canonicalSettingsSection("agents")).toBe("agents-defaults");
-    expect(canonicalSettingsSection("profiles")).toBe("sync");
-    expect(canonicalSettingsSection("browser")).toBe("search");
-    expect(canonicalSettingsSection("browser-privacy")).toBe("sync");
-    expect(canonicalSettingsSection("spaces-manage")).toBe("general");
-    expect(settingsRegistry.find((e) => e.id === "sync")?.area).toBe("sync");
-    expect(settingsRegistry.find((e) => e.id === "browser-handoff")).toBeUndefined();
-    expect(canonicalSettingsSection("browser-handoff")).toBe("sync");
+
+  it("renders every block of a page together", async () => {
+    await render("general");
+    for (const id of ["general", "browser-links", "browser-tabs", "updates", "about"])
+      expect(container.querySelector(`[data-settings-page="${id}"]`)).not.toBeNull();
+    expect(container.querySelector('[data-settings-nav-entry="updates"]')).toBeNull();
   });
-  it("searches individual preferences and opens their canonical page", async () => {
+
+  it("opens a deep-linked block on its page", async () => {
+    await render("devices");
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe("Sync");
+    expect(container.querySelector('[data-settings-page="devices"]')).not.toBeNull();
+  });
+
+  it("selects a page from the sidebar", async () => {
+    await render();
+    await act(async () =>
+      (container.querySelector('[data-settings-nav-entry="advanced"]') as HTMLElement).click(),
+    );
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("advanced", undefined);
+  });
+
+  it("searches preferences and opens the page that shows the row", async () => {
     await render();
     await act(async () =>
       fireEvent.change(container.querySelector('input[aria-label="Search settings"]')!, {
-        target: {
-          value: "homepage",
-        },
+        target: { value: "homepage" },
       }),
     );
     const result = container.querySelector(
@@ -212,6 +187,6 @@ describe.skip("SettingsWorkspace", () => {
     ) as HTMLButtonElement;
     expect(result.textContent).toContain("Homepage");
     await act(async () => result.click());
-    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-tabs");
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("browser-tabs", "Homepage");
   });
 });

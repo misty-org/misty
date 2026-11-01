@@ -102,22 +102,14 @@ pub async fn auth_http_start(
                 | "content-length"
                 | "connection"
                 | "user-agent"
-                | crate::infra::models::header::HEADER
+                // Model keys never leave this computer.
+                | "x-misty-models"
         ) {
             continue;
         }
         builder = builder.header(&name, &value);
     }
     builder = builder.header("X-Misty-CSRF", "1");
-    // Keys go only to the server this jar is signed in to, never with a sign-in attempt.
-    if !login && client.signed_in(&url) {
-        if let Some(models) = crate::infra::models::current_header(&app).await {
-            if let Ok(mut value) = reqwest::header::HeaderValue::from_str(&models) {
-                value.set_sensitive(true);
-                builder = builder.header(crate::infra::models::header::HEADER, value);
-            }
-        }
-    }
     if has_body {
         let total = body.len() as u64;
         let stream = async_stream::stream! {

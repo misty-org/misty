@@ -6,6 +6,10 @@ single explicitly selected Composio tool and single-step server-side Midscene
 planner are gone. That plan's security invariants are listed below and still
 apply.
 
+Since October 31, 2026 the runtime and every model call run on the person's computer, on
+the device's own models; the server never calls a model or holds a key. Where this brief
+says the server runtime calls a model or reads a route, read [runtime.md](runtime.md).
+
 ## Goal
 
 One sentence should be enough. For example:
@@ -572,10 +576,23 @@ Supersedes "Misty's own keys" above and the house model.
   the account's latest copy in memory only, picks each role's model from it at admission, and
   hands the credential to the runtime with the call (one-shot calls) or from the `model-provider`
   route (agent runs). The runtime never writes it to workflow history, logs or errors.
-- A server may set its own `MISTY_AGENT_MODEL` and provider keys for accounts whose devices send
-  none. With neither, AI answers 409 `model_key_needed`.
+- Only the development eval stack sets its own `MISTY_AGENT_MODEL` and provider keys; a server
+  stack refuses them. With no device keys, AI answers 409 `model_key_needed`.
 - Admission, holds, reservations, usage ceilings, plan tiers and the billing service are gone.
   Model IDs are any `provider/model`; there is no catalog to validate against.
+
+### No server model path (October 31, 2026)
+
+Supersedes "Every model call uses the AI SDK", the screen-model pass-through above and the
+development eval stack.
+
+- The server never calls a model. `internal/modelruntime`, `aimodels`, `byok`, the old Go agent
+  loop and its providers, the push mode (`MISTY_AGENT_RUNTIME_URL`) and the eval stack's
+  runtime container are gone. Every run and every one-shot call runs on the desktop's runtime,
+  on the device's keys ([runtime.md](runtime.md)).
+- The screen planner, companion pointing, dictation cleanup, voice, follow-up routing and
+  page-state restore are device calls (`/v1/device/*`). The conversation model picker and the
+  companion's model setting are gone with the server's model list.
 
 ### Schedules belong to workflows (October 5, 2026)
 

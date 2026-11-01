@@ -6,6 +6,7 @@ import {
   resolveRequiredApiBase,
 } from "@/api/client";
 import { cachedRequest } from "@/api/cache/cached-request";
+import { accountLimitMessages } from "@/api/client/accountLimits";
 import {
   isSpaceReferenceOnly,
   isSpaceWriteRequest,
@@ -120,12 +121,12 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
       "You have reached this server’s owned Space limit. Delete an owned Space permanently before creating another.",
     default_space_protected:
       "Your default Space can’t be deleted or transferred. It keeps your account usable.",
-    owner_storage_quota_exceeded:
-      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
+    owner_storage_quota_exceeded: accountLimitMessages.owner_storage_quota_exceeded!,
     space_storage_quota_exceeded:
       "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
-    storage_limit_reached:
-      "Your cloud storage is full. Free some storage to add more. Existing files remain available.",
+    storage_limit_reached: accountLimitMessages.storage_limit_reached!,
+    account_suspended: accountLimitMessages.account_suspended!,
+    account_closing: accountLimitMessages.account_closing!,
     model_key_needed: "Add a model key in Settings → Models.",
     library_uploads_disabled: "Library uploads are temporarily unavailable.",
     library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",

@@ -121,7 +121,10 @@ function DownloadRow(props: {
   const openable = entry.state === "finished" && entry.exists;
   return (
     <ListRow className="flex-wrap items-start py-2.5">
-      <Download className="mt-1 size-5 shrink-0 text-cream-muted" aria-hidden="true" />
+      {/* The same 24px icon cell and 16px glyph as History and Bookmarks rows. */}
+      <span className="mt-0.5 grid size-6 shrink-0 place-items-center text-cream-muted">
+        <Download className="size-4" aria-hidden="true" />
+      </span>
       <div className="min-w-0 flex-1 basis-40">
         <ListRowButton
           className={cn(

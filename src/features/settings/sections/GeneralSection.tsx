@@ -23,7 +23,7 @@ export function GeneralSection(props: SettingsContentProps) {
             description={
               launchOnLoginUnsupported
                 ? "Unavailable on this platform."
-                : "Start Misty automatically when you sign in to this device."
+                : "Start Misty when you sign in to this computer."
             }
           >
             <SwitchControl
@@ -33,22 +33,14 @@ export function GeneralSection(props: SettingsContentProps) {
             />
           </SettingsRow>
         }
-        <SettingsRow
-          label="Reopen last session"
-          description="Return to whichever view you were last in instead of a fixed one."
-        >
+        <SettingsRow label="Reopen last session">
           <SwitchControl
             checked={reopenLastSession}
             disabled={props.working}
             onChange={(value) => props.onSettingChange("general", "reopen_last_session", value)}
           />
         </SettingsRow>
-        <SettingsRow
-          label="Otherwise open"
-          description="The view Misty starts on when it is not reopening your last session."
-          muted={reopenLastSession}
-          indent
-        >
+        <SettingsRow label="Otherwise open" muted={reopenLastSession} indent>
           <SelectControl
             value={startupViewOption(
               numberSetting(props.document, "general", "startup_view_index", 0),

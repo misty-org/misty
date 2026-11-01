@@ -45,7 +45,7 @@ export function ApprovalActions({
         ) : null}
       </div>
       {remember ? (
-        <p className="text-[11px] leading-4 text-cream-muted">
+        <p className="text-2xs leading-4 text-cream-muted">
           Remember: {scope}
           {request.paymentCap ? ` (each payment up to ${formatCap(request.paymentCap)})` : ""}.
           {request.permissionMode === "ask"

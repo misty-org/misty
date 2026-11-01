@@ -5,7 +5,7 @@ import * as React from "react";
 const toneClasses: Record<StateTone, string> = {
   empty: "text-cream",
   error: "text-cream-bright",
-  permission: "text-sage-fg",
+  permission: "text-cream",
   loading: "text-cream",
 };
 

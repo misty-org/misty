@@ -102,7 +102,7 @@ export function FilePathControl(props: {
     <div className="grid w-[240px] min-w-0 max-w-full justify-items-end gap-2">
       <span
         className={cn(
-          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px]",
+          "max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-md",
           props.disabled || !props.value ? "text-cream-muted" : "text-cream",
         )}
         title={props.value || props.emptyLabel || "None"}
@@ -147,7 +147,7 @@ export function CopyableValueText(props: { value: string; disabled?: boolean }) 
     <span className="flex min-w-0 max-w-[360px] items-center justify-end gap-2">
       <span
         className={cn(
-          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-[15px]",
+          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-md",
           props.disabled ? "text-cream-muted" : "text-cream",
         )}
         title={props.value}

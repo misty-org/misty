@@ -154,8 +154,8 @@ export function BrowserSearchDialog() {
         style={anchor ? overAddressBar(anchor) : undefined}
         className={cn(
           anchor ? "max-w-none" : "max-w-[700px]",
-          "gap-0 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 p-0",
-          "ring-0 shadow-[0_24px_70px_rgba(0,0,0,0.65)] [&>[data-slot=dialog-close]]:hidden",
+          "gap-0 overflow-hidden rounded-xl border border-charcoal-border bg-charcoal-card p-0",
+          "ring-0 shadow-2xl [&>[data-slot=dialog-close]]:hidden",
         )}
       >
         <DialogTitle className="sr-only">Search or enter a URL</DialogTitle>
@@ -172,7 +172,7 @@ export function BrowserSearchDialog() {
           }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            <Search size={16} className="shrink-0 text-zinc-400" aria-hidden="true" />
+            <Search size={16} className="shrink-0 text-cream-muted" aria-hidden="true" />
             <Input
               variant="bare"
               autoFocus
@@ -183,7 +183,7 @@ export function BrowserSearchDialog() {
               onKeyDown={onKeyDown}
               autoComplete="off"
               spellCheck={false}
-              className="flex-1 text-zinc-100 placeholder:text-zinc-500"
+              className="flex-1 text-cream-bright placeholder:text-cream-muted"
             />
             <IconButton
               label="Open in new tab"
@@ -194,14 +194,14 @@ export function BrowserSearchDialog() {
               <ArrowUpRight size={18} />
             </IconButton>
           </div>
-          <div className="border-b border-white/[0.08]" />
+          <div className="border-b border-charcoal-border" />
           {error && (
             <p role="alert" className="px-4 py-2 text-xs text-destructive">
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="px-4 py-2 text-xs text-zinc-400">
+            <p role="status" className="px-4 py-2 text-xs text-cream-muted">
               {notice}
             </p>
           )}

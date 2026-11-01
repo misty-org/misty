@@ -1,4 +1,3 @@
-import { assistantApi } from "@/api/assistant/api";
 import { currentLessonConversation } from "../lessons/lessonEntry";
 import { frontMediaContext } from "./mediaContext";
 import { useDevicePreferences } from "@/features/settings/preferenceAccess";
@@ -202,16 +201,4 @@ async function listenToNative(
   if (s.disposed) return;
   s.nativeReady = true;
   s.change({});
-  void assistantApi
-    .frontierModels()
-    .then((catalog) => {
-      if (!s.disposed)
-        s.change({
-          models: catalog.models.map((m) => ({
-            id: m.id,
-            name: m.name,
-          })),
-        });
-    })
-    .catch(() => {});
 }

@@ -33,7 +33,7 @@ import { initialsForProfile } from "./helpers";
 
 function Initials(props: { children: string }) {
   return (
-    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-charcoal-active text-[10px] font-bold text-cream">
+    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-charcoal-active text-3xs font-bold text-cream">
       {props.children}
     </span>
   );
@@ -148,7 +148,7 @@ function ProfileMenuItems(props: {
                 }
                 shortcut={
                   saved.id === account?.id ? (
-                    <Check className="size-3.5 text-sage-fg" aria-label="Active account" />
+                    <Check className="size-3.5 text-cream-bright" aria-label="Active account" />
                   ) : undefined
                 }
                 onSelect={(event) => {

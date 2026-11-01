@@ -38,18 +38,18 @@ export function SummarizedDivider() {
       role="separator"
       aria-label="Earlier messages summarized"
       title="Misty keeps the messages above as summarized notes to stay within its context."
-      className="flex items-center gap-3 text-[11px] text-cream-muted"
+      className="flex items-center gap-3 text-2xs text-cream-muted"
     >
-      <span aria-hidden className="h-px flex-1 bg-white/10" />
+      <span aria-hidden className="h-px flex-1 bg-charcoal-border" />
       <span>Earlier messages summarized</span>
-      <span aria-hidden className="h-px flex-1 bg-white/10" />
+      <span aria-hidden className="h-px flex-1 bg-charcoal-border" />
     </div>
   );
 }
 
 export function MistyAvatar() {
   return (
-    <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-blue-400/10 ring-1 ring-white/5">
+    <span className="grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-cream/[0.06] ring-1 ring-white/5">
       <img src={mistyCompanion} alt="Misty" className="size-7 object-contain" draggable={false} />
     </span>
   );

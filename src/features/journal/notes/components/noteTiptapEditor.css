@@ -52,7 +52,7 @@
   font-size: 16px;
   line-height: 1.72;
   color: var(--color-cream);
-  caret-color: #8b7cf6;
+  caret-color: var(--color-cream-bright);
 }
 .misty-tiptap-prosemirror > * {
   position: relative;
@@ -106,7 +106,7 @@
   gap: 0.55rem;
 }
 .misty-tiptap-prosemirror a {
-  color: #a99bf8;
+  color: var(--color-cream-bright);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;

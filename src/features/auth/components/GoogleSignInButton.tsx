@@ -90,9 +90,15 @@ export default function GoogleSignInButton({
     }
   }
 
+  // The "or" rule belongs to the button: with Google sign-in off, nothing dangles under the form.
   if (!available) return null;
   return (
     <div className="flex flex-col gap-2">
+      <div className="mb-2 flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
+        <span className="h-px flex-1 bg-charcoal-border" />
+        or
+        <span className="h-px flex-1 bg-charcoal-border" />
+      </div>
       <Button
         type="button"
         variant="outline"
@@ -105,7 +111,7 @@ export default function GoogleSignInButton({
       </Button>
       {pending ? (
         <>
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-cream-muted">
             Finish signing in in your browser, then return to Misty.
           </p>
           {awaitingCode ? (
@@ -126,7 +132,7 @@ export default function GoogleSignInButton({
                   event.preventDefault();
                   submitCode();
                 }}
-                className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-faint"
+                className="h-11 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
               />
               {codeError ? <p className="text-sm text-cream-muted">{codeError}</p> : null}
               <Button type="button" variant="outline" onClick={submitCode}>

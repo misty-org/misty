@@ -8,7 +8,7 @@ export function BrowserNativeRuntimeRequired(props: { url: string; onOpenExterna
       data-testid="browser-native-runtime-required"
     >
       <div className="flex w-full max-w-md flex-col items-center text-center">
-        <div className="mb-5 grid size-12 place-items-center rounded-xl bg-charcoal-card text-sage-fg">
+        <div className="mb-5 grid size-12 place-items-center rounded-xl bg-charcoal-card text-cream-muted">
           <ShieldCheck className="size-6" aria-hidden="true" />
         </div>
         <h1 className="text-base font-semibold tracking-[-0.02em] text-cream-bright">

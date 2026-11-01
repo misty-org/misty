@@ -7,18 +7,11 @@ import type { SettingsContentProps } from "../settingsTypes";
 export function SyncRestoreSettings(props: SettingsContentProps & { compact?: boolean }) {
   const density = props.compact ? "compact" : "normal";
   return (
-    <SettingsSectionBlock
-      title="Switching devices"
-      description="Choose what Misty restores when you open this workspace on another device. These controls only affect page state."
-      density={density}
-    >
+    <SettingsSectionBlock title="Switching devices" density={density}>
       <SettingsRow
         label="Restore page state when switching devices"
         density={density}
-        description={
-          "Bring back half-filled forms, open sections and scroll position on the device " +
-          "you switch to. Passwords and payment details are never saved."
-        }
+        description="Forms, open sections and scroll position. Never passwords."
       >
         <SwitchControl
           checked={booleanSetting(props.document, "privacy", "page_state_restore", true)}
@@ -29,10 +22,7 @@ export function SyncRestoreSettings(props: SettingsContentProps & { compact?: bo
       <SettingsRow
         label="Let agents finish restoring"
         density={density}
-        description={
-          "When fields only appear after a click, Misty's agent fills them in. Those field " +
-          "values go through Misty's server to the AI provider and are not stored."
-        }
+        description="Field values pass through Misty's server and are not stored."
       >
         <SwitchControl
           checked={
@@ -48,7 +38,7 @@ export function SyncRestoreSettings(props: SettingsContentProps & { compact?: bo
       <SettingsRow
         label="Don't capture page state on these sites"
         density={density}
-        description="One site per line. Subdomains are included. Only the address and scroll position are kept."
+        description="One per line. Covers subdomains."
         stacked
       >
         <TextAreaControl
