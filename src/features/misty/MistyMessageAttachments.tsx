@@ -42,10 +42,10 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
     <img
       src={source}
       alt={attachment.name}
-      className="max-h-64 min-h-24 w-full rounded-xl border border-white/10 object-cover"
+      className="max-h-64 min-h-24 w-full rounded-xl border border-charcoal-border object-cover"
     />
   ) : (
-    <span className="grid min-h-24 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-cream-muted">
+    <span className="grid min-h-24 place-items-center rounded-xl border border-charcoal-border bg-cream/[0.03] text-cream-muted">
       <ImageIcon className="size-5" />
     </span>
   );

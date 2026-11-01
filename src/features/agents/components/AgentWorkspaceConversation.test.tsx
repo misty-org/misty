@@ -129,7 +129,6 @@ describe("Agents workspace conversations", () => {
       {
         executionMode: "user",
         interactionMode: "auto",
-        model: "",
       },
     );
     // Typing here never goes through the cursor companion.

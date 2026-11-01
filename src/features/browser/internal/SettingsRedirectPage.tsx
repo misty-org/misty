@@ -1,9 +1,10 @@
+import { openSettings, type SettingsSection } from "@/features/settings";
 import { Button, EmptyState } from "@/shared/ui";
 import { useEffect, type ReactNode } from "react";
 import { InternalPageFrame } from "./InternalPageFrame";
 
 /** The misty:// pages whose content moved into Settings, and where each one leads. */
-const redirects = {
+export const settingsRedirects = {
   extensions: {
     section: "browser-extensions",
     title: "Extensions",
@@ -18,20 +19,22 @@ const redirects = {
     action: "Open Passwords settings",
   },
   settings: {
-    section: "browser",
-    title: "Browser settings",
-    description: "Manage your browser preferences in Settings.",
-    action: "Open Browser settings",
+    section: "general",
+    title: "Settings",
+    description: "Browser preferences live in Settings.",
+    action: "Open Settings",
   },
-} as const;
-
-function openSettings(section: string) {
-  window.dispatchEvent(new CustomEvent("misty:open-settings", { detail: { section } }));
-}
+} as const satisfies Record<
+  string,
+  { section: SettingsSection; title: string; description: string; action: string }
+>;
 
 /** Opens the page's Settings section on arrival, with a button to open it again. */
-export function SettingsRedirectPage(props: { page: keyof typeof redirects; actions?: ReactNode }) {
-  const redirect = redirects[props.page];
+export function SettingsRedirectPage(props: {
+  page: keyof typeof settingsRedirects;
+  actions?: ReactNode;
+}) {
+  const redirect = settingsRedirects[props.page];
   useEffect(() => openSettings(redirect.section), [redirect.section]);
   return (
     <InternalPageFrame title={redirect.title} actions={props.actions}>

@@ -31,7 +31,7 @@ export default function AuthField({
         required={required}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 bg-transparent px-3.5 text-cream placeholder:text-cream-faint"
+        className="h-10 bg-transparent px-3.5 text-cream placeholder:text-cream-muted"
       />
     </div>
   );

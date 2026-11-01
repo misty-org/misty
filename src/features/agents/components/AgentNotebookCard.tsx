@@ -18,7 +18,7 @@ export function AgentNotebookCard({ notebook }: { notebook: AgentNotebook }) {
           state="plain"
           sub={notebook.noteId ? "Also saved as a note in your personal Space." : undefined}
         >
-          <div className="misty-markdown-message text-[13px] leading-5 text-cream">
+          <div className="misty-markdown-message text-ui leading-5 text-cream">
             <MistyMarkdown>{findings}</MistyMarkdown>
           </div>
         </StatusRow>

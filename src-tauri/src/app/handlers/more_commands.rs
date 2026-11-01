@@ -228,7 +228,6 @@ macro_rules! with_more_commands {
             crate::app::clipboard_commands::clipboard_cloud_copy,
             crate::app::clipboard_commands::clipboard_cloud_save,
             crate::app::shortcut_commands::shortcuts_replace,
-            crate::telemetry::telemetry_set_error_reporting_enabled,
         ]
     };
 }

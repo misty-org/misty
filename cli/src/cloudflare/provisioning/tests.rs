@@ -22,9 +22,8 @@ fn rerunning_setup_preserves_unrelated_routes() {
 const ACCOUNT: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const ZONE: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-fn options(target: Target, apply: bool) -> Options {
+fn options(apply: bool) -> Options {
     Options {
-        target,
         apply,
         account: None,
         zone: None,
@@ -76,7 +75,7 @@ impl Cloudflare {
         }
     }
     fn run(&mut self, workspace: &Workspace, options: Options) -> Result<()> {
-        let values = environment::read(workspace, options.target)?;
+        let values = environment::read(workspace, Target::Dev)?;
         provision(
             workspace,
             options,
@@ -93,84 +92,11 @@ impl Cloudflare {
 }
 
 #[test]
-fn production_preview_has_no_remote_or_local_writes_and_no_worker_dependency() {
-    let temporary = tempfile::tempdir().unwrap();
-    let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
-    let mut cloudflare = Cloudflare::default();
-    cloudflare
-        .run(&workspace, options(Target::Prod, false))
-        .unwrap();
-    assert!(cloudflare.only_reads());
-    assert!(!workspace.server.exists());
-    assert!(!cloudflare
-        .calls
-        .iter()
-        .any(|(_, path)| path.contains("workers")));
-}
-
-#[test]
-fn production_apply_is_isolated_and_repeatable() {
-    let temporary = tempfile::tempdir().unwrap();
-    let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
-    environment::set(
-        &workspace,
-        Target::Dev,
-        "CLOUDFLARE_TUNNEL_TOKEN",
-        "unchanged-dev-token",
-    )
-    .unwrap();
-    let dev_path = environment::root(&workspace, Target::Dev).join("integrations/cloudflare.env");
-    let dev_before = std::fs::read(&dev_path).unwrap();
-    environment::set(&workspace, Target::Prod, "MISTY_HOST_PORT", "9081").unwrap();
-    environment::set(
-        &workspace,
-        Target::Prod,
-        "MISTY_CLOUDFLARE_WORKER_HOST",
-        "preserved.workers.dev",
-    )
-    .unwrap();
-    let mut cloudflare = Cloudflare::default();
-    cloudflare
-        .run(&workspace, options(Target::Prod, true))
-        .unwrap();
-    assert_eq!(
-        cloudflare.config["config"]["ingress"][0]["service"],
-        "http://127.0.0.1:9081"
-    );
-    assert_eq!(cloudflare.tunnels[0]["name"], "misty-prod-api-example-com");
-    assert_eq!(std::fs::read(dev_path).unwrap(), dev_before);
-    let saved = environment::read(&workspace, Target::Prod).unwrap();
-    assert_eq!(saved["CLOUDFLARE_TUNNEL_TOKEN"], "fixture-connector-token");
-    assert_eq!(saved["MISTY_PUBLIC_API_URL"], "https://api.example.com/v1");
-    assert_eq!(
-        saved["MISTY_CLOUDFLARE_WORKER_HOST"],
-        "preserved.workers.dev"
-    );
-    assert!(!saved.contains_key("MISTY_DEV_API_ORIGIN"));
-    assert!(!saved.contains_key("MISTY_DEV_API_TUNNEL_HOSTNAME"));
-    assert!(!cloudflare
-        .calls
-        .iter()
-        .any(|(_, path)| path.contains("workers")));
-    let config_before = cloudflare.config.clone();
-    cloudflare.calls.clear();
-    let mut rerun = options(Target::Prod, true);
-    rerun.hostname = None;
-    cloudflare.run(&workspace, rerun).unwrap();
-    assert_eq!(cloudflare.config, config_before);
-    assert_eq!(cloudflare.tunnels.len(), 1);
-    assert_eq!(cloudflare.dns.len(), 1);
-    assert!(!cloudflare.calls.iter().any(|(method, _)| method == "POST"));
-}
-
-#[test]
 fn development_still_provisions_worker_configuration_and_container_origin() {
     let temporary = tempfile::tempdir().unwrap();
     let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
     let mut cloudflare = Cloudflare::default();
-    cloudflare
-        .run(&workspace, options(Target::Dev, true))
-        .unwrap();
+    cloudflare.run(&workspace, options(true)).unwrap();
     let values = environment::read(&workspace, Target::Dev).unwrap();
     assert_eq!(
         values["MISTY_CLOUDFLARE_WORKER_HOST"],
@@ -182,11 +108,27 @@ fn development_still_provisions_worker_configuration_and_container_origin() {
         cloudflare.config["config"]["ingress"][0]["service"],
         "http://misty-api:8080"
     );
-    assert!(!environment::root(&workspace, Target::Prod).exists());
 }
 
 #[test]
-fn conflicting_dns_or_development_tunnel_is_rejected_before_writes() {
+fn development_rerun_is_repeatable() {
+    let temporary = tempfile::tempdir().unwrap();
+    let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
+    let mut cloudflare = Cloudflare::default();
+    cloudflare.run(&workspace, options(true)).unwrap();
+    let config_before = cloudflare.config.clone();
+    cloudflare.calls.clear();
+    let mut rerun = options(true);
+    rerun.hostname = None;
+    cloudflare.run(&workspace, rerun).unwrap();
+    assert_eq!(cloudflare.config, config_before);
+    assert_eq!(cloudflare.tunnels.len(), 1);
+    assert_eq!(cloudflare.dns.len(), 1);
+    assert!(!cloudflare.calls.iter().any(|(method, _)| method == "POST"));
+}
+
+#[test]
+fn conflicting_dns_is_rejected_before_writes() {
     let temporary = tempfile::tempdir().unwrap();
     let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
     let mut cloudflare = Cloudflare {
@@ -194,40 +136,9 @@ fn conflicting_dns_or_development_tunnel_is_rejected_before_writes() {
         ..Default::default()
     };
     assert!(cloudflare
-        .run(&workspace, options(Target::Prod, true))
+        .run(&workspace, options(true))
         .unwrap_err()
         .to_string()
         .contains("DNS hostname"));
     assert!(cloudflare.only_reads());
-    cloudflare.dns.clear();
-    cloudflare.tunnels.push(json!({"name":"misty-prod-api-example-com", "id":"fixture-tunnel", "config_src":"cloudflare"}));
-    cloudflare.config = json!({"config":{"ingress":[{"hostname":"dev-api.example.com", "service":"http://misty-api:8080"},{"service":"http_status:404"}]}});
-    let before = cloudflare.config.clone();
-    assert!(cloudflare
-        .run(&workspace, options(Target::Prod, true))
-        .unwrap_err()
-        .to_string()
-        .contains("serves development"));
-    assert!(cloudflare.only_reads());
-    assert_eq!(cloudflare.config, before);
-    assert!(!workspace.server.exists());
-}
-
-#[test]
-fn production_requires_its_own_hostname_and_valid_port() {
-    let mut options = options(Target::Prod, false);
-    options.hostname = None;
-    let mut values = BTreeMap::from([(
-        "MISTY_DEV_API_TUNNEL_HOSTNAME".into(),
-        "dev-api.example.com".into(),
-    )]);
-    assert!(selected_hostname(&options, &values).is_err());
-    assert_eq!(
-        service(Target::Prod, &values).unwrap(),
-        "http://127.0.0.1:8081"
-    );
-    for port in ["0", "65536", "bad"] {
-        values.insert("MISTY_HOST_PORT".into(), port.into());
-        assert!(service(Target::Prod, &values).is_err());
-    }
 }

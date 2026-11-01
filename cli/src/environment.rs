@@ -20,19 +20,17 @@ pub use validate::*;
 #[cfg(test)]
 mod tests;
 
+/// The CLI configures development only. A server is deployed with
+/// server/compose.yml and its setup container (docs/self-hosting.md).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Target {
     Dev,
-    Staging,
-    Prod,
 }
 
 impl Target {
     pub fn label(self) -> &'static str {
         match self {
             Self::Dev => "dev",
-            Self::Staging => "staging",
-            Self::Prod => "prod",
         }
     }
 }
@@ -73,12 +71,9 @@ fn initial_file_contents(spec: FileSpec, target: Target) -> String {
         match spec.path {
             "runtime.env" => return "# Container development defaults.\nMISTY_ENVIRONMENT=development\nMISTY_HOST_PORT=8081\n".into(),
             "crypto/services.env" => { use base64::Engine; return format!("# Generated once; preserve across restarts.\nMISTY_AUTH_SIGNING_KEY={}\nMISTY_AGENT_RUNTIME_CONTROL_SECRET={}\n", base64::engine::general_purpose::STANDARD.encode(random_hex(32)), base64::engine::general_purpose::STANDARD.encode(random_hex(32))); },
-            "database.env" => return format!("# Generated once; preserve these with the database volume.\nDB_USER=misty_app\nDB_NAME=misty_server\nDB_MIGRATION_USER=misty\nDB_PASSWORD={}\nDB_MIGRATION_PASSWORD={}\nAGENT_RUNTIME_DB_PASSWORD={}\n", random_hex(32), random_hex(32), random_hex(32)),
+            "database.env" => return format!("# Generated once; preserve these with the database volume.\nDB_USER=misty_app\nDB_NAME=misty_server\nDB_MIGRATION_USER=misty\nDB_PASSWORD={}\nDB_MIGRATION_PASSWORD={}\n", random_hex(32), random_hex(32)),
             _ => {}
         }
-    }
-    if target == Target::Staging && spec.path == "storage.env" {
-        return "# Private, staging-only Library files on this host.\nMISTY_LIBRARY_BACKEND=filesystem\nMISTY_LIBRARY_FILESYSTEM_DIR=/var/lib/misty/library\n".into();
     }
     String::new()
 }
@@ -164,21 +159,13 @@ pub fn apply(workspace: &Workspace, target: Target) -> Result<()> {
     Ok(())
 }
 
-/// Every variable accepted by a scoped server environment file.
-pub fn registered_names() -> Vec<&'static str> {
-    FILES
-        .iter()
-        .flat_map(|spec| spec.names.iter().copied())
-        .collect()
-}
-
 fn cli_owner(name: &str) -> Result<&'static str> {
     if name.starts_with("TAURI_")
         || name.starts_with("APPLE_")
         || name.starts_with("WINDOWS_")
         || name.starts_with("MISTY_CODESIGN_")
         || name.starts_with("MISTY_NOTARY_")
-        || matches!(name, "MISTY_RELEASE_API_URL" | "MISTY_RELEASE_WEB_URL")
+        || name == "MISTY_RELEASE_WEB_URL"
     {
         return Ok("release.env");
     }
@@ -220,8 +207,6 @@ fn ownership() -> Result<BTreeMap<&'static str, &'static str>> {
 fn required(target: Target) -> &'static [&'static str] {
     match target {
         Target::Dev => DEV_REQUIRED,
-        Target::Staging => STAGING_REQUIRED,
-        Target::Prod => PROD_REQUIRED,
     }
 }
 
@@ -235,9 +220,7 @@ pub fn schema_json() -> serde_json::Value {
                 serde_json::json!({
                     "file": spec.path,
                     "name": name,
-                    "required": DEV_REQUIRED.contains(name)
-                        || STAGING_REQUIRED.contains(name)
-                        || PROD_REQUIRED.contains(name),
+                    "required": DEV_REQUIRED.contains(name),
                 })
             })
         })

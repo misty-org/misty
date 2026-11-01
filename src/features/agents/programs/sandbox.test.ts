@@ -12,6 +12,15 @@ beforeAll(() =>
 const deadline = () => Date.now() + 10_000;
 
 describe("browser_run sandbox", () => {
+  it("points a program that doesn't parse at the spot that broke", async () => {
+    const code = `const t = await openTab("https://a.test");\nreturn { url: t.url title: t.title };`;
+    const result = await runInSandbox(programPrelude, code, async () => null, {
+      deadline: deadline(),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("at line 2, column");
+    expect(result.error).toContain("return { url: t.url title: t.title };\n                    ^");
+  });
   it("runs a program against the page API and returns its value", async () => {
     const calls: Array<[string, Record<string, unknown>]> = [];
     const host = async (name: string, args: Record<string, unknown>) => {
@@ -96,10 +105,22 @@ describe("browser_run sandbox", () => {
       if (name === "text") return { url: "https://cars.test", title: "Cars", text: "RAV4" };
       return { ok: true, args };
     };
-    const missing = await runInSandbox(programPrelude, `const t = await getTab("cars"); await t.evaluate("1");`, host, { deadline: deadline() });
+    const missing = await runInSandbox(
+      programPrelude,
+      `const t = await getTab("cars"); await t.evaluate("1");`,
+      host,
+      { deadline: deadline() },
+    );
     expect(missing).toMatchObject({ ok: false });
-    expect(JSON.stringify(missing)).toMatch(/tab\.evaluate\(\) does not exist\. A tab has: read, text/);
-    const unawaited = await runInSandbox(programPrelude, `await getTab("cars").clickOn("Search");`, host, { deadline: deadline() });
+    expect(JSON.stringify(missing)).toMatch(
+      /tab\.evaluate\(\) does not exist\. A tab has: read, text/,
+    );
+    const unawaited = await runInSandbox(
+      programPrelude,
+      `await getTab("cars").clickOn("Search");`,
+      host,
+      { deadline: deadline() },
+    );
     expect(JSON.stringify(unawaited)).toMatch(/tab\.clickOn\(\) does not exist/);
     const mapped = await runInSandbox(
       programPrelude,
@@ -109,7 +130,9 @@ describe("browser_run sandbox", () => {
     );
     expect(mapped).toMatchObject({ ok: true, value: "RAV4" });
     expect(calls).toContain("goto");
-    await runInSandbox(programPrelude, `await getTab("cars").close();`, host, { deadline: deadline() });
+    await runInSandbox(programPrelude, `await getTab("cars").close();`, host, {
+      deadline: deadline(),
+    });
     expect(calls).toContain("close");
   });
 

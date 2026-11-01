@@ -89,7 +89,7 @@ export function AgentAvatarPicker({
                     <span className="text-xs font-medium text-cream leading-none">
                       {variant.name}
                     </span>
-                    <span className="text-[13px] text-cream-muted leading-tight">
+                    <span className="text-ui text-cream-muted leading-tight">
                       {variant.expression}
                     </span>
                   </Toggle>

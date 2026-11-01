@@ -370,6 +370,40 @@
     return "";
   };
 
+  /** What a page keeps in collapsed sections: a closed <details>, or an accordion panel whose
+   * toggle says it is collapsed. Hidden, it never reaches the page's text, and a run read "the
+   * page does not mention salary reviews" off a page whose closed benefits panel said so
+   * (Odysseys, October 29). Menus, navigation and dialogs are not content and stay out. */
+  P.collapsedText = (limit = 8000) => {
+    const out = [];
+    const seen = new Set();
+    let chars = 0;
+    const chrome = "nav,header,footer,[role=navigation],[role=menu],[role=menubar],[role=dialog],[role=listbox],[role=tooltip]";
+    const add = (label, text, el) => {
+      if (!el || seen.has(el) || chars >= limit || el.closest(chrome)) return;
+      seen.add(el);
+      const flat = (text || "").replace(/\s+/g, " ").trim();
+      if (flat.length < 20) return;
+      const line = `- ${label ? `${P.clip(label.replace(/\s+/g, " ").trim(), 80)}: ` : ""}${P.clip(flat, 1500)}`;
+      chars += line.length + 1;
+      out.push(line);
+    };
+    for (const details of document.querySelectorAll("details:not([open])")) {
+      const summary = details.querySelector(":scope > summary");
+      const body = [...details.childNodes].filter((node) => node !== summary).map((node) => node.textContent || "").join(" ");
+      add(summary?.textContent || "", body, details);
+    }
+    for (const toggle of document.querySelectorAll('[aria-expanded="false"]')) {
+      if (toggle.closest(chrome)) continue;
+      const ids = (toggle.getAttribute("aria-controls") || "").split(/\s+/).filter(Boolean);
+      const panels = ids.length ? ids.map((id) => document.getElementById(id))
+        : [toggle.nextElementSibling, toggle.parentElement?.nextElementSibling];
+      const panel = panels.find((el) => el && P.hidden(el) && !el.contains(toggle));
+      if (panel) add(P.name(toggle), panel.textContent, panel);
+    }
+    return out.length ? out.join("\n") : "";
+  };
+
   /** Readable Markdown of the page for a model to extract from. */
   P.markdown = (args) => {
     const built = P.build(document, { maxRefs: 0 });
@@ -400,6 +434,8 @@
       }
     };
     walk(built.tree, "");
-    return { ok: true, url: location.href, title: document.title || "", markdown: out.join("\n").replace(/\n{3,}/g, "\n\n").trim(), truncated };
+    let collapsed = "";
+    try { collapsed = P.collapsedText(); } catch { collapsed = ""; }
+    return { ok: true, url: location.href, title: document.title || "", markdown: out.join("\n").replace(/\n{3,}/g, "\n\n").trim(), truncated, collapsed };
   };
 })(globalThis.__mistyAgentPageV1 ??= {});

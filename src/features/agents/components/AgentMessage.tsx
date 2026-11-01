@@ -113,8 +113,8 @@ function AgentMessageView(props: AgentMessageProps) {
         ) : null}
         <div
           className={cn(
-            "max-w-[82%] rounded-2xl rounded-br-md border border-white/5 bg-charcoal-card",
-            "px-4 py-3 text-[14px] leading-6 text-cream shadow-sm",
+            "max-w-[82%] rounded-2xl rounded-br-md border border-charcoal-border/60 bg-charcoal-card",
+            "px-4 py-3 text-sm leading-6 text-cream shadow-sm",
           )}
         >
           <MistyMessageAttachments attachments={message.attachments} />
@@ -159,7 +159,7 @@ function AgentMessageView(props: AgentMessageProps) {
         {message.subagents?.length ? <AgentSubagents subagents={message.subagents} /> : null}
         {message.notebook ? <AgentNotebookCard notebook={message.notebook} /> : null}
         {content ? (
-          <div className="misty-markdown-message text-[14px] leading-6 text-cream">
+          <div className="misty-markdown-message text-sm leading-6 text-cream">
             <MistyMarkdown>{content}</MistyMarkdown>
             <LinkPreviews
               text={content}

@@ -15,8 +15,6 @@ export function toServerInvocation(input: AiInvocationRequest) {
     schedule_id: input.scheduleId,
     schedule_claim: input.scheduleClaim,
     skill_version_ids: input.skillVersionIds,
-    companion_model: input.companionModel,
-    model_override: input.modelOverride,
     collaboration_mode: input.collaborationMode,
     lesson: input.lesson,
     lesson_index: input.lessonIndex,

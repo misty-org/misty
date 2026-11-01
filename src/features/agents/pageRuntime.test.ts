@@ -269,6 +269,19 @@ describe("agent page runtime", () => {
     expect(result.markdown).toContain("| Max | $20 |");
   });
 
+  it("hands over what collapsed sections hold, but not menus", () => {
+    const page = load(`<h2>Benefits</h2>
+      <details><summary>Pay</summary><p>Annual salary review for every graduate.</p></details>
+      <button aria-expanded="false" aria-controls="perks">Perks</button>
+      <div id="perks" hidden>Twenty-six days of holiday plus bank holidays.</div>
+      <nav><button aria-expanded="false" aria-controls="menu">Menu</button>
+      <ul id="menu" hidden><li>Careers home and every other section</li></ul></nav>`);
+    const { collapsed } = page.call("markdown", { maxChars: 10000 });
+    expect(collapsed).toContain("- Pay: Annual salary review for every graduate.");
+    expect(collapsed).toContain("- Perks: Twenty-six days of holiday plus bank holidays.");
+    expect(collapsed).not.toContain("Careers home");
+  });
+
   it("truncates long pages with a marker instead of failing", () => {
     const page = load(
       Array.from({ length: 400 }, (_, i) => `<p>Paragraph ${i} with some words</p>`).join(""),

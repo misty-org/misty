@@ -20,8 +20,19 @@
   --misty-theme-text-bright: #f1f1f1;
   --misty-theme-text-muted: #8c8c8c;
   --misty-theme-danger: #c94747;
-  --misty-theme-sage: #a3bfab;
-  --misty-theme-sage-bg: #28312b;
+}
+
+/* Type. One system face for the whole interface and one monospace face for code, URLs and
+   codes. Sizes are a fixed scale: 3xs 10 · 2xs 11 · xs 12 · ui 13 (controls) · sm 14 ·
+   md 15 (page text) · base 16 · lg 18 · xl 20 · 2xl 24 · 3xl 30. Use these, never `text-[Npx]`.
+   The added steps set only the size, so line height still comes from `leading-*` or the parent. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --text-3xs: 10px;
+  --text-2xs: 11px;
+  --text-ui: 13px;
+  --text-md: 15px;
 }
 
 @theme inline {
@@ -48,10 +59,8 @@
   --color-control-hover: color-mix(in srgb, var(--misty-theme-text) 10%, transparent);
   --color-control-active: color-mix(in srgb, var(--misty-theme-text) 16%, transparent);
   --color-notification-red: var(--misty-theme-danger);
-
-  --color-sage-fg: var(--misty-theme-sage);
-  --color-sage-bg: var(--misty-theme-sage-bg);
-  --color-status-green: var(--misty-theme-sage);
+  /* Ink for text on a colored chip (a tab group's label and swatches), dark on every theme. */
+  --color-ink-on-color: #202124;
 
   /* Item-type glyph tones (see src/shared/ui/icons/itemTones.ts). Mixed toward
      the theme text so they soften on dark themes and deepen on light ones. */

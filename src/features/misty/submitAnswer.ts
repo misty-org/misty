@@ -203,7 +203,6 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
       attachments,
       selection,
       companion,
-      requestState,
       requestAgentId,
       handoff,
       executionMode,

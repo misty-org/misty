@@ -22,7 +22,7 @@ export function BrowserViewportSizeSliders(props: {
       {axes.map(({ axis, label }) => {
         const range = browserViewportRanges[props.device][axis];
         return (
-          <div key={axis} className="flex items-center gap-2.5 text-[11px] text-cream-muted">
+          <div key={axis} className="flex items-center gap-2.5 text-2xs text-cream-muted">
             <span className="w-3 font-medium">{label}</span>
             <Slider
               min={range.min}

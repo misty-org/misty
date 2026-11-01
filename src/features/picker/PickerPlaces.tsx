@@ -58,7 +58,7 @@ export function PickerPlaces(props: PickerPlacesProps) {
 function PlacesSection({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <section className="grid gap-0.5">
-      <h3 className="px-2 pb-1 text-[11px] font-medium text-cream-muted">{label}</h3>
+      <h3 className="px-2 pb-1 text-2xs font-medium text-cream-muted">{label}</h3>
       {children}
     </section>
   );

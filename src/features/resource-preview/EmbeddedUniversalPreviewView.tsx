@@ -123,7 +123,7 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (resource?.kind === "text")
     return (
-      <pre className="m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-7 text-left font-mono text-[13px] leading-6 text-cream/80">
+      <pre className="m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-7 text-left font-mono text-ui leading-6 text-cream/80">
         {resource.text}
       </pre>
     );
@@ -132,7 +132,7 @@ export function EmbeddedUniversalPreviewView(props: {
       <article
         className={cn(
           "mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10",
-          "py-12 text-left font-serif text-[16px] leading-8 text-cream/80",
+          "py-12 text-left text-base leading-8 text-cream/80",
         )}
       >
         {resource.text || "This document contains no readable text."}

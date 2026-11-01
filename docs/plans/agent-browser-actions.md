@@ -216,9 +216,10 @@ proof, instead of a vague "could not complete".
 
 ## 9. The benchmark package
 
-Today the evals sit under `server/apps/agent-runtime/evals/` (odysseys, code, voice, pointing,
-free-model), run with vitest, and reach the desktop through a debug-only bridge.
-They share a judge, spend and watchdog code and are tied to the runtime's package. Split them:
+The evals that sat under `server/apps/agent-runtime/evals/` (odysseys, voice, pointing,
+free-model) were removed on October 31, 2026, with the server-side runtime they drove; their code
+is in git history. They shared a judge, spend and watchdog code and were tied to the runtime's
+package. Rebuild them on the desktop runtime as their own package:
 
 ```
 benchmarks/                 own package.json, own tsconfig, no import from src/ or server/
@@ -228,7 +229,7 @@ benchmarks/                 own package.json, own tsconfig, no import from src/ 
     ...                     one adapter per outside harness, for comparison runs
   suites/
     obstacles/              new: fixtures and live pages (below)
-    odysseys/               moved from evals/odysseys
+    odysseys/               rebuilt from the removed evals/odysseys
     online-mind2web/        later
     webvoyager/             later
     bu-bench-v1/            later; researched when we add it
@@ -239,8 +240,8 @@ benchmarks/                 own package.json, own tsconfig, no import from src/ 
   can also run against another agent for comparison.
 - Each suite declares its tasks, a judge (rubric, deterministic check, or both), and a cost cap.
   The three tiers in the harness plan (iterate on Nemotron, check with an official judge, report) stay.
-- The repo's runtime-specific evals that are not browser (code, voice, pointing, free-model) move
-  later or stay; Odysseys moves first.
+- The runtime-specific evals that are not browser (voice, pointing, free-model) come back later;
+  Odysseys comes first.
 - Local checks stay local (no CI), run from the Mac like releases.
 
 ### The obstacles suite (new)

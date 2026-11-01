@@ -1,26 +1,20 @@
+import { deviceModelCall } from "@/api/device-models";
+
 export function createAgentsApi(
   apiRequest: <T = void>(path: string, init?: RequestInit) => Promise<T>,
 ) {
   return {
-    realtimeVoiceTicket: (deviceId: string, signal?: AbortSignal) =>
-      apiRequest<{ ticket: string; expires_in: number }>("/agent-voice/realtime/ticket", {
-        method: "POST",
-        signal,
-        body: JSON.stringify({ device_id: deviceId }),
-      }),
     run: <T>(runId: string) => apiRequest<T>(`/agent-runs/${encodeURIComponent(runId)}`),
+    /** Transcribes a spoken request on this computer's transcription model. */
     transcribeVoice: async (audio: Blob, durationMs: number, signal?: AbortSignal) =>
-      apiRequest<{ transcript: string; detected_language: string; duration_ms: number }>(
-        "/agent-voice/transcriptions",
+      deviceModelCall<{ transcript: string; detected_language: string; duration_ms: number }>(
+        "voice-transcription",
         {
-          signal,
-          method: "POST",
-          body: JSON.stringify({
-            audio_base64: arrayBufferToBase64(await audio.arrayBuffer()),
-            mime_type: audio.type || "audio/webm",
-            duration_ms: durationMs,
-          }),
+          audio_base64: arrayBufferToBase64(await audio.arrayBuffer()),
+          mime_type: audio.type || "audio/webm",
+          duration_ms: durationMs,
         },
+        signal,
       ),
   };
 }

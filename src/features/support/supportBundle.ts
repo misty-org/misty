@@ -1,5 +1,5 @@
-import { clientMetadata } from "@/telemetry/metadata";
-import { redactRecord } from "@/telemetry/redaction";
+import { clientMetadata } from "./clientMetadata";
+import { redactRecord } from "./redaction";
 import { readClientDebugEvents } from "@/shared/platform/clientDebug";
 
 import { readSystemErrors } from "./systemErrors";

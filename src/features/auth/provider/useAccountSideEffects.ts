@@ -2,10 +2,7 @@ import { apiSessionInvalidEvent, readApiAuthToken } from "@/api/client/session";
 import { isLocalProfile, profileIdFor, restoreAccountWorkspace } from "@/features/workspace";
 import { continueWithTemporaryWorkspace } from "@/features/workspace/nativeWorkspaceRecovery";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
-import { analytics } from "@/telemetry/client";
-import { TelemetryIdentityManager } from "@/telemetry/identity";
-import { setAnalyticsAuthenticationState, setTelemetryAccountPresent } from "@/telemetry/lifecycle";
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import {
   assertAccountIdentity,
   clearStoredUser,
@@ -48,21 +45,6 @@ export function useNativeWorkspaceRecovery(
       canceled = true;
     };
   }, [activeUserId, accountOperationActive]);
-}
-
-/** Keeps analytics identity in step with the verified account. */
-export function useTelemetryIdentitySync(activeUser: AuthUser | null) {
-  const verifiedAccountId = useUserStore((state) => state.me?.id);
-  const [telemetryIdentity] = useState(() => new TelemetryIdentityManager(analytics));
-  // Without an account nothing is sent at all.
-  useEffect(() => setTelemetryAccountPresent(Boolean(activeUser)), [activeUser]);
-  useEffect(() => {
-    // Saved display metadata is not proof that the new server cookies work.
-    // Wait for /me before issuing authenticated telemetry requests.
-    const verifiedUser = activeUser?.id === verifiedAccountId ? activeUser : null;
-    setAnalyticsAuthenticationState(Boolean(verifiedUser));
-    telemetryIdentity.sync(verifiedUser);
-  }, [activeUser, verifiedAccountId, telemetryIdentity]);
 }
 
 /** Mirrors the active user into (or out of) local storage. */

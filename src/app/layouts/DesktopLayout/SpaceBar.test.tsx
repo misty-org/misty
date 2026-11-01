@@ -140,7 +140,7 @@ it("slides the bar at a steady pace in whole pixels, holding the page its full s
   expect(Math.max(...steps)).toBeLessThanOrEqual(Math.min(...steps) * 2);
   advance(300);
   expect(browserSlideExtra()).toBe(0);
-  expect(row.style.height).toBe("calc(var(--pane-frame, 6px) + 36px)");
+  expect(row.style.height).toBe("calc(var(--shell-edge, 6px) + 36px)");
   expect(resumed).toHaveBeenCalledTimes(2);
   window.removeEventListener("misty:browser-runtime-resume", resumed);
 });

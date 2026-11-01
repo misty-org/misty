@@ -1,7 +1,8 @@
 //! The browser benchmark's way into Misty's own browser (debug builds only).
 //!
-//! `server/apps/agent-runtime/evals/odysseys` runs a real model against real
-//! pages. With this bridge each task runs in a Misty tab, in the system
+//! The Odysseys eval (removed October 31, 2026, docs/agents/evals/odysseys.md)
+//! ran a real model against real pages through it; evals rebuilt on the desktop
+//! runtime can use it again. With this bridge each task runs in a Misty tab, in the system
 //! webview (WKWebView on macOS, WebView2 on Windows), through the same agent
 //! path production uses: a native task lease, a grant for the tab, and
 //! `browser_agent_execute` with its page layer, site checks and input rules.

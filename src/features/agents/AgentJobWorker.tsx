@@ -3,6 +3,8 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { DesktopAgentJobWorker } from "./worker";
+import { RuntimeDeliveryWorker } from "./runtimeDeliveries";
+import { DeviceEmbeddingWorker } from "./deviceEmbeddings";
 import { endAllHostedSessions } from "./hostedSessions";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "./localExecution";
@@ -35,10 +37,18 @@ export function AgentJobWorker() {
     if (!hasTauriInternals() || !host || !user?.id) return;
     let canceled = false;
     let worker: DesktopAgentJobWorker | null = null;
+    let runtime: RuntimeDeliveryWorker | null = null;
+    let embeddings: DeviceEmbeddingWorker | null = null;
     void readAccountAuthToken().then((token) => {
       if (canceled || !token) return;
       worker = new DesktopAgentJobWorker();
       worker.start(user.id);
+      // Agent runs themselves work on this computer's own runtime.
+      runtime = new RuntimeDeliveryWorker();
+      runtime.start(user.id);
+      // So do the vectors search and memory rank by.
+      embeddings = new DeviceEmbeddingWorker();
+      embeddings.start();
       // Old project switches become remembered approvals, once.
       void import("./coding/projectMigration")
         .then(({ migrateProjectSwitches }) => migrateProjectSwitches())
@@ -54,6 +64,8 @@ export function AgentJobWorker() {
     return () => {
       canceled = true;
       worker?.stop();
+      runtime?.stop();
+      embeddings?.stop();
       unwatch();
       // The agent's own sessions end with this account here.
       void endAllHostedSessions();

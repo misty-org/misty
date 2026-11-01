@@ -211,9 +211,6 @@ export interface AiInvocationRequest {
   methodInputs?: Record<string, string | number | boolean>;
   skillVersionIds?: string[];
   companionMode?: "team" | "auto";
-  companionModel?: string;
-  /** Pins a new conversation's Thinking model with its first message. */
-  modelOverride?: string;
   displayCaptures?: DisplayCapture[];
   agentId?: string;
   taskId?: string;

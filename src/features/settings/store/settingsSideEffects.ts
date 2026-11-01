@@ -27,7 +27,6 @@ import { configureBrowserMouseGestures } from "@/features/webviews/mouseGestures
 import { configureHiddenTabSleep } from "@/features/webviews/hiddenTabSleep";
 import { configureTabArchive } from "@/features/workspace/tabArchiveSettings";
 import { configureExternalLinks } from "@/features/workspace/externalLinkSettings";
-import { telemetryPreferencesChanged } from "@/telemetry/lifecycle";
 import { invoke } from "@/native/invoke";
 import { configureLinkPreviews } from "@/features/link-preview/settings";
 import { settingsBoolean, settingsNumber, settingsString } from "./preferences";
@@ -70,10 +69,6 @@ export function applySettingsSideEffects(
   } catch {
     /* Invalid legacy data uses the last applied presets. */
   }
-  telemetryPreferencesChanged(
-    settingsBoolean(document, "privacy", "anonymous_usage_analytics_enabled", false),
-    settingsBoolean(document, "privacy", "anonymous_error_reporting_enabled", false),
-  );
   configurePageRestore({
     enabled: settingsBoolean(document, "privacy", "page_state_restore", true),
     agent: settingsBoolean(document, "privacy", "page_state_agent_restore", true),

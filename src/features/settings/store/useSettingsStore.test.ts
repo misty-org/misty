@@ -29,7 +29,6 @@ vi.mock("@/features/webviews/browserRuntime", () => ({
   setBrowserDownloadPrompt: vi.fn(),
   setBrowserStatusBubbleEnabled: vi.fn(),
 }));
-vi.mock("@/telemetry/lifecycle", () => ({ telemetryPreferencesChanged: vi.fn() }));
 import { registerPreferenceWriter } from "../devicePreferences/bridge";
 import { useSettingsStore as store } from "./useSettingsStore";
 import { useDockingLayoutStore } from "@/features/app-shell/dockingLayout";

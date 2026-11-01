@@ -13,6 +13,7 @@ import {
   type ProgressStep,
   type ProgressTool,
 } from "./progressTimeline";
+import { usageLimitNotice, usageLimitNotices } from "./usageLimits";
 
 /**
  * How a reply got its answer, kept quiet: the whole timeline folds into one line that opens to
@@ -32,6 +33,12 @@ export function AgentProgress({ items, live = true }: { items: AiProgressItem[];
       <MistyMarkdown>{group.text}</MistyMarkdown>
     </div>
   );
+  // A used-up monthly allowance stays in view below the folded work, said plainly.
+  const limits = usageLimitNotices(items).map((text) => (
+    <p key={text} className="agent-progress-note">
+      {text}
+    </p>
+  ));
   const timeline = groups
     .filter((group) => group !== plan)
     .map((group) =>
@@ -42,7 +49,13 @@ export function AgentProgress({ items, live = true }: { items: AiProgressItem[];
       ),
     );
   // Narration with no tools is just Misty talking: it stays in the transcript.
-  if (!steps) return <div className="agent-progress">{timeline}</div>;
+  if (!steps)
+    return (
+      <div className="agent-progress">
+        {timeline}
+        {limits}
+      </div>
+    );
   const latest = toolGroups[toolGroups.length - 1]!;
   return (
     <div className="agent-progress">
@@ -58,6 +71,7 @@ export function AgentProgress({ items, live = true }: { items: AiProgressItem[];
       >
         <div className="agent-progress-timeline">{timeline}</div>
       </WorkGroup>
+      {limits}
     </div>
   );
 }
@@ -125,7 +139,7 @@ function stepOutput(step: ProgressStep): ReactNode {
   if (state === "failed")
     parts.push(
       <p key="why" className="agent-progress-why">
-        {error || "This step didn't finish."}
+        {usageLimitNotice(error) ?? (error || "This step didn't finish.")}
       </p>,
     );
   if (activity?.rows?.length)

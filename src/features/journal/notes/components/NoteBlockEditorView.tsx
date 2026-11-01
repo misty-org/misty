@@ -1,4 +1,3 @@
-import { collaborationOffMessage } from "@/features/collaboration/collaborationOff";
 import { cn, SkeletonDocument } from "@/shared/ui";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { JSONContent } from "@tiptap/react";
@@ -39,17 +38,10 @@ function CollaborativeNoteEditor(
     spaceId: string;
   },
 ) {
-  const { session, error, notice, localOnly } = props.runtime.useCollaborationRoom(
+  const { session, error, notice } = props.runtime.useCollaborationRoom(
     props.spaceId,
     props.noteId,
   );
-  if (localOnly)
-    return (
-      <div className="relative h-full">
-        <p className="m-0 mb-3 text-sm text-cream-muted">{collaborationOffMessage}</p>
-        <MistyTipTapEditor {...props} editable={false} readOnlyReason={collaborationOffMessage} />
-      </div>
-    );
   if (error) {
     return (
       <>

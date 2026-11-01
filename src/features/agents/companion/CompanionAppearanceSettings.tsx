@@ -21,14 +21,8 @@ export function CompanionAppearanceSettings() {
     void companionControl(value).catch((reason) => setError(String(reason)));
   };
   return (
-    <DesktopSettingsSection
-      title="Misty at your cursor"
-      description="Misty stays beside your pointer, including outside the app. Changes apply at once and stay on this device."
-    >
-      <DesktopSettingsRow
-        label="Show beside your cursor"
-        description="Turn off to keep Misty out of the way until you call it."
-      >
+    <DesktopSettingsSection title="Cursor">
+      <DesktopSettingsRow label="Show beside your cursor">
         <Switch
           aria-label="Show cursor companion"
           checked={presentation.showCompanion ?? true}
@@ -36,7 +30,7 @@ export function CompanionAppearanceSettings() {
           onCheckedChange={(visible) => change({ kind: "visibility", visible })}
         />
       </DesktopSettingsRow>
-      <DesktopSettingsRow label="Size" description="How big Misty appears beside your cursor.">
+      <DesktopSettingsRow label="Size">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center" aria-hidden="true">
             <img
@@ -56,7 +50,7 @@ export function CompanionAppearanceSettings() {
             disabled={!control}
             onValueChange={([next]) => change({ kind: "size", size: next })}
           />
-          <span className="w-10 text-right text-[14px] tabular-nums text-cream-muted">{size}%</span>
+          <span className="w-10 text-right text-sm tabular-nums text-cream-muted">{size}%</span>
           <Button
             variant="ghost"
             size="sm"
@@ -68,7 +62,7 @@ export function CompanionAppearanceSettings() {
         </div>
       </DesktopSettingsRow>
       {error && (
-        <p role="alert" className="border-t border-charcoal-border py-3 text-[14px] text-cream">
+        <p role="alert" className="border-t border-charcoal-border py-3 text-sm text-cream">
           {error}
         </p>
       )}

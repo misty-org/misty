@@ -60,7 +60,7 @@ export function LibraryTextPreview({
     );
   if (kind === "markdown")
     return (
-      <div className={cn(frame, "p-3 text-[11px] leading-snug [&_h1]:text-sm [&_h2]:text-xs")}>
+      <div className={cn(frame, "p-3 text-2xs leading-snug [&_h1]:text-sm [&_h2]:text-xs")}>
         <MistyMarkdown>{text.slice(0, 4000)}</MistyMarkdown>
       </div>
     );
@@ -68,7 +68,7 @@ export function LibraryTextPreview({
     const rows = csvPreview(text);
     return (
       <div className={cn(frame, "p-2")}>
-        <table className="w-full table-fixed border-collapse text-[10px]">
+        <table className="w-full table-fixed border-collapse text-3xs">
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex} className={rowIndex ? "" : "font-semibold text-cream-bright"}>
@@ -89,7 +89,7 @@ export function LibraryTextPreview({
   }
   const head = text.split("\n").slice(0, 18).join("\n");
   return (
-    <pre className={cn(frame, "m-0 p-3 font-mono text-[10px] leading-snug")}>
+    <pre className={cn(frame, "m-0 p-3 font-mono text-3xs leading-snug")}>
       {codeTokens(head).map((token, index) => (
         <span key={index} className={tokenClass[token.kind]}>
           {token.text}

@@ -20,6 +20,8 @@ beforeEach(async () => {
   Object.defineProperty(navigator, "platform", { configurable: true, value: "MacIntel" });
   mocks.invoke.mockResolvedValue(undefined);
   mocks.request.mockResolvedValue(undefined);
+  mocks.deviceCall.mockReset();
+  mocks.deviceCall.mockResolvedValue(undefined);
   mocks.deviceSnapshot.mockResolvedValue({ device: { id: "device" } });
   mocks.cancel.mockResolvedValue(undefined);
   mocks.state.invocationId = undefined;
@@ -263,8 +265,8 @@ describe("model-led follow-ups", () => {
     await startLocalExecution("owner", "agent");
     const submit = vi.fn();
     useCompanionState.setState({ accountId: "owner", submit });
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup" ? { route: "steer" } : undefined,
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "steer" } : undefined,
     );
     await routeLocalFollowup("Explain this problem on my screen");
     expect(submit).not.toHaveBeenCalled();
@@ -273,19 +275,23 @@ describe("model-led follow-ups", () => {
   });
   it("quiesces execution before interpreting a correction", async () => {
     await startLocalExecution("owner", "agent");
-    mocks.request.mockImplementation(async (path: string) => {
-      if (path === "/misty/agent-followup") {
+    mocks.deviceCall.mockImplementation(async (name: string) => {
+      if (name === "follow-up") {
         expect(useLocalExecution.getState().execution?.state).toBe("paused");
         return { route: "steer" };
       }
     });
     await routeLocalFollowup("Use Friday instead");
+    expect(mocks.deviceCall).toHaveBeenCalledWith("follow-up", {
+      conversation: [],
+      new_message: "Use Friday instead",
+    });
     expect(mocks.state.submitAnswer).toHaveBeenCalledWith("Use Friday instead");
   });
   it("queues an independent outcome and resumes the existing task", async () => {
     await startLocalExecution("owner", "agent");
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup" ? { route: "queue" } : undefined,
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "queue" } : undefined,
     );
     await routeLocalFollowup("Then organize a separate event");
     expect(mocks.invoke).toHaveBeenCalledWith("agent_foreground_queue", {
@@ -300,8 +306,8 @@ describe("model-led follow-ups", () => {
   });
   it("leaves an explicit stop paused without submitting more work", async () => {
     await startLocalExecution("owner", "agent");
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup" ? { route: "stop" } : undefined,
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up" ? { route: "stop" } : undefined,
     );
     await expect(routeLocalFollowup("Cancel this task")).resolves.toContain("not been undone");
     expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
@@ -310,8 +316,8 @@ describe("model-led follow-ups", () => {
   it("does not apply a late interpretation after the user stops again", async () => {
     await startLocalExecution("owner", "agent");
     let resolve!: (value: { route: string }) => void;
-    mocks.request.mockImplementation(async (path: string) =>
-      path === "/misty/agent-followup"
+    mocks.deviceCall.mockImplementation(async (name: string) =>
+      name === "follow-up"
         ? new Promise((done) => {
             resolve = done;
           })
@@ -326,7 +332,7 @@ describe("model-led follow-ups", () => {
   });
   it("does not continue when the routing service is unavailable", async () => {
     await startLocalExecution("owner", "agent");
-    mocks.request.mockRejectedValue(new Error("offline"));
+    mocks.deviceCall.mockRejectedValue(new Error("offline"));
     await expect(routeLocalFollowup("Use Friday")).rejects.toThrow("offline");
     expect(mocks.state.submitAnswer).not.toHaveBeenCalled();
     expect(useLocalExecution.getState().execution?.state).toBe("paused");

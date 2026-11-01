@@ -1,4 +1,4 @@
-/** Agent-restore limits. The server enforces the step and daily caps too. */
+/** Agent-restore limits, kept on this device. */
 export const RESTORE_LIMITS = {
   stepsPerTab: 8,
   tabsPerSwitch: 3,
@@ -26,7 +26,7 @@ export function reserveAgentRestore(usedThisSwitch: number, now = Date.now()): b
   try {
     localStorage.setItem(KEY, JSON.stringify([...runs, now]));
   } catch {
-    // Storage may be unavailable; the server's daily cap still applies.
+    // Storage may be unavailable; the per-switch cap still applies.
   }
   return true;
 }

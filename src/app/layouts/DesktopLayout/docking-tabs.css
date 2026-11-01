@@ -28,14 +28,14 @@
 }
 .misty-workspace-favorite:hover,
 .misty-workspace-favorite[data-menu-open] {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
 }
 .misty-workspace-favorite[data-active] {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
 }
 .misty-workspace-favorite:focus-visible {
   outline: none;
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
 }
 
 /* The tab sidebar: roomy. Favorites are a four-column tile grid, tabs are 40px
@@ -59,10 +59,10 @@
 .misty-workspace-tabs
   .misty-workspace-favorites-grid
   .misty-workspace-favorite:is(:hover, [data-menu-open]) {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
 }
 .misty-workspace-tabs .misty-workspace-favorites-grid .misty-workspace-favorite[data-active] {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
 }
 .misty-workspace-tabs .misty-workspace-tab-list {
   gap: 2px;
@@ -86,9 +86,11 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  /* The plus and label line up with the favicons and titles of the tab rows below, whose
+     1px border sits outside their 8px padding and 6px gap. */
+  gap: 6px;
   height: var(--shell-tab-height, 34px);
-  padding: 0 8px;
+  padding: 0 8px 0 9px;
   border-radius: 8px;
   font-size: 13px;
   color: var(--workspace-tab-muted, var(--color-cream-muted));
@@ -96,7 +98,7 @@
 }
 /* New Tab reads as a tab row: the same hover wash and text, without a close button. */
 .misty-workspace-new-tab-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
   color: var(--workspace-tab-text, var(--color-cream));
 }
 .misty-workspace-new-tab-row:focus-visible {
@@ -116,7 +118,7 @@
   align-content: start;
   border: 0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
 }
 /* Until a favorite exists the container takes no room and draws nothing. */
 .misty-workspace-tabs .misty-workspace-favorites-grid[data-empty] {
@@ -131,7 +133,7 @@
   top: 0;
   z-index: 1;
   margin: 0 0 2px;
-  padding: 0 8px;
+  padding: 0 8px 0 9px;
   width: 100%;
   background: var(--misty-tab-well);
 }
@@ -139,7 +141,11 @@
    beneath the sticky row never show through. */
 .misty-workspace-tabs .misty-workspace-new-tab-row:is(:hover, :focus-visible) {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)), var(--misty-tab-well);
+    linear-gradient(
+      color-mix(in srgb, var(--misty-theme-text) 5%, transparent),
+      color-mix(in srgb, var(--misty-theme-text) 5%, transparent)
+    ),
+    var(--misty-tab-well);
   color: var(--workspace-tab-text, var(--color-cream));
 }
 
@@ -166,8 +172,8 @@
   background: transparent;
 }
 .misty-workspace-tabs .misty-workspace-tab:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
 }
 .misty-workspace-tabs .misty-workspace-tab[data-active="true"] {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
 }

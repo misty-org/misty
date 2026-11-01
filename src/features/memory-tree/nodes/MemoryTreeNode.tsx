@@ -78,13 +78,13 @@ export function MemoryTreeNode({ data }: NodeProps<MemoryFlowNode>) {
               >
                 <NodeGlyph node={node} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-cream-bright">
+                  <span className="block truncate text-ui font-medium text-cream-bright">
                     {label}
                   </span>
-                  <span className="block truncate text-[11px] text-cream-muted">{subtitle}</span>
+                  <span className="block truncate text-2xs text-cream-muted">{subtitle}</span>
                 </span>
                 {leaf && (
-                  <span className="shrink-0 text-[11px] tabular-nums text-cream-muted">
+                  <span className="shrink-0 text-2xs tabular-nums text-cream-muted">
                     {formatWhen(node.last_at)}
                   </span>
                 )}

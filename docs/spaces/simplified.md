@@ -31,6 +31,12 @@ Space rail or tool strip.
 
 - A Space has an **owner and members**. Only the owner invites, removes people
   or deletes the Space. There are no roles and no per-member permissions.
+- **An invitation is how new people join a server.** After a server's first account, an email
+  address can create an account only while a Space invitation to it is pending
+  ([../self-hosting.md](../self-hosting.md#accounts)). The server sends no email: inviting
+  answers with the invitation's link (`misty://open/invite/…`), which the invite dialog shows
+  with a Copy button for the owner to send. Pending invitations offer **New link**, which
+  replaces the old link and shows the new one the same way.
 - **Agents are members under a person.** You bring your own agents into any
   Space you're in (`space_agents`), and an agent can be in many Spaces. The
   member list shows each person with their agents under them. When a person

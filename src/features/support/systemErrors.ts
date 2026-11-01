@@ -1,4 +1,4 @@
-import { redactText } from "@/telemetry/redaction";
+import { redactText } from "./redaction";
 import { createElement, useEffect } from "react";
 
 export interface SystemErrorInput {

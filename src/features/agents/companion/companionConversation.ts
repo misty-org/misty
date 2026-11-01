@@ -15,7 +15,12 @@ interface Options {
   onTranscript: (id: string, text: string) => void;
   onError: (error: Error) => void;
   onExpired: () => void;
+  /** The ID of the task a tool started or acted on; for get_task_status, the status as JSON. */
   tool: (tool: ConversationTool, conversationId: string) => Promise<string | undefined>;
+  /** The chat's recent turns (JSON) and its current task, which the voice may read. */
+  context: (conversationId: string) => { history: string; task: string };
+  /** A finished task's saved answer, to read aloud. */
+  taskResult: (invocationId: string) => string;
 }
 
 /** Persistent, push-to-talk conversation; transport loss never replays work. */
@@ -54,9 +59,7 @@ export class CompanionConversation {
   private async connect() {
     this.conversationId = await this.options.conversation();
     this.current();
-    this.socket = await openVoiceSocket(this.conversationId, this.connectAbort.signal, () =>
-      this.current(),
-    );
+    this.socket = await openVoiceSocket(() => this.current());
     this.socket.onmessage = ({ data }) => {
       if (this.closed) return;
       try {
@@ -151,7 +154,7 @@ export class CompanionConversation {
     await this.beginning;
     this.current();
     this.committed = true;
-    this.send({ type: "task.read", invocationId });
+    this.send({ type: "task.read", invocationId, result: this.options.taskResult(invocationId) });
     this.deadline(90_000);
     return this.done.promise;
   }
@@ -183,6 +186,7 @@ export class CompanionConversation {
     switch (e.type) {
       case "ready":
         clearTimeout(this.timer);
+        this.send({ type: "context", ...this.options.context(this.conversationId) });
         this.ready.resolve();
         this.ping = setInterval(() => {
           try {
@@ -238,7 +242,11 @@ export class CompanionConversation {
           .tool(tool, this.conversationId)
           .then((id) => {
             if (!this.closed && !this.canceled && generation === this.generation)
-              this.send({ type: "tool.result", callId: tool.callId, invocationId: id ?? "" });
+              this.send(
+                tool.name === "get_task_status"
+                  ? { type: "tool.result", callId: tool.callId, invocationId: "", result: id ?? "" }
+                  : { type: "tool.result", callId: tool.callId, invocationId: id ?? "" },
+              );
           })
           .catch(() => {
             if (!this.closed && !this.canceled && generation === this.generation)

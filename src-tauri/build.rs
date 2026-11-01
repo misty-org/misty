@@ -145,11 +145,7 @@ fn expose_public_app_configuration() {
         .unwrap_or_else(|| PathBuf::from("."));
     let app_env_path = manifest_dir.parent().unwrap_or(Path::new(".")).join(".env");
     println!("cargo:rerun-if-changed={}", app_env_path.display());
-    for key in [
-        "POSTHOG_PROJECT_TOKEN",
-        "POSTHOG_HOST",
-        "MISTY_RELEASE_CHANNEL",
-    ] {
+    for key in ["MISTY_RELEASE_CHANNEL"] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)
             .ok()

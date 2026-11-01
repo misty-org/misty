@@ -1,36 +1,3 @@
-/* The website's hero highlight: an italic serif word on a hand-drawn pastel marker, tilted a
-   little like a stroke made by hand. Colors match misty-website's midnight.css. */
-.misty-welcome-marker {
-  position: relative;
-  z-index: 0;
-  padding: 0 0.1em 0 0.06em;
-  background: none;
-  color: var(--misty-theme-text-bright);
-  white-space: nowrap;
-  line-height: 1;
-  font-family: "Instrument Serif", Georgia, serif;
-  font-size: 1.1em;
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-.misty-welcome-marker::before {
-  content: "";
-  position: absolute;
-  inset: 0.12em 0 0.04em;
-  z-index: -1;
-  border-radius: 0.1em 0.18em 0.12em 0.2em;
-  background: var(--marker);
-  transform: rotate(-1.5deg) skewX(-8deg);
-  opacity: 0.5;
-}
-.misty-welcome-marker[data-tone="yellow"] {
-  --marker: #f0d58c;
-}
-.misty-welcome-marker[data-tone="blue"] {
-  --marker: #a0c4d4;
-}
-
 /* Page transition: a page's content (not the bar) fades and rises into place. Opacity and transform only,
    so it runs on the compositor; a blur filter made it stutter in WebKit. */
 .misty-page-in {

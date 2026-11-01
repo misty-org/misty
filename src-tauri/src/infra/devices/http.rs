@@ -25,6 +25,20 @@ impl std::fmt::Display for DeviceHttpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Status(401, _) => write!(f, "Sign in again to manage devices."),
+            // The account limits a server sets (docs/cloud/README.md), worded as the app's
+            // `src/api/client/accountLimits.ts` words them.
+            Self::Status(403, code) if code == "account_suspended" => write!(
+                f,
+                "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Cloud, write to support@mistysys.com."
+            ),
+            Self::Status(403, code) if code == "account_closing" => write!(
+                f,
+                "This account is closing and is read-only. You can still open and export everything until it is deleted. Subscribe again to keep it."
+            ),
+            Self::Status(409, code) if code == "device_limit_reached" => write!(
+                f,
+                "This account has as many devices as its plan allows. Remove one you no longer use in Settings › Devices, then try again."
+            ),
             Self::Status(403, code) if code == "device_removed" => {
                 write!(f, "This device was removed from your account.")
             }
@@ -238,4 +252,23 @@ async fn read_limited(mut response: reqwest::Response) -> Result<Vec<u8>, Device
         bytes.extend_from_slice(&chunk);
     }
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DeviceHttpError;
+
+    #[test]
+    fn account_limits_say_what_to_do_next() {
+        let limit = DeviceHttpError::Status(409, "device_limit_reached".into()).to_string();
+        assert!(limit.contains("Settings › Devices"), "{limit}");
+        let suspended = DeviceHttpError::Status(403, "account_suspended".into()).to_string();
+        assert!(suspended.contains("suspended"), "{suspended}");
+        let closing = DeviceHttpError::Status(403, "account_closing".into()).to_string();
+        assert!(closing.contains("read-only"), "{closing}");
+        assert_eq!(
+            DeviceHttpError::Status(409, "device_list_conflict".into()).to_string(),
+            "Your devices changed. Try again."
+        );
+    }
 }

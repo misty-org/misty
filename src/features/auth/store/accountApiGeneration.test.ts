@@ -23,11 +23,6 @@ vi.mock("@/api/client/session", () => ({
   readApiSessionGeneration: () => mocks.generation,
   isApiSignedOut: () => false,
 }));
-vi.mock("@/telemetry/client", () => ({
-  analytics: {
-    isAnalyticsEnabled: () => false,
-  },
-}));
 describe("account API generation isolation", () => {
   beforeEach(() => {
     mocks.generation = 0;

@@ -55,7 +55,7 @@ export function SyncStatusView({
           <Icon aria-hidden className="size-4 shrink-0" />
           {status.title}
         </h2>
-        <p className="mt-1 text-[13px] leading-5 text-cream-muted">{status.detail}</p>
+        <p className="mt-1 text-ui leading-5 text-cream-muted">{status.detail}</p>
       </div>
       {status.action && !hideAction && (
         <Button variant="outline" size="sm" disabled={busy} onClick={onAction}>

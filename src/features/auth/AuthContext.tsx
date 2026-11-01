@@ -11,7 +11,6 @@ import {
   useSavedAccountListSync,
   useStartupSessionValidation,
   useStoredUserPersistence,
-  useTelemetryIdentitySync,
 } from "./provider/useAccountSideEffects";
 import { useAccountSwitching } from "./provider/useAccountSwitching";
 import { useAuthenticateAccount } from "./provider/useAuthenticateAccount";
@@ -51,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authenticateAccount = useAuthenticateAccount(activeUser, operation, setters);
   const refreshUser = useRefreshUser(activeUser, accountOperationActive, setUserState);
   useNativeWorkspaceRecovery(activeUser?.id, accountOperationActive);
-  useTelemetryIdentitySync(activeUser);
   useStoredUserPersistence(activeUser);
   useSavedAccountListSync(activeUser, setAccounts);
   useStartupSessionValidation(activeUser, operation, setters, markSessionExpired);

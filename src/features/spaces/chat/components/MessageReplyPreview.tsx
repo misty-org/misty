@@ -30,7 +30,7 @@ export function MessageReplyPreview({
         <span className="absolute left-[21px] top-3 h-5 w-[37px] rounded-tl-md border-l-2 border-t-2 border-cream-muted/55" />
       </div>
       <Pressable
-        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden text-[13px] leading-5 text-cream-muted hover:text-cream"
+        className="flex min-w-0 items-center gap-1.5 self-start overflow-hidden text-ui leading-5 text-cream-muted hover:text-cream"
         onClick={onOpen}
         aria-label={
           message ? `Jump to ${message.sender_name}'s message` : "Original message unavailable"
@@ -40,7 +40,7 @@ export function MessageReplyPreview({
           <>
             <Avatar className="size-[18px] shrink-0">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
-              <AvatarFallback className="bg-charcoal-card text-cream text-[7px] font-semibold">
+              <AvatarFallback className="bg-charcoal-card text-cream text-3xs font-semibold">
                 {agentAuthored ? "AI" : initials(message.sender_name)}
               </AvatarFallback>
             </Avatar>

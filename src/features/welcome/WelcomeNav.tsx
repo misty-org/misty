@@ -4,14 +4,19 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { IconType } from "react-icons";
 import { FaDiscord, FaGithub, FaInstagram, FaXTwitter, FaYoutube } from "react-icons/fa6";
 
-/** misty-website's navbar socials, with its icons; accounts without a page yet open nothing. */
-const socialLinks: { label: string; icon: IconType; href?: string }[] = [
+/** misty-website's navbar socials, with its icons. Accounts without a page yet stay hidden, so
+ * no button opens nothing; give one an `href` to show it. */
+const socialAccounts: { label: string; icon: IconType; href?: string }[] = [
   { label: "GitHub", icon: FaGithub, href: "https://github.com/misty-org" },
   { label: "X", icon: FaXTwitter },
-  { label: "Discord", icon: FaDiscord },
+  // The community server the repository README links.
+  { label: "Discord", icon: FaDiscord, href: "https://discord.gg/B5WgSw6uX" },
   { label: "YouTube", icon: FaYoutube },
   { label: "Instagram", icon: FaInstagram },
 ];
+const socialLinks = socialAccounts.flatMap((account) =>
+  account.href ? [{ ...account, href: account.href }] : [],
+);
 
 /** The floating bar on every signed-out page: the logo (which goes back when it can) and the socials. */
 export function WelcomeNav({ onBack }: { onBack?: () => void }) {
@@ -42,10 +47,8 @@ export function WelcomeNav({ onBack }: { onBack?: () => void }) {
           <IconButton
             key={label}
             size="sm"
-            label={href ? `Misty on ${label}` : `${label} (coming soon)`}
-            onClick={() => {
-              if (href) void openUrl(href);
-            }}
+            label={`Misty on ${label}`}
+            onClick={() => void openUrl(href)}
           >
             <Icon aria-hidden="true" className="size-3.5" />
           </IconButton>

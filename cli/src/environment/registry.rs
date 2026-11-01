@@ -1,4 +1,6 @@
-//! The environment files Misty manages and the names each target requires.
+//! The development environment files and the names development requires.
+//! A server is configured with the five files under server/.env/ instead
+//! (docs/self-hosting.md).
 
 #[derive(Clone, Copy)]
 pub(super) struct FileSpec {
@@ -11,36 +13,36 @@ pub(super) const FILES: &[FileSpec] = &[
         path: "runtime.env",
         names: &[
             "AUTH_HANDOFF_START_URL",
-            // Optional Compose services, such as `collab` (docs/cloudflare.md).
-            "COMPOSE_PROFILES",
-            // open, first (production default) or closed.
-            "MISTY_REGISTRATION",
-            "MISTY_COLLAB_HOST_PORT",
-            "MISTY_AGENT_RUNTIME_IMAGE",
-            "MISTY_AGENT_RUNTIME_INTERNAL_API_URL",
-            "MISTY_AGENT_RUNTIME_URL",
+            // Bearer token of the operator account API (docs/cloud/README.md).
+            "MISTY_OPERATOR_TOKEN",
             "MISTY_ALLOWED_ORIGINS",
-            "MISTY_API_IMAGE",
             "MISTY_ENVIRONMENT",
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
             "MISTY_PUBLIC_API_URL",
             "MISTY_DEVICE_JOBS_ENABLED",
-            "MISTY_AI_TOOL_RESULT_EVENTS",
-            "MISTY_ALLOW_MODEL_OVERRIDE",
             "MISTY_WEBSITE_URL",
-            "PASSWORD_RESET_START_URL",
-            "PASSWORD_RESET_URL",
             "PORT",
             "TRUST_PROXY_HEADERS",
             "TRUSTED_PROXY_CIDRS",
+            // No longer read: the server sends no email, so there are no
+            // reset or invitation links to address. Kept so existing
+            // development files still load.
+            "PASSWORD_RESET_START_URL",
+            "PASSWORD_RESET_URL",
             "MISTY_INVITATION_URL_BASE",
+            // No longer read: agents and model calls run on the desktop
+            // (docs/agents/runtime.md). Kept so existing development files
+            // still load.
+            "MISTY_AGENT_RUNTIME_URL",
+            "MISTY_AGENT_RUNTIME_INTERNAL_API_URL",
+            "MISTY_ALLOW_MODEL_OVERRIDE",
+            "MISTY_AI_TOOL_RESULT_EVENTS",
         ],
     },
     FileSpec {
         path: "database.env",
         names: &[
-            "AGENT_RUNTIME_DB_PASSWORD",
             "DB_HOST",
             "DB_MIGRATION_PASSWORD",
             "DB_MIGRATION_USER",
@@ -53,36 +55,25 @@ pub(super) const FILES: &[FileSpec] = &[
             "DB_CONN_MAX_LIFETIME",
             "DB_CONN_MAX_IDLE_TIME",
             "DB_USER",
+            // No longer read: there is no workflow database. Kept so existing
+            // development files still load.
+            "AGENT_RUNTIME_DB_PASSWORD",
         ],
     },
     FileSpec {
         path: "storage.env",
         names: &[
-            "MISTY_LIBRARY_BACKEND",
-            "MISTY_LIBRARY_FILESYSTEM_DIR",
-            "MISTY_S3_ACCESS_KEY_ID",
-            "MISTY_S3_BUCKET",
-            "MISTY_S3_ENDPOINT",
-            "MISTY_S3_FORCE_PATH_STYLE",
-            "MISTY_S3_REGION",
-            "MISTY_S3_SECRET_ACCESS_KEY",
             "R2_ACCESS_KEY",
             "R2_BUCKET",
             "R2_ENDPOINT",
             "R2_SECRET_KEY",
             "MISTY_R2_ALLOWED_ORIGINS",
-            "MISTY_BACKUP_BUCKET",
-            "MISTY_BACKUP_AGE_RECIPIENT",
-            "MISTY_BACKUP_R2_ACCESS_KEY",
-            "MISTY_BACKUP_R2_SECRET_KEY",
         ],
     },
     FileSpec {
         path: "observability.env",
         names: &[
             "MISTY_METRICS_TOKEN",
-            "POSTHOG_PROJECT_TOKEN",
-            "POSTHOG_HOST",
             "MISTY_RELEASE_CHANNEL",
             "MISTY_SERVER_VERSION",
         ],
@@ -90,11 +81,19 @@ pub(super) const FILES: &[FileSpec] = &[
     FileSpec {
         path: "integrations/ai.env",
         names: &[
-            "AI_GATEWAY_API_KEY",
-            "AI_GATEWAY_BASE_URL",
-            "MISTY_SERPER_API_KEY",
             "MISTY_RECALL",
             "MISTY_RECALL_BACKLOG_CAP",
+            // No longer read: web search runs on each device, on a search key
+            // the person keeps there (docs/byok.md). Kept so existing
+            // development files still load.
+            "MISTY_SEARCH_PROVIDER",
+            "MISTY_SEARCH_API_KEY",
+            "MISTY_SERPER_API_KEY",
+            // No longer read: the server calls no model and holds no model key;
+            // each device brings its own (docs/byok.md). Kept so existing
+            // development files still load.
+            "AI_GATEWAY_API_KEY",
+            "AI_GATEWAY_BASE_URL",
             "OPENAI_API_KEY",
             "ANTHROPIC_API_KEY",
             "CLAUDE_API_KEY",
@@ -151,6 +150,8 @@ pub(super) const FILES: &[FileSpec] = &[
     },
     FileSpec {
         path: "integrations/composio.env",
+        // MISTY_COMPOSIO_DEPLOYMENT is no longer read; kept so existing
+        // development files still load.
         names: &["MISTY_COMPOSIO_DEPLOYMENT", "MISTY_COMPOSIO_API_KEY"],
     },
     FileSpec {
@@ -158,11 +159,9 @@ pub(super) const FILES: &[FileSpec] = &[
         names: &["MISTY_WEB_FETCH_URL", "MISTY_WEB_FETCH_SECRET"],
     },
     FileSpec {
-        path: "integrations/dropbox.env",
-        names: &["MISTY_DROPBOX_CLIENT_ID", "MISTY_DROPBOX_CLIENT_SECRET"],
-    },
-    FileSpec {
         path: "integrations/email.env",
+        // No longer read: the server sends no email. Kept so existing
+        // development files still load.
         names: &[
             "MAILJET_API_KEY",
             "MAILJET_API_BASE_URL",
@@ -177,18 +176,12 @@ pub(super) const FILES: &[FileSpec] = &[
             "GOOGLE_CLIENT_ID",
             "GOOGLE_CLIENT_SECRET",
             "GOOGLE_SIGN_IN_REDIRECT_URL",
-            "MISTY_GOOGLE_DRIVE_CLIENT_ID",
-            "MISTY_GOOGLE_DRIVE_CLIENT_SECRET",
         ],
     },
     FileSpec {
         path: "integrations/microsoft.env",
-        names: &[
-            "MICROSOFT_CLIENT_ID",
-            "MICROSOFT_CLIENT_SECRET",
-            "MISTY_ONEDRIVE_CLIENT_ID",
-            "MISTY_ONEDRIVE_CLIENT_SECRET",
-        ],
+        // No longer read; kept so existing development files still load.
+        names: &["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"],
     },
     FileSpec {
         path: "crypto/documents.env",
@@ -229,23 +222,6 @@ pub(super) const FILES: &[FileSpec] = &[
     },
 ];
 
-pub(super) const PROD_REQUIRED: &[&str] = &[
-    "AGENT_RUNTIME_DB_PASSWORD",
-    "DB_HOST",
-    "DB_MIGRATION_PASSWORD",
-    "DB_MIGRATION_USER",
-    "DB_NAME",
-    "DB_PASSWORD",
-    "DB_USER",
-    "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
-    "MISTY_AUTH_SIGNING_KEY",
-    "MISTY_DEVICE_PAIRING_PEPPER",
-    "MISTY_DEVICE_TICKET_PRIVATE_KEY",
-    "MISTY_ENVIRONMENT",
-    "MISTY_PUBLIC_API_URL",
-    "SPACE_LINK_ENCRYPTION_KEY",
-];
-
 pub(super) const DEV_REQUIRED: &[&str] = &[
     "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_TUNNEL_TOKEN",
@@ -253,24 +229,4 @@ pub(super) const DEV_REQUIRED: &[&str] = &[
     "MISTY_DEV_API_ORIGIN",
     "MISTY_DEV_API_TUNNEL_HOSTNAME",
     "MISTY_CLOUDFLARE_WORKER_HOST",
-];
-
-pub(super) const STAGING_REQUIRED: &[&str] = &[
-    "AGENT_RUNTIME_DB_PASSWORD",
-    "DB_HOST",
-    "DB_MIGRATION_PASSWORD",
-    "DB_MIGRATION_USER",
-    "DB_NAME",
-    "DB_PASSWORD",
-    "DB_USER",
-    "MISTY_AGENT_RUNTIME_CONTROL_SECRET",
-    "MISTY_AUTH_SIGNING_KEY",
-    "MISTY_DEVICE_PAIRING_PEPPER",
-    "MISTY_DEVICE_TICKET_PRIVATE_KEY",
-    "MISTY_ENVIRONMENT",
-    "MISTY_HOST_PORT",
-    "MISTY_LIBRARY_BACKEND",
-    "MISTY_LIBRARY_FILESYSTEM_DIR",
-    "MISTY_PUBLIC_API_URL",
-    "SPACE_LINK_ENCRYPTION_KEY",
 ];

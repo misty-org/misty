@@ -8,18 +8,8 @@
 .secrets/
 .wrangler/
 
-# Safe templates may be versioned intentionally.
-!.env.example
-!.env.*.example
-!*.env.example
-!*.example.env
-!example.env
-!*.env.sample
-!*.sample.env
-!sample.env
-!*.env.template
-!*.template.env
-!template.env
+# No env file is ever committed, not even an example: the docs list every
+# value (docs/self-hosting.md). server/.env/ holds a server's five files.
 
 **/.venv
 .windows-test/
@@ -171,3 +161,6 @@ artifacts/
 
 # Midscene run logs.
 midscene_run/
+
+# The agent runtime's Node sidecar, copied in by the release build.
+src-tauri/binaries/

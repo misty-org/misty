@@ -4,6 +4,7 @@ mod metadata;
 mod model;
 mod preflight;
 mod publish;
+mod runtime;
 mod state;
 mod verification;
 mod windows_signing;
@@ -94,7 +95,7 @@ pub fn build(workspace: &Workspace, raw_version: &str, dry_run: bool) -> Result<
     let platforms = local_platforms(&manifest)?;
     let public_environment = config::public_environment()?;
     if manifest.build_environment != public_environment {
-        bail!("release API/website configuration differs from the release-start manifest");
+        bail!("release website configuration differs from the release-start manifest");
     }
     let config_path = state::release_root(workspace, &version).join("tauri.release.conf.json");
     let config = config::build()?;

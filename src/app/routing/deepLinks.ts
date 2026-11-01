@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
+import { openSetupDeepLink } from "@/features/auth/setupLinks";
 import { openExternalLink } from "@/features/workspace/externalLinks";
 import { isLinkTargetWindow } from "@/features/workspace/spaceWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -105,6 +106,11 @@ export function routeForMistyDeepLink(
   }
   if (first === "auth") {
     return resolveAuthRoute();
+  }
+  if (first === "setup") {
+    // The website's setup page: the wizard opens on Misty Cloud, filled in.
+    openSetupDeepLink(rawUrl);
+    return null;
   }
   return normalizeDeepLinkRoute(parts, url.search, isRouteAllowed);
 }

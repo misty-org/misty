@@ -1,27 +1,29 @@
 import { spacesApi } from "@/api/spaces/api";
 import type { SpaceInvitation } from "@/api/spaces/dto/entities";
 import { Button, Card, IconButton } from "@/shared/ui";
-import { RefreshCcw, XCircle } from "lucide-react";
+import { Link2, XCircle } from "lucide-react";
 import { useState } from "react";
 
-const deliveryLabel = (status: SpaceInvitation["delivery_status"]) =>
-  status === "failed"
-    ? "Delivery failed—ready to retry"
-    : status === "sent"
-      ? "Invitation sent"
-      : "Waiting to send";
+const expiresLabel = (expiresAt: string) =>
+  `Expires ${new Date(expiresAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 
-/** Outstanding invitations, with resend and revoke. Owner-only. */
+/**
+ * Outstanding invitations, with a new link and revoke. Owner-only. Only an invitation's hash is
+ * kept, so its link can't be shown again: New link makes one (the old one stops working) and
+ * shows it in the invite dialog to copy.
+ */
 export function PendingInvitationsCard({
   spaceId,
   invitations,
   onReloadInvitations,
   onReloadSpaces,
+  onLink,
 }: {
   spaceId: string;
   invitations: SpaceInvitation[];
   onReloadInvitations: () => Promise<void>;
   onReloadSpaces: () => Promise<unknown>;
+  onLink: (email: string, link: string) => void;
 }) {
   const [busyAction, setBusyAction] = useState("");
   if (invitations.length === 0) return null;
@@ -44,7 +46,7 @@ export function PendingInvitationsCard({
           <div className="min-w-0 flex-1">
             <p className="m-0 truncate text-sm">{invitation.invited_email}</p>
             <p className="mb-0 mt-0.5 text-xs text-cream-muted">
-              {deliveryLabel(invitation.delivery_status)}
+              {expiresLabel(invitation.expires_at)}
             </p>
           </div>
           <Button
@@ -53,15 +55,16 @@ export function PendingInvitationsCard({
             type="button"
             disabled={Boolean(busyAction)}
             onClick={() =>
-              run(`resend:${invitation.id}`, () =>
-                spacesApi.resendInvitation(spaceId, invitation.id).then(onReloadInvitations),
+              run(`link:${invitation.id}`, () =>
+                spacesApi.resendInvitation(spaceId, invitation.id).then(async (refreshed) => {
+                  if (refreshed.link) onLink(invitation.invited_email, refreshed.link);
+                  await onReloadInvitations();
+                }),
               )
             }
           >
-            <RefreshCcw
-              className={`size-3.5 ${busyAction === `resend:${invitation.id}` ? "animate-spin" : ""}`}
-            />
-            Resend
+            <Link2 className="size-3.5" />
+            New link
           </Button>
           <IconButton
             size="md"

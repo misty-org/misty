@@ -1,4 +1,4 @@
-import { normalizeApiBaseUrl, withDefaultApiPath } from "@/api/client/base-url";
+import { currentApiBase, loadServerChoice } from "./serverChoice";
 
 /** Misty is hosted only, so every client uses the one Hosted namespace. */
 const hostedScope = "hosted";
@@ -21,16 +21,16 @@ export function readDeploymentStorageItem(key: string): string | null {
   }
 }
 
+/**
+ * The Misty server's API base: the one chosen on this device in the setup wizard, "" when
+ * Misty is the browser only, or in development the build's default (serverChoice.ts).
+ */
 export async function resolveApiBase(): Promise<string> {
-  return resolveHostedApiBase();
+  await loadServerChoice();
+  return currentApiBase();
 }
 
+/** The same base, read synchronously; the app reads the choice before it renders. */
 export function resolveHostedApiBase(): string {
-  const base =
-    normalizeApiBaseUrl(import.meta.env.VITE_MISTY_PUBLIC_API_URL) ??
-    // compose.dev.yml publishes the Go API on loopback port 8081. Desktop
-    // development should not depend on the public Cloudflare tunnel, which is
-    // still used by remote callbacks and the collaboration Worker.
-    (import.meta.env.DEV ? "http://127.0.0.1:8081/v1" : null);
-  return withDefaultApiPath(base);
+  return currentApiBase();
 }

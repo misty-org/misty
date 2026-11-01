@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   changePassword: vi.fn(),
   derive: vi.fn(),
   known: vi.fn(() => false),
+  mark: vi.fn(),
+  problem: vi.fn(async (): Promise<string | null> => null),
 }));
 vi.mock("@/api/account/api", () => ({
   accountApi: { changePassword: mocks.changePassword },
@@ -12,8 +14,12 @@ vi.mock("@/api/account/api", () => ({
 vi.mock("./accountCredential", () => ({
   deriveLoginCredential: mocks.derive,
   isCredentialEmail: mocks.known,
+  markCredentialAccount: mocks.mark,
+  passwordProblem: mocks.problem,
 }));
-import { accountChangePassword } from "./accountPassword";
+import { accountChangePassword, accountSetFirstPassword } from "./accountPassword";
+import { markPasswordPending, pendingPasswordEmail } from "./pendingPassword";
+import { passwordResetToken, rememberPasswordReset } from "./passwordReset";
 
 const unauthorized = Object.assign(new Error("invalid credentials"), { status: 401 });
 beforeEach(() => {
@@ -79,6 +85,82 @@ describe("changing the account password", () => {
     await expect(accountChangePassword("ada@example.test", "old", "new")).rejects.toThrow(
       "desktop app",
     );
+    expect(mocks.changePassword).not.toHaveBeenCalled();
+  });
+});
+
+describe("the first password after a setup key", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    markPasswordPending("account-1", "ada@example.test");
+  });
+
+  it("sends a derived credential with an empty current password and marks the account", async () => {
+    mocks.changePassword.mockResolvedValue({ status: "ok" });
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).resolves.toBe("set");
+    expect(mocks.derive).toHaveBeenCalledWith("ada@example.test", "a long password");
+    expect(mocks.changePassword).toHaveBeenCalledWith("", "credential:a long password", undefined);
+    // The same email the keys came from is kept, so the vault key is rebuilt the same way.
+    expect(mocks.mark).toHaveBeenCalledWith("account-1", "ada@example.test");
+    expect(pendingPasswordEmail("account-1")).toBeNull();
+  });
+
+  it("checks the password rules before anything reaches the server", async () => {
+    mocks.problem.mockResolvedValueOnce("Use at least 12 characters.");
+    await expect(accountSetFirstPassword("account-1", "ada@example.test", "short")).rejects.toThrow(
+      "Use at least 12 characters.",
+    );
+    expect(mocks.changePassword).not.toHaveBeenCalled();
+    expect(pendingPasswordEmail("account-1")).toBe("ada@example.test");
+  });
+
+  it("replaces a forgotten password with the sign-in's reset token", async () => {
+    rememberPasswordReset("account-1", "reset-token");
+    mocks.changePassword.mockResolvedValue({ status: "ok" });
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).resolves.toBe("set");
+    expect(mocks.changePassword).toHaveBeenCalledWith(
+      "",
+      "credential:a long password",
+      "reset-token",
+    );
+    expect(passwordResetToken("account-1")).toBeUndefined();
+  });
+
+  it("says so when the sign-in can no longer reset the password", async () => {
+    rememberPasswordReset("account-1", "expired-token");
+    mocks.changePassword.mockRejectedValue(unauthorized);
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).rejects.toThrow("can no longer set a password");
+    expect(mocks.mark).not.toHaveBeenCalled();
+  });
+
+  it("keeps the password an account already has", async () => {
+    mocks.changePassword.mockRejectedValue(unauthorized);
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).resolves.toBe("existing");
+    expect(mocks.mark).not.toHaveBeenCalled();
+    expect(pendingPasswordEmail("account-1")).toBeNull();
+  });
+
+  it("stays pending when the server can't be reached", async () => {
+    mocks.changePassword.mockRejectedValue(new Error("offline"));
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).rejects.toThrow("offline");
+    expect(pendingPasswordEmail("account-1")).toBe("ada@example.test");
+  });
+
+  it("needs the desktop app to derive the credential", async () => {
+    mocks.derive.mockResolvedValueOnce(null as unknown as string);
+    await expect(
+      accountSetFirstPassword("account-1", "ada@example.test", "a long password"),
+    ).rejects.toThrow("desktop app");
     expect(mocks.changePassword).not.toHaveBeenCalled();
   });
 });

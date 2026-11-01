@@ -1,14 +1,14 @@
 import { expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ request: vi.fn() }));
-vi.mock("@/api/client", () => ({ apiRequest: mocks.request }));
+const mocks = vi.hoisted(() => ({ call: vi.fn() }));
+vi.mock("@/api/device-models", () => ({ deviceModelCall: mocks.call }));
 import { screenModelClient, screenModelConfig } from "./screenModel";
 
-it("numbers every model call through Misty's metered pass-through", async () => {
-  mocks.request.mockResolvedValue({
+it("sends every model call to the runtime on this computer", async () => {
+  mocks.call.mockResolvedValue({
     model: "m",
     choices: [{ message: { role: "assistant", content: "<plan/>" } }],
   });
-  const model = screenModelClient("job 1");
+  const model = screenModelClient();
   const client = await model.createOpenAIClient();
   await client.chat.completions.create({ messages: [{ role: "user", content: "look" }] });
   const stream = (await client.chat.completions.create({
@@ -17,13 +17,10 @@ it("numbers every model call through Misty's metered pass-through", async () => 
   })) as AsyncGenerator<{ choices: Array<{ delta: { content: string } }> }>;
   const chunks = [];
   for await (const chunk of stream) chunks.push(chunk.choices[0].delta.content);
-  expect(mocks.request.mock.calls.map(([path]) => path)).toEqual([
-    "/me/screen-model/job%201?call=0",
-    "/me/screen-model/job%201?call=1",
+  expect(mocks.call.mock.calls.map(([name, body]) => [name, body])).toEqual([
+    ["screen-model", { messages: [{ role: "user", content: "look" }] }],
+    ["screen-model", { messages: [{ role: "user", content: "again" }] }],
   ]);
-  expect(JSON.parse(mocks.request.mock.calls[0][1].body)).toEqual({
-    messages: [{ role: "user", content: "look" }],
-  });
   expect(chunks).toEqual(["<plan/>"]);
   expect(model.calls()).toBe(2);
 });

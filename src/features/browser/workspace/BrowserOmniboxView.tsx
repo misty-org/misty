@@ -65,6 +65,7 @@ export function BrowserOmniboxView(props: {
             event.preventDefault();
             openPanel();
           }}
+          placeholder="Search or enter URL"
           aria-label="Search or enter address"
           aria-haspopup="dialog"
           autoComplete="off"
@@ -91,9 +92,10 @@ export function BrowserOmniboxView(props: {
   );
 }
 
-/** The full address at rest, protocol included, so where a page lives is never hidden. */
+/** The full address at rest, protocol included, so where a page lives is never hidden. A blank
+ * tab has none, so the field shows its muted placeholder instead of prompt text as a value. */
 function toolbarAddress(value: string): string {
-  return value === blankBrowserUrl || isNewTabOverrideUrl(value) ? "Search or enter URL" : value;
+  return value === blankBrowserUrl || isNewTabOverrideUrl(value) ? "" : value;
 }
 
 /** A secure page's site without protocol, www or path; anything else keeps its full address. */

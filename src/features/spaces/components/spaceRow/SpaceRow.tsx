@@ -139,7 +139,7 @@ export function SpaceRow({
                       <SpaceAvatar
                         space={space}
                         className="size-5 shrink-0 rounded-md"
-                        fallbackClassName="text-[9px] font-semibold"
+                        fallbackClassName="text-3xs font-semibold"
                       />
                       <span className="min-w-0 truncate font-medium">{name}</span>
                       <MenuChevron className="size-5 text-cream-muted" />

@@ -52,7 +52,7 @@ function SyncSleepScreen({
     >
       <div className="mt-6 min-h-10 max-w-sm text-sm" aria-live="polite">
         {error ? (
-          <p role="alert" className="text-red-300">
+          <p role="alert" className="text-cream-bright">
             {error}
           </p>
         ) : busy ? (

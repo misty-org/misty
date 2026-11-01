@@ -135,7 +135,7 @@
 .misty-sidebar-now-playing .misty-now-playing-card {
   border: 1px solid var(--color-charcoal-border);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
 }
 .misty-sidebar-now-playing .misty-now-playing-card + .misty-now-playing-card {
   border-top: 1px solid var(--color-charcoal-border);

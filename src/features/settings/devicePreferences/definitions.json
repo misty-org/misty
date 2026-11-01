@@ -183,28 +183,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "app.privacy.anonymous_usage_analytics_enabled",
-    "label": "Share anonymous usage analytics",
-    "page": "privacy",
-    "section": "privacy",
-    "key": "anonymous_usage_analytics_enabled",
-    "default": false,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "app.privacy.anonymous_error_reporting_enabled",
-    "label": "Send anonymous crash reports",
-    "page": "privacy",
-    "section": "privacy",
-    "key": "anonymous_error_reporting_enabled",
-    "default": false,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "app.updates.automatic",
     "label": "Check for updates automatically",
     "page": "about",
@@ -656,17 +634,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "agents.companion.model",
-    "label": "Companion model",
-    "page": "agents-companion",
-    "section": "companion",
-    "key": "model",
-    "default": "",
-    "type": "string",
-    "owner": "device",
-    "platforms": ["desktop"]
-  },
-  {
     "id": "collections.tabs.space",
     "label": "Space tab order",
     "page": "appearance",
@@ -927,8 +894,20 @@
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],
-    "keywords": ["AI", "API key", "BYOK", "OpenAI", "Anthropic", "Google", "OpenRouter", "Ollama"],
+    "keywords": [
+      "AI",
+      "API key",
+      "BYOK",
+      "OpenAI",
+      "Anthropic",
+      "Google",
+      "OpenRouter",
+      "Ollama",
+      "ChatGPT",
+      "Ollama Cloud"
+    ],
     "enum": [
+      "chatgpt",
       "openai",
       "anthropic",
       "google",
@@ -936,6 +915,7 @@
       "gateway",
       "nvidia",
       "ollama",
+      "ollama-cloud",
       "openai-compatible"
     ]
   },
@@ -945,7 +925,7 @@
     "page": "models",
     "section": "models",
     "key": "ollama_base_url",
-    "default": "http://host.docker.internal:11434/v1",
+    "default": "http://127.0.0.1:11434/v1",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],
@@ -958,7 +938,7 @@
     "page": "models",
     "section": "models",
     "key": "openai_compatible_base_url",
-    "default": "http://host.docker.internal:8000/v1",
+    "default": "http://127.0.0.1:8000/v1",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],
@@ -1016,6 +996,19 @@
     "platforms": ["desktop"],
     "keywords": ["thinking", "effort"],
     "enum": ["none", "minimal", "low", "medium", "high", "xhigh"]
+  },
+  {
+    "id": "models.search_provider",
+    "label": "Web search provider",
+    "page": "models",
+    "section": "models",
+    "key": "search_provider",
+    "default": "decodo",
+    "owner": "device",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["web search", "search key", "API key", "Decodo", "Serper", "research"],
+    "enum": ["decodo", "serper"]
   },
   {
     "id": "models.speech_model",

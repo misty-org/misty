@@ -8,7 +8,6 @@ import { SavedAccountSessionUnavailableError } from "./sessionErrors";
 import AuthCard from "./components/AuthCard";
 import AuthMessage from "./components/AuthMessage";
 import AuthShell from "./components/AuthShell";
-import ForgotPasswordForm from "./components/ForgotPasswordForm";
 import SignInForm from "./components/SignInForm";
 import type { SavedAccountSession } from "./store/accountVault";
 
@@ -29,7 +28,7 @@ export default function SignIn() {
   const addingAccount = Boolean(routeState?.addingAccount);
   const reauthenticateEmail = routeState?.reauthenticateEmail ?? "";
   // Saved accounts come first, even when adding one; with none, straight to the login form.
-  const [mode, setMode] = useState<"chooser" | "login" | "forgot">(
+  const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !reauthenticateEmail ? "chooser" : "login",
   );
   const back = () =>
@@ -93,7 +92,7 @@ export default function SignIn() {
                 key={account.id}
                 className={
                   "group flex items-center gap-1 rounded-lg border border-charcoal-border p-1 " +
-                  "transition-colors hover:bg-white/5 focus-within:bg-white/5"
+                  "transition-colors hover:bg-control-hover focus-within:bg-control-hover"
                 }
               >
                 <Pressable
@@ -152,22 +151,6 @@ export default function SignIn() {
     );
   }
 
-  if (mode === "forgot") {
-    return (
-      <AuthShell title="Forgot your password?">
-        <AuthCard>
-          <ForgotPasswordForm
-            initialEmail={email}
-            onBack={() => {
-              setError("");
-              setMode("login");
-            }}
-          />
-        </AuthCard>
-      </AuthShell>
-    );
-  }
-
   return (
     <AuthShell
       title={
@@ -203,7 +186,6 @@ export default function SignIn() {
           error={error}
           onErrorChange={setError}
           onSuccess={() => navigate(from, { replace: true })}
-          onForgot={() => setMode("forgot")}
         />
       </AuthCard>
     </AuthShell>

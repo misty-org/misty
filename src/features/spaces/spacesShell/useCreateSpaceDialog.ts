@@ -83,11 +83,18 @@ export function useCreateSpaceDialog(options: {
       pendingInvites.map((email) => spacesApi.invite(created.space.id, email)),
     );
     const unsent = sent.filter((result) => result.status === "rejected").length;
+    // Misty sends no email: each invitation's link is shared from Members (New link).
     if (unsent) {
       useAppStore
         .getState()
         .setMessage(
-          `Space created. ${unsent} invitation${unsent === 1 ? "" : "s"} couldn't be sent. Invite them from Members.`,
+          `Space created. ${unsent} invitation${unsent === 1 ? "" : "s"} couldn't be made. Invite them from Members.`,
+        );
+    } else if (pendingInvites.length) {
+      useAppStore
+        .getState()
+        .setMessage(
+          "Space created. Misty doesn't send email: in Members, choose New link to share each invitation.",
         );
     }
   };

@@ -177,11 +177,7 @@ button.agent-progress-row:hover {
   border-radius: 8px;
   background: var(--color-charcoal-bg);
   color: var(--color-cream);
-  font:
-    12px/1.55 ui-monospace,
-    "SF Mono",
-    Menlo,
-    monospace;
+  font: 12px/1.55 var(--font-mono);
   white-space: pre-wrap;
 }
 @media (prefers-reduced-motion: reduce) {

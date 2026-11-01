@@ -58,14 +58,14 @@
 /* The sidebar's address field is a filled pill, like Zen's: no outline, a quiet lift on focus. */
 [data-browser-toolbar][data-sidebar] input {
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--misty-theme-text) 7%, transparent);
 }
 [data-browser-toolbar][data-sidebar] input:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--misty-theme-text) 9%, transparent);
 }
 [data-browser-toolbar][data-sidebar] input:focus {
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.11);
+  background: color-mix(in srgb, var(--misty-theme-text) 11%, transparent);
 }
 
 /* Open as a search panel, the field is the panel's top row, not a filled pill. */
@@ -73,6 +73,11 @@
 [data-browser-toolbar][data-sidebar] form[data-panel] input:hover,
 [data-browser-toolbar][data-sidebar] form[data-panel] input:focus {
   background: transparent;
+}
+
+/* At rest the address text starts on the same line as the tab favicons below it. */
+[data-browser-toolbar][data-sidebar] form:not([data-panel]) input {
+  padding-left: 8px;
 }
 
 /* Zen's address text: the site, brighter and a touch heavier. */

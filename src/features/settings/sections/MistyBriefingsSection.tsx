@@ -153,7 +153,7 @@ export function MistyBriefingsSection(props: MistyBriefingsSectionProps) {
             }
           />
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[10px] text-cream-muted">
+            <span className="text-3xs text-cream-muted">
               {recapDraft.next_run_at
                 ? `Next: ${new Date(recapDraft.next_run_at).toLocaleString()}`
                 : "No run is scheduled"}

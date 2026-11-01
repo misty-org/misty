@@ -155,7 +155,7 @@ function Section(props: {
           aria-expanded={!props.collapsed}
           onClick={props.onToggle}
           className={cn(
-            "flex min-w-0 flex-1 items-center gap-0.5 pl-2 text-[13px] font-medium",
+            "flex min-w-0 flex-1 items-center gap-0.5 pl-2 text-ui font-medium",
             "text-cream-muted hover:text-cream",
           )}
         >
@@ -222,7 +222,7 @@ function Row(props: {
           aria-hidden
           className={cn(
             "grid size-5 shrink-0 place-items-center [&_svg]:size-4",
-            "[&_.agent-avatar]:!size-5 [&_.agent-avatar]:text-[10px] [&_.agent-avatar_img]:object-contain",
+            "[&_.agent-avatar]:!size-5 [&_.agent-avatar]:text-3xs [&_.agent-avatar_img]:object-contain",
           )}
         >
           {props.icon}

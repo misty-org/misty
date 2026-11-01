@@ -3,7 +3,7 @@ import { Button, Input } from "@/shared/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";
 
-const labelClass = "grid gap-1 text-[10px] capitalize text-cream-muted";
+const labelClass = "grid gap-1 text-3xs capitalize text-cream-muted";
 const speedOptions: [string, string][] = [
   ["0.5", "0.5×"],
   ["1", "1×"],

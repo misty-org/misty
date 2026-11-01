@@ -56,11 +56,6 @@ export interface Presentation {
   ask?: boolean;
   /** Teach mode: every turn is a lesson step that teaches and never acts. Defaults off. */
   teach?: boolean;
-  model: string;
-  models?: {
-    id: string;
-    name: string;
-  }[];
   error?: string;
   point?: PresentedPoint;
   /** Teach mode: the regions to look at while Misty explains the step. */

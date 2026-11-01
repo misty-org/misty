@@ -27,20 +27,9 @@ import { PreferenceRow } from "./PreferenceRow";
 export function AgentDefaultsSection() {
   return (
     <>
-      <Section
-        title="Conversations"
-        description={
-          "In Plan, agents research and propose a plan you approve before they change " +
-          "anything. Turn Plan on or off in any chat with Shift+Tab."
-        }
-      >
+      <Section title="Conversations">
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
-      </Section>
-      <Section
-        title="Chat panel"
-        description="Choose which side of the current window hosts the agent panel."
-      >
         <PanelSideRow />
       </Section>
       <ScreenLocationSection />
@@ -54,10 +43,7 @@ function PanelSideRow() {
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "right");
   return (
-    <Row
-      label={d.label}
-      description="Sets the default for new chats; change it any time with Shift+Tab."
-    >
+    <Row label={d.label}>
       <ChoiceControl
         disabled={store.working || !ready}
         value={value}
@@ -77,10 +63,7 @@ function CollaborationModeRow() {
   const section = store.settings?.document[d.section] as Record<string, unknown> | undefined;
   const value = String(fromLegacy(d, section?.[d.key]) || "act");
   return (
-    <Row
-      label={d.label}
-      description="Sets the default for new chats; change it any time with Shift+Tab."
-    >
+    <Row label={d.label} description="Agents propose a plan first. Shift+Tab in any chat.">
       <SwitchControl
         disabled={store.working || !ready}
         checked={value === "plan"}
@@ -103,10 +86,11 @@ export function DevicesSection() {
 export function AgentPermissionsSection() {
   return (
     <>
-      <PaymentsAskSection />
+      <AgentSitesSection>
+        <PaymentsAskSection />
+      </AgentSitesSection>
       <AgentGrantsSection />
       {hasTauriInternals() ? <AgentScopeList /> : null}
-      <AgentSitesSection />
     </>
   );
 }
@@ -149,19 +133,12 @@ function AgentScopeList() {
       </Section>
     ) : null;
   return (
-    <Section
-      title="Projects"
-      description="Folders on this computer your coding tool works in when a chat picks them. Add one from a chat’s Project menu."
-    >
+    <Section title="Projects" description="Add one from a chat’s Project menu.">
       {scopes.map((s) => (
         <Row
           key={s.id}
           label={s.displayName}
-          description={
-            s.kind === "project_folder"
-              ? "Your coding tool works here and asks before changes that need you."
-              : "Read only: agents can list and read files here."
-          }
+          description={s.kind === "project_folder" ? "Coding tools work here." : "Read only."}
         >
           <Button
             variant="outline"

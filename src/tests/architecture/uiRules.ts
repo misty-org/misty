@@ -67,6 +67,15 @@ export const uiRules = {
     pattern: /<(?:Loader2|LoaderCircle)\b[^>]*animate-spin/,
     guidance: "use Spinner",
   },
+  "all-caps": {
+    // A class token inside a string on one line, so prose that says "uppercase" is fine.
+    pattern: /["'`](?:[^"'`\n]*\s)?(?:[a-z-]+:)*(?:uppercase|small-caps)(?=[\s"'`])/,
+    guidance: "write sentence case; keep only real acronyms in capitals",
+  },
+  "font-size-literal": {
+    pattern: /\btext-\[\d+(?:\.\d+)?px\]/,
+    guidance: "use the type scale in src/styles/theme.css (text-3xs to text-3xl)",
+  },
   "hex-color": {
     pattern: /-\[#[0-9a-fA-F]{3,8}\]/,
     guidance: "use theme color tokens instead of hex values",

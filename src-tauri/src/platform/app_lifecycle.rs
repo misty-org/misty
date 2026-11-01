@@ -68,7 +68,8 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         crate::infra::browser_sync::flush_before_exit();
         // Coding tools started for agents never outlive Misty.
         crate::agents::runners::registry::stop_all();
-        crate::telemetry::shutdown();
+        // Its runs wait in the runtime's local store for the next launch.
+        crate::infra::agent_runtime::stop();
     }
 }
 

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { deviceModelCall } from "@/api/device-models";
 import { pictureAgentTab } from "./agentTabPictures";
 import { agentTab, noteAgentTabJob, wakeAgentTab } from "./agentTabs";
 import { touchHostedSession } from "./hostedSessionsState";
@@ -46,6 +47,7 @@ export async function executeBrowserJob(
   leaseExpiresAt: string | null | undefined,
 ): Promise<Record<string, unknown>> {
   let output = await executeOnce(job, signal, leaseExpiresAt);
+  if (job.operation === "browser.extract") return withExtraction(job, output, signal);
   const known = agentTab(job.scopeId)?.url;
   if (!["browser.snapshot", "browser.find"].includes(job.operation) || blank(known)) return output;
   if (!blank(pageUrl(output))) return output;
@@ -63,6 +65,32 @@ export async function executeBrowserJob(
     leaseExpiresAt,
   );
   return executeOnce({ ...job, id: `${job.id}.reopened` }, signal, leaseExpiresAt);
+}
+
+/**
+ * `browser.extract` reads the page, then the extraction runs on this computer's agent model; the
+ * server checks the links against the page it is sent with (docs/agents/runtime.md).
+ */
+async function withExtraction(
+  job: ClaimedWorkflowNodeJob["job"],
+  page: Record<string, unknown>,
+  signal: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const input = (job.input ?? {}) as { instruction?: unknown; schema?: unknown };
+  if (typeof input.instruction !== "string" || !input.schema) return page;
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  const { data } = await deviceModelCall<{ data: unknown }>(
+    "extract",
+    {
+      instruction: input.instruction,
+      schema: input.schema,
+      url: text(page.url),
+      title: text(page.title),
+      markdown: text(page.markdown).slice(0, 120_000),
+    },
+    signal,
+  );
+  return { ...page, data };
 }
 
 async function executeOnce(

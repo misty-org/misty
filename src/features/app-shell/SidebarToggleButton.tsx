@@ -20,7 +20,9 @@ export function SidebarToggleButton({ side = "left" }: { side?: "left" | "right"
         useSidebarCollapsedStore.getState().toggle();
       }}
     >
-      <Icon {...toolbarIconProps} size={20} />
+      {/* Panel glyphs fill their box, so they take the sidebar's 18px optical size (see
+          browserToolbar.css); without a size class the xs button shrinks them to 14px. */}
+      <Icon {...toolbarIconProps} className="size-4.5" />
     </IconButton>
   );
 }

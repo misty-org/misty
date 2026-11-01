@@ -4,7 +4,6 @@ mod cli;
 mod cloudflare;
 mod config;
 mod console;
-mod deploy;
 mod desktop;
 mod diagnostics;
 mod environment;

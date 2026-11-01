@@ -5,13 +5,15 @@ import {
   readApiAuthToken,
   readApiSessionGeneration,
 } from "@/api/client/session";
+import { usePasswordPending } from "@/features/auth/core";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { readNativeSync, unlockNativeSync } from "./native";
 import { useBrowserSyncStore } from "./store";
 
 /** Best-effort background startup. Sync must never gate the signed-in app: a
  * missing vault, unavailable server, or browser-profile recovery remains visible
- * in Settings while the local workspace continues to work. */
+ * in Settings while the local workspace continues to work. A setup-key account
+ * starts no sync until its password is chosen: the password opens the vault. */
 export function BrowserSyncStartup({
   accountId,
   children,
@@ -20,8 +22,9 @@ export function BrowserSyncStartup({
   children: ReactNode;
 }) {
   const enabled = nativeWorkspaceRecoveryEnabled();
+  const pending = usePasswordPending(accountId);
   useEffect(() => {
-    if (!enabled || !accountId) return;
+    if (!enabled || !accountId || pending) return;
     let active = true;
     const generation = readApiSessionGeneration();
     const valid = () =>
@@ -108,6 +111,6 @@ export function BrowserSyncStartup({
       clearTimeout(timer);
       window.removeEventListener("online", retry);
     };
-  }, [accountId, enabled]);
+  }, [accountId, enabled, pending]);
   return children;
 }

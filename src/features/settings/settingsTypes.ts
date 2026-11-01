@@ -7,55 +7,59 @@ import type {
   UpdateShortcutRequest,
 } from "@/native/ipc";
 
-export type SettingsSection =
-  | "profiles"
-  | "devices"
-  | "about"
-  | "diagnostics"
-  | "browser-downloads"
-  | "browser-links"
-  | "browser-appearance"
-  | "browser-tabs"
-  | "passwords"
-  | "browser-privacy"
-  | "browser-permissions"
-  | "browser-signins"
-  | "browser-extensions"
-  | "browser-handoff"
-  | "browser-import"
-  | "spaces-defaults"
-  | "spaces-manage"
-  | "files-locations"
-  | "files-indexing"
-  | "agents-defaults"
-  | "agents-memory"
-  | "agents-connections"
-  | "agents-permissions"
-  | "agents-coding"
-  | "agents-companion"
-  | "models"
-  | "voice"
-  | "recall"
-  | "account"
-  | "general"
-  | "sync"
-  | "appearance"
-  | "layout"
-  | "shortcuts"
-  | "social"
-  | "journal"
-  | "search"
-  | "library"
-  | "browser"
-  | "terminal"
-  | "code"
-  | "misty"
-  | "agents"
-  | "privacy"
-  | "server"
-  | "updates"
-  | "support"
-  | "advanced";
+/** Every Settings section id, including retired ones that resolve elsewhere (settingsRouting.ts). */
+export const settingsSections = [
+  "profiles",
+  "devices",
+  "about",
+  "diagnostics",
+  "browser-downloads",
+  "browser-links",
+  "browser-appearance",
+  "browser-tabs",
+  "passwords",
+  "browser-privacy",
+  "browser-permissions",
+  "browser-signins",
+  "browser-extensions",
+  "browser-handoff",
+  "browser-import",
+  "spaces-defaults",
+  "spaces-manage",
+  "files-locations",
+  "files-indexing",
+  "agents-defaults",
+  "agents-memory",
+  "agents-connections",
+  "agents-permissions",
+  "agents-coding",
+  "agents-companion",
+  "models",
+  "voice",
+  "recall",
+  "account",
+  "general",
+  "sync",
+  "appearance",
+  "layout",
+  "shortcuts",
+  "social",
+  "journal",
+  "search",
+  "library",
+  "browser",
+  "terminal",
+  "code",
+  "misty",
+  "agents",
+  "privacy",
+  "server",
+  "updates",
+  "support",
+  "advanced",
+] as const;
+
+export type SettingsSection = (typeof settingsSections)[number];
 
 export type SettingValue =
   string | number | boolean | Record<string, unknown> | Array<Record<string, unknown>>;

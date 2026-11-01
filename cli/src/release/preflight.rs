@@ -8,11 +8,8 @@ use super::config;
 
 pub(super) fn check(workspace: &Workspace) -> Result<()> {
     let mut required = vec![
-        "MISTY_RELEASE_API_URL",
         "MISTY_RELEASE_WEB_URL",
         "TAURI_UPDATER_PUBLIC_KEY",
-        "TAURI_CSP_CONNECT_SOURCES",
-        "TAURI_CSP_IMAGE_SOURCES",
         "TAURI_SIGNING_PRIVATE_KEY",
     ];
     if cfg!(target_os = "macos") {

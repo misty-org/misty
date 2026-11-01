@@ -28,7 +28,7 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
     return (
       <div className="grid min-h-full place-items-center px-8 py-20 text-center">
         <div className="max-w-sm">
-          <span className="mx-auto grid size-14 place-items-center overflow-hidden rounded-full bg-blue-400/10 ring-1 ring-white/5">
+          <span className="mx-auto grid size-14 place-items-center overflow-hidden rounded-full bg-cream/[0.06] ring-1 ring-white/5">
             <img src={mistyCompanion} alt="" className="size-14 object-contain" draggable={false} />
           </span>
           <h3 className="mb-0 mt-5 text-lg font-semibold tracking-tight text-cream-bright">

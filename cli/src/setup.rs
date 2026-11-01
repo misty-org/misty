@@ -20,11 +20,6 @@ pub struct Setup {
     cloudflare: crate::cloudflare::Options,
 }
 pub fn run(workspace: &Workspace, options: Setup) -> Result<()> {
-    if options.cloudflare.target != Target::Dev
-        && !matches!(options.component, Component::Cloudflare)
-    {
-        anyhow::bail!("--target prod is supported by misty setup cloudflare only");
-    }
     match options.component {
         Component::Cloudflare => crate::cloudflare::setup(workspace, options.cloudflare),
         Component::Desktop => desktop(workspace),
@@ -99,30 +94,8 @@ mod tests {
     }
 
     #[test]
-    fn cloudflare_target_defaults_to_dev_and_accepts_prod() {
-        let dev = Command::try_parse_from(["setup", "cloudflare"]).unwrap();
-        assert_eq!(dev.setup.cloudflare.target, Target::Dev);
-        let prod = Command::try_parse_from([
-            "setup",
-            "cloudflare",
-            "--target",
-            "prod",
-            "--tunnel-name",
-            "misty-prod",
-            "--hostname",
-            "api.mistysys.com",
-            "--apply",
-        ])
-        .unwrap();
-        assert_eq!(prod.setup.cloudflare.target, Target::Prod);
-    }
-
-    #[test]
-    fn production_target_does_not_initialize_development_for_other_components() {
-        let temporary = tempfile::tempdir().unwrap();
-        let workspace = Workspace::from_root(temporary.path().to_owned()).unwrap();
-        let command = Command::try_parse_from(["setup", "server", "--target", "prod"]).unwrap();
-        assert!(run(&workspace, command.setup).is_err());
-        assert!(!workspace.server.exists());
+    fn cloudflare_setup_is_development_only() {
+        Command::try_parse_from(["setup", "cloudflare"]).unwrap();
+        assert!(Command::try_parse_from(["setup", "cloudflare", "--target", "prod"]).is_err());
     }
 }

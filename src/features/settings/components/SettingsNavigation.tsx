@@ -30,7 +30,7 @@ export function SettingsNavigation<Id extends string>(props: {
     >
       {props.groups.map((group) => (
         <div key={group.label} role="group" aria-label={group.label} className="pb-3">
-          <p className="px-2.5 pb-1.5 pt-2 text-[13px] leading-5 text-cream-muted">{group.label}</p>
+          <p className="px-2.5 pb-1.5 pt-2 text-ui leading-5 text-cream-muted">{group.label}</p>
           <div className="grid gap-0.5">
             {group.items.map((entry) => {
               const Icon = entry.icon;
@@ -42,7 +42,7 @@ export function SettingsNavigation<Id extends string>(props: {
                   data-settings-nav-entry={entry.id}
                   data-misty-window-drag-block="true"
                   className={cn(
-                    "flex h-9 w-full min-w-0 items-center gap-3 rounded-lg px-2.5 text-left text-[15px] leading-5",
+                    "flex h-9 w-full min-w-0 items-center gap-3 rounded-lg px-2.5 text-left text-md leading-5",
                     "transition-colors",
                     active
                       ? "bg-charcoal-hover text-cream-bright"

@@ -81,6 +81,42 @@ export const devicesApi = {
     jobId: string,
     body: unknown,
   ) => signed(request, localId, `${workflowJobPath(deviceId, jobId)}/fail`, "POST", body),
+  /** The runs this device starts, cancels and resumes on its own agent runtime. With waitMs
+   * the server holds the claim until one is queued (at most 25 s). */
+  claimRuntimeDeliveries: <T>(
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    hold?: { waitMs: number; signal: AbortSignal },
+  ) =>
+    request<T>(localId, `${devicePath(deviceId)}/agent-runtime/deliveries/claim`, {
+      method: "POST",
+      body: JSON.stringify(hold ? { waitMs: hold.waitMs } : {}),
+      signal: hold?.signal,
+    }),
+  /** Up to 32 of this person's chunks that wait for a vector from this device. */
+  claimEmbeddings: <T>(request: SignedDeviceRequest, localId: string, deviceId: string) =>
+    signed<T>(request, localId, `${devicePath(deviceId)}/embeddings/claim`, "POST", {}),
+  completeEmbeddings: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    body: unknown,
+  ) => signed(request, localId, `${devicePath(deviceId)}/embeddings/complete`, "POST", body),
+  finishRuntimeDelivery: (
+    request: SignedDeviceRequest,
+    localId: string,
+    deviceId: string,
+    deliveryId: string,
+    body: unknown,
+  ) =>
+    signed(
+      request,
+      localId,
+      `${devicePath(deviceId)}/agent-runtime/deliveries/${encodeURIComponent(deliveryId)}/finish`,
+      "POST",
+      body,
+    ),
 };
 
 function signed<T>(

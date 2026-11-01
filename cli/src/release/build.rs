@@ -27,6 +27,7 @@ pub(super) fn platform(
     } else {
         "nsis"
     };
+    super::runtime::prepare(workspace, platform)?;
     let mut arguments = vec!["run", "tauri", "--", "build", "--bundles", bundles];
     if let Some(target) = cross_target(platform) {
         arguments.extend(["--target", target]);

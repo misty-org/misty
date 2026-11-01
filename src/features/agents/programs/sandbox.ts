@@ -113,7 +113,7 @@ export async function runInSandbox(
     loaded.value.dispose();
     // The program body runs as an async function, so it can await page calls and return a value.
     const started = vm.evalCode(`(async () => {\n${code}\n})()`, "program.js");
-    if (started.error) return failed(vm, started.error, logs);
+    if (started.error) return failed(vm, started.error, logs, code);
     const settled = vm.resolvePromise(started.value);
     started.value.dispose();
     runtime.executePendingJobs();
@@ -140,9 +140,34 @@ export async function runInSandbox(
   }
 }
 
-function failed(vm: QuickJSContext, error: QuickJSHandle, logs: string[]): SandboxResult {
+function failed(
+  vm: QuickJSContext,
+  error: QuickJSHandle,
+  logs: string[],
+  code?: string,
+): SandboxResult {
   const dumped = vm.dump(error) as { name?: string; message?: string; stack?: string } | string;
   error.dispose();
+  // A program that doesn't parse gets its own line back with a caret, so the next try fixes that
+  // spot instead of repeating it: the bare message names a token, not where it went wrong.
+  const at =
+    code && typeof dumped !== "string" && dumped?.name === "SyntaxError"
+      ? /program\.js:(\d+):(\d+)/.exec(dumped.stack ?? "")
+      : null;
+  const line = at ? code!.split("\n")[Number(at[1]) - 2] : undefined;
+  if (at && line !== undefined && typeof dumped !== "string") {
+    const column = Math.max(0, Number(at[2]) - 1);
+    const start = Math.max(0, column - 80);
+    const shown = line.slice(start, column + 80);
+    return {
+      ok: false,
+      error:
+        `SyntaxError: ${dumped.message ?? ""} at line ${Number(at[1]) - 1}, column ${column + 1} of your program:\n` +
+        `${shown}\n${" ".repeat(column - start)}^\n` +
+        "Write plain JavaScript: commas between object fields, no type annotations or Python syntax.",
+      logs,
+    };
+  }
   const text =
     typeof dumped === "string"
       ? dumped

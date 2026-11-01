@@ -88,6 +88,7 @@ export function SpaceMembers({
             invitations={state.pendingInvitations}
             onReloadInvitations={state.loadPendingInvitations}
             onReloadSpaces={state.load}
+            onLink={dialogs.showInviteLink}
           />
         ) : null}
       </div>

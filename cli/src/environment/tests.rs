@@ -58,31 +58,18 @@ fn set_replaces_export_assignments_without_creating_duplicates() {
     let tmp = tempfile::tempdir().unwrap();
     let workspace = fixture_workspace(tmp.path());
     let path = root(&workspace, Target::Dev).join("integrations/ai.env");
-    write_private(&path, b"export AI_GATEWAY_API_KEY=old\n").unwrap();
+    write_private(&path, b"export MISTY_SERPER_API_KEY=old\n").unwrap();
     set(
         &workspace,
         Target::Dev,
-        "AI_GATEWAY_API_KEY",
+        "MISTY_SERPER_API_KEY",
         "new-$literal",
     )
     .unwrap();
     assert_eq!(
-        read(&workspace, Target::Dev).unwrap()["AI_GATEWAY_API_KEY"],
+        read(&workspace, Target::Dev).unwrap()["MISTY_SERPER_API_KEY"],
         "new-$literal"
     );
-}
-
-#[test]
-fn fresh_production_keys_need_no_placeholder_files_and_are_preserved() {
-    let tmp = tempfile::tempdir().unwrap();
-    let workspace = fixture_workspace(tmp.path());
-    init(&workspace, Target::Prod).unwrap();
-    crate::server::generate_production_worker_secrets(&workspace).unwrap();
-    let first = read(&workspace, Target::Prod).unwrap();
-    assert!(first.contains_key("JOURNAL_COLLAB_ROOM_SALT"));
-    assert!(first.contains_key("JOURNAL_COLLAB_TICKET_PRIVATE_KEY"));
-    assert!(crate::server::generate_production_worker_secrets(&workspace).is_err());
-    assert_eq!(first, read(&workspace, Target::Prod).unwrap());
 }
 
 #[test]
@@ -130,41 +117,40 @@ fn every_name_has_one_owner() {
 fn composio_scoped_files_load_without_exposing_or_relocating_keys() {
     let tmp = tempfile::tempdir().unwrap();
     let workspace = fixture_workspace(tmp.path());
-    for target in [Target::Dev, Target::Prod] {
-        let base = root(&workspace, target);
-        write_private(
-            &base.join("composio.env"),
-            b"COMPOSIO_API_KEY=private-fixture-key\n",
-        )
-        .unwrap();
-        write_private(
-            &base.join("integrations/composio.env"),
-            b"MISTY_COMPOSIO_DEPLOYMENT=cloud\n",
-        )
-        .unwrap();
-        let values = read(&workspace, target).unwrap();
-        assert_eq!(values["COMPOSIO_API_KEY"], "private-fixture-key");
-        assert_eq!(values["MISTY_COMPOSIO_DEPLOYMENT"], "cloud");
-        set(
-            &workspace,
-            target,
-            "MISTY_COMPOSIO_API_KEY",
-            "private-instance-key",
-        )
-        .unwrap();
-        assert_eq!(
-            read(&workspace, target).unwrap()["MISTY_COMPOSIO_API_KEY"],
-            "private-instance-key"
-        );
-        write_private(
-            &base.join("integrations/composio.env"),
-            b"COMPOSIO_API_KEY=private-misplaced-key\n",
-        )
-        .unwrap();
-        let error = read(&workspace, target).unwrap_err().to_string();
-        assert!(error.contains("belongs in"));
-        assert!(!error.contains("private-misplaced-key"));
-    }
+    let target = Target::Dev;
+    let base = root(&workspace, target);
+    write_private(
+        &base.join("composio.env"),
+        b"COMPOSIO_API_KEY=private-fixture-key\n",
+    )
+    .unwrap();
+    write_private(
+        &base.join("integrations/composio.env"),
+        b"MISTY_COMPOSIO_DEPLOYMENT=cloud\n",
+    )
+    .unwrap();
+    let values = read(&workspace, target).unwrap();
+    assert_eq!(values["COMPOSIO_API_KEY"], "private-fixture-key");
+    assert_eq!(values["MISTY_COMPOSIO_DEPLOYMENT"], "cloud");
+    set(
+        &workspace,
+        target,
+        "MISTY_COMPOSIO_API_KEY",
+        "private-instance-key",
+    )
+    .unwrap();
+    assert_eq!(
+        read(&workspace, target).unwrap()["MISTY_COMPOSIO_API_KEY"],
+        "private-instance-key"
+    );
+    write_private(
+        &base.join("integrations/composio.env"),
+        b"COMPOSIO_API_KEY=private-misplaced-key\n",
+    )
+    .unwrap();
+    let error = read(&workspace, target).unwrap_err().to_string();
+    assert!(error.contains("belongs in"));
+    assert!(!error.contains("private-misplaced-key"));
 }
 
 #[test]
@@ -195,19 +181,13 @@ fn optional_files_are_created_only_when_configured() {
     init(&workspace, Target::Dev).unwrap();
     assert!(!workspace.cli.join(".env").exists());
     assert!(read_cli_files(&workspace).unwrap().is_empty());
-    let integration = root(&workspace, Target::Dev).join("integrations/dropbox.env");
+    let integration = root(&workspace, Target::Dev).join("integrations/web-fetch.env");
     assert!(!integration.exists());
     let before = read(&workspace, Target::Dev).unwrap();
-    assert!(!before.contains_key("MISTY_DROPBOX_CLIENT_ID"));
-    set(
-        &workspace,
-        Target::Dev,
-        "MISTY_DROPBOX_CLIENT_ID",
-        "fixture",
-    )
-    .unwrap();
+    assert!(!before.contains_key("MISTY_WEB_FETCH_URL"));
+    set(&workspace, Target::Dev, "MISTY_WEB_FETCH_URL", "fixture").unwrap();
     assert_eq!(
-        read(&workspace, Target::Dev).unwrap()["MISTY_DROPBOX_CLIENT_ID"],
+        read(&workspace, Target::Dev).unwrap()["MISTY_WEB_FETCH_URL"],
         "fixture"
     );
     fs::remove_file(integration).unwrap();
@@ -216,8 +196,6 @@ fn optional_files_are_created_only_when_configured() {
     let error = validate(&workspace, Target::Dev).unwrap_err().to_string();
     assert!(error.contains("missing required values"));
     assert!(error.contains("CLOUDFLARE_API_TOKEN"));
-    init(&workspace, Target::Prod).unwrap();
-    assert!(read(&workspace, Target::Prod).unwrap().is_empty());
 }
 
 #[test]
@@ -248,14 +226,14 @@ fn setup_is_idempotent_and_setting_values_stay_private() {
     set(
         &workspace,
         Target::Dev,
-        "AI_GATEWAY_API_KEY",
+        "MISTY_SERPER_API_KEY",
         "test-$literal-secret",
     )
     .unwrap();
     init(&workspace, Target::Dev).unwrap();
     crate::server::initialize_development_secrets(&workspace).unwrap();
     let second = read(&workspace, Target::Dev).unwrap();
-    assert_eq!(second["AI_GATEWAY_API_KEY"], "test-$literal-secret");
+    assert_eq!(second["MISTY_SERPER_API_KEY"], "test-$literal-secret");
     for (name, value) in first {
         assert_eq!(second[&name], value, "{name} changed on rerun");
     }
@@ -263,7 +241,7 @@ fn setup_is_idempotent_and_setting_values_stay_private() {
     assert!(set(
         &workspace,
         Target::Dev,
-        "AI_GATEWAY_API_KEY",
+        "MISTY_SERPER_API_KEY",
         "x\nINJECTED=bad"
     )
     .is_err());

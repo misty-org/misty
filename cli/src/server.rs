@@ -30,22 +30,14 @@ mod env_files;
 use env_files::*;
 mod health;
 pub use health::*;
-mod prod;
-pub use prod::*;
-mod staging;
-pub use staging::*;
 mod tunnel;
 pub use tunnel::*;
 mod worker;
 pub use worker::*;
-mod worker_validation;
-use worker_validation::*;
 mod secrets;
 use secrets::*;
 mod r2;
 pub use r2::*;
-mod release;
-pub use release::release;
 #[cfg(test)]
 mod tests;
 

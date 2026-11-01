@@ -2,17 +2,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import {
-  Button,
-  IconButton,
-  Switch,
-  Slider,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui";
+import { Button, IconButton, Switch, Slider } from "@/shared/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
@@ -24,9 +14,6 @@ import {
   companionSizeStep,
   normalizeCompanionSize,
 } from "./companionSize";
-
-// Radix Select has no empty value, so the server default gets a stand-in.
-const serverDefaultModel = "__server_default__";
 
 export function AgentCompanionPanel() {
   const { presentation: state, control } = useCompanionState();
@@ -140,27 +127,6 @@ export function AgentCompanionPanel() {
             <kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</kbd>
           </DesktopSettingsRow>
         )}
-        <DesktopSettingsRow label="Model">
-          <Select
-            value={state.model || serverDefaultModel}
-            disabled={!control}
-            onValueChange={(model) =>
-              act({ kind: "model", model: model === serverDefaultModel ? "" : model })
-            }
-          >
-            <SelectTrigger aria-label="Companion model">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={serverDefaultModel}>Server default</SelectItem>
-              {state.models?.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  {model.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </DesktopSettingsRow>
       </DesktopSettingsSection>
       {(error || state.error) && (
         <div className="agent-companion-error" role="alert">

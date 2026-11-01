@@ -1,4 +1,4 @@
-import { apiRequest } from "@/api/client";
+import { deviceModelCall } from "@/api/device-models";
 
 type Completion = {
   model?: string;
@@ -23,12 +23,15 @@ export const screenModelConfig = {
   ...slot("MIDSCENE_PLANNING_MODEL"),
 };
 
+// One act job runs a whole goal for up to four minutes, waiting between moves without model
+// calls; this caps runaway planners, not normal play.
+const maxCalls = 80;
+
 /**
- * An OpenAI-style client whose every completion is one numbered call to
- * Misty's metered pass-through for this act job. The server admits, meters
- * and caps each call, and the desktop never holds a model key.
+ * An OpenAI-style client whose every completion is one call to the agent runtime on this
+ * computer, on the run's device's agent model.
  */
-export function screenModelClient(jobId: string) {
+export function screenModelClient() {
   let call = 0;
   const client = {
     chat: {
@@ -37,13 +40,12 @@ export function screenModelClient(jobId: string) {
           request: { messages: unknown[]; stream?: boolean },
           options?: { signal?: AbortSignal },
         ) => {
-          const response = await apiRequest<Completion>(
-            `/me/screen-model/${encodeURIComponent(jobId)}?call=${call++}`,
-            {
-              method: "POST",
-              body: JSON.stringify({ messages: request.messages }),
-              signal: options?.signal,
-            },
+          if (call >= maxCalls) throw new Error("This screen task used all of its model calls.");
+          call++;
+          const response = await deviceModelCall<Completion>(
+            "screen-model",
+            { messages: request.messages },
+            options?.signal,
           );
           if (!request.stream) return response;
           const text = response.choices[0]?.message.content ?? "";

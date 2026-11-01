@@ -53,8 +53,9 @@ The same window as today, minus what needs an account:
 
 One sheet, opened over the browsing window, for every reason. Its title and one line say what
 asked, and **Not now** returns to the page. It reuses the sign-in form that exists today
-(`AuthCard`, `GoogleSignInButton`, `ForgotPasswordForm`) with Create account as a link inside
-it.
+(`AuthCard`, `GoogleSignInButton`) with Create account as a link inside it. There is no
+forgot-password form: a server sends no email, so the form says to ask whoever runs the server
+for a sign-in link (on Misty Cloud, `https://mistysys.com/sign-in`).
 
 | What the person did | Where | Sheet title |
 | --- | --- | --- |
@@ -217,7 +218,6 @@ synced copy.
 | Updates | `src/features/updater/UpdateNotices.tsx` | Returns early with no account id, so no update notices | Show them signed out |
 | Tab archive | `src/features/workspace/tabArchive.ts`, `browser/internal/ArchivedTabsList.tsx`, `webviews/useBrowserRuntimeServices.ts` | Archiving and the list need an account id | Use the profile id |
 | Settings pages | `settings/sections/PasswordsSettings.tsx`, `devices/AddThisDevice.tsx`, `MistySection.tsx` | Read `useSyncController(user?.id)` or `user.id` | Local vault for passwords; sign-in rows elsewhere |
-| Telemetry | `useTelemetryIdentitySync`, `src/telemetry/` | Anonymous until `/me` verifies | Send nothing while signed out (decision 5) |
 | Deep links | `src/app/routing/navigation.ts`, `SpaceInvitationRedemption` | Invite route works signed out, then asks to sign in in the small window | Invite opens the sheet over the window |
 | Account-only features | `src/features/agents`, `misty`, `journal`, `ai-surface`, `voice`, `recall`, `screen-memory`, `library`, `connected-devices`, `infra/cloud_clipboard` | An account | Unchanged: hidden signed out, or the sheet when invoked |
 
@@ -318,7 +318,8 @@ Answered 2026-10-23. Nothing blocks the build.
    data back with it (decision 2).
 4. **Merging asks once,** with counts, when sync turns on for an account that already syncs
    from other devices (as mocked).
-5. **No telemetry while signed out.** Nothing is sent to Misty until someone signs in.
+5. **No telemetry while signed out.** Nothing is sent to Misty until someone signs in. Since
+   October 31, 2026 the app sends no analytics or crash reports at all: PostHog was removed.
 6. **The Terms and Privacy footer stays** on the first-run welcome.
 7. **No AI chrome while signed out.** Only the agent shortcuts reach the sign-in sheet.
 8. **The local vault is a local mode of the existing sync crate** (`crates/browser-sync`), with

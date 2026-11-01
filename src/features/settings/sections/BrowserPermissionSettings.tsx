@@ -54,11 +54,7 @@ export function BrowserPermissionSettings() {
   return (
     <DesktopSettingsSection
       title="Website permissions"
-      description={
-        "Saved choices for the Spaces open now; each Space keeps its own. Websites ask before " +
-        "using your camera or microphone. Change a site's choices from the information button " +
-        "beside its address. Resetting stops capture in that Space."
-      }
+      description="Camera and microphone choices. Each Space keeps its own."
     >
       {loading ? (
         <SkeletonList

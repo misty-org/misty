@@ -44,7 +44,7 @@ export function SpaceLibraryUploadTray({
         >
           <Upload className={uploading ? "animate-pulse" : ""} size={15} aria-hidden="true" />
           <span
-            className={`absolute -right-1 -top-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold text-cream-bright ${
+            className={`absolute -right-1 -top-1 grid size-4 place-items-center rounded-full text-3xs font-semibold text-cream-bright ${
               failed.length > 0 ? "bg-charcoal-active" : "bg-charcoal-active"
             }`}
           >
@@ -73,7 +73,7 @@ export function SpaceLibraryUploadTray({
             <li className="border-b px-3 py-2 last:border-b-0" key={job.id}>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="min-w-0 flex-1 truncate text-xs">{job.name}</span>
-                <span className="shrink-0 text-[10px] text-cream-muted">
+                <span className="shrink-0 text-3xs text-cream-muted">
                   {job.stage === "failed"
                     ? "Failed"
                     : job.stage === "ready"

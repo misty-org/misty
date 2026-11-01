@@ -7,6 +7,8 @@ live in that feature's folder: [agents](../agents/README.md), [browser](../brows
 
 ## Rules
 
+- Type is one system face (`font-sans`) and, for code, URLs and codes only, one monospace face (`font-mono`), both defined once in `src/styles/theme.css`. No decorative or serif faces. Sizes come from the scale there (`text-3xs` 10, `2xs` 11, `xs` 12, `ui` 13 for controls, `sm` 14, `md` 15 for page text, `base` 16, `lg` 18 and up); never `text-[Npx]`. Copy is sentence case: no `uppercase`, small caps or ALL-CAPS labels, only real acronyms (URL, PDF, AI).
+
 - Shared dropdown and context-menu selections use checkmarks, never dot indicators. Collection toolbars must not add a filter menu that duplicates their visible section tabs.
 
 - Use the approved black, white and gray palette. Do not introduce green, sage, colored status dots, tinted selections or accent-colored focus rings unless the user explicitly requests color for that surface. Convey status through text and icons as well as contrast.

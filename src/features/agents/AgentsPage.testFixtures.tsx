@@ -47,9 +47,6 @@ vi.mock("@/api/agents/native", () => ({
     memories: async () => ({ memories: [] }),
   },
 }));
-vi.mock("@/api/assistant/api", () => ({
-  assistantApi: { frontierModels: async () => ({ models: [] }) },
-}));
 vi.mock("@/features/misty/handoff", () => ({ openMisty: async () => {} }));
 
 beforeEach(() => {

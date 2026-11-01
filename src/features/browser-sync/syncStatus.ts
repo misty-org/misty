@@ -1,3 +1,4 @@
+import { accountLimitMessages } from "@/api/client/accountLimits";
 import type { NativeSyncView } from "./native";
 import { currentDeviceId } from "./websiteData";
 
@@ -57,6 +58,12 @@ export const syncIssues: Record<string, SyncStatus> = {
   local_storage_unavailable: attention(
     "Local saving needs attention",
     "Misty cannot write sync data. Check available disk space and keep Misty open until saved.",
+  ),
+  // The server refused writes because the account's storage is full. They wait on this
+  // device and are sent again in a while, or at once with Retry after freeing space.
+  storage_limit_reached: attention(
+    "Storage is full",
+    `${accountLimitMessages.storage_limit_reached} New changes wait on this device until there is room.`,
   ),
   sync_protocol_failed: attention(
     "Sync could not complete",

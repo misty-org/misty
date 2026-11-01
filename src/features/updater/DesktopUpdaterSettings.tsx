@@ -104,18 +104,15 @@ export function DesktopUpdaterSettings() {
               ? "Downloading update…"
               : `Downloading update… ${progress.percent}%`
             : state === "error"
-              ? "Open Activity for details"
+              ? "The last check failed"
               : "Not checked";
 
   return (
     <>
-      <DesktopSettingsRow label="Version">
-        <span className="font-mono text-xs text-cream-muted">v{version}</span>
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Release channel">
-        <span className="text-sm text-cream">Beta</span>
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Misty updates">
+      <DesktopSettingsRow
+        label="Version"
+        description={`${version} · ${supported ? status : "Updates come with packaged builds"}`}
+      >
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[760px]:justify-items-start">
           <div className="flex flex-wrap items-center justify-end gap-2 max-[760px]:justify-start">
             {state === "error" ? (
@@ -125,9 +122,6 @@ export function DesktopUpdaterSettings() {
                 title="Misty update needs attention"
               />
             ) : null}
-            <span className="text-xs text-cream-muted" role="status">
-              {supported ? status : "Available in packaged desktop builds"}
-            </span>
             {state === "available" ? (
               <Button size="sm" type="button" onClick={() => void installUpdate()}>
                 Install and restart

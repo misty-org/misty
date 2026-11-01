@@ -8,21 +8,21 @@ import AuthMessage from "./AuthMessage";
 import AuthSubmitButton from "./AuthSubmitButton";
 import GoogleSignInButton from "./GoogleSignInButton";
 
-/** Email and password, Forgot your password, and Google: the sign-in page and the sign-in
- * sheet share it. The email and the error belong to the host, which keeps them across its
- * other screens. */
+/** Email and password, and Google: the sign-in page and the sign-in sheet share it. The email
+ * and the error belong to the host, which keeps them across its other screens. A server sends
+ * no email, so a forgotten password is reset with a sign-in link from whoever runs it. */
 export default function SignInForm(props: {
   email: string;
   onEmailChange: (email: string) => void;
   error: string;
   onErrorChange: (error: string) => void;
   onSuccess: () => void;
-  onForgot: () => void;
 }) {
   const { transitioning, authenticateAccount } = useAuth();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  // After a reset by email the account holds the password as typed. That is sent only when asked for.
+  // An account whose password was reset by email (older servers) holds the password as typed.
+  // That is sent only when asked for.
   const [offerPlainSignIn, setOfferPlainSignIn] = useState(false);
 
   async function signIn(legacy: boolean) {
@@ -72,24 +72,17 @@ export default function SignInForm(props: {
           disabled={loading || transitioning}
           onChange={setPassword}
         />
-        <Button
-          type="button"
-          variant="link"
-          className="h-auto self-start p-0 text-cream"
-          onClick={() => {
-            props.onErrorChange("");
-            props.onForgot();
-          }}
-        >
-          Forgot your password?
-        </Button>
+        <p className="m-0 text-xs text-cream-muted">
+          Forgot your password? Ask the person who runs this server for a sign-in link. On Misty
+          Cloud, get one at mistysys.com/sign-in.
+        </p>
       </div>
       {props.error ? <AuthMessage tone="error" message={props.error} /> : null}
       {offerPlainSignIn ? (
         <div className="flex flex-col gap-1 text-sm text-cream-muted">
           <span>
-            Reset your password by email? That password is sent to Misty as typed, once, and your
-            sync vault needs a new password afterwards.
+            Was your password reset by email? That password is sent to Misty as typed, once, and
+            your sync vault needs a new password afterwards.
           </span>
           <Button
             type="button"
@@ -103,16 +96,11 @@ export default function SignInForm(props: {
         </div>
       ) : null}
       <AuthSubmitButton
-        idleLabel="Sign In"
-        loadingLabel="Signing in..."
+        idleLabel="Sign in"
+        loadingLabel="Signing in…"
         loading={loading}
         disabled={transitioning}
       />
-      <div className="flex items-center gap-3 text-xs text-cream-muted" aria-hidden="true">
-        <span className="h-px flex-1 bg-charcoal-border" />
-        or
-        <span className="h-px flex-1 bg-charcoal-border" />
-      </div>
       <GoogleSignInButton
         disabled={loading || transitioning}
         onBusy={setLoading}

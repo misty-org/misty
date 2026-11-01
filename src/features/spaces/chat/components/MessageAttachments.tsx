@@ -95,14 +95,14 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
                 {attachment.display_name}
               </Button>
               {attachment.promoted_item_id ? (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                <Badge variant="secondary" className="h-5 px-1.5 text-3xs">
                   In Library
                 </Badge>
               ) : (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-1.5 text-[10px]"
+                  className="h-6 px-1.5 text-3xs"
                   type="button"
                   onClick={() =>
                     void spacesApi.promoteAttachment(props.spaceId, attachment.id).then((item) => {

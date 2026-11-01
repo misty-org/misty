@@ -53,7 +53,7 @@ export function ChatThreadColumn({
     <li key={message.id} className="px-3 py-2">
       <div className="flex items-baseline gap-2">
         <strong className="text-sm text-cream">{message.sender_name}</strong>
-        <time className="text-[11px] tabular-nums text-cream-muted">
+        <time className="text-2xs tabular-nums text-cream-muted">
           {formatChatMessageTime(message.created_at)}
         </time>
       </div>

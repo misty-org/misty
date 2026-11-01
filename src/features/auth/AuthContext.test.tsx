@@ -157,18 +157,6 @@ vi.mock("@/features/agents", () => ({
 vi.mock("@/features/journal/notes", () => ({
   resetNotesAccountState: mocks.resetNotesAccountState,
 }));
-vi.mock("@/telemetry/lifecycle", () => ({
-  setAnalyticsAuthenticationState: vi.fn(),
-  setTelemetryAccountPresent: vi.fn(),
-}));
-vi.mock("@/telemetry/client", () => ({
-  analytics: {},
-}));
-vi.mock("@/telemetry/identity", () => ({
-  TelemetryIdentityManager: class {
-    sync() {}
-  },
-}));
 describe("AuthProvider account switching", () => {
   let container: HTMLDivElement;
   let root: Root | undefined;

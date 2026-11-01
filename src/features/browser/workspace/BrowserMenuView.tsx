@@ -230,7 +230,11 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
               icon={<Settings />}
               label="Settings"
               shortcut="app.open_settings"
-              onSelect={() => window.dispatchEvent(new CustomEvent("misty:open-settings"))}
+              onSelect={() =>
+                window.dispatchEvent(
+                  new CustomEvent("misty:open-settings", { detail: { section: "general" } }),
+                )
+              }
             />
             <DropdownMenuSeparator />
           </>

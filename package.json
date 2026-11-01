@@ -30,7 +30,6 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.1",
-    "@fontsource/instrument-serif": "^5.3.0",
     "@impierce/tauri-plugin-keystore": "^2.1.0-alpha.1",
     "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@midscene/core": "1.14.0",
@@ -96,7 +95,6 @@
     "mammoth": "^1.12.0",
     "motion": "^12.42.2",
     "pdfjs-dist": "4.8.69",
-    "posthog-js": "^1.399.2",
     "qrcode.react": "^4.2.0",
     "quickjs-emscripten-core": "0.32.0",
     "react": "19.2.8",
@@ -122,7 +120,6 @@
   "devDependencies": {
     "@cyclonedx/cyclonedx-npm": "6.0.0",
     "@eslint/js": "9.39.5",
-    "@posthog/rollup-plugin": "^1.4.7",
     "@tauri-apps/cli": "^2.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.0.0",

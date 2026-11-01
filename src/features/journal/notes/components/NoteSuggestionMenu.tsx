@@ -113,7 +113,7 @@ export function NoteSuggestionMenu(props: {
         top: props.suggestion.y,
       }}
     >
-      <p className="mx-2 mb-1.5 mt-1 text-[11px] font-semibold text-cream-muted">
+      <p className="mx-2 mb-1.5 mt-1 text-2xs font-semibold text-cream-muted">
         {props.suggestion.type === "wiki" ? "Link to note" : "Insert block"}
       </p>
       {props.suggestion.type === "slash"

@@ -33,7 +33,7 @@ export function MemoryPopover({ node }: { node: MemoryNode }) {
     <div className="flex flex-col gap-2.5">
       <div className="flex items-start gap-2">
         <NodeGlyph node={node} className="mt-0.5" />
-        <h2 className="m-0 line-clamp-2 min-w-0 text-[13px] font-medium leading-5 text-cream-bright">
+        <h2 className="m-0 line-clamp-2 min-w-0 text-ui font-medium leading-5 text-cream-bright">
           {node.label}
         </h2>
       </div>
@@ -42,7 +42,7 @@ export function MemoryPopover({ node }: { node: MemoryNode }) {
           <Badge variant="outline">{sourceLabels[node.source]}</Badge>
         )}
         {node.detail && <Badge variant="outline">{node.detail}</Badge>}
-        <span className="text-[11px] text-cream-muted">{formatWhen(node.last_at)}</span>
+        <span className="text-2xs text-cream-muted">{formatWhen(node.last_at)}</span>
       </div>
       {body && (
         <p
@@ -54,7 +54,7 @@ export function MemoryPopover({ node }: { node: MemoryNode }) {
           {body}
         </p>
       )}
-      <p className="m-0 text-[11px] text-cream-muted">
+      <p className="m-0 text-2xs text-cream-muted">
         {node.searchable
           ? "Searchable by you and your agents."
           : "Not searchable yet. New memories are indexed within the hour."}

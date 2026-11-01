@@ -38,7 +38,7 @@ export function EmptyWorkspacePane() {
   return (
     <div className="relative grid h-full place-items-center bg-charcoal-bg px-6 text-center">
       <FlyingMisty />
-      <p className="relative z-10 m-0 text-base font-medium text-cream">A little quiet here...</p>
+      <p className="relative z-10 m-0 text-base font-medium text-cream">A little quiet here…</p>
     </div>
   );
 }

@@ -52,7 +52,6 @@ export interface PreparedTurn {
   attachments: NonNullable<SubmitArgs[1]>;
   selection?: AiSelectionSnapshot;
   companion: SubmitArgs[6];
-  requestState: MistyState;
   requestAgentId: string;
   handoff: MistyState["handoff"];
   executionMode: AiInvocationRequest["executionMode"];
@@ -84,7 +83,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     attachments,
     selection,
     companion,
-    requestState,
     requestAgentId,
     handoff,
     executionMode,
@@ -135,8 +133,6 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
         : undefined,
       mode: companion ? "companion" : "drawer",
       companionMode: companion?.interactionMode,
-      companionModel: companion?.model,
-      modelOverride: companion ? undefined : requestState.pendingModelOverride,
       displayCaptures: companion?.displayCaptures,
       methodVersionId: companion?.methodVersionId,
       methodInputs: companion?.methodInputs,
@@ -219,19 +215,9 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
       useCollaborationStore.getState().adoptDraftMode(conversationId);
       useConversationCodingTool.getState().adoptDraft(conversationId);
     }
-    // The server saved a model picked before this conversation existed.
-    const pinned = companion ? undefined : requestState.pendingModelOverride;
     set({
       invocationId: created.invocationId,
       invocationConversationId: conversationId,
-      ...(pinned
-        ? {
-            pendingModelOverride: undefined,
-            conversations: get().conversations.map((c) =>
-              c.id === conversationId ? { ...c, modelOverride: pinned, modelId: pinned } : c,
-            ),
-          }
-        : {}),
     });
     replaceActiveGlobalInvocationStream(
       subscribeToAiInvocation(

@@ -4,7 +4,8 @@ import { useLocation } from "react-router-dom";
 import type { SpaceMembersState } from "./useSpaceMembers";
 
 /**
- * The invite dialog and the transfer/remove confirmation.
+ * The invite dialog and the transfer/remove confirmation. The server sends no email, so once an
+ * invitation is made (or given a new link) the dialog shows its link to copy and pass on.
  *
  * Both leave their errors to the shared Spaces store, which is why the failure
  * branches here are empty — the dialogs render `store.error` directly.
@@ -15,6 +16,7 @@ export function useMemberDialogs(spaceId: string, state: SpaceMembersState, star
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [invitedLink, setInvitedLink] = useState<{ email: string; link: string } | null>(null);
   const [memberAction, setMemberAction] = useState<MemberAction>();
   const [actionBusy, setActionBusy] = useState(false);
 
@@ -28,8 +30,19 @@ export function useMemberDialogs(spaceId: string, state: SpaceMembersState, star
     if (inviting) return;
     setInviteOpen(false);
     setInviteEmail("");
+    setInvitedLink(null);
     clearError();
   }, [clearError, inviting]);
+
+  /** Opens the dialog on an invitation's link, as right after inviting. */
+  const showInviteLink = useCallback(
+    (email: string, link: string) => {
+      clearError();
+      setInvitedLink({ email, link });
+      setInviteOpen(true);
+    },
+    [clearError],
+  );
 
   const openInvite = () => {
     clearError();
@@ -42,10 +55,11 @@ export function useMemberDialogs(spaceId: string, state: SpaceMembersState, star
     if (!email || inviting) return;
     setInviting(true);
     try {
-      await invite(spaceId, email);
+      const link = await invite(spaceId, email);
       await state.loadPendingInvitations();
       setInviteEmail("");
-      setInviteOpen(false);
+      if (link) setInvitedLink({ email, link });
+      else setInviteOpen(false);
     } catch {
       // The shared store error is rendered in the dialog.
     } finally {
@@ -78,6 +92,8 @@ export function useMemberDialogs(spaceId: string, state: SpaceMembersState, star
     openInvite,
     closeInvite,
     submitInvite,
+    invitedLink,
+    showInviteLink,
     memberAction,
     setMemberAction,
     actionBusy,

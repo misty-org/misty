@@ -7,11 +7,11 @@ use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
+/// Provisions the development tunnel, DNS route and Worker host. A server
+/// provisions its own Cloudflare resources in its setup container
+/// (server/deploy/setup).
 #[derive(Debug, clap::Args)]
 pub struct Options {
-    /// Environment to provision. Production uses a host-installed cloudflared connector.
-    #[arg(long, value_enum, default_value = "dev")]
-    pub target: Target,
     /// Apply the displayed Cloudflare resource plan.
     #[arg(long)]
     apply: bool,
@@ -27,16 +27,9 @@ pub struct Options {
 }
 
 pub fn setup(workspace: &Workspace, options: Options) -> Result<()> {
-    if options.target == Target::Staging {
-        bail!(
-            "staging is private and uses SSH port forwarding; Cloudflare is not configured for it"
-        );
-    }
-    if options.target == Target::Dev {
-        environment::init(workspace, Target::Dev)?;
-        crate::server::initialize_development_secrets(workspace)?;
-    }
-    let values = environment::read(workspace, options.target)?;
+    environment::init(workspace, Target::Dev)?;
+    crate::server::initialize_development_secrets(workspace)?;
+    let values = environment::read(workspace, Target::Dev)?;
     let mut credentials = values.clone();
     // Only credentials inherit the CLI/shell environment. Routing stays target-scoped.
     for key in [
@@ -56,10 +49,7 @@ pub fn setup(workspace: &Workspace, options: Options) -> Result<()> {
             .filter(|v| !v.is_empty())
             .cloned()
             .with_context(|| {
-                format!(
-                    "{key} is missing; use misty env set {} {key} (value from stdin)",
-                    options.target.label()
-                )
+                format!("{key} is missing; use misty env set dev {key} (value from stdin)")
             })
     };
     let token = required("CLOUDFLARE_API_TOKEN")?;
@@ -93,9 +83,9 @@ fn provision(
     zone: String,
     mut request: impl FnMut(&str, &str, Option<Value>) -> Result<Value>,
 ) -> Result<()> {
-    let target = options.target;
+    let target = Target::Dev;
     let host = selected_hostname(&options, &values)?;
-    let service = service(target, &values)?;
+    let service = service();
     id(&account)?;
     id(&zone)?;
     hostname(&host)?;
@@ -115,11 +105,7 @@ fn provision(
                 .filter(|v| !v.is_empty())
                 .cloned()
         })
-        .unwrap_or_else(|| match target {
-            Target::Dev => format!("misty-{}", host.replace('.', "-")),
-            Target::Staging => format!("misty-staging-{}", host.replace('.', "-")),
-            Target::Prod => format!("misty-prod-{}", host.replace('.', "-")),
-        });
+        .unwrap_or_else(|| format!("misty-{}", host.replace('.', "-")));
     if name.trim().is_empty() || name.contains(['\n', '\r', '\0', '\'']) {
         bail!("invalid tunnel name");
     }
@@ -170,19 +156,8 @@ fn provision(
     } else {
         json!({})
     };
-    if target == Target::Prod
-        && current["config"]["ingress"]
-            .as_array()
-            .is_some_and(|rules| {
-                rules
-                    .iter()
-                    .any(|rule| rule["service"] == "http://misty-api:8080")
-            })
-    {
-        bail!("this tunnel serves development; choose a separate production tunnel name");
-    }
     let config = merge_ingress(&current, &host, &service)?;
-    let worker = if target == Target::Dev {
+    let (worker_name, worker_host) = {
         let subdomain = request(
             "GET",
             &format!("accounts/{account}/workers/subdomain"),
@@ -207,14 +182,10 @@ fn provision(
         );
         }
         let worker_host = format!("{worker_name}.{subdomain}.workers.dev");
-        Some((worker_name, worker_host))
-    } else {
-        None
+        (worker_name, worker_host)
     };
     println!("Cloudflare {} plan: account {account}, zone {zone_name}\nTunnel: {name}\nRoute: https://{host} → {service}\nDNS: proxied CNAME to the tunnel", target.label());
-    if worker.is_some() {
-        println!("Worker: deploy separately with misty server deploy");
-    }
+    println!("Worker: deploy separately with misty server deploy");
     if !options.apply {
         println!(
             "No remote changes made. Repeat with --apply to provision and save configuration."
@@ -260,31 +231,21 @@ fn provision(
     .as_str()
     .context("missing tunnel token")?
     .to_owned();
-    let mut settings = vec![
+    let settings = vec![
         ("CLOUDFLARE_ACCOUNT_ID", account),
         ("CLOUDFLARE_ZONE_ID", zone),
         ("CLOUDFLARE_API_TOKEN", token),
         ("CLOUDFLARE_TUNNEL_TOKEN", tunnel_token),
         ("MISTY_CLOUDFLARE_TUNNEL_NAME", name),
+        ("MISTY_CLOUDFLARE_WORKER_NAME", worker_name),
+        ("MISTY_CLOUDFLARE_WORKER_HOST", worker_host),
+        ("MISTY_DEV_API_ORIGIN", format!("https://{host}")),
+        ("MISTY_DEV_API_TUNNEL_HOSTNAME", host),
     ];
-    if let Some((worker_name, worker_host)) = worker {
-        settings.extend([
-            ("MISTY_CLOUDFLARE_WORKER_NAME", worker_name),
-            ("MISTY_CLOUDFLARE_WORKER_HOST", worker_host),
-            ("MISTY_DEV_API_ORIGIN", format!("https://{host}")),
-            ("MISTY_DEV_API_TUNNEL_HOSTNAME", host),
-        ]);
-    } else {
-        settings.push(("MISTY_PUBLIC_API_URL", format!("https://{host}/v1")));
-    }
     for (key, val) in settings {
         environment::set(workspace, target, key, &val)?;
     }
-    match target {
-        Target::Dev => println!("Cloudflare configured. Next: misty server up; misty server deploy; misty doctor cloudflare"),
-        Target::Staging => unreachable!("staging Cloudflare setup was rejected above"),
-        Target::Prod => println!("Production tunnel configured. Configuration saved under server/.env/prod/.\nNext: misty server prod up; start cloudflared on the VPS host using the saved CLOUDFLARE_TUNNEL_TOKEN.\nSee cli/README.md#production-cloudflare-tunnel for connector setup."),
-    }
+    println!("Cloudflare configured. Next: misty server up; misty server deploy; misty doctor cloudflare");
     Ok(())
 }
 mod ingress;

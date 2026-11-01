@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { defaultDockingLayout, useDockingLayoutStore } from "@/features/app-shell/dockingLayout";
 import { useWorkspaceStore } from "@/features/workspace";
 import { useWindowDockingLayout } from "@/features/workspace/useWindowDockingLayout";
-import { settingsPage, canonicalSettingsSection } from "../settingsRegistry";
+import { canonicalSettingsSection } from "../settingsRouting";
 import type { SettingsContentProps } from "../settingsTypes";
 import { AppearanceSection } from "./AppearanceSection";
 
@@ -41,6 +41,5 @@ it("moves this window's tab sidebar between the left and the right from Appearan
 });
 
 it("has no Layout page of its own; old links open Appearance", () => {
-  expect(settingsPage("layout")).toBeUndefined();
   expect(canonicalSettingsSection("layout")).toBe("appearance");
 });

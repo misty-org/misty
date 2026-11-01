@@ -30,7 +30,7 @@ type SegmentedControlProps<T extends string> = {
 };
 
 const itemSizes = {
-  xs: "h-6 gap-1 px-2 text-[11px] [&_svg:not([class*='size-'])]:size-3",
+  xs: "h-6 gap-1 px-2 text-2xs [&_svg:not([class*='size-'])]:size-3",
   sm: "h-7 gap-1.5 px-3 text-xs [&_svg:not([class*='size-'])]:size-3.5",
 } as const;
 

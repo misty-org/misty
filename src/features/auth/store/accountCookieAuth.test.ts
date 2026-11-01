@@ -20,8 +20,6 @@ vi.mock("@/api/deployment/api", () => ({
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/telemetry/client", () => ({ analytics: { isAnalyticsEnabled: () => false } }));
-vi.mock("@/telemetry/lifecycle", () => ({ configureTelemetryPreferencesSync: vi.fn() }));
 
 describe("server JWT cookie account contract", () => {
   beforeEach(() => {
@@ -61,6 +59,37 @@ describe("server JWT cookie account contract", () => {
       expect(new Headers(options?.headers).get("X-Misty-CSRF")).toBe("1");
       expect(new Headers(options?.headers).has("Authorization")).toBe(false);
     }
+  });
+
+  it("marks a setup-key account that has no password yet, and only that one", async () => {
+    localStorage.clear();
+    const answer = (credential: boolean) =>
+      mocks.nativeFetch.mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              user_id: "account-c",
+              username: "cara",
+              email: "cara@example.test",
+              credential_account: credential,
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      );
+    const account = await import("./useAccountStore");
+    const pending = await import("./pendingPassword");
+    answer(true);
+    await account.accountRedeemSetupKey(" misty_setup_abcdefghijklmnopqrstuvwxyz234567 ");
+    expect(pending.pendingPasswordEmail("account-c")).toBeNull();
+    answer(false);
+    await account.accountRedeemSetupKey("misty_setup_abcdefghijklmnopqrstuvwxyz234567");
+    expect(pending.pendingPasswordEmail("account-c")).toBe("cara@example.test");
+    const calls = mocks.nativeFetch.mock.calls;
+    const [url, options] = calls[calls.length - 1]!;
+    expect(String(url)).toBe("https://misty.example/v1/setup-keys/redeem");
+    expect(JSON.parse(String(options?.body))).toEqual({
+      setup_key: "misty_setup_abcdefghijklmnopqrstuvwxyz234567",
+    });
   });
 
   it("invalidates the restored identity when the server rejects its access and refresh cookies", async () => {

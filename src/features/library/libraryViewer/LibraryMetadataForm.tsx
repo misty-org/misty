@@ -4,7 +4,7 @@ import { Button, Input, Textarea } from "@/shared/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { LibraryMetadataRow } from "../SpaceLibraryViewerUtils";
 
-const labelClass = "grid gap-1.5 text-[10px] font-medium capitalize text-cream-muted";
+const labelClass = "grid gap-1.5 text-3xs font-medium capitalize text-cream-muted";
 
 /**
  * Editable name, caption and tags — or a read-only summary without permission.

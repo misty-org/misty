@@ -8,7 +8,8 @@ import { SettingsNote } from "@/features/settings/SettingsControls";
 import { SyncDeleteVaultDialog } from "./SyncDeleteVaultDialog";
 import { SyncPasswordDialog } from "./SyncPasswordDialog";
 import { SyncVaultForm } from "./SyncVaultForm";
-import { isCredentialAccount } from "@/features/auth";
+import { isCredentialAccount, openSignInSheet } from "@/features/auth";
+import { usePasswordPending } from "@/features/auth/core";
 import type { SyncController } from "./useSyncController";
 export function SyncUnlockForm({
   controller,
@@ -21,6 +22,19 @@ export function SyncUnlockForm({
 }) {
   const { vault, reenroll, unlock } = controller;
   const [choosing, setChoosing] = useState(false);
+  const pending = usePasswordPending(controller.accountId);
+  if (pending)
+    return (
+      <Section title={sectionTitle ?? "Sync vault"} density={compact ? "compact" : "normal"}>
+        <Row
+          label="Choose a password"
+          description="Your account was set up with a key and has no password yet. Sync encrypts your data with it, so it starts once you choose one."
+          density={compact ? "compact" : "normal"}
+        >
+          <Button onClick={() => openSignInSheet("password")}>Choose password…</Button>
+        </Row>
+      </Section>
+    );
   if (!vault) return <SyncVaultFormSkeleton />;
   const create = !reenroll && !vault.local && vault.remote === false;
   const google = controller.provider === "google";

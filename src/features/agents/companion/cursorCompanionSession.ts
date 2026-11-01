@@ -119,10 +119,6 @@ export class CursorCompanionSession {
       size: normalizeCompanionSize(values["agents.companion.size"]),
       ask: values["agents.companion.ask"] === true,
       teach: values["agents.companion.teach"] === true,
-      model:
-        typeof values["agents.companion.model"] === "string"
-          ? values["agents.companion.model"]
-          : "",
     });
   };
 

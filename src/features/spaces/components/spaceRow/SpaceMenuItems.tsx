@@ -50,7 +50,7 @@ export function SpaceMenuItems(props: {
             <SpaceAvatar
               space={item}
               className="size-5 rounded-md"
-              fallbackClassName="text-[9px] font-semibold"
+              fallbackClassName="text-3xs font-semibold"
             />
             <span className="min-w-0 flex-1 truncate">{spaceNavigationName(item)}</span>
           </DropdownMenuCheckboxItem>

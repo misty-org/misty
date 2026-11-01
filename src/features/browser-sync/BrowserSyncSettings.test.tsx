@@ -43,9 +43,11 @@ vi.mock("@/features/auth", () => ({
   isCredentialAccount: () => true,
   markCredentialAccount: mocks.markCredential,
   passwordProblem: async () => null,
+  openSignInSheet: vi.fn(),
 }));
 vi.mock("@/features/auth/core", () => ({
   useUserStore: (select: (s: unknown) => unknown) => select({ me: { name: "User" } }),
+  usePasswordPending: () => false,
 }));
 vi.mock("@/features/settings/devicePreferences/store", () => ({
   useDevicePreferences: create(() => ({
@@ -131,22 +133,44 @@ async function mount() {
     render(<BrowserSyncSettings {...props} />);
   });
 }
-/** Moves the wizard from connecting to managing a connected workspace. */
-async function manage() {
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Continue" })));
+/** Opens the setup wizard from a page that is already set up. */
+async function openSetup() {
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Open setup" })));
 }
-it("opens the sync wizard and groups each concern on the manage step", async () => {
+it("opens the setup wizard on arrival while sync is not set up", async () => {
+  useBrowserSyncStore.setState({ session: null });
   await mount();
-  expect(screen.getByRole("dialog", { name: "Sync" })).toBeTruthy();
-  expect(screen.getByRole("region", { name: "Vault access" })).toBeTruthy();
-  await manage();
-  for (const name of ["Timing", "Workspace devices", "Website sign-ins"])
+  const dialog = screen.getByRole("dialog", { name: "Sync" });
+  expect(within(dialog).getByLabelText("Misty password")).toBeTruthy();
+  await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Done" })));
+  expect(screen.queryByRole("dialog", { name: "Sync" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Set up sync" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Workspace devices" })).toBeNull();
+});
+it("shows settings and devices without the wizard once sync is set up", async () => {
+  await mount();
+  expect(screen.queryByRole("dialog", { name: "Sync" })).toBeNull();
+  for (const name of ["Sync", "Workspace devices", "Website sign-ins"])
     expect(screen.getByRole("region", { name })).toBeTruthy();
   expect(
     screen.getByText("Publishing from").closest("[data-setting-label]")?.textContent,
   ).toContain("MacBook");
   expect(screen.queryByRole("tablist")).toBeNull();
   expect(screen.queryByRole("combobox")).toBeNull();
+});
+it("re-runs setup from a plain button row once sync is set up", async () => {
+  await mount();
+  const row = screen.getByText("Sync is on").closest("[data-setting-label]")!;
+  expect(within(row as HTMLElement).getByRole("button", { name: "Open setup" })).toBeTruthy();
+  await openSetup();
+  const dialog = screen.getByRole("dialog", { name: "Sync" });
+  expect(within(dialog).getByRole("region", { name: "Vault access" })).toBeTruthy();
+});
+it("does not reopen the wizard by itself when a set-up session ends", async () => {
+  await mount();
+  act(() => useBrowserSyncStore.setState({ session: null }));
+  expect(screen.queryByRole("dialog", { name: "Sync" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Set up sync" })).toBeTruthy();
 });
 it("writes restore preferences through the settings callback and disables dependent restore", async () => {
   render(<SyncRestoreSettings {...props} />);
@@ -162,7 +186,6 @@ it("writes restore preferences through the settings callback and disables depend
 });
 it("writes labeled mode changes and waits for server confirmation", async () => {
   await mount();
-  await manage();
   await act(async () =>
     fireEvent.click(screen.getByRole("switch", { name: "Full sync for Office" })),
   );
@@ -188,7 +211,6 @@ it("confirms opening another device's tabs without taking its sign-in lease", as
   };
   useBrowserSyncStore.setState({ session: twoWorkspaces() });
   await mount();
-  await manage();
   await act(async () =>
     fireEvent.click(screen.getByRole("button", { name: /Open tabs from .* here/ })),
   );
@@ -203,7 +225,6 @@ it("confirms opening another device's tabs without taking its sign-in lease", as
 });
 it("absorbs device names into inline rename", async () => {
   await mount();
-  await manage();
   fireEvent.click(screen.getByRole("button", { name: "Rename Office" }));
   const input = screen.getByRole("textbox", { name: "Name for Office" });
   fireEvent.change(input, { target: { value: "Studio" } });
@@ -229,6 +250,7 @@ it("only offers creation after the server confirms vault absence", async () => {
 });
 it("locks sync and prevents background auto-unlock; forgetting removes the saved key", async () => {
   await mount();
+  await openSetup();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Forget key" })));
   expect(mocks.lock).toHaveBeenCalledWith("s", true);
   expect(useBrowserSyncStore.getState().locked).toBe("a");
@@ -261,7 +283,6 @@ it("deletes a locked vault after confirmation, then offers to create a new one",
 it("keeps the vault and shows why when resetting fails", async () => {
   mocks.deleteVault.mockRejectedValue(new Error("Could not reach the sync server."));
   await mount();
-  await manage();
   fireEvent.click(screen.getByRole("button", { name: "Reset sync…" }));
   const dialog = screen.getByRole("alertdialog");
   fireEvent.change(within(dialog).getByLabelText("Misty password"), {
@@ -288,6 +309,7 @@ it("clears old-account forms when the account changes", async () => {
 
 async function submitPasswordChange(current: string, next: string) {
   await mount();
+  await openSetup();
   fireEvent.click(screen.getByRole("button", { name: "Change password…" }));
   const dialog = screen.getByRole("dialog", { name: "Choose a new Misty password" });
   fireEvent.change(within(dialog).getByLabelText("Current password"), {
@@ -357,7 +379,6 @@ it("leaves the account alone when the server confirms it holds only a credential
 });
 it("asks for the password before deleting the vault, and says plainly when it is wrong", async () => {
   await mount();
-  await manage();
   fireEvent.click(screen.getByRole("button", { name: "Reset sync…" }));
   const dialog = screen.getByRole("alertdialog");
   await act(async () =>

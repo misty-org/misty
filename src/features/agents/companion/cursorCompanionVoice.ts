@@ -7,7 +7,7 @@ import {
   type ConversationTool,
   type SavedVoiceTurn,
 } from "./companionConversation";
-import { mergeVoiceTurn } from "./companionConversationHistory";
+import { mergeVoiceTurn, voiceContext } from "./companionConversationHistory";
 import type { CompanionOrigin, CursorCompanionSession } from "./cursorCompanionSession";
 
 /**
@@ -68,6 +68,17 @@ export class CursorCompanionVoice {
     if (!origin || origin.conversationId !== conversationId || !s.originIsCurrent(origin))
       throw new Error("The voice conversation changed.");
     const current = useMistyStore.getState();
+    if (tool.name === "get_task_status") {
+      // Read from this chat: the task's state and its saved answer, if it has one.
+      const id =
+        current.invocationConversationId === conversationId ? current.invocationId : undefined;
+      if (!id) return JSON.stringify({ state: "none" });
+      return JSON.stringify({
+        invocation_id: id,
+        state: current.working ? "running" : "completed",
+        reply: (this.reply(id)?.content ?? "").slice(0, 6000),
+      });
+    }
     if (tool.name === "start_task") {
       if (current.working) throw new Error("A task is already running; use steering.");
       const generation = s.turn;
@@ -99,7 +110,6 @@ export class CursorCompanionVoice {
           turn: generation,
           executionMode: "user",
           interactionMode: s.state.mode,
-          model: s.state.model,
           idempotencyKey: tool.key,
           ...(screens.length ? { displayCaptures: screens } : {}),
           ...(mediaContext ? { mediaContext } : {}),
@@ -195,6 +205,14 @@ export class CursorCompanionVoice {
         if (s.conversationVoice === session) s.closeConversationVoice();
       },
       tool: this.tool,
+      context: (conversationId) => {
+        const state = useMistyStore.getState();
+        const conversation = state.conversations.find((c) => c.id === conversationId);
+        const task =
+          state.invocationConversationId === conversationId ? (state.invocationId ?? "") : "";
+        return { history: voiceContext(conversation), task };
+      },
+      taskResult: (invocationId) => this.reply(invocationId)?.content ?? "",
     });
     s.conversationVoice = session;
     return session;

@@ -113,7 +113,7 @@ function BindingSlot(props: {
           <span>Press shortcut…</span>
         ) : props.value ? (
           formatShortcut(props.value, props.platform).map((keycap) => (
-            <kbd key={keycap} className="font-sans text-[11px]">
+            <kbd key={keycap} className="font-sans text-2xs">
               {keycap}
             </kbd>
           ))

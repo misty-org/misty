@@ -24,3 +24,4 @@ export { blockIfUnsaved, useDevicePreferences } from "./devicePreferences/store"
 export { resolveSetting } from "./devicePreferences/model";
 export { ModelKeyNeededButton, needsModelKey } from "./ModelKeyNeeded";
 export { openModelSettings } from "./models/modelKeys";
+export { openSettings, openSettingsEvent, type OpenSettingsDetail } from "./openSettings";

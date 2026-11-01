@@ -100,7 +100,7 @@ export function NoteReadingPaneView(
             <Link2 size={14} />
             <span className="hidden xl:inline">Backlinks</span>
             {note.backlinkCount ? (
-              <span className="rounded-full bg-charcoal-active px-1.5 text-[10px]">
+              <span className="rounded-full bg-charcoal-active px-1.5 text-3xs">
                 {note.backlinkCount}
               </span>
             ) : null}

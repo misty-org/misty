@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
       super("That password did not work.");
     }
   },
-  accountForgotPassword: vi.fn(),
 }));
 
 let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
@@ -47,7 +46,6 @@ vi.mock("./AuthContext", () => ({
 
 vi.mock("./store/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
-  accountForgotPassword: mocks.accountForgotPassword,
   CredentialSignInRefused: mocks.CredentialSignInRefused,
 }));
 
@@ -333,7 +331,7 @@ describe("SignInPage", () => {
       legacy: false,
     });
     await act(async () => {});
-    expect(container.textContent).toContain("Reset your password by email?");
+    expect(container.textContent).toContain("Was your password reset by email?");
     const plain = [...container.querySelectorAll("button")].find((b) =>
       b.textContent?.includes("Sign in with the reset password"),
     )!;
@@ -344,9 +342,7 @@ describe("SignInPage", () => {
     });
   });
 
-  it("sends a reset link from the forgot-password form and returns to sign-in", async () => {
-    mocks.accountForgotPassword.mockResolvedValue(undefined);
-
+  it("tells a person who forgot their password where a sign-in link comes from", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
@@ -355,40 +351,12 @@ describe("SignInPage", () => {
       );
     });
 
-    await act(async () => {
-      setInputValue(
-        container.querySelector<HTMLInputElement>('input[type="email"]')!,
-        "alice@example.com",
-      );
-    });
-    const forgot = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Forgot your password?",
-    )!;
-    await act(async () => {
-      forgot.click();
-    });
-
-    expect(container.textContent).toContain("Send reset link");
-    const emailInput = container.querySelector<HTMLInputElement>('input[type="email"]')!;
-    expect(emailInput.value).toBe("alice@example.com");
-
-    await act(async () => {
-      container
-        .querySelector<HTMLFormElement>("form")!
-        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    });
-
-    expect(mocks.accountForgotPassword).toHaveBeenCalledWith("alice@example.com");
-    expect(document.body.textContent).toContain("Check your email for the reset link.");
-    expect(container.textContent).toContain("Resend in 60s");
-
-    const back = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Back to sign in",
-    )!;
-    await act(async () => {
-      back.click();
-    });
-    expect(container.textContent).toContain("Welcome back");
+    expect(container.textContent).toContain(
+      "Ask the person who runs this server for a sign-in link",
+    );
+    expect(container.textContent).toContain("mistysys.com/sign-in");
+    const buttons = Array.from(container.querySelectorAll("button")).map((b) => b.textContent);
+    expect(buttons).not.toContain("Forgot your password?");
   });
 
   it("asks for a fresh sign-in when a saved account's session expired", async () => {

@@ -1,12 +1,12 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  apiRequest: vi.fn(),
+  deviceModelCall: vi.fn(),
   guardPage: vi.fn(),
   pageAct: vi.fn(),
   pageControls: vi.fn(),
 }));
-vi.mock("@/api/client", () => ({ apiRequest: mocks.apiRequest }));
+vi.mock("@/api/device-models", () => ({ deviceModelCall: mocks.deviceModelCall }));
 vi.mock("./native", () => ({
   guardPage: mocks.guardPage,
   pageAct: mocks.pageAct,
@@ -34,27 +34,28 @@ beforeEach(() => {
 });
 
 it("sends only unplaced normal fields, one step at a time, until done", async () => {
-  mocks.apiRequest
+  mocks.deviceModelCall
     .mockResolvedValueOnce({ action: { type: "type", ref: "1", value: "M" } })
     .mockResolvedValueOnce({ action: { type: "done" } });
   await expect(agentRestore("tab-1", report, () => true)).resolves.toBe("done");
-  const body = JSON.parse(mocks.apiRequest.mock.calls[0][1].body);
+  const [name, body] = mocks.deviceModelCall.mock.calls[0];
+  expect(name).toBe("restore-step");
   expect(body.goal).toEqual([{ label: "Size", kind: "text", value: { value: "M" } }]);
-  expect(body.step).toBe(0);
-  expect(JSON.parse(mocks.apiRequest.mock.calls[1][1].body).step).toBe(1);
+  expect(body.history).toEqual([]);
+  expect(mocks.deviceModelCall.mock.calls[1][1].history).toHaveLength(1);
   // The page is guarded during the run and released afterwards.
   expect(mocks.guardPage).toHaveBeenLastCalledWith("tab-1", false);
 });
 
 it("stops as soon as the user touches the page", async () => {
-  mocks.apiRequest.mockResolvedValue({ action: { type: "click", ref: "1" } });
+  mocks.deviceModelCall.mockResolvedValue({ action: { type: "click", ref: "1" } });
   mocks.guardPage.mockResolvedValueOnce(100).mockResolvedValue(200);
   await expect(agentRestore("tab-1", report, () => true)).resolves.toBe("user");
   expect(mocks.pageAct).not.toHaveBeenCalled();
 });
 
 it("gives up after the step budget", async () => {
-  mocks.apiRequest.mockResolvedValue({ action: { type: "scroll", dy: 100 } });
+  mocks.deviceModelCall.mockResolvedValue({ action: { type: "scroll", dy: 100 } });
   await expect(agentRestore("tab-1", report, () => true)).resolves.toBe("budget");
-  expect(mocks.apiRequest).toHaveBeenCalledTimes(8);
+  expect(mocks.deviceModelCall).toHaveBeenCalledTimes(8);
 });

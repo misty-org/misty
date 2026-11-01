@@ -27,7 +27,11 @@ export interface SpaceInvitation {
   invited_email: string;
   invited_by_user_id: string;
   inviter_name?: string;
-  delivery_status: "pending" | "sent" | "failed";
+  /**
+   * The invitation's link (`misty://open/invite/…`), only in the answer that made it: the server
+   * sends no email, so the owner passes it on. A new link replaces the old one.
+   */
+  link?: string;
   expires_at: string;
   created_at: string;
 }

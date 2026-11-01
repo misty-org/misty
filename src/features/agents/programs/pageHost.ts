@@ -70,14 +70,15 @@ export function pageHost(state: ProgramState) {
     // The tab's record follows the page, so tabs lists and the finish check see where it is now.
     const page = (output.page ?? output) as { url?: unknown; title?: unknown };
     // Google answers searches from busy agents with a robot check. It is never solved: the run's
-    // web_search tool gives the same results, and their pages open directly.
+    // web_search tool (on the device's search key) gives the same results, and their pages open directly.
     if (
       typeof page.url === "string" &&
       /^https:\/\/(www\.)?google\.[a-z.]+\/sorry\//.test(page.url)
     )
       throw new Error(
         "Google showed a robot check for this search. Don't try to pass it: use the web_search " +
-          "tool for Google's results, then open the result pages with openTab(url).",
+          "tool for Google's results if you have it, or another search engine, then open the " +
+          "result pages with openTab(url).",
       );
     const tab = agentTab(scopeId);
     if (tab && typeof page.url === "string" && /^https?:/.test(page.url)) {
@@ -238,13 +239,16 @@ export function pageHost(state: ProgramState) {
       case "text": {
         const scopeId = ownTab(args.tab);
         const page = await landed(scopeId, () => operate("browser.extract", scopeId, {}));
+        const limit = Math.min(60_000, Math.max(1_000, Number(args.maxChars) || 20_000));
+        // Collapsed sections come last but are kept when a long page is cut, since the visible
+        // text never holds them.
+        const collapsed = page.collapsed
+          ? `\n\n## Collapsed on the page (click its toggle to show it on screen)\n${clip(page.collapsed, Math.floor(limit / 3))}`
+          : "";
         return {
           url: page.url,
           title: page.title,
-          text: clip(
-            page.markdown,
-            Math.min(60_000, Math.max(1_000, Number(args.maxChars) || 20_000)),
-          ),
+          text: clip(page.markdown, limit - collapsed.length) + collapsed,
         };
       }
       case "find": {

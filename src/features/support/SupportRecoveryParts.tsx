@@ -59,7 +59,7 @@ export function SupportSectionBlock(props: {
     <section className="mb-6 min-w-0 last:mb-0">
       <div className="mb-3 min-w-0">
         <h2 className="text-sm font-semibold leading-5 text-cream">{props.title}</h2>
-        <p className="mt-1 max-w-2xl text-[13px] leading-[18px] text-cream-muted">
+        <p className="mt-1 max-w-2xl text-ui leading-[18px] text-cream-muted">
           {props.description}
         </p>
       </div>

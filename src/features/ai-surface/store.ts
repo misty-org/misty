@@ -1,4 +1,3 @@
-import { analytics } from "@/telemetry/client";
 import { create } from "zustand";
 import { aiSurfaceApi } from "./api";
 import { aiPaneSession, aiSessionKey } from "./storeHelpers";
@@ -139,10 +138,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
   },
   returnHome: () => {
     const current = get().companion;
-    const registration =
-      current.accountId && current.paneId
-        ? get().registrations[aiSessionKey(current.accountId, current.paneId)]
-        : undefined;
     if (current.accountId && current.paneId) {
       const session = aiPaneSession(get().sessions, current.accountId, current.paneId);
       const inFlight = session.state === "queued" || session.state === "running";
@@ -162,12 +157,6 @@ export const useAiSurfaceStore = create<AiSurfaceState>((set, get) => ({
         completedCount: current.completedCount,
       },
     });
-    if (registration) {
-      analytics.track("ai_companion_dismissed", {
-        surface: registration.adapter.surfaceId,
-        had_task: Boolean(current.speech || current.approval),
-      });
-    }
   },
   dismiss: () => get().returnHome(),
   settle: () => {

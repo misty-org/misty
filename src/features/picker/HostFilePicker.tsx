@@ -122,7 +122,7 @@ export function MistyFilePicker({
       const path = selectedFolder?.path || activePath;
       return path ? (
         <div className="flex items-center gap-2 text-xs text-cream min-w-0">
-          <Folder size={14} className="text-sage-fg shrink-0" />
+          <Folder size={14} className="shrink-0 text-cream-muted" />
           <span className="truncate font-mono text-xs">{path}</span>
         </div>
       ) : (
@@ -149,7 +149,7 @@ export function MistyFilePicker({
       const file = selectedFiles[0];
       return (
         <div className="flex items-center gap-2 text-xs text-cream min-w-0">
-          <Badge variant="secondary" className="px-1.5 py-0 font-mono text-[10px]">
+          <Badge variant="secondary" className="px-1.5 py-0 text-3xs">
             {file.extension ? file.extension.toUpperCase() : "File"}
           </Badge>
           <span className="truncate font-medium">{file.name}</span>
@@ -161,7 +161,7 @@ export function MistyFilePicker({
     const totalBytes = selectedFiles.reduce((acc, f) => acc + (f.sizeBytes ?? 0), 0);
     return (
       <div className="flex items-center gap-2 text-xs text-cream min-w-0">
-        <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+        <Badge variant="secondary" className="px-1.5 py-0 text-3xs">
           {selectedFiles.length} selected
         </Badge>
         <span className="text-cream-muted font-medium">Total {formatBytes(totalBytes)}</span>

@@ -17,9 +17,7 @@ export function useSettingsControlLabel(fallback: string) {
   return useContext(SettingsControlLabelContext) ?? fallback;
 }
 export function SettingsNote(props: { children: ReactNode }) {
-  return (
-    <p className="m-0 max-w-2xl py-2 text-[14px] leading-5 text-cream-muted">{props.children}</p>
-  );
+  return <p className="m-0 max-w-2xl py-2 text-sm leading-5 text-cream-muted">{props.children}</p>;
 }
 
 export function SelectControl(props: {

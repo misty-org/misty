@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { apiRequest } from "@/api/client";
+import { deviceModelCall } from "@/api/device-models";
+import type { GlobalAiConversation } from "@/features/misty/types";
 import {
   executionGeneration,
   finishLocalExecution,
@@ -56,17 +57,11 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
       "This workflow is stopped. Review its results and explicitly start a new run; automatic workflow resume is not available.",
     );
   const routingGeneration = executionGeneration();
-  const { route } = await apiRequest<{ route: "steer" | "queue" | "stop" }>(
-    "/misty/agent-followup",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        agent_id: execution.agentId,
-        conversation_id: conversationId,
-        prompt,
-      }),
-    },
-  );
+  // The device's fast model decides; the chat's last turns give it the task's context.
+  const { route } = await deviceModelCall<{ route: "steer" | "queue" | "stop" }>("follow-up", {
+    conversation: recentTurns(useMistyStore.getState().conversations, conversationId),
+    new_message: prompt,
+  });
   if (
     executionGeneration() !== routingGeneration ||
     useLocalExecution.getState().execution?.taskId !== execution.taskId ||
@@ -83,6 +78,19 @@ export async function routeLocalFollowup(prompt: string): Promise<string> {
   }
   await steerLocalExecution(prompt);
   return "Follow-up applied to this task.";
+}
+
+const clip = (text: string) => [...text].slice(0, 3000).join("");
+
+/** The chat's last six request and reply pairs, oldest first. */
+function recentTurns(conversations: GlobalAiConversation[] | undefined, conversationId: string) {
+  const messages = conversations?.find((item) => item.id === conversationId)?.messages ?? [];
+  const turns: { request: string; response: string }[] = [];
+  for (const message of messages) {
+    if (message.role === "user") turns.push({ request: clip(message.content), response: "" });
+    else if (turns.length) turns[turns.length - 1].response = clip(message.content);
+  }
+  return turns.slice(-6);
 }
 
 const enqueueForegroundTask = ({ accountId, agentId, spaceId }: Execution, prompt: string) =>

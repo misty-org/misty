@@ -43,7 +43,6 @@ it("renders activity fades while preserving explicit visibility and active feedb
     visible: true,
     phase: "idle",
     mode: "team",
-    model: "",
   });
   const { container } = render(<CursorCompanionRoot />);
   await act(async () => {});
@@ -57,7 +56,6 @@ it("renders activity fades while preserving explicit visibility and active feedb
           phase,
           error,
           mode: "team",
-          model: "",
         },
       }),
     );
@@ -130,7 +128,6 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
     visible: true,
     phase: "idle",
     mode: "auto",
-    model: "",
   });
   const { container } = render(<CursorCompanionRoot />);
   await act(async () => {});
@@ -155,7 +152,6 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
         visible: true,
         phase: "idle",
         mode: "auto",
-        model: "",
         point: {
           x: 400,
           y: 300,

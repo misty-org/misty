@@ -210,7 +210,7 @@ function PaneRotateChips({
       <IconButton size="2xs" tooltip={false} label="Previous pane" onClick={() => step(-1)}>
         <ChevronLeft className="size-3" aria-hidden="true" />
       </IconButton>
-      <span aria-live="polite" className="text-[10px] tabular-nums">
+      <span aria-live="polite" className="text-3xs tabular-nums">
         {index + 1}/{panes.length}
       </span>
       <IconButton size="2xs" tooltip={false} label="Next pane" onClick={() => step(1)}>

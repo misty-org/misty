@@ -67,10 +67,7 @@ export function AgentGrantsSection() {
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      <Section
-        title="Remembered approvals"
-        description="When you choose Accept and remember on an agent’s request, it appears here and skips the pause while a chat is in Auto. Ask always asks."
-      >
+      <Section title="Remembered approvals">
         {grants === null && !error ? (
           <SkeletonList label="Remembered approvals" rows={3} leading="none" trailing />
         ) : null}
@@ -98,7 +95,7 @@ export function AgentGrantsSection() {
           )),
         )}
         {(grants?.length ?? 0) > 1 ? (
-          <Row label="Revoke all" description="Forget every remembered approval for every agent.">
+          <Row label="Revoke all">
             <Button variant="outline" disabled={Boolean(working)} onClick={() => void revokeAll()}>
               Revoke all
             </Button>

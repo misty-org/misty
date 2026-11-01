@@ -37,7 +37,6 @@ const allowedSourceRoots = new Set([
   "native",
   "shared",
   "styles",
-  "telemetry",
   "tests",
 ]);
 

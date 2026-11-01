@@ -1,6 +1,6 @@
-import { apiRequest } from "@/api/client";
 import { invoke } from "@/native/invoke";
 import { useCallback, useEffect, useState } from "react";
+import { addModelKey, signInToOpenRouter, type AddedKey } from "./modelAccounts";
 
 /**
  * Provider keys live in the device keychain, written and read only by the native app.
@@ -32,6 +32,18 @@ export function useSavedModelKeys() {
       return false;
     }
   }, []);
+  /** Saves a key once its provider listed models with it; null when no provider took it. */
+  const added = useCallback(async (work: () => Promise<AddedKey>) => {
+    setError("");
+    try {
+      const result = await work();
+      setSaved(result.saved);
+      return result;
+    } catch (cause) {
+      setError(typeof cause === "string" ? cause : "That key couldn't be saved.");
+      return null;
+    }
+  }, []);
   return {
     saved,
     error,
@@ -39,26 +51,21 @@ export function useSavedModelKeys() {
       run(() => invoke<string[]>("model_keys_save", { providerId, key })),
     remove: (providerId: string) =>
       run(() => invoke<string[]>("model_keys_remove", { providerId })),
+    /** A pasted key: its provider is found from the key itself, else `fallback` is tried. */
+    add: (key: string, fallback?: string) =>
+      added(async () => {
+        try {
+          return await addModelKey(key);
+        } catch (detection) {
+          if (!fallback) throw detection;
+          return addModelKey(key, fallback);
+        }
+      }),
+    signInToOpenRouter: () => added(signInToOpenRouter),
   };
 }
 
-/**
- * Whether the Misty server supplies its own models (`GET /instance`), in which case
- * this device's keys are optional. Unknown while loading or when the server is unreachable.
- */
-export function useOperatorModels(): boolean | null {
-  const [operator, setOperator] = useState<boolean | null>(null);
-  useEffect(() => {
-    let live = true;
-    apiRequest<{ models?: { operator?: boolean } }>("/instance")
-      .then((instance) => live && setOperator(instance.models?.operator === true))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, []);
-  return operator;
-}
+export type SavedModelKeys = ReturnType<typeof useSavedModelKeys>;
 
 /** Opens Settings on the Models page. */
 export function openModelSettings() {

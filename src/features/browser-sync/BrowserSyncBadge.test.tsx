@@ -34,6 +34,7 @@ vi.mock("@/features/auth", () => ({
 }));
 vi.mock("@/features/auth/core", () => ({
   useUserStore: (select: (s: unknown) => unknown) => select({ me: { name: "User" } }),
+  usePasswordPending: () => false,
 }));
 vi.mock("@/features/settings/devicePreferences/store", () => ({
   useDevicePreferences: create(() => ({

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
-import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
+import { DesktopSettingsRow } from "../components/DesktopSettingsUI";
 import { SwitchControl } from "../SettingsControls";
 
-/** Whether agents stop for your OK before they pay, even while a chat is in Auto. */
+/** Whether agents stop for your OK before they pay, even while a chat is in Auto. A row in
+ * Access › Limits. */
 export function PaymentsAskSection() {
   const [paymentsAsk, setPaymentsAsk] = useState<boolean | null>(null);
   const [working, setWorking] = useState(false);
@@ -32,14 +33,8 @@ export function PaymentsAskSection() {
     }
   };
   return (
-    <DesktopSettingsSection title="Payments">
-      <DesktopSettingsRow
-        label="Ask before paying"
-        description={
-          "Agents stop and ask you before they pay or buy anything, even while a chat is in " +
-          "Auto. Turned off, they pay on their own."
-        }
-      >
+    <>
+      <DesktopSettingsRow label="Ask before paying" description="Even while a chat is in Auto.">
         <SwitchControl
           checked={paymentsAsk ?? true}
           disabled={paymentsAsk === null || working}
@@ -51,6 +46,6 @@ export function PaymentsAskSection() {
           {error}
         </p>
       ) : null}
-    </DesktopSettingsSection>
+    </>
   );
 }

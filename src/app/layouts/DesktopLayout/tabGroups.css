@@ -18,7 +18,7 @@
   border-radius: 6px;
   border: 0;
   background: var(--tab-group-color);
-  color: #202124;
+  color: var(--color-ink-on-color);
   font-size: 12px;
   font-weight: 500;
 }
@@ -51,7 +51,7 @@
   height: 20px;
   border-radius: 50%;
   border: 0;
-  color: #202124;
+  color: var(--color-ink-on-color);
 }
 .misty-tab-group-swatch svg {
   width: 12px;
@@ -98,6 +98,6 @@
   padding: 0 1px;
   border: 1px solid var(--color-charcoal-border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--misty-theme-text) 5%, transparent);
   color: var(--color-cream-muted);
 }

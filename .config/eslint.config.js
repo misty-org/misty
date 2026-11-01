@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 /**
  * Frontend architecture boundaries.
  *
- *   app  →  features  →  api / native / telemetry / shared
+ *   app  →  features  →  api / native / shared
  *
  * A layer may import from layers to its right, never to its left. Features are
  * mutually opaque: they talk to each other through `index.ts` only.
@@ -137,7 +137,7 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": restrict([
         [
-          ["@/api/*", "@/app/*", "@/features/*", "@/native/*", "@/telemetry/*"],
+          ["@/api/*", "@/app/*", "@/features/*", "@/native/*"],
           "shared/ must not depend on any layer above it.",
         ],
       ]),
@@ -147,10 +147,7 @@ export default tseslint.config(
     files: ["src/api/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        [
-          ["@/app/*", "@/features/*", "@/telemetry/*"],
-          "api/ must not depend on application or features.",
-        ],
+        [["@/app/*", "@/features/*"], "api/ must not depend on application or features."],
       ]),
     },
   },
@@ -158,18 +155,7 @@ export default tseslint.config(
     files: ["src/native/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": restrict([
-        [
-          ["@/api/*", "@/app/*", "@/features/*", "@/telemetry/*"],
-          "native/ must not depend on application layers.",
-        ],
-      ]),
-    },
-  },
-  {
-    files: ["src/telemetry/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-imports": restrict([
-        [["@/app/*", "@/features/*"], "telemetry/ must not depend on application or features."],
+        [["@/api/*", "@/app/*", "@/features/*"], "native/ must not depend on application layers."],
       ]),
     },
   },
@@ -189,17 +175,16 @@ export default tseslint.config(
     },
   },
 
-  // Network access belongs to the API and telemetry boundaries.
+  // Network access belongs to the API boundary.
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/api/**", "src/telemetry/**", "src/tests/**", "src/**/*.test.{ts,tsx}"],
+    ignores: ["src/api/**", "src/tests/**", "src/**/*.test.{ts,tsx}"],
     rules: {
       "no-restricted-globals": [
         REFACTOR,
         {
           name: "fetch",
-          message:
-            "Network access belongs in src/api/ or src/telemetry/. Stores hold state, not HTTP.",
+          message: "Network access belongs in src/api/. Stores hold state, not HTTP.",
         },
       ],
     },

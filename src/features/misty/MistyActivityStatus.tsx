@@ -26,7 +26,7 @@ export function MistyActivityStatus({
 }) {
   return (
     <div
-      className={`flex items-center text-cream-muted ${compact ? "py-1 text-xs" : "text-[14px]"}`}
+      className={`flex items-center text-cream-muted ${compact ? "py-1 text-xs" : "text-sm"}`}
       role="status"
       aria-live="polite"
     >

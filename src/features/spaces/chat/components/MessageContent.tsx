@@ -12,14 +12,14 @@ export function MessageHeader({ message }: { message: SpaceMessage }) {
   const agentAuthored = isAgentAuthoredMessage(message);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 leading-5">
-      <strong className="text-[15px] font-semibold text-cream">{message.sender_name}</strong>
+      <strong className="text-md font-semibold text-cream">{message.sender_name}</strong>
       {agentAuthored ? (
-        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-[9px]">
+        <Badge variant="secondary" className="h-4 gap-1 rounded px-1 text-3xs">
           <Bot />
           Agent
         </Badge>
       ) : null}
-      <time className="text-[11px] tabular-nums text-cream-muted">
+      <time className="text-2xs tabular-nums text-cream-muted">
         {formatChatMessageTime(message.created_at)}
       </time>
     </div>

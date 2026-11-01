@@ -1,10 +1,6 @@
 import type { AppSnapshot } from "@/native/ipc";
 
 import { invoke } from "./invoke";
-export function telemetrySetErrorReportingEnabled(enabled: boolean): Promise<void> {
-  return invoke("telemetry_set_error_reporting_enabled", { enabled });
-}
-
 export function revealMainWindow(): Promise<void> {
   return invoke("reveal_main_window");
 }
