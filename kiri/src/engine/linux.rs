@@ -1,9 +1,11 @@
-//! WebKitGTK on Linux: the permission-request signal and capture state on the
-//! view. WebKitGTK has no prompt of its own and does not say which frame
+//! WebKitGTK on Linux: the permission-request signal (camera, microphone and
+//! location) and capture state on the view. WebKitGTK has no prompt of its own and does not say which frame
 //! asked, so Kiri always asks with a GTK dialog naming the tab's site; only a
 //! block is applied silently.
 
-use super::{media_verdict, MediaRequest, PageFacts, Reply, StoreScope};
+use super::{
+    location_verdict, media_verdict, LocationRequest, MediaRequest, PageFacts, Reply, StoreScope,
+};
 use crate::permissions::{canonical_origin, MediaKind, Verdict};
 use gtk::prelude::*;
 use std::{
@@ -12,8 +14,8 @@ use std::{
 };
 use tauri::Webview;
 use webkit2gtk::{
-    MediaCaptureState, PermissionRequest, PermissionRequestExt, SettingsExt,
-    UserMediaPermissionRequest, UserMediaPermissionRequestExt, WebViewExt,
+    GeolocationPermissionRequest, MediaCaptureState, PermissionRequest, PermissionRequestExt,
+    SettingsExt, UserMediaPermissionRequest, UserMediaPermissionRequestExt, WebViewExt,
 };
 
 /// Native views that already have Kiri's handler.
@@ -26,12 +28,15 @@ fn page_origin(view: &webkit2gtk::WebView) -> Option<String> {
     view.uri().and_then(|url| canonical_origin(&url).ok())
 }
 
-fn ask(view: &webkit2gtk::WebView, request: PermissionRequest, origin: &str, kind: MediaKind) {
-    let action = match kind {
+fn media_action(kind: MediaKind) -> &'static str {
+    match kind {
         MediaKind::Camera => "use your camera",
         MediaKind::Microphone => "use your microphone",
         MediaKind::CameraAndMicrophone => "use your camera and microphone",
-    };
+    }
+}
+
+fn ask(view: &webkit2gtk::WebView, request: PermissionRequest, origin: &str, action: &str) {
     let parent = view
         .toplevel()
         .and_then(|widget| widget.downcast::<gtk::Window>().ok());
@@ -55,7 +60,7 @@ fn ask(view: &webkit2gtk::WebView, request: PermissionRequest, origin: &str, kin
     dialog.show_all();
 }
 
-pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String> {
+pub(super) fn install_site_permissions(webview: &Webview) -> Result<(), String> {
     let label = webview.label().to_owned();
     webview
         .with_webview(move |platform| {
@@ -74,6 +79,22 @@ pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String>
                 settings.set_enable_webrtc(true);
             }
             view.connect_permission_request(move |view, request| {
+                if request.is::<GeolocationPermissionRequest>() {
+                    let origin = page_origin(view);
+                    let verdict = location_verdict(&LocationRequest {
+                        webview: label.clone(),
+                        top_origin: origin.clone(),
+                        requester_origin: origin.clone(),
+                        store: None,
+                    });
+                    match (verdict, origin) {
+                        (Verdict::Deny, _) | (_, None) => request.deny(),
+                        (_, Some(origin)) => {
+                            ask(view, request.clone(), &origin, "know your location")
+                        }
+                    }
+                    return true;
+                }
                 let Some(media) = request.downcast_ref::<UserMediaPermissionRequest>() else {
                     return false;
                 };
@@ -95,7 +116,9 @@ pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String>
                     (Verdict::Deny, _, _) | (_, None, _) | (_, _, None) => request.deny(),
                     // The requesting frame is unknown, so an allowance is
                     // confirmed each time rather than extended to embeds.
-                    (_, Some(origin), Some(kind)) => ask(view, request.clone(), &origin, kind),
+                    (_, Some(origin), Some(kind)) => {
+                        ask(view, request.clone(), &origin, media_action(kind))
+                    }
                 }
                 true
             });

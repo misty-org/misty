@@ -99,3 +99,31 @@ fn annotated_source_tags_resolve_to_their_commit() {
         head.trim()
     );
 }
+
+#[test]
+fn versions_keep_the_rules_the_pattern_had() {
+    for good in ["1.2.3", "0.1.0-beta.1", "10.0.0-rc-1"] {
+        assert!(valid_version(good), "{good}");
+    }
+    for bad in [
+        "1.2",
+        "1.2.3.4",
+        "1..3",
+        "v1.2.3",
+        "1.2.3-",
+        "1.2.3-a b",
+        "",
+    ] {
+        assert!(!valid_version(bad), "{bad}");
+    }
+}
+
+#[test]
+fn reads_only_the_package_version_from_a_manifest() {
+    let manifest = "[workspace]\nversion = \"9.9.9\"\n[package]\nname = \"x\"\nversion = \"1.2.3\" # note\n[dependencies]\nversion = \"0\"\n";
+    assert_eq!(cargo_package_version(manifest).as_deref(), Some("1.2.3"));
+    assert_eq!(
+        cargo_package_version("[dependencies]\nversion = \"1\"\n"),
+        None
+    );
+}

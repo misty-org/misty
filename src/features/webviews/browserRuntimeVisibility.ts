@@ -61,7 +61,7 @@ let strayPageSweepTimer = 0;
 
 /**
  * Hides any tab page this window has on screen but no longer wants there. A page whose tab lost
- * track of it (its runtime id changed, the renderer reloaded, or the window switched Space while
+ * track of it (its runtime id changed, the renderer reloaded, or the page moved while
  * it was being created) is otherwise never hidden again and covers whatever replaced it. Runs
  * after a page is shown or hidden, and at startup; with nothing wanted on screen it hides them
  * all. Waits out switch handoffs, layout moves and in-flight work, and spares pages parked for
@@ -123,7 +123,7 @@ export function releaseAllDeferredNavigations(): void {
  * it. Unopened pages will use the projected URL when they are created. A page
  * on screen is never reloaded under its reader by another machine's
  * navigation: the change applies when the page is next hidden. */
-export function navigateSyncedBrowserWebview(
+function navigateSyncedBrowserWebview(
   tab: BrowserRuntimeTab,
   url: string,
   stillCurrent: () => boolean,

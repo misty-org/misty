@@ -1,5 +1,5 @@
-/** 17: Window → Tab → Pane → View field names (see workspaceShapeUpgrade). */
-export const browserWorkspaceStoreVersion = 17;
+/** 18: one layout per window; bookmarks and saved tab groups live in the profile's records. */
+export const browserWorkspaceStoreVersion = 18;
 export const workspaceRecoveryKey = (name: string) => `${name}:before-browser-workspace:v14`;
 
 /** Preserve the exact pre-migration record before Zustand can replace retired views. */

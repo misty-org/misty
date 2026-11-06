@@ -15,7 +15,7 @@ const validSections = new Set([
 ]);
 const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 
-export interface SpaceRoute {
+interface SpaceRoute {
   activeSpaceId: string;
   section: string;
   settingsSection: string;

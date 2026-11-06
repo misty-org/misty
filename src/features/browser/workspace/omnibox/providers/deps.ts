@@ -13,17 +13,10 @@ export interface OmniboxDeps {
   /** The person opted in to sending typed text to their search engine. */
   searchSuggestionsEnabled(): boolean;
   fetchSearchSuggestions(engine: string, text: string): Promise<SearchSuggestion[]>;
-  /** Durable history for a profile; empty text returns top pages. */
-  historySuggestions(request: {
-    profileId?: string;
-    text: string;
-    limit: number;
-  }): Promise<BrowserHistorySuggestion[]>;
-  /** A profile's most recent page visits, newest first. */
-  recentVisits(request: {
-    profileId?: string;
-    limit: number;
-  }): Promise<{ url: string; title: string }[]>;
+  /** This window's profile's durable history; empty text returns top pages. */
+  historySuggestions(request: { text: string; limit: number }): Promise<BrowserHistorySuggestion[]>;
+  /** This window's profile's most recent page visits, newest first. */
+  recentVisits(request: { limit: number }): Promise<{ url: string; title: string }[]>;
   /** Saved websites (bookmarks), from the synced workspace. */
   bookmarks(): { url: string; title: string }[];
   /** A web address on the clipboard, read locally; null when there is none. */
@@ -33,7 +26,6 @@ export interface OmniboxDeps {
     tabId: string;
     url: string;
     title: string;
-    profileId?: string;
     private: boolean;
     agentOwned: boolean;
     faviconUrl?: string | null;

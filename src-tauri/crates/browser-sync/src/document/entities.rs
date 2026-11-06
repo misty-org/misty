@@ -9,9 +9,8 @@ use crate::{Error, Result};
 pub type Fields = BTreeMap<String, Value>;
 
 /// Record kinds. Serialized names are the stored ones (`group`, `website`,
-/// `layout`, `tab`): they are inside encrypted records and hashed into node
-/// IDs, so they never change. Record fields renamed in code keep their stored
-/// names the same way.
+/// `layout`, `tab`): they are inside encrypted records, so they never change.
+/// Record fields renamed in code keep their stored names the same way.
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
@@ -24,12 +23,11 @@ pub enum Kind {
     Tab,
     #[serde(rename = "tab")]
     View,
-    /// An open tab group in a workspace: name, color and the tabs in it.
-    /// Written only once every device understands it (see `SyncState::all_upgraded`).
+    /// An open tab group: name, color and the tabs in it.
     TabGroup,
-    /// A closed tab group kept to reopen on any device (`tab_groups` collection).
+    /// A closed tab group kept to reopen on any computer (`tab_groups` collection).
     SavedTabGroup,
-    /// One device's browsing history for one hour, or one part of it
+    /// One computer's browsing history for one hour, or one part of it
     /// (`history` collection).
     HistoryBatch,
     /// A single extension storage.sync key in a private encrypted collection.
@@ -39,23 +37,32 @@ pub enum Kind {
     /// A saved website sign-in (`passwords` collection). Native-only: sealed with
     /// the vault key and never projected to a renderer.
     Login,
-    /// The sites a Space claims: links to them from other apps open in its
-    /// window (`space_settings` collection). Native-only.
+    /// The sites a profile claims: links to them from other apps open in its
+    /// window. Native-only.
     SpaceSites,
-    /// An extension installed in the Space (`extensions` collection). Native-only.
+    /// An extension installed in the profile (`extensions` collection). Native-only.
     Extension,
-    /// One site's permission choices in the Space (`site_permissions`
+    /// One site's permission choices in the profile (`site_permissions`
     /// collection). Native-only.
     SitePermission,
-    /// The Space's default search engine (`search` collection, one record).
+    /// The profile's default search engine (`search` collection, one record).
     SearchDefault,
     /// A search engine the person added (`search` collection).
     SearchEngine,
     /// A `!trigger` search shortcut the person added (`search` collection).
     SearchBang,
     /// A finished download (`downloads` collection); the file stays on the
-    /// device that downloaded it.
+    /// computer that downloaded it.
     Download,
+    /// One of the account's profiles: its name, color, order and claimed sites.
+    Profile,
+    /// One tab strip entry of a profile, with its splits and views. Its fields belong to the
+    /// renderer, which has to read them back: anything it adds later just travels.
+    OpenTab,
+    /// One site's cookies in a profile, merged per cookie.
+    SiteCookies,
+    /// One site's localStorage in a profile, or one part of it.
+    SiteStorage,
 }
 
 impl Kind {
@@ -83,6 +90,10 @@ impl Kind {
             Self::SearchEngine => "search_engine",
             Self::SearchBang => "search_bang",
             Self::Download => "download",
+            Self::Profile => "profile",
+            Self::OpenTab => "open_tab",
+            Self::SiteCookies => "site_cookies",
+            Self::SiteStorage => "site_storage",
         };
         Ok(format!("{kind}/{id}"))
     }
@@ -133,8 +144,7 @@ pub struct Folder {
     pub order: f64,
     pub hidden: bool,
     /// The folder this one sits in. Absent for the roots and for folders
-    /// directly in Other bookmarks, so records without nesting keep the shape
-    /// older versions accept (see `NESTED_BOOKMARK_FIELDS`).
+    /// directly in Other bookmarks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
     /// When the folder was first added, in ms since the epoch (kept from imports).
@@ -156,12 +166,6 @@ pub struct Bookmark {
     pub added_at: Option<i64>,
 }
 
-/// Bookmark tree fields. Versions before nested folders reject records that
-/// carry them, so they are only written once every device understands them
-/// (control version 2); until then sync drops them and folders stay flat.
-pub const NESTED_BOOKMARK_FIELDS: [&str; 2] = ["parent_id", "added_at"];
-/// Folders nest at most this deep below a root.
-pub const MAX_FOLDER_DEPTH: usize = 64;
 
 fn added_at(value: Option<i64>) -> Result<()> {
     if value.is_some_and(|at| !(0..=10_000_000_000_000).contains(&at)) {
@@ -255,7 +259,7 @@ pub use collections::{
     login_origin, site_host, Download, Extension, HistoryBatch, Login, SearchBang, SearchDefault,
     SearchEngine, SiteDecision, SitePermission, SpaceSites, Visit, MAX_SPACE_SITES,
 };
-pub use layout::{Direction, Placement, SplitTree, Surface, Tab, View, Window, PINNED_TAB_FIELDS};
+pub use layout::{Direction, Placement, SplitTree, Surface, Tab, View, Window};
 pub use validate::validate;
 
 #[cfg(test)]

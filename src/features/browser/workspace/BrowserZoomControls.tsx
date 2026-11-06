@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { Minus, Plus, ZoomIn } from "lucide-react";
 import { Button, cn, MenuItem, Pressable } from "@/shared/ui";
+import { pageZoomLevels } from "./pageZoom";
 
-const levels = [25, 33, 50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250, 300, 400, 500];
+const levels = pageZoomLevels;
 
 /**
  * Keep the displayed value tied to the page that actually accepted the change.

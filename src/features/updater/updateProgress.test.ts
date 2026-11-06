@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { applyUpdateProgress, EMPTY_UPDATE_PROGRESS, readableUpdateError } from "./updateProgress";
+import {
+  applyUpdateProgress,
+  EMPTY_UPDATE_PROGRESS,
+  isNoReleaseError,
+  readableUpdateError,
+} from "./updateProgress";
 
 describe("update progress", () => {
   it("tracks bounded progress from updater events", () => {
@@ -40,5 +45,8 @@ describe("update progress", () => {
     );
     expect(readableUpdateError(new Error("network connection failed"))).toContain("update service");
     expect(readableUpdateError(new Error("secret internal failure"))).not.toContain("secret");
+    // The plugin's words when the feed answers 404, which is not a connection problem.
+    expect(isNoReleaseError("Could not fetch a valid release JSON from the remote")).toBe(true);
+    expect(isNoReleaseError(new Error("network connection failed"))).toBe(false);
   });
 });

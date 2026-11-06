@@ -79,5 +79,5 @@ function escapeRegexCharacter(character: string): string {
   return /[\\^$+?.()|[\]{}]/.test(character) ? `\\${character}` : character;
 }
 
-export type EntryFilterMatcher =
+type EntryFilterMatcher =
   { kind: "substring"; query: string } | { kind: "pattern"; expression: RegExp };

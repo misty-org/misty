@@ -119,7 +119,7 @@ pub(super) async fn context_menu_copies_through_kiri(
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
     let previous = clipboard.get_text().ok();
     let _ = clipboard.set_text("kiri-probe-before");
-    let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
+    let main = crate::infra::profile_windows::primary_webview(&app).ok_or("Missing main view")?;
     let result = async {
         context_menu::select(app, &main, &key, "copy")?;
         wait_for("copy through kiri::engine::edit", || {
@@ -138,7 +138,7 @@ pub(super) async fn context_menu_copies_through_kiri(
 
 pub(super) async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), String> {
     use super::super::super::site_settings::permissions;
-    let main = crate::infra::space_windows::primary_webview(&app).ok_or("Missing main view")?;
+    let main = crate::infra::profile_windows::primary_webview(&app).ok_or("Missing main view")?;
     let info = serde_json::to_value(
         permissions::browser_site_info(main.clone(), app.clone(), ID.into()).await?,
     )
@@ -151,6 +151,7 @@ pub(super) async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), S
     let allowed = permissions::Permissions {
         camera: permissions::Decision::Allow,
         microphone: permissions::Decision::Block,
+        location: permissions::Decision::Allow,
     };
     let saved = serde_json::to_value(
         permissions::browser_site_permissions_set(
@@ -170,6 +171,7 @@ pub(super) async fn site_permissions_round_trip(app: &AppHandle) -> Result<(), S
     permissions::browser_site_permissions_reset(main.clone(), app.clone(), profile, origin).await?;
     if saved["permissions"]["camera"] != "allow"
         || saved["permissions"]["microphone"] != "block"
+        || saved["permissions"]["location"] != "allow"
         || !found
     {
         return Err(format!("decision did not round-trip: {saved}"));

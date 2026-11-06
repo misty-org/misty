@@ -62,7 +62,7 @@ export class RuntimeDeliveryWorker {
       try {
         const snapshot = await agentsDeviceSnapshot();
         if (!snapshot.device || snapshot.device.status === "revoked")
-          throw new Error("This Misty device is unavailable.");
+          throw new Error("This signed-in session is unavailable.");
         const local = snapshot.device;
         const device = await ensureServerAgentDevice(local);
         while (current()) {

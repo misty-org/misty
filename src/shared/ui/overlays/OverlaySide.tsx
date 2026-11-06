@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export type OverlaySide = "top" | "right" | "bottom" | "left";
+type OverlaySide = "top" | "right" | "bottom" | "left";
 const OverlaySideContext = createContext<OverlaySide | undefined>(undefined);
 /** Docked chrome points menus, popovers and hints inward, including portals. */
 export const OverlaySideProvider = OverlaySideContext.Provider;

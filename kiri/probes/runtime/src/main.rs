@@ -9,6 +9,11 @@ use std::{
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 static EVENTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+#[cfg(target_os = "macos")]
+static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+/// How the probe answers the next location question.
+#[cfg(target_os = "macos")]
+static ALLOW_LOCATION: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 fn record(event: String) {
     println!("EVENT {event}");
@@ -45,13 +50,44 @@ impl kiri::channel::HostChannel for Channel {
 }
 
 struct Policy;
-impl kiri::engine::MediaPolicy for Policy {
+impl kiri::engine::SitePolicy for Policy {
     fn media_verdict(&self, request: &kiri::engine::MediaRequest) -> kiri::permissions::Verdict {
         record(format!(
             "media-request {} {:?} {:?}",
             request.webview, request.top_origin, request.kind
         ));
         kiri::permissions::Verdict::Deny
+    }
+
+    fn location_verdict(
+        &self,
+        request: &kiri::engine::LocationRequest,
+    ) -> kiri::permissions::Verdict {
+        record(format!(
+            "location-request {} {:?}",
+            request.webview, request.top_origin
+        ));
+        if cfg!(target_os = "macos") {
+            kiri::permissions::Verdict::Prompt
+        } else {
+            kiri::permissions::Verdict::Deny
+        }
+    }
+
+    /// Holds the decision across a turn of the main loop, as a host waiting for a person does.
+    #[cfg(target_os = "macos")]
+    fn ask(
+        &self,
+        request: kiri::engine::PermissionAsk,
+        answer: kiri::engine::AskAnswer,
+    ) -> Result<(), kiri::engine::AskAnswer> {
+        record(format!("location-ask {:?} {:?}", request.top_origin, request.kinds));
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let allow = ALLOW_LOCATION.load(std::sync::atomic::Ordering::SeqCst);
+            let _ = APP.get().unwrap().run_on_main_thread(move || answer.answer(allow));
+        });
+        Ok(())
     }
 }
 
@@ -109,7 +145,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(kiri::init(|_| kiri::Kiri::new("probe-", Host)))
         .setup(move |app| {
-            kiri::engine::set_media_policy(Policy);
+            #[cfg(target_os = "macos")]
+            let _ = APP.set(app.handle().clone());
+            kiri::engine::set_site_policy(Policy);
             kiri::channel::set_host_channel(Channel);
             // Test-only: expose the captured sender so the script can report back.
             let expose = format!("window.__kiriHost = ({});", kiri::channel::sender_script());
@@ -126,7 +164,7 @@ fn main() {
                     settings.set_enable_mock_capture_devices(true);
                 }
             })?;
-            kiri::engine::install_media_permissions(webview)?;
+            kiri::engine::install_site_permissions(webview)?;
             kiri::channel::install_host_channel(webview)?;
             let handle = app.handle().clone();
             let origin = origin.clone();
@@ -196,6 +234,28 @@ fn drive(app: tauri::AppHandle, origin: String) {
     std::thread::sleep(Duration::from_millis(800));
     let copied = clipboard_text(&app);
     check("engine::edit Copy reaches the clipboard", copied.as_deref() == Some("Kiri copy check"), format!("{copied:?}"));
+    #[cfg(target_os = "macos")]
+    {
+        // WebKit remembers an answer until the page reloads, so each answer gets a fresh page.
+        const LOCATE: &str = r#"navigator.geolocation.getCurrentPosition(
+          () => window.__kiriHost()('result:location=position'),
+          (e) => window.__kiriHost()('result:location=code' + e.code),
+          { timeout: 6000 });"#;
+        webview.eval(LOCATE).expect("eval");
+        let granted = wait("host probe-tab result:location=", 12).unwrap_or_default();
+        let asks = EVENTS.lock().unwrap().iter().filter(|e| e.starts_with("location-ask")).count();
+        check("a location request is held for the host to ask", asks == 1, format!("{asks} asks"));
+        // The position itself needs macOS's own answer for this app, which nobody gives here, so
+        // anything but a refusal shows the grant got through.
+        check("a grant reaches the page", !granted.is_empty() && !granted.ends_with("=code1"), granted);
+        EVENTS.lock().unwrap().retain(|e| !e.contains("result:location"));
+        ALLOW_LOCATION.store(false, std::sync::atomic::Ordering::SeqCst);
+        webview.eval("location.reload()").expect("eval");
+        std::thread::sleep(Duration::from_secs(2));
+        webview.eval(LOCATE).expect("eval");
+        let refused = wait("host probe-tab result:location=", 12).unwrap_or_default();
+        check("a refusal reaches the page", refused.ends_with("=code1"), refused);
+    }
     finish(&app, failures);
 }
 

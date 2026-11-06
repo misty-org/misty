@@ -5,6 +5,7 @@ import { Button, Notification } from "@/shared/ui";
 import { useEffect } from "react";
 import { setBrowserError } from "./browserErrors";
 import { browserRuntimeId, useBrowserRuntimeStore } from "@/features/webviews/browserRuntime";
+import { PasswordFillMenu } from "./PasswordFillMenu";
 import { PasswordOfferNotice } from "./PasswordOfferNotice";
 
 /** Errors, download messages and compatibility warnings for one browser tab. */
@@ -44,6 +45,7 @@ export function BrowserNotices({ tab, active }: { tab: WorkspaceView; active: bo
         </>
       ) : null}
 
+      <PasswordFillMenu tabId={tab.id} runtimeId={browserRuntimeId(tab)} active={active} />
       <PasswordOfferNotice runtimeId={browserRuntimeId(tab)} active={active} />
       {downloadNotice || compatibilityIssue ? (
         <Notification

@@ -10,7 +10,7 @@ import {
   type CollectionItem,
 } from "./collectionItemTypes";
 
-export function CollectionGrid({ children }: { children: ReactNode }) {
+function CollectionGrid({ children }: { children: ReactNode }) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">{children}</div>
   );

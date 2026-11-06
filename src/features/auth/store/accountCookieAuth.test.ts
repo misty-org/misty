@@ -44,7 +44,7 @@ describe("server JWT cookie account contract", () => {
     await expect(account.accountSignIn(user.email, "password")).resolves.toMatchObject({
       id: "account-a",
     });
-    expect(mocks.invoke).toHaveBeenCalledWith("auth_cookie_capture", {
+    expect(mocks.invoke).toHaveBeenCalledWith("auth_session_capture", {
       apiBase: "https://misty.example/v1",
       accountId: "account-a",
     });
@@ -61,29 +61,23 @@ describe("server JWT cookie account contract", () => {
     }
   });
 
-  it("marks a setup-key account that has no password yet, and only that one", async () => {
-    localStorage.clear();
-    const answer = (credential: boolean) =>
-      mocks.nativeFetch.mockImplementation(
-        async () =>
-          new Response(
-            JSON.stringify({
-              user_id: "account-c",
-              username: "cara",
-              email: "cara@example.test",
-              credential_account: credential,
-            }),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-      );
+  it("redeems a setup key and remembers its reset token", async () => {
+    mocks.nativeFetch.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            user_id: "account-c",
+            username: "cara",
+            email: "cara@example.test",
+            password_reset_token: "reset-token",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+    );
     const account = await import("./useAccountStore");
-    const pending = await import("./pendingPassword");
-    answer(true);
+    const { passwordResetToken } = await import("./passwordReset");
     await account.accountRedeemSetupKey(" misty_setup_abcdefghijklmnopqrstuvwxyz234567 ");
-    expect(pending.pendingPasswordEmail("account-c")).toBeNull();
-    answer(false);
-    await account.accountRedeemSetupKey("misty_setup_abcdefghijklmnopqrstuvwxyz234567");
-    expect(pending.pendingPasswordEmail("account-c")).toBe("cara@example.test");
+    expect(passwordResetToken("account-c")).toBe("reset-token");
     const calls = mocks.nativeFetch.mock.calls;
     const [url, options] = calls[calls.length - 1]!;
     expect(String(url)).toBe("https://misty.example/v1/setup-keys/redeem");
@@ -110,75 +104,31 @@ describe("server JWT cookie account contract", () => {
       status: 401,
     });
     expect(mocks.notifyApiSessionInvalid).not.toHaveBeenCalled();
-    expect(mocks.invoke).not.toHaveBeenCalledWith("auth_cookie_capture", expect.anything());
+    expect(mocks.invoke).not.toHaveBeenCalledWith("auth_session_capture", expect.anything());
   });
 
-  describe("derived login credential", () => {
+  it("sends the password as typed, once", async () => {
     const user = { user_id: "account-a", username: "ada", email: "ada@example.test" };
-    const json = { status: 200, headers: { "Content-Type": "application/json" } };
-    const loginBodies = () =>
+    const logins = () =>
       mocks.nativeFetch.mock.calls
         .filter(([url]) => String(url).endsWith("/login"))
         .map(([, options]) => JSON.parse(String(options?.body)).password);
-    beforeEach(() => {
-      localStorage.clear();
-      mocks.invoke.mockImplementation(async (command: string) =>
-        command === "account_login_credential" ? "derived-credential" : "account-a",
-      );
-    });
+    mocks.nativeFetch.mockImplementation(
+      async () =>
+        new Response(JSON.stringify(user), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    const account = await import("./useAccountStore");
+    await account.accountSignIn(user.email, "typed password");
+    expect(logins()).toEqual(["typed password"]);
 
-    it("sends the credential derived on the device, not the password, and remembers the account", async () => {
-      mocks.nativeFetch.mockImplementation(async () => new Response(JSON.stringify(user), json));
-      const account = await import("./useAccountStore");
-      const { isCredentialAccount } = await import("./accountCredential");
-      await account.accountSignIn(user.email, "typed password");
-      expect(loginBodies()).toEqual(["derived-credential"]);
-      expect(isCredentialAccount("account-a")).toBe(true);
-    });
-
-    const refuseCredential = () =>
-      mocks.nativeFetch.mockImplementation(async (_url, options) =>
-        JSON.parse(String(options?.body)).password === "derived-credential"
-          ? new Response("invalid credentials", { status: 401 })
-          : new Response(JSON.stringify(user), json),
-      );
-
-    it("falls back to the password as typed for an account this device has not seen use a credential", async () => {
-      refuseCredential();
-      const account = await import("./useAccountStore");
-      await account.accountSignIn(user.email, "typed password");
-      expect(loginBodies()).toEqual(["derived-credential", "typed password"]);
-    });
-
-    it("never sends the password in plain form for an account known to use a credential", async () => {
-      const { markCredentialAccount, isCredentialAccount } = await import("./accountCredential");
-      markCredentialAccount("account-a", " Ada@Example.test ");
-      refuseCredential();
-      const account = await import("./useAccountStore");
-      // A typo, or a server that answers 401 to the credential, learns nothing more.
-      await expect(account.accountSignIn(user.email, "typo")).rejects.toBeInstanceOf(
-        account.CredentialSignInRefused,
-      );
-      expect(loginBodies()).toEqual(["derived-credential"]);
-      expect(isCredentialAccount("account-a")).toBe(true);
-    });
-
-    it("sends it as typed only when asked, and then forgets the account is safe", async () => {
-      const { markCredentialAccount, isCredentialAccount } = await import("./accountCredential");
-      markCredentialAccount("account-a", user.email);
-      refuseCredential();
-      const account = await import("./useAccountStore");
-      await account.accountSignIn(user.email, "reset password", { legacy: true });
-      expect(loginBodies()).toEqual(["reset password"]);
-      // The server has now seen this password in plain form, so it must not seed keys.
-      expect(isCredentialAccount("account-a")).toBe(false);
-    });
-
-    it("does not retry on a server error", async () => {
-      mocks.nativeFetch.mockImplementation(async () => new Response("down", { status: 500 }));
-      const account = await import("./useAccountStore");
-      await expect(account.accountSignIn(user.email, "typed password")).rejects.toBeTruthy();
-      expect(loginBodies()).toEqual(["derived-credential"]);
-    });
+    mocks.nativeFetch.mockClear();
+    mocks.nativeFetch.mockImplementation(
+      async () => new Response("invalid credentials", { status: 401 }),
+    );
+    await expect(account.accountSignIn(user.email, "typo")).rejects.toMatchObject({ status: 401 });
+    expect(logins()).toEqual(["typo"]);
   });
 });

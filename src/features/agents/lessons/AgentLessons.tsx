@@ -11,7 +11,7 @@ const statusWord: Record<Lesson["status"], string> = {
   finished: "Finished",
 };
 
-/** The lessons whose chats are on this device, for one agent: the one in progress, then paused, then finished. */
+/** The lessons whose chats are loaded, for one agent: the one in progress, then paused, then finished. */
 export function useAgentLessons(agentId: string) {
   const lessons = useLessonStore((s) => s.lessons);
   const conversations = useMistyStore((s) => s.conversations);

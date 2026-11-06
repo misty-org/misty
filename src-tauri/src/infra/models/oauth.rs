@@ -11,8 +11,9 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
-/// How long the browser has to come back to Misty.
-pub const SIGN_IN_WINDOW: Duration = Duration::from_secs(5 * 60);
+/// How long the browser has to come back to Misty. A first sign-in can take a while: an email
+/// code, a passkey, the consent page.
+pub const SIGN_IN_WINDOW: Duration = Duration::from_secs(15 * 60);
 
 /// A random value for `state`, `nonce` or a PKCE verifier: 32 bytes, base64url.
 pub fn random_token() -> String {
@@ -35,7 +36,7 @@ pub fn client() -> reqwest::Client {
 }
 
 /// Waits on `127.0.0.1` (and, for a `localhost` redirect, `[::1]` too) for the browser to
-/// open one path, and answers it with a page saying the person can go back to Misty.
+/// open one path, and answers it with a page that opens Misty again.
 pub struct Loopback {
     listeners: Vec<TcpListener>,
     pub port: u16,
@@ -116,10 +117,13 @@ async fn answer(mut stream: TcpStream, path: &str) -> Option<HashMap<String, Str
             .await;
         return None;
     }
-    let page = "<!doctype html><meta charset=utf-8><title>Misty</title>\
+    // A bare misty:// link brings the app forward and leaves it where it is.
+    let page = "<!doctype html><meta charset=utf-8>\
+        <meta http-equiv=refresh content=\"0;url=misty://\"><title>Misty</title>\
+        <style>a{color:inherit}</style>\
         <body style=\"font:15px -apple-system,system-ui,sans-serif;background:#111;color:#eee;\
         display:grid;place-items:center;height:100vh;margin:0\">\
-        <p>You can close this tab and go back to Misty.</p>";
+        <p>Going back to Misty. <a href=\"misty://\">Open Misty</a></p>";
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\
          Cache-Control: no-store\r\nConnection: close\r\n\r\n{page}",
@@ -171,7 +175,7 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert!(page.text().await.unwrap().contains("go back to Misty"));
+        assert!(page.text().await.unwrap().contains("url=misty://"));
         let query = waiting.await.unwrap().unwrap();
         assert_eq!(query.get("code").map(String::as_str), Some("abc"));
         assert_eq!(query.get("state").map(String::as_str), Some("xyz"));

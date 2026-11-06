@@ -29,6 +29,8 @@ pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     app::plugins::register(tauri::Builder::default())
         .setup(app_setup::setup)
+        // A full reload of a window closes the pages its old renderer made.
+        .on_page_load(infra::browser::close_pages_on_renderer_load)
         .invoke_handler(app::handlers::invoke_handler())
         .build(context)
         .expect("failed to build Misty Tauri app")

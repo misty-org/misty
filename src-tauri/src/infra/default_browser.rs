@@ -61,21 +61,21 @@ pub fn remember_launch<S: AsRef<str>>(args: impl IntoIterator<Item = S>) {
     }
 }
 
-/// The links this Space window opens: the ones Misty was started with that belong to
-/// its Space, and those other apps sent it since. A link goes to the Space that claims
-/// its site ("Open these sites in this Space"), else to the window used last.
+/// The links this window opens: the ones Misty was started with that belong to its
+/// profile, and those other apps sent it since. A link goes to the profile that claims
+/// its site ("Open these sites in this profile"), else to the window used last.
 #[tauri::command]
 pub fn app_take_launch_urls(webview: tauri::Webview) -> Vec<String> {
-    use crate::infra::space_windows;
-    if !space_windows::is_app_window(webview.label()) {
+    use crate::infra::profile_windows;
+    if !profile_windows::is_app_window(webview.label()) {
         return Vec::new();
     }
     let launch = LAUNCH_URLS
         .lock()
         .map(|mut urls| std::mem::take(&mut *urls))
         .unwrap_or_default();
-    let mut urls = space_windows::route_links(webview.app_handle(), webview.label(), launch);
-    urls.extend(space_windows::take_links(webview.label()));
+    let mut urls = profile_windows::route_links(webview.app_handle(), webview.label(), launch);
+    urls.extend(profile_windows::take_links(webview.label()));
     urls
 }
 

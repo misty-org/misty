@@ -55,7 +55,7 @@ export function AdvancedSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
-      <SettingsSectionBlock title="Window">
+      <SettingsSectionBlock title="Display">
         <SettingsRow label="Dim inactive panes">
           <SwitchControl {...toggle("appearance", "dim_inactive_panes", true)} />
         </SettingsRow>

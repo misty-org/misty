@@ -2,12 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { uploadLibraryBlob } from "@/api/spaces/library-upload";
 import { bookmarks, bookmarkUrl, saveBookmark } from "@/features/bookmarks/library";
 import { parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
-import { mapAllWorkspaceWindowViews } from "@/features/workspace/windows";
+import { allLayoutViews } from "@/features/workspace/layoutTabs";
 import { devicesNative } from "@/native/devices";
 import { agentsPrepareScopedDocument } from "./store/useAgentsStore";
-import { billingNote, browserNote, readablePage } from "./webFetchText";
 import type { ClaimedWorkflowNodeJob } from "./workerBrowserJobs";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 
 /**
  * Device jobs for the grants a desktop chat attached: shared folders (read
@@ -23,7 +22,6 @@ export const deviceAgentOperations = new Set([
   "browser.tab.open",
   "bookmark.list",
   "bookmark.add",
-  "web.fetch",
 ]);
 
 const readLimit = 20_000;
@@ -87,14 +85,13 @@ export async function runDeviceAgentOperation(
     case "browser.tab.list": {
       const tabs: Array<{ id: string; title: string; url: string }> = [];
       const seen = new Set<string>();
-      mapAllWorkspaceWindowViews(useWorkspaceStore.getState(), (view) => {
+      for (const view of allLayoutViews(useWorkspaceStore.getState().layout)) {
         if (view.surfaceId === "browser" && !isIncognitoWindow() && !seen.has(view.id)) {
           seen.add(view.id);
           const url = parseBrowserViewState(view.state).url;
           if (/^https?:/i.test(url)) tabs.push({ id: view.id, title: view.title, url });
         }
-        return view;
-      });
+      }
       return { tabs: tabs.slice(0, 200) };
     }
     case "browser.tab.open": {
@@ -114,26 +111,6 @@ export async function runDeviceAgentOperation(
         .slice(0, 100)
         .map((item) => ({ id: item.id, title: item.title, url: item.url }));
       return { bookmarks: items };
-    }
-    case "web.fetch": {
-      // Fetched natively without cookies; the network checks live in web_fetch.rs.
-      const page = await invoke<{
-        finalUrl: string;
-        status: number;
-        contentType: string;
-        body: string;
-        truncated: boolean;
-      }>("agents_web_fetch", { url: webAddress(input.url) });
-      const question = typeof input.question === "string" ? input.question : "";
-      const readable = readablePage(page.body, page.contentType, question);
-      return {
-        url: page.finalUrl,
-        status: page.status,
-        title: readable.title,
-        text: readable.text,
-        truncated: readable.truncated || page.truncated,
-        note: browserNote(page.status, readable.text) ?? billingNote(readable.text),
-      };
     }
     case "bookmark.add": {
       const url = webAddress(input.url);

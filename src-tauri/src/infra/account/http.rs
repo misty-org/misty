@@ -1,7 +1,8 @@
-//! Streaming HTTP for account requests. Only the native cookie jar sees JWTs, and only
-//! this layer adds the device's model keys (`X-Misty-Models`); the renderer can neither
-//! set nor read that header.
-use super::cookies::{self, AccountClient};
+//! Streaming HTTP for account requests. Only native code sees JWTs: this layer adds the bearer,
+//! takes tokens from responses and strips them before the renderer reads the headers. Only this
+//! layer adds the device's model keys (`X-Misty-Models`); the renderer can neither set nor read
+//! that header.
+use super::session::{self, AccountClient, Captured, RefreshAnswer};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -10,9 +11,14 @@ use std::{
 use tauri::Manager;
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 
+/// What `auth_http_read` streams: a server's response, or an answer made here.
+enum Answer {
+    Remote(reqwest::Response),
+    Local(Option<Vec<u8>>),
+}
 struct RequestSlot {
     cancel: Notify,
-    response: AsyncMutex<Option<reqwest::Response>>,
+    response: AsyncMutex<Option<Answer>>,
 }
 #[derive(Default)]
 struct RequestRegistry {
@@ -47,6 +53,45 @@ pub struct ResponseHead {
     url: String,
 }
 
+/// Sign-ins that make an account this computer's. A setup key is not one of them: it can be
+/// redeemed on a server this device hasn't moved to yet, and the sign-in flow captures it after.
+const LOGIN_PATHS: [&str; 4] = [
+    "/login",
+    "/register",
+    "/auth/google/complete",
+    "/auth/confirm-email/sign-in",
+];
+
+/// Headers only native code decides. Tokens and model keys never come from the renderer, and an
+/// `Origin` would make the server treat this as a page and answer in cookies nobody would keep.
+fn renderer_may_set(name: &str) -> bool {
+    !matches!(
+        name.to_ascii_lowercase().as_str(),
+        "cookie"
+            | "authorization"
+            | "origin"
+            | "host"
+            | "content-length"
+            | "connection"
+            | "user-agent"
+            | "x-misty-token-transport"
+            | "x-misty-access-token"
+            | "x-misty-refresh-token"
+            | "x-misty-session-ended"
+            // Model keys never leave this computer.
+            | "x-misty-models"
+    )
+}
+
+/// The server ended the session: the windows are nobody's now.
+async fn session_ended(app: &tauri::AppHandle, url: &url::Url) -> Result<(), String> {
+    super::super::profile_data::change_account(Some(app), || {
+        session::set_account(url, None);
+        Ok(())
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn auth_http_start(
     webview: tauri::Webview,
@@ -78,52 +123,59 @@ pub async fn auth_http_start(
     };
     let progress: tauri::ipc::Channel<[u64; 2]> = progress.channel_on(webview);
     uuid::Uuid::parse_str(&request_id).map_err(|_| "Invalid request ID")?;
-    let url = cookies::server(&url)?;
+    let url = session::server(&url)?;
     let method =
         reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "Invalid HTTP method")?;
-    let login = method == reqwest::Method::POST
-        && ["/login", "/auth/google/complete", "/register"]
-            .iter()
-            .any(|path| url.path().ends_with(path));
-    let refresh = method == reqwest::Method::POST && url.path().ends_with("/auth/refresh");
-    // A failed attempt to add another account must not change the active jar.
+    let posted = |path: &str| method == reqwest::Method::POST && url.path().ends_with(path);
+    let login = LOGIN_PATHS.iter().any(|path| posted(path));
+    let refresh = posted("/auth/refresh");
+    let logout = posted("/logout");
+    // A failed attempt to add another account must not change the active client.
     let client = if login {
         AccountClient::new()?
     } else {
-        cookies::current(&url)?
+        session::current(&url)?
+    };
+    let used_access = client.access_header();
+    // Signing out names the session by its refresh token, which outlives an access token.
+    let bearer = if logout {
+        client.refresh_header(&url).or(used_access.clone())
+    } else {
+        used_access.clone()
     };
     let mut builder = client.http.request(method, url.clone());
     for (name, value) in headers {
-        if matches!(
-            name.to_ascii_lowercase().as_str(),
-            "cookie"
-                | "authorization"
-                | "host"
-                | "content-length"
-                | "connection"
-                | "user-agent"
-                // Model keys never leave this computer.
-                | "x-misty-models"
-        ) {
-            continue;
+        if renderer_may_set(&name) {
+            builder = builder.header(&name, &value);
         }
-        builder = builder.header(&name, &value);
     }
-    builder = builder.header("X-Misty-CSRF", "1");
+    if let Some(bearer) = bearer {
+        builder = builder.header(
+            reqwest::header::AUTHORIZATION,
+            session::authorization(&bearer)?,
+        );
+    }
+    // Any response may issue or end a session, so every one comes back as headers.
+    builder = builder
+        .header(session::TOKEN_TRANSPORT.0, session::TOKEN_TRANSPORT.1)
+        .header("X-Misty-CSRF", "1");
     if has_body {
         let total = body.len() as u64;
-        let stream = async_stream::stream! {
-            let mut sent = 0;
-            let mut reported = std::time::Instant::now();
-            for chunk in body.chunks(256*1024) {
-                yield Ok::<Vec<u8>,std::io::Error>(chunk.to_vec());
-                sent += chunk.len() as u64;
-                if sent == total || reported.elapsed().as_millis() >= 50 {
-                    let _ = progress.send([sent,total]);
-                    reported = std::time::Instant::now();
-                }
+        let mut sent = 0;
+        let mut reported = std::time::Instant::now();
+        // Each poll means the chunk before it was taken, so that's when it counts as sent.
+        let stream = futures_util::stream::poll_fn(move |_| {
+            if sent > 0 && (sent == total || reported.elapsed().as_millis() >= 50) {
+                let _ = progress.send([sent, total]);
+                reported = std::time::Instant::now();
             }
-        };
+            let start = sent as usize;
+            let end = body.len().min(start + 256 * 1024);
+            sent = end as u64;
+            std::task::Poll::Ready(
+                (start < end).then(|| Ok::<Vec<u8>, std::io::Error>(body[start..end].to_vec())),
+            )
+        });
         builder = builder
             .header(reqwest::header::CONTENT_LENGTH, total)
             .body(reqwest::Body::wrap_stream(stream));
@@ -145,46 +197,44 @@ pub async fn auth_http_start(
         map.active.insert(request_id.clone(), slot.clone());
     }
     let outcome = async {
-        // Hold the jar's refresh lock until the rotated cookies are persisted.
-        let _refresh_guard = if refresh {
-            Some(client.refresh_lock.clone().lock_owned().await)
-        } else {
-            None
-        };
+        // The renderer asks for a refresh, but the tokens and the lock are native. It goes on
+        // even if this request is cancelled, so what the server rotated to isn't lost.
+        if refresh {
+            let answer = tokio::select! {
+                answer = client.rotate(url.clone(), used_access) => answer?,
+                _ = slot.cancel.notified() => return Err("Request aborted".to_string()),
+            };
+            if answer.ended {
+                session_ended(&app, &url).await?;
+            }
+            let RefreshAnswer { status, body, .. } = answer;
+            *slot.response.lock().await = Some(Answer::Local(Some(body)));
+            return Ok(ResponseHead {
+                status,
+                url: url.to_string(),
+                headers: Vec::new(),
+            });
+        }
         let response = tokio::select! {
             response = builder.send() => response.map_err(|_| "Could not reach the Misty server")?,
             _ = slot.cancel.notified() => return Err("Request aborted".to_string()),
         };
-        if response.headers().contains_key(reqwest::header::SET_COOKIE) {
-            let account = client.persist(&url)?;
-            if account.is_none() || (login && response.status().is_success()) {
-                super::super::browser_sync::change_account(Some(&app), || {
-                    if login && response.status().is_success() && account.is_some() {
-                        cookies::activate(&url, client.clone())?;
-                    }
-                    Ok(())
+        match client.capture(&url, response.headers())? {
+            Captured::Signed if login && response.status().is_success() => {
+                super::super::profile_data::change_account(Some(&app), || {
+                    session::activate(&url, client.clone())
                 })
                 .await?;
             }
+            Captured::Ended => session_ended(&app, &url).await?,
+            Captured::Signed | Captured::Nothing => {}
         }
         let head = ResponseHead {
             status: response.status().as_u16(),
             url: response.url().to_string(),
-            headers: response
-                .headers()
-                .iter()
-                .filter_map(|(name, value)| {
-                    if name == reqwest::header::SET_COOKIE {
-                        return None;
-                    }
-                    value
-                        .to_str()
-                        .ok()
-                        .map(|value| (name.to_string(), value.to_string()))
-                })
-                .collect(),
+            headers: session::renderer_headers(response.headers()),
         };
-        *slot.response.lock().await = Some(response);
+        *slot.response.lock().await = Some(Answer::Remote(response));
         Ok(head)
     }
     .await;
@@ -205,10 +255,12 @@ pub async fn auth_http_read(request_id: String) -> Result<Option<Vec<u8>>, Strin
         .ok_or("Request aborted")?;
     let outcome = async {
         let mut response = slot.response.lock().await;
-        let response = response.as_mut().ok_or("Response is not ready")?;
-        tokio::select! {
-            chunk = response.chunk() => chunk.map(|chunk|chunk.map(|bytes|bytes.to_vec())).map_err(|_| "Could not read the Misty response".to_owned()),
-            _ = slot.cancel.notified() => Err("Request aborted".to_owned()),
+        match response.as_mut().ok_or("Response is not ready")? {
+            Answer::Local(body) => Ok(body.take().filter(|body| !body.is_empty())),
+            Answer::Remote(response) => tokio::select! {
+                chunk = response.chunk() => chunk.map(|chunk|chunk.map(|bytes|bytes.to_vec())).map_err(|_| "Could not read the Misty response".to_owned()),
+                _ = slot.cancel.notified() => Err("Request aborted".to_owned()),
+            },
         }
     }.await;
     if !matches!(outcome, Ok(Some(_))) {
@@ -231,4 +283,27 @@ pub async fn auth_http_cancel(request_id: String) -> Result<(), String> {
         map.canceled.insert(request_id);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::renderer_may_set;
+
+    #[test]
+    fn the_renderer_cannot_set_session_headers() {
+        for name in [
+            "Authorization",
+            "Cookie",
+            "Origin",
+            "X-Misty-Token-Transport",
+            "x-misty-access-token",
+            "X-Misty-Refresh-Token",
+            "X-Misty-Session-Ended",
+            "X-Misty-Models",
+        ] {
+            assert!(!renderer_may_set(name), "{name}");
+        }
+        assert!(renderer_may_set("Content-Type"));
+        assert!(renderer_may_set("X-Misty-Automation"));
+    }
 }

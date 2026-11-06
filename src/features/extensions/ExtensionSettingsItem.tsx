@@ -13,10 +13,10 @@ type Work = (action: () => Promise<unknown>) => Promise<void>;
 /** What the switch's account-wide intent means on this device right now. */
 function runtimeStatus(item: Installation, local?: InstalledState): string {
   if (local?.detail) return local.detail;
-  if (!item.enabled) return "Off on all your devices.";
-  if (local?.status === "enabled") return "Running on this device.";
+  if (!item.enabled) return "Off everywhere you're signed in.";
+  if (local?.status === "enabled") return "Running on this computer.";
   if (local?.status === "needs-review") return "Waiting for you to review its access here.";
-  return "Starting on this device.";
+  return "Starting on this computer.";
 }
 
 /** One installed extension's controls in Settings › Browser › Extensions. */
@@ -53,7 +53,7 @@ export function ExtensionSettingsItem({
       {local?.status === "needs-review" && (
         <DesktopSettingsRow
           label="Review access"
-          description="This version asks for access you haven't approved on this device."
+          description="This version asks for access you haven't approved on this computer."
         >
           <Button variant="outline" disabled={busy} onClick={() => requestInstall(item.id)}>
             Review
@@ -155,7 +155,7 @@ export function ExtensionSettingsItem({
       </DesktopSettingsRow>
       <DesktopSettingsRow
         label="Remove extension"
-        description="Removes it and its synced data from all your devices."
+        description="Removes it and its data everywhere you're signed in."
       >
         <Button variant="outline" disabled={busy} onClick={() => onRemove(item)}>
           Remove

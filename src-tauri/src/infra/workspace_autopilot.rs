@@ -77,7 +77,7 @@ fn authorize(app: &AppHandle, request: &BrowserAgentExecuteRequest) -> Result<Va
     super::agents::workspace::authorize_scope(app, &request.scope_id, &request.agent_id, task)?;
     let window = super::agents::workspace::task_window(app, task)
         .and_then(|label| app.get_window(&label))
-        .or_else(|| crate::infra::space_windows::primary(app))
+        .or_else(|| crate::infra::profile_windows::primary(app))
         .ok_or("Misty window closed")?;
     if state.context["desktopControl"] != true && !window.is_focused().unwrap_or(false) {
         #[cfg(target_os = "macos")]

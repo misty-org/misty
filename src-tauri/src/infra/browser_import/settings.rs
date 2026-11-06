@@ -1,5 +1,5 @@
 //! The settings Misty has an equivalent for: search engine, homepage, startup,
-//! and camera and microphone decisions for sites.
+//! and camera, microphone and location decisions for sites.
 use super::discover::Family;
 use super::snapshot::Snapshot;
 use serde::Serialize;
@@ -28,7 +28,7 @@ pub struct SearchEngine {
 #[serde(rename_all = "camelCase")]
 pub struct SitePermission {
     pub origin: String,
-    /// `camera` or `microphone`.
+    /// `camera`, `microphone` or `location`.
     pub kind: &'static str,
     pub allow: bool,
 }
@@ -123,6 +123,7 @@ fn chromium_permissions(prefs: &Value) -> Vec<SitePermission> {
     for (setting, kind) in [
         ("media_stream_camera", "camera"),
         ("media_stream_mic", "microphone"),
+        ("geolocation", "location"),
     ] {
         for (pattern, entry) in exceptions[setting].as_object().into_iter().flatten() {
             // Patterns read "https://site:443,*"; only exact sites carry over.
@@ -216,7 +217,7 @@ fn firefox_permissions(profile: &Path) -> Vec<SitePermission> {
         return Vec::new();
     };
     let Ok(mut statement) = db.prepare(
-        "SELECT origin, type, permission FROM moz_perms WHERE type IN ('camera', 'microphone') AND expireType = 0",
+        "SELECT origin, type, permission FROM moz_perms WHERE type IN ('camera', 'microphone', 'geo') AND expireType = 0",
     ) else {
         return Vec::new();
     };
@@ -233,10 +234,10 @@ fn firefox_permissions(profile: &Path) -> Vec<SitePermission> {
         .filter_map(|(site, kind, permission)| {
             Some(SitePermission {
                 origin: origin(&site)?,
-                kind: if kind == "camera" {
-                    "camera"
-                } else {
-                    "microphone"
+                kind: match kind.as_str() {
+                    "camera" => "camera",
+                    "microphone" => "microphone",
+                    _ => "location",
                 },
                 allow: match permission {
                     1 => true,

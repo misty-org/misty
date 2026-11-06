@@ -36,7 +36,7 @@ export function CodingToolsSection() {
   if (!hasTauriInternals()) return null;
 
   return (
-    <Section title="Coding tools">
+    <Section title="Coding">
       <Row label={defaultTool.label} description="Agents hand coding to this tool first.">
         <DropdownControl
           value={defaultTool.value}

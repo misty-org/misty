@@ -3,7 +3,6 @@ import { MistyFilePicker } from "@/features/picker/FilePicker";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
 import { SpaceLibraryViewer } from "../SpaceLibraryViewer";
-import { publicBetaFeatureEnabled } from "@/features/launch";
 import { transcribeLibraryFile } from "@/features/voice";
 import { libraryMediaKind } from "../libraryViewer/libraryMediaKind";
 import { libraryItemMIME } from "../SpaceLibraryPrimitives";
@@ -172,9 +171,8 @@ export function SpaceLibraryOverlays() {
   );
 }
 
-/** Audio and video files can be transcribed once voice notes are on. */
+/** Audio and video files can be transcribed. */
 function transcribable(item: Parameters<typeof libraryItemMIME>[0]) {
-  if (!publicBetaFeatureEnabled("voiceNotes")) return false;
   const kind = libraryMediaKind(libraryItemMIME(item), item.file.intrinsic_metadata);
   return kind.isAudio || kind.isVideo;
 }

@@ -19,14 +19,9 @@ import type {
 } from "@/features/ai-surface/types";
 import { planDeepThinking } from "./conversationTurn";
 import { globalMistyError, globalMistyId } from "./globalMistyActions";
-import { historyTurns } from "./localChats";
-import { keepChatOnThisDevice } from "./localChatSync";
+import { turnChangesSettled } from "./mistyConversationActions";
 import type { MistyState } from "./mistyState";
-import {
-  patchConversationMessage,
-  replaceActiveGlobalInvocationStream,
-  updateConversation,
-} from "./mistyStoreHelpers";
+import { patchConversationMessage, replaceActiveGlobalInvocationStream } from "./mistyStoreHelpers";
 import type { MistyGet, MistySet } from "./mistyStoreHelpers";
 import { submissionEpoch } from "./mistySubmissionEpoch";
 import { finishNeverStarted } from "./turnExecution";
@@ -43,7 +38,7 @@ export function clearUncertainAdmissions() {
 }
 
 /** One turn, ready to send: everything submitAnswer gathered before the server takes it. */
-export interface PreparedTurn {
+interface PreparedTurn {
   accountId: string;
   epoch: number;
   spaceId: string;
@@ -99,13 +94,8 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
     markPreparation,
   } = turn;
   try {
-    // A chat from before chats moved to devices becomes this device's once it continues here.
-    const unkept = get().conversations.find((c) => c.id === conversationId);
-    if (unkept?.remote && !unkept.keptOnDeviceId && !conversationId.startsWith("local-")) {
-      const kept = await keepChatOnThisDevice(conversationId);
-      if (kept)
-        updateConversation(set, get, conversationId, (c) => ({ ...c, keptOnDeviceId: kept }));
-    }
+    // The run's history comes from the server, so what was just taken out has to be out first.
+    await turnChangesSettled(conversationId);
     const admission = JSON.stringify([
       accountId,
       conversationId,
@@ -152,8 +142,11 @@ export async function startInvocation(set: MistySet, get: MistyGet, turn: Prepar
             : "message",
       requestedArtifactKind: handoff?.requestedArtifactKind,
       prompt: normalized,
-      // Earlier turns from this device's copy of the chat; the server keeps none.
-      historyTurns: historyTurns(get().conversations.find((c) => c.id === conversationId)),
+      // The run works on this computer; continuing from another computer runs there.
+      originDeviceId: await import("@/features/agents/workflows/deviceScheduledRuns")
+        .then(({ thisComputerDeviceId }) => thisComputerDeviceId())
+        .then((id) => id ?? undefined)
+        .catch(() => undefined),
       context: invocationContext,
       attachmentIds: attachments.map((attachment) => attachment.id),
       deviceContexts: [

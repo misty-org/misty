@@ -21,6 +21,7 @@ import {
   type BrowserSyncState,
 } from "./browserRuntimeSets";
 import { cancelDeferredHide, markBrowserPerf } from "./browserSwitchHandoff";
+import { isMediaHeld } from "./mediaHold";
 import { presentReconciledPage } from "./browserRuntimeVisibility";
 
 export function requestBrowserWebviewLayout(tab: BrowserRuntimeTab): void {
@@ -108,7 +109,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         originSpaceId: input.originSpaceId,
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
-        ...(input.profileId ? { profileId: input.profileId } : {}),
+        holdMedia: isMediaHeld(input.tab.id),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,
@@ -139,7 +140,7 @@ async function applyBrowserSync(id: string, input: BrowserSyncInput): Promise<vo
         originSpaceId: input.originSpaceId,
         theme: input.theme,
         nativeLiveResize: Boolean(input.nativeLiveResize),
-        ...(input.profileId ? { profileId: input.profileId } : {}),
+        holdMedia: isMediaHeld(input.tab.id),
         ...(input.providerId ? { providerId: input.providerId } : {}),
         ...(input.profileProviderId ? { profileProviderId: input.profileProviderId } : {}),
         ...input.bounds,

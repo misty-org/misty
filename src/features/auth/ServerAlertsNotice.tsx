@@ -7,8 +7,8 @@ import { useAuth } from "./authState";
 const refreshEvery = 5 * 60 * 1000;
 
 /**
- * The server's owner (its first account) sees the alerts service's open problems here: the
- * server sends no email, so this and the operator console are where they show. The notice is
+ * The server's owner (its first account) sees the alerts service's open problems here: this and
+ * the operator console are where they show. The notice is
  * calm and neutral, lists each problem, and leaves when they clear. Anyone else gets 403 once
  * and nothing more is asked. Dismissing hides it until the set of problems changes.
  */

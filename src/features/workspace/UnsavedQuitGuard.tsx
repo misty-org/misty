@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/shared/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
+import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
 
 interface HeldQuit {
   unsaved: number;
@@ -49,12 +49,8 @@ export function UnsavedQuitGuard() {
     >
       <AlertDialogContent className="max-w-sm">
         <AlertDialogHeader>
-          <AlertDialogTitle>Some changes are not saved on this device</AlertDialogTitle>
-          <AlertDialogDescription>
-            {changes} exist only in this window. Keep Misty open so it can keep trying, or{" "}
-            {held.closing ? "close" : "quit"} without them. Anything already synced stays on your
-            other devices.
-          </AlertDialogDescription>
+          <AlertDialogTitle>Some changes are not saved on this computer</AlertDialogTitle>
+          <AlertDialogDescription>{changes} exist only in this window.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Keep Misty open</AlertDialogCancel>

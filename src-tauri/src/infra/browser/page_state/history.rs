@@ -1,18 +1,13 @@
-//! Per-tab browsing history in the tab's encrypted history slot, so back and
-//! forward keep working on another device and across restarts. The renderer
-//! owns the history model and its size budget; native code only bounds the
-//! payload and moves it in and out of the driven workspace.
-use misty_browser_sync::workspace::protocol::PAGE_HISTORY;
+//! Per-tab browsing history in the tab's encrypted record, so back and forward
+//! keep working across restarts. The renderer owns the history model and its size
+//! budget; native code only bounds the payload and moves it in and out of the
+//! window's profile.
+use super::{slot_id, valid_tab, window_records, HISTORY_SLOT};
+use crate::infra::profile_data::PAGE_STATE;
 use tauri::Webview;
 
 /// Hard ceiling matching the renderer's 1 MB setting maximum.
 const MAX_HISTORY_BYTES: usize = 1 << 20;
-
-fn valid_tab(view_id: &str) -> Result<(), String> {
-    (!view_id.is_empty() && view_id.len() <= 200)
-        .then_some(())
-        .ok_or_else(|| "Tab identifier is invalid.".into())
-}
 
 #[tauri::command]
 pub async fn browser_view_history_save(
@@ -28,11 +23,13 @@ pub async fn browser_view_history_save(
     {
         return Err("Tab history exceeds the 1 MB limit.".into());
     }
-    let handle = crate::infra::browser_sync::page_state_worker().await?;
-    handle
-        .write_page_slot(view_id, PAGE_HISTORY, history.map(String::into_bytes))
+    window_records(&webview)?
+        .raw_write(
+            PAGE_STATE,
+            &slot_id(&view_id, HISTORY_SLOT),
+            history.map(String::into_bytes),
+        )
         .await
-        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -42,11 +39,9 @@ pub async fn browser_view_history_load(
 ) -> Result<Option<String>, String> {
     super::require_main(&webview)?;
     valid_tab(&view_id)?;
-    let (handle, workspace) = crate::infra::browser_sync::page_state_reader().await?;
-    let bytes = handle
-        .read_page_slot(workspace, view_id, PAGE_HISTORY)
-        .await
-        .map_err(|e| e.to_string())?;
+    let bytes = window_records(&webview)?
+        .raw_read(PAGE_STATE, &slot_id(&view_id, HISTORY_SLOT))
+        .await?;
     Ok(bytes
         .filter(|b| b.len() <= MAX_HISTORY_BYTES)
         .and_then(|b| String::from_utf8(b).ok()))

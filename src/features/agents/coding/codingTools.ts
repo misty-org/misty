@@ -52,18 +52,3 @@ export interface CodingToolStatus {
 }
 
 export const detectCodingTools = () => invoke<CodingToolStatus[]>("coding_engines_detect");
-
-/** One line on what a tool can do and whether it's ready. */
-export function codingToolStatusText(tool: CodingTool, status?: CodingToolStatus) {
-  if (!status?.installed) return "Not installed on this computer.";
-  const ready = status.signed_in
-    ? `Signed in${status.version ? ` · ${status.version}` : ""}.`
-    : "Signed out. Sign in to it in a terminal.";
-  const asks = tool.fullAccessOnly
-    ? ` ${tool.name} can’t ask before acting, so it runs only in Auto.`
-    : tool.asks
-      ? ""
-      : " Can’t ask before acting, so in Ask it only plans.";
-  const usage = tool.reportsUsage ? "" : " Usage cap unavailable for this tool.";
-  return `${ready}${asks}${usage}`;
-}

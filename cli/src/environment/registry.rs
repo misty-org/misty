@@ -1,5 +1,5 @@
 //! The development environment files and the names development requires.
-//! A server is configured with the five files under server/.env/ instead
+//! A server is configured with the four files under ~/.misty/server/prod/ instead
 //! (docs/self-hosting.md).
 
 #[derive(Clone, Copy)]
@@ -15,11 +15,17 @@ pub(super) const FILES: &[FileSpec] = &[
             "AUTH_HANDOFF_START_URL",
             // Bearer token of the operator account API (docs/cloud/README.md).
             "MISTY_OPERATOR_TOKEN",
+            // Anyone may make an account (docs/self-hosting.md#accounts).
+            "MISTY_OPEN_SIGNUP",
+            // Only these emails may make an account or sign in (docs/self-hosting.md#accounts).
+            "MISTY_ALLOWED_EMAILS",
             "MISTY_ALLOWED_ORIGINS",
             "MISTY_ENVIRONMENT",
             "MISTY_HOST_PORT",
             "MISTY_INSTANCE_NAME",
             "MISTY_PUBLIC_API_URL",
+            // The website a development app links to (`misty desktop dev`).
+            "MISTY_PUBLIC_URL",
             "MISTY_DEVICE_JOBS_ENABLED",
             "MISTY_WEBSITE_URL",
             "PORT",
@@ -81,6 +87,8 @@ pub(super) const FILES: &[FileSpec] = &[
     FileSpec {
         path: "integrations/ai.env",
         names: &[
+            // No longer read: every server has Memory. Kept so existing
+            // development files still load.
             "MISTY_RECALL",
             "MISTY_RECALL_BACKLOG_CAP",
             // No longer read: web search runs on each device, on a search key
@@ -153,22 +161,6 @@ pub(super) const FILES: &[FileSpec] = &[
         // MISTY_COMPOSIO_DEPLOYMENT is no longer read; kept so existing
         // development files still load.
         names: &["MISTY_COMPOSIO_DEPLOYMENT", "MISTY_COMPOSIO_API_KEY"],
-    },
-    FileSpec {
-        path: "integrations/web-fetch.env",
-        names: &["MISTY_WEB_FETCH_URL", "MISTY_WEB_FETCH_SECRET"],
-    },
-    FileSpec {
-        path: "integrations/email.env",
-        // No longer read: the server sends no email. Kept so existing
-        // development files still load.
-        names: &[
-            "MAILJET_API_KEY",
-            "MAILJET_API_BASE_URL",
-            "MAILJET_FROM_EMAIL",
-            "MAILJET_FROM_NAME",
-            "MAILJET_SECRET_KEY",
-        ],
     },
     FileSpec {
         path: "integrations/google.env",

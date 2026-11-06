@@ -16,7 +16,7 @@ import {
 import { formatWhen, nodeSubtitle } from "../format";
 import { NODE_H, NODE_W } from "../layout";
 import { MemoryPopover } from "../MemoryPopover";
-import { addForms } from "../addForms";
+import { addForms, addOrder } from "../addForms";
 import { isLeaf } from "../model";
 import { useMemoryTreeStore } from "../useMemoryTreeStore";
 import { type VisibleNode } from "../visibleTree";
@@ -117,6 +117,22 @@ export function MemoryTreeNode({ data }: NodeProps<MemoryFlowNode>) {
             </PopoverContent>
           )}
         </Popover>
+        {!node && (
+          <ContextMenuContent className="w-52">
+            {addOrder.map((branch) => (
+              <ContextMenuItem key={branch} onSelect={() => askAdd(branch)}>
+                <Plus aria-hidden="true" />
+                {addForms[branch].menu}…
+              </ContextMenuItem>
+            ))}
+            <ContextMenuItem
+              onSelect={() => askForget({ id: "space", label: `everything in ${spaceName}` })}
+            >
+              <Trash2 aria-hidden="true" />
+              Forget everything…
+            </ContextMenuItem>
+          </ContextMenuContent>
+        )}
         {node && (
           <ContextMenuContent className="w-44">
             {node.type === "branch" && (

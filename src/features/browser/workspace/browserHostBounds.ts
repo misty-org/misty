@@ -39,7 +39,7 @@ export function visibleBrowserBounds(host: HTMLElement): BrowserBounds | null {
 /**
  * The chrome the pane paints around the page's rounded corners, as `#rrggbb`. The pane's seam
  * layer paints it (its inset shadow and corner gradients), so its resolved color already carries
- * the theme and the Space's wash.
+ * the theme and the profile's wash.
  */
 function paneChromeColor(host: HTMLElement): string | undefined {
   const pane = host.closest<HTMLElement>('[data-browser-corner-clip="seam"]');

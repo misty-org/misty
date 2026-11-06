@@ -147,15 +147,7 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
   );
 }
 
-/** Every view this window holds, in its Space's layout and any device profile's. */
-export function workspaceTabsById(state: {
-  layout: WorkspaceLayout;
-  layoutsByScope: Partial<Record<string, WorkspaceLayout>>;
-}): Map<string, WorkspaceView> {
-  return new Map(
-    [state.layout, ...Object.values(state.layoutsByScope)]
-      .filter((layout): layout is WorkspaceLayout => Boolean(layout))
-      .flatMap((layout) => allLayoutViews(layout))
-      .map((tab) => [tab.id, tab]),
-  );
+/** Every view this window holds. */
+export function workspaceTabsById(state: { layout: WorkspaceLayout }): Map<string, WorkspaceView> {
+  return new Map(allLayoutViews(state.layout).map((tab) => [tab.id, tab]));
 }

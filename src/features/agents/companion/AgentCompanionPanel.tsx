@@ -2,7 +2,7 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import sprite from "@/shared/assets/misty-cloud-expression-cycle.webp?inline";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton, Switch, Slider } from "@/shared/ui";
+import { Button, ErrorNotification, IconButton, Switch, Slider } from "@/shared/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import "./agentCompanionPanel.css";
@@ -128,16 +128,13 @@ export function AgentCompanionPanel() {
           </DesktopSettingsRow>
         )}
       </DesktopSettingsSection>
-      {(error || state.error) && (
-        <div className="agent-companion-error" role="alert">
-          <p>{error || state.error}</p>
-          {desktop && (
-            <Button variant="ghost" size="sm" onClick={() => act({ kind: "retry" })}>
-              Retry companion
-            </Button>
-          )}
-        </div>
-      )}
+      <ErrorNotification message={error || state.error} onDismiss={() => setError("")}>
+        {desktop && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => act({ kind: "retry" })}>
+            Retry companion
+          </Button>
+        )}
+      </ErrorNotification>
     </div>
   );
 }

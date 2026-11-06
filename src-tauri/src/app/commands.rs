@@ -44,7 +44,7 @@ pub async fn agents_list_scoped_files(
     request: crate::infra::agents::ListScopedFilesRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<serde_json::Value> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err(crate::error::ApiError::Message(
             "Only the Host can process approved device scopes.".into(),
         ));
@@ -61,7 +61,7 @@ pub async fn agents_prepare_scoped_document(
     request: PrepareScopedAgentDocumentRequest,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<PreparedAgentDocument> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err(crate::error::ApiError::Message(
             "Only the Host can process approved device scopes.".into(),
         ));
@@ -125,7 +125,7 @@ pub async fn navigation_names_snapshot(
     state: State<'_, MistyRuntime>,
     account: String,
 ) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only the trusted Misty shell can read navigation names.".into());
     }
     Ok(state.navigation_names.snapshot(&account).await)
@@ -138,84 +138,51 @@ pub async fn navigation_names_update(
     key: String,
     name: Option<String>,
 ) -> Result<crate::infra::navigation_names::NavigationSnapshot, String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only the trusted Misty shell can rename navigation.".into());
     }
     state.navigation_names.update(account, key, name).await
 }
 
-/// Agent chats kept on this device (docs/agents/browser.md, local chats).
 #[tauri::command]
-pub async fn agent_chats_list(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    kind: String,
-) -> Result<Vec<String>, String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("Only the trusted Misty shell can read agent chats.".into());
-    }
-    state.agent_chats.list(account, kind).await
-}
-
-#[tauri::command]
-pub async fn agent_chats_put(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    kind: String,
-    id: String,
-    document: String,
-) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("Only the trusted Misty shell can save agent chats.".into());
-    }
-    state.agent_chats.put(account, kind, id, document).await
-}
-
-#[tauri::command]
-pub async fn agent_chats_delete(
-    webview: tauri::Webview,
-    state: State<'_, MistyRuntime>,
-    account: String,
-    kind: String,
-    id: String,
-) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("Only the trusted Misty shell can delete agent chats.".into());
-    }
-    state.agent_chats.delete(account, kind, id).await
-}
-
-#[tauri::command]
-pub async fn settings_profile_state(
+pub async fn settings_session_state(
     webview: tauri::Webview,
     scope: String,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings::profile_store::ProfileStateSnapshot> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err(ApiError::Unavailable(
-            "Only the trusted Misty shell can read settings profiles.".into(),
+            "Only the trusted Misty shell can read settings.".into(),
         ));
     }
     state.settings.profile_state(scope, None).await
 }
 
 #[tauri::command]
-pub async fn settings_profile_commit(
+pub async fn settings_session_commit(
     webview: tauri::Webview,
     scope: String,
     revision: i64,
     document: serde_json::Value,
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<crate::infra::settings::profile_store::ProfileStateSnapshot> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err(ApiError::Unavailable(
-            "Only the trusted Misty shell can save settings profiles.".into(),
+            "Only the trusted Misty shell can save settings.".into(),
         ));
     }
     state
         .settings
         .profile_state(scope, Some((revision, document)))
         .await
+}
+
+#[tauri::command]
+pub async fn server_host_resolves_public(webview: tauri::Webview, host: String) -> ApiResult<bool> {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
+        return Err(ApiError::Unavailable(
+            "Only the trusted Misty shell can check a server's address.".into(),
+        ));
+    }
+    Ok(crate::infra::agents::web_fetch::host_resolves_public(&host).await)
 }

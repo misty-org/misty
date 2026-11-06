@@ -5,7 +5,9 @@ mod model;
 mod preflight;
 mod publish;
 mod runtime;
+mod stage;
 mod state;
+pub mod test_build;
 mod verification;
 mod windows_signing;
 
@@ -28,7 +30,9 @@ use model::{
     WINDOWS_ARM_PLATFORM, WINDOWS_PLATFORM,
 };
 
-pub use publish::{publish, verify};
+pub use publish::publish;
+pub use stage::{stage, Stage};
+pub use state::normalize_version;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
 pub enum ReleaseOs {
@@ -38,6 +42,16 @@ pub enum ReleaseOs {
 
 pub fn check(workspace: &Workspace) -> Result<()> {
     preflight::check(workspace)
+}
+
+/// The version package.json declares, which a new release starts from.
+pub fn app_version(workspace: &Workspace) -> Result<String> {
+    let package: serde_json::Value =
+        serde_json::from_slice(&fs::read(workspace.misty.join("package.json"))?)?;
+    package["version"]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| anyhow::anyhow!("package.json has no version"))
 }
 
 pub fn start(

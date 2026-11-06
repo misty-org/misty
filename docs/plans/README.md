@@ -18,8 +18,7 @@ around as history, and do not write a plan for work that fits in a pull request 
 
 | Plan | Graduates to |
 | --- | --- |
-| [mvp-ledger.md](mvp-ledger.md): everything left before the Misty Cloud MVP and a working self-hosted server | [cloud](../cloud/README.md) |
+| [mvp-ledger.md](mvp-ledger.md): everything left before the Misty Pro MVP and a working self-hosted server | [cloud](../cloud/README.md) |
 | [agent-browser-actions.md](agent-browser-actions.md): a catalog of page actions, obstacles and a vision fallback | [agents](../agents/README.md) |
 | [spaces-as-profiles.md](spaces-as-profiles.md): the build plan for Spaces as profiles (partly built) | [spaces](../spaces/README.md) |
-| [extensions-sync-plan.md](extensions-sync-plan.md): extensions, ad blocking, passwords and sync | [kiri](../kiri/README.md) |
 | [extensions-windows-test.md](extensions-windows-test.md): the Windows extension checklist | [kiri](../kiri/README.md) |

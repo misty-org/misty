@@ -18,6 +18,7 @@ pub(super) const TOP_PAGES_WINDOW_MS: i64 = 90 * 86_400_000;
 /// (typed visits count triple) decayed by age. Empty text returns top pages.
 pub(super) fn browser_history_suggest_blocking(
     app: AppHandle,
+    profile: String,
     request: BrowserHistoryQueryRequest,
 ) -> Result<Vec<BrowserHistorySuggestion>, String> {
     let search = text(&request.text, 200);
@@ -44,7 +45,7 @@ pub(super) fn browser_history_suggest_blocking(
     let rows = statement
         .query_map(
             params![
-                profile_key(request.profile_id),
+                profile,
                 like_pattern(&search),
                 now,
                 request.limit.unwrap_or(5).clamp(1, 20),

@@ -114,8 +114,8 @@ describe("AddFilesToSpaceDialog", () => {
   it("states copy semantics and lists the person's Spaces", async () => {
     await renderDialog(root, ["/Users/misty/report.pdf"]);
 
-    expect(container.textContent).toContain("Your originals stay in Files");
-    expect(container.textContent).toContain("never moved or replaced");
+    expect(container.textContent).toContain("Add copies to a Space");
+    expect(container.textContent).toContain("Files up to 128 MB each");
     expect(container.textContent).toContain("Launch room");
     expect(container.textContent).toContain("report.pdf");
     expect(mocks.load).toHaveBeenCalledOnce();
@@ -196,7 +196,7 @@ describe("AddFilesToSpaceDialog", () => {
     await clickButton("Add copies");
 
     expect(container.textContent).toContain("1 added to Launch room; 1 failed.");
-    expect(container.textContent).toContain("Network unavailable");
+    expect(document.body.textContent).toContain("Network unavailable");
 
     await clickButton("Retry failed");
 

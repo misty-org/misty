@@ -1,15 +1,14 @@
 import { invoke } from "./invoke";
 
-// Devices (docs/sync/devices.md). Identity, trust, signatures and the
-// control channel stay native; these only drive them. Everything between a
-// person's devices goes through the server.
+// This signed-in session's identity. Its key, signatures and the channel stay native; these
+// only drive them.
 
 interface PeerPresence {
   deviceId: string;
   online: boolean;
 }
 
-export interface ChannelSnapshot {
+interface ChannelSnapshot {
   connected: boolean;
   admitted: boolean;
   peers: PeerPresence[];
@@ -34,29 +33,11 @@ export interface DevicePolicy {
 export interface DevicesView {
   serverDeviceId: string | null;
   admitted: boolean;
-  canSign: boolean;
-  vaultPinned: boolean;
-  listVersion: number;
   channel: ChannelSnapshot;
   policy: DevicePolicy | null;
 }
 
-export interface AdmissionView {
-  requestId: string;
-  state: "pending" | "challenged" | "revealed" | "approved" | "denied" | "expired";
-  code: string | null;
-  deviceName: string;
-  admitted: boolean;
-}
-
-export interface PendingAdmission {
-  requestId: string;
-  deviceId: string;
-  deviceName: string;
-  state: AdmissionView["state"];
-}
-
-export interface SignedRecord {
+interface SignedRecord {
   payload: string;
   signature: string;
 }
@@ -69,30 +50,7 @@ export const devicesNative = {
     device: { name: string; platform: string; osVersion: string; appVersion: string },
   ) => invoke<DevicesView>("devices_start", { ...account, ...device }),
   stop: () => invoke<void>("devices_stop"),
-  view: (accountId: string) => invoke<DevicesView>("devices_view", { accountId }),
-  refresh: (account: Account) => invoke<DevicesView>("devices_refresh", account),
-  admitSelf: (account: Account) => invoke<DevicesView>("devices_admit_self", account),
-  requestApproval: (account: Account) => invoke<AdmissionView>("devices_request_approval", account),
-  approvalStatus: (account: Account, requestId: string) =>
-    invoke<AdmissionView>("devices_approval_status", { ...account, requestId }),
-  pendingRequests: (account: Account) =>
-    invoke<PendingAdmission[]>("devices_pending_requests", account),
-  approveStart: (account: Account, requestId: string) =>
-    invoke<AdmissionView>("devices_approve_start", { ...account, requestId }),
-  approveStatus: (account: Account, requestId: string) =>
-    invoke<AdmissionView>("devices_approve_status", { ...account, requestId }),
-  approveConfirm: (account: Account, requestId: string) =>
-    invoke<void>("devices_approve_confirm", { ...account, requestId }),
-  deny: (account: Account, requestId: string) =>
-    invoke<void>("devices_deny", { ...account, requestId }),
-  remove: (account: Account, deviceId: string) =>
-    invoke<DevicesView>("devices_remove", { ...account, deviceId }),
-  rename: (account: Account, deviceId: string, name: string) =>
-    invoke<void>("devices_rename", { ...account, deviceId, name }),
-  setPolicy: (
-    account: Account,
-    policy: { files: FileSharing; clipboard: boolean; agentSurfaces: AgentSurface[] },
-  ) => invoke<DevicePolicy>("devices_set_policy", { ...account, ...policy }),
+  view: (_accountId: string) => invoke<DevicesView>("devices_view"),
   publishFolders: (account: Account) => invoke<void>("devices_publish_folders", account),
   signRequest: (
     account: Account,

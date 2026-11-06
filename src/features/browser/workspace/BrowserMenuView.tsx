@@ -38,8 +38,9 @@ import type { BrowserPageCommands } from "./useBrowserPageCommands";
 import { BrowserHistoryMenu } from "./BrowserHistoryMenu";
 import { pictureInPictureSupported } from "@/features/webviews/pictureInPictureSettings";
 import { SiteAppsMenu } from "./SiteAppsMenu";
+import { LiveSubtitlesMenuItem } from "@/features/voice";
 
-export interface BrowserMenuViewProps {
+interface BrowserMenuViewProps {
   setOverlay: (reason: string, active: boolean) => Promise<void>;
   zoomId?: string;
   /** The site's saved zoom percent; omitted for private tabs. */
@@ -55,8 +56,6 @@ export interface BrowserMenuViewProps {
   overlayReason?: string;
   /** Favorites and Bookmarks, as panels beside the History row. */
   library?: ReactNode;
-  /** Rows closing the menu: sync. */
-  account?: ReactNode;
   /** Rows above the browser's own, such as the sidebar's bookmark, Misty and extensions. */
   lead?: ReactNode;
   /** The trigger is a tools icon, as in the vertical-tabs sidebar's address field. */
@@ -128,8 +127,8 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             />
             <Item
               icon={<AppWindow />}
-              label="Open Space"
-              shortcut="workspace.open_space"
+              label="New window"
+              shortcut="workspace.new_window"
               onSelect={commands.newWindow}
             />
             <Item
@@ -178,6 +177,7 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
                 </>
               ) : null}
               <Item icon={<Languages />} label="Translate page" onSelect={commands.translate} />
+              <LiveSubtitlesMenuItem onError={props.reportError} />
               <Item
                 icon={<BookOpenText />}
                 label="Reader view"
@@ -239,7 +239,6 @@ export function BrowserMenuView(props: BrowserMenuViewProps) {
             <DropdownMenuSeparator />
           </>
         ) : null}
-        {commands ? props.account : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

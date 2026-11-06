@@ -1,59 +1,80 @@
-//! The ring of sealed clips in sync: following it for clips from other
-//! devices, and placing clips copied here into its oldest slot.
+//! The ring of sealed clips: opening what it holds, and sealing clips copied here into its
+//! oldest slot. They are records like any other, so the vault link carries them.
 
 use std::{collections::HashSet, time::Duration};
 
-use misty_browser_sync::{
-    crypto::ClipboardKey,
-    worker::{ClipboardRow, Phase, WorkerHandle},
-};
+use misty_browser_sync::crypto::ClipboardKey;
 
-use super::{clip, payload, CloudStart, CloudStatus, Inner};
+use super::{clip, CloudStart, CloudStatus, Inner};
 use crate::domain::clipboard::ClipboardPayload;
 use crate::infra::devices::trust;
+use crate::infra::{profile_data, vault};
 
 /// How many clips the ring keeps (one per slot).
 const SLOTS: u8 = misty_browser_sync::collections::CLIPBOARD_SLOTS;
-/// Clips copied on other devices up to this long before this device joined
-/// are not pasted here: they were already in the ring.
-const ARRIVAL_SLACK_MS: i64 = 5_000;
 
 pub(super) struct Session {
-    handle: WorkerHandle,
     key: ClipboardKey,
     pub(super) device_id: String,
     device_name: String,
-    /// When this device started following the ring.
-    joined_at_ms: i64,
 }
 
 pub(super) async fn run(inner: std::sync::Arc<Inner>, generation: u64, start: CloudStart) {
     while inner.current(generation) {
-        if !trust::effective_policy().clipboard || !trust::self_admitted() {
+        if !trust::effective_policy().clipboard {
             close(&inner, CloudStatus::Off);
             tokio::time::sleep(Duration::from_secs(15)).await;
             continue;
         }
-        let Some((handle, key)) =
-            crate::infra::browser_sync::clipboard_session(&start.account_id).await
-        else {
+        let Some(key) = vault::clipboard_key().await else {
             close(&inner, CloudStatus::Locked);
             tokio::time::sleep(Duration::from_secs(5)).await;
             continue;
         };
         let session = std::sync::Arc::new(Session {
-            handle,
             key,
             device_id: start.server_device_id.clone(),
             device_name: start.device_name.clone(),
-            joined_at_ms: chrono::Utc::now().timestamp_millis(),
         });
         if let Ok(mut slot) = inner.session.write() {
-            *slot = Some(session.clone());
+            *slot = Some(session);
         }
-        follow(&inner, generation, &session).await;
-        close(&inner, CloudStatus::Unavailable);
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        inner.set_status(CloudStatus::Ready);
+        follow(&inner, generation).await;
+    }
+}
+
+const COLLECTION: &str = misty_browser_sync::collections::CLIPBOARD;
+/// How long a clip stays on the ring, on the server and here alike.
+const LIFETIME_MS: i64 = 24 * 60 * 60 * 1000;
+
+/// Opens the ring whenever it changes, until the vault closes.
+async fn follow(inner: &std::sync::Arc<Inner>, generation: u64) {
+    let mut changes = profile_data::subscribe();
+    loop {
+        let Some(session) = inner.session() else {
+            return;
+        };
+        if let Some(records) = vault::clipboard_records() {
+            let mut rows = Vec::new();
+            for slot in 0..SLOTS {
+                if let Ok(Some(sealed)) = records.raw_read(COLLECTION, &slot.to_string()).await {
+                    rows.push((slot, sealed));
+                }
+            }
+            absorb(inner, &session, &rows);
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(30)) => {}
+            change = changes.recv() => {
+                if matches!(&change, Ok(change) if change.collection != COLLECTION) {
+                    continue;
+                }
+            }
+        }
+        if !inner.current(generation) || vault::clipboard_key().await.is_none() {
+            return;
+        }
     }
 }
 
@@ -64,40 +85,16 @@ fn close(inner: &Inner, status: CloudStatus) {
     inner.set_status(status);
 }
 
-/// Follows the ring until the worker stops, the policy turns the clipboard
-/// off, or the clipboard restarts.
-async fn follow(inner: &Inner, generation: u64, session: &Session) {
-    let mut rows = session.handle.clipboard_rows.clone();
-    let mut status = session.handle.status.clone();
-    loop {
-        if !inner.current(generation) || !trust::effective_policy().clipboard {
-            return;
-        }
-        inner.set_status(match status.borrow().phase {
-            Phase::Ready | Phase::CatchingUp => CloudStatus::Ready,
-            Phase::Connecting => CloudStatus::Connecting,
-            Phase::Offline | Phase::Attention => CloudStatus::Unavailable,
-            Phase::Stopped => return,
-        });
-        let current = rows.borrow_and_update().clone();
-        absorb(inner, session, &current);
-        tokio::select! {
-            changed = rows.changed() => if changed.is_err() { return },
-            changed = status.changed() => if changed.is_err() { return },
-            // Policy changes are not signalled here; look again now and then.
-            _ = tokio::time::sleep(Duration::from_secs(30)) => {}
-        }
-    }
-}
-
-/// Opens the ring's rows into the clip history and pastes clips that arrived
-/// from other devices since this device joined.
-fn absorb(inner: &Inner, session: &Session, rows: &[ClipboardRow]) {
+/// Opens the ring's rows (slot and sealed clip) into the clip history. Clips from other
+/// devices only appear in the list; they never reach the system clipboard.
+fn absorb(inner: &Inner, session: &Session, rows: &[(u8, Vec<u8>)]) {
     let mut opened: Vec<(u8, clip::Clip)> = rows
         .iter()
-        .filter_map(|row| {
-            let body = session.key.open(row.slot, &row.ciphertext).ok()?;
-            Some((row.slot, clip::decode(&body).ok()?))
+        .filter_map(|(slot, sealed)| {
+            let body = session.key.open(*slot, sealed).ok()?;
+            let clip = clip::decode(&body).ok()?;
+            let age = chrono::Utc::now().timestamp_millis() - clip.header.created_unix_ms;
+            (age < LIFETIME_MS).then_some((*slot, clip))
         })
         .collect();
     opened.sort_by(|left, right| {
@@ -107,41 +104,24 @@ fn absorb(inner: &Inner, session: &Session, rows: &[ClipboardRow]) {
             .created_unix_ms
             .cmp(&left.1.header.created_unix_ms)
     });
-    let arrived: Vec<clip::Clip> = {
+    {
         let Ok(mut history) = inner.history.lock() else {
             return;
         };
-        let known: HashSet<String> = history
+        let known: HashSet<&str> = history
             .iter()
-            .map(|(_, clip)| clip.header.clip_id.clone())
+            .map(|(_, clip)| clip.header.clip_id.as_str())
             .collect();
         if history.len() == opened.len()
             && opened
                 .iter()
-                .all(|(_, clip)| known.contains(&clip.header.clip_id))
+                .all(|(_, clip)| known.contains(clip.header.clip_id.as_str()))
         {
             return;
         }
-        let arrived = opened
-            .iter()
-            .map(|(_, clip)| clip)
-            .filter(|clip| {
-                !known.contains(&clip.header.clip_id)
-                    && clip.header.device_id != session.device_id
-                    && clip.header.created_unix_ms >= session.joined_at_ms - ARRIVAL_SLACK_MS
-            })
-            .cloned()
-            .collect();
         *history = opened;
-        arrived
-    };
-    inner.notify();
-    if let Some(handler) = inner.handler() {
-        // Oldest first, so the newest ends up on the system clipboard.
-        for clip in arrived.iter().rev() {
-            handler(payload(clip));
-        }
     }
+    inner.notify();
 }
 
 /// Seals a copy made on this device into the ring's oldest slot.
@@ -160,16 +140,30 @@ pub(super) async fn publish(inner: &Inner, session: &Session, copy: ClipboardPay
         }
         Err(_) => return,
     };
-    let slot = next_slot(inner);
+    // The same content again is not a new entry: the newest copy of it stays as it is, and an
+    // older one moves to the top in its own slot.
+    let repeated = inner.history.lock().ok().and_then(|history| {
+        history
+            .iter()
+            .enumerate()
+            .find(|(_, (_, existing))| clip::same_content(existing, &clip))
+            .map(|(index, (slot, _))| (index, *slot))
+    });
+    if matches!(repeated, Some((0, _))) {
+        return;
+    }
+    let slot = repeated.map_or_else(|| next_slot(inner), |(_, slot)| slot);
     let Ok(sealed) = session.key.seal(slot, &body) else {
         return;
     };
-    if session
-        .handle
-        .clipboard_publish(slot, sealed)
-        .await
-        .is_err()
-    {
+    let published = match vault::clipboard_records() {
+        Some(records) => records
+            .raw_write(COLLECTION, &slot.to_string(), Some(sealed))
+            .await
+            .is_ok(),
+        None => false,
+    };
+    if !published {
         inner.set_notice(Some("Your copy couldn't be shared. Sync isn't running."));
         return;
     }

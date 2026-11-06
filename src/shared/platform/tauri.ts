@@ -17,7 +17,7 @@ export function safeTauriAssetUrl(path: string): string {
   return path;
 }
 
-export type TauriInternals = {
+type TauriInternals = {
   convertFileSrc?: (filePath: string, protocol?: string) => string;
   invoke?: unknown;
 };

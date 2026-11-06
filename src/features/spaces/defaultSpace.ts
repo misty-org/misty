@@ -27,8 +27,7 @@ export function spaceNavigationName(space: Pick<Space, "name">): string {
 }
 
 /**
- * The Space this window belongs to. Every window shows only its own Space; the personal
- * Space's window learns its id from the account's Spaces.
+ * The Space this window shows now. The personal Space's id comes from the account's Spaces.
  */
 export function windowSpace(spaces: Space[]): Space | undefined {
   const own = spaceWindow();

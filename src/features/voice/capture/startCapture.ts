@@ -1,7 +1,6 @@
 import { useSettingsStore } from "@/features/settings";
 import { voiceSettings } from "../voiceSettings";
 import { captureApi } from "./captureApi";
-import { useRecordingStore } from "../recording/useRecordingStore";
 import { useCaptureStore, type CaptureSource } from "./useCaptureStore";
 
 function settings() {
@@ -21,13 +20,6 @@ export function captureSystemAudio(title = "System audio") {
   return useCaptureStore
     .getState()
     .start({ kind: "system", title, mic: withMic() }, settings().language);
-}
-
-/** Records the main display with its sound, and the microphone per Settings › Voice. */
-export function captureScreen() {
-  return useRecordingStore
-    .getState()
-    .start({ microphone: withMic(), language: settings().language });
 }
 
 /** Listens to a browser tab through the page itself; tabId is its runtime id. */

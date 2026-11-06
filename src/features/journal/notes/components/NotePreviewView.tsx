@@ -1,10 +1,10 @@
-import { Button, EmptyState, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, ErrorNotification, Skeleton } from "@/shared/ui";
 import { ClipboardCopy } from "lucide-react";
 import { Suspense, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../model/types";
 
 import type { NoteBlockEditorProps } from "./NoteBlockEditorView";
-export interface NotePreviewRuntime {
+interface NotePreviewRuntime {
   Editor: ComponentType<Omit<NoteBlockEditorProps, "runtime">>;
   copy(text: string): Promise<void>;
   report(error: unknown): void;
@@ -53,11 +53,14 @@ export function NotePreviewView(props: NotePreviewProps & { runtime: NotePreview
       </div>
 
       <div className="misty-scrollbar min-h-0 overflow-auto">
-        {copyFailed ? (
-          <p role="alert" className="px-3 text-sm text-cream-muted">
-            Copy failed. Try Copy to clipboard again or select and copy the text.
-          </p>
-        ) : null}
+        <ErrorNotification
+          message={
+            copyFailed
+              ? "Copy failed. Try Copy to clipboard again or select and copy the text."
+              : ""
+          }
+          onDismiss={() => setCopyFailed(false)}
+        />
         {noteText.trim() ? (
           <Suspense
             fallback={

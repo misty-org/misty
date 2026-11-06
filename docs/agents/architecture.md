@@ -149,7 +149,7 @@ Each phase leaves the product working.
 
 - Gateway-owned Composio sessions reaching every toolkit, connect cards and
   policy on each tool slug. Done; see
-  [deploy/composio/README.md](../../server/deploy/composio/README.md).
+  [deploy/composio/README.md](https://github.com/misty-org/misty-server/blob/main/deploy/composio/README.md).
 - The calendar-only adapter and its per-agent calendar binding are deleted.
   Connected apps belong to the account and every agent inherits them.
 - Connect and approval cards hold the calling tool for up to 40 seconds. If the
@@ -348,7 +348,7 @@ were dropped by `20271004070000_retire_legacy_features.sql`.
 The Go API no longer calls models over HTTP. Library analysis, embeddings,
 media and voice transcription, the screen planner and Go's own completions go
 to the agent runtime's signed `POST /v1/models/{text,embed,transcribe}` routes
-(`server/internal/modelruntime`), which call the model with the Vercel AI SDK
+(`misty-server/internal/modelruntime`), which call the model with the Vercel AI SDK
 (`generateText` with structured output, `embedMany`, `transcribe`). Go still
 resolves each call's route (Misty's Gateway, or the account's own connection
 and key, sent only over the signed channel) and meters it before and after.
@@ -461,7 +461,7 @@ working, completed, failed, rejected and canceled.
 ### Catalog coverage (October 5, 2026)
 
 Every route that changes data has a recorded decision in
-`server/test/contract/http/app/agent_tool_coverage_test.go`: the tool that
+`misty-server/test/contract/http/app/agent_tool_coverage_test.go`: the tool that
 reaches it, why agents never use it (credentials, payments, vault keys,
 access control, a person's own decisions), or a named gap. A new route fails
 that test until someone decides; it records no open gaps. Common actions

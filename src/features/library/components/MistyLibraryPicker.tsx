@@ -264,9 +264,9 @@ export function MistyLibraryPicker({
   );
 }
 
-export type LibraryMediaFilter = "all" | "image" | "video" | "audio" | "document";
+type LibraryMediaFilter = "all" | "image" | "video" | "audio" | "document";
 
-export interface MistyLibraryPickerProps {
+interface MistyLibraryPickerProps {
   spaceId: string;
   /** Render only the picker panel when a parent owns the shared dialog shell. */
   embedded?: boolean;

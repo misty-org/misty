@@ -20,7 +20,7 @@ export function openSignOutSheet() {
 }
 
 /**
- * Signing out keeps browsing: sync, Spaces and agents stop on this device, and the window
+ * Signing out keeps browsing: Spaces and agents stop on this computer, and the window
  * goes on with the personal Space's tabs, bookmarks, passwords and history, which belong to
  * no account again. Removing them is a choice, off by default
  * (docs/browser/no-account.md, decision 2).
@@ -50,8 +50,7 @@ export function SignOutSheet() {
       <DialogContent aria-describedby="sign-out-description" className="max-w-[440px]">
         <DialogTitle className="text-lg">Sign out of Misty?</DialogTitle>
         <DialogDescription id="sign-out-description">
-          Sync, Spaces and agents stop on this device. You keep browsing with your tabs, bookmarks,
-          passwords, history and extensions.
+          You keep browsing on this computer.
         </DialogDescription>
         <label className="flex items-start gap-3 text-sm text-cream">
           <Checkbox
@@ -60,10 +59,9 @@ export function SignOutSheet() {
             onCheckedChange={(checked) => setRemoveData(checked === true)}
           />
           <span>
-            Also remove my browsing data from this device
+            Also remove my browsing data from this computer
             <span className="mt-0.5 block text-xs text-cream-muted">
-              Erases tabs, bookmarks, passwords, history and website sign-ins here. Your account
-              keeps its synced copy.
+              Erases tabs, bookmarks, passwords, history and website sign-ins here.
             </span>
           </span>
         </label>

@@ -2,10 +2,16 @@
 use super::*;
 
 #[tauri::command]
-pub fn browser_webview_reload(
+pub async fn browser_webview_reload(
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
+    #[cfg(any(target_os = "macos", windows))]
+    if let Some(webview) = app.get_webview(&webview_label(&request.id)?) {
+        if let Ok(url) = webview.url() {
+            crate::infra::vault::site_data::prepare_own_page(&webview, &url).await;
+        }
+    }
     with_webview(&app, &request.id, |webview| {
         reload_browser_webview(&webview)
     })
@@ -17,7 +23,7 @@ pub fn browser_webview_show(
     app: AppHandle,
     request: BrowserWebviewIdRequest,
 ) -> Result<(), String> {
-    let space = super::super::super::extensions::native::page_space(&app, &request.id);
+    let space = super::super::super::extensions::native::page_profile(&app, &request.id);
     super::super::super::extensions::native::tab_event(
         &app,
         space.as_deref(),

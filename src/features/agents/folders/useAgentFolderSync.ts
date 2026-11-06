@@ -4,9 +4,8 @@ import { useMistyStore } from "@/features/misty/useMistyStore";
 import { useAgentFoldersStore } from "./agentFoldersStore";
 
 /**
- * Loads this device's agent folders and follows the names the server generates
- * after a conversation starts. Folders, filing and read state live on this device
- * (docs/agents/chats-local.md), so only titles arrive from the account.
+ * Loads the agent folders and follows changes from the person's other signed-in sessions:
+ * the names the server generates after a conversation starts, and folders and filing.
  * The first run only needs folders; the Agents page already loads conversations.
  */
 export function useAgentFolderSync(accountId: string): void {
@@ -16,7 +15,7 @@ export function useAgentFolderSync(accountId: string): void {
       return;
     }
     let initial = true;
-    return observeAccountChanges(accountId, ["conversation-titles"], () => {
+    return observeAccountChanges(accountId, ["conversation-titles", "agent-folders"], () => {
       const reloadConversations = !initial;
       initial = false;
       return Promise.all([

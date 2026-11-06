@@ -4,10 +4,10 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   Input,
   Pressable,
   Skeleton,
@@ -64,13 +64,9 @@ export function FromGitHubDialog(props: {
   );
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
         <DialogHeader>
           <DialogTitle>From GitHub</DialogTitle>
-          <DialogDescription>
-            Clone a repository from your connected GitHub account into a new project folder. Git on
-            this computer does the cloning, signed in the way it usually is.
-          </DialogDescription>
         </DialogHeader>
         <Input
           aria-label="Search repositories"
@@ -118,11 +114,7 @@ export function FromGitHubDialog(props: {
             </ul>
           )}
         </div>
-        {error ? (
-          <p role="alert" className="text-sm text-cream-muted">
-            {error}
-          </p>
-        ) : null}
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
       </DialogContent>
     </Dialog>
   );
@@ -183,13 +175,9 @@ export function PublishDialog(props: {
   };
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
           <DialogTitle>Publish to GitHub</DialogTitle>
-          <DialogDescription>
-            Makes a repository on your connected GitHub account and pushes this project to it with
-            git on this computer. A folder without commits gets one with everything in it.
-          </DialogDescription>
         </DialogHeader>
         {done ? (
           <>
@@ -230,11 +218,7 @@ export function PublishDialog(props: {
                   aria-label="Private repository"
                 />
               </label>
-              {error ? (
-                <p role="alert" className="text-sm text-cream-muted">
-                  {error}
-                </p>
-              ) : null}
+              <ErrorNotification message={error} onDismiss={() => setError("")} />
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => props.onOpenChange(false)}>

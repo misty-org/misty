@@ -4,6 +4,13 @@ export type MemoryBranch = "moments" | "summaries" | "facts" | "workflows";
 export type MemoryNodeType = "branch" | "group" | "moment" | "summary" | "fact" | "workflow";
 export type MemoryRange = "today" | "week" | "all";
 
+/** One thing a person did that day, with when it started and stopped ("15:04"). */
+export interface RecapThread {
+  title: string;
+  from: string;
+  to: string;
+}
+
 /** One node of a Space's memory tree, as the server describes it. */
 export interface MemoryNode {
   id: string;
@@ -22,6 +29,8 @@ export interface MemoryNode {
   last_at?: string;
   searchable: boolean;
   expandable: boolean;
+  /** A day's recap only: its threads and what was left to do. */
+  outline?: { threads?: RecapThread[]; next?: string[] };
 }
 
 export interface ForgetCounts {
@@ -51,8 +60,7 @@ export const branchLabels: Record<MemoryBranch, string> = {
 export const sourceLabels: Record<string, string> = {
   page: "Web pages",
   screen: "Screen",
-  voice: "Dictation",
-  recording: "Recordings",
+  voice: "Voice",
   note: "Notes",
 };
 

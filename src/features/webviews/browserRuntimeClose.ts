@@ -59,8 +59,7 @@ export function switchBrowserPages(ids: readonly string[]): void {
 }
 
 /**
- * Closes this window's tab pages that belong to no tab it still has (`liveTabs`: every tab of
- * every Space the window holds). Pages outlive a renderer reload so tabs can take them back;
+ * Closes this window's tab pages that belong to no tab it still has (`liveTabs`). Pages outlive a renderer reload so tabs can take them back;
  * the ones nobody takes back would otherwise stay alive, and audible, until the app quits.
  */
 export async function closeOrphanBrowserPages(liveTabs: () => BrowserRuntimeTab[]): Promise<void> {

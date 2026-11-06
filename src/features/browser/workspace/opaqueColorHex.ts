@@ -1,5 +1,5 @@
 /**
- * An opaque computed color as `#rrggbb`, from a color function's name and arguments. A Space's
+ * An opaque computed color as `#rrggbb`, from a color function's name and arguments. A profile's
  * wash is a `color-mix(in srgb, …)`, which Chromium computes as `color(srgb r g b)` with
  * channels from 0 to 1, not `rgb()`.
  */

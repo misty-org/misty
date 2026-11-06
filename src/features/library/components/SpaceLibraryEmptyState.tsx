@@ -13,7 +13,7 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
     </div>
   );
 }
-export interface SpaceLibraryEmptyStateProps {
+interface SpaceLibraryEmptyStateProps {
   collection: string;
   searching?: boolean;
   uploadAvailable: boolean;

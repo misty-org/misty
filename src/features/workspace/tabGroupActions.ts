@@ -21,12 +21,7 @@ export function tabGroupActions(
     const state = get();
     if (!tabs.length) tabs = [emptyTab()];
     const id = selected && tabs.some((t) => t.id === selected) ? selected : tabs[0].id;
-    set(
-      withActiveWindowLayout(
-        state,
-        activateTab({ ...state.layout, tabs: contiguousTabs(tabs) }, id),
-      ),
-    );
+    set(withActiveWindowLayout(activateTab({ ...state.layout, tabs: contiguousTabs(tabs) }, id)));
   };
   const update = (id: string, patch: Partial<MistyTabGroup>) =>
     set({ tabGroups: get().tabGroups.map((g) => (g.id === id ? { ...g, ...patch } : g)) });
@@ -44,7 +39,6 @@ export function tabGroupActions(
             name: name.trim().slice(0, 80),
             color,
             collapsed: false,
-            scopeKey: state.activeScopeKey,
           },
         ],
       });
@@ -83,13 +77,7 @@ export function tabGroupActions(
       const state = get(),
         tabs = layoutTabs(state.layout),
         tab = tabs.find((t) => t.id === tabId);
-      if (
-        !tab ||
-        (groupId &&
-          !state.tabGroups.some(
-            (g) => g.id === groupId && !g.savedTabs && g.scopeKey === state.activeScopeKey,
-          ))
-      )
+      if (!tab || (groupId && !state.tabGroups.some((g) => g.id === groupId && !g.savedTabs)))
         return;
       // Groups belong to one window. Menus expose only this window's groups.
       if (groupId && !tabs.some((t) => t.tabGroupId === groupId)) return;
@@ -137,7 +125,7 @@ export function tabGroupActions(
     reopenTabGroup(id) {
       let state = get();
       const group = state.tabGroups.find((g) => g.id === id);
-      if (!group || group.scopeKey !== state.activeScopeKey) return null;
+      if (!group) return null;
       const open = layoutTabs(state.layout).find((t) => t.tabGroupId === id);
       if (open) {
         update(id, { collapsed: false });

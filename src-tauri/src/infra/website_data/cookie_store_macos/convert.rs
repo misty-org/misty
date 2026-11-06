@@ -54,7 +54,40 @@ pub(super) fn export_cookie(native: &NSHTTPCookie) -> Result<Cookie> {
     Ok(cookie)
 }
 
+/// A cookie exactly as given: refused if Foundation would change anything about it.
 pub(crate) fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
+    let native = native_cookie(cookie)?;
+    let exported = aligned_export(cookie, &native)?;
+    if !equal(cookie, &exported)? {
+        return Err(CookieStoreError::Unsupported);
+    }
+    Ok(native)
+}
+
+/// A cookie as close as this engine holds it: Foundation may shorten a long expiry, and anything
+/// else it would change is refused.
+pub(super) fn clamped_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
+    let native = native_cookie(cookie)?;
+    let mut exported = aligned_export(cookie, &native)?;
+    if exported.expires_unix_seconds.is_some() {
+        exported.expires_unix_seconds = cookie.expires_unix_seconds;
+    }
+    if !equal(cookie, &exported)? {
+        return Err(CookieStoreError::Unsupported);
+    }
+    Ok(native)
+}
+
+/// What Foundation made of a cookie, with the explicit `SameSite=None` it never reports.
+fn aligned_export(cookie: &Cookie, native: &NSHTTPCookie) -> Result<Cookie> {
+    let mut exported = export_cookie(native)?;
+    if matches!(cookie.same_site, Some(SameSite::None)) && exported.same_site.is_none() {
+        exported.same_site = Some(SameSite::None);
+    }
+    Ok(exported)
+}
+
+fn native_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
     cookie.validate().map_err(|_| CookieStoreError::Invalid)?;
     if cookie.partition_key.is_some() {
         return Err(CookieStoreError::Unsupported);
@@ -102,17 +135,7 @@ pub(crate) fn import_cookie(cookie: &Cookie) -> Result<Retained<NSHTTPCookie>> {
             };
             properties.insert(NSHTTPCookieSameSitePolicy, value);
         }
-        let native =
-            NSHTTPCookie::cookieWithProperties(&properties).ok_or(CookieStoreError::Invalid)?;
-        // Reject a lossy platform conversion before touching the live store.
-        let mut exported = export_cookie(&native)?;
-        if matches!(cookie.same_site, Some(SameSite::None)) && exported.same_site.is_none() {
-            exported.same_site = Some(SameSite::None);
-        }
-        if !equal(cookie, &exported)? {
-            return Err(CookieStoreError::Unsupported);
-        }
-        Ok(native)
+        NSHTTPCookie::cookieWithProperties(&properties).ok_or(CookieStoreError::Invalid)
     }
 }
 
@@ -123,12 +146,6 @@ pub(super) fn equal(a: &Cookie, b: &Cookie) -> Result<bool> {
         Ok(value)
     };
     Ok(normalized(a)? == normalized(b)?)
-}
-
-/// Whether this engine stores the cookie exactly as given (no clamped expiry,
-/// dropped partition or changed policy). Other cookies are left untouched.
-pub(crate) fn representable(cookie: &Cookie) -> bool {
-    objc2::rc::autoreleasepool(|_| import_cookie(cookie).is_ok())
 }
 
 pub(super) fn skip(native: &NSHTTPCookie, error: CookieStoreError) -> (String, SkipReason) {

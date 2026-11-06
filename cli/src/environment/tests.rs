@@ -78,9 +78,7 @@ fn development_generation_preserves_keys_and_detects_api_overrides() {
     let workspace = fixture_workspace(tmp.path());
     init(&workspace, Target::Dev).unwrap();
     crate::server::initialize_development_secrets(&workspace).unwrap();
-    let path = workspace
-        .server
-        .join("apps/journal-collab/.secrets/server.env");
+    let path = root(&workspace, Target::Dev).join("crypto/journal.env");
     let original = fs::read(&path).unwrap();
     assert!(crate::server::generate_worker_secrets(&workspace).is_err());
     assert_eq!(fs::read(path).unwrap(), original);
@@ -88,7 +86,7 @@ fn development_generation_preserves_keys_and_detects_api_overrides() {
     set(
         &workspace,
         Target::Dev,
-        "JOURNAL_COLLAB_CONTROL_SECRET",
+        "JOURNAL_COLLAB_TICKET_PUBLIC_KEY",
         "different",
     )
     .unwrap();
@@ -181,13 +179,19 @@ fn optional_files_are_created_only_when_configured() {
     init(&workspace, Target::Dev).unwrap();
     assert!(!workspace.cli.join(".env").exists());
     assert!(read_cli_files(&workspace).unwrap().is_empty());
-    let integration = root(&workspace, Target::Dev).join("integrations/web-fetch.env");
+    let integration = root(&workspace, Target::Dev).join("integrations/google.env");
     assert!(!integration.exists());
     let before = read(&workspace, Target::Dev).unwrap();
-    assert!(!before.contains_key("MISTY_WEB_FETCH_URL"));
-    set(&workspace, Target::Dev, "MISTY_WEB_FETCH_URL", "fixture").unwrap();
+    assert!(!before.contains_key("GOOGLE_SIGN_IN_REDIRECT_URL"));
+    set(
+        &workspace,
+        Target::Dev,
+        "GOOGLE_SIGN_IN_REDIRECT_URL",
+        "fixture",
+    )
+    .unwrap();
     assert_eq!(
-        read(&workspace, Target::Dev).unwrap()["MISTY_WEB_FETCH_URL"],
+        read(&workspace, Target::Dev).unwrap()["GOOGLE_SIGN_IN_REDIRECT_URL"],
         "fixture"
     );
     fs::remove_file(integration).unwrap();
@@ -213,14 +217,11 @@ fn setup_is_idempotent_and_setting_values_stay_private() {
     crate::server::initialize_development_secrets(&workspace).unwrap();
     crate::server::validate_development_secrets(&workspace).unwrap();
     let first = read(&workspace, Target::Dev).unwrap();
-    let worker = workspace.server.join("apps/journal-collab/.dev.vars");
-    let original_worker = fs::read(&worker).unwrap();
-    fs::remove_file(&worker).unwrap();
     crate::server::initialize_development_secrets(&workspace).unwrap();
     assert_eq!(
-        fs::read(&worker).unwrap(),
-        original_worker,
-        "interrupted setup must recover the same Worker keys"
+        read(&workspace, Target::Dev).unwrap(),
+        first,
+        "repeating setup must keep the same Worker keys"
     );
 
     set(

@@ -1,11 +1,12 @@
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import AuthCard from "./components/AuthCard";
 import AuthShell from "./components/AuthShell";
 import RegisterForm from "./components/RegisterForm";
+import { ServerStep, useNeedsServer } from "./setup/ServerStep";
+import { useFinishSignIn } from "./signInSheet/useFinishSignIn";
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
   const routeState = location.state as { from?: string; addingAccount?: boolean } | null;
@@ -15,12 +16,21 @@ export default function RegisterPage() {
       ? rawFrom
       : "/browser";
   const addingAccount = Boolean(routeState?.addingAccount || user);
+  const finishSignIn = useFinishSignIn(from, !user);
+  const needsServer = useNeedsServer();
+
+  if (needsServer) {
+    return (
+      <AuthShell title="Choose a server">
+        <AuthCard>
+          <ServerStep />
+        </AuthCard>
+      </AuthShell>
+    );
+  }
 
   return (
-    <AuthShell
-      title={addingAccount ? "Create another account" : "Create an account"}
-      onBack={addingAccount ? () => navigate(from, { replace: true }) : undefined}
-    >
+    <AuthShell title={user ? "Create another account" : "Create an account"}>
       <AuthCard
         footer={
           <NavLink
@@ -32,7 +42,7 @@ export default function RegisterPage() {
           </NavLink>
         }
       >
-        <RegisterForm onSuccess={() => navigate(from, { replace: true })} />
+        <RegisterForm onSuccess={finishSignIn} />
       </AuthCard>
     </AuthShell>
   );

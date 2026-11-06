@@ -2,7 +2,7 @@ import { apiRequest } from "@/api/client";
 import { readApiAccountId, readApiSessionGeneration } from "@/api/client/session";
 import { readApiCache, writeApiCache } from "./api-cache";
 
-export interface CachedRequestOptions<T> {
+interface CachedRequestOptions<T> {
   /**
    * Called first, with the saved copy, when there is one. Paint it; the fresh response follows.
    * It is not called when nothing is saved, so the screen shows its skeleton only on a first

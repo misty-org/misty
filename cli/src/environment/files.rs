@@ -73,7 +73,7 @@ pub fn set(workspace: &Workspace, target: Target, name: &str, value: &str) -> Re
     }
     lines.push(format!("{name}='{value}'"));
     fs::create_dir_all(path.parent().context("environment path has no parent")?)?;
-    secure_directories(&workspace.server.join(".env"))?;
+    secure_directories(&root(workspace, target))?;
     use std::io::Write;
     let mut temporary =
         tempfile::NamedTempFile::new_in(path.parent().context("environment path has no parent")?)?;

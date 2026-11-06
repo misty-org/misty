@@ -15,7 +15,7 @@ import {
 /** How many recent files the home page reads; the Files tab of the Library has the rest. */
 const FILE_LIMIT = 60;
 
-export interface SpaceGallery {
+interface SpaceGallery {
   items: GalleryItem[];
   /** True until the first read finishes. Later reads keep the current items on screen. */
   loading: boolean;

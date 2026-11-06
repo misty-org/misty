@@ -12,7 +12,7 @@ export const useUserStore = create<UserStore>((set) => ({
   clear: () => set({ me: null, loading: false, error: false }),
 }));
 
-export interface UserStore {
+interface UserStore {
   me: AccountMeResponse | null;
   loading: boolean;
   error: boolean;

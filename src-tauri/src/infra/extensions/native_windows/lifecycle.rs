@@ -91,7 +91,7 @@ fn forget_applied(crx: &str) {
     });
 }
 
-/// The open browser views of one Space.
+/// The open browser views of one Misty profile.
 fn browser_views(space: &str) -> Vec<Webview> {
     let Ok(app) = app() else {
         return Vec::new();
@@ -102,7 +102,7 @@ fn browser_views(space: &str) -> Vec<Webview> {
             label.starts_with("misty-browser-") && !label.starts_with("misty-browser-capture-")
         })
         .map(|(_, view)| view)
-        .filter(|view| view_space(view).as_deref() == Some(space))
+        .filter(|view| view_profile(view).as_deref() == Some(space))
         .collect()
 }
 

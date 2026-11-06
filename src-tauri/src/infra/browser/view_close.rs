@@ -68,7 +68,7 @@ pub fn close_browser_webview(
 ) -> Result<(), String> {
     #[cfg(windows)]
     let _ = unstack(&request.id);
-    let space = super::super::extensions::native::page_space(&app, &request.id);
+    let space = super::super::extensions::native::page_profile(&app, &request.id);
     super::super::extensions::native::tab_event(&app, space.as_deref(), &request.id, "close");
     let children = {
         let mut sessions = state
@@ -126,8 +126,6 @@ pub fn close_browser_webview(
     if let Ok(blank) = tauri::Url::parse("about:blank") {
         let _ = webview.navigate(blank);
     }
-    #[cfg(any(target_os = "macos", windows))]
-    super::super::website_data::session_storage::clear(&webview);
     unregister_browser_cursor_ownership(&webview)?;
     #[cfg(target_os = "macos")]
     url_observer::remove(&webview, &request.id);
@@ -145,10 +143,10 @@ pub fn close_browser_webview(
     Ok(())
 }
 
-/// The last incognito window of a Space closed: its session goes, so the next
+/// The last incognito window of a profile closed: its session goes, so the next
 /// incognito window starts signed out with no site data or permission choices.
 pub(crate) fn end_incognito_session(app: &AppHandle, session: &str) {
-    let id = super::super::space_windows::incognito_store_id(session);
+    let id = super::super::profile_windows::incognito_store_id(session);
     #[cfg(target_os = "macos")]
     let _ = app.run_on_main_thread(move || wry::end_private_session(id));
     let _ = (app, id);

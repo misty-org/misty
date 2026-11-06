@@ -55,6 +55,8 @@ function rendered(tracking) {
   return source
     .replace('__KIRI_HOST_SENDER_PLACEHOLDER__', sender)
     .replace('__MISTY_BACKGROUND_PLACEHOLDER__', '')
+    .replace('__MISTY_CARET_PLACEHOLDER__', '')
+    .replace('__MISTY_FULLSCREEN_PLACEHOLDER__', '')
     .replace('__MISTY_CONTEXT_MENU_PLACEHOLDER__', '')
     .replace('__MISTY_SHORTCUT_TOKEN_PLACEHOLDER__', '"test-token"')
     .replace('__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__', '[]')

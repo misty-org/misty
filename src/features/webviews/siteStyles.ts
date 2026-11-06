@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /** A site's own look: extra CSS (hidden elements included) and an optional dark mode. */
-export interface SiteStyle {
+interface SiteStyle {
   host: string;
   css: string;
   dark: boolean;
@@ -64,7 +64,7 @@ const boostEnd = "/* end misty-boost */";
 const boostBlock = /\/\* misty-boost \*\/[\s\S]*?\/\* end misty-boost \*\/\n?/;
 
 /** A site's font and text size, kept in a marked block at the top of its CSS. */
-export interface Boost {
+interface Boost {
   font: string;
   size: string;
 }

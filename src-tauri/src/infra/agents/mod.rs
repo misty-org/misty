@@ -1,5 +1,3 @@
-pub mod chats;
-pub mod files;
 pub mod projects;
 mod storage;
 pub mod web_fetch;
@@ -22,9 +20,7 @@ use crate::{
     infra::environment::AppEnvironmentService,
 };
 pub(crate) use storage::device_id;
-#[cfg(test)]
-use storage::strip_verbatim_prefixes;
-use storage::{device_snapshot_sync, import_legacy, scoped_file_path_sync};
+use storage::{device_snapshot_sync, scoped_file_path_sync};
 
 /// A folder's canonical path as it is stored and compared: on Windows without
 /// the `\\?\` prefix canonicalizing adds, so every path here has one form.
@@ -57,13 +53,8 @@ pub struct PrepareScopedAgentDocumentRequest {
 
 impl AgentService {
     pub fn new(environment: AppEnvironmentService) -> Self {
-        let store = environment.store();
-        // Folders shared before the database moved come along once.
-        if let Err(error) = import_legacy(&store, &environment.misty_db_path()) {
-            eprintln!("Could not import earlier shared folders: {error}");
-        }
         Self {
-            database_path: store.path().to_path_buf(),
+            database_path: environment.store().path().to_path_buf(),
         }
     }
 

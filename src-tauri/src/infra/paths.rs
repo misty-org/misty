@@ -14,3 +14,18 @@ fn resolve_desktop_home_dir() -> Option<PathBuf> {
         .or_else(|| env::var_os("USERPROFILE"))
         .map(PathBuf::from)
 }
+
+/// Tests never reach the person's real data, whatever they exercise: everything that looks for a
+/// home folder finds this one, the credential store included.
+#[cfg(test)]
+#[ctor::ctor]
+fn isolate_tests() {
+    let home = env::temp_dir().join(format!("misty-test-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&home);
+    let home = std::fs::canonicalize(&home).unwrap_or(home);
+    unsafe {
+        env::set_var("HOME", &home);
+        env::set_var("USERPROFILE", &home);
+        env::remove_var("MISTY_DATA_ROOT");
+    }
+}

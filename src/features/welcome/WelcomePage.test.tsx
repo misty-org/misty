@@ -26,7 +26,7 @@ function renderAt(state?: object) {
 }
 
 beforeEach(() => {
-  useSetupStore.setState({ welcomed: false });
+  useSetupStore.setState({ welcomed: false, tabSidePending: false });
   useSignInSheetStore.getState().close();
   useServerChoice.setState({
     loaded: true,
@@ -35,12 +35,21 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("starts browsing without an account and doesn't show again", () => {
+it("starts browsing straight in the browser, asking only for the tab side", () => {
   renderAt();
-  expect(screen.getByText(/No account needed/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Start browsing" }));
+  expect(useSignInSheetStore.getState().reason).toBeNull();
   expect(screen.getByTestId("where").textContent).toBe("/browser");
   expect(useSetupStore.getState().welcomed).toBe(true);
+  expect(useSetupStore.getState().tabSidePending).toBe(true);
+});
+
+it("does not ask for the tab side again after the first run", () => {
+  useSetupStore.setState({ welcomed: true });
+  renderAt();
+  fireEvent.click(screen.getByRole("button", { name: "Start browsing" }));
+  expect(screen.getByTestId("where").textContent).toBe("/browser");
+  expect(useSetupStore.getState().tabSidePending).toBe(false);
 });
 
 it("offers Sign in beside Start browsing", () => {
@@ -49,17 +58,26 @@ it("offers Sign in beside Start browsing", () => {
   expect(screen.getByTestId("where").textContent).toBe("/signin");
 });
 
-it("opens the setup wizard once when this device has chosen no server", () => {
-  useServerChoice.setState({ loaded: true, choice: null });
-  renderAt();
-  expect(useSignInSheetStore.getState().reason).toBe("setup");
-  useSignInSheetStore.getState().close();
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(useSignInSheetStore.getState().reason).toBe("setup");
-});
+it.each([null, { mode: "none" as const }])(
+  "goes to the sign-in page, not the wizard, with no server chosen: %j",
+  (choice) => {
+    useServerChoice.setState({ loaded: true, choice });
+    renderAt();
+    expect(useSignInSheetStore.getState().reason).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(useSignInSheetStore.getState().reason).toBeNull();
+    expect(screen.getByTestId("where").textContent).toBe("/signin");
+  },
+);
 
 it("keeps Sign in and Create account when adding an account", () => {
   renderAt({ addingAccount: true });
   expect(screen.queryByRole("button", { name: "Start browsing" })).toBeNull();
   expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
+});
+
+it("goes back to the page that asked when adding an account", () => {
+  renderAt({ addingAccount: true, from: "/spaces/main" });
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByTestId("where").textContent).toBe("/spaces/main");
 });

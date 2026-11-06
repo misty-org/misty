@@ -10,11 +10,11 @@ pub async fn extensions_action(
     anchor: Option<Value>,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
+        let profile = native::caller_profile(&caller)?;
         if !["actions", "invoke", "options", "diagnostics"].contains(&operation.as_str()) {
             return Err("Invalid extension action.".into());
         }
-        let account = service(&space).lock().await.account.clone();
+        let account = service(&profile).lock().await.account.clone();
         if id
             .as_ref()
             .is_some_and(|id| catalog::Store::of(id).is_none())
@@ -22,7 +22,7 @@ pub async fn extensions_action(
             return Err("Invalid extension ID.".into());
         }
         native::request(
-            json!({"operation":operation,"account":account,"space":space,"id":id,"tabId":tab_id,"anchor":anchor}),
+            json!({"operation":operation,"account":account,"space":profile,"id":id,"tabId":tab_id,"anchor":anchor}),
         )
         .await
     }
@@ -37,9 +37,9 @@ pub async fn extensions_respond(
     allowed: bool,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_,String> = async {
-    let space = native::caller_space(&caller)?;
-    let account = service(&space).lock().await.account.clone();
-    native::request(json!({"operation":"permission-response","account":account,"space":space,"requestId":request_id,"allowed":allowed})).await
+    let profile = native::caller_profile(&caller)?;
+    let account = service(&profile).lock().await.account.clone();
+    native::request(json!({"operation":"permission-response","account":account,"space":profile,"requestId":request_id,"allowed":allowed})).await
 
     }.await;
     result.map_err(ExtensionFailure::from)
@@ -51,9 +51,9 @@ pub async fn extensions_tab_created(
     tab_id: String,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_,String> = async {
-    let space = native::caller_space(&caller)?;
-    let account = service(&space).lock().await.account.clone();
-    native::request(json!({"operation":"tab-created","account":account,"space":space,"requestId":request_id,"tabId":tab_id})).await
+    let profile = native::caller_profile(&caller)?;
+    let account = service(&profile).lock().await.account.clone();
+    native::request(json!({"operation":"tab-created","account":account,"space":profile,"requestId":request_id,"tabId":tab_id})).await
 
     }.await;
     result.map_err(ExtensionFailure::from)

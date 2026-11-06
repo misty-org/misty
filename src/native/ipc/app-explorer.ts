@@ -6,16 +6,6 @@ export interface AppSnapshot {
 }
 interface AppEnvironmentSnapshot {
   homeDir: string;
-  mistyDir: string;
-  configDir: string;
-  dbDir: string;
-  cacheDir: string;
-  tmpDir: string;
-  settingsPath: string;
-  mistyConfigPath: string;
-  commandsPath: string;
-  mountPath: string;
-  configExists: boolean;
 }
 export interface MountedDevice {
   id: string;

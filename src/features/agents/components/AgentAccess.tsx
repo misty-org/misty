@@ -3,7 +3,7 @@ import { appsApi } from "../apps/api";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { AgentDeviceSnapshot } from "../model/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Skeleton } from "@/shared/ui";
+import { Button, ErrorNotification, Skeleton } from "@/shared/ui";
 import { Cable, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -135,14 +135,11 @@ export function AgentAccess({
             ))}
           </div>
         ) : null}
-        {access.connectionsError && (
-          <div role="alert" className="text-xs text-cream-muted">
-            Some connections couldn’t load.{" "}
-            <Button type="button" variant="ghost" size="xs" onClick={access.retry}>
-              Retry connections
-            </Button>
-          </div>
-        )}
+        <ErrorNotification message={access.connectionsError ? "Some connections couldn’t load." : ""}>
+          <Button type="button" variant="ghost" size="sm" onClick={access.retry}>
+            Retry connections
+          </Button>
+        </ErrorNotification>
         {!access.loading && access.connections.length ? (
           access.connections.map((connection) => (
             <Button

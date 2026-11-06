@@ -1,4 +1,4 @@
-export interface LibraryMediaKind {
+interface LibraryMediaKind {
   isImage: boolean;
   isVideo: boolean;
   isAudio: boolean;

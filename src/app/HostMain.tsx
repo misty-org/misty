@@ -26,7 +26,17 @@ if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
 }
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 export const startup = bootstrap();
+/** Marks from when an account's password also derived its vault keys. Nothing reads them now. */
+function removeRetiredStorage() {
+  try {
+    for (const key of ["misty-credential-accounts", "misty-password-pending"])
+      localStorage.removeItem(key);
+  } catch {
+    // Without storage there is nothing to remove.
+  }
+}
 async function bootstrap() {
+  removeRetiredStorage();
   // The app and its styles load while the session is prepared, not after it. The shell
   // loads beside them too, instead of when the first route renders.
   const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);

@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { defaultDockingLayout, useDockingLayoutStore } from "@/features/app-shell/dockingLayout";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { useWindowDockingLayout } from "./useWindowDockingLayout";
+import { parseWorkspaceRecord } from "./workspaceRecord";
+import { partialWorkspaceStore } from "./workspaceStorePersistence";
 
 beforeEach(() => {
   useDockingLayoutStore.setState({ initialLayout: defaultDockingLayout, savedLayouts: [] });
@@ -10,12 +12,12 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it.each(["left", "right"] as const)("preserves the %s tab side in workspace snapshots", (side) => {
+it.each(["left", "right"] as const)("preserves the %s tab side in saved workspaces", (side) => {
   const store = useWorkspaceStore.getState();
   store.setWindowDockingLayout({ navigation: side === "left" ? "right" : "left", tabs: side });
-  const snapshot = store.createSnapshot("account", "device");
+  const saved = JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState()));
   store.reset();
-  store.replaceSnapshot(JSON.parse(JSON.stringify(snapshot)));
+  useWorkspaceStore.setState(parseWorkspaceRecord(saved));
   const { result } = renderHook(useWindowDockingLayout);
   expect(result.current.tabs).toBe(side);
 });

@@ -1,9 +1,9 @@
-import { Button, cn, IconButton } from "@/shared/ui";
-import { CircleAlert, X } from "lucide-react";
+import { Button, cn, IconButton, Notification } from "@/shared/ui";
+import { X } from "lucide-react";
 import { createContext, type ReactNode } from "react";
 import { useSettingReset } from "../devicePreferences/SettingScope";
 import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
-export type { DesktopSettingsNavEntry, DesktopSettingsNavGroup } from "./SettingsNavigation";
+;
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
@@ -52,33 +52,23 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       {navigation ? <div aria-hidden="true" className="bg-charcoal-border" /> : null}
 
       <main className="relative flex min-h-0 min-w-0 flex-col bg-charcoal-bg">
-        {/* No title bar: section headers carry the page, as the sidebar already names the area. */}
-        <h1 className="sr-only">{props.title}</h1>
-        {overlay ? (
-          <IconButton
-            label={`Close ${props.ariaLabel.toLowerCase()}`}
-            className="absolute right-4 top-3 z-10"
-            onClick={props.onClose}
-          >
-            <X className="size-4" strokeWidth={1.8} />
-          </IconButton>
-        ) : null}
+        {/* The page we're on, over a divider; the page scrolls under it, never behind it. */}
+        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-charcoal-border pl-6 pr-4 max-[720px]:pl-4">
+          <h1 className="min-w-0 truncate text-md font-semibold leading-6 text-cream-bright">
+            {props.title}
+          </h1>
+          {overlay ? (
+            <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
+              <X className="size-4" strokeWidth={1.8} />
+            </IconButton>
+          ) : null}
+        </header>
         {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
-        {/* In the overlay the scroller starts below the close button, so the scrollbar and the
-            page never run under it; the page's top padding moves up to match. */}
         <div
           data-settings-scroller
-          className={cn(
-            "misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain",
-            overlay ? "mt-12" : "mt-3",
-          )}
+          className="misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
         >
-          <div
-            className={cn(
-              "w-full max-w-[960px] px-10 pb-12 text-md leading-6 max-[720px]:px-6",
-              overlay ? "pt-0" : "pt-9",
-            )}
-          >
+          <div className="w-full max-w-[960px] px-6 pb-12 pt-6 text-md leading-6 max-[720px]:px-4">
             {props.contentHeader}
             {props.children}
           </div>
@@ -89,8 +79,20 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
   );
 }
 /**
- * A group of rows under a plain header with an optional muted line of context. Spacing separates
- * rows; there are no cards or dividers.
+ * One panel: whatever a section holds gets the same inset and a hairline between items, and rows
+ * wrapped in another element keep their hairlines too. The website's settings use the same panel.
+ */
+const settingsPanelClass = cn(
+  "min-w-0 overflow-hidden rounded-lg border border-charcoal-border bg-charcoal-card empty:hidden",
+  "[&>*]:px-5 [&>*:empty]:hidden [&>*:not([data-setting-label])]:py-3",
+  "[&>*+*]:border-t [&>*+*]:border-charcoal-border",
+  "[&_[data-setting-label]+[data-setting-label]]:border-t",
+  "[&_[data-setting-label]+[data-setting-label]]:border-charcoal-border",
+);
+/**
+ * A group of rows in one panel under a plain header, with an optional muted line of context. The
+ * compact density, used inside the setup wizard, stays a plain list because the wizard is its own
+ * card.
  */
 export function DesktopSettingsSection(props: {
   title: string;
@@ -101,16 +103,13 @@ export function DesktopSettingsSection(props: {
   return (
     <section
       aria-label={props.title}
-      className={cn(
-        "@container/settings min-w-0 last:mb-0",
-        props.density === "compact" ? "mb-8" : "mb-10",
-      )}
+      className={cn("@container/settings min-w-0 last:mb-0", "mb-8")}
     >
-      <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-2")}>
+      <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-3")}>
         <h2
           className={cn(
             "font-semibold text-cream-bright",
-            props.density === "compact" ? "text-base leading-6" : "text-lg leading-7",
+            props.density === "compact" ? "text-base leading-6" : "text-md leading-6",
           )}
         >
           {props.title}
@@ -121,7 +120,9 @@ export function DesktopSettingsSection(props: {
           </p>
         ) : null}
       </div>
-      <div className="min-w-0">{props.children}</div>
+      <div className={props.density === "compact" ? "min-w-0" : settingsPanelClass}>
+        {props.children}
+      </div>
     </section>
   );
 }
@@ -155,7 +156,8 @@ export function DesktopSettingsRow(props: {
         props.stacked
           ? "grid-cols-1"
           : "grid-cols-[minmax(0,1fr)_auto] @max-[560px]/settings:grid-cols-1",
-        props.indent && "pl-5",
+        // The panel owns the row's own padding, so the indent goes on its contents.
+        props.indent && "[&>:first-child]:pl-5",
       )}
     >
       <div className="grid min-w-0 gap-1">
@@ -204,20 +206,16 @@ export function DesktopSettingsRow(props: {
     </div>
   );
 }
-/** Inline status for a whole page, e.g. a save that failed. Monochrome; the icon carries the state. */
+/** A failure for a whole page, e.g. a save that failed, shown as a notification. */
 export function DesktopSettingsNotice(props: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div
-      role="alert"
-      className="mb-5 flex min-w-0 items-center gap-2.5 px-0 py-2 text-sm leading-5 text-cream"
-    >
-      <CircleAlert aria-hidden className="size-4 shrink-0 text-cream-muted" />
-      <span className="min-w-0 flex-1">{props.children}</span>
+    <Notification tone="error">
+      {props.children}
       {props.action}
-    </div>
+    </Notification>
   );
 }
-export interface DesktopSettingsFrameProps<Id extends string> {
+interface DesktopSettingsFrameProps<Id extends string> {
   activeId: Id;
   ariaLabel: string;
   children: ReactNode;
@@ -228,7 +226,7 @@ export interface DesktopSettingsFrameProps<Id extends string> {
   saveBar?: ReactNode;
   onSelect: (id: Id) => void;
   presentation?: "page" | "overlay";
-  /** Announced to screen readers; the sidebar already shows it. */
+  /** The page we're on, in the header over the content. */
   title: ReactNode;
   navigationHeader?: ReactNode;
   /** Replaces the section list, e.g. with search results while the user types. */

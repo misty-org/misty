@@ -2,16 +2,16 @@ import { WelcomeNav } from "@/features/welcome";
 import type { ReactNode } from "react";
 import { useFitToHeight } from "./useFitToHeight";
 
-export default function AuthShell({ title, description, children, onBack }: AuthShellProps) {
+export default function AuthShell({ title, description, children }: AuthShellProps) {
   const { panelRef, containerRef, scale } = useFitToHeight<HTMLDivElement, HTMLDivElement>();
   return (
     <div
       ref={containerRef}
-      className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-8 pt-32 sm:px-6"
+      className="relative flex h-full flex-col overflow-y-auto bg-window-chrome px-4 pb-6 pt-20 sm:px-6"
     >
-      <WelcomeNav onBack={onBack} />
-      <div ref={panelRef} style={{ zoom: scale }} className="mx-auto my-auto w-full max-w-sm">
-        <div key={title} className="misty-page-in flex flex-col gap-5">
+      <WelcomeNav />
+      <div ref={panelRef} style={{ zoom: scale }} className="mx-auto my-auto w-full max-w-md">
+        <div key={title} className="misty-page-in flex flex-col gap-8">
           <div className="text-center">
             <h1 className="text-balance text-2xl font-medium tracking-[-0.04em] text-cream sm:text-3xl">
               {title}
@@ -28,9 +28,8 @@ export default function AuthShell({ title, description, children, onBack }: Auth
   );
 }
 
-export interface AuthShellProps {
+interface AuthShellProps {
   title: string;
   description?: string;
   children: ReactNode;
-  onBack?: () => void;
 }

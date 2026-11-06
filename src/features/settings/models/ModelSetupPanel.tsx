@@ -8,7 +8,7 @@ import {
   qualifiedModel,
 } from "./modelProviders";
 import { ModelTestLines } from "./ModelTestRow";
-import { Button, Input, Label, Skeleton, Spinner } from "@/shared/ui";
+import { BrandIcon, Button, ErrorNotification, Input, Label, Skeleton, Spinner } from "@/shared/ui";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -62,7 +62,11 @@ export function ModelSetupPanel() {
           aria-busy={chatgpt.busy}
           onClick={() => void chatgpt.signIn().then((next) => next?.planUsage && choose("chatgpt"))}
         >
-          {chatgpt.busy ? <Spinner size="sm" label={false} /> : null}
+          {chatgpt.busy ? (
+            <Spinner size="sm" label={false} />
+          ) : (
+            <BrandIcon brand="openai" size={16} />
+          )}
           Sign in with ChatGPT
         </Button>
         <Button
@@ -71,6 +75,7 @@ export function ModelSetupPanel() {
             void keys.signInToOpenRouter().then((added) => added && choose("openrouter"))
           }
         >
+          <BrandIcon brand="openrouter" size={16} />
           Sign in with OpenRouter
         </Button>
       </div>
@@ -106,11 +111,7 @@ export function ModelSetupPanel() {
           </Button>
         </div>
       </form>
-      {chatgpt.error || keys.error ? (
-        <p role="alert" className="m-0 text-sm text-cream">
-          {chatgpt.error || keys.error}
-        </p>
-      ) : null}
+      <ErrorNotification message={chatgpt.error || keys.error} />
       {chosen ? (
         <div className="grid gap-1.5">
           <Label htmlFor="setup-agent-model" className="text-sm text-cream">
@@ -150,18 +151,11 @@ export function ModelSetupPanel() {
               {test.running ? <Spinner size="sm" label={false} /> : null}
               Check it
             </Button>
-            <span className="text-sm text-cream-muted">
-              {test.error || "Checks that it calls tools and sees screenshots."}
-            </span>
+            <ErrorNotification message={test.error} />
           </div>
           {test.result ? <ModelTestLines result={test.result} /> : null}
         </div>
-      ) : (
-        <p className="m-0 text-sm text-cream-muted">
-          Agents run on this computer with your own model account. Keys and sign-ins stay on this
-          computer.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

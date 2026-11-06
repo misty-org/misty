@@ -3,7 +3,7 @@ import { toolCommand } from "./tooling.ts";
 
 try {
   const [name, ...args] = process.argv.slice(2);
-  if (!name) throw new Error("Usage: misty tool <name> [arguments]");
+  if (!name) throw new Error("Usage: npm run tool -- <name> [arguments]");
   const command = toolCommand(name, args);
   const result = spawnSync(command.program, command.args, {
     cwd: command.cwd,

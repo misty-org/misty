@@ -1,81 +1,104 @@
-import { currentApiBase, useServerChoice } from "@/api/deployment/serverChoice";
-import { routes } from "@/features/app-shell/routes";
+import { mistyProServer, useServerChoice } from "@/api/deployment/serverChoice";
+import { isAuthPath, routes } from "@/features/app-shell/routes";
+import {
+  setupStepCopy,
+  SetupStepBody,
+  useSetupSteps,
+  type SetupStep,
+} from "@/features/setup/SetupSteps";
 import { useSetupStore } from "@/features/setup/useSetupStore";
 import { setBrowserWebviewsSuspended } from "@/features/webviews/browserRuntime";
 import {
+  BackButton,
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogTitle,
+  ErrorNotification,
   Skeleton,
 } from "@/shared/ui";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import RegisterForm from "../components/RegisterForm";
 import SignInForm from "../components/SignInForm";
-import { useAuth } from "../authState";
 import { ChoosePasswordScreen } from "../setup/ChoosePasswordScreen";
-import { pendingPasswordEmail } from "../store/pendingPassword";
 import { CloudScreen } from "../setup/CloudScreen";
 import { OwnServerScreen } from "../setup/OwnServerScreen";
 import { serverHost } from "../setup/serverAddress";
 import { ServerChoiceScreen, type ServerChoiceTarget } from "../setup/ServerChoiceScreen";
 import { useSetupLinkStore } from "../setup/setupLinkStore";
 import { useServerSwitch } from "../setup/useServerSwitch";
-import { usePendingPasswordPrompt } from "./usePendingPasswordPrompt";
-import { signInReasonCopy, useSignInSheetStore } from "./signInSheetStore";
+import { useTabSidePrompt } from "./useTabSidePrompt";
+import { isSetupReason, setupReasonTitle, useSignInSheetStore } from "./signInSheetStore";
 
 // The model step belongs to Settings › Models; it loads when the wizard reaches it.
 const ModelSetupPanel = lazy(async () => ({
   default: (await import("@/features/settings/modelSetup")).ModelSetupPanel,
 }));
 
-type Screen = "server" | "cloud" | "password" | "own" | "signin" | "register" | "models";
+type Screen =
+  "server" | "cloud" | "password" | "own" | "signin" | "register" | "models" | "rerun" | SetupStep;
 
-const screenCopy: Partial<Record<Screen, { title: string; description: string }>> = {
-  cloud: {
-    title: "Misty Cloud",
-    description: "Paste the link from your welcome email, or a sign-in link.",
-  },
-  password: {
-    title: "Choose a password",
-    description: "You'll use it to sign in on your other computers. Sync starts once it's set.",
-  },
-  own: { title: "Your own server", description: "Enter the address of the Misty server you run." },
-  register: { title: "Create an account", description: "Your account lives on this Misty server." },
-  models: {
-    title: "Choose a model",
-    description: "Agents need a model account. Sign in to one, or paste a key from any provider.",
-  },
+const screenTitle: Partial<Record<Screen, string>> = {
+  cloud: "Use a sign-in link",
+  password: "Choose a password",
+  own: "Your own server",
+  signin: "Sign in",
+  register: "Create an account",
+  models: "Choose a model",
+  rerun: "Run setup again?",
 };
 
 /**
- * The one place an account is asked for once Misty is running, and the setup wizard: a sheet
- * over the browsing window whose title says what asked. With no server chosen it starts by
- * choosing one (Misty Cloud, your own server, or browsing only), signs in there and ends on
- * the model step. Not now goes back to the page; nothing else changes.
+ * The setup wizard: the model step, then this computer's import and extensions, and last the tab
+ * side, once the browser is on screen and the tabs can be seen moving. It follows a first sign-in
+ * on this device, and any later sign-in offers it again. Help › Run setup again runs only the
+ * computer's part. Settings opens it on choosing a server, and a setup link on the sign-in link
+ * step. Not now goes back to the page.
+ *
+ * The Sign in buttons (and a session that expired) leave for the sign-in page. Anything else
+ * that asks for an account leaves for the welcome pages, and comes back when it is
+ * done or the person goes back.
  */
 export function SignInSheet() {
   const reason = useSignInSheetStore((state) => state.reason);
-  const { user } = useAuth();
   const initialEmail = useSignInSheetStore((state) => state.email);
   const close = useSignInSheetStore((state) => state.close);
   const choice = useServerChoice((state) => state.choice);
-  const { browseOnly } = useServerSwitch();
+  const { browseOnly, switchToMistyPro } = useServerSwitch();
   const finishWelcome = useSetupStore((state) => state.finishWelcome);
+  const askTabSide = useSetupStore((state) => state.askTabSide);
   const linkRevision = useSetupLinkStore((state) => state.revision);
   const navigate = useNavigate();
   const location = useLocation();
+  const setupSteps = useSetupSteps();
+  const firstSetupStep = setupSteps[0];
+  const firstRun = location.pathname === routes.welcome;
   const [screen, setScreen] = useState<Screen>("signin");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // Whether this opening went through choosing a server, so sign-in leads on to models.
   const settingUp = useRef(false);
+  // Whether this opening is the wizard that follows signing in.
+  const afterSignIn = useRef(false);
   const done = useRef(false);
   const handledLink = useRef(0);
-  const open = reason !== null;
+  const setupReason = reason && isSetupReason(reason) ? reason : null;
+  const open = setupReason !== null;
+
+  useEffect(() => {
+    if (!reason || isSetupReason(reason)) return;
+    close();
+    const from = isAuthPath(location.pathname) ? routes.browser : location.pathname;
+    if (reason === "expired")
+      navigate(routes.signIn, {
+        state: { from, addingAccount: true, reauthenticateEmail: initialEmail },
+      });
+    else if (reason === "account")
+      navigate(routes.signIn, { state: { from, addingAccount: true } });
+    else navigate(routes.welcome, { state: { from, addingAccount: true } });
+  }, [reason, initialEmail, close, navigate, location.pathname]);
 
   // Native page views draw above the app, so hide them while the sheet is up.
   useEffect(() => {
@@ -83,103 +106,119 @@ export function SignInSheet() {
     return () => setBrowserWebviewsSuspended(false, "sign-in-sheet");
   }, [open]);
 
-  usePendingPasswordPrompt();
+  useTabSidePrompt();
 
-  // Every opening starts over: on choosing a server when there is none, else on sign-in. A
-  // setup link opens on Misty Cloud, filled in; an account without its password on that step.
+  // Every opening starts over, on choosing a server. A setup link opens on its own step, filled
+  // in.
   useEffect(() => {
-    if (!reason) return;
+    if (!setupReason) return;
     // A link that arrived since the last opening (the screen may already have taken its key).
     const linked =
-      reason === "setup" &&
+      setupReason === "setup" &&
       (linkRevision !== handledLink.current || useSetupLinkStore.getState().link !== null);
     handledLink.current = linkRevision;
     const start: Screen =
-      reason === "password"
-        ? "password"
-        : linked
-          ? "cloud"
-          : reason === "setup" || !currentApiBase()
-            ? "server"
-            : "signin";
+      setupReason === "tabs"
+        ? "tabs"
+        : setupReason === "device"
+          ? firstSetupStep
+          : setupReason === "wizard"
+            ? "models"
+            : setupReason === "rerun"
+              ? "rerun"
+              : linked
+                ? "cloud"
+                : "server";
     settingUp.current = start === "server" || start === "cloud";
+    afterSignIn.current = setupReason === "wizard" || setupReason === "rerun";
     done.current = false;
     setScreen(start);
     setEmail(initialEmail);
     setError("");
     setBusy(false);
-  }, [reason, initialEmail, linkRevision]);
+  }, [setupReason, initialEmail, linkRevision, firstSetupStep]);
 
   // The first-run welcome gives way to the browser once setup did something.
   const finish = () => {
     if (done.current && location.pathname === routes.welcome) {
       finishWelcome();
+      // A wizard that already asked (outside the native app) has nothing left for the browser.
+      if (!setupSteps.includes("tabs")) askTabSide();
       navigate(routes.browser, { replace: true });
     }
     close();
   };
-  const signedIn = () => {
+  // On the welcome or after signing in, the account part leads on to setting up this computer.
+  const afterAccount = () => {
     done.current = true;
-    if (settingUp.current) setScreen("models");
+    if (firstRun || afterSignIn.current) setScreen(firstSetupStep);
     else finish();
   };
+  const signedIn = () => {
+    done.current = true;
+    if (settingUp.current || setupReason === "wizard") setScreen("models");
+    else if (setupReason === "rerun") setScreen("rerun");
+    else afterAccount();
+  };
+  const setupStep = screen in setupStepCopy ? (screen as SetupStep) : null;
+  // The tab side, asked in the browser, is outside the wizard's list and stands alone.
+  const setupIndex = setupSteps.indexOf(screen as SetupStep);
+  const lastSetupStep = setupIndex < 0 || setupIndex === setupSteps.length - 1;
+  const nextSetupStep = () => {
+    if (!lastSetupStep) return setScreen(setupSteps[setupIndex + 1]);
+    if (afterSignIn.current && !setupSteps.includes("tabs")) askTabSide();
+    finish();
+  };
   const choose = (target: ServerChoiceTarget) => {
-    if (target !== "browse") return setScreen(target);
+    if (target === "own") return setScreen(target);
+    setError("");
     setBusy(true);
-    void browseOnly()
-      .then(() => {
-        done.current = true;
-        finish();
-      })
+    const chosen =
+      target === "cloud"
+        ? switchToMistyPro().then(() => setScreen("signin"))
+        : browseOnly().then(afterAccount);
+    void chosen
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => setBusy(false));
   };
 
-  const copy = reason ? signInReasonCopy[reason] : signInReasonCopy.account;
-  const host = choice?.mode === "server" ? serverHost(choice.url) : "";
-  const heading =
-    screen === "server"
-      ? reason === "setup"
-        ? copy
-        : {
-            title: copy.title,
-            description: "Signing in needs a Misty server. Choose one, or keep browsing.",
-          }
+  const host =
+    choice?.mode !== "server"
+      ? ""
+      : choice.url === mistyProServer()
+        ? "Misty Pro"
+        : serverHost(choice.url);
+  const title = setupStep
+    ? setupStepCopy[setupStep]
+    : screen === "server"
+      ? setupReasonTitle.setup
       : screen === "signin" && settingUp.current && host
-        ? {
-            title: `Sign in to ${host}`,
-            description: "Use your Misty email and password, or Google through this server.",
-          }
-        : screen === "password" && user && !pendingPasswordEmail(user.id)
-          ? {
-              // A sign-in link for an account that has a password: it is a reset.
-              title: "Choose a new password",
-              description: "It replaces your old password on every computer.",
-            }
-          : (screenCopy[screen] ?? copy);
+        ? `Sign in to ${host}`
+        : (screenTitle[screen] ?? setupReasonTitle[setupReason ?? "setup"]);
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next || busy ? undefined : finish())}>
       <DialogContent
-        aria-describedby="sign-in-sheet-description"
-        className="max-w-[440px] gap-0 p-0"
+        aria-describedby={undefined}
+        className={setupStep ? "max-w-[520px] gap-0 p-0" : "max-w-[440px] gap-0 p-0"}
       >
         <header className="px-6 pb-4 pt-5">
-          <DialogTitle className="text-lg">{heading.title}</DialogTitle>
-          <DialogDescription id="sign-in-sheet-description" className="mt-1">
-            {heading.description}
-          </DialogDescription>
+          <DialogTitle className="text-lg">{title}</DialogTitle>
         </header>
-        <div className="border-t border-charcoal-border px-6 py-5">
-          {screen === "server" ? (
+        <div className="border-t border-charcoal-border px-6 py-5" hidden={screen === "rerun"}>
+          {screen === "rerun" ? null : setupStep ? (
+            <SetupStepBody step={setupStep} onNext={nextSetupStep} />
+          ) : screen === "server" ? (
             <ServerChoiceScreen busy={busy} onChoose={choose} />
           ) : screen === "cloud" ? (
             <CloudScreen
               key={linkRevision}
               onBusy={setBusy}
-              onRedeemed={() => {
+              onRedeemed={(hasPassword) => {
                 done.current = true;
-                setScreen("password");
+                // A sign-in link is how a password is reset; a Google account has none to choose.
+                if (hasPassword) setScreen("password");
+                else signedIn();
               }}
             />
           ) : screen === "password" ? (
@@ -203,38 +242,60 @@ export function SignInSheet() {
               <ModelSetupPanel />
             </Suspense>
           )}
-          {screen === "server" && error ? (
-            <p role="alert" className="m-0 mt-3 text-sm text-cream">
-              {error}
-            </p>
+          {screen === "server" ? (
+            <ErrorNotification message={error} onDismiss={() => setError("")} />
           ) : null}
         </div>
-        <footer className="flex items-center justify-between gap-3 border-t border-charcoal-border py-3 pl-3.5 pr-6">
-          {screen === "cloud" || screen === "own" ? (
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setScreen("server")}>
-              Back
+        {setupStep === "import" ? null : setupStep ? (
+          // Importing has its own Skip; the other steps go Back and Continue.
+          <footer className="flex items-center justify-between gap-3 border-t border-charcoal-border py-3 pl-3.5 pr-6">
+            {setupIndex > 0 ? (
+              <BackButton onClick={() => setScreen(setupSteps[setupIndex - 1])} />
+            ) : (
+              <span />
+            )}
+            <Button variant="primary" size="sm" onClick={nextSetupStep}>
+              {lastSetupStep ? "Done" : "Continue"}
             </Button>
-          ) : screen === "signin" ? (
-            <Button variant="ghost" size="sm" onClick={() => setScreen("register")}>
-              Create account
-            </Button>
-          ) : screen === "register" ? (
-            <Button variant="ghost" size="sm" onClick={() => setScreen("signin")}>
-              Sign in instead
-            </Button>
-          ) : (
-            <span />
-          )}
-          {screen === "models" ? (
-            <Button variant="primary" size="sm" onClick={finish}>
-              Done
-            </Button>
-          ) : (
-            <Button variant="outline" size="sm" disabled={busy} onClick={finish}>
-              Not now
-            </Button>
-          )}
-        </footer>
+          </footer>
+        ) : (
+          <footer className="flex items-center justify-between gap-3 border-t border-charcoal-border py-3 pl-3.5 pr-6">
+            {screen === "cloud" || screen === "own" ? (
+              <BackButton disabled={busy} onClick={() => setScreen("server")} />
+            ) : screen === "server" ? (
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setScreen("cloud")}>
+                Use a sign-in link
+              </Button>
+            ) : screen === "signin" ? (
+              <Button variant="ghost" size="sm" onClick={() => setScreen("register")}>
+                Create account
+              </Button>
+            ) : screen === "register" ? (
+              <Button variant="ghost" size="sm" onClick={() => setScreen("signin")}>
+                Sign in instead
+              </Button>
+            ) : screen === "rerun" ? (
+              <Button variant="ghost" size="sm" onClick={() => setScreen("models")}>
+                Run setup
+              </Button>
+            ) : (
+              <span />
+            )}
+            {screen === "models" ? (
+              <Button variant="primary" size="sm" onClick={afterAccount}>
+                {firstRun || afterSignIn.current ? "Continue" : "Done"}
+              </Button>
+            ) : screen === "rerun" ? (
+              <Button variant="primary" size="sm" onClick={finish}>
+                Continue
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" disabled={busy} onClick={finish}>
+                Not now
+              </Button>
+            )}
+          </footer>
+        )}
       </DialogContent>
     </Dialog>
   );

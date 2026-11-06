@@ -35,7 +35,7 @@ pub(super) fn remember_main_macos_webview(
             }
         })
         .map_err(|error| error.to_string())?;
-    if crate::infra::space_windows::is_app_window(window_label) {
+    if crate::infra::profile_windows::is_app_window(window_label) {
         configure_main_webview_pointer_guard(&main_webview)?;
     }
     // Configure the renderer's native background once, before the Browser

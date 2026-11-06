@@ -1,4 +1,4 @@
-import type { AiArtifact, AiCitation } from "./types";
+import type { AiArtifact } from "./types";
 
 export type ScreenLocation = "window" | "ask";
 export interface AiUserSettings {
@@ -49,23 +49,4 @@ export interface AiSavedAction {
   label: string;
   prompt: string;
   requested_artifact_kind?: AiArtifact["kind"];
-}
-
-export interface AiRecapRecord {
-  surface_id: "global" | "activity";
-  enabled: boolean;
-  cadence: "daily" | "weekly";
-  local_time: string;
-  weekday: number;
-  timezone: string;
-  prompt: string;
-  state: "idle" | "running" | "failed";
-  next_run_at?: string;
-  last_invocation_id?: string;
-  last_result?: string;
-  last_citations: AiCitation[];
-  last_error?: string;
-  last_run_at?: string;
-  last_seen_at?: string;
-  updated_at: string;
 }

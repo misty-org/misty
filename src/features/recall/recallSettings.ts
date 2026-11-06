@@ -6,6 +6,7 @@ export const PAUSED_UNTIL_RESUMED = Number.MAX_SAFE_INTEGER;
 
 export interface RecallSettings extends RecallPrivacy {
   rememberDictation: boolean;
+  morningBrief: boolean;
 }
 
 /** Settings › Memory, read from the device's settings document. */
@@ -14,7 +15,7 @@ export function recallSettings(document: Record<string, unknown> | undefined): R
   const section = (doc.recall ?? {}) as Record<string, unknown>;
   const paused = Number(section.paused_until ?? 0);
   return {
-    enabled: booleanSetting(doc, "recall", "enabled", false),
+    enabled: booleanSetting(doc, "recall", "enabled", true),
     pausedUntil: Number.isFinite(paused) && paused > 0 ? paused : 0,
     excludedSites: stringSetting(doc, "recall", "excluded_sites", "")
       .split("\n")
@@ -22,5 +23,6 @@ export function recallSettings(document: Record<string, unknown> | undefined): R
       .filter(Boolean)
       .slice(0, 500),
     rememberDictation: booleanSetting(doc, "recall", "remember_dictation", true),
+    morningBrief: booleanSetting(doc, "recall", "morning_brief", true),
   };
 }

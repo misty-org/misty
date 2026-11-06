@@ -267,28 +267,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-stream"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
-dependencies = [
- "async-stream-impl",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.118",
-]
-
-[[package]]
 name = "async-task"
 version = "4.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -333,16 +311,6 @@ name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
-
-[[package]]
-name = "audeeo-core"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "swift-rs",
- "wasapi",
-]
 
 [[package]]
 name = "autocfg"
@@ -947,7 +915,6 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747"
 dependencies = [
- "percent-encoding",
  "time",
  "version_check",
 ]
@@ -957,24 +924,6 @@ name = "cookie-factory"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9885fa71e26b8ab7855e2ec7cae6e9b380edff76cd052e07c683a0319d51b3a2"
-
-[[package]]
-name = "cookie_store"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15b2c103cf610ec6cae3da84a766285b42fd16aad564758459e6ecf128c75206"
-dependencies = [
- "cookie",
- "document-features",
- "idna",
- "log",
- "publicsuffix",
- "serde",
- "serde_derive",
- "serde_json",
- "time",
- "url",
-]
 
 [[package]]
 name = "core-foundation"
@@ -1407,15 +1356,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
-]
-
-[[package]]
-name = "document-features"
-version = "0.2.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4b8a88685455ed29a21542a33abd9cb6510b6b129abadabdcef0f4c55bc8f61"
-dependencies = [
- "litrs",
 ]
 
 [[package]]
@@ -2920,7 +2860,6 @@ dependencies = [
  "gtk",
  "javascriptcore-rs",
  "objc",
- "objc2",
  "objc2-foundation",
  "objc2-web-kit",
  "psl",
@@ -3087,12 +3026,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
-name = "litrs"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
-
-[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3217,16 +3150,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "misty-agent-files"
+name = "misty-audio-capture"
 version = "0.1.0"
 dependencies = [
- "libc",
- "misty-windows-files",
- "rusqlite",
  "serde",
  "serde_json",
- "uuid",
- "windows-sys 0.59.0",
+ "swift-rs",
+ "wasapi",
 ]
 
 [[package]]
@@ -3280,8 +3210,6 @@ dependencies = [
  "aes",
  "aes-gcm",
  "arboard",
- "async-stream",
- "audeeo-core",
  "axum",
  "base64 0.22.1",
  "block2",
@@ -3291,17 +3219,17 @@ dependencies = [
  "cocoa",
  "core-foundation 0.10.1",
  "core-graphics 0.24.0",
+ "ctor",
  "dirs",
  "ed25519-dalek",
  "flate2",
  "futures-util",
  "hex",
- "hkdf",
  "image",
  "kiri",
  "libc",
  "lz4_flex",
- "misty-agent-files",
+ "misty-audio-capture",
  "misty-browser-sync",
  "misty-credential-store",
  "misty-windows-confine",
@@ -3321,7 +3249,6 @@ dependencies = [
  "security-framework 3.7.0",
  "serde",
  "serde_json",
- "sha1_smol",
  "sha2",
  "tauri",
  "tauri-build",
@@ -3346,23 +3273,14 @@ dependencies = [
  "windows 0.61.3",
  "windows-sys 0.59.0",
  "wry",
- "x25519-dalek",
  "xcap",
  "zeroize",
  "zip",
  "zstd",
- "zune-psd",
 ]
 
 [[package]]
 name = "misty-windows-confine"
-version = "0.1.0"
-dependencies = [
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "misty-windows-files"
 version = "0.1.0"
 dependencies = [
  "windows-sys 0.59.0",
@@ -4416,16 +4334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33cb294fe86a74cbcf50d4445b37da762029549ebeea341421c7c70370f86cac"
 
 [[package]]
-name = "publicsuffix"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f42ea446cab60335f76979ec15e12619a2165b5ae2c12166bef27d283a9fadf"
-dependencies = [
- "idna",
- "psl-types",
-]
-
-[[package]]
 name = "pxfm"
 version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4635,8 +4543,6 @@ checksum = "219c5811de6525e5416c7d5d53bb656d3afdbc6c5af816e0802bcfa42dbdc1c3"
 dependencies = [
  "base64 0.22.1",
  "bytes",
- "cookie",
- "cookie_store",
  "futures-core",
  "futures-util",
  "http",
@@ -5194,12 +5100,6 @@ dependencies = [
  "cpufeatures 0.3.0",
  "digest 0.11.3",
 ]
-
-[[package]]
-name = "sha1_smol"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"
@@ -7626,18 +7526,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
-name = "x25519-dalek"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7e468321c81fb07fa7f4c636c3972b9100f0346e5b6a9f2bd0603a52f7ed277"
-dependencies = [
- "curve25519-dalek",
- "rand_core 0.6.4",
- "serde",
- "zeroize",
-]
-
-[[package]]
 name = "xattr"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8006,15 +7894,6 @@ name = "zune-jpeg"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
-dependencies = [
- "zune-core",
-]
-
-[[package]]
-name = "zune-psd"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a518b7a7bee76246a6c783d795c56204cd9184ce0e2e4483717f1b9438c902c"
 dependencies = [
  "zune-core",
 ]

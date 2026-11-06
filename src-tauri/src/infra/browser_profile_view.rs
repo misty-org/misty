@@ -5,13 +5,15 @@ use tauri::Webview;
 
 /// Opens a hidden `about:blank` page in `profile` (the default profile when
 /// `None`). The caller closes it; [`ProfileView`] does so on drop.
+// Windows reaches profile data through it today; the vault link uses it next on macOS too.
+#[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn open_hidden_profile_view(
     app: &tauri::AppHandle,
     profile: Option<&str>,
 ) -> Result<Webview, String> {
-    // Any Space window can hold the off-screen page; the store, not the window,
+    // Any app window can hold the off-screen page; the store, not the window,
     // decides whose data it reaches.
-    let owner = crate::infra::space_windows::primary(app).ok_or("No Space window is open")?;
+    let owner = crate::infra::profile_windows::primary(app).ok_or("No Misty window is open")?;
     let builder = tauri::WebviewBuilder::new(
         format!("misty-browser-capture-{}", uuid::Uuid::new_v4()),
         tauri::WebviewUrl::External("about:blank".parse().map_err(|_| "Invalid capture URL")?),

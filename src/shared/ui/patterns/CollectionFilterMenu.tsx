@@ -16,7 +16,7 @@ import {
   DropdownMenuSubContent,
 } from "../overlays/DropdownMenu";
 
-export type CollectionFilterGroup = {
+type CollectionFilterGroup = {
   label: string;
   submenu?: boolean;
   kind?: "filter" | "sort";
@@ -106,7 +106,7 @@ function FilterOptions({ group }: { group: CollectionFilterGroup }) {
   );
 }
 
-export type CollectionRefinement = { period: string; sort: string; facet: string };
+type CollectionRefinement = { period: string; sort: string; facet: string };
 export const defaultCollectionRefinement: CollectionRefinement = {
   period: "all",
   sort: "default",

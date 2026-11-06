@@ -3,11 +3,6 @@
 //! that change trust run only in the main window.
 #![cfg(desktop)]
 
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc, Mutex,
-};
-
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -19,18 +14,16 @@ use crate::infra::{
     devices::trust,
 };
 
-static GENERATION: AtomicU64 = AtomicU64::new(0);
-
 pub(super) fn require_main(webview: &tauri::Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Devices are managed from the main Misty window.".into());
     }
     Ok(())
 }
 
-/// Only a Space window may sign its device requests.
+/// Only a profile's window may sign its device requests.
 pub(crate) fn require_device_window(webview: &tauri::Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("This window can't act for the device.".into());
     }
     Ok(())
@@ -85,34 +78,18 @@ pub(super) async fn context(
 #[serde(rename_all = "camelCase")]
 pub struct DevicesView {
     pub server_device_id: Option<String>,
-    /// This device is in the root-signed device list.
+    /// This session is registered, which is all it takes to be trusted.
     pub admitted: bool,
-    /// This device holds the vault root right now (sync is unlocked).
-    pub can_sign: bool,
-    pub vault_pinned: bool,
-    pub list_version: u64,
     pub channel: ChannelSnapshot,
     pub policy: Option<DevicePolicy>,
 }
 
-pub(super) async fn view(account_id: &str) -> DevicesView {
+pub(super) fn view() -> DevicesView {
     DevicesView {
         server_device_id: trust::server_device_id(),
         admitted: trust::self_admitted(),
-        can_sign: crate::infra::browser_sync::device_admission_authority(account_id)
-            .await
-            .is_some(),
-        vault_pinned: trust::pinned_root().is_some(),
-        list_version: trust::list_version(),
         channel: channel::snapshot(),
         policy: trust::own_policy().map(|(policy, _)| policy),
-    }
-}
-
-/// Refreshes trust after a device-list hint.
-async fn refresh(api_base: String, account_id: String, local: String) {
-    if let Ok(context) = DeviceContext::open(&api_base, &account_id, &local) {
-        let _ = admission::refresh_trust(&context).await;
     }
 }
 
@@ -139,7 +116,7 @@ fn windows_device_name() -> Option<String> {
 
 /// The name people gave this computer ("Matthew's MBP"), so each device is
 /// recognizable in lists; "This Misty" only when the system has none.
-fn computer_name() -> String {
+pub(crate) fn computer_name() -> String {
     #[cfg(target_os = "macos")]
     let name = std::process::Command::new("/usr/sbin/scutil")
         .args(["--get", "ComputerName"])
@@ -187,15 +164,6 @@ pub async fn devices_start(
         given => given.to_owned(),
     };
     admission::register(&mut context, &name, &platform, &os_version, &app_version).await?;
-    let _ = admission::refresh_trust(&context).await;
-    // Unlocking sync on this device is the proof that adds it: add once.
-    if !trust::self_admitted()
-        && crate::infra::browser_sync::device_admission_authority(&account_id)
-            .await
-            .is_some()
-    {
-        let _ = admission::admit_self(&context).await;
-    }
     if trust::own_policy().is_none() {
         let first = DevicePolicy::first(shared_folders(&state).await);
         let _ = admission::publish_policy(
@@ -212,45 +180,16 @@ pub async fn devices_start(
         .cloud_clipboard
         .start(crate::infra::cloud_clipboard::CloudStart {
             app: app.clone(),
-            account_id: account_id.clone(),
             server_device_id: context.server_device_id.clone(),
             device_name: name.trim().to_owned(),
         });
-    GENERATION.fetch_add(1, Ordering::SeqCst);
-    let (event_base, event_account, event_local) =
-        (api_base.clone(), account_id.clone(), local.clone());
-    let refreshing = Arc::new(Mutex::new(false));
     channel::start(ChannelConfig {
         app: Some(app.clone()),
         http: context.http.clone(),
         local_device_id: local.clone(),
         server_device_id: context.server_device_id.clone(),
-        on_event: Arc::new(move |topic| {
-            if topic != "devices" && topic != "ready" && topic != "reset" {
-                return;
-            }
-            let Ok(mut busy) = refreshing.lock() else {
-                return;
-            };
-            if *busy {
-                return;
-            }
-            *busy = true;
-            let flag = refreshing.clone();
-            let (base, account, local) = (
-                event_base.clone(),
-                event_account.clone(),
-                event_local.clone(),
-            );
-            tauri::async_runtime::spawn(async move {
-                refresh(base, account, local).await;
-                if let Ok(mut busy) = flag.lock() {
-                    *busy = false;
-                }
-            });
-        }),
     });
-    Ok(view(&account_id).await)
+    Ok(view())
 }
 
 #[tauri::command]
@@ -259,7 +198,6 @@ pub async fn devices_stop(
     state: State<'_, MistyRuntime>,
 ) -> Result<(), String> {
     require_main(&webview)?;
-    GENERATION.fetch_add(1, Ordering::SeqCst);
     state.cloud_clipboard.stop();
     channel::stop();
     trust::close();
@@ -267,17 +205,6 @@ pub async fn devices_stop(
 }
 
 #[tauri::command]
-pub async fn devices_view(account_id: String) -> Result<DevicesView, String> {
-    Ok(view(&account_id).await)
-}
-
-#[tauri::command]
-pub async fn devices_refresh(
-    state: State<'_, MistyRuntime>,
-    api_base: String,
-    account_id: String,
-) -> Result<DevicesView, String> {
-    let context = context(&state, &api_base, &account_id).await?;
-    admission::refresh_trust(&context).await?;
-    Ok(view(&account_id).await)
+pub async fn devices_view() -> Result<DevicesView, String> {
+    Ok(view())
 }

@@ -1,16 +1,13 @@
 //! Writes records signed by this app's own code for the server's parsers to
-//! check (`server/test/contract/http/api/testdata/device_records.json`), so
+//! check (`misty-server/test/contract/http/api/testdata/device_records.json`), so
 //! the two sides cannot drift. Regenerate with
 //! MISTY_WRITE_DEVICE_FIXTURE=<path> cargo test --lib device_record_fixture.
 use serde_json::json;
 
 use super::{
-    identity::{canonical_request, DeviceIdentity, ADMISSION_DOMAIN},
-    records::{
-        grant_payload, DeviceList, DevicePolicy, ListMember, RunGrant, SharedFolder, SignedRecord,
-    },
+    identity::{canonical_request, DeviceIdentity},
+    records::{DevicePolicy, RunGrant, SharedFolder, SignedRecord},
 };
-use misty_browser_sync::crypto::VaultRoot;
 
 const ISSUED_AT: i64 = 1_900_000_000;
 
@@ -22,30 +19,10 @@ fn device_record_fixture() {
     let credentials = tempfile::tempdir().unwrap();
     let _ = misty_credential_store::configure_root(credentials.path().to_path_buf());
     let account = "user_fixture";
-    let vault = "00000000-0000-4000-8000-000000000001";
     let device = "device_00000000-0000-4000-8000-000000000002";
     let target = "device_00000000-0000-4000-8000-000000000003";
     let identity = DeviceIdentity::load(account, "device_aaaaaaaaaaaa").unwrap();
-    let root = VaultRoot::generate();
     let record = |payload: Vec<u8>, signature: String| SignedRecord::new(&payload, signature);
-    let grant = grant_payload(
-        account,
-        vault,
-        device,
-        1,
-        &identity.public_key(),
-        "",
-        ISSUED_AT,
-        "",
-    )
-    .unwrap();
-    let grant = record(grant.clone(), root.sign_device_record(&grant).unwrap());
-    let member = ListMember {
-        device_id: device.into(),
-        public_key: identity.public_key(),
-    };
-    let list = DeviceList::next_payload(account, vault, 1, 1, &[member], &[], ISSUED_AT).unwrap();
-    let list = record(list.clone(), root.sign_device_record(&list).unwrap());
     let policy = DevicePolicy {
         version: 7,
         files: "view".into(),
@@ -73,28 +50,16 @@ fn device_record_fixture() {
     .payload()
     .unwrap();
     let run = record(run.clone(), identity.sign_record(&run).unwrap());
-    let admission = serde_json::to_vec(&(
-        ADMISSION_DOMAIN,
-        account,
-        device,
-        identity.public_key(),
-        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-        "0000000000000000000000000000000000000000000000000000000000000000",
-        ISSUED_AT,
-    ))
-    .unwrap();
-    let admission = record(admission.clone(), identity.sign_record(&admission).unwrap());
     let canonical = canonical_request(
         "POST",
-        "/api/devices/x/admit",
+        "/api/devices/x/policy",
         "1900000000",
         "bm9uY2U=",
         &"ab".repeat(32),
     );
     let fixture = json!({
-        "accountId": account, "vaultId": vault, "rootPublicKey": root.public_key().unwrap(),
-        "deviceId": device, "devicePublicKey": identity.public_key(), "targetDeviceId": target, "issuedAt": ISSUED_AT,
-        "grant": grant, "list": list, "policy": policy, "runGrant": run, "admission": admission,
+        "accountId": account, "deviceId": device, "devicePublicKey": identity.public_key(), "targetDeviceId": target, "issuedAt": ISSUED_AT,
+        "policy": policy, "runGrant": run,
         "registration": {"endpointId": identity.endpoint_id(), "proof": identity.registration_proof(account, ISSUED_AT).unwrap()},
         "channel": {"instance": "instance-1", "challenge": "challenge-1",
             "signature": identity.channel_proof(account, device, "instance-1", "challenge-1").unwrap()},

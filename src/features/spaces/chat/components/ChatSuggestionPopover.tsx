@@ -13,7 +13,7 @@ import {
 import { Bot, LibraryBig, Paperclip, Users } from "lucide-react";
 import type { ComponentPropsWithoutRef } from "react";
 
-export interface ChatSuggestionPopoverProps {
+interface ChatSuggestionPopoverProps {
   listId: string;
   suggestions: ChatComposerSuggestion[];
   activeIndex: number;

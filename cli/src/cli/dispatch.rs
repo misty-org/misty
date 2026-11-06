@@ -3,29 +3,16 @@
 use super::*;
 
 pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
-    load_command_environment(&arguments.command, &settings)?;
-    match arguments.command {
-        Command::Tool { name, arguments } => crate::process::CommandSpec::new("node")
-            .arg(
-                settings
-                    .workspace
-                    .misty
-                    .join("cli/tasks/run-tool.ts")
-                    .into_os_string(),
-            )
-            .arg(name)
-            .args(arguments)
-            .run(&settings.workspace.misty),
+    let Some(command) = arguments.command else {
+        crate::config::load_cli_environment(&settings.workspace, GUIDED_ENVIRONMENT)?;
+        return crate::guide::menu(&settings);
+    };
+    load_command_environment(&command, &settings)?;
+    if matches!(command, Command::Server(_)) {
+        settings.workspace.require_server()?;
+    }
+    match command {
         Command::Setup(options) => crate::setup::run(&settings.workspace, options),
-        Command::Tasks => crate::tasks::list(&settings.workspace),
-        Command::Task { name, arguments } => {
-            crate::tasks::run(&settings.workspace, &name, &arguments)
-        }
-        Command::Configure(command) => {
-            let path = Settings::save_workspace(&command.workspace)?;
-            println!("Saved workspace configuration to {}", path.display());
-            Ok(())
-        }
         Command::Doctor(options) => {
             if options.target == crate::diagnostics::Target::Release {
                 if options.json || options.fix {
@@ -68,26 +55,20 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 .args(["run", "test:scripts"])
                 .run(&settings.workspace.misty),
             CheckTarget::Server => checks::server(&settings.workspace),
-            CheckTarget::GoSizes => checks::go_file_sizes(&settings.workspace.server),
+            CheckTarget::GoSizes => {
+                settings.workspace.require_server()?;
+                checks::go_file_sizes(&settings.workspace.server)
+            }
             CheckTarget::Website => checks::website(&settings.workspace),
             CheckTarget::Features => checks::features(&settings.workspace),
             CheckTarget::Cli => checks::cli(&settings.workspace),
-            CheckTarget::All => {
-                checks::app(&settings.workspace)?;
-                crate::process::CommandSpec::new(crate::process::npm())
-                    .args(["run", "test:scripts"])
-                    .run(&settings.workspace.misty)?;
-                checks::server(&settings.workspace)?;
-                checks::website(&settings.workspace)?;
-                checks::features(&settings.workspace)?;
-                checks::cli(&settings.workspace)
-            }
+            CheckTarget::All => checks::all(&settings.workspace),
         },
+        Command::Build => crate::guide::build(&settings.workspace),
         Command::Desktop(command) => match command.command {
             DesktopCommand::Dev { profile, route } => {
                 desktop::dev(&settings.workspace, profile.as_deref(), route.as_deref())
             }
-            DesktopCommand::Build => desktop::build(&settings.workspace),
             DesktopCommand::Clean { apply } => desktop::clean(&settings.workspace, apply),
             DesktopCommand::Icons { command } => match command {
                 IconCommand::Sync { source } => {
@@ -129,9 +110,6 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 follow,
                 tail,
             } => server::logs(&settings.workspace, service.as_deref(), follow, tail),
-            ServerCommand::Image { command } => match command {
-                ImageCommand::Build { tag } => server::build_image(&settings.workspace, &tag),
-            },
             ServerCommand::Worker { command } => match command {
                 WorkerCommand::GenerateSecrets => {
                     server::generate_worker_secrets(&settings.workspace)
@@ -143,46 +121,16 @@ pub fn dispatch(arguments: Cli, settings: Settings) -> Result<()> {
                 }
             },
         },
-        Command::Release(command) => match command.command {
-            ReleaseCommand::Check => release::check(&settings.workspace),
-            ReleaseCommand::Start {
-                version,
-                dry_run,
-                os,
-            } => release::start(&settings.workspace, &version, dry_run, &os),
-            ReleaseCommand::Build {
-                version,
-                dry_run,
-                upload,
-            } => {
-                release::build(&settings.workspace, &version, dry_run)?;
-                if upload && !dry_run {
-                    release::upload(&settings.workspace, &version, false)?;
-                }
-                Ok(())
-            }
-            ReleaseCommand::Upload { version, dry_run } => {
-                release::upload(&settings.workspace, &version, dry_run)
-            }
-            ReleaseCommand::Verify { version, dry_run } => {
-                release::verify(&settings.workspace, &version, dry_run)
-            }
-            ReleaseCommand::Publish {
-                version,
-                yes,
-                dry_run,
-            } => release::publish(&settings.workspace, &version, yes, dry_run),
-        },
+        Command::Release(command) => crate::guide::release(&settings.workspace, command.dry_run),
     }
 }
 
+/// The guided flows reach builds and releases, so they read what those need.
+const GUIDED_ENVIRONMENT: &[&str] = &["common.env", "release.env"];
+
 pub(super) fn load_command_environment(command: &Command, settings: &Settings) -> Result<()> {
     let files: &[&str] = match command {
-        Command::Configure(_) | Command::Env(_) | Command::Home(_) | Command::Tasks => &[],
-        Command::Task { name, .. } if name.starts_with("release/") => {
-            &["common.env", "release.env"]
-        }
-        Command::Task { .. } => &["common.env"],
+        Command::Env(_) | Command::Home(_) => &[],
         Command::Setup(options)
             if matches!(options.component, crate::setup::Component::Cloudflare) =>
         {
@@ -196,21 +144,15 @@ pub(super) fn load_command_environment(command: &Command, settings: &Settings) -
             &["common.env", "cloudflare.env"]
         }
         Command::Doctor(_) => &["common.env"],
-        Command::Release(_) => &["common.env", "release.env"],
-        Command::Desktop(desktop) => match desktop.command {
-            DesktopCommand::Build => &["common.env", "release.env"],
-            _ => &["common.env"],
-        },
-
+        Command::Release(_) | Command::Build => GUIDED_ENVIRONMENT,
+        Command::Desktop(_) => &["common.env"],
         Command::Server(server) => match &server.command {
             ServerCommand::Worker { .. } | ServerCommand::R2 { .. } => {
                 &["common.env", "cloudflare.env"]
             }
             _ => &["common.env"],
         },
-        Command::Tool { .. } | Command::Check(_) | Command::Docs(_) | Command::Website(_) => {
-            &["common.env"]
-        }
+        Command::Check(_) | Command::Docs(_) | Command::Website(_) => &["common.env"],
     };
     crate::config::load_cli_environment(&settings.workspace, files)?;
     if let Command::Server(_) = command {

@@ -2,29 +2,31 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "./dockTree";
 import { useWorkspaceStore } from "./useWorkspaceStore";
 import { currentWindows } from "./windows";
-import { followSpaceWindow } from "./spaceWindow";
+import { currentWindowId } from "./profileWindow";
+import { followSpaceWindow, spaceWindow } from "./spaceWindow";
+import { parseWorkspaceRecord } from "./workspaceRecord";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 import { allLayoutViews } from "./layoutTabs";
 
-describe("a window showing one Space at a time", () => {
+describe("a window of one profile", () => {
   beforeEach(() => {
     useWorkspaceStore.persist.clearStorage();
     useWorkspaceStore.getState().reset();
   });
 
-  it("holds exactly one window, in its Space's scope", () => {
+  it("holds exactly one window, under the native window's id", () => {
     const state = useWorkspaceStore.getState();
-    expect(state.activeScopeKey).toBe("space:personal");
+    expect(state.activeWindowId).toBe(currentWindowId());
     expect(currentWindows(state)).toHaveLength(1);
     expect(currentWindows(state)[0].id).toBe(state.activeWindowId);
   });
 
-  it("keeps the window's identity through a snapshot", () => {
+  it("keeps the window's identity through a save and restore", () => {
     const id = useWorkspaceStore.getState().activeWindowId;
     const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://example.com" });
-    const snapshot = useWorkspaceStore.getState().createSnapshot("account", "device");
+    const saved = JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState()));
     useWorkspaceStore.getState().reset();
-    useWorkspaceStore.getState().replaceSnapshot(snapshot);
+    useWorkspaceStore.setState(parseWorkspaceRecord(saved));
     expect(useWorkspaceStore.getState().activeWindowId).toBe(id);
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toContain(
       tab.id,
@@ -63,8 +65,8 @@ describe("a window showing one Space at a time", () => {
       },
       17,
     );
-    expect(migrated.activeScopeKey).toBe("space:personal");
-    expect(migrated.activeWindowId).toBe("window:b");
+    expect("activeScopeKey" in migrated).toBe(false);
+    expect(migrated.activeWindowId).toBe(currentWindowId());
     expect(allLayoutViews(migrated.layout).map((view) => view.id)).toEqual(["tab-b"]);
     expect("windowsByScope" in migrated).toBe(false);
   });
@@ -99,14 +101,11 @@ describe("a window showing one Space at a time", () => {
       root = insertDockSplit(root, target, leaf, "right");
       target = leaf.id;
     }
-    useWorkspaceStore.getState().replaceSnapshot({
-      version: 2,
-      accountId: "account",
-      deviceId: "device",
-      savedAt: 1,
-      layout: { root, focusedPaneId: target },
-      lastUsedViewByGroup: {},
-    });
+    useWorkspaceStore.setState(
+      parseWorkspaceRecord(
+        JSON.stringify({ layout: { root, focusedPaneId: target }, lastUsedViewByGroup: {} }),
+      ),
+    );
 
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)).toHaveLength(4);
   });
@@ -141,59 +140,66 @@ describe("a window showing one Space at a time", () => {
 });
 
 describe("switching a window's Space", () => {
-  // A Space's window key is its id, and its scope is `space:<id>`.
   const workKey = "space_01951d32-40ac-7000-8000-000000000001";
-  const work = `space:${workKey}` as const;
-  // The bridge does this when the native side switches the window.
-  const show = (
-    key: string,
-    scope: Parameters<ReturnType<typeof useWorkspaceStore.getState>["showSpace"]>[0],
-  ) => {
-    followSpaceWindow(key);
-    useWorkspaceStore.getState().showSpace(scope);
-  };
   beforeEach(() => {
     followSpaceWindow("personal");
     useWorkspaceStore.persist.clearStorage();
     useWorkspaceStore.getState().reset();
   });
 
-  it("shows the other Space's own tabs and window, and restores both on the way back", () => {
-    const personalTab = useWorkspaceStore
-      .getState()
-      .openBrowserView({ url: "https://personal.example" });
-    const personalWindow = useWorkspaceStore.getState().activeWindowId;
-
-    show(workKey, work);
-    const inWork = useWorkspaceStore.getState();
-    expect(inWork.activeScopeKey).toBe(work);
-    expect(inWork.activeWindowId).not.toBe(personalWindow);
-    expect(allLayoutViews(inWork.layout).map((view) => view.id)).not.toContain(personalTab.id);
-    const workTab = inWork.openBrowserView({ url: "https://work.example" });
-    const workWindow = useWorkspaceStore.getState().activeWindowId;
-
-    show("personal", "space:personal");
-    const back = useWorkspaceStore.getState();
-    expect(back.activeWindowId).toBe(personalWindow);
-    expect(allLayoutViews(back.layout).map((view) => view.id)).toContain(personalTab.id);
-    expect(allLayoutViews(back.layout).map((view) => view.id)).not.toContain(workTab.id);
-
-    show(workKey, work);
-    expect(useWorkspaceStore.getState().activeWindowId).toBe(workWindow);
-    expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toContain(
-      workTab.id,
-    );
+  it("never touches tabs", () => {
+    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://personal.example" });
+    const before = useWorkspaceStore.getState().layout;
+    const windowId = useWorkspaceStore.getState().activeWindowId;
+    followSpaceWindow(workKey);
+    expect(spaceWindow()).toMatchObject({ key: workKey, spaceId: workKey, personal: false });
+    expect(useWorkspaceStore.getState().layout).toBe(before);
+    expect(useWorkspaceStore.getState().activeWindowId).toBe(windowId);
+    followSpaceWindow("personal");
+    expect(useWorkspaceStore.getState().layout).toBe(before);
+    expect(allLayoutViews(before).map((view) => view.id)).toContain(tab.id);
   });
 
-  it("keeps every Space's layout through a save and restore", () => {
-    show(workKey, work);
-    const workTab = useWorkspaceStore.getState().openBrowserView({ url: "https://work.example" });
-    show("personal", "space:personal");
+  it("saves one layout, with nothing per Space", () => {
+    const tab = useWorkspaceStore.getState().openBrowserView({ url: "https://personal.example" });
     const saved = JSON.parse(JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState())));
+    expect("layoutsByScope" in saved).toBe(false);
     const restored = migrateWorkspaceStore(saved, 0);
-    expect(allLayoutViews(restored.layoutsByScope[work]!).map((view) => view.id)).toContain(
-      workTab.id,
+    expect(allLayoutViews(restored.layout).map((view) => view.id)).toContain(tab.id);
+  });
+
+  it("takes only the personal Space's tabs from a record saved per Space", () => {
+    const layout = (id: string) => {
+      const leaf = createDockLeaf([
+        {
+          id,
+          surfaceId: "agents" as const,
+          groupKey: "tool:agents" as const,
+          instanceKey: id,
+          title: "Agents",
+          route: "/agents",
+          sidebarVisible: false,
+          state: {},
+          createdAt: 1,
+          lastFocusedAt: 1,
+        },
+      ]);
+      return { root: leaf, focusedPaneId: leaf.id };
+    };
+    const migrated = migrateWorkspaceStore(
+      {
+        activeScopeKey: "space:work",
+        layout: layout("work-tab"),
+        layoutsByScope: { "space:work": layout("work-tab"), "space:personal": layout("own-tab") },
+        tabGroups: [
+          { id: "own", name: "Own", color: "blue", collapsed: false, scopeKey: "space:personal" },
+          { id: "work", name: "Work", color: "red", collapsed: false, scopeKey: "space:work" },
+        ],
+      },
+      17,
     );
-    expect(restored.windowIdsByScope?.[work]).toBeDefined();
+    expect(allLayoutViews(migrated.layout).map((view) => view.id)).toEqual(["own-tab"]);
+    expect(migrated.tabGroups.map((group) => group.id)).toEqual(["own"]);
+    expect("scopeKey" in migrated.tabGroups[0]).toBe(false);
   });
 });

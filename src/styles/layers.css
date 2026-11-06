@@ -56,7 +56,7 @@
   z-index: 2147483500;
 }
 
-/* Night light (Settings › Appearance): a warm multiply layer over the whole
+/* Night light (Settings › Interface): a warm multiply layer over the whole
    window, above tooltips, that never takes the pointer. Browser pages are
    native views on top of this one and get the same layer injected. */
 :root[data-night-light]::after {

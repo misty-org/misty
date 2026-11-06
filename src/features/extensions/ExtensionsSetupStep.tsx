@@ -4,7 +4,7 @@ import { Button, SkeletonList } from "@/shared/ui";
 import {
   parseInstallations,
   requestInstall,
-  spaceInstallationsRaw,
+  profileInstallationsRaw,
   useExtensionsStore,
 } from "./store";
 
@@ -54,7 +54,7 @@ export function ExtensionsSetupStep() {
   const ready = useExtensionsStore((state) => state.ready);
   const profile = useDevicePreferences((state) => state.state);
   const installed = new Set(
-    parseInstallations(spaceInstallationsRaw(profile))
+    parseInstallations(profileInstallationsRaw(profile))
       .filter((item) => item.installed)
       .map((item) => item.id),
   );

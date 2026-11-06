@@ -1,7 +1,5 @@
-//! What this device trusts (docs/sync/devices.md): the vault root it
-//! pinned when it unlocked the vault, the newest device list that verifies
-//! against that root, and its own signed policy. Peers are trusted only
-//! through this list, never through anything the server asserts.
+//! What this session keeps about itself (docs/sync/devices.md): its id on the
+//! server and its own signed policy.
 use std::{
     path::PathBuf,
     sync::{Mutex, OnceLock},
@@ -14,15 +12,13 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     error::{ApiError, ApiResult},
-    infra::devices::records::{DeviceList, DevicePolicy, RunGrant, SignedRecord},
+    infra::devices::records::{DevicePolicy, RunGrant, SignedRecord},
 };
 
-mod list;
-#[cfg(test)]
-pub use list::current_list;
-pub use list::{
-    apply_server_list, effective_policy, forget_after_removal, list_version, own_policy,
-    self_admitted, store_own_policy, verify_job_grant, ListOutcome,
+mod policy;
+pub use policy::{
+    effective_policy, forget_after_removal, own_policy, self_admitted, store_own_policy,
+    verify_job_grant,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -33,12 +29,6 @@ struct TrustFile {
     account_id: String,
     local_device_id: String,
     server_device_id: Option<String>,
-    root_public_key: Option<String>,
-    vault_id: Option<String>,
-    list: Option<SignedRecord>,
-    /// "server" or "peer": a list learned from a peer only carried removals.
-    list_source: String,
-    list_fresh_at: i64,
     own_policy: Option<SignedRecord>,
     own_policy_state: Option<DevicePolicy>,
 }
@@ -47,7 +37,6 @@ pub struct TrustState {
     store: Store,
     key: String,
     file: TrustFile,
-    list: Option<DeviceList>,
 }
 
 static ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -115,22 +104,10 @@ pub fn open(deployment: &str, account_id: &str, local_device_id: &str) -> ApiRes
             deployment: deployment.to_owned(),
             account_id: account_id.to_owned(),
             local_device_id: local_device_id.to_owned(),
-            list_source: "server".to_owned(),
             ..Default::default()
         };
     }
-    let list = match (&file.list, &file.root_public_key) {
-        (Some(record), Some(root_key)) => {
-            DeviceList::verify(record, root_key).filter(|list| list.account_id == account_id)
-        }
-        _ => None,
-    };
-    *guard = Some(TrustState {
-        store,
-        key,
-        file,
-        list,
-    });
+    *guard = Some(TrustState { store, key, file });
     Ok(())
 }
 
@@ -179,29 +156,6 @@ pub fn set_server_device_id(device_id: &str) -> ApiResult<()> {
 
 pub fn server_device_id() -> Option<String> {
     state().lock().ok()?.as_ref()?.file.server_device_id.clone()
-}
-
-/// Pins the vault root public key, derived from the root this device holds.
-/// A different root later is refused: the vault key never silently changes.
-pub fn pin_root(root_public_key: &str, vault_id: &str) -> ApiResult<()> {
-    with_state(|current| {
-        match current.file.root_public_key.as_deref() {
-            Some(pinned) if pinned != root_public_key => {
-                return Err(ApiError::Message(
-                    "Your sync vault key changed. Remove this device and add it again.".to_owned(),
-                ))
-            }
-            Some(_) => return Ok(()),
-            None => {}
-        }
-        current.file.root_public_key = Some(root_public_key.to_owned());
-        current.file.vault_id = Some(vault_id.to_owned());
-        current.save()
-    })
-}
-
-pub fn pinned_root() -> Option<String> {
-    state().lock().ok()?.as_ref()?.file.root_public_key.clone()
 }
 
 #[cfg(test)]

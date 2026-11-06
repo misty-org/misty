@@ -42,13 +42,13 @@ const ToolbarGroup = React.forwardRef<HTMLDivElement, ToolbarGroupProps>(
 ToolbarGroup.displayName = "ToolbarGroup";
 export { Toolbar, ToolbarGroup };
 
-export type ToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
+type ToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
   variant?: "default" | "floating" | "bare";
   wrap?: boolean;
 };
 
-export type ToolbarGroupProps = React.HTMLAttributes<HTMLDivElement> & {
+type ToolbarGroupProps = React.HTMLAttributes<HTMLDivElement> & {
   align?: "start" | "end";
   separated?: boolean;
 };

@@ -70,33 +70,6 @@ pub(super) fn write_all(all: &PermissionStore) -> Result<(), String> {
     write_all_to(&store().ok_or("Misty's data folder is unavailable.")?, all)
 }
 
-/// Imports the choices an earlier layout kept elsewhere (a JSON file, or the macOS
-/// preferences), once. `earlier` returns their JSON text.
-pub(super) fn import_earlier_once(earlier: impl FnOnce() -> Option<String>) {
-    let Some(store) = store() else {
-        return;
-    };
-    let _ = store.import_once("site-permissions", |connection| -> Result<(), rusqlite::Error> {
-        let Some(raw) = earlier() else {
-            return Ok(());
-        };
-        let Ok(all) = serde_json::from_str::<PermissionStore>(&raw) else {
-            return Ok(());
-        };
-        for (profile, sites) in all {
-            for (origin, permissions) in sites {
-                if let Ok(raw) = serde_json::to_string(&permissions) {
-                    connection.execute(
-                        "INSERT OR IGNORE INTO site_permissions (profile, origin, permissions) VALUES (?1, ?2, ?3)",
-                        rusqlite::params![profile, origin, raw],
-                    )?;
-                }
-            }
-        }
-        Ok(())
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,6 +82,7 @@ mod tests {
         let allowed = Permissions {
             camera: Decision::Allow,
             microphone: Decision::Ask,
+            location: Decision::Ask,
         };
         let mut all = PermissionStore::new();
         all.entry("profile-a".into())

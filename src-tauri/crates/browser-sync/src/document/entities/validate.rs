@@ -122,6 +122,9 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             search_template(&v.url)?;
             order(v.order)?;
         }
+        // Their shape is the client's own business: a record that can't be read is ignored by what
+        // reads it, and nothing here can hold up the others.
+        Kind::Profile | Kind::OpenTab | Kind::SiteCookies | Kind::SiteStorage => {}
         Kind::Download => {
             let v: Download = serde_json::from_value(value)?;
             web_url(&v.url)?;

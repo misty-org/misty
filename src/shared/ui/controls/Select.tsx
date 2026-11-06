@@ -32,7 +32,6 @@ const SelectTrigger = React.forwardRef<
       "aria-invalid:ring-charcoal-active/20 bg-charcoal-card aria-invalid:border-charcoal-active/50",
       "aria-invalid:ring-charcoal-active/40 [&>span]:line-clamp-1 [&_svg]:pointer-events-none",
       "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:border-charcoal-active",
-      "focus-visible:border-cream-muted",
       className,
     )}
     {...props}

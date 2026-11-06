@@ -10,7 +10,7 @@ import { devicesNative, type DevicesView } from "@/native/devices";
 import { secureId } from "@/shared/platform/secureId";
 import type { AgentDevice } from "../model/types";
 import { ManagedAiRequestError } from "@/api/ai/managed";
-import { isSpaceWindowLabel } from "@/features/workspace/spaceWindow";
+import { isProfileWindowLabel } from "@/features/workspace/profileWindow";
 
 // One device identity (docs/sync/devices.md). The device key lives in
 // native code only: this module never sees private key material. It asks the
@@ -36,7 +36,7 @@ const agentDeviceCapabilities = {
 export async function deviceAccount(): Promise<{ apiBase: string; accountId: string }> {
   const accountId = useUserStore.getState().me?.id;
   if (!accountId || isApiSessionTransitioning()) {
-    throw new ManagedAiRequestError("Sign in to use this device.", 401, "account_session_changed");
+    throw new ManagedAiRequestError("Sign in to use agents here.", 401, "account_session_changed");
   }
   return { apiBase: await resolveApiBase(), accountId };
 }
@@ -47,9 +47,10 @@ export async function deviceAccount(): Promise<{ apiBase: string; accountId: str
 export async function ensureDeviceStarted(): Promise<DevicesView> {
   const account = await deviceAccount();
   const key = JSON.stringify([account.apiBase, account.accountId, readApiSessionGeneration()]);
-  if (!isSpaceWindowLabel(getCurrentWindow().label)) {
+  if (!isProfileWindowLabel(getCurrentWindow().label)) {
     const view = await devicesNative.view(account.accountId);
-    if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
+    if (!view.serverDeviceId)
+      throw new Error("This signed-in session isn't registered with Misty yet.");
     return view;
   }
   if (started?.key === key) return started.promise;
@@ -79,7 +80,8 @@ export async function ensureServerAgentDevice(
   if ("__TAURI_INTERNALS__" in window)
     browserDeviceSessionId = await invoke<string>("agent_browser_session_id");
   const view = await ensureDeviceStarted();
-  if (!view.serverDeviceId) throw new Error("This device isn't registered with Misty yet.");
+  if (!view.serverDeviceId)
+    throw new Error("This signed-in session isn't registered with Misty yet.");
   lastHeartbeatByServerId.set(view.serverDeviceId, Date.now());
   return { id: view.serverDeviceId, name: local.displayName };
 }

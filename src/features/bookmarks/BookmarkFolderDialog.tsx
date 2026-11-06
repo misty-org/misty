@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogTitle,
+  ErrorNotification,
   Field,
   Input,
   Select,
@@ -85,11 +86,7 @@ export function BookmarkFolderDialog(props: {
               </Select>
             </Field>
           )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
             <Button variant="ghost" type="button" onClick={props.onClose}>
               Cancel

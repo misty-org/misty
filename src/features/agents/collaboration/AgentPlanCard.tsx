@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MistyMarkdown } from "@/features/ai-surface/MistyMarkdown";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { AgentPlanEditor } from "./AgentPlanEditor";
 import { PlanRiskTag } from "./PlanRiskTag";
@@ -128,11 +128,7 @@ export function AgentPlanCard({
           </ul>
         </details>
       )}
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
         <Button
           variant="primary"

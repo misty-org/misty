@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-export interface NamesSnapshot {
+interface NamesSnapshot {
   names: Record<string, string>;
   error: string | null;
 }

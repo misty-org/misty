@@ -114,8 +114,8 @@ describe("ShortcutsSection", () => {
       );
     });
 
-    expect(container.textContent).toContain("already used by First action");
-    const reassign = [...container.querySelectorAll("button")].find(
+    expect(document.body.textContent).toContain("already used by First action");
+    const reassign = [...document.body.querySelectorAll("button")].find(
       (button) => button.textContent === "Reassign",
     );
     await act(async () => reassign?.click());

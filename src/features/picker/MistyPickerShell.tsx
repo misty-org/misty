@@ -1,13 +1,12 @@
 import { FolderOpen, LibraryBig } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
-export type { MistyPickerProps, MistyPickerSource } from "./model/MistyPicker";
+;
 
 import { MistyLibraryPicker } from "@/features/library";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   ToggleGroup,
@@ -73,7 +72,7 @@ export function MistyPickerShell({
         if (!open) onCancel();
       }}
     >
-      <DialogContent className={sharedPickerDialogClassName}>
+      <DialogContent aria-describedby={undefined} className={sharedPickerDialogClassName}>
         <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-14 text-left">
           <div className="min-w-0">
             <DialogTitle className="text-base">
@@ -81,15 +80,6 @@ export function MistyPickerShell({
                 ? "Choose from Library"
                 : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
             </DialogTitle>
-            <DialogDescription>
-              {source === "library"
-                ? `Select up to ${libraryMaximum} items to reference.`
-                : fileMode === "folder"
-                  ? "Pick a destination folder."
-                  : multiple
-                    ? "Pick one or more files."
-                    : "Pick a file."}
-            </DialogDescription>
           </div>
           {sourceToggle}
         </DialogHeader>

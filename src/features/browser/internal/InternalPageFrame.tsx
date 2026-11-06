@@ -1,4 +1,4 @@
-import { SavedWebsiteIcon } from "@/features/browser-sync/SavedWebsiteIcon";
+import { SavedWebsiteIcon } from "@/features/browser/SavedWebsiteIcon";
 import { CollectionHeading, CollectionPage, CollectionSearch, EmptyState } from "@/shared/ui";
 import type { ReactNode } from "react";
 

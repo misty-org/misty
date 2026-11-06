@@ -1,3 +1,4 @@
+import { ErrorNotification } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi, type ScreenLocation } from "@/features/ai-surface/api";
 import { DesktopSettingsRow, DesktopSettingsSection } from "../components/DesktopSettingsUI";
@@ -81,11 +82,7 @@ export function ScreenLocationSection() {
           onChange={(value) => void changeKeepAwake(value)}
         />
       </DesktopSettingsRow>
-      {error ? (
-        <p role="alert" className="mt-2 text-xs text-cream-muted">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </DesktopSettingsSection>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { localProfileId } from "@/features/workspace/profileId";
+import { localAccountScope } from "@/features/workspace/accountScope";
 import { useDevicePreferences } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -18,13 +18,14 @@ import { answerCompatRequest, startCompatEvents } from "./compat/requests";
 import { startNewTabOverride } from "./newTabOverride";
 import type { ExtensionEvent } from "./types";
 import { extensionsNative } from "./native";
+import { startFollowingProfile } from "./followProfile";
 import {
   closeExtensionPopup,
   extensionWindowIdFor,
   floatExtensionPopup,
   watchExtensionPopups,
 } from "./extensionPopups";
-import { isIncognitoWindow, isLinkTargetWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow, isLinkTargetWindow } from "@/features/workspace/profileWindow";
 import {
   enqueuePermission,
   finishPermission,
@@ -32,7 +33,7 @@ import {
   installations,
   updateInstallation,
   parseInstallations,
-  spaceInstallationsRaw,
+  profileInstallationsRaw,
   useExtensionsStore,
 } from "./store";
 
@@ -62,7 +63,7 @@ function publishLayout() {
       .map((tab, index) => ({ ...tab, index })),
   );
 }
-/** Opens the window or tab an extension asked for, in this Space window. */
+/** Opens the window or tab an extension asked for, in this window. */
 function openFromExtension(event: ExtensionEvent) {
   const previousView = activeLayoutView(useWorkspaceStore.getState().layout);
   if (event.kind === "open-window") {
@@ -95,11 +96,11 @@ export function useExtensionsRuntime() {
   // Extensions belong to this device, as their install list (a device setting) does: signing
   // in or out keeps them installed and running, with nothing to move
   // (docs/browser/no-account.md).
-  const account = localProfileId;
+  const account = localAccountScope;
   const profile = useDevicePreferences((s) => s.state);
   const profilesReady = useDevicePreferences((s) => s.ready);
   const profilesError = useDevicePreferences((s) => s.error);
-  const raw = spaceInstallationsRaw(profile);
+  const raw = profileInstallationsRaw(profile);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;
@@ -163,7 +164,7 @@ export function useExtensionsRuntime() {
     const stopNewTabOverride = startNewTabOverride();
     const stopPopups = watchExtensionPopups();
     const listener = listen<ExtensionEvent>("misty://extensions", ({ payload: event }) => {
-      // Events come from this window's Space; its incognito windows run no extensions.
+      // Events come from this window's profile; its incognito windows run no extensions.
       if (cancelled || event.account !== account || isIncognitoWindow()) return;
       // Extension API calls are frequent and change no extension UI state.
       if (event.kind === "compat-request") {
@@ -211,7 +212,7 @@ export function useExtensionsRuntime() {
         useExtensionsStore.setState({ error: event.detail ?? "Extension sync needs attention." });
       const workspace = useWorkspaceStore.getState();
       const tab = allLayoutViews(workspace.layout).find((t) => browserRuntimeId(t) === event.tabId);
-      // Closing an extension's window closes only its floating popup, never a Space window.
+      // Closing an extension's window closes only its floating popup, never a Misty window.
       if (event.kind === "close-window" || event.kind === "close-tab")
         closeExtensionPopup({ tabId: event.tabId, windowId: event.windowId });
       // A new window or tab the extension asks for opens once, in the window used last.
@@ -246,6 +247,10 @@ export function useExtensionsRuntime() {
       void listener.then((off) => off());
     };
   }, [account]);
+  useEffect(() => {
+    if (!account || !profilesReady || !hasTauriInternals()) return;
+    return startFollowingProfile();
+  }, [account, profilesReady]);
   useEffect(() => {
     if (!account || !profilesReady || !hasTauriInternals()) return;
     let stopped = false;

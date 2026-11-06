@@ -1,10 +1,17 @@
-import type { NativeRecoveryStorage } from "@/features/browser-sync/recovery";
-import { spaceWindow } from "./spaceWindow";
+import type { NativeRecoveryStorage } from "@/features/workspace/recoveryStorage";
 
-/** A window saves its tabs under the Space it shows. The personal Space keeps the record
- * from before Spaces had windows, so its tabs come back. */
-export function spaceRecoveryKey(space: { personal: boolean; key: string }) {
-  return space.personal ? "workspace" : `workspace:space:${space.key}`;
+/** Each window saves its own tabs under its own id, so two windows of a profile can't overwrite
+ * each other. */
+export function windowRecoveryKey(windowId: string) {
+  return `workspace:w:${windowId}`;
+}
+
+/** The one record from before windows had ids. The first profile takes it over once. */
+export const legacyWorkspaceRecoveryKey = "workspace";
+
+/** The recovery store has no delete: a record's value is blanked, and blank reads as nothing. */
+export function readRecoveryRecord(storage: NativeRecoveryStorage, key: string): string | null {
+  return storage.getItem(key) || null;
 }
 
 /** Snapshot at the end of a burst, not on every resize frame. The recovery store
@@ -14,6 +21,7 @@ export class WorkspaceRecoveryWriter {
   private since?: number;
   constructor(
     private storage: NativeRecoveryStorage,
+    private key: string,
     private capture: () => string,
     private failed: (error: unknown) => void,
     private saved: () => void = () => undefined,
@@ -32,7 +40,7 @@ export class WorkspaceRecoveryWriter {
    * leave those alone until their value changes. */
   async flush(retry = false) {
     this.cancel();
-    this.storage.setItem(spaceRecoveryKey(spaceWindow()), this.capture());
+    this.storage.setItem(this.key, this.capture());
     await (retry ? this.storage.retry() : this.storage.flush());
   }
   cancel() {

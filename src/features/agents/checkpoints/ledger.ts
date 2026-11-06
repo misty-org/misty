@@ -1,6 +1,6 @@
 /**
  * The requirements ledger a run ends with (docs/agents/checkpoints.md; the runtime's
- * server/apps/agent-runtime/src/ledger.ts writes it). It rides at the end of the run's final
+ * src-tauri/services/agent-runtime/src/ledger.ts writes it). It rides at the end of the run's final
  * text as a comment, so each assistant message carries the ledger as it stood at that turn.
  */
 type LedgerState = "pending" | "done" | "failed" | "blocked" | "skipped";

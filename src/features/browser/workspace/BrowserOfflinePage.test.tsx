@@ -13,7 +13,9 @@ describe("BrowserOfflinePage", () => {
 
     expect(screen.getByText("Cannot connect to the internet")).toBeDefined();
     expect(
-      screen.getByText(/Misty could not load this page because your device appears to be offline/i),
+      screen.getByText(
+        /Misty could not load this page because your computer appears to be offline/i,
+      ),
     ).toBeDefined();
     expect(screen.getByText("https://example.com")).toBeDefined();
   });

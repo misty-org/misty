@@ -5,7 +5,7 @@ type DistributionChannel =
   "direct" | "microsoft_store" | "mac_app_store" | "linux_package" | "unknown";
 
 /** What a support bundle says about this copy of Misty. It stays on this device. */
-export interface CommonClientProperties {
+interface CommonClientProperties {
   platform: Platform;
   os_version?: string;
   app_version: string;

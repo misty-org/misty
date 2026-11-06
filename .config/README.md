@@ -1,15 +1,15 @@
 # Project tooling configuration
 
-`.config/tooling.json` is Misty's shared tool registry. The `misty tool` command and root npm scripts both use `cli/tasks/tooling.ts` to select configuration here, validate required files, resolve locally installed tool binaries, and run from the project root. Calling the CLI from a nested directory produces the same lookup.
+`.config/tooling.json` is Misty's shared tool registry. The root npm scripts use `cli/tasks/tooling.ts` to select configuration here, validate required files, resolve locally installed tool binaries, and run from the project root. Calling a script from a nested directory produces the same lookup.
 
 Examples:
 
 ```sh
-misty tool vite build --mode desktop
-misty tool vitest run src/features/files
-misty tool eslint src
-misty tool prettier --check src/app/entry.ts
-misty tool gitleaks detect
+npm run tool -- vite build --mode desktop
+npm run tool -- vitest run src/features/files
+npm run tool -- eslint src
+npm run tool -- prettier --check src/app/entry.ts
+npm run tool -- gitleaks detect
 ```
 
 `npm run tool -- <name> <arguments>` uses the same resolver without installing the Misty CLI. Existing commands such as `misty desktop dev`, `npm run build:desktop`, `npm test`, and `npm run lint` retain their interfaces.

@@ -15,6 +15,8 @@ Tabs always sit in the tab sidebar, on the left or the right of the window. Ther
 
 The sidebar is a card on the window chrome. Its head row shares the band of the native window buttons and holds the sidebar toggle and back, forward and reload. Below it come the focused browser page's address field, the favorites grid, the sticky New Tab row and the tab list, whose edges fade while more tabs sit beyond them. The foot row holds Downloads on the left; the account row is its own container beneath the card. Collapsed, the sidebar's width animates to nothing and the card slides over the page when revealed. The outer edge resizes it.
 
+The macOS window buttons stay native, so they can't sit inside the bar's DOM, but they act as part of it: they sit on the sidebar with tabs on the left and on the Space bar with tabs on the right, appear with no fade once placed, and slide with that bar at its speed and curve, off the window while it is away.
+
 `useMergedTitlebar` reserves the native button overlap only where no sidebar holds the window controls (focus mode, which hides the sidebar and the Space bar; a browser page then shows its own toolbar row). `useDockingTransition` keeps mounted panes in place while the shell moves and shares its 300ms ease-in-out timeline; native pages resume once the motion settles, and reduced motion skips it.
 
 A tab split into panes shows each pane as its own rounded container with a gap between them; a single pane shares the page's outline. There is no bookmarks bar.

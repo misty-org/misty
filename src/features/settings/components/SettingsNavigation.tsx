@@ -24,8 +24,7 @@ export function SettingsNavigation<Id extends string>(props: {
     <nav
       aria-label={props.label}
       className={cn(
-        "misty-scrollbar min-h-0 flex-1 overflow-y-auto pl-3 pr-[max(0px,calc(0.75rem-var(--misty-scrollbar-size)))]",
-        "[scrollbar-gutter:stable] max-[680px]:pl-2 max-[680px]:pr-[max(0px,calc(0.5rem-var(--misty-scrollbar-size)))]",
+        "misty-scrollbar min-h-0 flex-1 overflow-y-auto px-3 max-[680px]:px-2",
       )}
     >
       {props.groups.map((group) => (

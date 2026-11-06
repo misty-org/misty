@@ -42,6 +42,8 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::site_settings::permissions::browser_site_permissions_set,
             #[cfg(desktop)]
+            crate::infra::site_settings::permissions::browser_site_permission_answer,
+            #[cfg(desktop)]
             crate::infra::site_settings::permissions::browser_site_permissions_list,
             #[cfg(desktop)]
             crate::infra::site_settings::permissions::browser_site_permissions_reset,
@@ -62,6 +64,12 @@ macro_rules! with_more_commands {
             crate::infra::browser::browser_webview_restore_focus,
             #[cfg(desktop)]
             crate::infra::browser::browser_webviews_set_overlay_active,
+            #[cfg(desktop)]
+            crate::infra::browser::browser_webviews_set_notice_rects,
+            #[cfg(target_os = "macos")]
+            crate::infra::google_sign_in_sheet::google_sign_in_sheet_open,
+            #[cfg(target_os = "macos")]
+            crate::infra::google_sign_in_sheet::google_sign_in_sheet_close,
             #[cfg(desktop)]
             crate::infra::browser::browser_webviews_set_pointer_tracking,
             #[cfg(desktop)]
@@ -85,6 +93,8 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser::page_tools::browser_webview_set_muted,
             #[cfg(desktop)]
+            crate::infra::browser::page_tools::browser_webview_set_media_hold,
+            #[cfg(desktop)]
             crate::infra::browser::page_tools::media_tools::browser_webview_picture_in_picture,
             #[cfg(desktop)]
             crate::infra::browser::page_tools::media_tools::browser_webview_media_playback,
@@ -95,21 +105,46 @@ macro_rules! with_more_commands {
             crate::infra::browser::page_tools::media_tools::browser_webview_reader_article,
             #[cfg(desktop)]
             crate::infra::browser::retired_profiles::browser_retired_profiles_erase,
-            crate::infra::space_windows::space_window_info,
-            crate::infra::space_windows::space_windows_set_spaces,
-            crate::infra::space_windows::space_window_open,
-            crate::infra::space_windows::space_window_switch,
-            crate::infra::space_windows::space_window_is_host,
-            crate::infra::space_windows::space_incognito_open,
-            crate::infra::space_windows::space_window_set_color,
-            crate::infra::space_windows::space_window_close,
-            crate::infra::space_windows::space_windows_menu,
-            crate::infra::space_windows::space_window_link_target,
-            crate::infra::space_windows::space_window_remove,
+            crate::infra::profile_windows::profile_window_info,
+            crate::infra::profile_windows::profiles_list,
+            crate::infra::profile_windows::profile_create,
+            crate::infra::profile_windows::profile_rename,
+            crate::infra::profile_windows::profile_set_color,
+            crate::infra::profile_windows::profile_delete,
+            crate::infra::profile_windows::profile_open,
+            crate::infra::profile_windows::profile_window_new,
+            crate::infra::profile_windows::profile_incognito_open,
+            crate::infra::profile_windows::profile_window_close,
+            crate::infra::profile_windows::profile_window_take_orphans,
+            crate::infra::profile_windows::profile_window_set_space,
+            crate::infra::profile_windows::profile_window_is_host,
+            crate::infra::profile_windows::profile_window_link_target,
+            crate::infra::profile_windows::profile_sites,
+            crate::infra::profile_windows::profile_set_sites,
+            crate::infra::profile_data::profile_records_list,
+            crate::infra::profile_data::profile_records_write,
+            crate::infra::extensions::records::profile_extensions_list,
+            crate::infra::profile_data::profile_tabs_sync,
+            crate::infra::profile_data::profile_tabs_publish,
+            crate::infra::vault::vault_state,
+            crate::infra::vault::vault_resume,
+            crate::infra::vault::vault_create,
+            crate::infra::vault::vault_unlock,
+            crate::infra::vault::vault_pause,
+            crate::infra::vault::vault_start,
+            crate::infra::vault::vault_decline,
+            crate::infra::vault::vault_change_password,
+            crate::infra::vault::vault_destroy,
+            crate::infra::vault::vault_sessions,
+            crate::infra::vault::vault_rename_session,
+            crate::infra::vault::vault_remove_session,
+            crate::infra::vault::vault_usage,
             #[cfg(desktop)]
             crate::infra::site_settings::style::browser_set_mouse_gestures,
             #[cfg(desktop)]
             crate::infra::browser::host_messages::passwords::browser_password_offer_respond,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::passwords::browser_page_password_fill,
             #[cfg(desktop)]
             crate::infra::browser::host_messages::passwords::browser_passwords_list,
             #[cfg(desktop)]
@@ -120,12 +155,6 @@ macro_rules! with_more_commands {
             crate::infra::browser::host_messages::passwords::browser_passwords_save,
             #[cfg(desktop)]
             crate::infra::global_hotkey::global_hotkey_signed_out,
-            #[cfg(desktop)]
-            crate::infra::browser::host_messages::passwords::browser_passwords_device_preview,
-            #[cfg(desktop)]
-            crate::infra::browser::host_messages::passwords::browser_passwords_device_merge,
-            #[cfg(desktop)]
-            crate::infra::browser::host_messages::passwords::browser_passwords_device_keep,
             #[cfg(desktop)]
             crate::infra::browser_library::history::browser_history_clear,
             #[cfg(desktop)]
@@ -157,7 +186,7 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser_import::browser_import_signins,
             crate::infra::search::suggest::browser_search_suggest,
-            crate::infra::search::space::browser_space_search,
+            crate::infra::search::profile::browser_profile_search,
             #[cfg(desktop)]
             crate::infra::browser_library::browser_download_cancel,
             #[cfg(desktop)]
@@ -212,12 +241,10 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::app::commands::navigation_names_snapshot,
             crate::app::commands::navigation_names_update,
-            crate::app::commands::agent_chats_list,
-            crate::app::commands::agent_chats_put,
-            crate::app::commands::agent_chats_delete,
             crate::app::commands::settings_snapshot,
-            crate::app::commands::settings_profile_state,
-            crate::app::commands::settings_profile_commit,
+            crate::app::commands::settings_session_state,
+            crate::app::commands::settings_session_commit,
+            crate::app::commands::server_host_resolves_public,
             crate::app::commands::settings_save,
             crate::app::commands::settings_launch_on_login_snapshot,
             crate::app::commands::settings_apply_launch_on_login,
@@ -226,6 +253,7 @@ macro_rules! with_more_commands {
             crate::app::shortcut_commands::shortcuts_snapshot,
             crate::app::clipboard_commands::clipboard_cloud_view,
             crate::app::clipboard_commands::clipboard_cloud_copy,
+            crate::app::clipboard_commands::clipboard_cloud_paste,
             crate::app::clipboard_commands::clipboard_cloud_save,
             crate::app::shortcut_commands::shortcuts_replace,
         ]

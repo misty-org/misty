@@ -46,7 +46,7 @@ pub fn configure_r2_cors(workspace: &Workspace, apply: bool) -> Result<()> {
         .tempdir()?;
     let policy_path = temporary.path().join("cors.json");
     fs::write(&policy_path, serde_json::to_vec_pretty(&policy)?)?;
-    let worker = workspace.server.join("apps/journal-collab");
+    let worker = workspace.server.join("services/journal-collab");
     let wrangler = worker.join("node_modules/.bin").join(if cfg!(windows) {
         "wrangler.cmd"
     } else {

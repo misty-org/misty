@@ -87,6 +87,11 @@ export function listenBrowserPageEvents({
       pageBackgrounds.set(payload.id, payload.color);
       restorePageBackgrounds(pageBackgrounds);
     }),
+    // A page left full screen: its pane's bounds were ignored meanwhile, so measure them again.
+    listen<{ id: string; active: boolean }>("misty://browser-fullscreen", ({ payload }) => {
+      if (isDisposed() || payload.active) return;
+      requestBrowserWebviewLayoutByRuntimeId(payload.id);
+    }),
     // A newly created page stays parked until it paints; this brings it in.
     listen<{ id: string }>("misty://browser-reveal", ({ payload }) => {
       if (isDisposed()) return;

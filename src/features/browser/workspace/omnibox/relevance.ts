@@ -22,7 +22,7 @@ export const relevance = {
   copiedLink: 850,
 } as const;
 
-export type MatchQuality = "address-prefix" | "title-word-prefix" | "substring" | "none";
+type MatchQuality = "address-prefix" | "title-word-prefix" | "substring" | "none";
 
 /** How well typed text matches a page, best first. */
 export function matchQuality(

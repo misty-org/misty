@@ -1,7 +1,8 @@
+import { ErrorNotification } from "@/shared/ui";
 import { redactText } from "./redaction";
 import { createElement, useEffect } from "react";
 
-export interface SystemErrorInput {
+interface SystemErrorInput {
   /** Background refresh and app diagnostics render nothing. */
   intent?: "background" | "user-action";
   title: string;
@@ -11,7 +12,7 @@ export interface SystemErrorInput {
   scope: string;
 }
 
-export interface SystemErrorDiagnostic {
+interface SystemErrorDiagnostic {
   id: string;
   createdAt: string;
   title: string;
@@ -46,7 +47,7 @@ export function clearSystemErrors(): void {
   diagnostics = [];
 }
 
-/** Foreground failures render locally; background reports stay renderless. */
+/** Foreground failures show as a notification; background reports stay renderless. */
 export function SystemErrorNotice({
   intent,
   body,
@@ -63,22 +64,10 @@ export function SystemErrorNotice({
 
   if (intent === "background") return null;
   return createElement(
-    "div",
-    {
-      role: "alert",
-      className: "flex flex-wrap items-center gap-2 px-3 py-2 text-sm text-cream-muted",
-    },
-    createElement("span", null, `${title}. ${systemErrorMessage(message)}`),
+    ErrorNotification,
+    { message: `${title}. ${systemErrorMessage(message)}` },
     onRetry
-      ? createElement(
-          "button",
-          {
-            type: "button",
-            onClick: onRetry,
-            className: "min-h-11 px-2 underline hover:text-cream-bright",
-          },
-          "Retry",
-        )
+      ? createElement("button", { type: "button", onClick: onRetry }, "Retry")
       : null,
   );
 }

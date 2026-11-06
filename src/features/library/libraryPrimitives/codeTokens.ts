@@ -1,4 +1,4 @@
-export type CodeToken = {
+type CodeToken = {
   text: string;
   kind: "plain" | "keyword" | "string" | "comment" | "number";
 };

@@ -1,4 +1,4 @@
-import { clsx, type ClassValue } from "clsx";
+import { cx } from "class-variance-authority";
 import { extendTailwindMerge } from "tailwind-merge";
 
 // Named stacking layers from styles.css; they replace each other like z-* utilities.
@@ -28,6 +28,6 @@ const twMerge = extendTailwindMerge({
   },
 });
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+export function cn(...inputs: Parameters<typeof cx>) {
+  return twMerge(cx(inputs));
 }

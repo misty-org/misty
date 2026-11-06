@@ -14,7 +14,6 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogTitle,
   OptionSelect,
@@ -74,11 +73,8 @@ export function SiteStyleDialog(props: {
   };
   return (
     <Dialog open={props.open && !picking} onOpenChange={(open) => !open && props.onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
         <DialogTitle>Customize {host}</DialogTitle>
-        <DialogDescription>
-          Changes apply every time you visit this site, on each of your devices.
-        </DialogDescription>
         <label className="mt-2 flex min-h-10 items-center justify-between gap-3 text-sm">
           <span>Dark mode for this site</span>
           <Switch

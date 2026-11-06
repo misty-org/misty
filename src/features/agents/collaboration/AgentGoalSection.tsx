@@ -7,7 +7,7 @@ import {
   MessageCircleQuestion,
 } from "lucide-react";
 import { useState } from "react";
-import { Button, OptionSelect, Progress, Textarea } from "@/shared/ui";
+import { Button, ErrorNotification, OptionSelect, Progress, Textarea } from "@/shared/ui";
 import { pendingQuestionSet, useCollaborationStore } from "./store";
 import type { AgentGoal, ConversationCollaboration } from "./types";
 
@@ -119,11 +119,7 @@ export function AgentGoalSection({
           options={budgets}
           onValueChange={setBudget}
         />
-        {error && (
-          <p role="alert" className="agent-question-error">
-            {error}
-          </p>
-        )}
+        <ErrorNotification message={error} onDismiss={() => setError("")} />
         <div className="agent-plan-actions">
           <Button variant="primary" size="sm" disabled={busy || !objective.trim()} onClick={start}>
             Start goal
@@ -207,11 +203,7 @@ export function AgentGoalSection({
           )}
         </div>
       )}
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="agent-plan-actions">
         {goal.status === "pursuing" && (
           <Button

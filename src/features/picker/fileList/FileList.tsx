@@ -1,6 +1,7 @@
 import type { DirectoryListing, FileEntry } from "@/native/ipc";
 import { formatBytes } from "@/shared/lib/fileFormat";
 import type { MouseEvent } from "react";
+import { ErrorNotification } from "@/shared/ui";
 import { memo, useDeferredValue, useMemo } from "react";
 import { compileEntryFilterMatcher, entryMatchesQuery } from "./fileFilters";
 import type { FileListColumn, FileListSort } from "./fileListColumns";
@@ -40,12 +41,7 @@ export const FileList = memo(function FileList(props: FileListProps) {
     [filterMatcher, sourceEntries],
   );
 
-  if (props.error)
-    return (
-      <div role="alert" className="p-4 text-cream-muted">
-        {props.error}
-      </div>
-    );
+  if (props.error) return <ErrorNotification message={props.error} />;
   if (props.loading) return <FileListSkeleton />;
   if (!props.listing) {
     return <div className={fileListStyles.empty}>Choose a location to begin.</div>;

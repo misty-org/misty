@@ -8,10 +8,27 @@ const runtime = vi.hoisted(() => ({
   setBrowserPointerTrackingEnabled: vi.fn(),
 }));
 const settings = vi.hoisted(() => ({ autoHide: true }));
+const account = vi.hoisted(() => ({
+  user: { id: "account" } as { id: string } | null,
+  openSignInSheet: vi.fn(),
+  setSpaceBarAutoHide: vi.fn(),
+}));
 vi.mock("@/features/webviews/browserRuntime", () => runtime);
-vi.mock("@/features/spaces", () => ({ SpaceRow: () => <button type="button">Space</button> }));
-// The bar belongs to a signed-in window; signed out it isn't drawn.
-vi.mock("@/features/auth", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
+vi.mock("@/features/spaces", () => ({
+  SpaceRow: () => <button type="button">Space</button>,
+  SpaceRowPreview: (props: { onSignIn(): void }) => (
+    <button type="button" onClick={props.onSignIn}>
+      Preview
+    </button>
+  ),
+}));
+vi.mock("@/features/auth", () => ({
+  useAuth: () => ({ user: account.user }),
+  openSignInSheet: account.openSignInSheet,
+}));
+vi.mock("@/features/app-shell/barsAutoHide", () => ({
+  setSpaceBarAutoHide: account.setSpaceBarAutoHide,
+}));
 vi.mock("./useSpaceBarAutoHide", () => ({
   useSpaceBarAutoHide: () => settings.autoHide,
   useSpaceBarAlignment: () => "left",
@@ -29,6 +46,9 @@ function rowRect(this: HTMLElement): DOMRect {
 beforeEach(() => {
   vi.useFakeTimers();
   settings.autoHide = true;
+  account.user = { id: "account" };
+  account.openSignInSheet.mockClear();
+  account.setSpaceBarAutoHide.mockClear();
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(rowRect);
 });
 afterEach(() => {
@@ -169,6 +189,45 @@ it("fades the handle instead of mounting it over the sliding bar", () => {
   expect(row.dataset.spaceBar).toBe("open");
   expect(container.querySelector("[data-space-bar-handle]")).toBe(handle);
   expect(handle.className).toContain("opacity-0");
+});
+
+it("keeps room for the window buttons only with tabs on the right", () => {
+  const left = mount();
+  expect(left.container.querySelector("[data-window-toolbar]")).toBeNull();
+  left.unmount();
+  const right = render(<SpaceBar gridColumn={1} side="right" />);
+  expect(right.container.querySelector("[data-window-toolbar]")).not.toBeNull();
+});
+
+it("signed out, shows the row and asks to sign in when it is pressed", () => {
+  account.user = null;
+  settings.autoHide = false;
+  const { row, getByRole, queryByRole } = mount();
+  expect(row.dataset.spaceBar).toBe("open");
+  expect(queryByRole("button", { name: "Space" })).toBeNull();
+  fireEvent.click(getByRole("button", { name: "Preview" }));
+  expect(account.openSignInSheet).toHaveBeenCalledWith("space");
+});
+
+it("turning auto-hide on tucks the bar away at once", () => {
+  settings.autoHide = false;
+  const { row, getByRole, rerender } = mount();
+  fireEvent.click(getByRole("button", { name: "Auto-hide Space bar" }));
+  expect(account.setSpaceBarAutoHide).toHaveBeenCalledWith(true);
+  settings.autoHide = true;
+  rerender(<SpaceBar gridColumn={2} />);
+  expect(row.dataset.spaceBar).toBe("hidden");
+});
+
+it("turning auto-hide off keeps the bar open", () => {
+  const { row, getByRole, rerender } = mount();
+  pointerAt(300, 2);
+  advance(100);
+  fireEvent.click(getByRole("button", { name: "Keep Space bar open" }));
+  expect(account.setSpaceBarAutoHide).toHaveBeenCalledWith(false);
+  settings.autoHide = false;
+  rerender(<SpaceBar gridColumn={2} />);
+  expect(row.dataset.spaceBar).toBe("open");
 });
 
 it("pinned, takes its height and follows no pointer", () => {

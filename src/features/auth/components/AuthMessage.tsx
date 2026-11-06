@@ -12,7 +12,7 @@ export default function AuthMessage({ tone, message }: AuthMessageProps) {
   );
 }
 
-export interface AuthMessageProps {
+interface AuthMessageProps {
   tone: "error" | "success" | "muted";
   message: string;
 }

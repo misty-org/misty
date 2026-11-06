@@ -1,26 +1,29 @@
-import { Settings, UserRound } from "lucide-react";
-import type { ReactNode } from "react";
+import { Settings } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
   IconButton,
+  Notification,
   toolbarIconProps,
   TooltipHint,
 } from "@/shared/ui";
 import { preloadSettingsWorkspace } from "@/features/settings";
-import { ProfileNavButton } from "./NavRail";
-import { ProfileMenu } from "./ProfileMenu";
+import { AccountNavButton } from "./NavRail";
+import { AccountMenu } from "./AccountMenu";
 
+// As wide as the name needs, shrinking to truncate a long one. The padding keeps the avatar and the
+// name clear of the edges of the hover wash.
 const rowButtonClass = [
-  "flex h-7 min-w-0 flex-1 items-center gap-2 rounded-lg border-0 bg-transparent px-0",
+  "flex h-8 min-w-0 shrink items-center gap-2 rounded-lg border-0 bg-transparent py-0 pr-2.5 pl-1",
   "text-sm font-medium text-cream hover:bg-control-hover",
 ].join(" ");
 
 /**
- * The sidebar's closing row, inside its panel: the signed-in profile, then Sync and Settings
- * as quiet buttons. Signed out, the profile is a Sign in button and there is no Sync; an
- * expired session swaps Sync for Sign in again.
+ * The sidebar's closing row, inside its panel: the signed-in account, then Settings as a quiet
+ * button. Signed out, the account is a Sign in button. An expired session looks the same, and a
+ * notice says why: nothing on this computer is removed, and signing in brings the account back.
  */
 export function AccountIsland(props: {
   open: boolean;
@@ -28,15 +31,18 @@ export function AccountIsland(props: {
   onOpenAccountSettings: () => void;
   settingsOpen: boolean;
   onSettingsClick: () => void;
-  /** Nobody is signed in: Misty is browsing on the local profile. */
+  /** Nobody is signed in: Misty is browsing with no account. */
   signedOut?: boolean;
   /** The server rejected the account's session. */
   sessionExpired?: boolean;
   /** Opens the sign-in sheet; `again` signs the current account in again. */
   onSignIn: (again: boolean) => void;
-  /** The Sync button, beside Settings. */
-  sync?: ReactNode;
 }) {
+  const expired = Boolean(props.sessionExpired);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
+  useEffect(() => {
+    if (!expired) setNoticeDismissed(false);
+  }, [expired]);
   return (
     <div
       className="misty-sidebar-account"
@@ -45,48 +51,53 @@ export function AccountIsland(props: {
       data-misty-window-drag-block="true"
       data-account-island="true"
     >
-      {props.signedOut ? (
+      {props.signedOut || expired ? (
         <Button
           variant="ghost"
           type="button"
-          className={rowButtonClass}
-          onClick={() => props.onSignIn(false)}
+          className="mr-auto h-7 border-0 px-2 text-cream"
+          onClick={() => props.onSignIn(expired)}
         >
-          <span
-            aria-hidden="true"
-            className="grid size-7 shrink-0 place-items-center rounded-md border border-charcoal-border-strong text-cream-muted"
-          >
-            <UserRound {...toolbarIconProps} className="size-4" />
-          </span>
-          <span className="truncate">Sign in</span>
+          Sign in
         </Button>
       ) : (
         <DropdownMenu open={props.open} onOpenChange={props.onOpenChange} modal={false}>
-          <TooltipHint content="Profile">
+          <TooltipHint content="Account">
             <DropdownMenuTrigger asChild>
-              <ProfileNavButton
+              <AccountNavButton
                 open={props.open}
                 showAccountName
-                avatarClassName="size-7"
+                avatarClassName="size-6"
                 className={rowButtonClass}
               />
             </DropdownMenuTrigger>
           </TooltipHint>
-          <ProfileMenu
+          <AccountMenu
             onClose={() => props.onOpenChange(false)}
             onOpenAccountSettings={props.onOpenAccountSettings}
           />
         </DropdownMenu>
       )}
-      {props.sessionExpired ? (
-        <Button variant="ghost" size="sm" type="button" onClick={() => props.onSignIn(true)}>
-          Sign in again
-        </Button>
-      ) : (
-        props.sync
-      )}
+      {expired && !noticeDismissed ? (
+        <Notification onDismiss={() => setNoticeDismissed(true)}>
+          You've been signed out. Sign in to get your Spaces, sync and agents back.
+          <br />
+          <Button
+            type="button"
+            variant="link"
+            size="none"
+            onClick={() => {
+              setNoticeDismissed(true);
+              props.onSignIn(true);
+            }}
+          >
+            Sign in
+          </Button>
+        </Notification>
+      ) : null}
       <IconButton
         label="Settings"
+        className="ml-auto"
         aria-pressed={props.settingsOpen}
         onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
         onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}

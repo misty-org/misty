@@ -11,9 +11,9 @@ export interface VoiceTurn {
   text: string;
 }
 
-export type VoiceSourceKind = "mic" | "tab" | "system" | "app" | "recording" | "library_item";
+export type VoiceSourceKind = "mic" | "tab" | "system" | "app" | "library_item";
 
-export interface VoiceTranscript {
+interface VoiceTranscript {
   id: string;
   title: string;
   source: { kind: VoiceSourceKind; url?: string; title?: string; library_item_id?: string };
@@ -27,7 +27,7 @@ export interface VoiceTranscript {
 
 export type VoiceNoteMode = "notes" | "summary" | "actions" | "chapters";
 
-export interface VoiceNoteResult {
+interface VoiceNoteResult {
   note_id: string;
   space_id?: string;
   title: string;
@@ -44,12 +44,6 @@ export const captureApi = {
     apiRequest<void>(
       `/me/voice/transcripts/${encodeURIComponent(id)}`,
       json("PATCH", { speakers }),
-    ),
-  /** Links the Library item that holds the recording. */
-  recordingItem: (id: string, itemId: string) =>
-    apiRequest<void>(
-      `/me/voice/transcripts/${encodeURIComponent(id)}`,
-      json("PATCH", { recording_item_id: itemId }),
     ),
   remove: (id: string) =>
     apiRequest<void>(`/me/voice/transcripts/${encodeURIComponent(id)}`, { method: "DELETE" }),

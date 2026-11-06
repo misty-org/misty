@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Local checks for every commit and push (there is no GitHub CI).
-#   .githooks/checks.sh commit   suites touched by the staged changes
+#   .githooks/checks.sh commit   suites touched by the staged changes, at most 5 minutes
 #   .githooks/checks.sh push     every suite, on a clean tree
-#   .githooks/checks.sh all|frontend|scripts|server|rust-cli|rust-desktop|secrets|plan
+#   .githooks/checks.sh all|frontend|scripts|agent-runtime|rust-cli|rust-desktop|secrets|plan
+#   .githooks/checks.sh release  also compiles for Windows; run it when cutting a release
 # Skip once with git commit/push --no-verify.
 set -euo pipefail
 root=$(git rev-parse --show-toplevel)
@@ -12,7 +13,6 @@ cd "$root"
 # or their git init and config would write to this repository. From the
 # checkout root, git finds the same repository without them.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
-hooks="$root/.githooks"
 
 frontend() { parallel frontend-typecheck frontend-lint frontend-unit frontend-dev-navigation; }
 frontend_typecheck() { npm run typecheck; }
@@ -21,19 +21,15 @@ frontend_unit() { MISTY_SHARED_CPU=1 npm test; }
 frontend_dev_navigation() { npm run test:dev-navigation; }
 # Injected page scripts, the git hooks and the build and release scripts (cli/tasks).
 scripts() { npm run test:scripts; }
-server() { parallel server-go agent-runtime journal-collab; }
-server_go() {
-  cargo run --quiet --locked --manifest-path "$root/cli/Cargo.toml" -- check go-sizes
-  bash "$hooks/server-tests.sh"
-}
-agent_runtime() { (cd server/apps/agent-runtime && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test); }
-journal_collab() { (cd server/apps/journal-collab && npm ci --no-audit --no-fund --silent && npm run typecheck && npm test && npm run test:runtime); }
-rust_cli() { cargo test --locked --quiet --manifest-path cli/Cargo.toml; }
-rust_desktop() { parallel desktop-crate desktop-windows browser-sync-crate kiri-crate desktop-services; }
-desktop_crate() { cargo test --locked --quiet --manifest-path src-tauri/Cargo.toml; }
-# The desktop crate compiles for Windows too. A Windows machine already covers
-# it in desktop-crate; elsewhere cargo-xwin cross-checks every target, so
-# macOS-only changes cannot silently break the Windows build.
+# Reinstalling takes longer than the tests, so only when the lockfile moved.
+packages() { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci --no-audit --no-fund --silent; }
+agent_runtime() { (cd src-tauri/services/agent-runtime && packages && npm run typecheck && npm test); }
+rust_cli() { cargo test --locked --quiet --tests --manifest-path cli/Cargo.toml; }
+# Tests only: compiling for other platforms and building examples wait for a release.
+rust_desktop() { parallel desktop-crate browser-sync-crate kiri-crate desktop-services; }
+desktop_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/Cargo.toml; }
+# The desktop crate compiles for Windows too, and every example with it. Not part of a
+# commit or push: compiling is for cutting a release, which runs this through `release`.
 desktop_windows() {
   case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) echo "Covered by desktop-crate on Windows."; return 0 ;; esac
   if ! cargo xwin --version >/dev/null 2>&1; then
@@ -42,15 +38,16 @@ desktop_windows() {
     return 1
   fi
   cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path src-tauri/Cargo.toml
+  cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path cli/Cargo.toml
 }
-browser_sync_crate() { cargo test --locked --quiet --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
+browser_sync_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
 # Code projects: file tools, the Seatbelt sandbox and its escape tests (macOS).
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
-kiri_crate() { cargo test --locked --quiet --no-default-features --manifest-path kiri/Cargo.toml; }
+kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {
   local manifest
   for manifest in src-tauri/services/*/Cargo.toml; do
-    cargo test --locked --quiet --manifest-path "$manifest"
+    cargo test --locked --quiet --tests --manifest-path "$manifest"
   done
 }
 # A pinned gitleaks image with the repository's gitleaks configuration.
@@ -161,28 +158,75 @@ parallel() {
   return "$status"
 }
 
+# Asks a suite to stop so it can clean up, then insists: nothing may hold a commit past its limit.
+stop_group() {
+  local waited=0
+  kill -TERM -- "-$1" 2>/dev/null || true
+  while kill -0 -- "-$1" 2>/dev/null && [ "$waited" -lt 10 ]; do
+    sleep 0.5
+    waited=$((waited + 1))
+  done
+  kill -KILL -- "-$1" 2>/dev/null || true
+}
+
+# One suite at a time, cheapest first: a failure shows up early, and the machine isn't running
+# everything at once. With a limit, a suite still going when it's reached is stopped and left to
+# the push, which runs them all. A commit never waits longer, and a failure still refuses it.
+sequence() { # seconds (0 for no limit), then suite names
+  local limit=$1 started=$SECONDS name pid code unfinished=
+  shift
+  for name in "$@"; do
+    if [ "$limit" -gt 0 ] && [ $((SECONDS - started)) -ge "$limit" ]; then
+      unfinished="$unfinished $name"
+      continue
+    fi
+    # Its own process group, so stopping it stops everything it started.
+    set -m
+    run "$name" &
+    pid=$!
+    set +m
+    while kill -0 "$pid" 2>/dev/null; do
+      if [ "$limit" -gt 0 ] && [ $((SECONDS - started)) -ge "$limit" ]; then
+        stop_group "$pid"
+        unfinished="$unfinished $name"
+        break
+      fi
+      sleep 0.2
+    done
+    case "$unfinished " in *" $name "*) continue ;; esac
+    code=0
+    wait "$pid" || code=$?
+    [ "$code" -eq 0 ] || return "$code"
+  done
+  if [ -n "$unfinished" ]; then
+    echo "⚠ Stopped at the ${limit}s limit, so these weren't fully checked:$unfinished. The push runs them."
+  fi
+}
+
 suites_for() { # paths on stdin -> suite names
-  local frontend=0 server=0 cli=0 desktop=0 scripts=0 path
+  local frontend=0 runtime=0 cli=0 desktop=0 scripts=0 path
   while IFS= read -r path; do
     case "$path" in
       src/* | package.json | package-lock.json | tsconfig*.json | vite*.ts | vitest*.ts | .config/*) frontend=1; scripts=1 ;;
-      server/*) server=1 ;;
       cli/tasks/*) scripts=1 ;;
       cli/*) cli=1 ;;
-      .githooks/*) frontend=1; server=1; cli=1; desktop=1; scripts=1 ;;
+      .githooks/*) frontend=1; runtime=1; cli=1; desktop=1; scripts=1 ;;
+      src-tauri/services/agent-runtime/*) desktop=1; runtime=1 ;;
       src-tauri/* | kiri/*) desktop=1 ;;
       rust-toolchain.toml) cli=1; desktop=1 ;;
     esac
   done
-  ((frontend)) && echo frontend
-  ((server)) && echo server
+  ((scripts)) && echo scripts
   ((cli)) && echo rust-cli
   ((desktop)) && echo rust-desktop
-  ((scripts)) && echo scripts
+  ((runtime)) && echo agent-runtime
+  ((frontend)) && echo frontend
   return 0
 }
 
-all=(frontend scripts server rust-cli rust-desktop)
+all=(scripts rust-cli rust-desktop agent-runtime frontend)
+# A commit takes at most 5 minutes, secret scan and all, leaving a little for git itself.
+commit_seconds=${MISTY_COMMIT_SECONDS:-285}
 case "${1:-}" in
   plan) suites_for ;;
   commit)
@@ -195,8 +239,11 @@ case "${1:-}" in
     # macOS ships bash 3.2, which has no mapfile.
     suites=$(git diff --cached --name-only --diff-filter=ACMRD | suites_for)
     [ -n "$suites" ] || { echo "No test suites affected."; exit 0; }
+    # What's left of the limit. Never 0, which would mean no limit at all.
+    remaining=$((commit_seconds - SECONDS))
+    [ "$remaining" -gt 0 ] || remaining=1
     # shellcheck disable=SC2086 # one suite name per word
-    parallel $suites
+    sequence "$remaining" $suites
     ;;
   push)
     # Tests run on the working tree, so it must match what is being pushed.
@@ -204,9 +251,10 @@ case "${1:-}" in
       echo "Commit or discard local changes before pushing; checks must run on the pushed commit." >&2
       exit 1
     fi
-    parallel secrets "${all[@]}"
+    sequence 0 secrets "${all[@]}"
     ;;
-  all) parallel secrets "${all[@]}" ;;
-  frontend | scripts | server | rust-cli | rust-desktop | secrets) run "$1" ;;
-  *) echo "Usage: .githooks/checks.sh commit|push|all|frontend|scripts|server|rust-cli|rust-desktop|secrets|plan" >&2; exit 2 ;;
+  all) sequence 0 secrets "${all[@]}" ;;
+  release) sequence 0 secrets "${all[@]}" desktop-windows ;;
+  frontend | scripts | agent-runtime | rust-cli | rust-desktop | desktop-windows | secrets) run "$1" ;;
+  *) echo "Usage: .githooks/checks.sh commit|push|all|release|frontend|scripts|agent-runtime|rust-cli|rust-desktop|desktop-windows|secrets|plan" >&2; exit 2 ;;
 esac

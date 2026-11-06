@@ -31,7 +31,7 @@ unaffected; on a page that both blocks that protocol and declares `ipc`, Kiri's
 page features report an error instead of the whole site failing.
 
 Regression verification: with the browser eval bridge running (see
-`server/apps/agent-runtime/evals/odysseys/README.md`), a new sheet at
+`src-tauri/services/agent-runtime/evals/odysseys/README.md`), a new sheet at
 `https://docs.google.com/spreadsheets/create` gets its own address and enabled
 controls.
 

@@ -52,39 +52,40 @@ const shellCommands: ShortcutCommandDefinition[] = [
     nativeMenu: true,
   }),
   command("account.sign_out", "Sign out", {
-    description: "Sign out of Misty and keep browsing on this device.",
+    description: "Sign out of Misty and keep browsing on this computer.",
     category: "Misty",
     aliases: ["log out", "account"],
     allowInEditable: true,
     nativeMenu: true,
   }),
   ...focusModeCommands,
-  command("app.zoom_in", "Zoom in", {
-    description: "Increase the app interface scale.",
+  // Cmd/Ctrl with +, - and 0 zooms the page (browser.zoom_*); the app's own scale adds Shift.
+  command("app.zoom_in", "Scale app up", {
+    description: "Make Misty's own interface larger. Pages zoom with Cmd/Ctrl + without Shift.",
     category: "View",
-    mac: "Cmd+Plus",
-    macAlternate: "Ctrl+Plus",
-    windows: "Ctrl+Plus",
+    mac: "Cmd+Shift+Plus",
+    macAlternate: "Ctrl+Shift+Plus",
+    windows: "Ctrl+Shift+Plus",
     allowInEditable: true,
     repeatable: true,
     nativeMenu: true,
   }),
-  command("app.zoom_out", "Zoom out", {
-    description: "Decrease the app interface scale.",
+  command("app.zoom_out", "Scale app down", {
+    description: "Make Misty's own interface smaller.",
     category: "View",
-    mac: "Cmd+Minus",
-    macAlternate: "Ctrl+Minus",
-    windows: "Ctrl+Minus",
+    mac: "Cmd+Shift+Minus",
+    macAlternate: "Ctrl+Shift+Minus",
+    windows: "Ctrl+Shift+Minus",
     allowInEditable: true,
     repeatable: true,
     nativeMenu: true,
   }),
-  command("app.zoom_reset", "Reset zoom", {
-    description: "Return the app interface to its default scale.",
+  command("app.zoom_reset", "Reset app scale", {
+    description: "Return Misty's own interface to its default scale.",
     category: "View",
-    mac: "Cmd+0",
-    macAlternate: "Ctrl+0",
-    windows: "Ctrl+0",
+    mac: "Cmd+Shift+0",
+    macAlternate: "Ctrl+Shift+0",
+    windows: "Ctrl+Shift+0",
     allowInEditable: true,
     nativeMenu: true,
   }),
@@ -118,7 +119,7 @@ const tabAndToolCommands = [
           index === 8
             ? "Select the last tab in the focused pane."
             : `Select tab ${index + 1} in the focused pane.`,
-        category: "Tabs and panes",
+        category: "Tabs",
         scope: "workspace",
         mac: `Cmd+${index + 1}`,
         windows: `Ctrl+${index + 1}`,
@@ -129,7 +130,7 @@ const tabAndToolCommands = [
   ...toolSlots.map(([id, label, slot]) =>
     command(`tool.${id}`, `Open or focus ${label}`, {
       description: `Focus the last ${label} tab or open one in the focused pane.`,
-      category: "Jump to tool",
+      category: "Tools",
       scope: "workspace",
       aliases: ["jump", "switch tool", label.toLowerCase()],
       mac: `Cmd+Shift+${slot}`,

@@ -23,7 +23,7 @@ export function uninstallSiteApp(id: string): void {
 }
 
 /**
- * Opens an app in this Space window, reusing its tab when it is already open.
+ * Opens an app in this window, reusing its tab when it is already open.
  * Returns the app's view so the caller can show it.
  */
 export function launchSiteApp(app: Bookmark) {

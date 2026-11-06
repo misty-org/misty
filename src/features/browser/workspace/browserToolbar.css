@@ -44,8 +44,8 @@
   height: 28px;
 }
 /* Sidebar glyphs share one optical size. Thin glyphs (arrows, ⋯) draw at 20px; glyphs that
-   fill their box (reload, site info, the gear, pane layout, the Space row's Home, Chat and
-   People: marked `.size-4`) draw at 18px so they read the same. */
+   fill their box (reload, site info, the gear, pane layout, every icon in the Space row:
+   marked `.size-4`) draw at 18px so they read the same. */
 [data-browser-toolbar][data-sidebar] [data-icon-size="sm"] > svg:not(.absolute) {
   width: 20px;
   height: 20px;

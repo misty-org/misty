@@ -31,7 +31,7 @@ export interface SpacesStore {
   loadMembers: (spaceId: string) => Promise<void>;
   createSpace: (request: CreateSpaceRequest) => Promise<CreateSpaceResult>;
   renameSpace: (spaceId: string, name: string) => Promise<Space>;
-  /** Answers with the invitation's link for the owner to pass on; the server sends no email. */
+  /** Answers with the invitation's link for the owner to pass on. */
   invite: (spaceId: string, email: string) => Promise<string>;
   respondInvite: (inviteId: string, accept: boolean) => Promise<void>;
   removeMember: (spaceId: string, userId: string) => Promise<void>;

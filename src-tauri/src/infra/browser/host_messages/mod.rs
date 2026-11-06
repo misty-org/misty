@@ -48,6 +48,22 @@ impl HostChannel for Channel {
             }
             return;
         }
+        if let Some(caret) = caret_message(raw) {
+            #[cfg(target_os = "macos")]
+            if message.main_frame && trusted(app, id, &caret.token) {
+                if let Some(webview) = app.get_webview(message.webview) {
+                    let rect = caret.caret.map(|r| [r.x, r.y, r.w, r.h]);
+                    crate::infra::browser_pointer_guard_macos::set_caret_rect(&webview, rect);
+                }
+            }
+            return;
+        }
+        if let Some(fullscreen) = fullscreen_message(raw) {
+            if message.main_frame && trusted(app, id, &fullscreen.token) {
+                super::fullscreen::set_page_fullscreen(app, id, fullscreen.fullscreen);
+            }
+            return;
+        }
         if let Some(background) = background_message(raw) {
             if !message.main_frame || !trusted(app, id, &background.token) {
                 return;

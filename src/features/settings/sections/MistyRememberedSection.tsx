@@ -22,7 +22,7 @@ export function MistyRememberedSection({
   onForget: (memoryId: string) => void;
 }) {
   return (
-    <SettingsSectionBlock title="Remembered details">
+    <SettingsSectionBlock title="Context">
       <SettingsRow
         label="Remembered context"
         description="Only what you ask Misty to remember. Private to you."

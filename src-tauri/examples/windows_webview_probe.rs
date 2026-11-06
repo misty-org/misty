@@ -4,7 +4,11 @@
 //! runtime: cargo run --example windows_webview_probe
 //! It loads one synthetic page from memory; no network or existing profile.
 #[cfg(windows)]
-#[allow(dead_code, reason = "the probe exercises part of the helper")]
+#[allow(
+    dead_code,
+    unused_imports,
+    reason = "the probe exercises part of the helper"
+)]
 #[path = "../src/infra/webview2.rs"]
 mod webview2;
 

@@ -3,6 +3,8 @@
 //! web content process, where a busy or hostile page can delay or swallow it.
 //! AppKit hands every mouse-down to this monitor before routing it to a view,
 //! so the renderer learns which page was clicked before the page does.
+//! A mouse's back and forward side buttons on a page are reported the same way;
+//! WebKit hands them to neither the page nor its history.
 
 use objc2::runtime::{AnyObject, Bool};
 use objc2::{class, msg_send};
@@ -16,6 +18,9 @@ use tauri::{AppHandle, Emitter, Manager};
 struct BrowserPagePointerDown {
     x: f64,
     y: f64,
+    /// `back` or `forward` for a mouse's side buttons.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    navigate: Option<&'static str>,
 }
 
 pub(crate) fn install(app: &AppHandle) {
@@ -79,6 +84,13 @@ unsafe fn report_page_click(app: &AppHandle, event: &NSEvent) {
         }
         view = msg_send![view, superview];
     }
+    // Buttons 3 and 4 are the side buttons most mice label back and forward.
+    let button: isize = msg_send![event, buttonNumber];
+    let navigate = match button {
+        3 => Some("back"),
+        4 => Some("forward"),
+        _ => None,
+    };
     // WKWebView is flipped, so this is already measured from the top.
     let point: NSPoint =
         msg_send![renderer, convertPoint: location, fromView: std::ptr::null::<NSView>()];
@@ -88,6 +100,7 @@ unsafe fn report_page_click(app: &AppHandle, event: &NSEvent) {
         BrowserPagePointerDown {
             x: point.x,
             y: point.y,
+            navigate,
         },
     );
 }

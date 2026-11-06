@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ErrorNotification,
   IconButton,
   MenuItem,
 } from "@/shared/ui";
@@ -132,7 +133,6 @@ export function AgentFolderGroup({
       <FolderNameDialog
         open={action === "rename"}
         title="Rename project"
-        description="Choose a new name for this project."
         initialName={folder.name}
         submitLabel="Save"
         onOpenChange={(open) => !open && setAction(undefined)}
@@ -145,14 +145,9 @@ export function AgentFolderGroup({
         <AlertDialogContent>
           <AlertDialogTitle>Delete “{folder.name}”?</AlertDialogTitle>
           <AlertDialogDescription>
-            The project is removed. Its conversations move back to Conversations and are not
-            deleted.
+            Its conversations move back to Conversations.
           </AlertDialogDescription>
-          {error && (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button disabled={busy} onClick={() => void remove()}>

@@ -1,6 +1,6 @@
 import type { WorkspaceView } from "@/features/workspace";
 import { parseBrowserViewState } from "@/features/workspace/model";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 import { invoke } from "@tauri-apps/api/core";
 import { useBrowserRuntimeStore } from "./browserRuntimeStore";
 import type { PagePreview } from "./browserRuntimeTypes";
@@ -92,7 +92,6 @@ export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent
   const id = existing ? browserRuntimeId(tab) : `preview-${crypto.randomUUID()}`;
   const generation = previewGeneration;
   const current = () => stillCurrent() && generation === previewGeneration;
-  const profileId = state.profileId;
   try {
     if (!existing) {
       await invoke("browser_webview_create", {
@@ -101,7 +100,6 @@ export async function prepareBrowserPagePreview(tab: WorkspaceView, stillCurrent
           previewOnly: true,
           workspaceTabId: tab.id,
           url: state.url,
-          ...(profileId ? { profileId } : {}),
           x: 100_000,
           y: 0,
           width: 1440,

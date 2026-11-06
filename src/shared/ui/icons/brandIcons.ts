@@ -114,9 +114,10 @@ import brand112 from "./brand-icons/xai.svg?inline";
 import brand113 from "./brand-icons/zai.svg?inline";
 import brand114 from "./brand-icons/xiaomi.svg?inline";
 import brand115 from "./brand-icons/meituan.svg?inline";
+import brand116 from "./brand-icons/openrouter.svg?inline";
 
 /** Canonical artwork shared by packages, navigation, tabs, Discover, and connections. */
-export const brandIcons = {
+const brandIcons = {
   airtable: brand0,
   akamai: brand1,
   alibaba: brand2,
@@ -233,9 +234,10 @@ export const brandIcons = {
   zai: brand113,
   xiaomi: brand114,
   meituan: brand115,
+  openrouter: brand116,
 } as const;
 
-export type BrandId = keyof typeof brandIcons;
+type BrandId = keyof typeof brandIcons;
 
 const aliases: Record<string, BrandId> = {
   youtubemusic: "youtube-music",

@@ -3,7 +3,6 @@ import {
   type OpenWorkspaceSurfaceRequest,
   type WorkspaceSurfaceId,
 } from "./model";
-import { windowSpaceScope } from "./spaceWindow";
 
 export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfaceRequest | null {
   const path = pathname.split(/[?#]/)[0];
@@ -18,17 +17,14 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   const url = new URL(pathname, "https://misty.local");
   if (path === "/scheduled") {
     url.searchParams.set("view", "scheduled");
-    return {
-      ...request(
-        "agents",
-        "tool:agents",
-        "Agents",
-        `/agents${url.search}${url.hash}`,
-        "agents",
-        "single",
-      ),
-      scopeKey: windowSpaceScope(),
-    };
+    return request(
+      "agents",
+      "tool:agents",
+      "Agents",
+      `/agents${url.search}${url.hash}`,
+      "agents",
+      "single",
+    );
   }
   if (path === "/spaces" || path.startsWith("/spaces/")) {
     const parts = path.split("/").filter(Boolean);
@@ -39,40 +35,34 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       return null;
     }
     const tool = spaceToolFromSection(parts[2]);
-    return {
-      ...request(
-        "space",
-        spaceId ? `space:${spaceId}:${tool}` : "tool:space",
-        tool === "social"
-          ? "Chat"
-          : tool === "journal"
-            ? "Journal"
-            : tool === "library"
-              ? "Library"
-              : tool === "memory"
-                ? "Memory"
-                : spaceId
-                  ? "Home"
-                  : "Spaces",
-        pathname,
-        spaceId ? `${spaceId}:${tool}` : "spaces",
-        "single",
-      ),
-      scopeKey: windowSpaceScope(),
-    };
+    return request(
+      "space",
+      spaceId ? `space:${spaceId}:${tool}` : "tool:space",
+      tool === "social"
+        ? "Chat"
+        : tool === "journal"
+          ? "Journal"
+          : tool === "library"
+            ? "Library"
+            : tool === "memory"
+              ? "Memory"
+              : spaceId
+                ? "Home"
+                : "Spaces",
+      pathname,
+      spaceId ? `${spaceId}:${tool}` : "spaces",
+      "single",
+    );
   }
   if (path === "/agents" || path === "/apps/agents")
-    return {
-      ...request(
-        "agents",
-        "tool:agents",
-        "Agents",
-        `/agents${new URL(pathname, "https://misty.local").search}`,
-        "agents",
-        "single",
-      ),
-      scopeKey: windowSpaceScope(),
-    };
+    return request(
+      "agents",
+      "tool:agents",
+      "Agents",
+      `/agents${new URL(pathname, "https://misty.local").search}`,
+      "agents",
+      "single",
+    );
   if (
     ["/", "/new", "/browser", "/apps/browser"].includes(path) ||
     path.startsWith("/apps") ||
@@ -81,14 +71,13 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     const url = new URL(pathname, "https://misty.local").searchParams.get("url");
     return {
       ...request("browser", "tool:browser", "Browser", "/browser", undefined, "multiple"),
-      scopeKey: windowSpaceScope(),
       state: createBrowserViewState(url ?? undefined),
     };
   }
   return null;
 }
 
-export type SpaceWorkspaceTool = "journal" | "social" | "library" | "memory" | "space";
+type SpaceWorkspaceTool = "journal" | "social" | "library" | "memory" | "space";
 
 export function spaceWorkspaceToolFromRoute(pathname: string): SpaceWorkspaceTool {
   return spaceToolFromSection(pathname.split(/[?#]/)[0].split("/").filter(Boolean)[2]);

@@ -3,7 +3,7 @@ export type SettingOwnership = "device" | "resource";
 type SettingsPlatform = "desktop";
 export type PreferenceValue = string | number | boolean;
 export type PreferenceValues = Record<string, PreferenceValue>;
-export interface SettingDefinition {
+interface SettingDefinition {
   id: string;
   label: string;
   page: string;
@@ -22,15 +22,19 @@ export interface SettingDefinition {
   format?: "json";
 }
 export const settingDefinitions = definitions as SettingDefinition[];
-export type SettingSearchEntry = Pick<
+type SettingSearchEntry = Pick<
   SettingDefinition,
   "id" | "label" | "page" | "owner" | "platforms" | "keywords"
 >;
 // Controls with their own server APIs are searchable alongside preferences.
 // Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Tab orders are edited in place.
-  ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
+  // Tab orders are edited in place, and live subtitles in their own panel.
+  ...settingDefinitions.filter(
+    (definition) =>
+      !definition.id.startsWith("collections.tabs.") &&
+      definition.id !== "voice.subtitle_preferences",
+  ),
   {
     id: "agents.misty.enabled",
     label: "Enable Misty",
@@ -155,7 +159,7 @@ export function portableValues(document: Record<string, unknown>): PreferenceVal
   }
   return values;
 }
-export interface SettingRuntimeAdapter {
+interface SettingRuntimeAdapter {
   read(document: Record<string, unknown>): PreferenceValue;
   write(document: Record<string, unknown>, value: PreferenceValue): void;
 }

@@ -16,7 +16,7 @@ export const focusModeCommands = [
 export const tabFeatureCommands = [
   command("workspace.toggle_pin_tab", "Pin or unpin tab", {
     description: "Pin the current web page so it stays first and returns here when closed.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     aliases: ["pin tab", "unpin tab", "keep tab"],
     mac: null,
@@ -25,7 +25,7 @@ export const tabFeatureCommands = [
   }),
   command("workspace.clear_tabs", "Clear tabs", {
     description: "Close every tab that is not pinned, keeping the one you are on.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     aliases: ["clear", "close other tabs", "tidy tabs", "close all tabs"],
     mac: null,
@@ -34,7 +34,7 @@ export const tabFeatureCommands = [
   }),
   command("workspace.search_tabs", "Search open tabs", {
     description: "List the open tabs in every virtual window and switch to one.",
-    category: "Tabs and panes",
+    category: "Tabs",
     scope: "workspace",
     aliases: ["tab search", "switch tab", "find tab", "open tabs"],
     mac: "Cmd+Shift+A",

@@ -3,7 +3,6 @@ import type * as AgentsRuntimeModule from "./AgentsRuntime";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { useWorkspaceStore } from "@/features/workspace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
 import AgentsPage from "./AgentsPage";
 
@@ -65,7 +64,6 @@ beforeEach(() => {
     loadConversations: async () => {},
     submitAnswer: fixture.submit,
   });
-  useWorkspaceStore.setState({ activeScopeKey: "space:Studio" });
 });
 afterEach(cleanup);
 export { fixture };

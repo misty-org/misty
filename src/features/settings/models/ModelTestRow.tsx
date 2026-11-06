@@ -1,4 +1,4 @@
-import { Button, Spinner } from "@/shared/ui";
+import { Button, ErrorNotification, Spinner } from "@/shared/ui";
 import { Check, X } from "lucide-react";
 import { DesktopSettingsRow as Row } from "../components/DesktopSettingsUI";
 import { useModelTest, type ModelTestResult } from "./modelAccounts";
@@ -36,10 +36,7 @@ export function ModelTestRow(props: { disabled?: boolean }) {
     <>
       <Row
         label="Check the agent model"
-        description={
-          test.error ||
-          "Asks it to call a tool and read a screenshot, the two things every agent run needs."
-        }
+        description="Asks it to call a tool and read a screenshot, the two things every agent run needs."
       >
         <div className="flex w-[240px] max-w-full justify-end">
           <Button
@@ -54,6 +51,7 @@ export function ModelTestRow(props: { disabled?: boolean }) {
           </Button>
         </div>
       </Row>
+      <ErrorNotification message={test.error} />
       {test.result ? (
         <div className="pb-4 pl-5">
           <ModelTestLines result={test.result} />

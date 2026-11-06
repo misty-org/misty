@@ -1,6 +1,13 @@
 import { agentMethodsApi, type AgentMethod } from "@/api/ai/agent-methods";
 import { aiSurfaceApi } from "@/features/ai-surface/api";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import {
+  currentProfile,
+  firstProfileId,
+  isHostWindow,
+  listProfiles,
+  openProfile,
+} from "@/features/workspace/profileWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { desktopDeviceGrants } from "../deviceGrants";
 import { holdAwake, releaseAwake } from "../keepAwake";
@@ -57,6 +64,32 @@ export function startWaitingScheduledRuns(accountId: string): Promise<void> {
   return running;
 }
 
+/** Waiting runs a profile's window was already asked to pick up, so it comes forward once. */
+const openedFor = new Set<string>();
+
+/**
+ * Whether this window starts a run: it works in a window of the schedule's profile, with that
+ * profile's sign-ins. Another profile's window starts it, and one opens if none is. A computer
+ * without the profile can't run it: the server hears why, and the schedule says so.
+ */
+async function runsHere(run: { id: string; profile?: string; due_at?: string }, deviceId: string) {
+  const profile = run.profile ?? firstProfileId;
+  if (profile === currentProfile().id) return true;
+  if (!(await isHostWindow())) return false;
+  const profiles = (await listProfiles().catch(() => [])).map((item) => item.id);
+  if (!profiles.length) return false;
+  if (!profiles.includes(profile)) {
+    await agentMethodsApi.claimDeviceRun(run.id, deviceId, profiles).catch(() => null);
+    return false;
+  }
+  const key = `${run.id}:${run.due_at ?? ""}`;
+  if (!openedFor.has(key)) {
+    openedFor.add(key);
+    await Promise.resolve(openProfile(profile)).catch(() => undefined);
+  }
+  return false;
+}
+
 async function pickUp(accountId: string) {
   const deviceId = await thisComputerDeviceId();
   if (!deviceId || useMistyStore.getState().accountId !== accountId) return;
@@ -65,6 +98,7 @@ async function pickUp(accountId: string) {
   const methods = new Map<string, AgentMethod[]>();
   for (const run of runs) {
     if (useMistyStore.getState().accountId !== accountId) return;
+    if (!(await runsHere(run, deviceId))) continue;
     if (!methods.has(run.agent_id))
       methods.set(
         run.agent_id,
@@ -75,7 +109,9 @@ async function pickUp(accountId: string) {
     const target = method.definition.target;
     // A workflow that needs a Misty window waits for the current task to end.
     if (target !== "cloud" && useMistyStore.getState().working) continue;
-    const claim = await agentMethodsApi.claimDeviceRun(run.id, deviceId).catch(() => null);
+    const claim = await agentMethodsApi
+      .claimDeviceRun(run.id, deviceId, [currentProfile().id])
+      .catch(() => null);
     if (!claim) continue;
     try {
       if (target === "cloud") {
@@ -87,6 +123,8 @@ async function pickUp(accountId: string) {
           context: [],
           agentId: claim.agent_id,
           conversationId: claim.conversation_id,
+          profile: claim.profile,
+          originDeviceId: deviceId,
           methodVersionId: claim.method_version_id,
           methodInputs: claim.inputs,
           scheduleId: claim.schedule_id,

@@ -1,30 +1,44 @@
-import { deploymentStorageKey, resolveApiBase } from "@/api/deployment/api";
+import { resolveApiBase } from "@/api/deployment/api";
 import { readApiSessionGeneration } from "@/api/client/session";
 import {
   openWorkspaceRecovery,
   recoveryKey,
   registerRecoveryFlush,
   type NativeRecoveryStorage,
-} from "@/features/browser-sync/recovery";
+} from "@/features/workspace/recoveryStorage";
 import { useWorkspaceStore } from "./useWorkspaceStore";
-import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
-import { browserWorkspaceStoreVersion, workspaceRecoveryKey } from "./workspaceRecoveryStorage";
-import { workspaceStoreStorageKey, legacyWorkspaceCandidate } from "./workspaceRecoveryPlatform";
+import { partialWorkspaceStore } from "./workspaceStorePersistence";
+import { browserWorkspaceStoreVersion } from "./workspaceRecoveryStorage";
 import { mergeRecoveredWorkspace } from "./mergeRecoveredWorkspace";
-import type { WorkspaceStore } from "./useWorkspaceStore";
-import { initialWorkspaceWindow } from "./windows";
 import { collectUnrestoredViews } from "./workspaceMigrations";
 import { SaveRetryBackoff } from "./saveRetryBackoff";
-import { spaceWindow } from "./spaceWindow";
-import type { WorkspaceLayout, WorkspaceScopeKey } from "./model";
-import { readRecoveredSpaceLayout } from "./recoveredSpaceLayout";
-import { spaceRecoveryKey, WorkspaceRecoveryWriter } from "./workspaceRecoveryWriter";
+import {
+  currentProfile,
+  currentWindowId,
+  firstProfileId,
+  refreshProfileWindow,
+} from "./profileWindow";
+import {
+  recordSeed,
+  startProfileRecords,
+  type ProfileRecordCollection,
+  type ProfileRecordsHandle,
+} from "./profileRecords";
+import type { SharedRecord } from "@/features/workspace/profileRecordModel";
+import { legacyBrowserSources } from "./legacyBrowserSources";
+import { startProfileTabs } from "./profileTabs";
+import { startWindowOrphans } from "./windowOrphans";
+import { parseWorkspaceRecord } from "./workspaceRecord";
+import {
+  legacyWorkspaceRecoveryKey,
+  readRecoveryRecord,
+  windowRecoveryKey,
+  WorkspaceRecoveryWriter,
+} from "./workspaceRecoveryWriter";
 import { closedRecoveryState, useWorkspaceRecoveryState } from "./workspaceRecoveryState";
 
 export { useWorkspaceRecoveryState };
 
-/** The record this window opened with. */
-const key = spaceRecoveryKey(spaceWindow());
 let temporary:
   | {
       accountId: string;
@@ -32,20 +46,10 @@ let temporary:
       unregister: () => void;
     }
   | undefined;
-let syncBaseline: Partial<WorkspaceStore> | undefined;
-export function pendingRecoveredWorkspace(accountId: string) {
-  return owner?.accountId === accountId ? syncBaseline : undefined;
-}
-export async function acknowledgeRecoveredWorkspace(accountId: string) {
-  if (owner?.accountId !== accountId) return;
-  syncBaseline = undefined;
-  await owner.flush();
-}
 const captureWorkspace = () =>
   JSON.stringify({
     version: browserWorkspaceStoreVersion,
     state: partialWorkspaceStore(useWorkspaceStore.getState()),
-    syncBaseline,
   });
 let epoch = 0;
 let owner:
@@ -57,6 +61,13 @@ let owner:
     }
   | undefined;
 let opening: { accountId: string; generation: number; task: Promise<void> } | undefined;
+let records: ProfileRecordsHandle | undefined;
+
+function openProfileRecords(seed?: Partial<Record<ProfileRecordCollection, SharedRecord[]>>) {
+  records?.stop();
+  records = startProfileRecords(seed);
+  return records;
+}
 
 function failure(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -68,7 +79,8 @@ export function closeNativeWorkspaceRecovery() {
   opening = undefined;
   temporary?.unregister();
   temporary = undefined;
-  syncBaseline = undefined;
+  records?.stop();
+  records = undefined;
   useWorkspaceRecoveryState.setState({ ...closedRecoveryState });
 }
 export async function flushNativeWorkspace(accountId: string) {
@@ -104,6 +116,8 @@ export function continueWithTemporaryWorkspace(accountId: string, error: unknown
       baseline: partialWorkspaceStore(useWorkspaceStore.getState()),
       unregister: registerRecoveryFlush(async () => assertTemporarySaved()),
     };
+    // Bookmarks are the profile's and don't wait on this window's own saved tabs.
+    openProfileRecords();
   }
   useWorkspaceRecoveryState.setState({ accountId, usable: true, issue: failure(error) });
 }
@@ -147,35 +161,26 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     const storage = recovery.storage;
     // Refused saves are listed per item in `saves`; only other failures are an issue.
     const saveIssue = (error: unknown) => (storage.status().failed.length ? null : failure(error));
+    // After an account change this window's profile can be another one.
+    await refreshProfileWindow();
+    if (!valid()) return;
+    const key = windowRecoveryKey(currentWindowId());
     await storage.load(key);
     if (!valid()) return;
-    const legacyKey = deploymentStorageKey(`misty:workspace-account:${accountId}`);
-    const sources: [string, string][] = [];
-    // Only the personal Space's window takes over workspaces saved before Spaces.
-    const legacy = spaceWindow().personal;
-    const accountRaw = legacy ? localStorage.getItem(legacyKey) : null;
-    const accountBackup = legacy ? localStorage.getItem(workspaceRecoveryKey(legacyKey)) : null;
-    if (accountRaw !== null) sources.push([legacyKey, accountRaw]);
-    if (accountBackup !== null) sources.push([workspaceRecoveryKey(legacyKey), accountBackup]);
-    const candidate = legacy ? legacyWorkspaceCandidate() : undefined;
-    const global = candidate?.owner === accountId ? candidate : undefined;
-    if (global && localStorage.getItem(workspaceStoreStorageKey) === global.raw) {
-      sources.push([workspaceStoreStorageKey, global.raw]);
-      if (global.backup !== null)
-        sources.push([workspaceRecoveryKey(workspaceStoreStorageKey), global.backup]);
-    }
+    // Only the first profile's window takes over what was saved before windows had ids.
+    const legacy = currentProfile().id === firstProfileId;
+    if (legacy) await storage.load(legacyWorkspaceRecoveryKey);
+    if (!valid()) return;
+    let legacyRecord = legacy ? readRecoveryRecord(storage, legacyWorkspaceRecoveryKey) : null;
+    const { sources, newest } = legacyBrowserSources(accountId, legacy);
     // Archive every original before decoding or normalizing any of them.
     for (const [source, raw] of sources) {
       const archive = await recoveryKey("archive", [source, raw]);
       await storage.load(archive);
       storage.setItem(archive, raw);
     }
-    const persisted =
-      storage.getItem(key) ??
-      (global && sources.some(([name]) => name === workspaceStoreStorageKey)
-        ? global.raw
-        : accountRaw);
-    let restored: ReturnType<typeof migrateWorkspaceStore> | undefined;
+    const persisted = readRecoveryRecord(storage, key) ?? legacyRecord ?? newest;
+    let restored: ReturnType<typeof parseWorkspaceRecord> | undefined;
     if (persisted !== null) {
       // Preserve the original before decoding it, so whatever cannot be
       // restored below is still kept exactly as it was saved.
@@ -185,18 +190,7 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
       if (!valid()) return;
       const { result, skipped } = collectUnrestoredViews(() => {
         try {
-          const parsed = JSON.parse(persisted);
-          if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-            throw new Error("The saved windows and tabs are not in a readable format.");
-          const envelope = typeof parsed.version === "number" && parsed.state;
-          const state = migrateWorkspaceStore(
-            envelope ? parsed.state : parsed,
-            envelope ? parsed.version : 11,
-          );
-          if (!state.layout) Object.assign(state, initialWorkspaceWindow());
-          if (parsed.syncBaseline)
-            syncBaseline = migrateWorkspaceStore(parsed.syncBaseline, browserWorkspaceStoreVersion);
-          return { state, error: null };
+          return { state: parseWorkspaceRecord(persisted), error: null };
         } catch (error) {
           return { state: undefined, error };
         }
@@ -212,7 +206,6 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     if (!valid()) return;
     if (keepLive) {
       // The live windows and tabs become this profile's; its old record stays archived above.
-      syncBaseline = undefined;
       useWorkspaceRecoveryState.setState({ notRestored: [] });
       temporary?.unregister();
       temporary = undefined;
@@ -224,7 +217,6 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
         useWorkspaceStore.setState(
           changed ? mergeRecoveredWorkspace(restored, live, temporary.baseline) : restored,
         );
-      if (changed) syncBaseline ??= restored ?? temporary.baseline;
       temporary.unregister();
       temporary = undefined;
     } else if (restored) {
@@ -232,9 +224,20 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     } else {
       useWorkspaceStore.getState().reset();
     }
-    const restoredBaseline = partialWorkspaceStore(useWorkspaceStore.getState());
+    // What this window held from before records were the profile's. A legacy record kept from
+    // an earlier start that couldn't write them gets another try.
+    let seedState: Parameters<typeof recordSeed>[0] = useWorkspaceStore.getState();
+    if (legacyRecord && legacyRecord !== persisted && !keepLive) {
+      try {
+        seedState = parseWorkspaceRecord(legacyRecord);
+      } catch {
+        // Nothing readable to bring over; its archived copy stays.
+      }
+    }
+    const handle = openProfileRecords(recordSeed(seedState));
     const writer = new WorkspaceRecoveryWriter(
       storage,
+      key,
       captureWorkspace,
       (error) => {
         if (valid()) useWorkspaceRecoveryState.setState({ issue: saveIssue(error) });
@@ -255,12 +258,15 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
         for (const [source, raw] of sources) {
           if (localStorage.getItem(source) === raw) localStorage.removeItem(source);
         }
+        // The old record goes once its tabs are saved here and its bookmarks are the profile's.
+        if (legacyRecord && handle.seeded()) {
+          legacyRecord = null;
+          storage.setItem(legacyWorkspaceRecoveryKey, "");
+          await storage.flush();
+        }
         useWorkspaceRecoveryState.setState({ ready: true, issue: null });
       } catch (error) {
-        if (valid()) {
-          if (!useWorkspaceRecoveryState.getState().ready) syncBaseline ??= restoredBaseline;
-          useWorkspaceRecoveryState.setState({ issue: saveIssue(error) });
-        }
+        if (valid()) useWorkspaceRecoveryState.setState({ issue: saveIssue(error) });
         throw error;
       }
     };
@@ -268,6 +274,10 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
     backoff = new SaveRetryBackoff(flush);
     const retries = backoff;
     const release = recovery.release;
+    const stopOrphans = startWindowOrphans(storage, () => writer.flush(true));
+    const stopTabs = startProfileTabs();
+    if (legacyRecord)
+      void handle.whenSeeded.then(() => (valid() ? flush().catch(() => undefined) : undefined));
     owner = {
       accountId,
       storage,
@@ -277,6 +287,8 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
         writer.cancel();
         unsubscribe();
         unregister();
+        stopOrphans();
+        stopTabs();
         release();
       },
     };
@@ -292,15 +304,4 @@ async function restore(accountId: string, generation: number, keepLive: boolean)
   } finally {
     recovery?.release();
   }
-}
-
-/**
- * The tabs a Space last had on this device, for a window switching to a Space it
- * hasn't shown yet. `undefined` when nothing was saved or recovery isn't open.
- */
-export function recoveredSpaceLayout(
-  space: { personal: boolean; key: string },
-  scope: WorkspaceScopeKey,
-): Promise<WorkspaceLayout | undefined> {
-  return readRecoveredSpaceLayout(owner?.storage, space, scope);
 }

@@ -17,7 +17,7 @@ import {
   type WorkspaceView,
 } from "@/features/workspace";
 import { cn } from "@/shared/ui";
-import { memo, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { memo, useMemo, useRef, useState, type DragEvent } from "react";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import { AiPaneHost } from "@/features/ai-surface/AiPaneHost";
 import { dockSplitFits, dropZoneAt } from "./dockSplitFit";
@@ -79,7 +79,11 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
   const { pane } = props;
   const sectionRef = useRef<HTMLElement | null>(null);
   const [dropZone, setDropZone] = useState<DockDropZone | null>(null);
-  const [paneSize, setPaneSize] = useState({ width: 0, height: 0 });
+  // Measured when a drag asks. Kept in state it re-rendered the pane on every step of a window resize.
+  const paneSize = () => {
+    const bounds = sectionRef.current?.getBoundingClientRect();
+    return { width: bounds?.width ?? 0, height: bounds?.height ?? 0 };
+  };
   const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId) ?? pane.views[0];
   useWorkspacePagePreview(activeTab, sectionRef, props.workspaceActive !== false);
   const focused = props.workspaceActive !== false && pane.id === props.focusedPaneId;
@@ -96,7 +100,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
       const moving = allLayoutViews(useWorkspaceStore.getState().layout).find(
         (tab) => tab.id === drag.id,
       );
-      if (!moving || (zone !== "center" && !dockSplitFits(pane, paneSize, zone, moving)))
+      if (!moving || (zone !== "center" && !dockSplitFits(pane, paneSize(), zone, moving)))
         return null;
       const horizontal = zone === "left" || zone === "right";
       return {
@@ -164,22 +168,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
   // A browser page draws above the pane, so the host dims it natively.
   const activeView = pane.views.find((view) => view.id === pane.activeViewId);
   useBrowserPaneDim(activeView?.surfaceId === "browser" ? browserRuntimeId(activeView) : null, dim);
-  useEffect(() => {
-    const element = sectionRef.current;
-    if (!element) return;
-    const update = () => {
-      const bounds = element.getBoundingClientRect();
-      setPaneSize((current) =>
-        current.width === bounds.width && current.height === bounds.height
-          ? current
-          : { width: bounds.width, height: bounds.height },
-      );
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   const dragOver = (event: DragEvent<HTMLElement>) => {
     if (!event.dataTransfer.types.includes(viewDragType)) return;
@@ -193,7 +181,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
     const movingTab = allLayoutViews(useWorkspaceStore.getState().layout).find(
       (tab) => tab.id === movingTabId,
     );
-    if (zone !== "center" && (!movingTab || !dockSplitFits(pane, paneSize, zone, movingTab))) {
+    if (zone !== "center" && (!movingTab || !dockSplitFits(pane, paneSize(), zone, movingTab))) {
       event.dataTransfer.dropEffect = "none";
       setDropZone(null);
       return;
@@ -211,7 +199,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
     const movingTab = allLayoutViews(useWorkspaceStore.getState().layout).find(
       (tab) => tab.id === tabId,
     );
-    if (zone !== "center" && (!movingTab || !dockSplitFits(pane, paneSize, zone, movingTab)))
+    if (zone !== "center" && (!movingTab || !dockSplitFits(pane, paneSize(), zone, movingTab)))
       return;
     props.onDockView(tabId, pane.id, zone);
   };

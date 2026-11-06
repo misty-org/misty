@@ -1,7 +1,5 @@
 import { spacesApi } from "@/api/spaces/api";
 import { errorText } from "@/shared/lib/format";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { invoke } from "@tauri-apps/api/core";
 import type { SpacesStore } from "./spacesStoreTypes";
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
@@ -87,7 +85,6 @@ export function createSpaceLifecycleActions(
       set({ error: null });
       try {
         await spacesApi.leave(spaceId);
-        removeSpaceFromDevice(spaceId);
         set((state) => ({
           spaces: state.spaces.filter((space) => space.id !== spaceId),
         }));
@@ -113,7 +110,6 @@ export function createSpaceLifecycleActions(
       set({ error: null });
       try {
         await spacesApi.delete(spaceId, confirmation);
-        removeSpaceFromDevice(spaceId);
         set((state) => {
           const spaces = state.spaces.filter((space) => space.id !== spaceId);
           const messagesBySpace = { ...state.messagesBySpace };
@@ -131,10 +127,4 @@ export function createSpaceLifecycleActions(
       }
     },
   };
-}
-
-/** A Space this person left or deleted: its windows close and its website data goes. */
-function removeSpaceFromDevice(spaceId: string) {
-  if (!hasTauriInternals()) return;
-  void invoke("space_window_remove", { spaceId }).catch(() => undefined);
 }

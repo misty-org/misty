@@ -207,7 +207,7 @@ function useEmbeddedDocument(
   return { resource, loading, error };
 }
 
-export interface EmbeddedPreviewRuntime {
+interface EmbeddedPreviewRuntime {
   extractDocumentText?: (extension: string, bytes: Uint8Array) => Promise<string>;
   Error: PreviewErrorComponent;
   readBytes(url: string, signal: AbortSignal): Promise<ArrayBuffer>;

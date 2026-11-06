@@ -14,7 +14,7 @@ import { followAgentPages } from "./agentBrowser/agentPageEvents";
 import { livePagesAllowed, pressureLevel, resetMemoryPressure } from "./agentTabPressure";
 import { agentPageBounds, restoredAgentTabs, type AgentTab } from "./agentTabRecords";
 
-export { agentPageBounds, type AgentTab };
+export { agentPageBounds,  };
 
 /**
  * An agent's tabs in the person's window, which sleep (docs/agents/browser.md,

@@ -1,5 +1,5 @@
-//! Device browser profiles became Spaces. Their website data stores are erased once,
-//! on the first launch after: the renderer names the ones its saved state still listed.
+//! Device browser profiles were retired. Their website data stores are erased once, on the
+//! first launch after: the renderer names the ones its saved state still listed.
 use super::*;
 
 /// Present once the retired profiles were erased on this device.
@@ -17,20 +17,20 @@ fn retired(id: &str) -> bool {
         && id
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        && !crate::infra::space_windows::is_space_store(id)
-        && !super::super::browser_sync::vault_uses_store(id)
+        && !crate::infra::profile_windows::is_profile_store(id)
 }
 
 /// Erases the stores of the device profiles this window's saved state listed. Runs
-/// once per device; a store a Space or vault uses is never touched.
+/// once per computer; a store a profile uses is never touched.
 #[tauri::command]
 pub async fn browser_retired_profiles_erase(
     webview: Webview,
     app: AppHandle,
     profile_ids: Vec<String>,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_person_window(webview.label()) || profile_ids.len() > 100 {
-        return Err("Only a Space window can erase retired profiles.".into());
+    if !crate::infra::profile_windows::is_person_window(webview.label()) || profile_ids.len() > 100
+    {
+        return Err("Only a profile's window can erase retired profiles.".into());
     }
     let marker = marker().ok_or("Misty's data folder is unavailable.")?;
     if marker.exists() {

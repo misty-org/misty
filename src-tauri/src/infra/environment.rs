@@ -16,31 +16,13 @@ pub struct AppEnvironmentService {
 pub struct AppEnvironment {
     pub home_dir: PathBuf,
     pub misty_dir: PathBuf,
-    pub config_dir: PathBuf,
-    pub db_dir: PathBuf,
     pub cache_dir: PathBuf,
-    pub tmp_dir: PathBuf,
-    pub settings_path: PathBuf,
-    pub misty_config_path: PathBuf,
-    pub commands_path: PathBuf,
-    pub config_exists: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppEnvironmentSnapshot {
     pub home_dir: String,
-    pub misty_dir: String,
-    pub config_dir: String,
-    pub db_dir: String,
-    pub cache_dir: String,
-    pub tmp_dir: String,
-    pub settings_path: String,
-    pub misty_config_path: String,
-    pub commands_path: String,
-    /// Retired remote-mount prefix, relative to the home directory.
-    pub mount_path: String,
-    pub config_exists: bool,
 }
 
 impl AppEnvironmentService {
@@ -63,22 +45,6 @@ impl AppEnvironmentService {
                 .join("data")
                 .join("misty.db"),
         )
-    }
-
-    pub fn misty_db_path(&self) -> PathBuf {
-        self.inner.db_dir.join("data.db")
-    }
-
-    pub fn settings_path(&self) -> PathBuf {
-        self.inner.settings_path.clone()
-    }
-
-    pub fn commands_path(&self) -> PathBuf {
-        self.inner.commands_path.clone()
-    }
-
-    pub fn config_dir(&self) -> PathBuf {
-        self.inner.config_dir.clone()
     }
 
     pub fn home_dir(&self) -> PathBuf {
@@ -104,41 +70,18 @@ impl AppEnvironment {
     fn load(data_root: Option<PathBuf>) -> Self {
         let home_dir = data_root.or_else(resolve_home_dir).unwrap_or_default();
         let misty_dir = home_dir.join(".misty");
-        let config_dir = misty_dir.join("config");
-        let db_dir = misty_dir.join("db");
         let cache_dir = misty_dir.join("cache");
-        let tmp_dir = misty_dir.join("tmp");
-        let settings_path = config_dir.join("settings.json");
-        let misty_config_path = config_dir.join("misty.json");
-        let commands_path = config_dir.join("commands.msy");
 
         Self {
             home_dir,
             misty_dir,
-            config_dir,
-            db_dir,
             cache_dir,
-            tmp_dir,
-            settings_path,
-            misty_config_path: misty_config_path.clone(),
-            commands_path,
-            config_exists: misty_config_path.exists(),
         }
     }
 
     fn snapshot(&self) -> AppEnvironmentSnapshot {
         AppEnvironmentSnapshot {
             home_dir: display_path(&self.home_dir),
-            misty_dir: display_path(&self.misty_dir),
-            config_dir: display_path(&self.config_dir),
-            db_dir: display_path(&self.db_dir),
-            cache_dir: display_path(&self.cache_dir),
-            tmp_dir: display_path(&self.tmp_dir),
-            settings_path: display_path(&self.settings_path),
-            misty_config_path: display_path(&self.misty_config_path),
-            commands_path: display_path(&self.commands_path),
-            mount_path: ".misty/mnt".to_owned(),
-            config_exists: self.config_exists,
         }
     }
 }
@@ -165,32 +108,4 @@ fn clean_display_path(path: &str) -> String {
 #[cfg(not(windows))]
 fn clean_display_path(path: &str) -> String {
     path.to_string()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-
-    #[test]
-    fn application_database_uses_existing_shared_data_db() {
-        let root = env::temp_dir().join("misty-env-shared-data-db");
-        let service = AppEnvironmentService {
-            inner: Arc::new(AppEnvironment {
-                home_dir: root.clone(),
-                misty_dir: root.join(".misty"),
-                config_dir: root.join(".misty/config"),
-                db_dir: root.join(".misty/db"),
-                cache_dir: root.join(".misty/cache"),
-                tmp_dir: root.join(".misty/tmp"),
-                settings_path: root.join(".misty/config/settings.json"),
-                misty_config_path: root.join(".misty/config/misty.json"),
-                commands_path: root.join(".misty/config/commands.msy"),
-                config_exists: false,
-            }),
-        };
-
-        assert_eq!(service.misty_db_path(), root.join(".misty/db/data.db"));
-        assert_eq!(service.misty_db_path(), root.join(".misty/db/data.db"));
-    }
 }

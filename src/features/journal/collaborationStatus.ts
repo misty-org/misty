@@ -1,4 +1,4 @@
-export interface JournalDocumentStatus {
+interface JournalDocumentStatus {
   type: "document_status";
   status: "saved" | "warning" | "blocked" | "error";
   code?: string;

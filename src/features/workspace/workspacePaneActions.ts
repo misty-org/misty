@@ -165,7 +165,7 @@ export function workspacePaneActions(
       if (dockLeaves(current.layout.root).length >= maxWorkspacePanes) return null;
       const pane = findDockLeaf(current.layout.root, paneId);
       if (!pane) return null;
-      const leaf = createDockLeaf([createBlankWorkspaceView(current.activeScopeKey)]);
+      const leaf = createDockLeaf([createBlankWorkspaceView()]);
       set({
         ...withLayout(current, {
           ...current.layout,
@@ -204,9 +204,7 @@ export function workspacePaneActions(
     },
     fillEmptyPanes: () => {
       set((current) => {
-        const root = fillEmptyDockLeaves(current.layout.root, () =>
-          createDefaultWorkspaceView(current.activeScopeKey),
-        );
+        const root = fillEmptyDockLeaves(current.layout.root, () => createDefaultWorkspaceView());
         return root === current.layout.root
           ? current
           : withLayout(current, { ...current.layout, root });

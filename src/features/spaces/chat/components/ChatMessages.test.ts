@@ -55,14 +55,11 @@ describe("Space chat display rows", () => {
     const markup = renderMessages([sending, failed]);
 
     expect(markup).not.toContain("Sending…");
-    expect(markup).toContain("Message couldn’t be sent.");
   });
 
-  it("shows message loading failures with an inline retry action", () => {
+  it("shows message loading failures as a notification, not an empty prompt", () => {
     const markup = renderMessages([], "network error");
 
-    expect(markup).toContain("Messages couldn’t be loaded");
-    expect(markup).toContain("Try again");
     expect(markup).not.toContain("What should we work on");
   });
 

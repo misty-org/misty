@@ -74,7 +74,6 @@ describe("WorkspaceTabRouteScope", () => {
     const tab = useWorkspaceStore.getState().openSurface({
       surfaceId: "space",
       groupKey: "space:team:planner",
-      scopeKey: "space:team",
       instanceKey: "team:planner",
       instancePolicy: "multiple",
       title: "Planner",

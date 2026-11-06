@@ -1,4 +1,4 @@
-//! The device's own signing key.
+//! A session's own signing key.
 use super::*;
 
 impl DeviceKey {
@@ -10,54 +10,28 @@ impl DeviceKey {
         STANDARD.encode(SigningKey::from_bytes(&self.0).verifying_key().as_bytes())
     }
 
-    pub(crate) fn sign(&self, data: &[u8]) -> String {
+    pub(crate) fn public_key_bytes(&self) -> Vec<u8> {
+        SigningKey::from_bytes(&self.0)
+            .verifying_key()
+            .as_bytes()
+            .to_vec()
+    }
+
+    pub(crate) fn sign_bytes(&self, data: &[u8]) -> String {
         STANDARD.encode(SigningKey::from_bytes(&self.0).sign(data).to_bytes())
     }
 
-    pub fn connection_proof(
-        &self,
-        scope: &VaultScope,
-        device_id: &str,
-        challenge: &str,
-    ) -> Result<String> {
-        scope.validate()?;
-        if !valid_id(device_id)
-            || !(32..=128).contains(&challenge.len())
-            || !challenge
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-        {
+    /// The key's bytes, for keeping it sealed on this computer.
+    pub fn secret_bytes(&self) -> Zeroizing<[u8; 32]> {
+        Zeroizing::new(*self.0)
+    }
+
+    pub fn from_secret_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 32 {
             return Err(Error::Invalid);
         }
-        Ok(self.sign(&serde_json::to_vec(&(
-            "misty.sync.connect.v1",
-            &scope.vault_id,
-            device_id,
-            challenge,
-        ))?))
-    }
-
-    pub fn protect(
-        &self,
-        root: &VaultRoot,
-        scope: &VaultScope,
-        device_id: &str,
-    ) -> Result<Envelope> {
-        root.seal_local(scope, device_id, "device-key", self.0.as_ref())
-    }
-
-    pub fn restore(
-        root: &VaultRoot,
-        scope: &VaultScope,
-        device_id: &str,
-        envelope: &Envelope,
-    ) -> Result<Self> {
-        let bytes = root.open_local(scope, device_id, "device-key", envelope)?;
         let mut key = Zeroizing::new([0; 32]);
-        if bytes.len() != key.len() {
-            return Err(Error::Invalid);
-        }
-        key.copy_from_slice(&bytes);
+        key.copy_from_slice(bytes);
         Ok(Self(key))
     }
 }

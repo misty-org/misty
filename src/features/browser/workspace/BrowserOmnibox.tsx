@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { dockLeaves, parseBrowserViewState, useWorkspaceStore } from "@/features/workspace";
 import { BrowserOmniboxView } from "./BrowserOmniboxView";
-import { useBrowserSearchStore } from "@/features/browser-sync/search";
+import { useBrowserSearchStore } from "@/features/browser-search/search";
 
 /** The address bar, wired to the shared search panel. What is chosen there opens through `onNavigate`. */
 export function BrowserOmnibox(

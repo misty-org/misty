@@ -148,6 +148,56 @@ pub(super) fn zoom_message(raw: &str) -> Option<ZoomMessage> {
     serde_json::from_str(raw).ok()
 }
 
+/// Where the focused text field is, in page pixels from the page's top left; none once focus
+/// leaves a field.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CaretMessage {
+    pub(super) token: String,
+    pub(super) caret: Option<CaretRect>,
+}
+
+#[derive(serde::Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub(super) struct CaretRect {
+    pub(super) x: f64,
+    pub(super) y: f64,
+    pub(super) w: f64,
+    pub(super) h: f64,
+}
+
+pub(super) fn caret_message(raw: &str) -> Option<CaretMessage> {
+    if raw.len() > 512 || !raw.contains("\"caret\"") {
+        return None;
+    }
+    let message: CaretMessage = serde_json::from_str(raw).ok()?;
+    let in_range = |v: f64| v.is_finite() && v.abs() <= 1_000_000.0;
+    if let Some(rect) = message.caret {
+        if ![rect.x, rect.y, rect.w, rect.h].into_iter().all(in_range)
+            || rect.w < 0.0
+            || rect.h < 0.0
+        {
+            return None;
+        }
+    }
+    Some(message)
+}
+
+/// Whether the page has an element in full screen.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct FullscreenMessage {
+    pub(super) token: String,
+    pub(super) fullscreen: bool,
+}
+
+pub(super) fn fullscreen_message(raw: &str) -> Option<FullscreenMessage> {
+    if raw.len() > 256 || !raw.contains("\"fullscreen\"") {
+        return None;
+    }
+    serde_json::from_str(raw).ok()
+}
+
 pub(super) fn background_message(raw: &str) -> Option<BackgroundMessage> {
     if raw.len() > 1024 {
         return None;

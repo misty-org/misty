@@ -1,4 +1,4 @@
-import { useBrowserSearchStore } from "@/features/browser-sync/search";
+import { useBrowserSearchStore } from "@/features/browser-search/search";
 import { createBrowserViewState, type WorkspaceView } from "@/features/workspace";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";

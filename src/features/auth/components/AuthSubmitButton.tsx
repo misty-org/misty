@@ -1,4 +1,5 @@
 import { Button } from "@/shared/ui";
+import { authFormButtonClass } from "./authButtonClass";
 
 export default function AuthSubmitButton({
   idleLabel,
@@ -7,13 +8,19 @@ export default function AuthSubmitButton({
   disabled,
 }: AuthSubmitButtonProps) {
   return (
-    <Button type="submit" disabled={disabled || loading} variant="primary" className="h-10 w-full">
+    <Button
+      type="submit"
+      disabled={disabled || loading}
+      variant="primary"
+      size="lg"
+      className={authFormButtonClass}
+    >
       {loading ? loadingLabel : idleLabel}
     </Button>
   );
 }
 
-export interface AuthSubmitButtonProps {
+interface AuthSubmitButtonProps {
   idleLabel: string;
   loadingLabel: string;
   loading: boolean;

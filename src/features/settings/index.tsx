@@ -6,14 +6,13 @@ export type { SettingsSection } from "./settingsTypes";
 export * from "./store/appTheme";
 export { settingsBoolean } from "./store/preferences";
 export { PreferenceRow } from "./sections/PreferenceRow";
-export { SyncRestoreSettings } from "./sections/SyncRestoreSettings";
 export * from "./store/useAppThemeStore";
 export * from "./store/useSettingsStore";
 /** Resolves the already loaded Settings page for callers that warm it on hover. */
 export function preloadSettingsWorkspace(): Promise<typeof SettingsPageModule> {
   return Promise.resolve(SettingsPageModule);
 }
-export type SettingsWorkspaceProps = {
+type SettingsWorkspaceProps = {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 };
@@ -22,6 +21,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 }
 export { blockIfUnsaved, useDevicePreferences } from "./devicePreferences/store";
 export { resolveSetting } from "./devicePreferences/model";
-export { ModelKeyNeededButton, needsModelKey } from "./ModelKeyNeeded";
-export { openModelSettings } from "./models/modelKeys";
+;
+;
 export { openSettings, openSettingsEvent, type OpenSettingsDetail } from "./openSettings";

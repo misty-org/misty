@@ -21,7 +21,11 @@
 /* The vertical sidebar's holder. Open it is a column; collapsed, its width animates to nothing
    and the panel waits off its edge, sliding over the page when revealed. */
 .misty-sidebar-drawer {
-  --sidebar-w: max(272px, min(var(--shell-side-tabs, 280px), 35vw));
+  /* The width the person chose, whatever the window's. A sidebar that followed the window would
+     pull away from the native page during a live resize, since AppKit holds the page's left edge
+     until the window settles, and the gap would show the host behind it. Only a sidebar too wide
+     to leave the page 240px gives way. */
+  --sidebar-w: max(272px, min(var(--shell-side-tabs, 280px), calc(100vw - 240px)));
   position: relative;
   flex: none;
   width: var(--sidebar-w);
@@ -84,9 +88,14 @@
   opacity: 0;
   pointer-events: none;
 }
+/* Revealed over the page, the panel keeps its chrome fill, so the tab card and the account row
+   always sit on the window color and nothing on the page, such as a link's address label, shows
+   through the gaps around them. It floats as one piece: the same inset on every side, and its
+   corners are the cards' 12px plus that inset, so every corner shares one center. */
 .misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-drawer-panel {
+  padding: var(--pane-frame, 6px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  border-radius: 12px;
+  border-radius: calc(12px + var(--pane-frame, 6px));
 }
 
 /* Flat sidebar: the color the sticky New Tab row and the top fade blend into. */
@@ -139,13 +148,20 @@
 }
 .misty-sidebar-card .misty-sidebar-head {
   box-sizing: border-box;
-  height: 40px;
-  min-height: 40px;
+  /* The card's 1px border and this row together center on the Space bar's line, 24px down, so the
+     two read as one row. */
+  height: 34px;
+  min-height: 34px;
   margin: 0;
-  /* The window buttons sit on this panel, centered on it (the shell lowers them 10pt); the row
+  /* The window buttons sit on this panel, centered on it (the shell lowers them 5pt); the row
      starts where they end. */
   padding: 0 0 0 max(0px, calc(var(--window-chrome-left, 0px) - var(--pane-frame, 6px) - 12px));
   gap: 2px;
+}
+/* The sidebar toggle's panel glyph takes the Space bar's 18px, not the tab rows' 16px. */
+.misty-sidebar-card .misty-sidebar-head > [data-icon-size="xs"] > svg {
+  width: 18px;
+  height: 18px;
 }
 /* Back, forward and reload close the row on its right edge, opposite the sidebar toggle. */
 .misty-sidebar-card .misty-sidebar-head .misty-sidebar-nav {
@@ -187,22 +203,15 @@
   /* Agents and Settings sit 6px apart, like the header's and the Space row's buttons. */
   gap: 6px;
   margin-top: 8px;
-  /* The avatar and the settings button are both 28px boxes with the same 10px inset from their
-     edges, so their centers sit on the same two columns as the downloads and sync buttons above. */
-  padding: 6px 10px;
+  /* The account button's own 4px padding holds its 24px avatar, so 8px here and 10px beside the
+     28px settings button put both centers on the same two columns as the downloads and sync
+     buttons above. The height holds with no account button, when signed out. */
+  min-height: 42px;
+  padding: 4px 10px 4px 8px;
   border: 1px solid var(--color-charcoal-border);
   border-radius: 12px;
   background: var(--workspace-tab-surface);
 }
 .misty-sidebar-card .misty-sidebar-address {
   margin-bottom: 12px;
-}
-/* Revealed over the page, the card floats on its own shadow, with no backdrop of its own. */
-.misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-drawer-panel {
-  background: transparent;
-  box-shadow: none;
-  border-radius: 0;
-}
-.misty-sidebar-drawer[data-collapsed][data-revealed] .misty-sidebar-card {
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }

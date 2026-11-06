@@ -12,13 +12,12 @@ use std::{
     sync::{Mutex, MutexGuard, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 use super::store::Store;
-mod legacy;
-mod space;
-pub(crate) use space::seed_records as seed_download_records;
+mod profile;
+pub(crate) use profile::seed_records as seed_download_records;
 
 mod downloads;
 pub use downloads::*;
@@ -33,17 +32,11 @@ pub(crate) fn now_ms() -> i64 {
         .unwrap_or_default()
 }
 
-pub(crate) fn library(app: &AppHandle) -> Result<MutexGuard<'static, Connection>, String> {
+pub(crate) fn library(_app: &AppHandle) -> Result<MutexGuard<'static, Connection>, String> {
     if LIBRARY.get().is_none() {
         let home = super::paths::misty_home_dir().ok_or("Misty's data folder is unavailable.")?;
         let store = Store::at(home.join(".local").join("data").join("misty.db"));
-        // The library an earlier build kept beside the app's data comes along once.
-        let legacy = app
-            .path()
-            .app_data_dir()
-            .map_err(|error| error.to_string())?
-            .join("browser-library.sqlite");
-        let connection = open(&store, &legacy)?;
+        let connection = open(&store)?;
         let _ = LIBRARY.set(Mutex::new(connection));
     }
     LIBRARY
@@ -53,8 +46,7 @@ pub(crate) fn library(app: &AppHandle) -> Result<MutexGuard<'static, Connection>
         .map_err(|_| "The browser library is unavailable.".to_owned())
 }
 
-fn open(store: &Store, legacy: &Path) -> Result<Connection, String> {
-    legacy::import(store, legacy).map_err(|error| error.to_string())?;
+fn open(store: &Store) -> Result<Connection, String> {
     let connection = store.connect().map_err(|error| error.to_string())?;
     // Anything still running when Misty quit can no longer finish.
     connection
@@ -122,11 +114,11 @@ pub(crate) fn download_finished(app: &AppHandle, id: &str, success: bool, error:
     );
 }
 
-/// A finished download joins the downloads list of the Space whose pages use
+/// A finished download joins the downloads list of the profile whose pages use
 /// `store_key`. The file stays where it was saved.
-pub(crate) fn download_into_space(app: &AppHandle, store_key: String, id: &str) {
+pub(crate) fn download_into_profile(app: &AppHandle, store_key: String, id: &str) {
     let Ok(connection) = library(app) else { return };
-    space::publish(&connection, store_key, id);
+    profile::publish(&connection, store_key, id);
 }
 
 pub(crate) fn download_failed(app: &AppHandle, id: &str, url: &str, error: &str) {
@@ -180,16 +172,15 @@ fn local_downloads(app: &AppHandle) -> Result<Vec<BrowserDownloadEntry>, String>
     Ok(rows)
 }
 
-/// This device's downloads, then the window's Space's downloads that other
-/// devices hold, newest first.
+/// This computer's downloads, then the window's profile's downloads that other
+/// signed-in sessions hold, newest first.
 #[tauri::command]
 pub async fn browser_downloads_list(
     webview: tauri::Webview,
     app: AppHandle,
 ) -> Result<Vec<BrowserDownloadEntry>, String> {
     let mut rows = local_downloads(&app)?;
-    let space = crate::infra::browser_sync::window_space(webview.window().label());
-    rows.extend(space::remote_entries(space.as_deref()).await);
+    rows.extend(profile::remote_entries(webview.window().label()).await);
     rows.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     Ok(rows)
 }

@@ -60,6 +60,11 @@ const askOnPage = () => {
   useMistyPanelStore.getState().setOpen(true);
 };
 
+/** What someone needs to know before their first task. */
+const agentStorageDisclosure =
+  "What an agent reads on a signed-in page is stored on the server, outside your vault: " +
+  "whoever runs the server can read it, and backups keep it for up to 30 days after you delete it.";
+
 /**
  * The first steps with agents, ticked off from what the account has actually done. It
  * sits at the foot of the sidebar and leaves once every step is done.
@@ -107,6 +112,7 @@ export function AgentGetStarted({
         </span>
         <ChevronDown aria-hidden="true" />
       </Pressable>
+      <p className="agent-studio-get-started-note">{agentStorageDisclosure}</p>
       {!collapsed && (
         <ul>
           {steps.map((step) => (

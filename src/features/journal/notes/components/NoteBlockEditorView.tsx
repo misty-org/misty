@@ -44,12 +44,7 @@ function CollaborativeNoteEditor(
   );
   if (error) {
     return (
-      <>
-        {props.runtime.renderError(error, props.spaceId, props.noteId)}
-        <div className="rounded-md border border-charcoal-border bg-charcoal-card px-4 py-3 text-sm text-cream-muted">
-          The note connection could not be opened.
-        </div>
-      </>
+      <>{props.runtime.renderError(error, props.spaceId, props.noteId)}</>
     );
   }
   if (!session) return <SkeletonDocument label="Opening note" />;

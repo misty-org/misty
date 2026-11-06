@@ -14,7 +14,7 @@ pub(in crate::infra::browser) fn select(
     key: &str,
     action: &str,
 ) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only Misty's trusted shell can select a browser action.".into());
     }
     let state = app.state::<BrowserSessionState>();

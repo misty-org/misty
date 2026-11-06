@@ -22,6 +22,7 @@ export function BrowserMenuTools(props: {
   mistyPage: BrowserMistyPage | null;
   mistyPageLoading: boolean;
   onAttachPage: () => void;
+  pageId: string;
 }) {
   return (
     <>
@@ -44,7 +45,7 @@ export function BrowserMenuTools(props: {
         mistyPageLoading={props.mistyPageLoading}
         onAttachPage={props.onAttachPage}
       />
-      <BrowserClipboardButton />
+      <BrowserClipboardButton pageId={props.pageId} />
     </>
   );
 }

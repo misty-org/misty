@@ -28,7 +28,7 @@ function Spinner({ className, label = "Loading", size = "default", ...props }: S
 }
 export { Spinner };
 
-export type SpinnerProps = React.HTMLAttributes<HTMLSpanElement> & {
+type SpinnerProps = React.HTMLAttributes<HTMLSpanElement> & {
   /** Announced loading label; false when nearby text already says what is loading. */
   label?: string | false;
   size?: "sm" | "default" | "lg";

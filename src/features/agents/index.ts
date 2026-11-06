@@ -7,7 +7,7 @@ export { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 
 export { CompanionAppearanceSettings } from "./companion/CompanionAppearanceSettings";
 export { CursorCompanionController } from "./companion/CursorCompanionController";
-export { MistyPanel } from "./panel/MistyPanel";
+;
 export { MistyPanelDock } from "./panel/MistyPanelDock";
 export { useMistyPanelSide } from "./panel/mistyPanelSide";
 export { showAgentsPanel, useMistyPanelStore, type MistyPanelView } from "./panel/mistyPanelStore";
@@ -27,8 +27,8 @@ export { settleProgress, withAnswer, withToolEvent } from "./progress/progressTi
 export { WorkflowSchedulesBridge } from "./workflows/WorkflowSchedulesBridge";
 export { grantsApi, groupGrants, lastUsedText } from "./grants/api";
 export type { AgentGrant } from "./grants/api";
-export { codingToolStatusText, codingTools, detectCodingTools } from "./coding/codingTools";
-export type { CodingToolStatus } from "./coding/codingTools";
+export {  codingTools,  } from "./coding/codingTools";
+;
 // Dictation hands "Hey <agent>, …" to an agent through the cursor session.
 export { useCompanionState } from "./companion/companionState";
 export { routeLocalFollowup, useLocalExecution } from "./localExecution";

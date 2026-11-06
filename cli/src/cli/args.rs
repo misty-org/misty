@@ -7,29 +7,15 @@ use super::*;
 pub struct Cli {
     #[arg(long, global = true)]
     pub workspace: Option<PathBuf>,
+    /// Leave this out to be asked what to do, one step at a time.
     #[command(subcommand)]
-    pub(super) command: Command,
+    pub(super) command: Option<Command>,
 }
 
 #[derive(Debug, Subcommand)]
 pub(super) enum Command {
     /// Prepare server configuration, Cloudflare resources, or desktop dependencies.
     Setup(crate::setup::Setup),
-    /// Run a project tool using the shared .config registry.
-    Tool {
-        name: String,
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        arguments: Vec<String>,
-    },
-    /// List internal TypeScript build tasks.
-    Tasks,
-    /// Run an internal build task (see `misty tasks`).
-    Task {
-        name: String,
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
-        arguments: Vec<String>,
-    },
-    Configure(Configure),
     /// Diagnose setup and service health; choose server, desktop, cloudflare, or release.
     Doctor(crate::diagnostics::Doctor),
     /// Create and validate private runtime environments.
@@ -37,19 +23,16 @@ pub(super) enum Command {
     /// Generate and validate the cross-platform ~/.misty home.
     Home(Home),
     Check(Check),
+    /// Build the app, step by step.
+    Build,
     Desktop(Desktop),
     /// Run the documentation site.
     Docs(Docs),
     /// Run the public website.
     Website(Website),
     Server(Server),
+    /// Publish a release, step by step: start it, build it on each system, make it public.
     Release(Release),
-}
-
-#[derive(Debug, Args)]
-pub(super) struct Configure {
-    #[arg(long)]
-    pub(super) workspace: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -165,7 +148,6 @@ pub(super) enum DesktopCommand {
         #[arg(long)]
         route: Option<String>,
     },
-    Build,
     Clean {
         #[arg(long)]
         apply: bool,
@@ -186,45 +168,7 @@ pub(super) enum IconCommand {
 
 #[derive(Debug, Args)]
 pub(super) struct Release {
-    #[command(subcommand)]
-    pub(super) command: ReleaseCommand,
-}
-
-#[derive(Debug, Subcommand)]
-pub(super) enum ReleaseCommand {
-    /// Validate locally saved release configuration before compiling or uploading.
-    Check,
-    Start {
-        version: String,
-        #[arg(long)]
-        dry_run: bool,
-        /// Release operating systems, comma-separated; defaults to the current OS.
-        #[arg(long, value_enum, value_delimiter = ',')]
-        os: Vec<release::ReleaseOs>,
-    },
-    Build {
-        version: String,
-        /// Upload verified local artifacts to the draft after building.
-        #[arg(long)]
-        upload: bool,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    Upload {
-        version: String,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    Verify {
-        version: String,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    Publish {
-        version: String,
-        #[arg(long)]
-        yes: bool,
-        #[arg(long)]
-        dry_run: bool,
-    },
+    /// Walk through the steps without tagging, uploading or publishing anything.
+    #[arg(long)]
+    pub(super) dry_run: bool,
 }

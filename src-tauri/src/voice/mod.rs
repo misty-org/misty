@@ -1,4 +1,4 @@
-//! Voice: dictation into any app, captures, and screen recordings.
+//! Voice: dictation into any app and captures.
 //! Docs: docs/voice-memory/README.md.
 #[cfg(any(target_os = "macos", windows))]
 mod capture;
@@ -10,11 +10,10 @@ mod insert_macos;
 mod insert_windows;
 #[cfg(any(target_os = "macos", windows))]
 mod pill;
-pub mod recording;
-#[cfg(target_os = "windows")]
-mod recording_windows;
 #[cfg(any(target_os = "macos", windows))]
 mod session;
+#[cfg(any(target_os = "macos", windows))]
+mod subtitles;
 pub mod tab_tap;
 
 // Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates
@@ -23,3 +22,5 @@ pub mod tab_tap;
 pub use capture::*;
 #[cfg(any(target_os = "macos", windows))]
 pub use session::*;
+#[cfg(any(target_os = "macos", windows))]
+pub use subtitles::*;

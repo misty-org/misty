@@ -1,8 +1,13 @@
-import { activeLayoutView, allLayoutViews, appendTab, singleViewTab } from "./layoutTabs";
+import {
+  activeLayoutView,
+  allLayoutViews,
+  appendTab,
+  mapLayoutViews,
+  singleViewTab,
+} from "./layoutTabs";
 import { createDockId, dockLeaves, findDockLeaf, mapDockLeaf } from "./dockTree";
 import type { WorkspaceView } from "./model";
-import { mapAllWorkspaceWindowViews } from "./windows";
-import { isIncognitoWindow, windowSpaceScope } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 import {
   compareViewRecency,
   lastUsedUpdatesForView,
@@ -30,8 +35,6 @@ export function workspaceOpenActions(
 > {
   return {
     openSurface: (request) => {
-      if (request.scopeKey) get().setScope(request.scopeKey);
-      else if (request.surfaceId === "space") get().setScope(windowSpaceScope());
       const current = get();
       const pane =
         findDockLeaf(current.layout.root, request.paneId ?? current.layout.focusedPaneId) ??
@@ -57,7 +60,7 @@ export function workspaceOpenActions(
           get().updateViewRoute(existing.id, request.route);
         return allLayoutViews(get().layout).find((tab) => tab.id === existing.id)!;
       }
-      const now = nextWorkspaceFocusTimestamp(current.layoutsByScope);
+      const now = nextWorkspaceFocusTimestamp(current.layout);
       const tab: WorkspaceView = {
         id: createDockId("tab"),
         surfaceId: request.surfaceId,
@@ -92,7 +95,6 @@ export function workspaceOpenActions(
       return tab;
     },
     openDestination: (request) => {
-      if (request.scopeKey) get().setScope(request.scopeKey);
       const current = get();
       // An explicit new tab/split is an invitation to create another instance.
       if (!activeLayoutView(current.layout)?.placeholder) {
@@ -115,16 +117,16 @@ export function workspaceOpenActions(
     },
     commitPlaceholder: (tabId) => {
       if (!allLayoutViews(get().layout).some((tab) => tab.id === tabId && tab.placeholder)) return;
-      set((current) =>
-        mapAllWorkspaceWindowViews(current, (tab) =>
+      set((current) => ({
+        layout: mapLayoutViews(current.layout, (tab) =>
           tab.id === tabId ? { ...tab, placeholder: false } : tab,
         ),
-      );
+      }));
     },
     addSurface: (request) => get().openSurface({ ...request, forceNew: true }),
     newTab: () => {
       const current = get(),
-        view = createBlankWorkspaceView(current.activeScopeKey);
+        view = createBlankWorkspaceView();
       set(withLayout(current, appendTab(current.layout, singleViewTab(view))));
       return view;
     },
@@ -133,7 +135,6 @@ export function workspaceOpenActions(
       const tab = get().openSurface({
         surfaceId: "browser",
         groupKey: "tool:browser",
-        scopeKey: windowSpaceScope(),
         title: browserViewTitle(url),
         route: "/browser",
         state: {

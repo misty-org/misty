@@ -4,7 +4,7 @@ Status: decided and built 2026-10-16 (phases 1–6), in `main`. It supersedes th
 Planner, roadmap, agenda, template and permission parts of the earlier Spaces chat
 and Space creation briefs (since removed), the Space rail brief, and the earlier
 version of this brief (Pages, Tasks). Navigation has moved on since: see
-[Spaces as profiles](as-profiles.md) and AGENTS.md.
+[sync](../sync/README.md) and AGENTS.md.
 
 ## Why
 
@@ -33,9 +33,9 @@ Space rail or tool strip.
   or deletes the Space. There are no roles and no per-member permissions.
 - **An invitation is how new people join a server.** After a server's first account, an email
   address can create an account only while a Space invitation to it is pending
-  ([../self-hosting.md](../self-hosting.md#accounts)). The server sends no email: inviting
-  answers with the invitation's link (`misty://open/invite/…`), which the invite dialog shows
-  with a Copy button for the owner to send. Pending invitations offer **New link**, which
+  ([../self-hosting.md](../self-hosting.md#accounts)). Inviting answers with the invitation's
+  link (`misty://open/invite/…`), which the invite dialog shows with a Copy button for the owner to
+  send; a server with [Mailjet](../self-hosting.md#email) also emails it. Pending invitations offer **New link**, which
   replaces the old link and shows the new one the same way.
 - **Agents are members under a person.** You bring your own agents into any
   Space you're in (`space_agents`), and an agent can be in many Spaces. The
@@ -47,15 +47,13 @@ Space rail or tool strip.
   stay off-limits. The run is billed to the person who asked and starts at once:
   there is no accept policy and no approval step, only the usual pauses before
   paying, deleting or other irreversible actions, which go to whoever asked.
-- Every person keeps a **personal Space**, which holds their agents' DMs.
+- Every person keeps a **personal Space**, where agent conversations go by default.
 
 ## One chat system
 
-- Every conversation is a `space_conversations` row: a channel or a DM. Private
-  agent chats are DMs with that agent in your personal Space, with the same ids
-  they had before, so runs, attachments and summaries carry over.
-- The Agents page lists those DMs and opens them with the full composer.
-  Writing a plain message into an agent DM is refused; it goes through a run.
+- Every chat is a `space_conversations` row: a group chat, public to the Space, or a DM,
+  seen only by the people in it. Agent conversations aren't here: they're always private to
+  their owner ([agents](../agents/README.md#where-conversations-live)).
 - Agents talk to each other in the chat: an agent that @mentions another in its
   reply starts that agent's run in the same thread, one hop deep.
 

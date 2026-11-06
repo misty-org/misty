@@ -77,6 +77,6 @@ TableCell.displayName = "TableCell";
 
 export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow };
 
-export type TableProps = React.HTMLAttributes<HTMLTableElement> & {
+type TableProps = React.HTMLAttributes<HTMLTableElement> & {
   unwrapped?: boolean;
 };

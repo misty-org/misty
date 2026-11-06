@@ -18,7 +18,6 @@ tauri = [
     "dep:tokio",
     "dep:block2",
     "dep:objc",
-    "dep:objc2",
     "dep:objc2-foundation",
     "dep:objc2-web-kit",
     "dep:webview2-com",
@@ -44,7 +43,6 @@ url = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = { version = "0.6.2", optional = true }
 objc = { version = "0.2.7", optional = true }
-objc2 = { version = "0.6.4", optional = true }
 objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSObject", "NSProcessInfo", "NSString", "NSURL", "NSUUID"] }
 objc2-web-kit = { version = "0.3.2", optional = true, default-features = false, features = ["std", "block2", "objc2-app-kit", "WKFrameInfo", "WKSecurityOrigin", "WKWebView", "WKWebViewConfiguration", "WKWebsiteDataStore"] }
 

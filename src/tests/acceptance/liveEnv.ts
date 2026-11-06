@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
  * Live acceptance runs read the same development environment the local server
  * uses, without printing it. Process variables take precedence.
  */
-const envFiles = ["server/.env/dev/integrations/ai.env"];
+const envFiles = ["../misty-server/.env/dev/integrations/ai.env"];
 
 function fileValues(): Record<string, string> {
   const values: Record<string, string> = {};

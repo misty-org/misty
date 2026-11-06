@@ -55,7 +55,8 @@ pub(super) struct BrowserSession {
     pub(super) origin_space_id: Option<String>,
     pub(super) zoom_factor: Option<f64>,
     pub(super) profile_id: Option<String>,
-    // Only this logical identity is included in renderer/agent observations.
+    // The page's Misty profile. Only this, never the store above, is included in renderer and
+    // agent observations.
     pub(super) logical_profile_id: Option<String>,
     pub(super) profile_provider: Option<String>,
     pub(super) provider_id: Option<String>,
@@ -79,9 +80,7 @@ pub(super) struct BrowserSession {
 
 impl BrowserSession {
     pub(super) fn context_profile_id(&self) -> Option<&str> {
-        self.logical_profile_id
-            .as_deref()
-            .or(self.profile_id.as_deref())
+        self.logical_profile_id.as_deref()
     }
 }
 

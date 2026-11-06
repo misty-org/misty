@@ -13,3 +13,23 @@ export function withDefaultApiPath(base: string | null): string {
   if (!base) return "";
   return /\/(?:api(?:\/v\d+)?|v\d+)$/i.test(base) ? base : `${base}/api`;
 }
+
+/**
+ * Whether this build may use a server at this address. A release build only talks to an https
+ * domain: never plain http, an IP address or this computer. A development build takes those too.
+ */
+export function isAllowedServerUrl(value: string): boolean {
+  if (import.meta.env.DEV) return true;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/\.$/, "").toLowerCase();
+    return (
+      url.protocol === "https:" &&
+      host.includes(".") &&
+      !host.endsWith(".localhost") &&
+      !/^[\d.]+$/.test(host)
+    );
+  } catch {
+    return false;
+  }
+}

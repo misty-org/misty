@@ -12,7 +12,6 @@ use crate::infra::{
 
 pub struct MistyRuntime {
     pub navigation_names: crate::infra::navigation_names::NavigationNamesService,
-    pub agent_chats: crate::infra::agents::chats::AgentChatsService,
     pub environment: AppEnvironmentService,
     pub clipboard: Arc<ClipboardService>,
     pub settings: SettingsService,
@@ -37,7 +36,7 @@ impl MistyRuntime {
         #[cfg(desktop)]
         let cloud_clipboard = CloudClipboard::default();
         // Copies reach the account's other devices through the encrypted
-        // clipboard ring in sync.
+        // clipboard ring in sync. Clips from other devices never touch the system clipboard.
         #[cfg(desktop)]
         let shared_clipboard: Arc<dyn SharedClipboardClient> = Arc::new(cloud_clipboard.clone());
         #[cfg(desktop)]
@@ -47,12 +46,6 @@ impl MistyRuntime {
         clipboard.set_device_identity("local".to_owned(), "This Misty".to_owned());
         #[cfg(desktop)]
         {
-            let clipboard_for_peer = clipboard.clone();
-            let receive: Arc<dyn Fn(_) + Send + Sync> = Arc::new(move |payload| {
-                clipboard_for_peer.accept_remote_payload(payload);
-                let _ = clipboard_for_peer.apply_shared_to_system_async();
-            });
-            cloud_clipboard.set_handler(receive);
             let _ = clipboard.start();
         }
         let settings = SettingsService::new(environment.clone());
@@ -64,9 +57,7 @@ impl MistyRuntime {
         Self {
             navigation_names: crate::infra::navigation_names::NavigationNamesService::new(
                 environment.store(),
-                environment.config_dir().join("navigation.json"),
             ),
-            agent_chats: crate::infra::agents::chats::AgentChatsService::new(environment.store()),
             environment,
             clipboard,
             settings,

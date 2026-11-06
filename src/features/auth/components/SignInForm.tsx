@@ -1,16 +1,18 @@
+import { mistyWebsite } from "@/api/deployment/serverChoice";
 import { Button } from "@/shared/ui";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useAuth } from "../AuthContext";
-import { accountSignIn, CredentialSignInRefused } from "../store/useAccountStore";
+import { accountSignIn } from "../store/useAccountStore";
 import AuthField from "./AuthField";
 import AuthMessage from "./AuthMessage";
 import AuthSubmitButton from "./AuthSubmitButton";
 import GoogleSignInButton from "./GoogleSignInButton";
 
 /** Email and password, and Google: the sign-in page and the sign-in sheet share it. The email
- * and the error belong to the host, which keeps them across its other screens. A server sends
- * no email, so a forgotten password is reset with a sign-in link from whoever runs it. */
+ * and the error belong to the host, which keeps them across its other screens. A forgotten
+ * password is reset with a sign-in link, which the website's page sends or says how to get. */
 export default function SignInForm(props: {
   email: string;
   onEmailChange: (email: string) => void;
@@ -21,19 +23,15 @@ export default function SignInForm(props: {
   const { transitioning, authenticateAccount } = useAuth();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  // An account whose password was reset by email (older servers) holds the password as typed.
-  // That is sent only when asked for.
-  const [offerPlainSignIn, setOfferPlainSignIn] = useState(false);
 
-  async function signIn(legacy: boolean) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     props.onErrorChange("");
-    setOfferPlainSignIn(false);
     setLoading(true);
     try {
-      await authenticateAccount(() => accountSignIn(props.email, password, { legacy }));
+      await authenticateAccount(() => accountSignIn(props.email, password));
       props.onSuccess();
     } catch (signInError) {
-      setOfferPlainSignIn(signInError instanceof CredentialSignInRefused);
       props.onErrorChange(
         signInError instanceof Error ? signInError.message : "Could not sign in.",
       );
@@ -42,13 +40,8 @@ export default function SignInForm(props: {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await signIn(false);
-  }
-
   return (
-    <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
+    <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <AuthField
         id="signin-email"
         label="Email"
@@ -72,29 +65,16 @@ export default function SignInForm(props: {
           disabled={loading || transitioning}
           onChange={setPassword}
         />
-        <p className="m-0 text-xs text-cream-muted">
-          Forgot your password? Ask the person who runs this server for a sign-in link. On Misty
-          Cloud, get one at mistysys.com/sign-in.
-        </p>
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto self-start p-0 text-sm text-cream"
+          onClick={() => void openUrl(`${mistyWebsite()}/sign-in`)}
+        >
+          Forgot your password?
+        </Button>
       </div>
       {props.error ? <AuthMessage tone="error" message={props.error} /> : null}
-      {offerPlainSignIn ? (
-        <div className="flex flex-col gap-1 text-sm text-cream-muted">
-          <span>
-            Was your password reset by email? That password is sent to Misty as typed, once, and
-            your sync vault needs a new password afterwards.
-          </span>
-          <Button
-            type="button"
-            variant="link"
-            className="h-auto self-start p-0 text-cream"
-            disabled={loading || transitioning}
-            onClick={() => void signIn(true)}
-          >
-            Sign in with the reset password
-          </Button>
-        </div>
-      ) : null}
       <AuthSubmitButton
         idleLabel="Sign in"
         loadingLabel="Signing in…"

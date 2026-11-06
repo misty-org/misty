@@ -6,7 +6,7 @@ use super::*;
 pub(super) fn record_request(
     state: &BrowserSessionState,
     request: &BrowserWebviewCreateRequest,
-    logical_profile_id: &Option<String>,
+    profile: &str,
 ) -> Result<(), String> {
     if let Some(session) = state
         .sessions
@@ -25,8 +25,9 @@ pub(super) fn record_request(
         session.agent_run_id = request.agent_run_id.clone();
         if request.profile_id.is_some() {
             session.profile_id = request.profile_id.clone();
-            session.logical_profile_id = logical_profile_id.clone();
         }
+        // Incognito pages keep no profile in what the renderer and agents observe.
+        session.logical_profile_id = (!request.private).then(|| profile.to_owned());
         if request.profile_provider_id.is_some() || request.provider_id.is_some() {
             session.profile_provider = request
                 .profile_provider_id
@@ -46,7 +47,7 @@ pub(super) fn adopt_existing(
     window: &tauri::Window,
     webview: Webview,
     request: &BrowserWebviewCreateRequest,
-    space: &str,
+    profile: &str,
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
@@ -82,7 +83,7 @@ pub(super) fn adopt_existing(
     set_webview_bounds_if_changed(app, &webview, position, size)?;
     crate::infra::extensions::native::register(
         &webview,
-        space,
+        profile,
         &request.id,
         request.private,
         &request.url,

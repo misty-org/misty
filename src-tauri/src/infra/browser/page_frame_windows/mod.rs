@@ -14,6 +14,10 @@
 //! over the part of those edge pixels that lies outside the curve, with
 //! smooth alpha. Pixels wholly outside stay cut, so the renderer's own chrome
 //! shows there and only the one-pixel fringe uses the reported color.
+//!
+//! The same region cuts out the renderer's notices. A window region stops the
+//! mouse as well as drawing, so a notice shows and takes clicks in its own box
+//! while the page around it stays on top and keeps working.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
@@ -24,7 +28,8 @@ use windows_sys::Win32::{
     Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM},
     Graphics::Gdi::{
         CombineRgn, CreateCompatibleDC, CreateDIBSection, CreateRectRgn, DeleteDC, DeleteObject,
-        GetStockObject, SelectObject, SetWindowRgn, AC_SRC_ALPHA, AC_SRC_OVER, BITMAPINFO,
+        GetStockObject, MapWindowPoints, SelectObject, SetWindowRgn, AC_SRC_ALPHA, AC_SRC_OVER,
+        BITMAPINFO,
         BITMAPINFOHEADER, BI_RGB, BLACK_BRUSH, BLENDFUNCTION, DIB_RGB_COLORS, HBRUSH, HRGN,
         RGN_DIFF,
     },
@@ -33,10 +38,11 @@ use windows_sys::Win32::{
         HiDpi::GetDpiForWindow,
         Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
         WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, RegisterClassW,
-            SetLayeredWindowAttributes, SetWindowPos, ShowWindow, UpdateLayeredWindow, HWND_TOP,
-            LWA_ALPHA, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA, ULW_ALPHA, WM_NCDESTROY, WM_SIZE,
-            WNDCLASSW, WS_CHILD, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
+            CreateWindowExW, DefWindowProcW, DestroyWindow, GetAncestor, GetClientRect,
+            RegisterClassW, SetLayeredWindowAttributes, SetWindowPos, ShowWindow,
+            UpdateLayeredWindow, GA_ROOT, HWND_TOP, LWA_ALPHA, SWP_NOACTIVATE, SW_HIDE, SW_SHOWNA,
+            ULW_ALPHA, WM_MOVE, WM_NCDESTROY, WM_SIZE, WNDCLASSW, WS_CHILD, WS_EX_LAYERED,
+            WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
         },
     },
 };
@@ -63,6 +69,47 @@ struct Frame {
 fn frames() -> &'static Mutex<HashMap<isize, Frame>> {
     static FRAMES: OnceLock<Mutex<HashMap<isize, Frame>>> = OnceLock::new();
     FRAMES.get_or_init(Default::default)
+}
+
+/// One app window's notices: the renderer's host window, and the notices'
+/// corner radius and boxes (left, top, right, bottom) in that host's pixels.
+struct NoticeHoles {
+    main: isize,
+    radius: i32,
+    boxes: Vec<[i32; 4]>,
+}
+
+/// Each app window's notices, by its top-level window. Pages read these when
+/// they apply, so a new tab starts with its holes cut.
+fn notice_holes() -> &'static Mutex<HashMap<isize, NoticeHoles>> {
+    static HOLES: OnceLock<Mutex<HashMap<isize, NoticeHoles>>> = OnceLock::new();
+    HOLES.get_or_init(Default::default)
+}
+
+/// Records where the renderer hosted in `main` draws its notices. Call
+/// `reapply` on the window's pages afterwards.
+pub(super) fn set_notice_holes(main: isize, radius: i32, boxes: Vec<[i32; 4]>) {
+    // SAFETY: a plain query; a stale handle only returns null.
+    let root = unsafe { GetAncestor(main as HWND, GA_ROOT) } as isize;
+    if let Ok(mut all) = notice_holes().lock() {
+        if boxes.is_empty() {
+            all.remove(&root);
+        } else {
+            all.insert(
+                root,
+                NoticeHoles {
+                    main,
+                    radius,
+                    boxes,
+                },
+            );
+        }
+    }
+}
+
+/// Applies the page's frame again, for a change kept outside it.
+pub(super) fn reapply(webview: &Webview) -> Result<(), String> {
+    update(webview, true, |_| {})
 }
 
 /// Rounds the page's corners by `radii` (logical pixels; zero is square),
@@ -93,6 +140,14 @@ pub(super) fn set_dim(webview: &Webview, strength: f64) -> Result<(), String> {
 /// Records a change for the page's host window and applies its frame, on
 /// the window's own thread.
 fn change(webview: &Webview, edit: impl FnOnce(&mut Frame) + Send + 'static) -> Result<(), String> {
+    update(webview, false, edit)
+}
+
+fn update(
+    webview: &Webview,
+    force: bool,
+    edit: impl FnOnce(&mut Frame) + Send + 'static,
+) -> Result<(), String> {
     webview
         .with_webview(move |platform| {
             let mut host = Default::default();
@@ -116,14 +171,55 @@ fn change(webview: &Webview, edit: impl FnOnce(&mut Frame) + Send + 'static) -> 
             };
             // Every reconcile restates the frame; only a change is reapplied. A
             // resize reapplies it through the subclass.
-            if changed {
+            if changed || force {
                 apply(host);
             }
         })
         .map_err(|error| error.to_string())
 }
 
-/// Clips `host` to its rounded corners and fits its dim over it.
+/// Whether any notice is cut out of the app window holding `host`.
+fn has_notice_holes(host: HWND) -> bool {
+    // SAFETY: a plain query on a live window.
+    let root = unsafe { GetAncestor(host, GA_ROOT) } as isize;
+    notice_holes()
+        .lock()
+        .map(|all| all.contains_key(&root))
+        .unwrap_or(false)
+}
+
+/// `region` minus the notices that overlap `host`, creating it if it was null
+/// (no clipping) and a notice overlaps.
+///
+/// # Safety
+/// `region` is null or owned by the caller, who gets back a region to hand to
+/// the system or delete.
+unsafe fn cut_notice_holes(host: HWND, mut region: HRGN, width: i32, height: i32) -> HRGN {
+    let root = GetAncestor(host, GA_ROOT) as isize;
+    let Ok(all) = notice_holes().lock() else {
+        return region;
+    };
+    let Some(holes) = all.get(&root) else {
+        return region;
+    };
+    for &[left, top, right, bottom] in &holes.boxes {
+        let mut corners = [POINT { x: left, y: top }, POINT { x: right, y: bottom }];
+        MapWindowPoints(holes.main as HWND, host, corners.as_mut_ptr(), 2);
+        let [POINT { x: left, y: top }, POINT { x: right, y: bottom }] = corners;
+        if right <= 0 || bottom <= 0 || left >= width || top >= height {
+            continue;
+        }
+        if region.is_null() {
+            region = CreateRectRgn(0, 0, width, height);
+        }
+        let hole = notice_hole(left, top, right, bottom, holes.radius);
+        CombineRgn(region, region, hole, RGN_DIFF);
+        DeleteObject(hole);
+    }
+    region
+}
+
+/// Clips `host` to its rounded corners and notices and fits its dim over it.
 fn apply(host: HWND) {
     let Ok(mut frames) = frames().lock() else {
         return;
@@ -145,7 +241,7 @@ fn apply(host: HWND) {
     let radii = frame.radii.map(|radius| (radius * scale).round() as i32);
     // SAFETY: the system owns the region once set; a null region removes it.
     unsafe {
-        let region = rounded_region(width, height, radii);
+        let region = cut_notice_holes(host, rounded_region(width, height, radii), width, height);
         SetWindowRgn(host, region, 1);
     }
     apply_dim(host, frame, width, height);
@@ -229,6 +325,8 @@ unsafe extern "system" fn on_message(
     let result = DefSubclassProc(window, message, wparam, lparam);
     match message {
         WM_SIZE => apply(window),
+        // A notice stays put in the app window, so its hole shifts when the page moves.
+        WM_MOVE if has_notice_holes(window) => apply(window),
         WM_NCDESTROY => {
             let overlay = frames()
                 .lock()

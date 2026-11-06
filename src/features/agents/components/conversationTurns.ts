@@ -2,7 +2,7 @@ import type { GlobalAiMessage } from "@/features/misty/types";
 import { splitLedger } from "../checkpoints/ledger";
 import { companionReply } from "../companion/companionReply";
 
-export type Turn = {
+type Turn = {
   key: string;
   prompt?: GlobalAiMessage;
   replies: GlobalAiMessage[];

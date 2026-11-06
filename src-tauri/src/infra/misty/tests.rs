@@ -18,7 +18,8 @@ fn a_damaged_session_file_reads_as_signed_out() {
 
 #[test]
 fn a_session_saved_with_a_license_still_reads() {
-    let earlier = br#"{"user":{"id":"a","username":"a","email":"a@example.test"},"license":{"tier":"pro"}}"#;
+    let earlier =
+        br#"{"user":{"id":"a","username":"a","email":"a@example.test"},"license":{"tier":"pro"}}"#;
     let stored: StoredSession = serde_json::from_slice(earlier).unwrap();
     assert_eq!(stored.user.unwrap().id, "a");
 }

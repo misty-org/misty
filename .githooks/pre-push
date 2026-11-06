@@ -5,6 +5,6 @@ set -eu
 root=$(git rev-parse --show-toplevel)
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
-  python3 "$root/server/scripts/check-public-history.py" "$local_sha" || exit 1
+  python3 "$root/.githooks/check-public-history.py" "$local_sha" || exit 1
 done
 exec "$root/.githooks/checks.sh" push

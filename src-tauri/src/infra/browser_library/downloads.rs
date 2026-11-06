@@ -187,7 +187,7 @@ pub struct BrowserDownloadsRemoveRequest {
     pub since: Option<i64>,
 }
 
-/// Removes entries from the list, here and in the window's Space. Files
+/// Removes entries from the list, here and in the window's profile. Files
 /// already saved stay on disk.
 #[tauri::command]
 pub async fn browser_downloads_remove(
@@ -196,8 +196,7 @@ pub async fn browser_downloads_remove(
     request: BrowserDownloadsRemoveRequest,
 ) -> Result<(), String> {
     remove_local(&app, &request)?;
-    let space = crate::infra::browser_sync::window_space(webview.window().label());
-    space::remove(space.as_deref(), &request.ids, request.since).await;
+    profile::remove(webview.window().label(), &request.ids, request.since).await;
     Ok(())
 }
 

@@ -1,6 +1,6 @@
-//! Push-to-talk microphone for the agent at your cursor, on audeeo-core.
+//! Push-to-talk microphone for the agent at your cursor, on the audio-capture crate.
 //! Captures 16 kHz mono and hands the realtime voice session 24 kHz PCM16.
-use audeeo_core::{AudioSource, Capture, Resampler};
+use misty_audio_capture::{AudioSource, Capture, Resampler};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
@@ -20,7 +20,7 @@ impl Recording {
         let samples = Arc::new(Mutex::new(Vec::new()));
         let target = samples.clone();
         let meter_app = app.clone();
-        let capture = audeeo_core::start(
+        let capture = misty_audio_capture::start(
             AudioSource::Mic,
             move |chunk| {
                 if let Ok(mut samples) = target.lock() {
@@ -33,7 +33,7 @@ impl Recording {
                 );
             },
             move |e| {
-                let _ = crate::infra::space_windows::emit_to_primary(
+                let _ = crate::infra::profile_windows::emit_to_primary(
                     &app,
                     "misty://cursor-error",
                     serde_json::json!({"turn":turn,"error":format!("Microphone stopped: {e}")}),

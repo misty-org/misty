@@ -1,4 +1,4 @@
-//! Account-scoped local recovery, independent of the unlocked sync vault.
+//! Account-scoped local recovery, independent of any vault.
 use misty_browser_sync::{
     crypto::VaultScope,
     recovery::{RecoveryRecord, RecoveryStore},
@@ -37,22 +37,22 @@ pub(super) fn close_account() -> Result<(), String> {
     Ok(())
 }
 fn main_only(view: &tauri::Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_person_window(view.label()) {
+    if !crate::infra::profile_windows::is_person_window(view.label()) {
         return Err("Workspace recovery is available only in the main workspace".into());
     }
     Ok(())
 }
-/// The profile id the app uses while nobody is signed in. Its recovery belongs to the
-/// device, so it opens without an account session (docs/browser/no-account.md).
-const LOCAL_PROFILE: &str = "local";
+/// The account scope the app uses while nobody is signed in. Its recovery belongs to this
+/// computer, so it opens without an account session (docs/browser/no-account.md).
+const LOCAL_ACCOUNT_SCOPE: &str = "local";
 
-/// The deployment a profile's recovery is filed under. Recovery is this device's own data,
+/// The deployment an account scope's recovery is filed under. Recovery is this device's own data,
 /// sealed with a key in the OS keychain, so it does not ask the server: an account whose
 /// session expired keeps its windows and tabs while it waits to sign in again
-/// (docs/browser/no-account.md). The local profile has no deployment.
+/// (docs/browser/no-account.md). The local scope has no deployment.
 fn recovery_deployment(api_base: &str, account: &str) -> Result<String, String> {
-    if account == LOCAL_PROFILE {
-        return Ok(LOCAL_PROFILE.to_owned());
+    if account == LOCAL_ACCOUNT_SCOPE {
+        return Ok(LOCAL_ACCOUNT_SCOPE.to_owned());
     }
     let http = reqwest::Client::builder()
         .build()
@@ -126,7 +126,7 @@ pub async fn browser_recovery_forget(
     account_id: String,
 ) -> Result<(), String> {
     main_only(&webview)?;
-    let lifetime = super::browser_sync::browser_lifecycle().write().await;
+    let lifetime = super::profile_data::browser_lifecycle().write().await;
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
         // This command serves the saved-account chooser after its cookie entry
@@ -151,7 +151,7 @@ pub async fn browser_recovery_forget(
         }
         let directory = recovery_directory(&app, &deployment, &account_id)?;
         let _lock = if directory.exists() {
-            Some(super::browser_sync::lock_database(
+            Some(super::profile_data::lock_database(
                 &directory.join("recovery.sqlite"),
             )?)
         } else {
@@ -178,7 +178,7 @@ pub async fn browser_recovery_open(
     account_id: String,
 ) -> Result<RecoverySession, String> {
     main_only(&webview)?;
-    let lifetime = super::browser_sync::browser_lifecycle().read().await;
+    let lifetime = super::profile_data::browser_lifecycle().read().await;
     // Move the lifetime lease into the blocking task. Cancellation of IPC cannot
     // let an account switch race an outstanding SQLite operation.
     tauri::async_runtime::spawn_blocking(move || {
@@ -213,7 +213,7 @@ pub async fn browser_recovery_open(
             .create(&directory)
             .map_err(|_| "Could not create workspace storage")?;
         let path = directory.join("recovery.sqlite");
-        let lock = super::browser_sync::lock_database(&path)?;
+        let lock = super::profile_data::lock_database(&path)?;
         let key = secure_store::workspace_recovery_root(&scope, !path.exists()).map_err(error)?;
         let store = RecoveryStore::open(&path, scope, key).map_err(error)?;
         let pending = store.pending_keys().unwrap_or_default();
@@ -241,7 +241,7 @@ pub async fn browser_recovery_read(
     key: String,
 ) -> Result<Option<RecoveryRecord>, String> {
     main_only(&webview)?;
-    let lifetime = super::browser_sync::browser_lifecycle().read().await;
+    let lifetime = super::profile_data::browser_lifecycle().read().await;
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
         let current = client()
@@ -266,7 +266,7 @@ pub async fn browser_recovery_write(
     value: String,
 ) -> Result<RecoveryRecord, String> {
     main_only(&webview)?;
-    let lifetime = super::browser_sync::browser_lifecycle().read().await;
+    let lifetime = super::profile_data::browser_lifecycle().read().await;
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
         let mut current = client()

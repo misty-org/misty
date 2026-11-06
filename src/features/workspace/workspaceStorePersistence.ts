@@ -2,95 +2,70 @@ import { initialTabGroups, migrateSavedLinkGroups, savableGroupTabs } from "./ta
 import {
   initialBookmarkNavigation,
   userBookmarkFolders,
-} from "@/features/browser-sync/navigationDefaults";
+} from "@/features/bookmarks/navigationDefaults";
 import { layoutTabs, activateTab } from "./layoutTabs";
-import type { WorkspaceDockNode, WorkspaceLayout } from "./model";
+import { rendererRecords } from "./profileRecordModel";
+import type { WorkspaceDockNode, WorkspaceLayout, WorkspaceWindow } from "./model";
 import type { WorkspaceStore } from "./useWorkspaceStore";
-import {
-  createWorkspaceWindowId,
-  initialWorkspaceLayout,
-  normalizeWorkspaceLayout,
-} from "./windows";
+import { initialWorkspaceLayout, normalizeWorkspaceLayout } from "./windows";
 import { migrateRetiredWorkspaceView, migrateRetiredWorkspaceViews } from "./workspaceMigrations";
 import { migrateClosedWorkspaceItems } from "./closedWorkspaceItems";
 import { upgradeWorkspaceShape } from "./workspaceShapeUpgrade";
-import type { WorkspaceScopeKey, WorkspaceWindow } from "./model";
-import type { MistyTabGroup } from "./tabGroups";
-import { windowSpaceScope } from "./spaceWindow";
+import { currentWindowId } from "./profileWindow";
 import { eraseRetiredBrowserProfiles } from "./retiredBrowserProfiles";
-import type { DockingLayout } from "@/features/app-shell/dockingLayout";
+import { nativeWorkspaceRecoveryEnabled } from "./workspaceRecoveryPlatform";
 
-/** Saved state from before each Space had its own OS window: virtual windows per scope,
- * and a `global` scope for the default workspace. */
-type LegacyWindows = {
+/** Saved state from before a window had one layout: one per Space, and before that virtual
+ * windows per scope, with a `global` scope for the default workspace. */
+type LegacyLayouts = {
+  activeScopeKey?: string;
+  layoutsByScope?: Partial<Record<string, WorkspaceLayout>>;
+  windowIdsByScope?: unknown;
   windowsByScope?: Partial<Record<string, WorkspaceWindow[]>>;
   activeWindowIdByScope?: Partial<Record<string, string>>;
   closedWindowsByScope?: unknown;
+  browserProfiles?: unknown;
 };
 
-/** The scope kept for what was saved under a scope key: each Space keeps its own, and
- * the legacy `global` workspace becomes the Space this window opens in. Device browser
- * profiles are gone (they became Spaces); their layouts are dropped, `null`. */
-function currentScope(scope: string | undefined): WorkspaceScopeKey | null {
-  if (scope?.startsWith("space:")) return scope as WorkspaceScopeKey;
-  return scope === undefined || scope === "global" ? windowSpaceScope() : null;
-}
+const firstProfileScopes = ["space:personal", "global"];
+/** What was saved under no scope, or the personal Space's, is the first profile's. Other Spaces'
+ * tabs are gone: Spaces own no tabs now. */
+const isFirstProfileScope = (scope: string | undefined) =>
+  scope === undefined || firstProfileScopes.includes(scope);
 
 /**
- * Virtual windows are gone: a window shows one Space at a time. A scope's active virtual
- * window becomes its layout (its other windows are dropped; there are no users), and the
- * `global` workspace becomes the Space this window opens in.
+ * A window has one layout, and its id comes from the native window. What older shapes saved
+ * for the personal Space (or the `global` workspace) becomes it.
  */
-function dropVirtualWindows(
-  state: Partial<WorkspaceStore> & LegacyWindows,
-): Partial<WorkspaceStore> {
-  const { windowsByScope, activeWindowIdByScope, closedWindowsByScope: _closed, ...rest } = state;
-  const savedActive = state.activeScopeKey as string | undefined;
-  const layoutsByScope: Partial<Record<WorkspaceScopeKey, WorkspaceLayout>> = {};
-  let windowId = state.activeWindowId;
-  let dockingLayout: DockingLayout | undefined = state.dockingLayout;
-  const savedOwn = currentScope(savedActive) !== null;
-  for (const [scope, layout] of Object.entries(state.layoutsByScope ?? {})) {
-    const kept = currentScope(scope);
-    if (layout && kept) layoutsByScope[kept] = layout;
-  }
-  for (const [scope, windows] of Object.entries(windowsByScope ?? {})) {
-    const kept = currentScope(scope);
-    if (!windows?.length || !kept) continue;
-    const active =
-      windows.find((window) => window.id === activeWindowIdByScope?.[scope]) ?? windows[0];
-    layoutsByScope[kept] = active.layout;
-    if (scope === savedActive || (scope === "global" && !savedOwn)) {
-      windowId = active.id;
-      dockingLayout ??= active.dockingLayout;
-    }
-  }
-  const activeScopeKey = windowSpaceScope();
-  const savedScope = currentScope(savedActive);
-  // The layout on screen at save belongs to its own Space; a device profile's is dropped.
-  if (savedScope && state.layout) layoutsByScope[savedScope] = state.layout;
-  const layout = layoutsByScope[activeScopeKey];
-  // Each Space keeps its own window in its sync tree.
-  const windowIdsByScope: Partial<Record<WorkspaceScopeKey, string>> = {
-    ...state.windowIdsByScope,
-    ...(savedScope && windowId ? { [savedScope]: windowId } : {}),
-  };
-  const { browserProfiles, ...kept } = rest as typeof rest & { browserProfiles?: unknown };
+function singleLayout(state: Partial<WorkspaceStore> & LegacyLayouts): Partial<WorkspaceStore> {
+  const {
+    activeScopeKey,
+    layoutsByScope,
+    windowIdsByScope: _windowIds,
+    windowsByScope,
+    activeWindowIdByScope,
+    closedWindowsByScope: _closed,
+    browserProfiles,
+    ...kept
+  } = state;
   eraseRetiredBrowserProfiles(browserProfiles);
+  const scope = firstProfileScopes.find((name) => windowsByScope?.[name]?.length);
+  const windows = scope ? windowsByScope?.[scope] : undefined;
+  const virtual =
+    windows?.find((window) => window.id === activeWindowIdByScope?.[scope!]) ?? windows?.[0];
+  const layout =
+    (isFirstProfileScope(activeScopeKey) ? state.layout : undefined) ??
+    virtual?.layout ??
+    layoutsByScope?.["space:personal"] ??
+    layoutsByScope?.global;
   return {
     ...kept,
-    activeScopeKey,
-    layout: layout ?? initialWorkspaceLayout(activeScopeKey),
-    layoutsByScope,
-    windowIdsByScope,
-    activeWindowId: windowIdsByScope[activeScopeKey] ?? createWorkspaceWindowId(),
-    dockingLayout,
-    tabGroups: (state.tabGroups as (MistyTabGroup & { scopeKey: string })[] | undefined)?.flatMap(
-      (group) => {
-        const scopeKey = currentScope(group.scopeKey);
-        return scopeKey ? [{ ...group, scopeKey }] : [];
-      },
-    ),
+    layout: layout ?? initialWorkspaceLayout(),
+    activeWindowId: currentWindowId(),
+    dockingLayout: state.dockingLayout ?? virtual?.dockingLayout,
+    tabGroups: (state.tabGroups as (WorkspaceStore["tabGroups"][number] & { scopeKey?: string })[])
+      ?.filter((group) => isFirstProfileScope(group.scopeKey))
+      .map(({ scopeKey: _scope, ...group }) => group),
   };
 }
 
@@ -98,10 +73,14 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
   // Every load path (storage, native recovery, account switch) comes through here.
   const upgraded = upgradeWorkspaceShape(persisted) as Partial<WorkspaceStore> | undefined;
   if (!upgraded) return upgraded as unknown as WorkspaceStore;
-  const state = dropVirtualWindows(upgraded);
+  const state = singleLayout(upgraded);
   const migrated: Partial<WorkspaceStore> = {
     ...state,
     closedItems: migrateClosedWorkspaceItems(state.closedItems),
+    bookmarkFolders: rendererRecords(
+      state.bookmarkFolders ?? [],
+    ) as WorkspaceStore["bookmarkFolders"],
+    bookmarks: rendererRecords(state.bookmarks ?? []) as WorkspaceStore["bookmarks"],
   };
   void version;
 
@@ -122,9 +101,8 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
 }
 
 function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Partial<WorkspaceStore> {
-  const activeScopeKey = state.activeScopeKey ?? windowSpaceScope();
-  const migrateLayout = (layout: WorkspaceLayout, scopeKey: WorkspaceScopeKey) => {
-    const migrated = normalizeWorkspaceLayout(migrateRetiredWorkspaceViews(layout), scopeKey);
+  const migrateLayout = (layout: WorkspaceLayout) => {
+    const migrated = normalizeWorkspaceLayout(migrateRetiredWorkspaceViews(layout));
     const history = (node: WorkspaceDockNode): WorkspaceDockNode => {
       if (node.type === "split")
         return { ...node, first: history(node.first), second: history(node.second) };
@@ -139,32 +117,21 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
     const tabs = layoutTabs(migrated).map((tab) => ({ ...tab, root: history(tab.root) }));
     return activateTab({ ...migrated, tabs }, migrated.activeTabId ?? tabs[0].id);
   };
-  const layoutsByScope = Object.fromEntries(
-    Object.entries(state.layoutsByScope ?? {}).map(([scope, layout]) => [
-      scope,
-      layout ? migrateLayout(layout, scope as WorkspaceScopeKey) : layout,
-    ]),
-  ) as WorkspaceStore["layoutsByScope"];
 
   return {
     ...state,
-    activeScopeKey,
-    layout: state.layout ? migrateLayout(state.layout, activeScopeKey) : state.layout,
-    layoutsByScope,
+    layout: state.layout ? migrateLayout(state.layout) : state.layout,
     closedItems: migrateClosedWorkspaceItems(state.closedItems).map((closed) => ({
       ...closed,
       view: migrateRetiredWorkspaceView(closed.view),
       ...(closed.tab
         ? {
             tab: layoutTabs(
-              migrateLayout(
-                {
-                  ...closed.tab,
-                  tabs: [closed.tab],
-                  activeTabId: closed.tab.id,
-                },
-                activeScopeKey,
-              ),
+              migrateLayout({
+                ...closed.tab,
+                tabs: [closed.tab],
+                activeTabId: closed.tab.id,
+              }),
             )[0],
           }
         : {}),
@@ -172,23 +139,24 @@ function sanitizeRetiredWorkspaceSurfaces(state: Partial<WorkspaceStore>): Parti
   };
 }
 
+/** What a window saves. Its bookmarks and saved tab groups are the profile's records
+ * (profileRecords.ts), shared by all its windows; only a browser with no native side keeps
+ * them here. An incognito window never saves; the recovery writer doesn't run there either. */
 export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceStore> {
-  // An incognito window never saves; the recovery writer doesn't run there either.
+  const native = nativeWorkspaceRecoveryEnabled();
   return {
-    tabGroups: state.tabGroups.map((g) => ({
-      ...g,
-      savedTabs: g.savedTabs ? savableGroupTabs(g.savedTabs) : undefined,
-    })),
+    tabGroups: (native ? state.tabGroups.filter((group) => !group.savedTabs) : state.tabGroups).map(
+      (group) => ({
+        ...group,
+        savedTabs: group.savedTabs ? savableGroupTabs(group.savedTabs) : undefined,
+      }),
+    ),
     migratedTabGroupIds: state.migratedTabGroupIds,
-    bookmarkFolders: state.bookmarkFolders,
-    bookmarks: state.bookmarks,
+    ...(native ? {} : { bookmarkFolders: state.bookmarkFolders, bookmarks: state.bookmarks }),
     expandedBookmarkFolders: state.expandedBookmarkFolders,
     selectedBookmarkByFolder: state.selectedBookmarkByFolder,
-    activeScopeKey: state.activeScopeKey,
     layout: state.layout,
-    layoutsByScope: { ...state.layoutsByScope, [state.activeScopeKey]: state.layout },
     activeWindowId: state.activeWindowId,
-    windowIdsByScope: { ...state.windowIdsByScope, [state.activeScopeKey]: state.activeWindowId },
     dockingLayout: state.dockingLayout,
     lastUsedViewByGroup: state.lastUsedViewByGroup,
     closedItems: state.closedItems,

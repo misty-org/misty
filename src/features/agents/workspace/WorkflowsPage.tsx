@@ -9,7 +9,7 @@ import {
   Mail,
   Repeat2,
 } from "lucide-react";
-import { Button, Card, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/ui";
+import { Button, Card, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
 import { AgentMethodsCatalog } from "./AgentMethodsCatalog";
 import {
   categories,
@@ -108,12 +108,8 @@ export function WorkflowsPage({
           if (!open) setDetail(null);
         }}
       >
-        <DialogContent className="agent-studio-dialog">
+        <DialogContent aria-describedby={undefined} className="agent-studio-dialog">
           <DialogTitle>{detail?.name}</DialogTitle>
-          <DialogDescription>
-            Example prompt. Review the draft and the agent’s available connections before starting
-            work.
-          </DialogDescription>
           <p>{detail ? templatePrompt(detail) : ""}</p>
           <div className="agent-studio-detail-actions">
             <Button

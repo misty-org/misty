@@ -45,7 +45,7 @@ function themeMode(value: string): AppThemeMode {
 function nightLightMode(value: string): NightLightMode {
   return value === "on" || value === "scheduled" ? value : "off";
 }
-export interface AppearancePreferences {
+interface AppearancePreferences {
   appZoom: number;
   compactModeEnabled: boolean;
   themeMode: AppThemeMode;
@@ -54,7 +54,7 @@ export interface AppearancePreferences {
   nightLightEnd: string;
   nightLightWarmth: number;
 }
-export interface GeneralPreferences {
+interface GeneralPreferences {
   preferredWorkspaceRoot: string;
   reopenLastSession: boolean;
   searchEngineIndex: number;

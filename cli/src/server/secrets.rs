@@ -21,23 +21,14 @@ impl JournalSecrets {
         })
     }
 
-    pub(super) fn server_environment(&self) -> String {
+    pub(super) fn environment(&self) -> String {
         format!(
-            "# Append to the Misty server environment.\n\
-         # The private signing key must never be sent to Cloudflare.\n\
+            "# The private signing key must never be sent to Cloudflare.\n\
          {TICKET_PRIVATE_KEY}={}\n\
+         {TICKET_PUBLIC_KEY}={}\n\
          {CONTROL_SECRET}={}\n\
          {PROJECTION_SECRET}={}\n",
-            self.private, self.control, self.projection
-        )
-    }
-
-    pub(super) fn worker_environment(&self) -> String {
-        format!(
-            "{TICKET_PUBLIC_KEY}={}\n\
-             {CONTROL_SECRET}={}\n\
-             {PROJECTION_SECRET}={}\n",
-            self.public, self.control, self.projection
+            self.private, self.public, self.control, self.projection
         )
     }
 }

@@ -16,6 +16,8 @@ import {
 } from "./model";
 import { workspaceSurfaceFromRoute } from "./routeSurface";
 import { useWorkspaceStore } from "./useWorkspaceStore";
+import { parseWorkspaceRecord } from "./workspaceRecord";
+import { partialWorkspaceStore } from "./workspaceStorePersistence";
 
 const browserRequest = {
   surfaceId: "browser" as const,
@@ -200,28 +202,6 @@ describe("desktop dock store", () => {
     expect(useWorkspaceStore.getState()).toBe(current);
   });
 
-  it("gives each Space its own tabs and restores them on the way back", () => {
-    const store = useWorkspaceStore.getState();
-    store.setScope("space:family");
-    store.openSurface({
-      surfaceId: "agents",
-      groupKey: "tool:agents",
-      title: "Agents",
-      route: "/agents",
-      instancePolicy: "single",
-    });
-
-    useWorkspaceStore.getState().setScope("space:work");
-    expect(dockTreeViews(useWorkspaceStore.getState().layout.root)).toMatchObject([
-      { surfaceId: "browser", title: "google.com", route: "/browser", placeholder: true },
-    ]);
-
-    useWorkspaceStore.getState().setScope("space:family");
-    expect(
-      dockTreeViews(useWorkspaceStore.getState().layout.root).map((tab) => tab.surfaceId),
-    ).toContain("agents");
-  });
-
   it("migrates a saved Transfers tab to a browser tab", () => {
     const legacyTab = {
       id: "tab:legacy",
@@ -237,14 +217,11 @@ describe("desktop dock store", () => {
     } as unknown as WorkspaceView;
     const leaf = createDockLeaf([legacyTab]);
 
-    useWorkspaceStore.getState().replaceSnapshot({
-      version: 2,
-      accountId: "account",
-      deviceId: "device",
-      savedAt: 1,
-      layout: { root: leaf, focusedPaneId: leaf.id },
-      lastUsedViewByGroup: {},
-    });
+    useWorkspaceStore.setState(
+      parseWorkspaceRecord(
+        JSON.stringify({ layout: { root: leaf, focusedPaneId: leaf.id }, lastUsedViewByGroup: {} }),
+      ),
+    );
 
     const restored = dockTreeViews(useWorkspaceStore.getState().layout.root);
     expect(restored).toHaveLength(1);
@@ -268,14 +245,14 @@ describe("desktop dock store", () => {
     };
     const pane = createDockLeaf([legacyTab]);
 
-    useWorkspaceStore.getState().replaceSnapshot({
-      version: 2,
-      accountId: "account-1",
-      deviceId: "device-1",
-      savedAt: 1,
-      layout: { root: pane, focusedPaneId: pane.id },
-      lastUsedViewByGroup: { "space:one": legacyTab.id },
-    });
+    useWorkspaceStore.setState(
+      parseWorkspaceRecord(
+        JSON.stringify({
+          layout: { root: pane, focusedPaneId: pane.id },
+          lastUsedViewByGroup: { "space:one": legacyTab.id },
+        }),
+      ),
+    );
 
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)[0]).toMatchObject({
       id: legacyTab.id,
@@ -344,7 +321,6 @@ describe("desktop dock store", () => {
     const first = store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!);
     const browser = store.openBrowserView({ url: "https://example.com" });
     const second = store.openSurface(workspaceSurfaceFromRoute("/spaces/two/notes")!);
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toEqual([
       first.id,
       browser.id,
@@ -362,7 +338,6 @@ describe("desktop dock store", () => {
     const journal = useWorkspaceStore.getState().addSurface(journalRequest!);
     const planner = useWorkspaceStore.getState().addSurface(plannerRequest!);
 
-    expect(useWorkspaceStore.getState().activeScopeKey).toBe("space:personal");
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -556,18 +531,12 @@ describe("desktop dock store", () => {
     expect(dockLeaves(useWorkspaceStore.getState().layout.root)[0].activeViewId).toBe(active.id);
   });
 
-  it("preserves sidebar visibility in versioned snapshots", () => {
+  it("preserves sidebar visibility in saved workspaces", () => {
     const tab = useWorkspaceStore.getState().openSurface(browserRequest);
     useWorkspaceStore.getState().toggleSidebar(tab.id);
-    const snapshot = useWorkspaceStore.getState().createSnapshot("account-1", "device-1");
-    expect(snapshot.version).toBe(4);
-    expect(
-      findDockLeaf(snapshot.layout.root, snapshot.layout.focusedPaneId)?.views.find(
-        (candidate) => candidate.id === tab.id,
-      )?.sidebarVisible,
-    ).toBe(false);
+    const saved = JSON.stringify(partialWorkspaceStore(useWorkspaceStore.getState()));
     useWorkspaceStore.getState().reset();
-    useWorkspaceStore.getState().replaceSnapshot(snapshot);
+    useWorkspaceStore.setState(parseWorkspaceRecord(saved));
     expect(
       dockLeaves(useWorkspaceStore.getState().layout.root)[0].views.find(
         (candidate) => candidate.id === tab.id,

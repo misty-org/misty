@@ -1,6 +1,6 @@
 import type { ShortcutCommandDefinition, ShortcutScope } from "./types";
 
-export interface CommandOptions {
+interface CommandOptions {
   description: string;
   category: string;
   scope?: ShortcutScope;

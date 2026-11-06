@@ -3,7 +3,7 @@ import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentSpaceField } from "./AgentSpaceField";
 import { openMisty } from "@/features/misty/handoff";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, Field, Input, Textarea } from "@/shared/ui";
+import { Button, ErrorNotification, Field, Input, Textarea } from "@/shared/ui";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
@@ -215,11 +215,7 @@ export function AgentEditor({
           ) : null}
         </div>
       </details>
-      {error && (
-        <p role="alert" className="text-sm text-cream-muted">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
           <Button disabled={busy || !draft.name.trim()} type="submit">

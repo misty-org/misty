@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Checkbox, Input, OptionSelect, cn } from "@/shared/ui";
+import { BackButton, Button, Checkbox, ErrorNotification, Input, OptionSelect, cn } from "@/shared/ui";
 import { BrowserLogo } from "./BrowserLogo";
 import { ImportResults } from "./ImportResults";
 import { ImportReview, reviewRows, type ReviewRow } from "./ImportReview";
 import { chosenProfile, enter, ImportSourceList, type ChosenSource } from "./ImportSourceList";
 import { browserImport, type ImportedExtension, type ImportSource } from "./native";
 import { importBookmarksFile, runImport, type ImportKind, type ImportOutcome } from "./runImport";
-import { importIntoNewSpace, type SpaceImport } from "./spaceImport";
+import { importIntoNewProfile, type ProfileImport } from "./profileImport";
 
 type Step =
   | { name: "choose" }
@@ -18,8 +18,8 @@ type Step =
       outcomes: ImportOutcome[];
       done: boolean;
     }
-  /** Handed to a new Space's window, which runs the import. */
-  | { name: "handed"; source: ChosenSource; space: string };
+  /** Handed to a new profile's window, which runs the import. */
+  | { name: "handed"; source: ChosenSource; profile: string };
 
 const chromiumFamily = new Set(["chrome", "edge", "brave", "arc", "vivaldi", "opera", "chromium"]);
 /** "Misty found Zen and Google Chrome on this computer." */
@@ -42,8 +42,8 @@ const onMac = () => typeof navigator !== "undefined" && /mac/i.test(navigator.pl
 export function BrowserImportFlow(props: {
   onClose(): void;
   closeLabel?: string;
-  /** An import another window chose for this Space; it starts at once. */
-  start?: Pick<SpaceImport, "source" | "kinds" | "extensions">;
+  /** An import another window chose for this profile; it starts at once. */
+  start?: Pick<ProfileImport, "source" | "kinds" | "extensions">;
 }) {
   const [sources, setSources] = useState<ImportSource[] | null>(null);
   const [step, setStep] = useState<Step>(() =>
@@ -61,9 +61,9 @@ export function BrowserImportFlow(props: {
   const [extensions, setExtensions] = useState<ImportedExtension[]>([]);
   const [chosen, setChosen] = useState<Set<ImportKind>>(new Set());
   const [issue, setIssue] = useState("");
-  // A profile can come in as a Space of its own, as a Chrome profile is one.
-  const [ownSpace, setOwnSpace] = useState(false);
-  const [spaceName, setSpaceName] = useState("");
+  // Another browser's profile can come in as a Misty profile of its own.
+  const [ownProfile, setOwnProfile] = useState(false);
+  const [profileName, setProfileName] = useState("");
   const [handing, setHanding] = useState(false);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export function BrowserImportFlow(props: {
 
   const review = (source: ChosenSource) => {
     setStep({ name: "review", source });
-    setSpaceName(source.profileName ?? source.name);
+    setProfileName(source.profileName ?? source.name);
     setRows(null);
     setIssue("");
     browserImport
@@ -119,15 +119,15 @@ export function BrowserImportFlow(props: {
 
   const start = (source: ChosenSource) => {
     const kinds = [...chosen];
-    const name = spaceName.trim();
-    if (!ownSpace || !name) return begin(source, kinds, extensions);
+    const name = profileName.trim();
+    if (!ownProfile || !name) return begin(source, kinds, extensions);
     setHanding(true);
     setIssue("");
-    importIntoNewSpace(name, { source, kinds, extensions })
-      .then(() => setStep({ name: "handed", source, space: name }))
+    importIntoNewProfile(name, { source, kinds, extensions })
+      .then(() => setStep({ name: "handed", source, profile: name }))
       .catch((error: unknown) =>
         setIssue(
-          error instanceof Error ? error.message : "That Space couldn't be made. Try again.",
+          error instanceof Error ? error.message : "That profile couldn't be made. Try again.",
         ),
       )
       .finally(() => setHanding(false));
@@ -197,39 +197,35 @@ export function BrowserImportFlow(props: {
         <div className={cn("grid gap-2 rounded-md px-2 py-2", enter)}>
           <div className="flex items-start gap-3">
             <Checkbox
-              id="browser-import-own-space"
+              id="browser-import-own-profile"
               className="mt-0.5"
-              checked={ownSpace}
-              onCheckedChange={(value) => setOwnSpace(value === true)}
+              checked={ownProfile}
+              onCheckedChange={(value) => setOwnProfile(value === true)}
             />
-            <label htmlFor="browser-import-own-space" className="grid min-w-0 gap-0.5">
-              <span className="text-sm text-cream-bright">Make a Space for this profile</span>
+            <label htmlFor="browser-import-own-profile" className="grid min-w-0 gap-0.5">
+              <span className="text-sm text-cream-bright">Make a new profile for this</span>
               <span className="text-xs text-cream-muted">
                 It opens in its own window with its own sign-ins, and everything comes in there.
               </span>
             </label>
           </div>
-          {ownSpace && (
+          {ownProfile && (
             <Input
-              aria-label="Name of the new Space"
+              aria-label="Name of the new profile"
               className="ml-7 w-auto"
-              maxLength={80}
-              value={spaceName}
-              onChange={(event) => setSpaceName(event.target.value)}
+              maxLength={60}
+              value={profileName}
+              onChange={(event) => setProfileName(event.target.value)}
             />
           )}
         </div>
       )}
       {step.name === "handed" && (
         <p className="text-sm text-cream-muted">
-          {`“${step.space}” opened in its own window, and ${step.source.name} is coming in there.`}
+          {`“${step.profile}” opened in its own window, and ${step.source.name} is coming in there.`}
         </p>
       )}
-      {issue && (
-        <p role="alert" className="text-sm text-destructive">
-          {issue}
-        </p>
-      )}
+      <ErrorNotification message={issue} onDismiss={() => setIssue("")} />
       {step.name === "import" && (
         <ImportResults kinds={step.kinds} outcomes={step.outcomes} onLeave={props.onClose} />
       )}
@@ -241,11 +237,11 @@ export function BrowserImportFlow(props: {
         )}
         {step.name === "review" && (
           <>
-            <Button variant="ghost" onClick={() => setStep({ name: "choose" })}>
-              Back
-            </Button>
+            <BackButton size="default" onClick={() => setStep({ name: "choose" })} />
             <Button
-              disabled={!rows || chosen.size === 0 || handing || (ownSpace && !spaceName.trim())}
+              disabled={
+                !rows || chosen.size === 0 || handing || (ownProfile && !profileName.trim())
+              }
               onClick={() => start(step.source)}
             >
               Import

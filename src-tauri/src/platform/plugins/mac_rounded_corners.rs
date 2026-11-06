@@ -122,7 +122,7 @@ pub(crate) unsafe fn configure_continuous_live_resize(view: &objc2_app_kit::NSVi
     }
 }
 
-/// Windows whose first frame is ready. Each Space window reveals itself once.
+/// Windows whose first frame is ready. Each window reveals itself once.
 #[cfg(any(target_os = "macos", windows))]
 static READY_WINDOWS: std::sync::Mutex<std::collections::BTreeSet<String>> =
     std::sync::Mutex::new(std::collections::BTreeSet::new());
@@ -152,7 +152,7 @@ pub fn window_revealed(label: &str) -> bool {
     }
 }
 
-/// A closed window reveals itself again when its Space reopens.
+/// A closed window reveals itself again if its label is used again.
 pub fn forget_window(label: &str) {
     #[cfg(any(target_os = "macos", windows))]
     if let Ok(mut ready) = READY_WINDOWS.lock() {
@@ -178,7 +178,7 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
     // The main window can already contain embedded provider views on reload.
     // Command injection as WebviewWindow rejects any multi-webview window.
     let label = webview.label().to_owned();
-    if !crate::infra::space_windows::is_app_window(&label) || window_ready(&label) {
+    if !crate::infra::profile_windows::is_app_window(&label) || window_ready(&label) {
         return Ok(());
     }
     #[cfg(target_os = "macos")]

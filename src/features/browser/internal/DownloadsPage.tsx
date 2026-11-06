@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, cn, ListRow, ListRowButton, CollectionSkeleton } from "@/shared/ui";
+import { Button, cn, ErrorNotification, ListRow, ListRowButton, CollectionSkeleton } from "@/shared/ui";
 import {
   downloadProgressFraction,
   formatBytes,
@@ -80,11 +80,13 @@ export function DownloadsPage(props: BrowserInternalPageProps) {
         </Button>
       }
     >
-      {error || actionError ? (
-        <p role="alert" className="mb-3 text-sm text-cream-muted">
-          {actionError ?? error}
-        </p>
-      ) : null}
+      <ErrorNotification
+        message={actionError ?? error}
+        onDismiss={() => {
+          setActionError(null);
+          useBrowserDownloadsStore.setState({ error: null });
+        }}
+      />
       {!loaded && !error ? <CollectionSkeleton label="Loading downloads" view="rows" /> : null}
       {loaded && !error && !visible.length ? (
         <InternalPageEmpty

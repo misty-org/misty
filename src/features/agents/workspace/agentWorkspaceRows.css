@@ -78,28 +78,6 @@
   color: var(--color-cream-muted);
 }
 
-/* Folder work joins the bar's controls; its receipt and errors span the row below. */
-.agent-control-bar .misty-folder-work {
-  display: contents;
-}
-.agent-control-bar .misty-folder-work__controls {
-  gap: 2px;
-}
-.agent-control-bar .misty-folder-work__controls > span {
-  flex: 0 1 auto;
-  min-width: 0;
-  font-size: 12px;
-}
-.agent-control-bar .misty-folder-work__receipt,
-.agent-control-bar .misty-folder-work > p {
-  flex-basis: 100%;
-  order: 1;
-  margin: 0;
-  padding: 2px 8px 6px;
-  font-size: 12px;
-  color: var(--color-cream-muted);
-}
-
 /* Multi-selected recents share the open conversation's monochrome surface. */
 .agent-studio-recent-row[data-selected] {
   background: var(--color-charcoal-active);

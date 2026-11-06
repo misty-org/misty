@@ -1,15 +1,16 @@
 //! Voice captures the person starts: the microphone, system audio (without
-//! Misty's own sound) and specific apps or tabs, as separate channels. Mute
-//! closes the microphone; unmute reopens it. Nothing here starts on its own.
-use audeeo_core::{AudioSource, Capture, Channel, DuplexRouter, PcmChunk};
+//! Misty's own sound unless asked) and specific apps or tabs, as separate
+//! channels, sent to the window that started them. Mute closes the microphone;
+//! unmute reopens it. Nothing here starts on its own.
 use base64::{engine::general_purpose::STANDARD, Engine};
+use misty_audio_capture::{AudioSource, Capture, Channel, DuplexRouter, PcmChunk};
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Mutex,
 };
-use tauri::{AppHandle, State, Webview};
+use tauri::{AppHandle, Emitter, State, Webview};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,6 +18,9 @@ pub struct CaptureRequest {
     pub mic: bool,
     /// Everything the computer plays, except Misty.
     pub system: bool,
+    /// System audio with Misty in it: subtitles follow what's playing in a tab too.
+    #[serde(default)]
+    pub include_misty: bool,
     /// Only these processes (an app, or a tab's web content process).
     #[serde(default)]
     pub pids: Vec<u32>,
@@ -30,6 +34,8 @@ pub struct CaptureState {
 
 struct Running {
     id: u64,
+    /// The window that started this capture and receives its audio.
+    owner: String,
     mic: Option<Capture>,
     other: Option<Capture>,
     router: Arc<Mutex<DuplexRouter>>,
@@ -37,20 +43,20 @@ struct Running {
 }
 
 fn require_main(webview: &Webview) -> Result<(), String> {
-    crate::infra::space_windows::is_person_window(webview.label())
+    crate::infra::profile_windows::is_person_window(webview.label())
         .then_some(())
         .ok_or_else(|| "Main Misty window required.".into())
 }
 
-fn emit_chunks(app: &AppHandle, session: u64, chunks: Vec<PcmChunk>) {
+fn emit_chunks(app: &AppHandle, owner: &str, session: u64, chunks: Vec<PcmChunk>) {
     for chunk in chunks {
         let channel = if chunk.channel == Channel::Mic {
             "mic"
         } else {
             "system"
         };
-        let _ = crate::infra::space_windows::emit_to_primary(
-            &app,
+        let _ = app.emit_to(
+            owner,
             "misty://capture-audio",
             json!({"session": session, "channel": channel, "startFrame": chunk.start_frame, "power": chunk.power(), "pcm": STANDARD.encode(chunk.to_le_bytes())}),
         );
@@ -59,21 +65,25 @@ fn emit_chunks(app: &AppHandle, session: u64, chunks: Vec<PcmChunk>) {
 
 fn open(
     app: &AppHandle,
+    owner: &str,
     session: u64,
     source: AudioSource,
     router: Arc<Mutex<DuplexRouter>>,
 ) -> Result<Capture, String> {
     let chunk_app = app.clone();
     let failure_app = app.clone();
+    let chunk_owner = owner.to_owned();
+    let failure_owner = owner.to_owned();
     let channel = source.channel();
-    audeeo_core::start(
+    misty_audio_capture::start(
         source,
         move |chunk| {
             let ready = router.lock().map(|mut r| r.push(chunk)).unwrap_or_default();
-            emit_chunks(&chunk_app, session, ready);
+            emit_chunks(&chunk_app, &chunk_owner, session, ready);
         },
         move |error| {
-            let _ = crate::infra::space_windows::emit_to_primary(&failure_app,
+            let _ = failure_app.emit_to(
+                failure_owner.as_str(),
                 "misty://capture-state",
                 json!({"session": session, "channel": if channel == Channel::Mic { "mic" } else { "system" }, "error": error.to_string()}),
             );
@@ -100,26 +110,36 @@ pub fn voice_capture_start(
         drop(previous);
     }
     let session = state.session.fetch_add(1, Ordering::SeqCst) + 1;
+    let owner = webview.label().to_owned();
     let has_other = request.system || !request.pids.is_empty();
     // With both channels open, the system channel is the echo reference.
     let router = Arc::new(Mutex::new(DuplexRouter::new(request.mic && has_other)));
     let other = if has_other {
         let source = if request.pids.is_empty() {
-            AudioSource::System { exclude_self: true }
+            AudioSource::System {
+                exclude_self: !request.include_misty,
+            }
         } else {
             AudioSource::Processes(request.pids.clone())
         };
-        Some(open(&app, session, source, router.clone())?)
+        Some(open(&app, &owner, session, source, router.clone())?)
     } else {
         None
     };
     let mic = if request.mic {
-        Some(open(&app, session, AudioSource::Mic, router.clone())?)
+        Some(open(
+            &app,
+            &owner,
+            session,
+            AudioSource::Mic,
+            router.clone(),
+        )?)
     } else {
         None
     };
     *running = Some(Running {
         id: session,
+        owner,
         mic,
         other,
         router,
@@ -151,13 +171,14 @@ pub fn voice_capture_mute(
     } else if running.mic.is_none() {
         running.mic = Some(open(
             &app,
+            &running.owner,
             running.id,
             AudioSource::Mic,
             running.router.clone(),
         )?);
     }
-    let _ = crate::infra::space_windows::emit_to_primary(
-        &app,
+    let _ = app.emit_to(
+        running.owner.as_str(),
         "misty://capture-state",
         json!({"session": running.id, "muted": muted}),
     );
@@ -184,9 +205,9 @@ pub fn voice_capture_stop(
             .lock()
             .map(|mut r| r.flush())
             .unwrap_or_default();
-        emit_chunks(&app, running.id, rest);
-        let _ = crate::infra::space_windows::emit_to_primary(
-            &app,
+        emit_chunks(&app, &running.owner, running.id, rest);
+        let _ = app.emit_to(
+            running.owner.as_str(),
             "misty://capture-state",
             json!({"session": running.id, "stopped": true}),
         );

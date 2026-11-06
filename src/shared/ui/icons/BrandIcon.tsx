@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { brandIconAsset } from "./brandIcons";
 
-export interface BrandIconProps {
+interface BrandIconProps {
   brand: string;
   size?: number;
   className?: string;
@@ -24,6 +24,7 @@ const adaptiveMarks = new Set([
   "moonshot",
   "ollama",
   "openai",
+  "openrouter",
   "typeform",
   "vercel",
   "x",

@@ -153,7 +153,6 @@ export function MistyPanel({ side: propSide }: { side?: MistyPanelSide } = {}) {
                     agent={profile}
                     spaceId=""
                     accountId={accountId}
-                    showControlBar
                     emptyContent={
                       profile ? (
                         <div className="agent-studio-welcome">

@@ -1,13 +1,7 @@
 import { settingsString, useSettingsStore } from "@/features/settings";
 import { parseBrowserViewState, type WorkspaceView } from "@/features/workspace/model";
-import {
-  parseSiteZoomLevels,
-  siteZoomKey,
-  siteZoomPercent,
-  siteZoomSettingWith,
-} from "@/features/webviews/siteZoom";
+import { parseSiteZoomLevels, siteZoomKey, siteZoomPercent } from "@/features/webviews/siteZoom";
 import { openSystemExternalLink } from "@/shared/platform/openExternalLink";
-import { invoke } from "@tauri-apps/api/core";
 import {
   browserRuntimeId,
   useBrowserRuntimeStore,
@@ -17,7 +11,8 @@ import {
 import { BrowserMenuView } from "./BrowserMenuView";
 import { useCallback, useMemo, type ReactNode } from "react";
 import type { BrowserPageCommands } from "./useBrowserPageCommands";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
+import { setPageZoom, usePrivatePageZoom } from "./pageZoom";
 export function BrowserMenu(props: {
   nativeRuntime: boolean;
   tab: WorkspaceView;
@@ -28,7 +23,6 @@ export function BrowserMenu(props: {
   lead?: ReactNode;
   toolsIcon?: boolean;
   library?: ReactNode;
-  account?: ReactNode;
 }) {
   const runtimeId = browserRuntimeId(props.tab);
   const privateTab = Boolean(isIncognitoWindow());
@@ -37,8 +31,12 @@ export function BrowserMenu(props: {
   );
   const siteLevels = useMemo(() => parseSiteZoomLevels(siteZoomRaw), [siteZoomRaw]);
   // Private tabs zoom only themselves and never save a level.
-  const remembered =
-    privateTab || !siteZoomKey(props.url) ? undefined : siteZoomPercent(siteLevels, props.url);
+  const privateLevel = usePrivatePageZoom((state) => state.levels[runtimeId]);
+  const remembered = privateTab
+    ? privateLevel
+    : siteZoomKey(props.url)
+      ? siteZoomPercent(siteLevels, props.url)
+      : undefined;
   const setOverlay = useCallback(
     async (reason: string, active: boolean) => {
       setBrowserWebviewsSuspended(active, `browser-${reason}:${runtimeId}`);
@@ -65,20 +63,7 @@ export function BrowserMenu(props: {
         bookmarkId: parseBrowserViewState(props.tab.state).bookmarkId,
         installable: !privateTab && /^https?:\/\//i.test(props.url),
       }}
-      setZoom={async (factor) => {
-        await invoke("browser_webview_set_zoom", { request: { id: runtimeId, factor } });
-        if (privateTab) return;
-        const settings = useSettingsStore.getState();
-        const raw = settingsString(
-          settings.settings?.document ?? {},
-          "general",
-          "browser_site_zoom_json",
-          "[]",
-        );
-        const next = siteZoomSettingWith(raw, props.url, factor);
-        if (next !== null && next !== raw)
-          settings.updateSetting("general", "browser_site_zoom_json", next);
-      }}
+      setZoom={(factor) => setPageZoom(runtimeId, props.url, privateTab, factor)}
       reportError={reportError}
       openExternal={openSystemExternalLink}
     />

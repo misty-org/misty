@@ -3,8 +3,9 @@
 ## Set up
 
 Follow the [README](README.md) for requirements and getting a development build running: the
-desktop app (Tauri, in `src/` and `src-tauri/`), the server (`server/`) and the `misty` CLI
-(`cli/`). Then turn on the git hooks once per clone:
+desktop app (Tauri, in `src/` and `src-tauri/`) and the `misty` CLI
+(`cli/`). The server is in
+[misty-server](https://github.com/misty-org/misty-server), cloned beside this checkout. Then turn on the git hooks once per clone:
 
 ```sh
 git config core.hooksPath .githooks

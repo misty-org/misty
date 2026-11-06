@@ -85,9 +85,9 @@ Agent tabs are a run's working state on the device that runs it, not part of you
 - They are not in the sync tree: `workspaces` (window → tab → pane → view → page) holds only your
   tabs. The agent browser keeps its views and tabs in its own store, in memory, never in
   `misty.db`.
-- An app restart starts clean: agent views and their sleeping tabs are gone. The chat keeps its
-  answer, sources and links on this device, where the chat itself lives
-  ([agent-chats-local/BRIEF.md](chats-local.md)).
+- An app restart starts clean: agent views and their sleeping tabs are gone. The conversation keeps
+  its answer, sources and links on the server
+  ([README.md](README.md#where-conversations-live)).
 - A page moved to your tabs becomes one of your tabs and syncs from then on.
 
 ## What goes away

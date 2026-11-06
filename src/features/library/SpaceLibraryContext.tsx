@@ -13,7 +13,7 @@ export function useSpaceLibraryContext(): SpaceLibraryContextValue {
   return value;
 }
 
-export interface SpaceLibraryContextValue {
+interface SpaceLibraryContextValue {
   data: SpaceLibraryData;
   itemActions: SpaceLibraryItemActions;
   collectionActions: SpaceLibraryCollectionActions;

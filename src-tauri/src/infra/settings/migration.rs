@@ -8,12 +8,13 @@ use serde_json::{Map, Value};
 
 /// Bumped whenever a key is retired, so the prune below runs exactly once per
 /// user rather than on every launch.
-pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 11;
+pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 12;
 
 /// Whole sections that no longer exist. `account` and `ai` were never read.
 /// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
 /// (`files`, `transfer_profiles`) and file indexing (`search`) left Misty.
 /// Schema 10: Open With associations went with the file manager.
+/// Schema 12: reading other apps' windows (`screen_memory`) was removed.
 const RETIRED_SECTIONS: &[&str] = &[
     "account",
     "ai",
@@ -23,6 +24,7 @@ const RETIRED_SECTIONS: &[&str] = &[
     "search",
     "transfer_profiles",
     "open_with",
+    "screen_memory",
 ];
 
 /// Individual keys retired from sections that still exist.

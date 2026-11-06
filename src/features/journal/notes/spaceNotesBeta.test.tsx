@@ -407,7 +407,7 @@ describe("SpaceNotes beta simplification", () => {
       'button[aria-label="Back to notes"]',
     );
     expect(backButton).not.toBeNull();
-    expect(backButton?.textContent).toContain("Notes");
+    expect(backButton?.textContent).toContain("Back");
 
     // Click Back to return to List view
     await act(async () => {

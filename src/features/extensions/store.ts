@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useDevicePreferences } from "@/features/settings";
 import { resolveSetting } from "@/features/settings";
-import { spaceWindow } from "@/features/workspace/spaceWindow";
+import { currentProfile, firstProfileId } from "@/features/workspace/profileWindow";
 import type {
   ExtensionEvent,
   ExtensionReview,
@@ -134,14 +134,15 @@ export function parseInstallations(raw: string): Installation[] {
   }
 }
 type SettingsState = NonNullable<ReturnType<typeof useDevicePreferences.getState>["state"]>;
-/** Every other Space's installations: `[{ space, installations }]`. */
-type SpaceList = { space: string; installations: unknown };
-function spaceLists(raw: unknown): SpaceList[] {
+/** Every other profile's installations, under the setting's stored names:
+ * `[{ space: <profile id>, installations }]`. */
+type ProfileList = { space: string; installations: unknown };
+function profileLists(raw: unknown): ProfileList[] {
   try {
     const value: unknown = JSON.parse(String(raw));
     return Array.isArray(value)
       ? value.filter(
-          (entry): entry is SpaceList =>
+          (entry): entry is ProfileList =>
             typeof entry === "object" && entry !== null && typeof entry.space === "string",
         )
       : [];
@@ -150,37 +151,37 @@ function spaceLists(raw: unknown): SpaceList[] {
   }
 }
 /**
- * Extensions are installed per Space, as each Space runs its own extension host.
- * The personal Space keeps the list from before Spaces; every other Space has its
- * own entry. This window's Space is the one its toolbar and Settings manage.
+ * Extensions are installed per profile, as each profile runs its own extension host. The
+ * first profile keeps the list from before profiles; every other profile has its own entry.
+ * This window's profile is the one its toolbar and Settings manage.
  */
-export function spaceInstallationsRaw(state: SettingsState | null | undefined): string {
+export function profileInstallationsRaw(state: SettingsState | null | undefined): string {
   if (!state) return "[]";
-  const space = spaceWindow();
-  if (space.personal) return String(resolveSetting(state, "extensions.installations").value);
-  const list = spaceLists(resolveSetting(state, "extensions.space_installations").value).find(
-    (entry) => entry.space === space.key,
+  const { id } = currentProfile();
+  if (id === firstProfileId) return String(resolveSetting(state, "extensions.installations").value);
+  const list = profileLists(resolveSetting(state, "extensions.space_installations").value).find(
+    (entry) => entry.space === id,
   )?.installations;
   return Array.isArray(list) ? JSON.stringify(list) : "[]";
 }
 function installationsRaw(): string {
-  return spaceInstallationsRaw(useDevicePreferences.getState().state);
+  return profileInstallationsRaw(useDevicePreferences.getState().state);
 }
 export function installations() {
   return parseInstallations(installationsRaw());
 }
 async function setInstallations(raw: string) {
-  const space = spaceWindow();
-  if (space.personal) {
+  const { id } = currentProfile();
+  if (id === firstProfileId) {
     await setPreference("installations", raw);
     return;
   }
-  const lists = spaceLists(preference("space_installations", "[]")).filter(
-    (entry) => entry.space !== space.key,
+  const lists = profileLists(preference("space_installations", "[]")).filter(
+    (entry) => entry.space !== id,
   );
   await setPreference(
     "space_installations",
-    JSON.stringify([...lists, { space: space.key, installations: JSON.parse(raw) as unknown }]),
+    JSON.stringify([...lists, { space: id, installations: JSON.parse(raw) as unknown }]),
   );
 }
 export async function setPreference(key: string, value: string | boolean) {

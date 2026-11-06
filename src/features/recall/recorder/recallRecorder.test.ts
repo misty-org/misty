@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DWELL_MS, RecallRecorder, type ActivePage, type RecorderDeps } from "./recorder";
+import {
+  DWELL_MS,
+  RecallRecorder,
+  SETTLE_MS,
+  type ActivePage,
+  type RecorderDeps,
+} from "./recorder";
 
 const article = {
   blocks: [
@@ -97,5 +103,41 @@ describe("RecallRecorder", () => {
     await vi.advanceTimersByTimeAsync(DWELL_MS);
     // Only the first page was tried; the next waits out the backoff.
     expect(failing).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("RecallRecorder tab visits", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("records a tab opened in the background without reading it", async () => {
+    const { recorder, record, readArticle } = setup();
+    recorder.observeTabs([page("https://news.example/a", { runtimeId: "tab-2" })], "tab-1");
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    expect(readArticle).not.toHaveBeenCalled();
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0]![0]).toMatchObject({ kind: "page", body: "", dwell_ms: 0 });
+  });
+
+  it("leaves the tab in front to be read, and does not also count it as a visit", async () => {
+    const { recorder, record } = setup();
+    const front = page("https://news.example/b");
+    recorder.observe(front);
+    recorder.observeTabs([front], front.runtimeId);
+    await vi.advanceTimersByTimeAsync(DWELL_MS);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0]![0]).toMatchObject({ body: expect.stringContaining("council") });
+  });
+
+  it("counts a page left before it was read as a visit, and skips private ones", async () => {
+    const { recorder, record } = setup();
+    recorder.observe(page("https://news.example/c"));
+    await vi.advanceTimersByTimeAsync(DWELL_MS / 2);
+    recorder.observe(page("https://news.example/d", { runtimeId: "tab-2" }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(record).toHaveBeenCalledTimes(1);
+    recorder.observeTabs([page("https://news.example/e", { runtimeId: "tab-3", private: true })]);
+    await vi.advanceTimersByTimeAsync(SETTLE_MS);
+    expect(record).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,8 +1,7 @@
 import { pushPaneView } from "./paneHistory";
-import { layoutTabs, activateTab } from "./layoutTabs";
+import { layoutTabs, activateTab, mapLayoutViews } from "./layoutTabs";
 import { mapDockLeafForView } from "./dockTree";
 import type { BrowserViewState } from "./model";
-import { mapAllWorkspaceWindowViews, mapAllWorkspaceWindowLayouts } from "./windows";
 import {
   browserViewTitle,
   createBrowserViewState,
@@ -22,8 +21,8 @@ export function workspaceViewActions(
 > {
   return {
     updateBrowserView: (tabId, patch) => {
-      set((current) =>
-        mapAllWorkspaceWindowViews(current, (tab) => {
+      set((current) => ({
+        layout: mapLayoutViews(current.layout, (tab) => {
           if (tab.id !== tabId || tab.surfaceId !== "browser") return tab;
           const { title, ...statePatch } = patch;
           const existing = parseBrowserViewState(tab.state);
@@ -45,46 +44,43 @@ export function workspaceViewActions(
             state: { ...defaults, ...statePatch } satisfies BrowserViewState,
           };
         }),
-      );
+      }));
     },
     renameView: (tabId, title) => {
       const trimmed = title.trim();
       if (!trimmed) return;
-      set((current) =>
-        mapAllWorkspaceWindowViews(current, (tab) =>
+      set((current) => ({
+        layout: mapLayoutViews(current.layout, (tab) =>
           tab.id === tabId && tab.title !== trimmed ? { ...tab, title: trimmed } : tab,
         ),
-      );
+      }));
     },
     updateViewRoute: (tabId, route, replace = false) => {
-      set(
-        mapAllWorkspaceWindowLayouts(get(), (layout) => {
-          const tabs = layoutTabs(layout).map((tab) => ({
-            ...tab,
-            root: mapDockLeafForView(tab.root, tabId, (pane) => {
-              const view = pane.views[0];
-              return view.route === route
-                ? pane
-                : pushPaneView(pane, { ...view, route, placeholder: false }, replace);
-            }),
-          }));
-          return activateTab({ ...layout, tabs }, layout.activeTabId ?? tabs[0].id);
+      const { layout } = get();
+      const tabs = layoutTabs(layout).map((tab) => ({
+        ...tab,
+        root: mapDockLeafForView(tab.root, tabId, (pane) => {
+          const view = pane.views[0];
+          return view.route === route
+            ? pane
+            : pushPaneView(pane, { ...view, route, placeholder: false }, replace);
         }),
-      );
+      }));
+      set({ layout: activateTab({ ...layout, tabs }, layout.activeTabId ?? tabs[0].id) });
     },
     updateViewState: (tabId, state, title) => {
-      set((current) =>
-        mapAllWorkspaceWindowViews(current, (tab) =>
+      set((current) => ({
+        layout: mapLayoutViews(current.layout, (tab) =>
           tab.id === tabId ? { ...tab, state, title: title?.trim() || tab.title } : tab,
         ),
-      );
+      }));
     },
     toggleSidebar: (tabId) => {
-      set((current) =>
-        mapAllWorkspaceWindowViews(current, (tab) =>
+      set((current) => ({
+        layout: mapLayoutViews(current.layout, (tab) =>
           tab.id === tabId ? { ...tab, sidebarVisible: !tab.sidebarVisible } : tab,
         ),
-      );
+      }));
     },
   };
 }

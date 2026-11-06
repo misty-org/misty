@@ -7,7 +7,7 @@ const settingNames: Record<ImportSettingKind, string> = {
   searchEngine: "search engine",
   homepage: "homepage",
   startup: "startup",
-  sitePermissions: "camera and microphone choices",
+  sitePermissions: "camera, microphone and location choices",
 };
 const count = (n: number, one: string, many = `${one}s`) =>
   `${n.toLocaleString()} ${n === 1 ? one : many}`;

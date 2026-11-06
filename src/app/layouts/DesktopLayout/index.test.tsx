@@ -23,7 +23,6 @@ vi.mock("@/features/auth", () => ({
   AccountClosingNotice: () => null,
   AccountSuspendedNotice: () => null,
 }));
-vi.mock("@/features/passwords/DevicePasswordsMerge", () => ({ DevicePasswordsMerge: () => null }));
 
 vi.mock("@/features/workspace", () => ({
   useWindowDockingLayout: () => ({ navigation: "right", tabs: "left" }),
@@ -104,14 +103,10 @@ vi.mock("@/features/auth/AuthContext", () => ({
 }));
 
 vi.mock("@/features/setup", () => ({
-  FirstRunSetup: () => null,
-  isSetupCompletedForAccount: () => true,
-  useSetupStore: {
-    getState: () => ({ isOpen: false, startSetup: vi.fn() }),
-  },
+  useSetupStore: { getState: () => ({ finishWelcome: vi.fn() }) },
 }));
 
-vi.mock("./ProfileMenu", () => ({ ProfileMenu: () => null }));
+vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 vi.mock("./SettingsOverlays", () => ({ RemotesOverlay: () => null, SettingsOverlay: () => null }));
 vi.mock("./FramePacingOverlay", () => ({ FramePacingOverlay: () => null }));
 vi.mock("@/features/browser/workspace", () => ({
@@ -119,7 +114,7 @@ vi.mock("@/features/browser/workspace", () => ({
   setBrowserWebviewsSuspended: vi.fn(),
 }));
 vi.mock("@/features/webviews/BrowserRuntimeBridge", () => ({ BrowserRuntimeBridge: () => null }));
-vi.mock("@/features/browser-sync/BrowserSearchDialog", () => ({
+vi.mock("@/features/browser-search/BrowserSearchDialog", () => ({
   BrowserSearchDialog: () => null,
 }));
 vi.mock("@/features/webviews/browserRuntime", () => ({

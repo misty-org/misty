@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ErrorNotification } from "@/shared/ui";
 import { interventionLabels } from "@/features/agent-interventions/api";
 import { useAgentInterventions } from "@/features/agent-interventions/store";
 import { useMistyStore } from "@/features/misty/useMistyStore";
@@ -87,11 +88,8 @@ export function AgentControlIsland() {
         </p>
         {meta && <span className="shrink-0 text-xs text-cream-muted">{meta}</span>}
       </div>
-      {(error || notice) && (
-        <p className="px-2 text-xs text-cream-muted" role={error ? "alert" : undefined}>
-          {error || notice}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
+      {!error && notice && <p className="px-2 text-xs text-cream-muted">{notice}</p>}
       {takesMessages && (
         <AgentControlComposer
           name={name}

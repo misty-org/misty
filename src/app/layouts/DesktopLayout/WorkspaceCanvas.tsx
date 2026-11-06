@@ -1,5 +1,4 @@
-import { BrowserChromeSlotContext } from "@/features/browser/workspace";
-import { useBrowserSearchStore } from "@/features/browser-sync/search";
+import { useBrowserSearchStore } from "@/features/browser-search/search";
 import { PaneSwapMode } from "./PaneSwapMode";
 import { routes } from "@/features/app-shell";
 import type { TabSide } from "@/features/app-shell/dockingLayout";
@@ -36,18 +35,13 @@ export function WorkspaceCanvas(props: {
   /** Focus mode: pages fill the window without the tab strip. */
   hideTabStrip?: boolean;
   stripFootEnd?: ReactNode;
-  /** The vertical sidebar's closing row: the account, sync and settings, inside its panel. */
+  /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
-  /** Lent to the browser: Spaces beside Misty, and the account rows of its menu. */
-  browserChrome?: {
-    accountItems: ReactNode;
-  };
 }) {
   useLegacyTabTitles();
   const location = useLocation();
   const navigate = useNavigate();
   const layout = useWorkspaceStore((state) => state.layout);
-  const activeScopeKey = useWorkspaceStore((state) => state.activeScopeKey);
   const lastUsedTabByGroup = useWorkspaceStore((state) => state.lastUsedViewByGroup);
   const focusTab = useWorkspaceStore((state) => state.focusView);
   const closeTab = useWorkspaceStore((state) => state.closeView);
@@ -135,7 +129,7 @@ export function WorkspaceCanvas(props: {
   );
 
   useWorkspaceTabShortcuts(navigateToActiveLayoutTab);
-  const pinBlockedNotice = usePinTabShortcut();
+  usePinTabShortcut();
   useClearTabsShortcut();
   useWorkspaceCanvasShortcuts({ openTab, splitWorkspacePane });
 
@@ -162,13 +156,14 @@ export function WorkspaceCanvas(props: {
   const contentColumn = side === "right" ? 1 : 2;
 
   return (
-    <BrowserChromeSlotContext.Provider value={props.browserChrome ?? null}>
+    <>
+      {/* Clipped, not hidden: a collapsed right sidebar waits past this edge, and scrolling its
+          active tab into view must not scroll the Space bar and page sideways. */}
       <div
-        className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-charcoal-workspace ${
+        className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-clip bg-charcoal-workspace ${
           side === "right" ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)]"
         }`}
         data-workspace-panes={leaves.length}
-        data-workspace-scope={activeScopeKey}
       >
         {!props.hideTabStrip ? (
           <>
@@ -194,7 +189,7 @@ export function WorkspaceCanvas(props: {
                 footEnd={props.stripFootEnd}
               />
             </SidebarDrawer>
-            <SpaceBar gridColumn={contentColumn} />
+            <SpaceBar gridColumn={contentColumn} side={side} />
           </>
         ) : null}
         <WorkspaceTabPanels
@@ -205,9 +200,8 @@ export function WorkspaceCanvas(props: {
             if (closePeek()) navigateToActiveLayoutTab();
           }}
         />
-        {pinBlockedNotice}
         <PaneSwapMode />
       </div>
-    </BrowserChromeSlotContext.Provider>
+    </>
   );
 }

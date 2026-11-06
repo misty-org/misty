@@ -8,7 +8,7 @@ import { DeviceEmbeddingWorker } from "./deviceEmbeddings";
 import { endAllHostedSessions } from "./hostedSessions";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "./localExecution";
-import { isHostWindow, onHostWindow } from "@/features/workspace/spaceWindow";
+import { isHostWindow, onHostWindow } from "@/features/workspace/profileWindow";
 
 /** Whether this window runs the device's agent jobs: the oldest open window does, and the
  * next one takes over when it closes. */
@@ -49,10 +49,6 @@ export function AgentJobWorker() {
       // So do the vectors search and memory rank by.
       embeddings = new DeviceEmbeddingWorker();
       embeddings.start();
-      // Old project switches become remembered approvals, once.
-      void import("./coding/projectMigration")
-        .then(({ migrateProjectSwitches }) => migrateProjectSwitches())
-        .catch(() => undefined);
     });
     // This computer stays awake while its own agent task runs.
     const unwatch = watchLocalExecutionForKeepAwake((listener) => {

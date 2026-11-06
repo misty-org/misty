@@ -20,7 +20,7 @@ export interface BrowserDownloadEntry {
   device?: string | null;
 }
 
-export interface BrowserDownloadProgress {
+interface BrowserDownloadProgress {
   id: string;
   received: number;
   total: number;
@@ -62,30 +62,26 @@ export const browserLibrary = {
       request: { ids: request.ids ?? [], since: request.since },
     }),
 
-  recordVisit: (request: { profileId?: string; url: string; title: string; typed?: boolean }) =>
+  recordVisit: (request: { url: string; title: string; typed?: boolean }) =>
     invoke<void>("browser_history_record", { request }),
-  setVisitTitle: (request: { profileId?: string; url: string; title: string }) =>
+  setVisitTitle: (request: { url: string; title: string }) =>
     invoke<void>("browser_history_set_title", { request }),
-  history: (request: { profileId?: string; text?: string; before?: number; limit?: number }) =>
+  history: (request: { text?: string; before?: number; limit?: number }) =>
     invoke<BrowserHistoryVisit[]>("browser_history_query", { request }),
   /** Empty text returns the profile's top pages. */
-  historySuggestions: (request: { profileId?: string; text: string; limit?: number }) =>
+  historySuggestions: (request: { text: string; limit?: number }) =>
     invoke<BrowserHistorySuggestion[]>("browser_history_suggest", { request }),
   /** Removes every visit to one page. */
-  forgetPage: (request: { profileId?: string; url: string }) =>
-    invoke<void>("browser_history_forget", { request }),
+  forgetPage: (request: { url: string }) => invoke<void>("browser_history_forget", { request }),
   deleteVisits: (ids: number[]) => invoke<void>("browser_history_delete", { request: { ids } }),
-  clearHistory: (request: { profileId?: string; since?: number }) =>
+  clearHistory: (request: { since?: number }) =>
     invoke<void>("browser_history_clear", { request }).then(() => {
       // Open history lists reload instead of waiting for a manual refresh.
       window.dispatchEvent(new Event(browserHistoryClearedEvent));
     }),
 
-  clearWebsiteData: (request: {
-    profileId?: string;
-    kinds: BrowserWebsiteDataKind[];
-    since: number;
-  }) => invoke<void>("browser_clear_website_data", { request }),
+  clearWebsiteData: (request: { kinds: BrowserWebsiteDataKind[]; since: number }) =>
+    invoke<void>("browser_clear_website_data", { request }),
 };
 
 export interface BrowserMediaInfo {

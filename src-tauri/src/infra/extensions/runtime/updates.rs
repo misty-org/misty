@@ -7,10 +7,10 @@ pub async fn extensions_check_updates(
     app: tauri::AppHandle,
 ) -> Result<Vec<InstalledState>, ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
+        let profile = native::caller_profile(&caller)?;
         let _guard = lifecycle().lock().await;
         let (account, installations) = {
-            let state = service(&space).lock().await;
+            let state = service(&profile).lock().await;
             (
                 state.account.clone(),
                 state
@@ -31,17 +31,19 @@ pub async fn extensions_check_updates(
                 {
                     // The store took it down: stop running it everywhere it loaded.
                     Err(error) if error == catalog::REMOVED => {
-                        service(&space)
+                        service(&profile)
                             .lock()
                             .await
                             .removed
                             .insert(installation.id.clone());
-                        return Ok(Some(activate(&app, &account, &space, &installation).await?));
+                        return Ok(Some(
+                            activate(&app, &account, &profile, &installation).await?,
+                        ));
                     }
                     result => result?,
                 };
                 let current = read_review(&selected_package(
-                    &root(&app, &account, &space)?
+                    &root(&app, &account, &profile)?
                         .join("packages")
                         .join(&installation.id),
                     false,
@@ -49,7 +51,7 @@ pub async fn extensions_check_updates(
                 if current.entry.digest == latest.digest {
                     return Ok::<_, String>(None);
                 }
-                let review = prepare(&app, &account, &space, &installation.id).await?;
+                let review = prepare(&app, &account, &profile, &installation.id).await?;
                 if review.blocked
                     || review
                         .permissions
@@ -66,20 +68,22 @@ pub async fn extensions_check_updates(
                         review: Some(review),
                     }));
                 }
-                commit(&app, &space, &review.token).await?;
-                Ok(Some(activate(&app, &account, &space, &installation).await?))
+                commit(&app, &profile, &review.token).await?;
+                Ok(Some(
+                    activate(&app, &account, &profile, &installation).await?,
+                ))
             }
             .await;
             match result {
                 Ok(Some(status)) => {
-                    service(&space)
+                    service(&profile)
                         .lock()
                         .await
                         .states
                         .insert(installation.id.clone(), status);
                 }
                 Err(error) => {
-                    if let Some(status) = service(&space)
+                    if let Some(status) = service(&profile)
                         .lock()
                         .await
                         .states
@@ -91,13 +95,13 @@ pub async fn extensions_check_updates(
                 _ => {}
             }
         }
-        crate::infra::space_windows::emit_to_space(
+        crate::infra::profile_windows::emit_to_profile(
             &app,
-            &space,
+            &profile,
             "misty://extensions",
-            json!({"kind":"changed","account":account,"space":space}),
+            json!({"kind":"changed","account":account,"space":profile}),
         );
-        Ok(service(&space)
+        Ok(service(&profile)
             .lock()
             .await
             .states

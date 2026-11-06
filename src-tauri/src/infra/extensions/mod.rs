@@ -11,12 +11,12 @@ pub(crate) use native::{page_host, EXTENSION_SCHEME};
 #[cfg(windows)]
 mod native_windows;
 mod package;
+mod profiles;
+pub(crate) mod records;
 pub(crate) mod runtime;
-pub(crate) mod space;
-mod spaces;
 mod sync;
 mod tabs;
-pub(crate) use spaces::{release_space, remove_space};
+pub(crate) use profiles::{release_profile, remove_profile};
 pub(crate) use tabs::{
     agent_action, agent_extension_id, authorize_agent_url, context_menu, has_extensions,
     is_chrome_store_id, pending_navigation, request_store_install, request_store_remove,
@@ -146,18 +146,19 @@ async fn cancellable<T>(
     }
     tokio::select! { result=future=>result, _=changed.changed()=>Err("The extension account changed.".into()) }
 }
-/// Each Space keeps its own installations, states and loaded packages, as each
-/// has its own extension host. A Space's entry lives for the process (there are
-/// few); freeing a Space resets it.
-fn service(space: &str) -> &'static Mutex<ExtensionService> {
-    static SPACES: OnceLock<std::sync::Mutex<BTreeMap<String, &'static Mutex<ExtensionService>>>> =
-        OnceLock::new();
-    let mut spaces = SPACES
+/// Each profile keeps its own installations, states and loaded packages, as each
+/// has its own extension host. A profile's entry lives for the process (there are
+/// few); freeing a profile resets it.
+fn service(profile: &str) -> &'static Mutex<ExtensionService> {
+    static PROFILES: OnceLock<
+        std::sync::Mutex<BTreeMap<String, &'static Mutex<ExtensionService>>>,
+    > = OnceLock::new();
+    let mut profiles = PROFILES
         .get_or_init(Default::default)
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    spaces
-        .entry(space.to_owned())
+    profiles
+        .entry(profile.to_owned())
         .or_insert_with(|| &*Box::leak(Box::<Mutex<ExtensionService>>::default()))
 }
 /// The account whose extensions run; empty while signed out.
@@ -165,16 +166,16 @@ fn current_account() -> &'static std::sync::Mutex<String> {
     static ACCOUNT: OnceLock<std::sync::Mutex<String>> = OnceLock::new();
     ACCOUNT.get_or_init(Default::default)
 }
-/// Spaces whose extensions this process has started.
-fn running_spaces() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
+/// Profiles whose extensions this process has started.
+fn running_profiles() -> &'static std::sync::Mutex<std::collections::BTreeSet<String>> {
     static RUNNING: OnceLock<std::sync::Mutex<std::collections::BTreeSet<String>>> =
         OnceLock::new();
     RUNNING.get_or_init(Default::default)
 }
-fn spaces_running() -> Vec<String> {
-    running_spaces()
+fn profiles_running() -> Vec<String> {
+    running_profiles()
         .lock()
-        .map(|spaces| spaces.iter().cloned().collect())
+        .map(|profiles| profiles.iter().cloned().collect())
         .unwrap_or_default()
 }
 // Serializes lifecycle work, while allowing callbacks to acquire the state lock.
@@ -190,14 +191,14 @@ pub async fn close_account() {
     advance_epoch();
     let _guard = lifecycle().lock().await;
     sync::reset();
-    for space in spaces_running() {
-        let mut state = service(&space).lock().await;
+    for profile in profiles_running() {
+        let mut state = service(&profile).lock().await;
         for path in state.prepared.values() {
             let _ = std::fs::remove_dir_all(path);
         }
         *state = ExtensionService::default();
     }
-    if let Ok(mut running) = running_spaces().lock() {
+    if let Ok(mut running) = running_profiles().lock() {
         running.clear();
     }
     if let Ok(mut account) = current_account().lock() {
@@ -206,7 +207,7 @@ pub async fn close_account() {
     if let Ok(mut origins) = origins().write() {
         origins.clear();
     }
-    // An empty account stops every Space's host.
+    // An empty account stops every profile's host.
     let _ = native::request(json!({"operation":"configure", "account":""})).await;
     CLOSING.store(false, std::sync::atomic::Ordering::Release);
 }
@@ -233,7 +234,7 @@ pub async fn extensions_layout(
     tabs: Vec<LayoutTab>,
 ) -> Result<(), ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
+        let profile = native::caller_profile(&caller)?;
         if tabs.len() > 10000
             || tabs.iter().any(|t| {
                 t.id.len() > 256
@@ -244,12 +245,14 @@ pub async fn extensions_layout(
         {
             return Err("Invalid extension tab layout.".into());
         }
-        let account = service(&space).lock().await.account.clone();
+        let account = service(&profile).lock().await.account.clone();
         if account.is_empty() {
             return Ok(());
         }
-        native::request(json!({"operation":"layout","account":account,"space":space,"tabs":tabs}))
-            .await?;
+        native::request(
+            json!({"operation":"layout","account":account,"space":profile,"tabs":tabs}),
+        )
+        .await?;
         Ok(())
     }
     .await;
@@ -265,21 +268,21 @@ pub async fn extensions_compat(
     payload: Value,
 ) -> Result<Value, ExtensionFailure> {
     let result: Result<_, String> = async {
-        let space = native::caller_space(&caller)?;
+        let profile = native::caller_profile(&caller)?;
         if !["compat-reply", "compat-event"].contains(&operation.as_str())
             || !payload.is_object()
             || payload.to_string().len() > 8 * 1024 * 1024
         {
             return Err("Invalid extension compatibility message.".into());
         }
-        let account = service(&space).lock().await.account.clone();
+        let account = service(&profile).lock().await.account.clone();
         if account.is_empty() {
             return Ok(Value::Null);
         }
         let mut request = payload;
         request["operation"] = json!(operation);
         request["account"] = json!(account);
-        request["space"] = json!(space);
+        request["space"] = json!(profile);
         native::request(request).await
     }
     .await;

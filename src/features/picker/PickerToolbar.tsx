@@ -201,7 +201,7 @@ export function PickerToolbar(props: PickerToolbarProps) {
   );
 }
 
-export interface PickerToolbarProps {
+interface PickerToolbarProps {
   path: string;
   query: string;
   canGoBack: boolean;

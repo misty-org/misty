@@ -2,10 +2,9 @@
 //! sessions on their own website-data store.
 use super::Permissions;
 use kiri::engine::StoreScope as PermissionScope;
-use objc2_foundation::{NSString, NSUserDefaults};
+use objc2_foundation::NSString;
 use std::collections::BTreeMap;
 
-const PREFERENCES_KEY: &str = "misty.browser.site-permissions.v1";
 static TEMPORARY_PERMISSIONS_KEY: u8 = 0;
 
 unsafe extern "C" {
@@ -95,12 +94,6 @@ pub(super) unsafe fn update_scope(
 }
 
 pub(super) fn read_store() -> PermissionStore {
-    // Choices an earlier build kept in the macOS preferences move into the database once.
-    super::db::import_earlier_once(|| {
-        NSUserDefaults::standardUserDefaults()
-            .stringForKey(&NSString::from_str(PREFERENCES_KEY))
-            .map(|raw| raw.to_string())
-    });
     super::db::read_all()
 }
 

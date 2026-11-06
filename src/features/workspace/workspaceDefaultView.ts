@@ -1,10 +1,5 @@
 import { browserNewTabUrl } from "./browserHome";
-import {
-  browserViewTitle,
-  createBrowserViewState,
-  type WorkspaceScopeKey,
-  type WorkspaceView,
-} from "./model";
+import { browserViewTitle, createBrowserViewState, type WorkspaceView } from "./model";
 
 /** Settings store the view's index in the setting's legacy values, where 0 was
  * the retired Home page and 2 the retired Files tool; both now open the default. */
@@ -53,7 +48,7 @@ function createTab(index: number, placeholder: boolean): WorkspaceView {
     placeholder,
   };
 }
-export function createDefaultWorkspaceView(_scopeKey: WorkspaceScopeKey): WorkspaceView {
+export function createDefaultWorkspaceView(): WorkspaceView {
   return createTab(defaultIndex, true);
 }
 export const createBlankWorkspaceView = createDefaultWorkspaceView;

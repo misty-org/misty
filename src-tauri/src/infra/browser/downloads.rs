@@ -97,11 +97,11 @@ pub(super) fn handle_download_event(
                     record.success,
                     record.error.as_deref(),
                 );
-                // Private tabs have no Space store; their downloads stay here.
+                // Private tabs have no profile store; their downloads stay here.
                 if let (true, Some(kiri::engine::StoreScope::Persistent(store_key))) =
                     (record.success, session_permission_scope(app, tab_id))
                 {
-                    super::super::browser_library::download_into_space(
+                    super::super::browser_library::download_into_profile(
                         app,
                         store_key,
                         &record.download_id,

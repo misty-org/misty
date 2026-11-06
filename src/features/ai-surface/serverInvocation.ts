@@ -1,3 +1,5 @@
+import { currentProfile } from "@/features/workspace/profileWindow";
+import { spaceWindow } from "@/features/workspace/spaceWindow";
 import type { AiInvocationRequest, AiContextReference } from "./types";
 
 /** The invocation request as the server reads it: snake_case, captures flattened. */
@@ -53,7 +55,9 @@ export function toServerInvocation(input: AiInvocationRequest) {
     execution_mode: input.executionMode,
     window_label: input.windowLabel,
     current_tab: input.currentTab,
-    history_turns: input.historyTurns?.length ? input.historyTurns : undefined,
+    space_id: input.spaceId ?? spaceWindow().spaceId ?? undefined,
+    profile: input.profile ?? currentProfile().id,
+    origin_device_id: input.originDeviceId,
     device_contexts: input.deviceContexts?.map((context) => ({
       device_id: context.deviceId,
       kind: context.kind,

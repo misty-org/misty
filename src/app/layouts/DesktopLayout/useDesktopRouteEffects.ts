@@ -1,5 +1,5 @@
 import { isAuthPath, routes } from "@/features/app-shell";
-import { isSetupCompletedForAccount, useSetupStore } from "@/features/setup";
+import { useSetupStore } from "@/features/setup";
 import {
   activeLayoutView,
   allLayoutViews,
@@ -31,14 +31,11 @@ export function useDesktopRouteEffects(options: {
   } = options;
   const openWorkspaceSurface = useWorkspaceStore((state) => state.openSurface);
 
-  // Setup follows the welcome on first run, for an account or for browsing without one.
+  // Signing in passes the welcome as its wizard does; the wizard follows it in the sheet.
   const onAuthPage = isAuthPath(location.pathname);
   useEffect(() => {
-    if (transitioning || onAuthPage) return;
-    const setup = useSetupStore.getState();
-    // Signing in passes the welcome as Start browsing does.
-    if (userId) setup.finishWelcome();
-    if (!isSetupCompletedForAccount(setup, userId) && !setup.isOpen) setup.startSetup();
+    if (transitioning || onAuthPage || !userId) return;
+    useSetupStore.getState().finishWelcome();
   }, [userId, transitioning, onAuthPage]);
 
   useEffect(() => {

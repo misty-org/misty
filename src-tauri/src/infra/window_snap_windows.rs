@@ -45,7 +45,7 @@ fn key(code: u16, up: bool) -> INPUT {
 #[tauri::command]
 pub fn window_show_snap_layouts(webview: tauri::Webview) -> Result<(), String> {
     let window = webview.window();
-    if !crate::infra::space_windows::is_space_window(window.label()) || !has_snap_layouts() {
+    if !crate::infra::profile_windows::is_person_window(window.label()) || !has_snap_layouts() {
         return Ok(());
     }
     let hwnd = window.hwnd().map_err(|error| error.to_string())?;

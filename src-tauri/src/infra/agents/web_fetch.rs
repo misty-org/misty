@@ -1,56 +1,16 @@
-//! `web.fetch` on the person's device (docs/agents/harness.md, Reading without a screen):
-//! one public page, fetched without cookies or saved sign-ins, so an agent can
-//! read what a search found without opening a screen. Every hop is checked
-//! before connecting: http or https, no credentials in the address, and a host
-//! that resolves only to public addresses. The connection is pinned to the
-//! checked address so the name can't be re-resolved somewhere private.
+//! Fetching one public address without cookies or saved sign-ins, for link previews. Every hop
+//! is checked before connecting: http or https, no credentials in the address, and a host that
+//! resolves only to public addresses. The connection is pinned to the checked address so the
+//! name can't be re-resolved somewhere private. An agent's `web.fetch` applies the same rules in
+//! the agent runtime (services/agent-runtime/src/web-fetch/public-fetch.ts).
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use serde::Serialize;
 
-const MAX_BYTES: usize = 2 * 1024 * 1024;
 const MAX_REDIRECTS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(20);
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 MistyFetch/1";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FetchedPage {
-    pub final_url: String,
-    pub status: u16,
-    pub content_type: String,
-    pub body: String,
-    pub truncated: bool,
-}
-
-/// Fails with a short code the agent's tool turns into plain words.
-#[tauri::command]
-pub async fn agents_web_fetch(webview: tauri::Webview, url: String) -> Result<FetchedPage, String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
-        return Err("device_grant_invalid".into());
-    }
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    fetch(&url).await
-}
-
-pub async fn fetch(address: &str) -> Result<FetchedPage, String> {
-    let raw = fetch_raw(
-        address,
-        "text/html,application/xhtml+xml,text/plain,application/json;q=0.9,*/*;q=0.5",
-        MAX_BYTES,
-        readable,
-    )
-    .await?;
-    Ok(FetchedPage {
-        final_url: raw.final_url.to_string(),
-        status: raw.status,
-        content_type: raw.content_type,
-        body: String::from_utf8_lossy(&raw.body).into_owned(),
-        truncated: raw.truncated,
-    })
-}
 
 /// One response as bytes, after the same checks on every hop.
 pub struct RawResponse {
@@ -137,21 +97,6 @@ pub async fn fetch_raw(
     Err("too_many_redirects".into())
 }
 
-fn readable(content_type: &str) -> bool {
-    content_type.is_empty()
-        || [
-            "text/html",
-            "application/xhtml+xml",
-            "text/plain",
-            "text/markdown",
-            "application/json",
-            "application/xml",
-            "text/xml",
-        ]
-        .iter()
-        .any(|kind| content_type.starts_with(kind))
-}
-
 /// The address to connect to, once the URL and every address its host resolves to pass.
 async fn public_target(url: &url::Url) -> Result<SocketAddr, String> {
     if !matches!(url.scheme(), "http" | "https")
@@ -173,6 +118,16 @@ async fn public_target(url: &url::Url) -> Result<SocketAddr, String> {
         return Err("private_address".into());
     }
     Ok(addresses[0])
+}
+
+/// False when a server's host resolves to any private address. A name that doesn't resolve passes
+/// here and fails when the app tries to reach it, which says so better.
+pub async fn host_resolves_public(host: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    match tokio::net::lookup_host((host, 443)).await {
+        Ok(mut addresses) => addresses.all(|address| is_public(address.ip())),
+        Err(_) => true,
+    }
 }
 
 pub fn is_public(ip: IpAddr) -> bool {
@@ -240,6 +195,21 @@ mod tests {
                 "{address} should be allowed"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn a_server_host_on_a_private_address_is_refused() {
+        for host in ["localhost", "127.0.0.1", "192.168.1.20", "[::1]"] {
+            assert!(
+                !host_resolves_public(host).await,
+                "{host} should be refused"
+            );
+        }
+        assert!(host_resolves_public("1.1.1.1").await);
+    }
+
+    async fn fetch(address: &str) -> Result<RawResponse, String> {
+        fetch_raw(address, "*/*", 1024, |_| true).await
     }
 
     #[tokio::test]

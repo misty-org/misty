@@ -8,6 +8,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  ErrorNotification,
   MenuTrigger,
 } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
@@ -130,7 +131,6 @@ export function AgentProjectMenu({
         <DropdownMenuItem onSelect={() => void add()}>
           <FolderOpen aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">Add an existing folder…</span>
-          {failed && <span className="max-w-32 truncate text-xs text-cream-muted">{failed}</span>}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -138,6 +138,7 @@ export function AgentProjectMenu({
   return (
     <>
       {menu}
+      <ErrorNotification message={failed} onDismiss={() => setFailed("")} />
       <NewProjectDialog
         open={dialog === "new"}
         onOpenChange={(open) => setDialog(open ? "new" : null)}

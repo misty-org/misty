@@ -1,4 +1,4 @@
-import { ChevronDown, Hash, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Hash, MoreHorizontal, Pencil, Plus, Trash2, User } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState, type ReactNode } from "react";
 import type { SpaceConversation } from "@/api/spaces/dto/entities";
@@ -18,11 +18,12 @@ import { conversationName, groupConversations } from "./conversationGroups";
 import { readChatSidebar, writeChatSidebar } from "./chatSidebarPreferences";
 
 /** "everyone" is the Space-wide channel; anything else is a conversation id. */
-export type ChatSelection = string;
+type ChatSelection = string;
 
 /**
  * The chat page's sidebar, like Slack: a collapsible Channels section with the Space-wide
- * channel and every conversation with people. Agents are not here; mention one in a message.
+ * channel and the group chats, public to the Space, and a Direct messages section, visible only
+ * to the people in each. Agents are not here; mention one in a message.
  */
 export function ChatSidebar(props: {
   spaceName: string;
@@ -41,9 +42,10 @@ export function ChatSidebar(props: {
   onRangeSelect(event: MouseEvent, id: string, onOpen: () => void): void;
   onClearSelection(): void;
   onNewConversation(): void;
+  onNewDirectMessage(): void;
 }) {
   const [collapsed, setCollapsed] = useState(() => readChatSidebar());
-  const [channels] = groupConversations(props.conversations);
+  const [channels, directMessages] = groupConversations(props.conversations);
   const toggleSection = (id: string) => {
     const next = { ...collapsed, [id]: !collapsed[id] };
     setCollapsed(next);
@@ -135,6 +137,29 @@ export function ChatSidebar(props: {
             ),
           )
         )}
+      </Section>
+      <Section
+        title="Direct messages"
+        collapsed={collapsed.dms}
+        onToggle={() => toggleSection("dms")}
+        action={
+          props.canWrite && (
+            <IconButton label="New direct message" size="xs" onClick={props.onNewDirectMessage}>
+              <Plus />
+            </IconButton>
+          )
+        }
+      >
+        {directMessages.conversations.map((conversation) => (
+          <Row
+            key={conversation.id}
+            active={props.selected === conversation.id}
+            onClick={() => props.onSelect(conversation.id)}
+            icon={<User />}
+          >
+            {conversationName(conversation, props.currentUserId)}
+          </Row>
+        ))}
       </Section>
     </WorkspaceSidebar>
   );

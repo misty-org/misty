@@ -38,6 +38,15 @@ export function applyUpdateProgress(current: UpdateProgress, event: DownloadEven
   };
 }
 
+/**
+ * Whether the update feed answered that there's no release. The server was reached, so this isn't a
+ * connection problem, and it's what every check gets until a release has been published.
+ */
+export function isNoReleaseError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /valid release JSON/i.test(message);
+}
+
 export function readableUpdateError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/not configured|pubkey|endpoint/i.test(message)) {

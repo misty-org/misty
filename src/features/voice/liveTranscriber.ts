@@ -14,18 +14,20 @@ export interface SocketLike {
   onerror: ((event: unknown) => void) | null;
 }
 
-export type RelayMessage =
+type RelayMessage =
   | { type: "ready"; channels: LiveChannel[]; maxMs: number }
   | { type: "segment"; segment: Segment }
   | { type: "limit"; message: string }
   | { type: "error"; message: string }
   | { type: "finished"; usedMs: number };
 
-export interface LiveTranscriberEvents {
+interface LiveTranscriberEvents {
   /** The transcript changed (a segment was added or revised). */
   onChange?(transcript: Transcript): void;
   /** A plain-language problem; the session has ended or will end. */
   onNotice?(message: string): void;
+  /** The relay's socket closed, whoever closed it. */
+  onClosed?(): void;
 }
 
 /** Audio held before the relay is ready: what was said while connecting. */
@@ -56,7 +58,16 @@ export class LiveTranscriber {
   connect(
     url: string,
     ticket: string,
-    start: { language?: string; context?: { terms?: string[]; text?: string } },
+    start: {
+      language?: string;
+      target?: string;
+      context?: {
+        terms?: string[];
+        text?: string;
+        general?: { key: string; value: string }[];
+        translation_terms?: { source: string; target: string }[];
+      };
+    },
   ) {
     return new Promise<void>((resolve, reject) => {
       if (this.ended) return reject(new Error("Dictation ended."));
@@ -69,6 +80,7 @@ export class LiveTranscriber {
         this.ended = true;
         this.finished?.();
         reject(new Error("Live transcription closed."));
+        this.events.onClosed?.();
       };
       socket.onmessage = (event) => {
         if (typeof event.data !== "string") return;

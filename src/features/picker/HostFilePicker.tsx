@@ -1,14 +1,6 @@
 import type { FileEntry } from "@/native/ipc";
 import { formatBytes } from "@/shared/lib/fileFormat";
-import {
-  Badge,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui";
+import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui";
 import { Check, FileText, Folder } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { PickerFileBrowser, type PickerBrowserState } from "./PickerFileBrowser";
@@ -225,17 +217,10 @@ export function MistyFilePicker({
         if (!isOpen) onCancel();
       }}
     >
-      <DialogContent className={standaloneDialogClassName}>
+      <DialogContent aria-describedby={undefined} className={standaloneDialogClassName}>
         <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-charcoal-border px-5 py-3 pr-12 text-left shrink-0">
           <div className="min-w-0">
             <DialogTitle className="text-base font-semibold">{dialogTitle}</DialogTitle>
-            <DialogDescription className="text-xs text-cream-muted">
-              {mode === "folder"
-                ? "Select a destination folder."
-                : multiple
-                  ? "Select one or more files."
-                  : "Select a file."}
-            </DialogDescription>
           </div>
           {sourceToggle}
         </DialogHeader>

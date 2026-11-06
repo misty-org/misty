@@ -1,6 +1,7 @@
 // The only import path for shared UI. Features import from "@/shared/ui", never a subfolder.
 
 // controls
+export * from "./controls/BackButton";
 export * from "./controls/Button";
 export * from "./controls/Checkbox";
 export * from "./controls/ColorSwatch";
@@ -24,7 +25,6 @@ export * from "./controls/SegmentedControl";
 // overlays
 export * from "./overlays/OverlaySide";
 export * from "./overlays/AlertDialog";
-export * from "./overlays/BlockingScreen";
 export * from "./overlays/Command";
 export * from "./overlays/ContextMenu";
 export * from "./overlays/Dialog";
@@ -39,7 +39,7 @@ export * from "./overlays/SuggestionList";
 export * from "./overlays/Tooltip";
 export * from "./overlays/ViewportLayer";
 export * from "./overlays/WorkspaceOverlay";
-export type { MenuWidth } from "./overlays/popupStyles";
+;
 
 // layout
 export * from "./layout/Collapsible";

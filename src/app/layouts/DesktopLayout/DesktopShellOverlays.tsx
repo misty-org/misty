@@ -1,9 +1,8 @@
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { WorkflowSchedulesBridge } from "@/features/agents";
-import { BrowserSearchDialog } from "@/features/browser-sync/BrowserSearchDialog";
+import { BrowserSearchDialog } from "@/features/browser-search/BrowserSearchDialog";
 import { MistyContextBridgeHost } from "@/features/misty/MistyContextBridgeHost";
 import { BrowserContextMenuBridge } from "@/features/misty/BrowserContextMenuBridge";
-import { FirstRunSetup } from "@/features/setup";
 import { BrowserRuntimeBridge } from "@/features/webviews/BrowserRuntimeBridge";
 import { DeferUntilIdle } from "./DeferUntilIdle";
 import { SettingsOverlay } from "./SettingsOverlays";
@@ -24,7 +23,6 @@ export function DesktopShellOverlays(props: {
         {props.userId ? <MistyContextBridgeHost /> : null}
         <WorkflowSchedulesBridge />
         <AgentJobWorker />
-        <FirstRunSetup />
       </DeferUntilIdle>
     </>
   );

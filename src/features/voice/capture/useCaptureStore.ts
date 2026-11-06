@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { create } from "zustand";
+import { rememberCapture } from "@/features/recall";
 import { voiceApi, voiceDeviceId } from "../api";
 import { LiveTranscriber, type LiveChannel } from "../liveTranscriber";
 import { captureApi, type VoiceNoteMode, type VoiceSourceKind, type VoiceTurn } from "./captureApi";
@@ -62,7 +63,7 @@ interface Running {
 
 let running: Running | undefined;
 
-function decode(base64: string) {
+export function decodePcm(base64: string) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -123,7 +124,7 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         "misty://capture-audio",
         ({ payload }) => {
           if (current.sessions.has(payload.session))
-            live.push(payload.channel, decode(payload.pcm));
+            live.push(payload.channel, decodePcm(payload.pcm));
         },
       ),
       listen<{ session: number; error?: string; notice?: string }>(
@@ -137,14 +138,13 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     try {
       const device = await voiceDeviceId();
       const ticket = await voiceApi.liveTicket({ device_id: device, channels, language });
-      const hearsOther =
-        source.kind === "system" || source.kind === "app" || source.kind === "recording";
+      const hearsOther = source.kind === "system" || source.kind === "app";
       if (source.mic || source.kind === "mic" || hearsOther) {
         current.native = true;
         const session = await invoke<number>("voice_capture_start", {
           request: {
             mic: source.mic || source.kind === "mic",
-            system: source.kind === "system" || source.kind === "recording",
+            system: source.kind === "system",
             pids: source.pids ?? [],
           },
         });
@@ -194,6 +194,12 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
         duration_ms: Date.now() - current.startedAt,
       });
       set({ phase: "done", turns, transcriptId: saved.id });
+      rememberCapture({
+        id: saved.id,
+        title,
+        url: source.url,
+        text: turns.map((turn) => `${speakers[turn.speaker] ?? turn.speaker}: ${turn.text}`).join("\n"),
+      });
     } catch (error) {
       set({ phase: "done", turns, notice: message(error, "The transcript couldn't be saved.") });
     }

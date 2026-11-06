@@ -20,6 +20,9 @@ pub(super) fn set_webview_bounds_if_changed(
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
+    // A page in full screen fills its window, whatever its pane reports.
+    let (position, size) =
+        super::fullscreen::fullscreen_bounds(webview).unwrap_or((position, size));
     let scale = webview
         .window()
         .scale_factor()

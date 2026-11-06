@@ -39,12 +39,6 @@
       "hash": "c55227b71cc33062"
     }
   ],
-  "src/shared/ui/controls/Button.tsx": [
-    {
-      "length": 170,
-      "hash": "46fc84894a33e9df"
-    }
-  ],
   "src/shared/ui/display/Card.tsx": [
     {
       "length": 285,

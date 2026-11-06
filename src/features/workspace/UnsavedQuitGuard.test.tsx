@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/browser-sync/recovery", () => ({ flushWorkspaceRecovery: mocks.flush }));
+vi.mock("@/features/workspace/recoveryStorage", () => ({ flushWorkspaceRecovery: mocks.flush }));
 import { UnsavedQuitGuard } from "./UnsavedQuitGuard";
 
 beforeEach(() => {
@@ -40,7 +40,7 @@ it("asks before quitting when changes still cannot be saved", async () => {
   mocks.flush.mockRejectedValue(new Error("disk"));
   await hold({ unsaved: 2, closing: false });
   expect(mocks.invoke).not.toHaveBeenCalled();
-  expect(screen.getByText("Some changes are not saved on this device")).toBeTruthy();
+  expect(screen.getByText("Some changes are not saved on this computer")).toBeTruthy();
   expect(screen.getByText(/2 changes exist only in this window/)).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Quit anyway" })));
   expect(mocks.invoke).toHaveBeenCalledWith("app_quit_confirmed", { closing: false });
@@ -52,5 +52,5 @@ it("keeps Misty open when asked, and closes only the window when that was the re
   expect(screen.getByRole("button", { name: "Close anyway" })).toBeTruthy();
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Keep Misty open" })));
   expect(mocks.invoke).not.toHaveBeenCalled();
-  expect(screen.queryByText("Some changes are not saved on this device")).toBeNull();
+  expect(screen.queryByText("Some changes are not saved on this computer")).toBeNull();
 });

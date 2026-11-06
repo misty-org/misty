@@ -6,7 +6,7 @@ import type { LibraryEditDefinition } from "@/api/spaces/dto/common";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { defaultLibraryEdit, normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";
 
-export interface LibraryEditVersionsState {
+interface LibraryEditVersionsState {
   editVersions: LibraryEditVersion[];
   setEditVersions: Dispatch<SetStateAction<LibraryEditVersion[]>>;
   editingAvailable: boolean;

@@ -14,7 +14,7 @@ export async function createWorkspaceView(
 ) {
   const snapshot = await agentsDeviceSnapshot();
   assertCurrent();
-  if (!snapshot.device) throw new Error("This device is unavailable for agent execution.");
+  if (!snapshot.device) throw new Error("This signed-in session is unavailable for agents.");
   const device = await ensureServerAgentDevice(snapshot.device);
   assertCurrent();
   const id = `agent-${crypto.randomUUID()}`;

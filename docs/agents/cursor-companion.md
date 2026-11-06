@@ -6,7 +6,7 @@ and amended October 15 to capture every display (decision 2), following Clicky. 
 ("companion as orchestrator") was approved; the owner then dropped the companion as a separate
 idea, and revisions 3 and 4 follow that direction. It builds on the
 [agent architecture brief](architecture.md) (one durable loop for every entry
-point), [agent-chats-local](chats-local.md) (a run works on the device it was sent
+point), [where conversations live](README.md#where-conversations-live) (a run works on the computer it was sent
 from) and [docs/agents/harness.md](harness.md). The mockup is
 [mockup.html](mockups/cursor-companion.html).
 
@@ -61,7 +61,7 @@ aloud, and it handed over the answer. Teach mode is a hands-on tutor instead.
 - **A conversation mode.** Teach sits beside Ask, Auto and Plan in the mode menu, and the companion
   has a Teach mode switch. A chat in Teach mode stays in it, so every follow-up is a lesson step.
 - **A fast lane, not the agent loop.** A Teach turn is one streamed model call with no tools, no
-  `agent_finish`, no reviews and low reasoning (`server/apps/agent-runtime/src/teach-turn.ts`,
+  `agent_finish`, no reviews and low reasoning (`src-tauri/services/agent-runtime/src/teach-turn.ts`,
   `companion_teach_mode.txt`). Its text reaches the person a sentence at a time. When the person
   wants the work done, it says Auto mode will do it; it never acts.
 - **Teach, stop, check.** Each reply teaches one step and ends; Misty never watches or waits. The
@@ -70,8 +70,8 @@ aloud, and it handed over the answer. Teach mode is a hands-on tutor instead.
   contract. Answers come as a hint ladder (nudge, hint, then the exact line), and never the full
   solution unless the person chose code for each step.
 - **Lessons.** Each topic is its own lesson and its own chat. A lesson (goal, three to six objectives
-  with contracts, current step, answer policy, hint level, mistakes so far) lives on the device beside
-  its chat (`agent_chats` kind `lesson`) and travels with each turn; the server keeps none. One lesson
+  with contracts, current step, answer policy, hint level, mistakes so far) is kept on the server
+  beside its chat (`/misty/lessons`) and travels with each turn. One lesson
   per agent is active; the model starts a new one, resumes a paused one or continues, says so, and
   the turn moves to that lesson's chat. Saying they are done finishes the lesson with a summary of
   what was achieved.
@@ -85,7 +85,7 @@ aloud, and it handed over the answer. Teach mode is a hands-on tutor instead.
   up to four lookups while planning a lesson, one on a step, so steps stay fast. It says one short
   sentence before a lookup, offers at most one reference link from what it found, and never acts.
 - **Courses.** A broad topic ("teach me React") becomes a course of three to six lessons
-  (`[COURSE:{…}]`, kept on the device as `agent_chats` kind `course`). The sidebar shows a course as
+  (`[COURSE:{…}]`, kept beside the lessons). The sidebar shows a course as
   a row with its lessons hanging off it, and a finished lesson offers **Next lesson**.
 
 ## Drawing and video context (October 19, 2026)

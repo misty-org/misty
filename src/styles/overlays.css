@@ -38,7 +38,9 @@
       [data-popup-surface],
       [id="browser-omnibox-suggestions"]
     ) {
-    overflow: clip;
+    /* Not `clip`: with this border and radius, WebView2 drops ClearType for the
+       popup's text, which reads as blur on 1x displays. */
+    overflow: hidden;
   }
 }
 
@@ -67,7 +69,7 @@
     animation: none;
   }
 }
-/* The opening screen fades away over the window it opened, as the traffic lights fade in. */
+/* The opening screen fades away over the window it opened. */
 .misty-loading-screen-leaving {
   pointer-events: none;
   animation: misty-overlay-fade-out 450ms ease-in-out forwards;

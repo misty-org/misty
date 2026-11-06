@@ -1,12 +1,11 @@
-import { flushWorkspaceRecovery } from "@/features/browser-sync/recovery";
+import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
 import { useNativeSessionStore } from "@/features/native-session";
 import { routes } from "@/features/app-shell";
 import { browserLibrary } from "@/features/browser";
-import { passwordsApi } from "@/features/passwords/api";
 import {
   adoptAccountWorkspace,
   liveWorkspace,
-  localProfileId,
+  localAccountScope,
   removeAccountWorkspace,
   restoreAccountWorkspace,
   saveAccountWorkspace,
@@ -29,13 +28,13 @@ import type { AccountStateSetters } from "./providerTypes";
 // the account itself.
 // Saving the workspace and clearing native identity are best-effort: a failed
 // cleanup step is reported, but never leaves the person signed in.
-/** "Also remove my browsing data from this device": history, downloads, website sign-ins
- * and cached files of the personal Space, and the local profile's saved windows and tabs. */
+/** "Also remove my browsing data from this device": this window's profile's history, downloads,
+ * website sign-ins and cached files, and the saved windows and tabs kept for no account. */
 async function eraseDeviceBrowsingData() {
   await browserLibrary.clearHistory({ since: 0 });
   await browserLibrary.removeDownloads({ since: 0 });
   await browserLibrary.clearWebsiteData({ kinds: ["cookies", "cache"], since: 0 });
-  await removeAccountWorkspace(localProfileId);
+  await removeAccountWorkspace(localAccountScope);
 }
 
 export function useDeactivateToChooser(
@@ -67,9 +66,6 @@ export function useDeactivateToChooser(
       };
       await attempt(flushWorkspaceRecovery);
       if (accountId && !endSession) await attempt(() => saveAccountWorkspace(accountId));
-      // While the account's vault is still open: keep its saved passwords on this device for
-      // browsing without an account, or erase the device's.
-      await attempt(() => passwordsApi.deviceKeep(removeData));
       if (removeData) await attempt(eraseDeviceBrowsingData);
       // Signing out ends the server session and removes the account from this device;
       // adding it again needs its password.
@@ -86,8 +82,8 @@ export function useDeactivateToChooser(
       resetAccountScopedState(accountId);
       await attempt(() =>
         live
-          ? adoptAccountWorkspace(localProfileId, live)
-          : restoreAccountWorkspace(localProfileId),
+          ? adoptAccountWorkspace(localAccountScope, live)
+          : restoreAccountWorkspace(localAccountScope),
       );
       setUserState(null);
       setAccounts(listSavedAccountSessions());

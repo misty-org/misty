@@ -13,11 +13,14 @@ pub enum Decision {
     Block,
 }
 
-/// A site's camera and microphone choices.
+/// A site's camera, microphone and location choices.
 #[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct MediaPermissions {
+pub struct SitePermissions {
     pub camera: Decision,
     pub microphone: Decision,
+    /// Choices saved before location existed read as Ask.
+    #[serde(default)]
+    pub location: Decision,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +28,15 @@ pub enum MediaKind {
     Camera,
     Microphone,
     CameraAndMicrophone,
+}
+
+/// A permission a site can ask for.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionKind {
+    Camera,
+    Microphone,
+    Location,
 }
 
 /// What the engine should do with a request.
@@ -52,18 +64,36 @@ pub fn media_verdict(
     top_origin: Option<&str>,
     requester_origin: Option<&str>,
     kind: Option<MediaKind>,
-    lookup: impl Fn(&str) -> MediaPermissions,
+    lookup: impl Fn(&str) -> SitePermissions,
 ) -> Verdict {
     let (Some(top), Some(requester), Some(kind)) = (top_origin, requester_origin, kind) else {
         return Verdict::Deny;
     };
     let permissions = effective(&lookup(top), &lookup(requester));
+    let requested = match kind {
+        MediaKind::Camera => vec![permissions.camera],
+        MediaKind::Microphone => vec![permissions.microphone],
+        MediaKind::CameraAndMicrophone => vec![permissions.camera, permissions.microphone],
+    };
     // A top-level allowance never silently grants capture to an embedded third party.
-    decide(&permissions, kind, top == requester)
+    decide(&requested, top == requester)
+}
+
+/// Decides a request for the device's location, by the same rules as capture.
+pub fn location_verdict(
+    top_origin: Option<&str>,
+    requester_origin: Option<&str>,
+    lookup: impl Fn(&str) -> SitePermissions,
+) -> Verdict {
+    let (Some(top), Some(requester)) = (top_origin, requester_origin) else {
+        return Verdict::Deny;
+    };
+    let permissions = effective(&lookup(top), &lookup(requester));
+    decide(&[permissions.location], top == requester)
 }
 
 /// The tab's block applies to everything embedded in it.
-fn effective(top: &MediaPermissions, requester: &MediaPermissions) -> MediaPermissions {
+fn effective(top: &SitePermissions, requester: &SitePermissions) -> SitePermissions {
     let inherit = |top: Decision, requester: Decision| {
         if top == Decision::Block {
             Decision::Block
@@ -71,18 +101,14 @@ fn effective(top: &MediaPermissions, requester: &MediaPermissions) -> MediaPermi
             requester
         }
     };
-    MediaPermissions {
+    SitePermissions {
         camera: inherit(top.camera, requester.camera),
         microphone: inherit(top.microphone, requester.microphone),
+        location: inherit(top.location, requester.location),
     }
 }
 
-fn decide(permissions: &MediaPermissions, kind: MediaKind, same_origin: bool) -> Verdict {
-    let requested = match kind {
-        MediaKind::Camera => vec![permissions.camera],
-        MediaKind::Microphone => vec![permissions.microphone],
-        MediaKind::CameraAndMicrophone => vec![permissions.camera, permissions.microphone],
-    };
+fn decide(requested: &[Decision], same_origin: bool) -> Verdict {
     if requested.contains(&Decision::Block) {
         Verdict::Deny
     } else if same_origin && requested.iter().all(|value| *value == Decision::Allow) {
@@ -99,14 +125,69 @@ mod tests {
     const SITE: &str = "https://meet.example";
     const AD: &str = "https://ads.example";
 
-    fn store(camera: Decision, microphone: Decision) -> impl Fn(&str) -> MediaPermissions {
+    fn store(camera: Decision, microphone: Decision) -> impl Fn(&str) -> SitePermissions {
         move |origin| {
             if origin == SITE {
-                MediaPermissions { camera, microphone }
+                SitePermissions {
+                    camera,
+                    microphone,
+                    location: Decision::Ask,
+                }
             } else {
-                MediaPermissions::default()
+                SitePermissions::default()
             }
         }
+    }
+
+    fn located(location: Decision) -> impl Fn(&str) -> SitePermissions {
+        move |origin| SitePermissions {
+            location: if origin == SITE {
+                location
+            } else {
+                Decision::Ask
+            },
+            ..SitePermissions::default()
+        }
+    }
+
+    #[test]
+    fn location_follows_the_capture_rules() {
+        let allowed = located(Decision::Allow);
+        assert_eq!(
+            location_verdict(Some(SITE), Some(SITE), &allowed),
+            Verdict::Grant
+        );
+        // An allowance stays with its own site; embeds are asked.
+        assert_eq!(
+            location_verdict(Some(SITE), Some(AD), &allowed),
+            Verdict::Prompt
+        );
+        let blocked = located(Decision::Block);
+        assert_eq!(
+            location_verdict(Some(SITE), Some(AD), &blocked),
+            Verdict::Deny
+        );
+        assert_eq!(
+            location_verdict(Some(SITE), Some(SITE), located(Decision::Ask)),
+            Verdict::Prompt
+        );
+        assert_eq!(location_verdict(None, Some(SITE), &allowed), Verdict::Deny);
+        // Camera and microphone choices say nothing about location.
+        assert_eq!(
+            location_verdict(
+                Some(SITE),
+                Some(SITE),
+                store(Decision::Allow, Decision::Allow)
+            ),
+            Verdict::Prompt
+        );
+    }
+
+    #[test]
+    fn choices_saved_before_location_read_as_ask() {
+        let saved: SitePermissions =
+            serde_json::from_str(r#"{"camera":"allow","microphone":"block"}"#).unwrap();
+        assert_eq!(saved.location, Decision::Ask);
     }
 
     #[test]

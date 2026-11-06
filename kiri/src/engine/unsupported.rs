@@ -3,7 +3,7 @@ use tauri::Webview;
 
 const UNSUPPORTED: &str = "This platform's browser engine is not supported.";
 
-pub(super) fn install_media_permissions(_webview: &Webview) -> Result<(), String> {
+pub(super) fn install_site_permissions(_webview: &Webview) -> Result<(), String> {
     Err(UNSUPPORTED.into())
 }
 

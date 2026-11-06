@@ -65,6 +65,27 @@ describe("LiveTranscriber", () => {
     ]);
   });
 
+  it("keeps a translation that arrives after its speech, out of the transcript's words", async () => {
+    let socket!: FakeSocket;
+    const live = new LiveTranscriber({}, (url) => (socket = new FakeSocket(url)));
+    const connected = live.connect("wss://relay", "v1.a.b", { language: "auto", target: "en" });
+    socket.onopen?.({});
+    expect(JSON.parse(socket.sent[0] as string)).toEqual({
+      type: "start",
+      language: "auto",
+      target: "en",
+    });
+    socket.relay({ type: "ready", channels: ["system"], maxMs: 60000 });
+    await connected;
+    socket.relay({ type: "segment", segment: segment("1", "Hola", true) });
+    socket.relay({
+      type: "segment",
+      segment: { ...segment("2", "", false), translatedText: "Hello" },
+    });
+    expect(live.transcript.latest(2).map((item) => item.translatedText)).toEqual(["", "Hello"]);
+    expect(live.text()).toBe("Hola");
+  });
+
   it("finishes with confirmed words in order", async () => {
     let socket!: FakeSocket;
     const changes: string[] = [];

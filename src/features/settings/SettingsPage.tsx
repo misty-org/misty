@@ -29,8 +29,8 @@ import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 import { useSettingsStore } from "./store/useSettingsStore";
 import { useFocusSettingRow } from "./useFocusSettingRow";
 
-export { canonicalSettingsSection, settingsRegistry };
-export type { SettingsArea, SettingsRegistryEntry } from "./settingsRegistry";
+;
+;
 
 const navGroups: DesktopSettingsNavGroup<SettingsSection>[] = settingsGroups.map((group) => ({
   label: group.label,
@@ -42,7 +42,7 @@ const navGroups: DesktopSettingsNavGroup<SettingsSection>[] = settingsGroups.map
   }),
 }));
 
-export interface SettingsWorkspaceProps {
+interface SettingsWorkspaceProps {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 }
@@ -174,7 +174,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
               data-settings-page={item.id}
               data-settings-target={`page:${item.id}`}
               tabIndex={-1}
-              className="mb-10 outline-none last:mb-0"
+              className="mb-8 outline-none last:mb-0"
             >
               <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
                 <Block {...controls} />
@@ -188,4 +188,4 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
 });
 
 export default SettingsWorkspace;
-export type { SettingsSection } from "./settingsTypes";
+;

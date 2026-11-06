@@ -32,14 +32,31 @@ impl Workspace {
         };
         let misty = Self::discover(&absolute).unwrap_or_else(|| absolute.join("misty"));
         let root = misty.parent().unwrap_or(&misty).to_path_buf();
+        // A linked worktree sits inside the checkout, so look up from it for the sibling.
+        let server = misty
+            .ancestors()
+            .map(|folder| folder.join("misty-server"))
+            .find(|folder| folder.join("go.mod").is_file())
+            .unwrap_or_else(|| root.join("misty-server"));
         Ok(Self {
             features: misty.join("src/features"),
             cli: misty.join("cli"),
-            server: misty.join("server"),
+            server,
             website: root.join("misty-website"),
             misty,
             root,
         })
+    }
+
+    /// For commands that work on the server, which is a sibling checkout.
+    pub fn require_server(&self) -> Result<()> {
+        if !self.server.join("go.mod").is_file() {
+            bail!(
+                "This needs misty-server beside this checkout, at {}. Clone it with: git clone https://github.com/misty-org/misty-server.git",
+                self.server.display()
+            );
+        }
+        Ok(())
     }
 
     /// Local development needs only the product checkout. Remote services and
@@ -99,6 +116,24 @@ mod tests {
         let temporary = tempfile::tempdir().unwrap();
         let workspace = Workspace::from_root(temporary.path().to_path_buf()).unwrap();
         assert_eq!(workspace.misty, temporary.path().join("misty"));
-        assert_eq!(workspace.server, temporary.path().join("misty/server"));
+        assert_eq!(workspace.server, temporary.path().join("misty-server"));
+        assert!(workspace.require_server().is_err());
+    }
+
+    #[test]
+    fn a_linked_worktree_finds_the_server_beside_the_main_checkout() {
+        let temporary = tempfile::tempdir().unwrap();
+        let worktree = temporary.path().join("misty/.claude/worktrees/feature");
+        for name in ["src-tauri/tauri.conf.json", "cli/Cargo.toml"] {
+            let file = worktree.join(name);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, "").unwrap();
+        }
+        let server = temporary.path().join("misty-server");
+        fs::create_dir_all(&server).unwrap();
+        fs::write(server.join("go.mod"), "").unwrap();
+        let workspace = Workspace::from_root(worktree).unwrap();
+        assert_eq!(workspace.server, server);
+        workspace.require_server().unwrap();
     }
 }

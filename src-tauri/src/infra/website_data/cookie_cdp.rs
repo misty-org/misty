@@ -84,11 +84,6 @@ fn decode_one(raw: &Value) -> std::result::Result<Cookie, SkipReason> {
     })
 }
 
-/// Whether Storage.setCookies can store the cookie exactly.
-pub(crate) fn representable(cookie: &Cookie) -> bool {
-    encode(cookie).is_ok()
-}
-
 pub(crate) fn encode(cookie: &Cookie) -> Result<Value> {
     cookie.validate().map_err(|_| CookieStoreError::Invalid)?;
     if cookie.partition_key.is_some() {
@@ -169,6 +164,20 @@ mod tests {
         assert_eq!(persistent.expires_unix_seconds, Some(1_900_000_000));
         assert!(persistent.same_site.is_none());
         assert!(encode(&persistent).unwrap().get("sameSite").is_none());
+    }
+    #[test]
+    fn failures_carry_nothing_but_their_kind() {
+        use CookieStoreError::*;
+        for (error, text) in [
+            (Unavailable, "Unavailable"),
+            (Profile, "Profile"),
+            (Unsupported, "Unsupported"),
+            (Invalid, "Invalid"),
+            (TooLarge, "TooLarge"),
+            (Timeout, "Timeout"),
+        ] {
+            assert_eq!(format!("{error:?}"), text);
+        }
     }
     #[test]
     fn skips_partitioned_or_incomplete_cookies_and_keeps_the_rest() {

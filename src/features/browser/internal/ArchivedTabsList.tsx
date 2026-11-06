@@ -1,6 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useAuth } from "@/features/auth";
-import { profileIdFor } from "@/features/workspace/profileId";
+import { accountScopeFor } from "@/features/workspace/accountScope";
 import { useTabArchiveStore } from "@/features/workspace/tabArchive";
 import { IconButton, ListRow, ListRowButton } from "@/shared/ui";
 import { InternalPageEmpty, SiteIcon } from "./InternalPageFrame";
@@ -25,7 +25,7 @@ export function ArchivedTabsList(props: {
   const needle = props.text.trim().toLocaleLowerCase();
   const tabs = all.filter(
     (tab) =>
-      tab.accountId === profileIdFor(user?.id) &&
+      tab.accountId === accountScopeFor(user?.id) &&
       (!needle || `${tab.title} ${tab.url}`.toLocaleLowerCase().includes(needle)),
   );
   if (!tabs.length)

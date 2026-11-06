@@ -8,11 +8,14 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  ErrorNotification,
   MenuTrigger,
   Popover,
   PopoverContent,
 } from "@/shared/ui";
+import { conversationInSpace } from "@/features/misty/conversationSpace";
 import { useMistyStore } from "@/features/misty/useMistyStore";
+import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
 import {
   activityStateLabels,
   formatActivityTime,
@@ -50,6 +53,7 @@ export function PanelConversationPicker({
   const [open, setOpen] = useState(false);
   const activity = useAgentActivity(accountId, agentId);
   const conversations = useMistyStore((state) => state.conversations);
+  const space = useSpaceWindowStore((state) => state.identity);
   // The latest run's state per conversation, for the ones that need a word.
   const states = new Map<string, { state: string; updatedAt: string }>();
   for (const entry of activity.entries) {
@@ -60,7 +64,10 @@ export function PanelConversationPicker({
   }
   const recent = conversations
     .filter(
-      (c) => c.messages.length && (c.agentId === agentId || (!c.agentId && includeUnassigned)),
+      (c) =>
+        c.messages.length &&
+        conversationInSpace(c, space) &&
+        (c.agentId === agentId || (!c.agentId && includeUnassigned)),
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 30);
@@ -69,6 +76,7 @@ export function PanelConversationPicker({
     action();
   };
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <MenuTrigger
         kind="popover"
@@ -82,7 +90,7 @@ export function PanelConversationPicker({
           <CommandInput aria-label="Search conversations" placeholder="Search conversations" />
           <CommandList>
             <CommandEmpty>
-              {activity.failed ? "Conversations couldn’t load." : "No conversations yet."}
+              No conversations yet.
             </CommandEmpty>
             <CommandGroup>
               {recent.map((conversation) => {
@@ -120,5 +128,7 @@ export function PanelConversationPicker({
         </Command>
       </PopoverContent>
     </Popover>
+    <ErrorNotification message={activity.failed ? "Conversations couldn’t load." : ""} />
+    </>
   );
 }

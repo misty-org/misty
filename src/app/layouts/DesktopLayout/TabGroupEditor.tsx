@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, SquarePlus, Trash2, Ungroup, X } from "lucide-react";
-import { Button, Input, Pressable, Popover, PopoverAnchor, PopoverContent } from "@/shared/ui";
+import {
+  Button,
+  ErrorNotification,
+  Input,
+  Pressable,
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/shared/ui";
 import { useWorkspaceStore } from "@/features/workspace/useWorkspaceStore";
 import type { WorkspaceView } from "@/features/workspace/model";
 import { tabGroupColors, type TabGroupColor } from "@/features/workspace/tabGroups";
@@ -172,11 +180,7 @@ export function TabGroupEditor({
               Delete group
             </Button>
           </div>
-          {error && (
-            <p role="alert" className="px-1.5 pb-1.5 text-sm text-cream">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
         </form>
       </PopoverContent>
     </Popover>

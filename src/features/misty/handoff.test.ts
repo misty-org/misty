@@ -175,7 +175,7 @@ describe("openMisty", () => {
 });
 
 it("restores a pending review and keeps it bound to its saved conversation", async () => {
-  const artifact = { id: "proposal", kind: "file_plan", state: "proposed" } as AiArtifact;
+  const artifact = { id: "proposal", kind: "terminal_command", state: "proposed" } as AiArtifact;
   const base = {
     agentId: "agent",
     title: "Folder task",

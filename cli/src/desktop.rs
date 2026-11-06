@@ -9,6 +9,7 @@ use serde_json::json;
 use walkdir::WalkDir;
 
 use crate::{
+    environment::{self, Target},
     process::{npm, CommandSpec},
     workspace::Workspace,
 };
@@ -35,7 +36,7 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
     let mut config = json!({
         "build": {
             "devUrl": format!("http://127.0.0.1:{port}{route}"),
-            "beforeDevCommand": "npm run dev:desktop"
+            "beforeDevCommand": "node cli/tasks/run-tool.ts vite --mode desktop"
         }
     });
     if let Some(profile) = profile {
@@ -44,20 +45,41 @@ pub fn dev(workspace: &Workspace, profile: Option<&str>, route: Option<&str>) ->
     }
     fs::write(&config_path, serde_json::to_vec_pretty(&config)?)?;
 
-    let mut command = CommandSpec::new(npm())
-        .args(["run", "tauri", "--", "dev", "--config"])
+    // Node directly, like `beforeDevCommand` above, not through npm: npm is a batch file on
+    // Windows, and Ctrl+C leaves its cmd.exe asking "Terminate batch job (Y/N)?" on the terminal
+    // after Misty has exited. Same command as the `tauri` script in package.json.
+    let mut command = CommandSpec::new("node")
+        .args([
+            "--disable-warning=ExperimentalWarning",
+            "--experimental-strip-types",
+            "cli/tasks/tauri.ts",
+            "dev",
+            "--config",
+        ])
         .arg(config_path.as_os_str())
         .env("MISTY_DESKTOP_DEV_PORT", port.to_string());
     if let Some(profile) = profile {
         command = command.env("MISTY_PROFILE", profile);
     }
+    for (name, value) in development_addresses(workspace) {
+        if env::var_os(name).is_none() {
+            command = command.env(name, value);
+        }
+    }
     command.run(&workspace.misty)
 }
 
-pub fn build(workspace: &Workspace) -> Result<()> {
-    CommandSpec::new(npm())
-        .args(["run", "tauri", "--", "build"])
-        .run(&workspace.misty)
+/// The development stack's API and website, which the app uses until someone chooses a server.
+fn development_addresses(workspace: &Workspace) -> Vec<(&'static str, String)> {
+    let values = environment::read(workspace, Target::Dev).unwrap_or_default();
+    let api = values
+        .get("MISTY_DEV_API_ORIGIN")
+        .map(|origin| format!("{}/v1", origin.trim_end_matches('/')));
+    let website = values.get("MISTY_PUBLIC_URL").cloned();
+    [("MISTY_PUBLIC_API_URL", api), ("MISTY_PUBLIC_URL", website)]
+        .into_iter()
+        .filter_map(|(name, value)| Some((name, value?)))
+        .collect()
 }
 
 pub fn clean(workspace: &Workspace, apply: bool) -> Result<()> {
@@ -120,12 +142,15 @@ pub fn sync_icons(workspace: &Workspace, source: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
-fn validate_profile(profile: Option<&str>) -> Result<()> {
+pub fn validate_profile(profile: Option<&str>) -> Result<()> {
     let Some(profile) = profile else {
         return Ok(());
     };
-    let valid = regex::Regex::new(r"^[a-z0-9][a-z0-9-]{0,31}$")?;
-    if !valid.is_match(profile) {
+    let allowed = |byte: u8| byte.is_ascii_lowercase() || byte.is_ascii_digit();
+    let valid = profile.len() <= 32
+        && profile.bytes().next().is_some_and(allowed)
+        && profile.bytes().all(|byte| allowed(byte) || byte == b'-');
+    if !valid {
         bail!("profile names must use 1-32 lowercase letters, numbers, or hyphens");
     }
     Ok(())

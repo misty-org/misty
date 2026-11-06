@@ -95,6 +95,17 @@ pub(super) fn decode(body: &[u8]) -> Result<Clip, ClipError> {
     Ok(Clip { header, image })
 }
 
+/// Whether two clips hold the same copy, whoever made them and whenever.
+pub(super) fn same_content(left: &Clip, right: &Clip) -> bool {
+    let (a, b) = (&left.header, &right.header);
+    a.kind == b.kind
+        && a.text == b.text
+        && a.html == b.html
+        && a.file_names == b.file_names
+        && a.image == b.image
+        && left.image == right.image
+}
+
 /// Who copied a clip, as the ring records it.
 pub(super) struct Source<'a> {
     pub device_id: &'a str,

@@ -1,6 +1,14 @@
 import { withDeviceRunGrants } from "./deviceRunGrants";
 import { apiRequest } from "@/api/client";
-import type { AiProgressItem, AiArtifact, AiInvocationCreated, AiInvocationRequest } from "./types";
+import type {
+  AgentNotebook,
+  AgentSubagent,
+  AiArtifact,
+  AiCitation,
+  AiInvocationCreated,
+  AiInvocationRequest,
+  AiProgressItem,
+} from "./types";
 import type { MistyActivityEntry } from "@/features/misty/activity";
 
 import { toServerInvocation } from "./serverInvocation";
@@ -8,7 +16,6 @@ export * from "./aiSettingsTypes";
 export { subscribeToAiInvocation } from "./invocationSubscription";
 import type {
   AiMemoryRecord,
-  AiRecapRecord,
   AiSurfacePreferenceRecord,
   AiUserSettings,
   ScreenLocation,
@@ -63,18 +70,6 @@ export const aiSurfaceApi = {
       `/ai/preferences/${encodeURIComponent(surfaceId)}`,
       { method: "PUT", body: JSON.stringify(input) },
     ),
-  recaps: () => apiRequest<{ recaps: AiRecapRecord[] }>("/ai/recaps"),
-  updateRecap: (
-    surfaceId: AiRecapRecord["surface_id"],
-    input: Pick<
-      AiRecapRecord,
-      "enabled" | "cadence" | "local_time" | "weekday" | "timezone" | "prompt"
-    >,
-  ) =>
-    apiRequest<{ recap: AiRecapRecord }>(`/ai/recaps/${encodeURIComponent(surfaceId)}`, {
-      method: "PUT",
-      body: JSON.stringify(input),
-    }),
   feedback: (invocationId: string, rating: -1 | 1, reason = "", comment = "") =>
     apiRequest<void>(`/ai/invocations/${encodeURIComponent(invocationId)}/feedback`, {
       method: "POST",
@@ -90,9 +85,12 @@ export const aiSurfaceApi = {
   },
   /** How a reply got its answer: notes and tool runs, rebuilt from its stored events. */
   invocationProgress: (invocationId: string) =>
-    apiRequest<{ items: AiProgressItem[] }>(
-      `/ai/invocations/${encodeURIComponent(invocationId)}/progress`,
-    ),
+    apiRequest<{
+      items: AiProgressItem[];
+      citations?: AiCitation[];
+      notebook?: AgentNotebook;
+      subagents?: AgentSubagent[];
+    }>(`/ai/invocations/${encodeURIComponent(invocationId)}/progress`),
   /** The run's stored state: queued, running, awaiting_*, completed, failed or canceled. */
   invocationState: (invocationId: string) =>
     apiRequest<{ state: string }>(`/ai/invocations/${encodeURIComponent(invocationId)}/state`),

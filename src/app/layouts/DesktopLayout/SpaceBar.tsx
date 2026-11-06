@@ -1,11 +1,17 @@
+import { PanelTop } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useAuth } from "@/features/auth";
-import { SpaceRow } from "@/features/spaces";
+import { setSpaceBarAutoHide } from "@/features/app-shell/barsAutoHide";
+import { openSignInSheet, useAuth } from "@/features/auth";
+import { SpaceRow, SpaceRowPreview } from "@/features/spaces";
 import {
   browserRuntimeResumeEvent,
   setBrowserPointerTrackingEnabled,
 } from "@/features/webviews/browserRuntime";
 import { beginBrowserSlide, endBrowserSlide } from "@/features/webviews/browserSlide";
+import { setTrafficLightsVisible } from "@/native/runtime";
+import { hasTauriInternals } from "@/shared/platform/tauri";
+import { IconButton, toolbarIconProps } from "@/shared/ui";
+import { dockingMetrics } from "./dockingGeometry";
 import { useSpaceBarAlignment, useSpaceBarAutoHide } from "./useSpaceBarAutoHide";
 
 /** How long the bar waits after the pointer leaves before it tucks away again. */
@@ -16,7 +22,7 @@ const revealDelay = 80;
 /** The strip along the top edge that brings the bar out. */
 const edgeZone = 6;
 /** The bar's own height; the page's top margin below it is the gap to the page. */
-const barHeight = 36;
+const barHeight = dockingMetrics.spaceBar;
 /** The slide's length. The page below keeps its full size and moves its top edge with it. */
 const slideMs = 150;
 const openHeight = `calc(var(--shell-edge, 6px) + ${barHeight}px)`;
@@ -33,8 +39,12 @@ const closedHeight = "calc(var(--shell-edge, 6px) - var(--shell-gap, 4px))";
  * The pointer is followed by position rather than by enter and leave: the sidebar's window
  * drag band lies over the top of the row, and native pages swallow pointer events, so neither
  * would report the pointer reliably.
+ *
+ * With tabs on the right no sidebar sits under the window buttons, so they sit in this bar: it
+ * keeps room for them, and they leave and come back with it instead of lying over the page.
  */
-export function SpaceBar(props: { gridColumn: number }) {
+export function SpaceBar(props: { gridColumn: number; side?: "left" | "right" }) {
+  const holdsWindowButtons = props.side === "right";
   const autoHide = useSpaceBarAutoHide();
   const alignment = useSpaceBarAlignment();
   const [revealed, setRevealed] = useState(false);
@@ -43,12 +53,11 @@ export function SpaceBar(props: { gridColumn: number }) {
   const timer = useRef<number | undefined>(undefined);
   const revealedRef = useRef(false);
   const pointerInside = useRef(false);
-  const { user } = useAuth();
-  // Everything in the bar needs an account, so signed out it isn't drawn and the page takes
-  // its height; it slides in once someone signs in.
-  const signedIn = Boolean(user);
-  const edgeReveal = autoHide && signedIn;
-  const open = signedIn && (!autoHide || revealed);
+  const { user, sessionExpired } = useAuth();
+  // An expired session loads no Spaces, so it asks to sign in like being signed out does.
+  const signedIn = Boolean(user) && !sessionExpired;
+  const edgeReveal = autoHide;
+  const open = !autoHide || revealed;
   revealedRef.current = revealed;
 
   // The page grows to its tucked-away size while the bar waits to leave, so the strip it uncovers
@@ -211,6 +220,25 @@ export function SpaceBar(props: { gridColumn: number }) {
   }, [open]);
   useEffect(() => endBrowserSlide, []);
 
+  // The window buttons ride the bar: they start with the slide above, at its speed, and travel as
+  // far as the bar does. The first state is applied without motion.
+  const lightsSettled = useRef(false);
+  useLayoutEffect(() => {
+    if (!holdsWindowButtons || !hasTauriInternals()) return;
+    const duration = lightsSettled.current ? slideMs : 0;
+    lightsSettled.current = true;
+    void setTrafficLightsVisible(open, 0, duration, barHeight + dockingMetrics.gap).catch(
+      () => undefined,
+    );
+  }, [holdsWindowButtons, open]);
+  useEffect(() => {
+    if (!holdsWindowButtons || !hasTauriInternals()) return;
+    return () => {
+      lightsSettled.current = false;
+      void setTrafficLightsVisible(true).catch(() => undefined);
+    };
+  }, [holdsWindowButtons]);
+
   return (
     <div
       ref={row}
@@ -257,7 +285,37 @@ export function SpaceBar(props: { gridColumn: number }) {
           // strip does; the buttons inside keep their own presses.
           data-misty-window-titlebar-region="true"
         >
-          {signedIn ? <SpaceRow alignment={alignment} /> : null}
+          <div
+            className="flex h-full min-w-0 items-center"
+            data-window-toolbar={holdsWindowButtons ? "" : undefined}
+          >
+            <div className="relative h-full min-w-0 flex-1">
+              {signedIn ? (
+                <SpaceRow alignment={alignment} />
+              ) : (
+                // Everything in the bar needs an account, so signed out it shows what is there
+                // and pressing any of it asks to sign in.
+                <SpaceRowPreview
+                  alignment={alignment}
+                  onSignIn={() =>
+                    sessionExpired
+                      ? openSignInSheet("expired", user?.email)
+                      : openSignInSheet("space")
+                  }
+                />
+              )}
+            </div>
+            <IconButton
+              label={autoHide ? "Keep Space bar open" : "Auto-hide Space bar"}
+              size="xs"
+              className="mr-2 size-7 shrink-0"
+              aria-pressed={autoHide}
+              onClick={() => setSpaceBarAutoHide(!autoHide)}
+            >
+              {/* Panel glyphs fill their box, so they take the same 18px as the sidebar's. */}
+              <PanelTop {...toolbarIconProps} className="size-4.5" />
+            </IconButton>
+          </div>
         </div>
       </div>
     </div>

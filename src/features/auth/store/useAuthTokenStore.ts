@@ -27,7 +27,7 @@ import {
   selectActiveSession,
   updateSavedAccountSession,
 } from "./savedAccountSessions";
-export type { SavedAccountSession } from "./accountVault";
+;
 export { listSavedAccountSessions, readActiveSavedAccountSession, updateSavedAccountSession };
 let cachedToken: string | null | undefined;
 // A cold start can fan out several authenticated requests before the first
@@ -79,7 +79,7 @@ export async function saveAccountAuthToken(
     recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
-      message: "Could not store Misty account sessions in the device keystore.",
+      message: "Could not store Misty account sessions in this computer's keystore.",
       detail: errorDetail(error),
     });
     // Keep the new token active in memory without overwriting an existing vault.
@@ -124,7 +124,7 @@ async function loadAccountAuthToken(): Promise<string | null> {
     recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
-      message: "Could not read Misty account sessions from the device keystore.",
+      message: "Could not read Misty account sessions from this computer's keystore.",
       detail: errorDetail(error),
     });
   }
@@ -252,7 +252,7 @@ async function persistRawToken(token: string): Promise<void> {
     recordTokenDebugEvent({
       level: "error",
       scope: "account-auth-token",
-      message: "Could not store Misty auth token in the device keystore.",
+      message: "Could not store Misty auth token in this computer's keystore.",
       detail: errorDetail(error),
     });
   }

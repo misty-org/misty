@@ -45,7 +45,7 @@ pub fn build() -> Result<Value> {
     if let Ok(thumbprint) = env::var("WINDOWS_CERTIFICATE_THUMBPRINT") {
         let thumbprint = thumbprint.trim();
         if !thumbprint.is_empty() {
-            if !regex::Regex::new(r"(?i)^[a-f0-9]{40}$")?.is_match(thumbprint) {
+            if thumbprint.len() != 40 || !thumbprint.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                 bail!("WINDOWS_CERTIFICATE_THUMBPRINT must be 40 hexadecimal characters");
             }
             let timestamp = required("WINDOWS_TIMESTAMP_URL")?;
@@ -74,6 +74,20 @@ pub fn build() -> Result<Value> {
             }
         }
     }))
+}
+
+/// A build to try before releasing: the same policy, without signing or updater artifacts.
+pub(super) fn test_build(agents: bool) -> Value {
+    let mut bundle = json!({ "createUpdaterArtifacts": false });
+    if agents {
+        let runtime = super::runtime::bundle_settings();
+        bundle["resources"] = runtime["resources"].clone();
+        bundle["externalBin"] = runtime["externalBin"].clone();
+    }
+    json!({
+        "app": { "security": { "csp": csp() } },
+        "bundle": bundle
+    })
 }
 
 fn required(name: &str) -> Result<String> {

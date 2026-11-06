@@ -18,7 +18,7 @@ const blockIds = new Set(settingsRegistry.map((entry) => entry.id));
 
 describe("settings registry", () => {
   it("keeps a short list of one-word pages, each with its own icon", () => {
-    expect(areas.length).toBeLessThanOrEqual(13);
+    expect(areas.length).toBeLessThanOrEqual(15);
     expect(new Set(areas).size).toBe(areas.length);
     expect(Object.keys(settingsAreas).sort()).toEqual([...areas].sort());
     const labels = areas.map((area) => settingsAreas[area].label);
@@ -28,7 +28,12 @@ describe("settings registry", () => {
   });
 
   it("names groups by feature and never echoes a group in its pages", () => {
-    expect(settingsGroups.map((group) => group.label)).toEqual(["Settings", "Browser", "Agents"]);
+    expect(settingsGroups.map((group) => group.label)).toEqual([
+      "Account",
+      "App",
+      "Browser",
+      "Agents",
+    ]);
     for (const group of settingsGroups)
       for (const area of group.areas)
         expect(settingsAreas[area].label.toLowerCase()).not.toContain(group.label.toLowerCase());
@@ -61,7 +66,7 @@ describe("settings routing", () => {
     expect(settingsPage("browser")?.area).toBe("general");
     expect(settingsPage("search")?.id).toBe("browser-links");
     expect(settingsPage("browser-handoff")?.id).toBe("sync");
-    expect(settingsPage("account")?.id).toBe("about");
+    expect(settingsPage("about")?.id).toBe("account");
   });
 
   it("lands every “manage it in Settings” link on the page that holds it", () => {
@@ -88,5 +93,30 @@ describe("settings routing", () => {
     }
     expect(preferenceSection("app.diagnostics.framePacing", "about")).toBe("advanced");
     expect(preferenceSection("browser.searchSuggestions", "search")).toBe("browser-links");
+  });
+});
+
+describe("settings titles", () => {
+  it("never repeats a group, page or section title anywhere in settings", async () => {
+    const files = import.meta.glob(
+      ["./sections/**/*.tsx", "./models/*.tsx", "../extensions/ExtensionsSettings.tsx"],
+      { query: "?raw", import: "default", eager: true },
+    ) as Record<string, string>;
+    const seen = new Map<string, string>();
+    const claim = (title: string, where: string) => {
+      const owner = seen.get(title);
+      // The same section in another state (loading, signed out) keeps its title within one file.
+      if (owner && owner !== where) throw new Error(`"${title}" is used by ${owner} and ${where}`);
+      seen.set(title, where);
+    };
+    for (const group of settingsGroups) claim(group.label, "a sidebar group");
+    for (const area of Object.values(settingsAreas)) claim(area.label, "a settings page");
+    for (const [file, source] of Object.entries(files)) {
+      if (file.includes(".test.")) continue;
+      const titles = source.matchAll(
+        /<(?:Section|SettingsSectionBlock|DesktopSettingsSection)\b[^>]*?\btitle="([^"]+)"/g,
+      );
+      for (const [, title] of titles) claim(title, file);
+    }
   });
 });

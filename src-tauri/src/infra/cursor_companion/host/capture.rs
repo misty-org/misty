@@ -51,7 +51,7 @@ pub async fn task_visual(app: &AppHandle, task_id: &str) -> Result<Option<Vec<Va
         return Err("Companion interrupted".into());
     }
     // Only the main authenticated controller receives refreshed screenshot data.
-    let _ = crate::infra::space_windows::emit_to_primary(
+    let _ = crate::infra::profile_windows::emit_to_primary(
         &app,
         "misty://cursor-captures",
         json!({"turn":turn,"captures":captures}),

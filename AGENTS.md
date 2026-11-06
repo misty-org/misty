@@ -1,7 +1,7 @@
 # Misty
 
 Misty is a desktop browser with agents built in (Tauri app in `src/` and `src-tauri/`, server
-in `server/`, native web platform layer in `kiri/`). **Start in `docs/`:** [docs/README.md](docs/README.md)
+in the sibling repository [misty-server](https://github.com/misty-org/misty-server), native web platform layer in `kiri/`). **Start in `docs/`:** [docs/README.md](docs/README.md)
 says what Misty is and has one folder per feature. Before changing a feature, read that
 feature's `README.md`; it holds what the feature is, where its code lives and its interface rules.
 
@@ -9,7 +9,7 @@ feature's `README.md`; it holds what the feature is, where its code lives and it
 | --- | --- |
 | Agents, chat, harness, cursor companion, evals | `docs/agents/` |
 | Spaces, Space bar, Space color | `docs/spaces/` |
-| Sync, devices, clipboard | `docs/sync/` |
+| Sync, profiles, sessions, clipboard | `docs/sync/` |
 | Voice, notes, memory, memory tree | `docs/voice-memory/` |
 | Tabs, media controls, platform limits | `docs/browser/` |
 | Extensions, WebAuthn, native web APIs | `docs/kiri/` |
@@ -34,20 +34,27 @@ change; when a plan ships, fold it into the feature folder and delete the plan.
 - Misty is open source under the AGPL-3.0-or-later (copyleft), with the attribution term in
   `NOTICE`. Add dependencies only under AGPL-compatible licenses (MIT, BSD, Apache-2.0,
   MPL-2.0, LGPL), never proprietary or non-commercial ones. Every feature is on for everyone,
-  and nothing is optional: Cloudflare, Composio and Google sign-in are parts of every server. The open server sends no email: it hands out links (sign-in, invitation) and shows
-  alerts in the console and the owner's app; Misty Cloud's emails live in misty-billing.
-- The open repo has no billing. Misty Cloud is just another Misty server; its Stripe side
+  and nothing is optional: Cloudflare, Composio and Google sign-in are parts of every server. The one
+  exception is email: with Mailjet set up, the server sends sign-in links, invitations and closing
+  notices; without it, it hands out the links. Alerts show in the console and the owner's app.
+  All email is the server's; misty-billing sends none.
+- The open repo has no billing. Misty Pro is just another Misty server; its Stripe side
   lives in the private misty-billing service and reaches the server only through the
   operator account API (`docs/cloud/`). Never add prices, plan gates or payment code here;
   per-account limits are generic and unlimited unless set.
-- Agents and every model call run on the person's computer, on the device's own models
+- Agents and every model call run on the person's computer, on that computer's own models
   (`docs/agents/runtime.md`, `docs/byok.md`). Web search runs there too, on the person's own
   search key (Decodo or Serper); the server holds no search key and makes no search call. Keys
-  stay on the device and reach only their provider; never send a key, model call or search to
+  stay on the computer and reach only their provider; never send a key, model call or search to
   the server, store or log them.
+- Conversations are stored on the server, not encrypted, per person per Space, including tool
+  output, with screenshots in the object store (`docs/agents/README.md`). Only their owner can
+  read them, and whoever runs the server. A tool result marked redacted stays sealed and is never
+  stored readable. Only the vault is protected from the server.
 - No `*.env` file is ever committed, not even an example. Setup is taught in the website's
   docs. Every server address in the app comes from the person's choice, never a built-in
-  default (`src/api/deployment/`).
+  default; the one address the app knows is Misty's own, used only when someone chooses
+  Misty Pro (`src/api/deployment/`).
 
 # Commits
 

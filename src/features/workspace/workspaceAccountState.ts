@@ -12,7 +12,7 @@ import {
   workspaceRecoveryStorage,
 } from "./workspaceRecoveryStorage";
 import { useWorkspaceStore } from "./useWorkspaceStore";
-import { isIncognitoWindow } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspaceStorePersistence";
 
 function workspaceAccountStorageKey(accountId: string): string {
@@ -85,7 +85,14 @@ export function adoptAccountWorkspace(
 
 /** The windows and tabs on screen, to carry across an identity change. */
 export function liveWorkspace(): ReturnType<typeof partialWorkspaceStore> {
-  return partialWorkspaceStore(useWorkspaceStore.getState());
+  const state = useWorkspaceStore.getState();
+  // Bookmarks and saved groups aren't in a window's own record; they carry across too.
+  return {
+    ...partialWorkspaceStore(state),
+    tabGroups: state.tabGroups,
+    bookmarkFolders: state.bookmarkFolders,
+    bookmarks: state.bookmarks,
+  };
 }
 
 export function removeAccountWorkspace(accountId: string): void | Promise<void> {

@@ -24,8 +24,8 @@ export function WebSearchSection({ keys }: { keys: SavedModelKeys }) {
     searchProviders.find((item) => item.id === provider.value) ?? searchProviders[0]!;
   return (
     <Section
-      title="Web search"
-      description="Lets agents search the web. The key stays in this device’s keychain and goes only to the search service, from this computer."
+      title="Search"
+      description="Lets agents search the web. The key stays in this computer’s keychain and goes only to the search service, from this computer."
     >
       <ModelDropdownRow
         id="models.search_provider"

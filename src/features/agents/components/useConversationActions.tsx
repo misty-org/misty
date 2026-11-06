@@ -16,13 +16,13 @@ import {
   ContextMenuSeparator,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ErrorNotification,
   IconButton,
   Input,
   MenuItem,
@@ -161,9 +161,8 @@ export function useConversationActions({
           if (!open) close();
         }}
       >
-        <DialogContent onCloseAutoFocus={restoreFocus}>
+        <DialogContent aria-describedby={undefined} onCloseAutoFocus={restoreFocus}>
           <DialogTitle>Rename conversation</DialogTitle>
-          <DialogDescription>Choose a name for this conversation.</DialogDescription>
           <form
             className="grid gap-4"
             onSubmit={(event) => {
@@ -179,11 +178,7 @@ export function useConversationActions({
               onFocus={(event) => event.target.select()}
               onChange={(event) => setTitle(event.target.value)}
             />
-            {error && (
-              <p role="alert" className="text-sm text-cream-muted">
-                {error}
-              </p>
-            )}
+            <ErrorNotification message={error} onDismiss={() => setError("")} />
             <DialogFooter>
               <Button type="button" variant="outline" disabled={busy} onClick={close}>
                 Cancel
@@ -204,14 +199,9 @@ export function useConversationActions({
         <AlertDialogContent onCloseAutoFocus={restoreFocus}>
           <AlertDialogTitle>Delete conversation?</AlertDialogTitle>
           <AlertDialogDescription className="break-words">
-            “{name}” and its messages will be permanently deleted. Any unsent draft in this
-            conversation will be discarded. This cannot be undone.
+            “{name}” and its messages will be permanently deleted.
           </AlertDialogDescription>
-          {error && (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <Button disabled={disabled || busy} onClick={() => void submit()}>

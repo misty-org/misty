@@ -60,14 +60,14 @@ export function ModelsSection() {
     <>
       {keys.error ? <DesktopSettingsNotice>{keys.error}</DesktopSettingsNotice> : null}
       <Section
-        title="Sign in"
-        description="Use a plan or account you already have. The sign-in stays on this device."
+        title="Sign-ins"
+        description="Use a plan or account you already have. The sign-in stays on this computer."
       >
         <ModelSignInRows keys={keys} chatgpt={chatgpt} onSignedIn={adopt} />
       </Section>
       <Section
         title="Provider"
-        description="Keys stay in this device’s keychain and go only to the provider, from this computer."
+        description="Keys stay in this computer’s keychain and go only to the provider."
       >
         <ModelDropdownRow
           id="models.provider"
@@ -107,7 +107,7 @@ export function ModelsSection() {
         ) : null}
       </Section>
       <Section
-        title="Models"
+        title="Choices"
         description="Write a model as provider/model. A name without a provider uses the provider above."
       >
         <ModelTextRow
@@ -144,7 +144,7 @@ export function ModelsSection() {
       </Section>
       <WebSearchSection keys={keys} />
       <Section
-        title="Voice"
+        title="Voice keys"
         description="Optional keys for reading answers aloud and for dictation."
       >
         {voiceProviders.map((voice) => (

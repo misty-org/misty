@@ -10,7 +10,7 @@ beforeEach(() => {
 it("uses native account-scoped storage and surfaces a missing host", async () => {
   native.invoke.mockRejectedValue(new Error("Native host unavailable"));
   await expect(readState("account-a")).rejects.toThrow("Native host unavailable");
-  expect(native.invoke).toHaveBeenCalledWith("settings_profile_state", { scope: "account-a" });
+  expect(native.invoke).toHaveBeenCalledWith("settings_session_state", { scope: "account-a" });
 });
 
 it("retries a native revision conflict against the new state without losing another window's edits", async () => {
@@ -26,7 +26,7 @@ it("retries a native revision conflict against the new state without losing anot
       (value) => ({ ...value, mine: 3 }),
     ),
   ).toEqual({ first: 1, other: 2, mine: 3 });
-  expect(native.invoke).toHaveBeenLastCalledWith("settings_profile_commit", {
+  expect(native.invoke).toHaveBeenLastCalledWith("settings_session_commit", {
     scope: "account-a",
     revision: 2,
     document: { first: 1, other: 2, mine: 3 },

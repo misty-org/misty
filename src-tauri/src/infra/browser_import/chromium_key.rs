@@ -27,41 +27,19 @@ pub struct CookieKey {
 
 // Windows keeps the key in DPAPI instead; the tests cover the derivation everywhere.
 #[cfg(any(not(windows), test))]
-fn hmac_sha1(key: &[u8], parts: &[&[u8]]) -> [u8; 20] {
-    let mut block = [0u8; 64];
-    if key.len() > 64 {
-        block[..20].copy_from_slice(&sha1_smol::Sha1::from(key).digest().bytes());
-    } else {
-        block[..key.len()].copy_from_slice(key);
-    }
-    let mut inner = sha1_smol::Sha1::new();
-    inner.update(&block.map(|b| b ^ 0x36));
-    for part in parts {
-        inner.update(part);
-    }
-    let mut outer = sha1_smol::Sha1::new();
-    outer.update(&block.map(|b| b ^ 0x5c));
-    outer.update(&inner.digest().bytes());
-    outer.digest().bytes()
-}
-
-/// PBKDF2-HMAC-SHA1 for keys of at most one SHA-1 block (20 bytes).
-#[cfg(any(not(windows), test))]
 pub fn pbkdf2_sha1<const N: usize>(
     password: &[u8],
     salt: &[u8],
     iterations: u32,
 ) -> Zeroizing<[u8; N]> {
-    let mut u = hmac_sha1(password, &[salt, &1u32.to_be_bytes()]);
-    let mut t = u;
-    for _ in 1..iterations {
-        u = hmac_sha1(password, &[&u]);
-        for (a, b) in t.iter_mut().zip(u) {
-            *a ^= b;
-        }
-    }
     let mut out = Zeroizing::new([0u8; N]);
-    out.copy_from_slice(&t[..N]);
+    ring::pbkdf2::derive(
+        ring::pbkdf2::PBKDF2_HMAC_SHA1,
+        std::num::NonZeroU32::new(iterations).unwrap_or(std::num::NonZeroU32::MIN),
+        salt,
+        password,
+        &mut out[..],
+    );
     out
 }
 

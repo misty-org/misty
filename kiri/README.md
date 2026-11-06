@@ -14,7 +14,7 @@ Status and open items are at the end of this file.
 | Layer | Who starts it | Transport | Trust |
 | --- | --- | --- | --- |
 | Capabilities (`capabilities/`) | Website pages | `plugin:kiri\|call` (Tauri IPC) | Anything a page may do; origin comes from the engine |
-| Engine hooks (`engine/`) | The engine (camera/mic prompts) | Native delegates and events | The host's site-permission store decides |
+| Engine hooks (`engine/`) | The engine (camera, mic and location prompts) | Native delegates and events | The host's site-permission store decides |
 | Host channel (`channel/`) | The embedder's own injected scripts | Each engine's native message handler | The embedder authenticates each message (Misty: per-tab token) |
 | Extensions (`extensions/`) | WebExtension pages | WebKit's reply handler, answered by the embedder | Permissions the account granted |
 
@@ -55,12 +55,13 @@ To turn it on:
 WebView2 reaches Windows Hello itself, so Windows needs no shim. WebKitGTK has no
 authenticator integration; Linux has no passkeys yet.
 
-## Engine hooks: camera and microphone
+## Engine hooks: camera, microphone and location
 
-`engine::install_media_permissions` routes each tab's capture requests through the host's
-`MediaPolicy`, which normally answers from its site-permission store with
-`permissions::media_verdict`. The rules are the same everywhere: a block applies to embedded
-frames too, and an allowance never extends to a different origin.
+`engine::install_site_permissions` routes each tab's capture and location requests through the
+host's `SitePolicy`, which normally answers from its site-permission store with
+`permissions::media_verdict` and `permissions::location_verdict`. The rules are the same
+everywhere and for every kind: a block applies to embedded frames too, and an allowance never
+extends to a different origin.
 
 | Engine | Requests | Stopping capture |
 | --- | --- | --- |
@@ -72,6 +73,29 @@ WebKitGTK ships camera, microphone and WebRTC switched off; Kiri turns them on w
 installs the hook, since every request then goes through the policy. It has no prompt of its
 own and does not say which frame asked, so Kiri always asks with a dialog naming the tab's
 site; only a block is applied silently.
+
+Location:
+
+| Engine | Requests | Where the position comes from |
+| --- | --- | --- |
+| WebKit (macOS) | The private `_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:` UI delegate callback; without it WebKit refuses every request | `engine/macos_location.rs` reads Core Location, which asks once for Misty (`NSLocationUsageDescription`, `com.apple.security.personal-information.location`), and hands positions to WebKit's geolocation provider. `WKWebView` has no location source of its own on macOS: with only the callback, a granted page waits until it times out |
+| WebView2 | `PermissionRequested` with the geolocation kind | Windows location services |
+| WebKitGTK | `permission-request` with a geolocation request, asked with the same dialog | GeoClue |
+
+A site keeps a location it was granted until the page reloads; a new Block applies to the next
+request. WebKit also remembers a refusal until the page reloads. Nothing stops a running
+`watchPosition`, as no engine offers a call for it.
+
+### Asking in the host's interface
+
+When the policy answers `Verdict::Prompt` on macOS, Kiri offers the request to `SitePolicy::ask`
+with an `AskAnswer` holding WebKit's decision, for the host to ask in its own interface. It must be
+answered or dropped on the main thread, and dropping it refuses the request. A host that hands the
+answer back leaves the question to WebKit's own dialog. WebView2 and WebKitGTK still ask with their
+own dialogs. Misty asks in its site-information popup (`site_settings/permissions/ask.rs`,
+`BrowserSiteInfo`): a choice for the tab's own site is saved, closing the popup refuses this once
+and saves nothing, an embedded frame's answer is never saved, and a question nobody answers
+refuses after two minutes.
 
 ## Host channel
 
@@ -105,7 +129,7 @@ src/
   plugin.rs           Tauri adapter
   page/transport.js   page-side transport
   capabilities/       page APIs (media, webauthn)
-  engine/             camera and microphone hooks per engine
+  engine/             camera, microphone and location hooks per engine
   channel/            host channel per engine
   extensions/         WebExtension compatibility layer
 ```
@@ -142,7 +166,8 @@ has never answered "use passkeys in Misty?", macOS asks once.
 To run the Linux and Windows engine code for real, use the runtime probe. It is a minimal
 Tauri app built on Misty's locked versions, and it checks the page bridge and its ACL, the
 host channel, the camera permission hook, `engine::edit`, and that WebAuthn stays the
-engine's own off macOS:
+engine's own off macOS. On a Mac it also holds a location request for the host and checks that a
+grant and a refusal reach the page, when built into an `.app` with `NSLocationUsageDescription`:
 
 ```bash
 kiri/probes/runtime/run.sh
@@ -169,6 +194,7 @@ them together.
 | 2 | Camera and microphone permissions on every engine | Ran in app | Ran in probe | Ran in probe |
 | 3 | Passkeys (WebAuthn) for any site | Runs up to Apple's entitlement | Not available | WebView2's own |
 | 4 | Host channel, context menu everywhere, extension transport | Ran in app | Ran in probe | Ran in probe |
+| 5 | Location permissions on every engine | Ran in probe, not yet with a real position | Built, not yet run | Built, not yet run |
 
 The Windows runtime probe last passed on 2026-10-12 (Windows 11, WebView2 runtime current).
 

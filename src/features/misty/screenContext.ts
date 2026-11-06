@@ -3,7 +3,7 @@ import { desktopOs } from "@/shared/platform/desktopOs";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { captureAttachmentFromDataUrl } from "@/features/ai-surface/captureAttachment";
 
-export interface MistyScreenStatus {
+interface MistyScreenStatus {
   supported: boolean;
   allowed: boolean;
   external?: boolean;
@@ -19,7 +19,7 @@ export async function captureMistyScreen() {
     throw new Error(
       desktopOs() === "macos"
         ? "Allow screen recording in System Settings so Misty can read the current window."
-        : "Misty can't read the current window on this device.",
+        : "Misty can't read the current window on this computer.",
     );
   const result = await invoke<{
     error?: string;

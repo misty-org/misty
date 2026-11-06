@@ -5,7 +5,7 @@ import { extensionsNative } from "./native";
 import { rememberExtensionIcons } from "./extensionIcons";
 import {
   parseInstallations,
-  spaceInstallationsRaw,
+  profileInstallationsRaw,
   reportExtensionError,
   useExtensionsStore,
 } from "./store";
@@ -20,7 +20,7 @@ export function useExtensionActions(tabId: string, agentOwned: boolean) {
   const supported = useExtensionsStore((s) => s.supported);
   const revision = useExtensionsStore((s) => s.revision);
   const [actions, setActions] = useState<ExtensionAction[]>([]);
-  const installed = parseInstallations(spaceInstallationsRaw(profile)).filter((i) => i.installed);
+  const installed = parseInstallations(profileInstallationsRaw(profile)).filter((i) => i.installed);
   const agentAccess = profile
     ? Boolean(resolveSetting(profile, "extensions.agent_access").value)
     : true;

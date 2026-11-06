@@ -7,10 +7,11 @@ import {
 import { workspaceAppIcon } from "@/features/workspace/WorkspaceAppIcon";
 import { appIconStrokeWidth, BrandIcon, brandIconAsset, cn, Spinner } from "@/shared/ui";
 import { type LucideIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { providerFromRoute } from "@/features/webviews/providers";
 import { websiteIntegrations } from "@/features/webviews/websiteIntegrations";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
+import { SiteIcon } from "@/features/webviews/SiteIcon";
 function getViewAppId(tab: WorkspaceView | undefined): string {
   if (!tab) return "";
   if (tab.surfaceId === "space") {
@@ -43,6 +44,7 @@ export function ViewIcon({
   );
   const faviconUrl = browserState?.faviconUrl;
   useEffect(() => setFaviconFailed(false), [faviconUrl]);
+  const markFaviconFailed = useCallback(() => setFaviconFailed(true), []);
   if (isBrowser && isLoading) {
     return (
       <Spinner
@@ -54,17 +56,14 @@ export function ViewIcon({
   }
   if (isBrowser && faviconUrl && !faviconFailed) {
     return (
-      <img
-        alt=""
+      <SiteIcon
         className={cn(
           "shrink-0 select-none rounded-sm object-contain [image-rendering:auto]",
           size === 13 ? "size-3.5" : "size-4",
         )}
-        decoding="async"
-        draggable={false}
         key={faviconUrl}
-        onError={() => setFaviconFailed(true)}
-        src={faviconUrl}
+        onFailed={markFaviconFailed}
+        url={faviconUrl}
       />
     );
   }

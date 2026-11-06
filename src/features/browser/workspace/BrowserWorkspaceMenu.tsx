@@ -16,7 +16,6 @@ export function BrowserWorkspaceMenu({
   agentOwned,
   nativeRuntime,
   commands,
-  account,
   anchor,
   tools,
 }: {
@@ -26,7 +25,6 @@ export function BrowserWorkspaceMenu({
   agentOwned: boolean;
   nativeRuntime: boolean;
   commands: ReturnType<typeof useBrowserPageCommands>["commands"];
-  account?: ReactNode;
   anchor: RefObject<HTMLDivElement | null>;
   tools: ReactNode;
 }) {
@@ -35,7 +33,6 @@ export function BrowserWorkspaceMenu({
       toolsIcon={sidebarMenu}
       library={sidebarMenu ? undefined : <BrowserLibraryMenus />}
       layout={sidebarMenu ? undefined : <BrowserPaneLayoutSubmenu tabId={tab.id} />}
-      account={account}
       lead={
         sidebarMenu ? (
           <BrowserMenuLeadRows

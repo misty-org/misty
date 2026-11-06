@@ -1,4 +1,4 @@
-//! Where a Space's extension packages live, and which version of each runs.
+//! Where a profile's extension packages live, and which version of each runs.
 use super::*;
 
 pub(super) fn account_root(app: &tauri::AppHandle, account: &str) -> Result<PathBuf, String> {
@@ -9,12 +9,16 @@ pub(super) fn account_root(app: &tauri::AppHandle, account: &str) -> Result<Path
         .join("extensions")
         .join(identity(account)))
 }
-/// A Space's packages: `extensions/<account>/<space>`.
-pub(super) fn root(app: &tauri::AppHandle, account: &str, space: &str) -> Result<PathBuf, String> {
-    if !crate::infra::space_windows::valid_key(space) {
-        return Err("Unknown Space.".into());
+/// A profile's packages: `extensions/<account>/<profile>`.
+pub(super) fn root(
+    app: &tauri::AppHandle,
+    account: &str,
+    profile: &str,
+) -> Result<PathBuf, String> {
+    if !crate::infra::profile_windows::valid_key(profile) {
+        return Err("Unknown profile.".into());
     }
-    Ok(account_root(app, account)?.join(space))
+    Ok(account_root(app, account)?.join(profile))
 }
 #[derive(Default, Serialize, Deserialize)]
 pub(super) struct PackageSelection {

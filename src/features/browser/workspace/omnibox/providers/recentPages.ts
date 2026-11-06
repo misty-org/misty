@@ -17,9 +17,7 @@ export function recentPagesProvider(deps: OmniboxDeps): OmniboxProvider {
     id: "recent-pages",
     async start(input) {
       if (input.text.trim() || input.private) return [];
-      const visits = await deps
-        .recentVisits({ profileId: input.profileId, limit: VISITS })
-        .catch(() => []);
+      const visits = await deps.recentVisits({ limit: VISITS }).catch(() => []);
       const seen = new Set([urlKey(input.currentUrl)]);
       const matches: OmniboxMatch[] = [];
       for (const visit of visits) {

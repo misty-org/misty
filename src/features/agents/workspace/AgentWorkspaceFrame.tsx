@@ -201,7 +201,6 @@ export function AgentWorkspaceFrame({
         <FolderNameDialog
           open={creatingProject}
           title="New project"
-          description="Group this agent's conversations. Drag conversations into it."
           submitLabel="Create"
           onOpenChange={setCreatingProject}
           onSubmit={async (name) => {

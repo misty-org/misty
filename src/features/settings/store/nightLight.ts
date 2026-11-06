@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 export type NightLightMode = "off" | "on" | "scheduled";
 
 /** When a scheduled night light turns on and off, as local "HH:MM". */
-export interface NightLightSchedule {
+interface NightLightSchedule {
   startAt: string;
   endAt: string;
 }

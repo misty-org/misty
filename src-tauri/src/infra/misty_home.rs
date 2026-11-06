@@ -6,7 +6,7 @@
 //! to the Trash (the Recycle Bin on Windows) so the user can still recover
 //! them.
 use crate::infra::paths;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -23,13 +23,6 @@ struct Layout {
     #[cfg(unix)]
     private_files: Vec<String>,
     retired: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct HomeManifest {
-    format: String,
-    layout_version: u32,
 }
 
 #[derive(Debug, Default)]
@@ -72,22 +65,15 @@ fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
     }
     if manifest_version(root) != layout.layout_version {
         misty_credential_store::set_layout_version(root, layout.layout_version)?;
-        // The manifest an earlier layout kept as a file is superseded.
-        let _ = fs::remove_file(root.join("home.json"));
     }
     Ok(report)
 }
 
 fn manifest_version(root: &Path) -> u32 {
-    if let Ok(Some(version)) = misty_credential_store::layout_version(root) {
-        return version;
-    }
-    // An earlier layout recorded it in `home.json`.
-    fs::read(root.join("home.json"))
+    misty_credential_store::layout_version(root)
         .ok()
-        .and_then(|bytes| serde_json::from_slice::<HomeManifest>(&bytes).ok())
-        .filter(|manifest| manifest.format == "misty-home")
-        .map_or(0, |manifest| manifest.layout_version)
+        .flatten()
+        .unwrap_or(0)
 }
 
 fn retire(

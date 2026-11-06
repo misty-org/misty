@@ -56,6 +56,11 @@
 [data-tab-position="right"] .misty-space-bar-card {
   margin: var(--shell-edge, 6px) var(--shell-gap, 4px) 0 var(--shell-edge, 6px);
 }
+/* The window buttons sit in the bar with tabs on the right. The row's own padding and the card's
+   margin already count toward the room they need. */
+.misty-space-bar-card [data-window-toolbar][data-window-chrome="true"] {
+  padding-left: max(0px, calc(var(--window-chrome-left, 0px) - 16px)) !important;
+}
 .misty-workspace-tab-list {
   scrollbar-width: none;
 }

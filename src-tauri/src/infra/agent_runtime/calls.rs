@@ -1,6 +1,6 @@
 //! Signed calls to the agent runtime on this computer, and the deliveries the server queues
 //! for it. The signature is the one the runtime checks for every `/v1` call
-//! (`server/apps/agent-runtime/src/signature.ts`): HMAC-SHA256 over the method, path,
+//! (`src-tauri/services/agent-runtime/src/signature.ts`): HMAC-SHA256 over the method, path,
 //! timestamp and the body's SHA-256.
 use std::{
     sync::OnceLock,
@@ -200,7 +200,7 @@ pub async fn agent_runtime_deliver(
 }
 
 /// The model calls the desktop makes outside agent runs on its own runtime
-/// (`server/apps/agent-runtime/src/device-calls.ts`, `device-routing.ts`).
+/// (`src-tauri/services/agent-runtime/src/device-calls.ts`, `device-routing.ts`).
 const DEVICE_CALLS: [&str; 12] = [
     "cleanup",
     "voice-transcription",

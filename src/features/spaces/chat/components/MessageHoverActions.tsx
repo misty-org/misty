@@ -11,7 +11,7 @@ import { useState } from "react";
 import { ChatEmojiPicker } from "./ChatEmojiPicker";
 import { quickReactionEmojis } from "./messageHelpers";
 
-export interface MessageHoverActionsProps {
+interface MessageHoverActionsProps {
   message: SpaceMessage;
   currentUserId?: string;
   isOwner: boolean;

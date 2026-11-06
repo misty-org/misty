@@ -1,4 +1,4 @@
-export type SpaceActorRef = { kind: "person"; user_id: string };
+
 
 interface SpaceParticipant {
   kind: "person";
@@ -20,7 +20,8 @@ export interface SpaceMessageSender {
 
 export interface SpaceConversation {
   id: string;
-  kind?: "standard" | "direct";
+  /** standard is a group chat, public to the Space; dm is seen only by the people in it. */
+  kind?: "standard" | "direct" | "dm";
   space_id: string;
   title: string;
   created_by_user_id: string;

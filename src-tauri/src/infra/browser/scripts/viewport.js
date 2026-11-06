@@ -27,6 +27,8 @@
   };
   __MISTY_CONTEXT_MENU_PLACEHOLDER__
   __MISTY_BACKGROUND_PLACEHOLDER__
+  __MISTY_CARET_PLACEHOLDER__
+  __MISTY_FULLSCREEN_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
 
   // External pages own their layout and scrolling behavior. Page zoom is

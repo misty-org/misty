@@ -64,7 +64,7 @@ describe("desktop account requests through the native HTTP bridge", () => {
         pending.delete(body.requestId);
         return;
       }
-      if (command === "auth_cookie_capture") {
+      if (command === "auth_session_capture") {
         expect(signedIn).toBe(true);
         return "account-a";
       }

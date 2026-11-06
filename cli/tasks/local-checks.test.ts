@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -13,11 +13,11 @@ function plan(paths: string[]) {
 
 test("change selection covers configuration, helper crates, and release tooling", () => {
   assert.deepEqual(plan(["README.md"]), []);
-  assert.deepEqual(plan(["src/features/example.ts"]), ["frontend", "scripts"]);
+  assert.deepEqual(plan(["src/features/example.ts"]), ["scripts", "frontend"]);
   assert.deepEqual(plan(["src-tauri/services/peer-transport/Cargo.toml"]), ["rust-desktop"]);
   assert.deepEqual(plan(["cli/tasks/release/setup-keys.ts"]), ["scripts"]);
-  assert.deepEqual(plan(["server/internal/accounts/http.go"]), ["server"]);
-  assert.deepEqual(plan([".githooks/checks.sh"]), ["frontend", "server", "rust-cli", "rust-desktop", "scripts"]);
+  assert.deepEqual(plan(["src-tauri/services/agent-runtime/src/index.ts"]), ["rust-desktop", "agent-runtime"]);
+  assert.deepEqual(plan([".githooks/checks.sh"]), ["scripts", "rust-cli", "rust-desktop", "agent-runtime", "frontend"]);
 });
 
 test("pre-commit refuses to validate unstaged code instead of the staged snapshot", () => {
@@ -61,4 +61,78 @@ test("a failed check fails its suite even when the checks beside it pass", () =>
     assert.match(result.stdout, /✓ frontend-lint/);
     assert.doesNotMatch(result.stdout, /✓ frontend \(/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+/** A repository with a staged source file, and stand-ins for the tools a commit calls. */
+function commitFixture(npm: string) {
+  const directory = mkdtempSync(resolve(tmpdir(), "misty-hook-commit-"));
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: directory, stdio: "ignore" });
+  git("init");
+  git("config", "user.name", "Test");
+  git("config", "user.email", "test@example.invalid");
+  mkdirSync(resolve(directory, "src"));
+  writeFileSync(resolve(directory, "src/example.ts"), "staged");
+  git("add", "src/example.ts");
+  const tools = resolve(directory, ".tools");
+  mkdirSync(tools);
+  writeFileSync(resolve(directory, ".git/info/exclude"), ".tools\n");
+  writeFileSync(resolve(tools, "npm"), `#!/bin/sh\n${npm}\n`, { mode: 0o755 });
+  writeFileSync(resolve(tools, "docker"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  return { directory, env: { ...process.env, PATH: `${tools}:${process.env.PATH}` } };
+}
+
+test("a commit stops at its limit, says what it left, and isn't refused for it", () => {
+  const { directory, env } = commitFixture("sleep 60");
+  try {
+    const began = Date.now();
+    const result = spawnSync("bash", [hook, "commit"], {
+      cwd: directory, encoding: "utf8", env: { ...env, MISTY_COMMIT_SECONDS: "3" },
+    });
+    assert.ok(Date.now() - began < 20_000, "the limit didn't stop the suite");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Stopped at the \d+s limit/);
+    assert.match(result.stdout, /frontend/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a limit used up before the suites start doesn't turn into no limit", () => {
+  const { directory, env } = commitFixture("sleep 60");
+  try {
+    const began = Date.now();
+    const result = spawnSync("bash", [hook, "commit"], {
+      cwd: directory, encoding: "utf8", env: { ...env, MISTY_COMMIT_SECONDS: "0" },
+    });
+    assert.ok(Date.now() - began < 20_000, "the suites ran with no limit");
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Stopped at the \d+s limit/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a suite that ignores being asked to stop can't hold a commit", () => {
+  const { directory, env } = commitFixture("trap '' TERM; sleep 60");
+  try {
+    const began = Date.now();
+    const result = spawnSync("bash", [hook, "commit"], {
+      cwd: directory, encoding: "utf8", env: { ...env, MISTY_COMMIT_SECONDS: "2" },
+      timeout: 40_000,
+    });
+    assert.ok(Date.now() - began < 20_000, "a stubborn suite held the commit");
+    assert.equal(result.status, 0, result.stderr);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a commit stops at the first failing suite and is refused", () => {
+  const { directory, env } = commitFixture('echo "$*"; exit 37');
+  try {
+    const result = spawnSync("bash", [hook, "commit"], { cwd: directory, encoding: "utf8", env });
+    assert.equal(result.status, 37);
+    assert.match(result.stdout, /── scripts/);
+    assert.doesNotMatch(result.stdout, /── frontend/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("a commit and a push never compile for other platforms", () => {
+  const source = readFileSync(hook, "utf8");
+  assert.doesNotMatch(source.match(/^rust_desktop\(\).*$/m)?.[0] ?? "", /desktop-windows/);
+  assert.match(source, /release\) sequence 0 secrets .* desktop-windows/);
 });

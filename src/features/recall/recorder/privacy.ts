@@ -14,7 +14,7 @@ export interface PageCandidate {
   agentOwned?: boolean;
 }
 
-export type SkipReason =
+type SkipReason =
   "off" | "paused" | "private" | "agent" | "not-a-web-page" | "excluded" | "sensitive";
 
 /**

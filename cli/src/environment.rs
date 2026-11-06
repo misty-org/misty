@@ -21,7 +21,7 @@ pub use validate::*;
 mod tests;
 
 /// The CLI configures development only. A server is deployed with
-/// server/compose.yml and its setup container (docs/self-hosting.md).
+/// misty-server/compose.yml and its setup container (docs/self-hosting.md).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Target {
     Dev,
@@ -35,8 +35,17 @@ impl Target {
     }
 }
 
+/// Server settings live with the rest of Misty in ~/.misty, outside any checkout.
+/// `MISTY_ENV_DIR` names another folder, as it does for Compose.
 pub fn root(workspace: &Workspace, target: Target) -> PathBuf {
-    workspace.server.join(".env").join(target.label())
+    let in_workspace = || workspace.server.join(".env").join(target.label());
+    if cfg!(test) {
+        return in_workspace();
+    }
+    env::var_os("MISTY_ENV_DIR")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|home| home.join(".misty/server").join(target.label())))
+        .unwrap_or_else(in_workspace)
 }
 
 pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
@@ -56,7 +65,6 @@ pub fn init(workspace: &Workspace, target: Target) -> Result<()> {
     }
     fs::create_dir_all(root(workspace, target))?;
     secure_directories(&root(workspace, target))?;
-    secure_directories(&workspace.server.join(".env"))?;
     init_cli_files(workspace)?;
     println!(
         "Initialized {} environment ({} new files).",

@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 /// Provisions the development tunnel, DNS route and Worker host. A server
 /// provisions its own Cloudflare resources in its setup container
-/// (server/deploy/setup).
+/// (misty-server/deploy/setup).
 #[derive(Debug, clap::Args)]
 pub struct Options {
     /// Apply the displayed Cloudflare resource plan.

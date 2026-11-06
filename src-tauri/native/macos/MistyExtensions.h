@@ -3,8 +3,8 @@
 typedef void (*MistyExtensionReply)(void *context, const char *json);
 typedef void (*MistyExtensionEvent)(const char *json);
 // Each Space has its own extension host: its own WKWebExtensionController over
-// the Space's website data store. `space` is the Space's key (`personal` or the
-// Space id's 32 hex digits); requests name it in their "space" field.
+// the profile's website data store. `space` is the profile's id (`personal` or a
+// generated one); requests name it in their "space" field.
 void misty_extensions_request(const char *json, MistyExtensionReply reply, void *context);
 void misty_extensions_set_events(MistyExtensionEvent callback);
 // Main-thread only. The caller owns the returned retained configuration.

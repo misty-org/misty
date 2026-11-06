@@ -14,6 +14,7 @@ import { useTabHoverCards } from "./TabHoverCard";
 import { useTabStripReorder } from "./useTabStripReorder";
 import { SidebarToggleButton } from "@/features/app-shell/SidebarToggleButton";
 import { useBrowserToolbarSlot } from "@/features/browser/workspace";
+import { ProfileSwitcher } from "@/features/profiles/ProfileSwitcher";
 import { SidebarAddressFallback, SidebarNavFallback } from "./SidebarFallbacks";
 import { SidebarNowPlaying } from "./SidebarNowPlaying";
 import { WorkspaceTabStripTab } from "./WorkspaceTabStripTab";
@@ -180,6 +181,9 @@ export function WorkspaceTabStrip(
           <div className="misty-sidebar-foot" data-misty-window-drag-block="true">
             {/* Downloads keep the left edge and the pane layout the right, never side by side. */}
             <div className="flex items-center gap-1.5">{props.footEnd}</div>
+            <div className="flex min-w-0 flex-1 justify-center" data-browser-toolbar data-sidebar>
+              <ProfileSwitcher />
+            </div>
             <div ref={setFootSlot} className="ml-auto flex items-center" />
           </div>
         </div>

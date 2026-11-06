@@ -1,12 +1,10 @@
 import { Copy, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAuth } from "@/features/auth";
-import { useSyncController } from "@/features/browser-sync/useSyncController";
 import { PasswordEditor } from "@/features/passwords/PasswordEditor";
 import { passwordsApi, siteLabel, type SavedLogin } from "@/features/passwords/api";
 import { loginsToCsv, parseLoginsCsv, type CsvLogin } from "@/features/passwords/csv";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, IconButton, Input, SkeletonList } from "@/shared/ui";
+import { Button, ErrorNotification, IconButton, Input, SkeletonList } from "@/shared/ui";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as SettingsRow,
@@ -14,17 +12,14 @@ import {
 } from "../components/DesktopSettingsUI";
 import { SettingsNote } from "../SettingsControls";
 
-/** Saved sign-ins, sealed in the sync vault, or in this device's local vault while nobody is
- * signed in. A password is read only when you ask for it. */
+/** Saved sign-ins, kept by this window's profile. A password is read only when you ask for it. */
 export function PasswordsSettings() {
-  const { user } = useAuth();
-  const sync = useSyncController(user?.id ?? "");
-  const unlocked = !user || Boolean(sync.session);
   const [logins, setLogins] = useState<SavedLogin[] | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<SavedLogin | "new" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -36,14 +31,15 @@ export function PasswordsSettings() {
     }
   }, []);
   useEffect(() => {
-    if (unlocked) void load();
-  }, [unlocked, load]);
+    void load();
+  }, [load]);
 
   const importLogins = async (file: File) => {
     setNotice(null);
+    setFailure(null);
     const parsed = parseLoginsCsv(await file.text());
     if (!parsed.length) {
-      setNotice("That file has no passwords Misty can read. It needs url and password columns.");
+      setFailure("That file has no passwords Misty can read. It needs url and password columns.");
       return;
     }
     let added = 0;
@@ -55,16 +51,17 @@ export function PasswordsSettings() {
         // Counted below as skipped.
       }
     }
-    setNotice(
-      added === parsed.length
-        ? `Imported ${added} password${added === 1 ? "" : "s"}.`
-        : `Imported ${added} of ${parsed.length} passwords. The rest could not be saved.`,
-    );
+    if (added === parsed.length) {
+      setNotice(`Imported ${added} password${added === 1 ? "" : "s"}.`);
+    } else {
+      setFailure(`Imported ${added} of ${parsed.length} passwords. The rest could not be saved.`);
+    }
     void load();
   };
 
   const exportLogins = async () => {
     setNotice(null);
+    setFailure(null);
     const confirmed = await confirmAction(
       "The file will contain every saved password in plain text. Keep it somewhere safe and delete it when you are done. Export?",
     );
@@ -87,7 +84,7 @@ export function PasswordsSettings() {
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      setNotice("Passwords could not be exported. Try again.");
+      setFailure("Passwords could not be exported. Try again.");
     }
   };
 
@@ -98,27 +95,6 @@ export function PasswordsSettings() {
         !needle || `${login.origin} ${login.username}`.toLocaleLowerCase().includes(needle),
     );
   }, [logins, query]);
-
-  if (!unlocked)
-    return (
-      <SettingsSectionBlock title="Logins">
-        <SettingsRow
-          label="Unlock your sync vault"
-          description="Passwords are encrypted with your sync vault."
-        >
-          <Button
-            variant="outline"
-            onClick={() =>
-              window.dispatchEvent(
-                new CustomEvent("misty:open-settings", { detail: { section: "sync" } }),
-              )
-            }
-          >
-            Open Sync
-          </Button>
-        </SettingsRow>
-      </SettingsSectionBlock>
-    );
 
   return (
     <SettingsSectionBlock title="Logins">
@@ -158,6 +134,7 @@ export function PasswordsSettings() {
         />
       </div>
       {notice ? <SettingsNote>{notice}</SettingsNote> : null}
+      <ErrorNotification message={failure} onDismiss={() => setFailure(null)} />
       {editing ? (
         <PasswordEditor
           login={editing === "new" ? null : editing}

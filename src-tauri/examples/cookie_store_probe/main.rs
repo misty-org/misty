@@ -6,8 +6,12 @@
 #[cfg(target_os = "macos")]
 #[path = "../../src/infra/website_data"]
 mod website_data {
-    pub(super) mod cookie_restore;
     pub(super) use cookie_store_macos as cookie_store;
+    #[allow(
+        dead_code,
+        unused_imports,
+        reason = "the probe exercises only cookie reads and writes"
+    )]
     pub(super) mod cookie_store_macos;
     #[allow(
         dead_code,

@@ -8,10 +8,10 @@ export {
   CollectionViewToggle,
 } from "./collection/CollectionToolbar";
 export {
-  CollectionGrid,
+  
   CollectionCardTitle,
   CollectionCardMetadata,
 } from "./collection/CollectionCards";
 export { CollectionItems } from "./collection/CollectionItems";
 export { CollectionSkeleton } from "./collection/CollectionSkeleton";
-export type { CollectionItem, CollectionColumn } from "./collection/collectionItemTypes";
+;

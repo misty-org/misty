@@ -102,13 +102,14 @@ export interface GlobalAiConversation {
   folderId?: string;
   id: string;
   title: string;
+  /** The Space it belongs to, for its whole life. */
   spaceId?: string;
+  /** Whether that's the person's personal Space, which a window shows without knowing its id. */
+  personalSpace?: boolean;
   createdAt: string;
   updatedAt: string;
-  /** When the user last saw it on this device; runs newer than this are unread. */
+  /** When the user last saw it; runs newer than this are unread. */
   lastReadAt?: string;
-  /** The device that keeps this chat; absent while it waits in the server's inbox. */
-  keptOnDeviceId?: string;
   modelId?: string;
   /** The model picked for this conversation; empty follows the account's Thinking choice. */
   modelOverride?: string;

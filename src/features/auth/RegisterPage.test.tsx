@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   authenticateAccount: vi.fn(),
   accountRegister: vi.fn(),
+  accountSignIn: vi.fn(),
+  accountWaitForConfirmation: vi.fn(),
 }));
 
 vi.mock("@/api/account/api", () => ({
@@ -29,8 +31,11 @@ vi.mock("./AuthContext", () => ({
 
 vi.mock("./store/useAccountStore", () => ({
   accountRegister: mocks.accountRegister,
+  accountSignIn: mocks.accountSignIn,
+  accountWaitForConfirmation: mocks.accountWaitForConfirmation,
 }));
 
+import { ConfirmEmailSent } from "./store/confirmEmailSent";
 import RegisterPage from "./RegisterPage";
 import type * as ReactRouterDomModule from "react-router-dom";
 
@@ -43,6 +48,11 @@ function setInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
+
+const backButtonIn = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent?.trim() === "Back",
+  ) ?? null;
 
 describe("RegisterPage", () => {
   let container: HTMLDivElement;
@@ -96,7 +106,8 @@ describe("RegisterPage", () => {
       );
     });
 
-    expect(container.textContent).toContain("Create another account");
+    // Nobody is signed in here, so it isn't "another" account.
+    expect(container.textContent).toContain("Create an account");
     expect(container.textContent).not.toContain(
       "Your current account will remain signed in on this device.",
     );
@@ -115,14 +126,58 @@ describe("RegisterPage", () => {
     expect(container.textContent).not.toContain("Create an account on the website");
     expect(container.textContent).not.toContain("Sign in on the website");
 
-    const backButton = container.querySelector<HTMLButtonElement>('button[aria-label="Back"]');
-    expect(backButton).not.toBeNull();
+    // The page has no back button: the logo in the bar goes to the welcome page.
+    expect(backButtonIn(container)).toBeNull();
     expect(container.textContent).not.toContain("Return to app");
+  });
 
+  it("says to check email when the account waits for its email to be confirmed", async () => {
+    mocks.accountRegister.mockRejectedValue(new ConfirmEmailSent());
+    mocks.accountWaitForConfirmation.mockReturnValue(new Promise(() => {}));
+    mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
     await act(async () => {
-      backButton?.click();
+      root.render(
+        <MemoryRouter initialEntries={["/register"]}>
+          <RegisterPage />
+        </MemoryRouter>,
+      );
     });
-    expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
+    await act(async () => {
+      setInputValue(container.querySelector('input[id="register-username"]')!, "carol");
+      setInputValue(container.querySelector('input[id="register-email"]')!, "carol@example.com");
+      setInputValue(container.querySelector('input[id="register-password"]')!, "a long password");
+    });
+    await act(async () => {
+      container.querySelector("form")!.requestSubmit();
+    });
+
+    expect(container.textContent).toContain("We sent a link to carol@example.com.");
+    expect(container.querySelector('input[id="register-email"]')).toBeNull();
+    expect(mocks.accountSignIn).not.toHaveBeenCalled();
+  });
+
+  it("signs in by itself once the link has made the account", async () => {
+    mocks.accountRegister.mockRejectedValue(new ConfirmEmailSent());
+    mocks.accountWaitForConfirmation.mockResolvedValue(undefined);
+    mocks.accountSignIn.mockResolvedValue({ id: "acc-3", email: "carol@example.com" });
+    mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/register"]}>
+          <RegisterPage />
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      setInputValue(container.querySelector('input[id="register-username"]')!, "carol");
+      setInputValue(container.querySelector('input[id="register-email"]')!, "carol@example.com");
+      setInputValue(container.querySelector('input[id="register-password"]')!, "a long password");
+    });
+    await act(async () => {
+      container.querySelector("form")!.requestSubmit();
+    });
+
+    expect(mocks.accountSignIn).toHaveBeenCalledWith("carol@example.com", "a long password");
   });
 
   it("submits registration and authenticates when adding another account", async () => {

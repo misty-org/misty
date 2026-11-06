@@ -5,7 +5,7 @@ import { confirmAction } from "@/shared/lib/confirmAction";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { normalizeLibraryEdit } from "../SpaceLibraryViewerUtils";
 
-export interface LibraryEditActionsOptions {
+interface LibraryEditActionsOptions {
   spaceId: string;
   item: SpaceLibraryItem;
   canEdit: boolean;

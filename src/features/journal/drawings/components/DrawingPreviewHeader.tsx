@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  ErrorNotification,
   IconButton,
   Input,
   MenuItem,
@@ -11,7 +12,7 @@ import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { SpaceDrawing } from "../types";
 
-export interface DrawingPreviewHeaderProps {
+interface DrawingPreviewHeaderProps {
   reportError?: (input: { title: string; error: unknown; scope: string }) => void;
   drawing: SpaceDrawing;
   onRename: (title: string) => Promise<void>;
@@ -120,11 +121,10 @@ export function DrawingPreviewHeader({
         </h2>
       )}
 
-      {failed && renaming ? (
-        <span role="alert" className="text-xs text-cream-muted">
-          Not saved. Try Save again.
-        </span>
-      ) : null}
+      <ErrorNotification
+        message={failed && renaming ? "Not saved. Try Save again." : ""}
+        onDismiss={() => setFailed(false)}
+      />
       {!renaming && hasActions ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

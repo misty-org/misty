@@ -26,8 +26,6 @@ mod browser_profile;
 pub(crate) mod browser_profile_view;
 pub mod browser_provider;
 pub mod browser_shortcuts;
-pub mod browser_sync;
-pub mod clipboard_bridge;
 pub mod cloud_clipboard;
 pub mod credential_store;
 #[cfg(desktop)]
@@ -46,6 +44,8 @@ pub mod environment;
 pub mod explorer;
 pub mod extensions;
 pub mod global_hotkey;
+#[cfg(target_os = "macos")]
+pub mod google_sign_in_sheet;
 pub mod link_preview;
 pub mod misty;
 pub mod misty_context;
@@ -60,17 +60,20 @@ pub mod paths;
 mod plugin_routes;
 #[cfg(desktop)]
 pub mod power_keep_awake;
-pub mod screen_memory;
+#[cfg(desktop)]
+pub mod profile_data;
+#[cfg(desktop)]
+pub mod profile_windows;
 pub mod search;
 pub mod settings;
 pub mod shortcuts;
+pub mod site_icon;
 pub mod site_settings;
-#[cfg(desktop)]
-pub mod space_windows;
 pub mod store;
 pub mod system_memory;
 #[cfg(desktop)]
 pub mod tray;
+pub mod vault;
 pub mod website_data;
 #[cfg(windows)]
 pub(crate) mod webview2;

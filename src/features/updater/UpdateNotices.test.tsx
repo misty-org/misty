@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it("does not read the retired app catalog or respond to app update notices", async () => {
-  render(<UpdateNotices profileId="account" />);
+  render(<UpdateNotices accountScope="account" />);
   await waitFor(() => expect(mocks.check).toHaveBeenCalledTimes(1));
   act(() =>
     window.dispatchEvent(
@@ -34,21 +34,24 @@ it("still checks for Misty releases and opens update settings", async () => {
   const openSettings = vi.fn();
   window.addEventListener("misty:open-settings", openSettings);
   try {
-    render(<UpdateNotices profileId="account" />);
-    expect((await screen.findByRole("status")).textContent).toContain("Misty 2.0.0 is available");
+    render(<UpdateNotices accountScope="account" />);
+    const notice = await screen.findByRole("status");
+    expect(notice.textContent).toContain("Misty 2.0.0 is available");
+    // Registered as a notice, so it shows over a page in that corner.
+    expect(notice.getAttribute("data-misty-notification")).toBe("true");
     expect(close).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "View release" }));
     expect(openSettings).toHaveBeenCalledWith(
       expect.objectContaining({ detail: { section: "updates" } }),
     );
-    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
   } finally {
     window.removeEventListener("misty:open-settings", openSettings);
   }
 });
 it("preserves unsaved-work notices independently of update checks", () => {
   mocks.enabled = false;
-  render(<UpdateNotices profileId="account" />);
+  render(<UpdateNotices accountScope="account" />);
   act(() =>
     window.dispatchEvent(
       new CustomEvent("misty:workspace-notice", {
@@ -58,14 +61,14 @@ it("preserves unsaved-work notices independently of update checks", () => {
   );
   expect(screen.getByRole("status").textContent).toContain("Save your changes");
   expect(screen.queryByRole("button", { name: "View release" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Dismiss update notification" }));
-  expect(screen.queryByRole("complementary")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss notification" }));
+  expect(screen.queryByRole("status")).toBeNull();
   expect(mocks.check).not.toHaveBeenCalled();
 });
 it("does not check without an account or outside the native app", () => {
-  const view = render(<UpdateNotices profileId="" />);
+  const view = render(<UpdateNotices accountScope="" />);
   expect(mocks.check).not.toHaveBeenCalled();
   mocks.native = false;
-  view.rerender(<UpdateNotices profileId="account" />);
+  view.rerender(<UpdateNotices accountScope="account" />);
   expect(mocks.check).not.toHaveBeenCalled();
 });

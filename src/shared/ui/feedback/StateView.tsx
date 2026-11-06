@@ -60,16 +60,16 @@ function LoadingState({ label = "Loading", className }: LoadingStateProps) {
 }
 export { EmptyState, ErrorState, LoadingState, PermissionState };
 
-export type StateViewProps = Omit<React.HTMLAttributes<HTMLDivElement>, "title"> & {
+type StateViewProps = Omit<React.HTMLAttributes<HTMLDivElement>, "title"> & {
   title: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
   compact?: boolean;
 };
 
-export type StateTone = "empty" | "error" | "permission" | "loading";
+type StateTone = "empty" | "error" | "permission" | "loading";
 
-export type LoadingStateProps = Omit<StateViewProps, "title"> & {
+type LoadingStateProps = Omit<StateViewProps, "title"> & {
   title?: React.ReactNode;
   label?: string;
 };

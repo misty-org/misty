@@ -380,44 +380,9 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "browser.privacy.page_state_restore",
-    "label": "Restore page state when switching devices",
-    "page": "sync",
-    "section": "privacy",
-    "key": "page_state_restore",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "browser.privacy.page_state_agent_restore",
-    "label": "Let agents finish restoring",
-    "page": "sync",
-    "section": "privacy",
-    "key": "page_state_agent_restore",
-    "default": true,
-    "owner": "device",
-    "type": "boolean",
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "sync.frequency",
-    "label": "Sync frequency",
-    "keywords": ["batch", "battery", "data", "live", "saver", "requests"],
-    "page": "sync",
-    "section": "sync",
-    "key": "sync_frequency",
-    "default": "balanced",
-    "owner": "device",
-    "type": "string",
-    "platforms": ["desktop"],
-    "enum": ["live", "balanced", "saver"]
-  },
-  {
     "id": "browser.privacy.page_state_excluded_sites",
     "label": "Don't capture page state on these sites",
-    "page": "sync",
+    "page": "privacy",
     "section": "privacy",
     "key": "page_state_excluded_sites",
     "default": "",
@@ -687,7 +652,7 @@
   },
   {
     "id": "extensions.space_installations",
-    "label": "Installed extensions in other Spaces",
+    "label": "Installed extensions in other profiles",
     "page": "browser-extensions",
     "section": "extensions",
     "key": "space_installations",
@@ -822,16 +787,16 @@
     "enum": ["mic", "mic-tab", "mic-system", "tab", "system"]
   },
   {
-    "id": "voice.keep_recordings",
-    "label": "Keep recordings",
+    "id": "voice.subtitle_preferences",
+    "label": "Live subtitles",
     "page": "voice",
     "section": "voice",
-    "key": "keep_recordings",
-    "default": false,
+    "key": "subtitle_preferences",
+    "default": "{}",
     "owner": "device",
-    "type": "boolean",
+    "type": "string",
     "platforms": ["desktop"],
-    "keywords": ["audio", "storage"]
+    "maxLength": 60000
   },
   {
     "id": "recall.enabled",
@@ -839,7 +804,7 @@
     "page": "recall",
     "section": "recall",
     "key": "enabled",
-    "default": false,
+    "default": true,
     "owner": "device",
     "type": "boolean",
     "platforms": ["desktop"],
@@ -883,6 +848,18 @@
     "type": "boolean",
     "platforms": ["desktop"],
     "keywords": ["memory", "voice"]
+  },
+  {
+    "id": "recall.morning_brief",
+    "label": "Morning brief",
+    "page": "recall",
+    "section": "recall",
+    "key": "morning_brief",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"],
+    "keywords": ["memory", "recap", "briefing", "summary"]
   },
   {
     "id": "models.provider",

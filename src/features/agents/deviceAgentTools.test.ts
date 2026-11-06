@@ -25,9 +25,8 @@ vi.mock("./store/useAgentsStore", () => ({
     sections: [{ kind: "text", locator: "1", text: "Revenue grew" }],
   })),
 }));
-vi.mock("@/features/workspace/windows", () => ({
-  mapAllWorkspaceWindowViews: (_state: unknown, visit: (view: (typeof views)[number]) => unknown) =>
-    views.forEach(visit),
+vi.mock("@/features/workspace/layoutTabs", () => ({
+  allLayoutViews: () => views,
 }));
 vi.mock("@/features/workspace", () => ({
   useWorkspaceStore: {

@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  ErrorNotification,
   MenuItem,
   Skeleton,
 } from "@/shared/ui";
@@ -221,7 +222,7 @@ export function DrawingPreviewView(props: {
 
   let content: ReactNode;
   if (room.error || renderFailed) {
-    content = <PreviewMessage>Preview unavailable</PreviewMessage>;
+    content = <ErrorNotification message="Preview unavailable" />;
   } else if (empty) {
     content = <PreviewMessage>This canvas is empty</PreviewMessage>;
   } else if (!previewUrl) {
@@ -283,11 +284,7 @@ export function DrawingPreviewView(props: {
         <BackgroundChoices value={previewSurface} onChange={setPreviewSurface} />
       </div>
       <div className="min-h-0 transition-colors" style={{ backgroundColor: previewSurface }}>
-        {exportError ? (
-          <p role="alert" className="px-3 text-sm text-cream-muted">
-            {exportError}
-          </p>
-        ) : null}
+        <ErrorNotification message={exportError} onDismiss={() => setExportError("")} />
         {content}
       </div>
     </div>

@@ -1,10 +1,7 @@
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { useWorkspaceRecoveryState } from "@/features/workspace/nativeWorkspaceRecovery";
 import { useWorkspaceRecoveryRetry } from "@/features/workspace/useWorkspaceRecoveryRetry";
-import { BrowserSyncStartup } from "@/features/browser-sync/BrowserSyncStartup";
-import { BrowserSyncSleepOverlay } from "@/features/browser-sync/BrowserSyncSleepOverlay";
-import { BrowserSyncBridge } from "@/features/browser-sync/BrowserSyncBridge";
-import { PageStateBridge } from "@/features/browser-sync/PageStateBridge";
+import { PageStateBridge } from "@/features/page-state/PageStateBridge";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
 import { LoadingScreen } from "@/shared/ui";
 import { AgentExecutionSurface } from "@/features/agents/AgentExecutionSurface";
@@ -15,11 +12,11 @@ import { useAuth } from "@/features/auth";
 import { isAuthPath, routes } from "@/features/app-shell";
 import { useSetupStore } from "@/features/setup/useSetupStore";
 import { desktopRouteIdFromPath } from "../routing/navigation";
-import { ConnectedDevicesProvider } from "@/features/connected-devices";
+import { DeviceSessionBridge } from "@/features/connected-devices";
 import { UnsavedQuitGuard } from "@/features/workspace/UnsavedQuitGuard";
-import { useSpaceWindowStore } from "@/features/workspace/spaceWindow";
+import { useProfileWindowStore } from "@/features/workspace/profileWindow";
 import { SpaceWindowBridge } from "@/features/workspace/SpaceWindowBridge";
-import { profileIdFor } from "@/features/workspace/profileId";
+import { accountScopeFor } from "@/features/workspace/accountScope";
 
 // Let the initial Misty flight finish before revealing the app, even when its
 // code is already cached. Load the layout alongside account/workspace restore so
@@ -50,16 +47,14 @@ export function AppFrameLayout() {
   const isInviteRoute = location.pathname.startsWith("/invite/");
   const welcomed = useSetupStore((state) => state.welcomed);
   // Browsing data belongs to the signed-in account, or to the local profile with none.
-  const profileId = profileIdFor(user?.id);
-  useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? profileId : "");
-  // An incognito window keeps nothing and never syncs. Any other window syncs the tabs
-  // of the Space it shows, through that Space's vault; switching restarts the bridge.
-  // Sync needs an account.
-  const { incognito, key: spaceKey } = useSpaceWindowStore((state) => state.identity);
-  const syncAllowed =
-    Boolean(user) &&
+  const accountScope = accountScopeFor(user?.id);
+  useWorkspaceRecoveryRetry(!isAuthRoute && !transitioning ? accountScope : "");
+  // An incognito window keeps nothing. Any other window keeps its pages' state once its
+  // saved tabs are back.
+  const incognito = useProfileWindowStore((state) => state.incognito);
+  const keepsPageState =
     !incognito &&
-    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === profileId && recovery.ready));
+    (!nativeWorkspaceRecoveryEnabled() || (recovery.accountId === accountScope && recovery.ready));
 
   // First run shows the welcome once, before the shell mounts: the shell sends a bare "/"
   // straight to the active tab, which would skip it. Invite links go through.
@@ -75,7 +70,7 @@ export function AppFrameLayout() {
         : !isAuthRoute &&
             !incognito &&
             nativeWorkspaceRecoveryEnabled() &&
-            (recovery.accountId !== profileId || (!recovery.ready && !recovery.usable))
+            (recovery.accountId !== accountScope || (!recovery.ready && !recovery.usable))
           ? "Restoring workspace"
           : !layoutReady
             ? "Opening Misty"
@@ -103,27 +98,17 @@ export function AppFrameLayout() {
 
   return (
     <>
-      <BrowserSyncStartup
-        key={`sync-startup:${user?.id ?? "anonymous"}`}
-        accountId={syncAllowed ? (user?.id ?? "") : ""}
-      >
-        <Suspense fallback={null}>
-          <ConnectedDevicesProvider>
-            <DesktopLayout getRouteId={desktopRouteIdFromPath} />
-          </ConnectedDevicesProvider>
-        </Suspense>
-      </BrowserSyncStartup>
-      <BrowserSyncBridge key={spaceKey} accountId={syncAllowed ? (user?.id ?? "") : ""} />
-      <PageStateBridge accountId={syncAllowed ? (user?.id ?? "") : ""} />
+      {/* Another account starts the shell over, with nothing of the last one's left mounted. */}
+      <Suspense key={`account:${user?.id ?? "anonymous"}`} fallback={null}>
+        <DesktopLayout getRouteId={desktopRouteIdFromPath} />
+      </Suspense>
+      <DeviceSessionBridge />
+      <PageStateBridge enabled={keepsPageState} />
       <SpacesRealtimeBridge />
       <SpaceWindowBridge />
       {incognito ? null : <AgentExecutionSurface />}
-      <UpdateNotices profileId={profileId} />
+      <UpdateNotices accountScope={accountScope} />
       <UnsavedQuitGuard />
-      <BrowserSyncSleepOverlay
-        key={`sync-sleep:${user?.id ?? "anonymous"}`}
-        accountId={syncAllowed ? (user?.id ?? "") : ""}
-      />
       {leavingScreen}
     </>
   );

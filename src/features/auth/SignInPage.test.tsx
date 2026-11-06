@@ -12,11 +12,6 @@ const mocks = vi.hoisted(() => ({
   resumeAccount: vi.fn(),
   removeAccount: vi.fn(),
   accountSignIn: vi.fn(),
-  CredentialSignInRefused: class CredentialSignInRefused extends Error {
-    constructor() {
-      super("That password did not work.");
-    }
-  },
 }));
 
 let mockAccounts: Array<{ id: string; email: string; username: string }> = [];
@@ -46,7 +41,6 @@ vi.mock("./AuthContext", () => ({
 
 vi.mock("./store/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
-  CredentialSignInRefused: mocks.CredentialSignInRefused,
 }));
 
 import SignIn from "./SignInPage";
@@ -68,6 +62,11 @@ async function useAnotherAccount(container: HTMLElement) {
   )!;
   await act(async () => button.click());
 }
+
+const backButtonIn = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent?.trim() === "Back",
+  ) ?? null;
 
 describe("SignInPage", () => {
   let container: HTMLDivElement;
@@ -163,20 +162,9 @@ describe("SignInPage", () => {
     expect(container.textContent).not.toContain("Sign in on the website");
     expect(container.textContent).not.toContain("Create an account on the website");
 
-    // Verify back arrow button is rendered and return to app text button is removed
-    const backButton = container.querySelector<HTMLButtonElement>('button[aria-label="Back"]');
-    expect(backButton).not.toBeNull();
+    // The page has no back button: the logo in the bar goes to the welcome page.
+    expect(backButtonIn(container)).toBeNull();
     expect(container.textContent).not.toContain("Return to app");
-
-    // Back returns to the saved accounts, and Back again to the signed-in workspace.
-    await act(async () => {
-      backButton?.click();
-    });
-    expect(container.textContent).toContain("Choose an account");
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('button[aria-label="Back"]')?.click();
-    });
-    expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });
 
   it("returns to the requested route when identity arrives after an automatic sign-in redirect", async () => {
@@ -291,58 +279,11 @@ describe("SignInPage", () => {
     });
 
     expect(mocks.authenticateAccount).toHaveBeenCalled();
-    expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123", {
-      legacy: false,
-    });
+    expect(mocks.accountSignIn).toHaveBeenCalledWith("new@example.com", "secret123");
     expect(mocks.navigate).toHaveBeenCalledWith("/spaces/main", { replace: true });
   });
 
-  it("sends the password in plain form only when asked, after a refused credential sign-in", async () => {
-    mocks.authenticateAccount.mockImplementation(async (fn: () => Promise<unknown>) => fn());
-    mocks.accountSignIn.mockRejectedValueOnce(new mocks.CredentialSignInRefused());
-    mocks.accountSignIn.mockResolvedValueOnce({
-      id: "acc-1",
-      email: "a@example.com",
-      username: "A",
-    });
-    await act(async () => {
-      root.render(
-        <MemoryRouter initialEntries={["/signin"]}>
-          <SignIn />
-        </MemoryRouter>,
-      );
-    });
-    await act(async () => {
-      setInputValue(
-        container.querySelector<HTMLInputElement>('input[type="email"]')!,
-        "a@example.com",
-      );
-      setInputValue(
-        container.querySelector<HTMLInputElement>('input[type="password"]')!,
-        "reset password",
-      );
-    });
-    await act(async () => {
-      container
-        .querySelector<HTMLFormElement>("form")!
-        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    });
-    expect(mocks.accountSignIn).toHaveBeenLastCalledWith("a@example.com", "reset password", {
-      legacy: false,
-    });
-    await act(async () => {});
-    expect(container.textContent).toContain("Was your password reset by email?");
-    const plain = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("Sign in with the reset password"),
-    )!;
-    expect(plain).toBeTruthy();
-    await act(async () => plain.click());
-    expect(mocks.accountSignIn).toHaveBeenLastCalledWith("a@example.com", "reset password", {
-      legacy: true,
-    });
-  });
-
-  it("tells a person who forgot their password where a sign-in link comes from", async () => {
+  it("offers a person who forgot their password the way to a sign-in link", async () => {
     await act(async () => {
       root.render(
         <MemoryRouter initialEntries={["/signin"]}>
@@ -351,12 +292,8 @@ describe("SignInPage", () => {
       );
     });
 
-    expect(container.textContent).toContain(
-      "Ask the person who runs this server for a sign-in link",
-    );
-    expect(container.textContent).toContain("mistysys.com/sign-in");
     const buttons = Array.from(container.querySelectorAll("button")).map((b) => b.textContent);
-    expect(buttons).not.toContain("Forgot your password?");
+    expect(buttons).toContain("Forgot your password?");
   });
 
   it("asks for a fresh sign-in when a saved account's session expired", async () => {

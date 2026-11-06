@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /** Zoom factors keyed by host; 100% is never stored. */
-export type SiteZoomLevels = Record<string, number>;
+type SiteZoomLevels = Record<string, number>;
 
 /** Oldest sites drop off first so the account setting stays small. */
 const maxSites = 200;

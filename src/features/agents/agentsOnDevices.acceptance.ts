@@ -4,7 +4,7 @@ import { MistyClient } from "@/tests/acceptance/mistyClient";
 
 // Agents on this computer, live on the local server: the keep-awake setting and
 // the request state a device reads to end the agent's own session.
-// server/test/contract/http/api/remote_sessions_test.go covers the session itself
+// misty-server/test/contract/http/api/remote_sessions_test.go covers the session itself
 // with real keys.
 let client: MistyClient;
 

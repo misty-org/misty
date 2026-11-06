@@ -1,9 +1,12 @@
-//! Saved passwords and autofill. Sign-ins live in the vault's `passwords`
-//! collection, each sealed with the vault key, so the server and any copy of
-//! its database hold only ciphertext. The page script asks for sign-ins of its
-//! own top-level origin and reports submitted ones; Misty decides what a page
-//! receives from the page's real address, never from what the page claims.
+//! Saved passwords and autofill. Sign-ins live in the `passwords` collection of the profile
+//! whose pages use them, in the profile's encrypted records, so a page only ever sees its own
+//! profile's. The page script says when a sign-in field has focus and reports submitted
+//! sign-ins. It runs in the page's own JavaScript world, so nothing it sends can be trusted as the
+//! person's choice: the saved sign-ins go to Misty's own interface, never to the page, and only a
+//! click there fills one (`browser_page_password_fill`). Misty decides what a page receives from
+//! the page's real address, never from what the page claims.
 use super::super::*;
+use crate::infra::profile_data::ProfileRecords;
 use misty_browser_sync::{
     collections::PASSWORDS,
     document::{
@@ -14,14 +17,14 @@ use misty_browser_sync::{
 use std::collections::HashMap;
 use zeroize::Zeroizing;
 
-mod device;
 mod manage;
-pub use device::*;
 pub use manage::*;
 
-const LOCKED: &str = "Unlock your sync vault to use saved passwords.";
+const UNAVAILABLE: &str = "This computer's key storage is unavailable.";
 
 struct PendingCapture {
+    /// The profile of the page that submitted it, where it saves whichever window answers.
+    profile: String,
     origin: String,
     username: String,
     password: Zeroizing<String>,
@@ -37,18 +40,15 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-async fn handle() -> Result<misty_browser_sync::worker::WorkerHandle, String> {
-    crate::infra::browser_sync::vault_handle()
-        .await
-        .ok_or_else(|| LOCKED.to_owned())
+fn profile_records(profile: &str) -> Result<ProfileRecords, String> {
+    crate::infra::profile_data::profile_records(profile).ok_or_else(|| UNAVAILABLE.to_owned())
 }
 
-async fn logins() -> Result<Vec<(String, Login)>, String> {
-    let (_, records) = handle()
-        .await?
-        .records_list(PASSWORDS.into())
+async fn logins(profile: &str) -> Result<Vec<(String, Login)>, String> {
+    let records = profile_records(profile)?
+        .records_list(PASSWORDS)
         .await
-        .map_err(|_| LOCKED.to_owned())?;
+        .map_err(|_| UNAVAILABLE.to_owned())?;
     Ok(records
         .into_iter()
         .filter(|record| record.kind == Kind::Login)
@@ -61,7 +61,7 @@ async fn logins() -> Result<Vec<(String, Login)>, String> {
         .collect())
 }
 
-async fn write(id: String, login: Option<Login>) -> Result<(), String> {
+async fn write(profile: &str, id: String, login: Option<Login>) -> Result<(), String> {
     let record = match login {
         Some(login) => {
             let Value::Object(fields) = serde_json::to_value(&login).map_err(|e| e.to_string())?
@@ -81,18 +81,22 @@ async fn write(id: String, login: Option<Login>) -> Result<(), String> {
         }
         None => None,
     };
-    handle()
-        .await?
-        .records_write(PASSWORDS.into(), vec![(id, record)])
+    profile_records(profile)?
+        .records_write(PASSWORDS, vec![(id, record)])
         .await
         .map_err(|_| "The sign-in could not be saved. Try again.".to_owned())
 }
 
 /// Adds a sign-in, or updates the password of the one already saved for this
 /// site and username.
-async fn save_login(origin: &str, username: &str, password: &str) -> Result<(), String> {
+async fn save_login(
+    profile: &str,
+    origin: &str,
+    username: &str,
+    password: &str,
+) -> Result<(), String> {
     let now = now_ms();
-    let existing = logins()
+    let existing = logins(profile)
         .await?
         .into_iter()
         .find(|(_, login)| login.origin == origin && login.username == username);
@@ -101,6 +105,7 @@ async fn save_login(origin: &str, username: &str, password: &str) -> Result<(), 
         None => (format!("login:{}", uuid::Uuid::new_v4()), now),
     };
     write(
+        profile,
         id,
         Some(Login {
             origin: origin.to_owned(),
@@ -118,6 +123,13 @@ fn page_origin(app: &AppHandle, id: &str) -> Option<String> {
     let view = app.get_webview(&webview_label(id).ok()?)?;
     let url = view.url().ok()?;
     matches!(url.scheme(), "http" | "https").then(|| url.origin().ascii_serialization())
+}
+
+/// The profile a page belongs to, from the window that holds it: an incognito page's is the
+/// profile of its window. Never from anything the page says.
+fn page_profile(app: &AppHandle, id: &str) -> Option<String> {
+    let view = app.get_webview(&webview_label(id).ok()?)?;
+    crate::infra::profile_windows::profile_for_owner(view.window().label())
 }
 
 fn private_session(app: &AppHandle, id: &str) -> bool {
@@ -138,6 +150,40 @@ fn reply(app: &AppHandle, id: &str, script: String) {
     }
 }
 
+/// Where a page says its sign-in field is, as fractions of the page, kept inside the page.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
+struct MenuPlace {
+    left: f64,
+    bottom: f64,
+    width: f64,
+}
+
+impl MenuPlace {
+    fn from_query(values: &HashMap<String, String>) -> Self {
+        let fraction = |name: &str| {
+            values
+                .get(name)
+                .and_then(|value| value.parse::<f64>().ok())
+                .filter(|value| value.is_finite())
+                .map_or(0.0, |value| value.clamp(0.0, 1.0))
+        };
+        Self {
+            left: fraction("left"),
+            bottom: fraction("bottom"),
+            width: fraction("width"),
+        }
+    }
+}
+
+/// Tells the window showing this page which sign-ins to offer; none closes the menu.
+fn show_menu(app: &AppHandle, id: &str, logins: Vec<Value>, origin: &str, place: MenuPlace) {
+    let _ = app.emit_to(
+        browser_owner_label(app, id).as_str(),
+        "misty://browser-password-menu",
+        json!({"id": id, "origin": origin, "logins": logins, "place": place}),
+    );
+}
+
 /// Handles `misty-passwords:` messages from the page script. Returns whether
 /// the message was one.
 pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
@@ -155,12 +201,18 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
     let Some(origin) = page_origin(app, id) else {
         return true;
     };
+    let Some(profile) = page_profile(app, id) else {
+        return true;
+    };
     let app = app.clone();
     let id = id.to_owned();
     match url.path() {
         "list" => {
+            let place = MenuPlace::from_query(&values);
             tauri::async_runtime::spawn(async move {
-                let Ok(logins) = logins().await else { return };
+                let Ok(logins) = logins(&profile).await else {
+                    return;
+                };
                 let offers: Vec<Value> = logins
                     .into_iter()
                     .filter(|(_, login)| login.origin == origin)
@@ -169,40 +221,10 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                 if offers.is_empty() || page_origin(&app, &id).as_deref() != Some(&origin) {
                     return;
                 }
-                reply(
-                    &app,
-                    &id,
-                    format!(
-                        "window.__MISTY_PASSWORDS__?.offer({});",
-                        Value::from(offers)
-                    ),
-                );
+                show_menu(&app, &id, offers, &origin, place);
             });
         }
-        "fill" => {
-            let Some(login_id) = values.get("id").cloned() else {
-                return true;
-            };
-            tauri::async_runtime::spawn(async move {
-                let Ok(logins) = logins().await else { return };
-                let Some((_, login)) = logins
-                    .into_iter()
-                    .find(|(candidate, _)| *candidate == login_id)
-                else {
-                    return;
-                };
-                // Filled only into the site it was saved for, as it is now.
-                if login.origin != origin || page_origin(&app, &id).as_deref() != Some(&origin) {
-                    return;
-                }
-                let script = Zeroizing::new(format!(
-                    "window.__MISTY_PASSWORDS__?.fill({}, {});",
-                    Value::from(login.username),
-                    Value::from(login.password.as_str()),
-                ));
-                reply(&app, &id, script.to_string());
-            });
-        }
+        "hide" => show_menu(&app, &id, Vec::new(), &origin, MenuPlace::default()),
         "capture" => {
             let username = values.get("username").cloned().unwrap_or_default();
             let password = Zeroizing::new(values.get("password").cloned().unwrap_or_default());
@@ -214,7 +236,9 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                 return true;
             }
             tauri::async_runtime::spawn(async move {
-                let Ok(logins) = logins().await else { return };
+                let Ok(logins) = logins(&profile).await else {
+                    return;
+                };
                 let existing = logins
                     .iter()
                     .find(|(_, login)| login.origin == origin && login.username == username);
@@ -226,6 +250,7 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                     pending.insert(
                         id.clone(),
                         PendingCapture {
+                            profile: profile.clone(),
                             origin: origin.clone(),
                             username: username.clone(),
                             password,
@@ -233,9 +258,11 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                         },
                     );
                 }
-                // The renderer learns the site and username, never the password.
-                let _ = crate::infra::space_windows::emit(
+                // The renderer learns the site and username, never the password, and only the
+                // windows the person uses for this profile hear of it.
+                crate::infra::profile_windows::emit_to_profile_people(
                     &app,
+                    &profile,
                     "misty://browser-password-offer",
                     json!({"id": id, "origin": origin, "username": username, "update": update}),
                 );
@@ -245,3 +272,6 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
     }
     true
 }
+
+#[cfg(test)]
+mod tests;

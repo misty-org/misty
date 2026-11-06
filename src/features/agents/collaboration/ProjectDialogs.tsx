@@ -3,10 +3,10 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorNotification,
   Input,
 } from "@/shared/ui";
 import { newProject } from "../store/useAgentsStore";
@@ -47,12 +47,9 @@ export function NewProjectDialog(props: {
   };
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent aria-describedby={undefined} className="max-w-md">
         <DialogHeader>
           <DialogTitle>New project</DialogTitle>
-          <DialogDescription>
-            A new folder on this computer, set up with Git. Your coding tool works in it.
-          </DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-3"
@@ -65,11 +62,7 @@ export function NewProjectDialog(props: {
             Name
             <Input autoFocus value={name} onChange={(event) => setName(event.target.value)} />
           </label>
-          {error ? (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          ) : null}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => props.onOpenChange(false)}>
               Cancel

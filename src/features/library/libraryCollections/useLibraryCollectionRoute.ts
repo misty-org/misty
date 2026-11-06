@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 import type { LibraryCollectionKind, SpaceLibraryData } from "../types/useSpaceLibraryData";
 import { libraryCollectionKinds } from "../useSpaceLibraryData";
 
-export type SelectCollection = (next: LibraryCollectionKind) => void;
+type SelectCollection = (next: LibraryCollectionKind) => void;
 
 /**
  * Keeps the selected collection and the `?collection=` URL in step. Unknown

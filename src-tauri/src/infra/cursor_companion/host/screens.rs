@@ -8,7 +8,7 @@ fn contains(d: &Display, p: (f64, f64)) -> bool {
 /// Misty windows a person works in: app windows and extension popups. The
 /// companion, its overlays and other panels are never "in front".
 pub(super) fn person_works_in(label: &str) -> bool {
-    crate::infra::space_windows::is_app_window(label)
+    crate::infra::profile_windows::is_app_window(label)
         || label.starts_with(crate::infra::extensions::popup::POPUP_PREFIX)
 }
 #[cfg(windows)]

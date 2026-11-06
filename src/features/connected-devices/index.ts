@@ -1,2 +1,1 @@
-export * from "./ConnectedDevicesProvider";
-export { deviceStatusLabel, type DevicePeer } from "./connectedDeviceModel";
+export { DeviceSessionBridge } from "./DeviceSessionBridge";

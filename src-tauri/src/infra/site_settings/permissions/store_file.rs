@@ -21,13 +21,6 @@ fn file_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(Mutex::default)
 }
 
-/// The earlier layout's `browser/site-permissions.json`, as text.
-fn earlier_file() -> Option<String> {
-    crate::infra::paths::misty_home_dir()
-        .map(|home| home.join("browser").join("site-permissions.json"))
-        .and_then(|path| std::fs::read_to_string(path).ok())
-}
-
 pub(super) fn forget_temporary() {
     if let Ok(mut sessions) = temporary().lock() {
         sessions.clear();
@@ -87,7 +80,6 @@ pub(super) unsafe fn update_scope(
 }
 
 pub(super) fn read_store() -> PermissionStore {
-    super::db::import_earlier_once(earlier_file);
     super::db::read_all()
 }
 
@@ -113,6 +105,7 @@ mod tests {
         let allowed = Permissions {
             camera: Decision::Allow,
             microphone: Decision::Ask,
+            location: Decision::Ask,
         };
         unsafe {
             let persisted_before = read_store();

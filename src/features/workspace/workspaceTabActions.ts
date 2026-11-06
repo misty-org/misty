@@ -97,7 +97,7 @@ export function workspaceTabActions(
         set({ lastUsedViewByGroup: { ...current.lastUsedViewByGroup, ...updates } });
         return true;
       }
-      const now = nextWorkspaceFocusTimestamp(current.layoutsByScope);
+      const now = nextWorkspaceFocusTimestamp(current.layout);
       set({
         ...withLayout(current, {
           ...current.layout,

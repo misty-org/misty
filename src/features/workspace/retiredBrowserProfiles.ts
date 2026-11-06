@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isIncognitoWindow } from "./spaceWindow";
+import { isIncognitoWindow } from "./profileWindow";
 
 /**
  * Device browser profiles became Spaces. Saved state from before still lists them;

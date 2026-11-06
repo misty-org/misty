@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { agentMentionsApi, type AgentMention } from "@/api/spaces/agent-mentions";
-import { Skeleton } from "@/shared/ui";
+import { ErrorNotification, Skeleton } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 
 const states: Record<string, { state: StatusState; verb: string }> = {
@@ -34,9 +34,11 @@ export function AgentMentionsPage({ agentId }: { agentId: string }) {
         <p className="mb-4 mt-0 text-sm text-cream-muted">
           Times you mentioned this agent in a Space chat, and what it did to answer.
         </p>
-        {failed ? (
-          <p role="alert">Your mentions couldn&apos;t be loaded. Reopen this page to try again.</p>
-        ) : mentions === null ? (
+        <ErrorNotification
+          message={failed ? "Your mentions couldn’t be loaded. Reopen this page to try again." : ""}
+          onDismiss={() => setFailed(false)}
+        />
+        {failed ? null : mentions === null ? (
           <Skeleton className="h-24 w-full" />
         ) : mentions.length === 0 ? (
           <p>No mentions yet. Type @ and this agent&apos;s name in a Space chat.</p>

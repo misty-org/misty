@@ -1,6 +1,6 @@
 import { FileDiff } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import { projectUndo } from "../../store/useAgentsStore";
 import { DiffCounts, DiffFile } from "./DiffView";
 import { SnapshotLine } from "./SnapshotLine";
@@ -95,11 +95,7 @@ export function RunChanges({
           </>
         }
       />
-      {error ? (
-        <p role="alert" className="misty-diff-note">
-          {error}
-        </p>
-      ) : null}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       {agentId && agentId !== "misty-unified" ? (
         <SnapshotLine
           agentId={agentId}

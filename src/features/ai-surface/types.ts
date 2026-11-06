@@ -99,7 +99,6 @@ export type AiArtifactKind =
   | "calendar_event"
   | "roadmap_patch"
   | "drawing_patch"
-  | "file_plan"
   | "message_draft"
   | "code_patch"
   | "terminal_command"
@@ -199,11 +198,12 @@ export interface AiSurfaceAdapter {
   openCitation?: (citation: AiCitation) => void;
 }
 export interface AiInvocationRequest {
-  /**
-   * The chat's earlier turns, oldest first, from this device's copy: the server keeps no
-   * transcript (docs/agents/chats-local.md).
-   */
-  historyTurns?: { invocation_id?: string; prompt: string; reply?: string; created_at: string }[];
+  /** The Space of the window it came from; a new conversation joins it. */
+  spaceId?: string;
+  /** The profile of the window it came from, whose sign-ins the run uses. */
+  profile?: string;
+  /** The computer it was sent from, where the run works. */
+  originDeviceId?: string;
   /** A scheduled run this computer claimed and is starting (roadmap C1). */
   scheduleId?: string;
   scheduleClaim?: string;

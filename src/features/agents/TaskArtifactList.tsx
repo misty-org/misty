@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useTaskArtifacts } from "./taskArtifacts";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 
 const status = {
   downloading: "Downloading",
@@ -42,7 +42,7 @@ export function TaskArtifacts({ taskId }: { taskId: string }) {
           ) : null}
         </div>
       ))}
-      {error && <p role="alert">{error}</p>}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
     </section>
   );
 }

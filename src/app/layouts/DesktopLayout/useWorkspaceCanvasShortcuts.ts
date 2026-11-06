@@ -15,12 +15,13 @@ import { usePaneSwapMode } from "@/features/workspace/paneSwapMode";
 import type { DockSplitDirection } from "@/features/workspace/model";
 import { minimumForWorkspaceViews } from "./dockSplitFit";
 import {
-  closeSpaceWindow,
+  closeWindow,
   openIncognitoWindow,
-  showSpacesMenu,
-} from "@/features/workspace/spaceWindow";
+  openNewWindow,
+} from "@/features/workspace/profileWindow";
+import { flushWorkspaceRecovery } from "@/features/workspace/recoveryStorage";
 
-/** Pane and Space-window keyboard shortcuts for the workspace. */
+/** Pane and window keyboard shortcuts for the workspace. */
 export function useWorkspaceCanvasShortcuts(actions: {
   openTab: (view: WorkspaceView) => void;
   splitWorkspacePane: (
@@ -105,13 +106,17 @@ export function useWorkspaceCanvasShortcuts(actions: {
   }, [openTab, splitWorkspacePane]);
 
   useEffect(() => {
-    // Each Space opens in its own OS window; these act on this window or open another.
+    // A window belongs to one profile; these open another of its windows or close this one.
     const unregister = [
-      registerShortcutHandler("workspace.open_space", () => void showSpacesMenu()),
+      registerShortcutHandler("workspace.new_window", () => void openNewWindow()),
       registerShortcutHandler("workspace.new_incognito_window", () => void openIncognitoWindow()),
       registerShortcutHandler(
         "workspace.close_window",
-        () => void closeSpaceWindow(),
+        // Save first: the window's tabs move to another window of its profile.
+        () =>
+          void flushWorkspaceRecovery()
+            .catch(() => undefined)
+            .finally(() => void closeWindow()),
         () => canCloseWorkspaceView(),
       ),
       registerShortcutHandler("workspace.swap_panel_next", () => {

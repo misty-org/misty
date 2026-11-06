@@ -59,6 +59,29 @@ fn a_role_whose_provider_has_no_key_is_left_out() {
 }
 
 #[test]
+fn a_saved_soniox_key_reaches_the_live_relay_with_no_transcription_model_set() {
+    let settings = json!({ "agent_model": "anthropic/claude-sonnet-5-5" });
+    let with_soniox = |provider: &str| match provider {
+        "soniox" => Some(" soniox-test ".to_string()),
+        other => keys(other),
+    };
+    let decoded = document(&settings, &with_soniox).unwrap();
+    assert_eq!(decoded["providers"]["soniox"], json!({ "apiKey": "soniox-test" }));
+    assert!(decoded["models"].get("transcription").is_none());
+}
+
+#[test]
+fn a_saved_soniox_key_reaches_the_live_relay_with_no_agent_model() {
+    let with_soniox = |provider: &str| match provider {
+        "soniox" => Some("soniox-test".to_string()),
+        other => keys(other),
+    };
+    let decoded = document(&json!({}), &with_soniox).unwrap();
+    assert_eq!(decoded["providers"]["soniox"], json!({ "apiKey": "soniox-test" }));
+    assert_eq!(decoded["models"], json!({}));
+}
+
+#[test]
 fn local_providers_need_an_address_not_a_key() {
     let settings = json!({
         "agent_model": "ollama/qwen3:14b",
@@ -112,7 +135,8 @@ fn a_chatgpt_token_reaches_the_runtime_document() {
 
 #[test]
 fn carries_the_web_search_key_of_the_chosen_provider() {
-    let chosen = json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "serper" });
+    let chosen =
+        json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "serper" });
     assert_eq!(
         document(&chosen, &keys).unwrap()["search"],
         json!({ "provider": "serper", "apiKey": "serper-test" })
@@ -120,6 +144,7 @@ fn carries_the_web_search_key_of_the_chosen_provider() {
     // Decodo is the default and has no key here, so web search stays off.
     let unset = json!({ "agent_model": "anthropic/claude-sonnet-5-5" });
     assert!(document(&unset, &keys).unwrap().get("search").is_none());
-    let unknown = json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "bing" });
+    let unknown =
+        json!({ "agent_model": "anthropic/claude-sonnet-5-5", "search_provider": "bing" });
     assert!(document(&unknown, &keys).unwrap().get("search").is_none());
 }

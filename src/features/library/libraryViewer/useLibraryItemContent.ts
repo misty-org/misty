@@ -2,7 +2,7 @@ import { spacesApi } from "@/api/spaces/api";
 import type { SpaceLibraryItem } from "@/api/spaces/dto/entities";
 import { useEffect, useState } from "react";
 
-export interface LibraryItemContent {
+interface LibraryItemContent {
   contentUrl: string;
   contentLoading: boolean;
   contentError: string;

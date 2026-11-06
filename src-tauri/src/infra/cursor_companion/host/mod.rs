@@ -57,7 +57,7 @@ pub enum Shortcut {
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
-    if !crate::infra::space_windows::is_person_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Main Misty window required.".into());
     }
     Ok(())
@@ -73,7 +73,7 @@ fn current(state: &CursorCompanionState, turn: u64) -> bool {
     state.enabled.load(Ordering::SeqCst) && state.turn.load(Ordering::SeqCst) == turn
 }
 fn error(app: &AppHandle, turn: u64, message: String) {
-    let _ = crate::infra::space_windows::emit_to_primary(
+    let _ = crate::infra::profile_windows::emit_to_primary(
         &app,
         "misty://cursor-error",
         json!({"turn":turn,"error":message}),

@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { ApiRequestError } from "@/api/client";
 import { memoryApi } from "@/features/recall";
 import { treeApi } from "./api";
 import {
@@ -11,7 +10,7 @@ import {
   type NewMemory,
 } from "./model";
 
-type Status = "loading" | "ready" | "error" | "unavailable";
+type Status = "loading" | "ready" | "error";
 
 interface MemoryTreeState {
   spaceId: string;
@@ -75,10 +74,9 @@ export const useMemoryTreeStore = create<MemoryTreeState>()((set, get) => {
   const reloadAll = async (token: number) => {
     await Promise.all(["", ...get().expanded].map((parent) => load(parent, token)));
   };
-  const fail = (error: unknown, token: number) => {
+  const fail = (_error: unknown, token: number) => {
     if (token !== generation) return;
-    const unavailable = error instanceof ApiRequestError && error.code === "memory_unavailable";
-    set({ status: unavailable ? "unavailable" : "error" });
+    set({ status: "error" });
   };
 
   return {

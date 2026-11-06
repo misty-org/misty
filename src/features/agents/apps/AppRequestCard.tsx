@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { BrandIcon, brandIconAsset, Button } from "@/shared/ui";
+import { BrandIcon, brandIconAsset, Button, ErrorNotification } from "@/shared/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
@@ -118,21 +118,22 @@ export function AppRequestCard({
     )
   ) : undefined;
   return (
-    <StatusTable label={current.title} actions={actions}>
-      <StatusRow
-        state={row}
-        verb={pending ? "Waiting for you" : stateLabel(current, expired)}
-        sub={
-          error ||
-          (pending && current.kind === "connect" && opened
-            ? "Finish signing in in your browser. Misty continues when you’re done."
-            : current.summary) ||
-          undefined
-        }
-      >
-        {logo}
-        {current.title}
-      </StatusRow>
-    </StatusTable>
+    <>
+      <StatusTable label={current.title} actions={actions}>
+        <StatusRow
+          state={row}
+          verb={pending ? "Waiting for you" : stateLabel(current, expired)}
+          sub={
+            (pending && current.kind === "connect" && opened
+              ? "Finish signing in in your browser. Misty continues when you’re done."
+              : current.summary) || undefined
+          }
+        >
+          {logo}
+          {current.title}
+        </StatusRow>
+      </StatusTable>
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
+    </>
   );
 }

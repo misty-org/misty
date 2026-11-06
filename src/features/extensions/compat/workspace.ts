@@ -13,7 +13,7 @@ import {
 } from "@/features/workspace/browserSearchEngine";
 import { compatObject, type CompatCaller, type CompatHandler } from "./events";
 import { systemHandlers } from "./system";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 
 function activeBrowserRuntime(): string {
   const view = activeLayoutView(useWorkspaceStore.getState().layout);
@@ -75,7 +75,7 @@ export const workspaceHandlers: Record<string, CompatHandler> = {
       workspace.updateBrowserView(current.id, { url });
       return;
     }
-    // This Space has one window; a new window's search opens as a new tab in it.
+    // This window takes it; a new window's search opens as a new tab in it.
     useWorkspaceStore.getState().openBrowserView({ url });
   },
   "sessions.getRecentlyClosed": ([filter], caller) => {

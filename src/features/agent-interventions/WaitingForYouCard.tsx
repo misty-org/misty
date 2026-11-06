@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button, ErrorNotification } from "@/shared/ui";
 import { resumeExecutionAfterWait } from "@/features/agents/executionHandoff";
 import { useLocalExecution } from "@/features/agents/localExecution";
 import { interventionLabels } from "./api";
@@ -60,11 +60,7 @@ export function WaitingForYouCard({
       </div>
       <p className="agent-question-text">{interventionLabels[wait.action]}</p>
       <p className="agent-waiting-reason">{wait.reason}</p>
-      {error && (
-        <p role="alert" className="agent-question-error">
-          {error}
-        </p>
-      )}
+      <ErrorNotification message={error} onDismiss={() => setError("")} />
       <div className="agent-question-actions">
         <span className="agent-question-hint">
           You have control. Finish it on screen, then continue.

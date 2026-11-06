@@ -1,4 +1,4 @@
-//! Erasing a Space's website data store once the Space is deleted or left.
+//! Erasing a profile's website data store once the profile is deleted.
 use super::*;
 
 /// Closes the store's pages and erases its data. The caller picks the store natively.
@@ -68,14 +68,16 @@ fn is_locked(error: &std::io::Error) -> bool {
     cfg!(windows) && matches!(error.raw_os_error(), Some(5 | 32 | 33 | 145))
 }
 
-/// Erases a deleted or left Space's website data. Its windows are already closed;
-/// WebKit holds a store briefly after its last view goes, so this runs a moment later.
-pub(crate) async fn remove_space_data(app: AppHandle, key: String) -> Result<(), String> {
-    let profile_id = crate::infra::space_windows::space_store_identity(&key)
-        .ok_or("The personal Space's data can't be removed.")?;
+/// Erases a deleted profile's website data. Its windows are already closed; WebKit holds a
+/// store briefly after its last view goes, so this runs a moment later.
+pub(crate) async fn remove_profile_data(
+    app: AppHandle,
+    key: String,
+    store: String,
+) -> Result<(), String> {
     tokio::time::sleep(Duration::from_secs(3)).await;
-    if !crate::infra::space_windows::windows_for_space(&app, &key).is_empty() {
-        return Err("The Space was opened again before its data could be removed.".into());
+    if !crate::infra::profile_windows::windows_for_profile(&app, &key).is_empty() {
+        return Err("The profile was opened again before its data could be removed.".into());
     }
-    remove(app, profile_id).await
+    remove(app, store).await
 }

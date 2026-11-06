@@ -283,6 +283,8 @@ pub fn browser_webview_developer_tools(
 
 mod clear_data;
 pub use clear_data::*;
+mod media_hold;
+pub use media_hold::*;
 mod mute;
 pub use mute::*;
 

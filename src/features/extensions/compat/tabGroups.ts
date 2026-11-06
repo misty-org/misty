@@ -22,8 +22,7 @@ const mistyColor = (value: unknown): TabGroupColor | undefined =>
 
 /** Open groups in the current window; closed (saved) groups have no tabs to show. */
 function openGroups(): MistyTabGroup[] {
-  const state = useWorkspaceStore.getState();
-  return state.tabGroups.filter((g) => g.scopeKey === state.activeScopeKey && !g.savedTabs);
+  return useWorkspaceStore.getState().tabGroups.filter((g) => !g.savedTabs);
 }
 function apiGroup(group: MistyTabGroup) {
   return {
@@ -103,14 +102,8 @@ export const tabGroupHandlers: Record<string, CompatHandler> = {
 export function watchTabGroups(): () => void {
   let previous = new Map(openGroups().map((g) => [g.id, g]));
   return useWorkspaceStore.subscribe((state, prior) => {
-    if (state.tabGroups === prior.tabGroups && state.activeScopeKey === prior.activeScopeKey)
-      return;
+    if (state.tabGroups === prior.tabGroups) return;
     const current = new Map(openGroups().map((g) => [g.id, g]));
-    // Switching Spaces shows other groups; nothing was made or removed.
-    if (state.activeScopeKey !== prior.activeScopeKey) {
-      previous = current;
-      return;
-    }
     for (const [id, group] of current) {
       const before = previous.get(id);
       if (!before) emitCompatEvent("tabGroups.onCreated", [apiGroup(group)]);

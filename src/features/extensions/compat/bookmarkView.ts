@@ -36,7 +36,7 @@ export const fromApi = (value: unknown) => {
 
 /** The bookmark tree as extensions see it. Favorites and Apps are Misty's own and
  * stay out of view. Children are listed once per folder per call. */
-export interface View {
+interface View {
   current: BookmarkTree;
   skip: Set<string>;
   children(folderId: string): BookmarkNode[];

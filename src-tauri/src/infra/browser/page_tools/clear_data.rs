@@ -4,7 +4,6 @@ use super::*;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserClearDataRequest {
-    pub profile_id: Option<String>,
     /// Any of "cookies" (cookies and site storage) and "cache".
     pub kinds: Vec<String>,
     /// Data changed at or after this time (ms).
@@ -22,6 +21,7 @@ struct ClearKinds {
 #[tauri::command]
 pub async fn browser_clear_website_data(
     app: AppHandle,
+    webview: tauri::Webview,
     request: BrowserClearDataRequest,
 ) -> Result<(), String> {
     let mut kinds = ClearKinds::default();
@@ -35,17 +35,21 @@ pub async fn browser_clear_website_data(
     if !kinds.cookies && !kinds.cache {
         return Ok(());
     }
-    let identifier = browser_profile_identifier(request.profile_id.as_deref())?;
+    // Always the store of the window asking.
+    let profile = crate::infra::profile_windows::profile_for_window(webview.window().label())
+        .ok_or("This window has no profile.")?;
+    let store = crate::infra::profile_windows::store_for_profile(&profile)?;
+    let identifier = browser_profile_identifier(store.as_deref())?;
     #[cfg(target_os = "macos")]
     return clear_webkit_website_data(&app, identifier, kinds, request.since).await;
     #[cfg(windows)]
     {
         let _ = identifier;
-        clear_webview2_website_data(&app, request.profile_id.as_deref(), kinds, request.since).await
+        clear_webview2_website_data(&app, store.as_deref(), kinds, request.since).await
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
-        let _ = (app, identifier);
+        let _ = (app, identifier, store);
         Err("Clearing website data is not available on this platform.".to_owned())
     }
 }

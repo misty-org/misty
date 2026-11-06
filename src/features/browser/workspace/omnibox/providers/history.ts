@@ -101,9 +101,7 @@ export function historyProvider(deps: OmniboxDeps): OmniboxProvider {
       const text = input.text.trim();
       if (!text || input.private) return [];
       await wait(DEBOUNCE_MS, signal);
-      const pages = await deps
-        .historySuggestions({ profileId: input.profileId, text, limit: LIMIT })
-        .catch(() => []);
+      const pages = await deps.historySuggestions({ text, limit: LIMIT }).catch(() => []);
       return pages
         .map((page) => historyMatch(input, page, true))
         .filter((match): match is OmniboxMatch => match !== null);

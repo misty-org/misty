@@ -7,7 +7,7 @@ import { ensureServerAgentDevice } from "../store/useAgentDeviceStore";
 import { agentsDeviceSnapshot } from "../store/useAgentsStore";
 import type { Execution } from "../localExecution";
 import { browserTabAgentFileCapabilities } from "../browserTabCapabilities";
-import { currentWindowLabel, isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { currentWindowLabel, isIncognitoWindow } from "@/features/workspace/profileWindow";
 
 const words = (text: string) =>
   new Set(
@@ -136,7 +136,7 @@ export async function companionBrowserContext(
   const snapshot = await agentsDeviceSnapshot();
   assertCurrent();
   if (!snapshot.device || snapshot.device.status === "revoked")
-    throw new Error("This Misty device is unavailable.");
+    throw new Error("This signed-in session is unavailable.");
   const device = await ensureServerAgentDevice(snapshot.device);
   assertCurrent();
   const scopeId = browserScopeId(tab);

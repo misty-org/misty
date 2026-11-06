@@ -37,6 +37,11 @@ export function cloudClipboardCopy(clipId: string): Promise<void> {
   return invoke("clipboard_cloud_copy", { clipId });
 }
 
+/** Types the newest clip into the page's focused field without touching the system clipboard. */
+export function cloudClipboardPaste(pageId: string): Promise<void> {
+  return invoke("clipboard_cloud_paste", { id: pageId });
+}
+
 export function cloudClipboardSave(clipId: string): Promise<string[]> {
   return invoke("clipboard_cloud_save", { clipId });
 }

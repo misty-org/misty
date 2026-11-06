@@ -66,22 +66,22 @@ pub async fn browser_site_permissions_set(
     Ok(info)
 }
 
-/// The stores of Spaces with an open tab, with each Space's name. Dormant stores of
+/// The stores of profiles with an open tab, with each profile's name. Dormant stores of
 /// another signed-in account stay hidden.
 fn active_profiles(app: &AppHandle) -> std::collections::HashMap<String, String> {
-    let spaces = crate::infra::space_windows::listed_spaces();
+    let profiles = crate::infra::profile_windows::listed_profiles();
     app.webviews()
         .into_iter()
         .filter_map(|(label, view)| {
             let StoreScope::Persistent(profile) = session_scope(app, &label)? else {
                 return None;
             };
-            let key = crate::infra::space_windows::space_for_owner(view.window().label())?;
-            let name = spaces
+            let key = crate::infra::profile_windows::profile_for_owner(view.window().label())?;
+            let name = profiles
                 .iter()
-                .find(|space| space.key == key)
-                .map(|space| space.name.clone())
-                .unwrap_or_else(|| "Space".into());
+                .find(|profile| profile.id == key)
+                .map(|profile| profile.name.clone())
+                .unwrap_or_else(|| "Profile".into());
             Some((profile, name))
         })
         .collect()
@@ -97,7 +97,7 @@ pub async fn browser_site_permissions_list(
     Ok(read_store()
         .into_iter()
         .filter_map(|(profile, sites)| Some((active.get(&profile)?.clone(), profile, sites)))
-        .flat_map(|(space, profile, sites)| {
+        .flat_map(|(profile_name, profile, sites)| {
             sites
                 .into_iter()
                 .map(move |(origin, permissions)| ListedPermission {
@@ -106,7 +106,7 @@ pub async fn browser_site_permissions_list(
                         origin,
                         permissions,
                     },
-                    space: space.clone(),
+                    profile_name: profile_name.clone(),
                 })
         })
         .collect())
@@ -122,7 +122,7 @@ pub async fn browser_site_permissions_reset(
     require_host(&caller)?;
     let origin = canonical_origin(&origin)?;
     if !active_profiles(&app).contains_key(&profile) {
-        return Err("Open a tab in this Space before resetting its permissions.".into());
+        return Err("Open a tab in this profile before resetting its permissions.".into());
     }
     // Serialize all store read/modify/write operations on the main thread.
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -138,7 +138,7 @@ pub async fn browser_site_permissions_reset(
     .map_err(|error| error.to_string())?;
     rx.await
         .map_err(|_| "Could not reset website permissions.".to_owned())??;
-    space::publish(
+    profile::publish(
         affected_profile.clone(),
         [(reset_origin, Permissions::default())].into(),
     );

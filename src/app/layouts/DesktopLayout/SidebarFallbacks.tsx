@@ -68,7 +68,7 @@ function SidebarTrailingFallback() {
           {row(
             <AppWindow />,
             "New window",
-            () => void invokeShortcutCommand("workspace.open_space"),
+            () => void invokeShortcutCommand("workspace.new_window"),
           )}
           {row(
             <VenetianMask />,

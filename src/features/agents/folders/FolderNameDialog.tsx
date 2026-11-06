@@ -4,9 +4,9 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogTitle,
+  ErrorNotification,
   Input,
 } from "@/shared/ui";
 
@@ -14,7 +14,6 @@ import {
 export function FolderNameDialog({
   open,
   title,
-  description,
   initialName = "",
   submitLabel,
   onOpenChange,
@@ -22,7 +21,6 @@ export function FolderNameDialog({
 }: {
   open: boolean;
   title: string;
-  description: string;
   initialName?: string;
   submitLabel: string;
   onOpenChange(open: boolean): void;
@@ -51,9 +49,8 @@ export function FolderNameDialog({
   };
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
         <form
           className="grid gap-4"
           onSubmit={(event) => {
@@ -70,11 +67,7 @@ export function FolderNameDialog({
             onFocus={(event) => event.target.select()}
             onChange={(event) => setName(event.target.value)}
           />
-          {error && (
-            <p role="alert" className="text-sm text-cream-muted">
-              {error}
-            </p>
-          )}
+          <ErrorNotification message={error} onDismiss={() => setError("")} />
           <DialogFooter>
             <Button
               type="button"

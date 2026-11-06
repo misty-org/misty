@@ -1,5 +1,4 @@
-import { ArrowDownToLine, X } from "lucide-react";
-import { Button, IconButton } from "@/shared/ui";
+import { Button, Notification } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
@@ -8,16 +7,16 @@ import { hasTauriInternals } from "@/shared/platform/tauri";
 /** Checks only. Downloads and installation always follow an explicit user action. */
 const minCheckIntervalMs = 6 * 60 * 60_000;
 
-/** `profileId` is the signed-in account, or `local` while nobody is signed in: updates
+/** `accountScope` is the signed-in account, or `local` while nobody is signed in: updates
  * don't wait for an account. */
-export function UpdateNotices({ profileId }: { profileId: string }) {
+export function UpdateNotices({ accountScope }: { accountScope: string }) {
   const [hostVersion, setHostVersion] = useState("");
   const [notice, setNotice] = useState("");
   const [dismissed, setDismissed] = useState("");
   const enabled = useSettingsStore((s) =>
     settingsBoolean(s.settings?.document ?? {}, "general", "auto_update_enabled", true),
   );
-  const key = JSON.stringify([profileId, hostVersion, notice]);
+  const key = JSON.stringify([accountScope, hostVersion, notice]);
   useEffect(() => {
     const show = (event: Event) => {
       setNotice(String((event as CustomEvent).detail));
@@ -27,7 +26,7 @@ export function UpdateNotices({ profileId }: { profileId: string }) {
     return () => window.removeEventListener("misty:workspace-notice", show);
   }, []);
   useEffect(() => {
-    if (!profileId || !enabled || !hasTauriInternals()) return;
+    if (!accountScope || !enabled || !hasTauriInternals()) return;
     let closed = false,
       checking = false,
       found = false,
@@ -71,52 +70,32 @@ export function UpdateNotices({ profileId }: { profileId: string }) {
       clearTimeout(timer);
       window.removeEventListener("focus", run);
     };
-  }, [profileId, enabled]);
+  }, [accountScope, enabled]);
   if ((!hostVersion && !notice) || key === dismissed) return null;
-  const title = notice || `Misty ${hostVersion} is available`;
   return (
-    <aside
-      aria-label="Update notification"
-      className="fixed bottom-4 right-4 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-charcoal-border bg-charcoal-card p-3 text-cream"
+    <Notification
+      key={key}
+      title={notice ? undefined : `Misty ${hostVersion} is available`}
+      onDismiss={() => {
+        setDismissed(key);
+        setNotice("");
+      }}
     >
-      <div className="flex items-start gap-3">
-        <ArrowDownToLine aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-cream-muted" />
-        <div role="status" aria-live="polite" aria-atomic="true" className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-5">{title}</p>
-          {!notice && (
-            <p className="mt-1 break-words text-xs leading-4 text-cream-muted">
-              Review the release in Settings.
-            </p>
-          )}
-        </div>
-        <IconButton
-          label="Dismiss update notification"
-          className="-mr-1 -mt-1"
+      {notice || (
+        <Button
+          type="button"
+          variant="link"
+          size="none"
           onClick={() => {
             setDismissed(key);
-            setNotice("");
+            window.dispatchEvent(
+              new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
+            );
           }}
         >
-          <X aria-hidden="true" className="size-4" />
-        </IconButton>
-      </div>
-      {!notice && (
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            size="sm"
-            className="text-xs"
-            onClick={() => {
-              setDismissed(key);
-              window.dispatchEvent(
-                new CustomEvent("misty:open-settings", { detail: { section: "updates" } }),
-              );
-            }}
-          >
-            View release
-          </Button>
-        </div>
+          View release
+        </Button>
       )}
-    </aside>
+    </Notification>
   );
 }

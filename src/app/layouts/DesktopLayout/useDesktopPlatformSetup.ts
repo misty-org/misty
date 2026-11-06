@@ -31,8 +31,9 @@ export function useDesktopPlatform() {
 
 export function useWindowStyleSetup() {
   const { tabs } = useWindowDockingLayout();
-  // Beside tabs on the left the buttons align to the sidebar's drawer button.
-  const { sideTabInset } = dockingMetrics;
+  // Beside tabs on the left the buttons align to the sidebar's drawer button; with tabs on the
+  // right they sit in the Space bar, centered on it.
+  const { edge, sideTabInset, spaceBar } = dockingMetrics;
   useEffect(() => {
     if (!hasTauriInternals()) return;
     let disposed = false;
@@ -55,7 +56,8 @@ export function useWindowStyleSetup() {
           : null;
       const verticalDrawerOffset =
         drawerButtonCenter !== null ? drawerButtonCenter - trafficLightRestY : sideTabInset;
-      const verticalOffset = tabs === "left" ? verticalDrawerOffset : 0;
+      const verticalOffset =
+        tabs === "left" ? verticalDrawerOffset : edge + spaceBar / 2 - trafficLightRestY;
       await enableModernWindowStyle(getCurrentWindow(), {
         x: trafficLightOffsetDefault.x + (tabs === "left" ? sideTabTrafficLightNudgeX : 0),
         y: trafficLightOffsetDefault.y + verticalOffset,
@@ -69,5 +71,5 @@ export function useWindowStyleSetup() {
     return () => {
       disposed = true;
     };
-  }, [sideTabInset, tabs]);
+  }, [edge, sideTabInset, spaceBar, tabs]);
 }

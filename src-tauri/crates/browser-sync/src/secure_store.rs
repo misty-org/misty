@@ -1,4 +1,4 @@
-//! Remembered vault roots and the workspace recovery key, kept in Misty's credential
+//! The remembered vault root, local records key and workspace recovery key, kept in Misty's credential
 //! store: encrypted rows in `misty.db` under the one master key the OS keychain holds
 //! (service `com.misty.auth`), on every platform. These blocking APIs belong on the
 //! native coordinator's blocking worker.
@@ -22,33 +22,8 @@ fn account(scope: &VaultScope) -> Result<String> {
     Ok(digest.iter().map(|b| format!("{b:02x}")).collect())
 }
 
-pub fn remember(scope: &VaultScope, root: &VaultRoot) -> Result<()> {
-    let mut bytes = Zeroizing::new(Vec::with_capacity(33));
-    bytes.push(1);
-    bytes.extend_from_slice(root.protected_bytes());
-    platform::write(&account(scope)?, &bytes)
-}
-
-pub fn recall(scope: &VaultScope, expected_public_key: &str) -> Result<Option<VaultRoot>> {
-    let Some(bytes) = platform::read(&account(scope)?)? else {
-        return Ok(None);
-    };
-    if bytes.len() != 33 || bytes[0] != 1 {
-        return Err(Error::Invalid);
-    }
-    let root = VaultRoot::from_protected(&bytes[1..])?;
-    if root.public_key()? != expected_public_key {
-        return Err(Error::Identity);
-    }
-    Ok(Some(root))
-}
-
-pub fn forget(scope: &VaultScope) -> Result<()> {
-    platform::delete(&account(scope)?)
-}
-
-/// A separate device-local key for workspace recovery while the sync vault is
-/// locked. Call under the recovery database's exclusive process lock. Never
+/// A separate key on this computer for workspace recovery, whether or not the vault
+/// is open. Call under the recovery database's exclusive process lock. Never
 /// replace a missing key when a database already contains recoverable records.
 pub fn workspace_recovery_root(scope: &VaultScope, create: bool) -> Result<VaultRoot> {
     let name = format!("workspace-recovery:v1:{}", account(scope)?);
@@ -73,31 +48,36 @@ pub fn forget_workspace_recovery_root(scope: &VaultScope) -> Result<()> {
     platform::delete(&format!("workspace-recovery:v1:{}", account(scope)?))
 }
 
-/// The root of a local vault: one made on this device for browsing without an account, never
-/// wrapped with a sync password because it never reaches a server. Created on first use when
-/// `create` is set. The caller checks it against the vault's stored grant (`Store::unlock`),
-/// so a wrong or replaced root opens nothing.
-pub fn local_vault_root(scope: &VaultScope, create: bool) -> Result<VaultRoot> {
-    let name = format!("local-vault:v1:{}", account(scope)?);
-    if let Some(bytes) = platform::read(&name)? {
-        if bytes.len() != 33 || bytes[0] != 1 {
-            return Err(Error::SecureStorage);
-        }
-        return VaultRoot::from_protected(&bytes[1..]);
-    }
-    if !create {
-        return Err(Error::SecureStorage);
-    }
-    let root = VaultRoot::generate();
-    let mut bytes = Zeroizing::new(Vec::with_capacity(33));
-    bytes.push(1);
-    bytes.extend_from_slice(root.protected_bytes());
-    platform::write(&name, &bytes)?;
-    Ok(root)
+/// The key that seals an install's local records. `Ok(None)` is confirmed missing; a read that
+/// failed (a locked keychain) is an error, so a passing problem never reads as a lost key.
+pub fn local_records_key(identity: &str) -> Result<Option<crate::local::LocalKey>> {
+    platform::read(&format!("local-records:v1:{identity}"))?
+        .map(|bytes| crate::local::LocalKey::from_bytes(&bytes))
+        .transpose()
 }
 
-pub fn forget_local_vault_root(scope: &VaultScope) -> Result<()> {
-    platform::delete(&format!("local-vault:v1:{}", account(scope)?))
+/// Makes the key for a new local database. Only call after `local_records_key` confirmed none.
+pub fn create_local_records_key(identity: &str) -> Result<crate::local::LocalKey> {
+    let key = crate::local::LocalKey::generate();
+    platform::write(&format!("local-records:v1:{identity}"), key.bytes())?;
+    Ok(key)
+}
+
+/// Keeps the vault root in this computer's protected storage, so the vault password is only ever
+/// typed once per session. `identity` names the account.
+pub fn remember_vault_root(identity: &str, root: &VaultRoot) -> Result<()> {
+    platform::write(&format!("vault-root:v1:{identity}"), root.protected_bytes())
+}
+
+/// The remembered root. `Ok(None)` is confirmed missing; a failed read is an error, and retries.
+pub fn recall_vault_root(identity: &str) -> Result<Option<VaultRoot>> {
+    platform::read(&format!("vault-root:v1:{identity}"))?
+        .map(|bytes| VaultRoot::from_protected(&bytes))
+        .transpose()
+}
+
+pub fn forget_vault_root(identity: &str) -> Result<()> {
+    platform::delete(&format!("vault-root:v1:{identity}"))
 }
 
 mod platform {

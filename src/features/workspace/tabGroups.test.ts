@@ -5,8 +5,6 @@ import { activeLayoutView, allLayoutViews, layoutTabs } from "./layoutTabs";
 import { migrateSavedLinkGroups } from "./tabGroups";
 import { createBookmarkFolder, saveBookmark } from "@/features/bookmarks/library";
 import { partialWorkspaceStore, migrateWorkspaceStore } from "./workspaceStorePersistence";
-import { retainDeviceState } from "@/features/browser-sync/deviceState";
-import { currentWindows } from "./windows";
 const state = () => useWorkspaceStore.getState();
 const tabs = () => layoutTabs(state().layout);
 const add = (title: string) => {
@@ -79,18 +77,6 @@ it("migrates old Groups once without opening or losing saved links, and survives
   const restored = migrateWorkspaceStore(partialWorkspaceStore(state()), 16);
   expect(restored.tabGroups.some((g) => g.id === id)).toBe(true);
   expect(layoutTabs(restored.layout)[0].tabGroupId).toBe(id);
-});
-it("retains local group membership across a remote page/title update", () => {
-  const id = state().createTabGroup([tabs()[0].id])!;
-  const before = currentWindows(state());
-  const incoming = before.map((w) => ({
-    ...w,
-    layout: {
-      ...w.layout,
-      tabs: layoutTabs(w.layout).map((t) => ({ ...t, tabGroupId: undefined })),
-    },
-  }));
-  expect(layoutTabs(retainDeviceState(incoming, before)[0].layout)[0].tabGroupId).toBe(id);
 });
 it("does not reinterpret new bookmark folders as tab groups on restart", () => {
   const folder = createBookmarkFolder("Bookmarks only");

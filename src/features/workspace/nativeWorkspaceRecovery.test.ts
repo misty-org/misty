@@ -13,6 +13,7 @@ const native = vi.hoisted(() => ({
     }
   >(),
   account: "",
+  listeners: new Map<string, (message: { payload: unknown }) => void>(),
 }));
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
@@ -34,6 +35,14 @@ vi.mock("@/api/deployment/api", () => ({
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: native.invoke,
 }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async (event: string, handler: (message: { payload: unknown }) => void) => {
+    native.listeners.set(event, handler);
+    return () => native.listeners.delete(event);
+  }),
+}));
+/** With no native window in a test, this window's id is `local`. */
+const ownKey = "workspace:w:local";
 let close: (() => void) | undefined;
 beforeEach(() => {
   vi.resetModules();
@@ -44,6 +53,7 @@ beforeEach(() => {
   native.failRead = false;
   native.account = "";
   native.paused = undefined;
+  native.listeners.clear();
   native.invoke.mockReset().mockImplementation(
     async (
       command: string,
@@ -55,6 +65,10 @@ beforeEach(() => {
         value: string;
       },
     ) => {
+      if (command === "profile_window_take_orphans") return [];
+      if (command === "profile_records_list") return [];
+      if (command === "profile_records_write") return [];
+      if (command === "profile_window_info") return null;
       if (command === "browser_recovery_open") {
         if (native.failRead) throw new Error("Keychain unavailable");
         native.account = args.accountId;
@@ -171,7 +185,6 @@ it("preserves browser originals on failed native writes and can retry without re
   expect(h.workspace.getState().bookmarkFolders[0].fields.label).toBe("Recover me");
   expect(localStorage.getItem("misty:workspace-account:a")).toBeNull();
   expect(JSON.stringify(h.workspace.getState().layout)).toContain(tab.id);
-  expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
 });
 it("keeps temporary tabs selected while restoring old windows after an unreadable store recovers", async () => {
   const h = await context();
@@ -200,17 +213,10 @@ it("keeps temporary tabs selected while restoring old windows after an unreadabl
     ready: true,
     issue: null,
   });
-  const windows = JSON.stringify(h.workspace.getState().layoutsByScope);
+  const windows = JSON.stringify(h.workspace.getState().layout);
   expect(windows).toContain(saved.id);
   expect(windows).toContain(added.id);
   expect(h.workspace.getState().activeWindowId).toBe(active);
-  const persisted = native.values.get("a:workspace")!.value;
-  expect(JSON.parse(persisted).syncBaseline).toBeDefined();
-  h.closeNativeWorkspaceRecovery();
-  await h.restoreNativeWorkspace("a");
-  expect(h.pendingRecoveredWorkspace("a")).toBeDefined();
-  await h.acknowledgeRecoveredWorkspace("a");
-  expect(JSON.parse(native.values.get("a:workspace")!.value).syncBaseline).toBeUndefined();
 });
 it("does not expose a previous account when recovery fails for the next account", async () => {
   const h = await context();
@@ -223,7 +229,7 @@ it("does not expose a previous account when recovery fails for the next account"
   native.generation++;
   native.failRead = true;
   await h.restoreNativeWorkspace("b");
-  expect(JSON.stringify(h.workspace.getState().layoutsByScope)).not.toContain("private.example");
+  expect(JSON.stringify(h.workspace.getState().layout)).not.toContain("private.example");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     accountId: "b",
     usable: true,
@@ -313,21 +319,21 @@ it("coalesces resize bursts and persists a continuous burst within two seconds",
 });
 
 it("restores what it can from an unreadable save and lists the rest, keeping the original", async () => {
-  native.values.set("a:workspace", { revision: 1, value: "{not a workspace" });
+  native.values.set(`a:${ownKey}`, { revision: 1, value: "{not a workspace" });
   const h = await context();
   await h.restoreNativeWorkspace("a");
   expect(h.useWorkspaceRecoveryState.getState()).toMatchObject({
     usable: true,
     ready: true,
     issue: null,
-    notRestored: [{ id: "workspace", title: "Saved windows and tabs" }],
+    notRestored: [{ id: ownKey, title: "Saved windows and tabs" }],
   });
   const archived = [...native.values].filter(([id]) => id.startsWith("a:archive:"));
   expect(archived.map(([, record]) => record.value)).toContain("{not a workspace");
   // The fresh workspace saves normally over the unreadable copy.
   const tab = h.workspace.getState().openBrowserView({ url: "https://after.example" });
   await h.flushNativeWorkspace("a");
-  expect(native.values.get("a:workspace")?.value).toContain(tab.id);
+  expect(native.values.get(`a:${ownKey}`)?.value).toContain(tab.id);
 });
 
 it("keeps other tabs when one saved view cannot be restored", async () => {
@@ -337,7 +343,7 @@ it("keeps other tabs when one saved view cannot be restored", async () => {
   const kept = h.workspace.getState().openBrowserView({ url: "https://kept.example" });
   await h.flushNativeWorkspace("a");
   h.closeNativeWorkspaceRecovery();
-  const record = native.values.get("a:workspace")!;
+  const record = native.values.get(`a:${ownKey}`)!;
   const saved = JSON.parse(record.value);
   // An unparseable URL is damage restore cannot repair, so migrating it throws.
   // (A missing or non-string route is repaired instead.)
@@ -353,13 +359,13 @@ it("keeps other tabs when one saved view cannot be restored", async () => {
   };
   walk(saved);
   expect(hits).toBeGreaterThan(0);
-  native.values.set("a:workspace", { ...record, value: JSON.stringify(saved) });
+  native.values.set(`a:${ownKey}`, { ...record, value: JSON.stringify(saved) });
   const again = await context();
   await again.restoreNativeWorkspace("a");
   const state = again.useWorkspaceRecoveryState.getState();
   expect(state).toMatchObject({ usable: true, ready: true, issue: null });
   expect(state.notRestored.map((view) => view.id)).toContain(damaged.id);
-  expect(JSON.stringify(again.workspace.getState().layoutsByScope)).toContain(kept.id);
+  expect(JSON.stringify(again.workspace.getState().layout)).toContain(kept.id);
 });
 
 it("lists refused saves per item instead of reporting a blanket failure", async () => {
@@ -369,5 +375,5 @@ it("lists refused saves per item instead of reporting a blanket failure", async 
   const state = h.useWorkspaceRecoveryState.getState();
   expect(state.issue).toBeNull();
   expect(state.usable).toBe(true);
-  expect(state.saves.failed.map((f) => f.key)).toContain("workspace");
+  expect(state.saves.failed.map((f) => f.key)).toContain(ownKey);
 });

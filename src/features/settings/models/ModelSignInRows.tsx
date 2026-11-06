@@ -1,11 +1,10 @@
-import { Button, Skeleton, Spinner } from "@/shared/ui";
+import { Button, ErrorNotification, Skeleton, Spinner } from "@/shared/ui";
 import { DesktopSettingsRow as Row } from "../components/DesktopSettingsUI";
 import type { AddedKey, useChatgptAccount } from "./modelAccounts";
 import type { SavedModelKeys } from "./modelKeys";
 
 function chatgptDescription(account: ReturnType<typeof useChatgptAccount>): string {
   const status = account.status;
-  if (account.error) return account.error;
   if (!status?.signedIn)
     return "Agents use your ChatGPT plan instead of a key. It has no embedding or voice models.";
   if (!status.planUsage)
@@ -52,12 +51,13 @@ export function ModelSignInRows(props: {
           )}
         </div>
       </Row>
+      <ErrorNotification message={chatgpt.error} />
       <Row
         label="OpenRouter"
         description={
           openRouterSaved
             ? "OpenRouter's key is saved. Replace or remove it under Provider."
-            : "Sign in to OpenRouter and it makes a key for Misty, saved on this device."
+            : "Sign in to OpenRouter and it makes a key for Misty, saved on this computer."
         }
       >
         <div className="flex w-[240px] max-w-full justify-end">

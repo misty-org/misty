@@ -1,116 +1,213 @@
-# Unified Sync — approved design
+# Sync
 
-Approved for implementation, revision 2 (September 29, 2026), with the user’s subsequent corrections: black, white and gray only. Its server-account settings model is superseded: settings are device-local and never sync (AGENTS.md). Keep the incumbent navbar without its Account footer and show cohesive sections under small headers. `mockup.html` is a historical illustrative review artifact.
+Sync is something a person thinks about once, when they create the vault. After that, Misty feels like
+one workspace everywhere they're signed in. Settings › Sync is the only place it shows, apart from four
+notices that need the person.
 
-## October 1 popup simplification
+## The model
 
-The user approved direct implementation of a minimal popup: icon, title, one small status label, and device actions labeled **Open**. This supersedes the earlier popup-specific requirements for visible descriptive paragraphs and unavailable-action explanations. The popup has no device-section heading or per-device dividers. Detailed sync status remains available to assistive technology and in Settings; required recovery forms and actionable errors still appear when needed. Settings keeps its existing full explanations and controls. The popup has no routine Sync heading or status row, and starts directly with devices when healthy. Every device row has a right-aligned **Open** button, disabled when already open or unavailable. Device rows show one label: This device, Open here, connection state, or Opening…. **Manage sync** uses slightly larger text and no leading icon. Actionable recovery status and forms still appear when required.
+```
+Account (Misty login)
+├─ Vault: one per account, one password, known only to clients
+│  ├─ Profile: School
+│  ├─ Profile: Work           tabs, tab groups, cookies, localStorage, history, bookmarks,
+│  └─ Profile: Business       passwords, extensions, site permissions, search, downloads list
+├─ Signed-in sessions: each Misty install signed in to the account
+└─ Spaces: the same set in every profile, pulled from the server
+```
 
-## Purpose and visual direction
+- **Vault.** The encrypted container: one per account, one local database, one connection.
+- **Profile.** One browsing identity with its own native browser store. Any signed-in session can open any
+  profile. The first is called `personal` on every computer and can't be deleted.
+- **Signed-in session.** One Misty install signed in to the account. Interface text and docs say this, or
+  "computer" when they mean a place; only older tables such as `trusted_devices` keep the old word.
+- **Window.** A local OS window showing one profile. Sync never tracks windows.
+- **Space.** Shared content. It owns no tabs or sign-ins and is never in the vault
+  ([spaces](../spaces/README.md)).
 
-Misty desktop users should be able to tell what is syncing, why it stopped, and how to continue on this device. This is an Operate surface. Use black, white and gray only, including status, selection and focus indicators. Preserve the existing charcoal theme, compact typography, bordered settings sections and shared controls. The mockup mirrors those primitives; production must use `DesktopSettingsSection`, `DesktopSettingsRow` and `SettingsControls`, not introduce a parallel settings component system.
+## What syncs
 
-Preserve the current sidebar’s Search field, dimensions, row spacing, icon set, group dividers and selected treatment. Remove only the Account footer from its chrome. Existing right chevrons may remain as page-navigation cues; they never open dropdowns or nested lists. Preserve the `MonitorSmartphone` icon on the renamed **File sharing** area; it remains unique and keeps the incumbent icon language.
+Everything in a profile syncs in the background to every session with the vault open, whether or not that
+profile is open there.
 
-Each area opens one scrollable settings page. Sync contains Overview, Workspace devices, Website sign-ins, Switching devices, Settings sync and Sync account as visible sections under small, muted sentence-case headers. The sidebar stays stationary while settings scroll. No sub-page launcher list, tab strip, accordion or dropdown hides these sections. This revision supersedes the first mockup’s four chevron sub-pages. Search jumps directly to the relevant section.
+| Data | Behavior |
+|---|---|
+| Tabs, splits, tab groups, pinned tabs | Same everywhere. The newest tabs from elsewhere load ahead of being opened |
+| Bookmarks, history, downloads list | Same everywhere. Downloaded files stay where they were downloaded |
+| Saved passwords | Same everywhere, within the profile |
+| Cookies | Merged per cookie, newest wins. Signing out of a site signs out everywhere |
+| localStorage | Whole origin, newest wins, up to 8 MiB per site |
+| Back/forward list, scroll, form state | Per tab. Sensitive fields stay excluded |
+| Extensions, their settings, permissions, search engines | Same everywhere, within the profile. Each computer fetches packages from the store |
+| Profile list: name, color, order | Same everywhere |
+| Shared clipboard | A small ring of sealed clips with a 24-hour expiry ([clipboard](clipboard.md)) |
 
-## Screens and behavior
+Never synced: incognito, agents' own tabs, which tab has focus, window layout, session settings.
 
-- **Overview:** one status title and an always-visible plain-language detail. Show only this workspace’s device roster, local device first. Each device has its name, inline Rename → edit and commit on Enter/blur, with Cancel, labeled Online/Offline/Connection unknown, a visible “Open its tabs here” action for remote devices, and a labeled Full sync switch with an explanatory sentence. Turning it off clearly describes Independent workspace. Full sync means “Share this device’s tabs and website sign-ins.” Independent workspace means “Keep this device’s tabs and website sign-ins here.” Account settings always sync independently of workspace mode. Disable unavailable tab actions with the reason beside the row; never infer online from missing presence. Device modes and renames need pending/error states and acknowledged server results.
-- **Website sign-ins:** explain cookies and sign-in keys, and that some sites require another sign-in. Name the machine currently publishing using authoritative publisher data, not merely the viewed workspace or an online device. Reuse `DeviceWebsiteDataList` and its `WebsiteDataCoverage`, showing partial coverage first, with reasons, and visible fully synced sites grouped by device. The user’s no-dropdown direction supersedes the current coverage component’s collapsible presentation. Do not expose cookie values or sign-in key contents. No duplicate status calculation in this page.
-- **Switching devices:** move the two existing page-restore toggles here, preserving their setting keys and their current privacy disclosures. Agent restore depends on page restore. Site exclusions remain in Browser → Privacy because the request moves only the two toggles.
-- **Settings sync:** rename the current `SyncSection`, retain the pending preference count, and explain that changes are saved to the account on the server. Use the shared selector for preference failures and pending changes, and the shared recovery action. No local-only mode, device overrides or profile picker. The other settings-storage chat owns the account-record migration.
-- **Sync account:** reuse `SyncVaultForm` for create, unlock and re-enroll: one Misty password and the remember-key control (see "One password" below). A vault made before account passwords keeps a sync password and sync secret field until it is moved over. Keep lock and forget-key actions with clear consequences. Forget key explains that the password will be needed again. Preserve existing encryption and metadata disclosure.
+### Closing things
 
-The popup is approximately 344–384 px wide and viewport constrained. Its order is: status title + detail, at most one contextual recovery action (or its in-place form), compact devices, “Restoring pages” only while active, and “Manage sync” to Overview. Device actions always remain visible. The popup has no workspace-mode controls, seats, takeover, or hover-only Switch to. Saved-key unlock and reconnect execute in place; rejected-device recovery opens the password form there. Missing saved key falls back to that form. Setup scrolls to the Sync account section.
+- **Closing a tab** closes it everywhere, including a profile's last tab. It can be reopened for 90 days.
+- **Closing a window** says nothing to sync. Its tabs stay in the profile and move, asleep, into that
+  profile's next open window on that computer. Closing the last window, or quitting, only closes it there;
+  the tabs are back next time.
+- Nothing on one computer ever closes a window on another.
+- Native code owns which window holds a tab (`infra/profile_data/tabs.rs`). A tab that left a window counts
+  as closed only if no other window claims it within 2 seconds, so dragging one across isn't a close. During
+  those 2 seconds nothing hands it back to a window as if new, or a closing tab would reappear and be saved again.
+- A tab from elsewhere is loaded ahead of being opened, so going to it is instant (`workspace/tabPreload.ts`). It waits
+  8 seconds first, because a tab travels ahead of its site's cookies, and loads again once if its sign-in lands within
+  the next minute. At most 5 wait unopened, the newest first; the rest load when clicked, and after a restart they all
+  do. Until it's opened a preloaded page adds no history and sends nothing, or a redirect to a sign-in page would move
+  the tab on the computer it came from. Tabs opened on this computer load in the background as before.
+- A page that came from another computer, or moved because of one, plays nothing while nobody is looking at it: its
+  window isn't focused or it isn't the tab showing. Starting media is refused the way a browser refuses autoplay, and
+  sites show their play button. Looking at the tab lifts the hold; nothing starts by itself (`webviews/mediaHold.ts`,
+  `browser/scripts/media_hold.js`). Web Audio that starts without being resumed isn't caught on Windows.
 
-The preview state radio group belongs to the review harness, not the product. It includes healthy, offline, locked, forbidden-device, setup and restoring states. Unrelated sidebar areas are shown as context and disabled in this preview.
+### What won't carry over
 
-## One status contract
+- **IndexedDB, none of it.** Web apps that keep work there start empty elsewhere. Sites using Firebase Auth
+  keep their sign-in there, so they ask once per session.
+- **Cache API, service workers and OPFS.** Sites rebuild them when visited.
+- **Passkeys,** which are tied to the OS or hardware.
+- **Partitioned cookies.**
 
-`selectSyncStatus(input)` returns `{ tone, title, detail, action }`. `action` is null or a typed action descriptor. All renderers display detail, including success and neutral states. The selector accepts account-scoped workspace, local recovery, vault availability, website and profile-preference state; it rejects stale cross-account/session data. Page restore activity is supplemental rather than replacing sync health.
+Some sites may ask for a sign-in again anyway: those that bind a session to a machine, IP or browser, and
+those with rotating refresh tokens if two sessions use the site at once.
 
-Priority: local persistence failure → authentication/access/key/integrity failures → other sync errors → setup/locked → offline/connecting → pending workspace/website/preferences → independent → up to date. A healthy workspace must not hide a profile failure. Independent workspace must not imply preferences are disabled. Do not assert “saved locally” unless local recovery confirms it. Show unknown device presence while disconnected. Detail identifies the affected scope.
+## Vault password and keys
 
-All existing `syncIssueMessage.ts` codes receive explicit copy and exactly one next action:
+- **Separate from the Misty password,** with the same strength rules (`password.rs`). The server never
+  receives it in any form.
+- **Derivation.** Argon2id on the client (`argon2id-m131072-t3-p1.vault-v1`, recorded in the envelope), with a
+  random salt stored with the sealed key.
+- **Sealing.** The vault root is 32 random bytes, sealed by the derived key. The server stores only the sealed
+  copy and the root's public key. A wrong password simply fails to open it.
+- **Creation.** One screen after first sign-in, with **Not now**. Skipping keeps everything local and Misty
+  never asks again; Settings can start it later.
+- **New session.** Sign in and enter the vault password, once. It's the only way in. The root then stays in the
+  OS keychain's protection, with no checkbox. A failed keychain read is not a missing key: it retries.
+- **Change password.** From any open session. It reseals the root and signs the change, so a hostile server
+  can't swap the sealed key. Other sessions keep working.
+- **Forgotten password.** No recovery. An open session can set a new one; otherwise destroy the vault and create
+  another, and every computer uploads what it has.
+- **Signing out** forgets the key on that computer and keeps local browsing data, which stays readable by anyone
+  using that computer. Signing back in asks for the password once.
+- **Destroying** deletes the server's data and stops sync everywhere; each session keeps its local data. It needs
+  the vault password, or the account password, or a Google sign-in within the last 10 minutes.
 
-| Code | Title | Detail | Single action |
-| --- | --- | --- | --- |
-| `sign_in_required` | Sign in to resume sync | Your Misty session has expired. Sign in again to reconnect sync. | Sign in |
-| `sync_device_forbidden` | This device needs to reconnect | Its sync access was removed. Enter your sync password and secret to register it again. | Reconnect device |
-| `vault_identity_failed` | Verify this device | Misty could not verify this device’s sync identity. Your existing local data is preserved. | Retry sync |
-| `replay_conflict` | Sync needs to reconnect | Misty could not safely apply changes in order. Your existing local data is preserved. | Retry sync |
-| `checkpoint_or_key_recovery_required` | Sync needs recovery | Misty needs to restore its sync connection or unlock the vault again. Your existing local data is preserved. | Retry sync |
-| `local_storage_unavailable` | Local saving needs attention | Misty cannot write sync data. Check available disk space, keep Misty open, then retry. | Retry sync |
-| `sync_protocol_failed` | Sync could not complete | Misty could not finish exchanging changes with the server. | Retry sync |
-| `storage_limit_reached` | Storage is full | Your storage is full. Free some space in your Library, or ask whoever runs your Misty server for more. Nothing already stored is lost. New changes wait on this device until there is room. | Retry sync |
+## How it works
 
-`storage_limit_reached` is the server refusing record or favicon writes once the account's storage is full ([cloud/README.md](../cloud/README.md#limits)). The worker reports it on a running session without stopping, holds that collection's writes for ten minutes, and clears it once a write goes through. An account a Misty Cloud setup key signed in has no password until it chooses one in the wizard; until then sync does not start and the Sync account section offers **Choose password…** in place of the vault form.
+Local data comes first. Each account has one encrypted record store on each computer (`LocalStore`, in
+`crates/browser-sync/src/local.rs`), which works with no vault and no account. The vault link
+(`crates/browser-sync/src/vault/`) only copies records to and from the server, so pausing, losing the connection
+or destroying the vault leaves everything on the computer as it is. Native data such as history, cookies and
+extensions is copied into and out of records by `infra/vault/` and `infra/profile_data/`.
 
-Additional branches: saved-key unlock → Unlock sync; no remote vault → Set up sync (only after confirmed absence); profile-only errors → Retry sync with preference-specific detail; unknown errors → safe human fallback and Retry sync (do not display raw protocol codes). Recovery actions never bypass integrity checks or silently reset data. Persistent integrity/key errors remain visible and expose the existing supported recovery form where appropriate.
+The server stores opaque records: `scope` (HMAC of profile and collection), `record_key`, `version`, and the sealed
+body. One cursor per vault, compare-and-swap on version, newest edit (`edited_at`) wins, 256 KiB per record, 1 MiB
+per page. Deletes are sealed records kept for 90 days. An edit carries a hybrid clock, so clock skew can't win
+forever, and an idle session loses a tie to an active one.
 
-## One recovery path
+### Never stuck
 
-`retrySync()` is the sole recovery orchestrator called by settings and popup. Its action variant comes from the selector. It routes account sign-in, native local recovery, saved-key unlock, reconnect, and profile refresh as needed. Forbidden-device recovery invalidates the rejected saved identity and requests the sync password and secret for re-enrollment, preserving existing local data. Vault absence/unknown availability must not be confused. If explicit credentials are required, the orchestrator returns that state to the calling surface rather than redirecting everything to Settings.
+| What happens | Response | Visible? |
+|---|---|---|
+| Offline, server down, timeout, 5xx | Retry forever with backoff | No |
+| One record is invalid or can't be opened | Set it aside and carry on | Settings lists it |
+| Record kind or frame from a newer version | Keep it untouched, or ignore the frame | No |
+| Site over the localStorage cap | Sync the rest | Settings names the site |
+| Password changed elsewhere, key no longer opens | Stop and keep local data | One notice |
+| This session was removed | Stop and keep local data | One notice |
+| Storage full | Hold uploads, keep downloading | One notice |
+| Vault destroyed elsewhere | Stop and keep local data | One notice |
 
-Use one pending guard, generation/account checks before mutations, one busy label, and a visible failure detail. Repeat activation while pending cannot start duplicate native operations. A success means acknowledged state, not merely dispatching an event. Keep unrelated Rename, Open tabs and vault-management actions separate from retry recovery.
+### Cookies and localStorage
 
-## Registry, backend dependency and validation
+- `infra/vault/site_data/`. Cookies upload as one sealed record per site, compared against what this session last
+  saw. Passes run after navigations, every 15 seconds while active, every 60 seconds when idle, and on hide and
+  quit. Applied cookies update the baseline, so they're never echoed back. Applying never closes a page.
+- Windows reads and writes through `Network.*`, which answers for the view's own store, and falls back to `Storage.*`.
+- Settings › Sync shows each profile's cookie and site counts from the last check on this computer, or that a check
+  couldn't finish. Those counts and "Couldn't sync" describe only the computer you're looking at.
+- The computer in use wins. Sites like Google keep refreshing tokens in background tabs, so a refresh made on an idle
+  computer doesn't replace a copy made in use within the last hour, or sites end up half signed in. Past that hour it
+  sticks. Idle means no Misty window focused for 5 minutes, or no keyboard or mouse input on the computer for 5
+  minutes. Watching a video without touching anything counts as idle, so two idle computers can still trade tokens.
+- What a store has been brought up to is kept per cookie, not per site. A cookie that arrived while a computer was
+  closed always lands there, even if its edit is older than the site's newest, and is never read as a sign-out.
+- WebKit reads a store as empty until its file has loaded, for a few seconds after launch. What the first non-empty
+  read finds was there all along, not a change made now, so it never beats a copy from elsewhere. The Mac also never
+  believes an empty read in that time.
+- Foundation reports `SameSite=None` as unspecified, and WebKit enforces unspecified as `None`. So a secure cookie
+  read as unspecified on Mac is recorded as `None`, or Windows would treat it as `Lax` and break cross-site logins.
+- localStorage is read from an isolated script world so a site can't observe it, after load, every 30 seconds, on
+  hide and on quit, and skipped when unchanged. A force-quit can lose the last 30 seconds of a site's edits here.
+- New localStorage from elsewhere never lands under an open page. It waits until the site's last other tab closes,
+  or until its only tab reloads or navigates from the toolbar, which waits for it first. A link clicked inside the
+  page can't wait, so that site gets it at the next load.
+- Mac writes through a hidden document given its HTML directly. The startup script that writes the document on
+  Windows must never run on Mac: rewriting a document mid-parse leaves it loading forever.
 
-`src/features/settings/settingsRegistry.tsx` is the only navigation registry. One canonical Sync area (`sync`) contains named section targets instead of separate pages. Existing and proposed `sync-*` destinations can resolve to section targets for compatibility and search. File sharing may retain the existing `devices` id. Redirect legacy `browser-handoff` to `sync`; redirect legacy `profiles` to the Settings sync section. Update search and navigation consumers through the registry. The global sidebar keeps its current look, stays flat with unique icons and no ampersands, and omits the Account footer.
+### Store identity
 
+Each computer keeps a local mapping of profile to native store (`~/.misty/profiles.json`), never derived from the
+vault. The first profile adopts the store already in use, so nobody gets signed out by turning on sync. New profiles
+get a new store. Destroying and recreating the vault changes nothing about which store is used.
 
-**Part A3 is a landing dependency.** Current `DeviceControlContent` calls `claimNativeTree`, and `treeControl.ts` exposes seat semantics. Before production UI lands, verify the backend supplies non-exclusive tab opening, publisher identity, workspace device membership and stable per-device mode controls. Do not merely relabel a seat claim as opening tabs. Remove `SeatCheckScreen`/seat gating and `BrowserSyncSleepOverlay` together with the backend seat retirement; preserve unrelated page restoration and local recovery protections. The user confirmed Part A3 is handled in another chat. Its non-exclusive API is not yet present in this checkout; keep the existing seat protections until that migration lands.
+## Profiles and windows
 
-Required tests after approval: update `BrowserSyncBadge.test.tsx`, `BrowserSyncSettings.test.tsx`, `SettingsWorkspace.test.tsx` (remove Browser Sync versus Sync split), `BrowserSyncSleepOverlay.test.tsx`, `SeatCheck.test.tsx`, and `treeControl.test.ts`. Add selector coverage for every issue code, precedence, saved/unsaved recovery, mixed workspace/profile health, unknown presence, unsupported website sync, independent mode, setup/locked, account transitions and unknown-error fallback. Add shared recovery tests for saved-key unlock, missing-key form, forbidden re-enrollment, pending deduplication and stale-account cancellation. Verify every visible control, no tab strips, unique sidebar icons and no ampersands, always-visible detail and device actions, and Manage sync routing to Overview.
+As in Chrome: each profile opens in its own OS windows, one app process. Switching profile opens or focuses that
+profile's window and tabs never swap under you. A session opening a profile for the first time shows its tabs in one
+window; new tabs from elsewhere join the most recently used window of that profile; nothing opens a new OS window on
+its own. Window color comes from the profile. Deleting a profile removes it everywhere after a confirmation, including
+each session's browser store. Offline sessions do this when they reconnect.
 
-Implementation is authorized. The user confirmed that another chat owns Part A3. The UI and account-settings changes can be reviewed here, but shipping non-exclusive tab opening and removing seat overlays must wait for that backend contract. Existing exclusive `claimNativeTree` wiring is explicitly temporary, not evidence that Part A3 is complete.
+With two or more profiles, the sidebar's footer shows a round button for each, between Downloads and the pane layout
+(`features/profiles/ProfileSwitcher.tsx`). A letter names it and the full name shows on hover. Clicking opens or focuses
+that profile's window, and right-clicking edits that profile. Past five, the rest sit behind a `⋯` button, and this
+window's profile always stays visible. With one profile, and in incognito, the row is hidden. Adding a profile stays in
+the account menu and Window › Add Profile. The buttons are black, white and gray: only window chrome takes the color.
 
-## Review verification
+## Settings › Sync
 
-Revision 1 browser checks covered chevron navigation and in-popup re-enrollment; revision 2 supersedes them. Revision 2 replaces hand-drawn sidebar approximations with the same Lucide icons used by the current registry, restores Search and the incumbent sidebar geometry, removes the sub-page launcher list, and exposes all Sync sections. Preview controls change sample state only. No production tests are claimed for this standalone mockup. Existing unrelated working-tree changes remain untouched.
+Status (Up to date, Syncing with what's left, Paused, or Off), Start and Pause for this session only, storage used by
+profile and by kind (the server reports sizes under opaque names and the client names them), data transferred over 30
+days, what couldn't sync, signed-in sessions (name, last seen, rename, remove), change password, destroy vault.
 
-Revision 2 checks: browser confirmed Search finds Switching devices and the section is exposed on the same page; turning off page restore disables agent restore. Desktop and narrow-pane layouts were inspected. The layout detector returned no findings in degraded regex mode (HTML parser dependencies unavailable), so this is not a complete accessibility audit.
+## Security and privacy
 
-## Implementation handoff
+**The server can see:** the account, that a vault exists, session names and platforms, connection times, IP addresses,
+opaque scope and record IDs, how many records there are, padded record sizes and storage totals.
 
-Browser review used the real React components with sample native/account data at desktop and narrow desktop widths, including the in-popup re-enrollment form. The account form uses one section, and rows respond to their container width.
+**The server can't see:** the vault password or key, profile names, tabs, URLs, history, bookmarks, saved passwords,
+cookies or localStorage.
 
-The settings/sidebar, coverage, recovery and status tests pass after updates, including generation cancellation, shared retry deduplication, settings-only versus workspace recovery, explicit lock during startup, server-confirmed device changes, and server-confirmed vault absence. TypeScript and targeted ESLint checks pass. The legacy sleep/seat/tree regressions remain in place for Part A3; they have not been removed prematurely. Seat-check recovery already uses the shared status/controller, and the old event-based retry path and standalone device-name section are removed.
+| Threat | Answer |
+|---|---|
+| Server reads vault data | Sealed on the client; the server has no key |
+| Server moves a record, or changes its ID or version | Associated data binds all three, so it fails to open |
+| Server serves old data | Sessions remember the highest version seen and refuse lower ones |
+| Server forges a delete | Deletes are sealed |
+| Server swaps the sealed key | Changes are signed by the root and checked against the pinned public key |
+| Stolen login session | Can't open the vault, and can't destroy it without further proof |
+| Stolen computer | Remove its session and the server refuses it. Its local copy can't be recalled, and it still holds the key; for full lockout, destroy and recreate the vault |
+| Script in the app's web layer | Keys stay in native code, and the password is cleared after use |
+| Site tries to observe capture | Isolated script world |
 
-Part A3 handoff: replace the temporary `claimNativeTree` call and acknowledgment check in `SyncDeviceList.tsx` with the non-exclusive open-tabs API, then remove the seat overlays/gating and update `BrowserSyncSleepOverlay.test.tsx`, `SeatCheck.test.tsx` and `treeControl.test.ts` together with that backend change. This work does not claim completion of the backend migration.
+What the vault protects is browsing. Spaces, chats and agent conversations live on the server without vault
+encryption ([agents](../agents/README.md)).
 
-## Interface rules
+## Where the code lives
 
-- Approved Sync direction: this brief, revision 2, including the approved monochrome palette. Its server-account settings model is superseded: settings are device-local. Historical mockup screenshots do not override these instructions.
+| Piece | Path |
+|---|---|
+| Records, keys, exchange, link | `src-tauri/crates/browser-sync/src/{local.rs,vault/}` |
+| Link lifecycle, commands, history, usage, site data | `src-tauri/src/infra/vault/` |
+| Local records and tabs | `src-tauri/src/infra/profile_data/` |
+| Profiles and windows | `src-tauri/src/infra/profile_windows/` |
+| Server | `misty-server/internal/browsersync/`, routes in `internal/app/server_mount_public_routes.go` |
+| Interface | `src/features/vault/`, `src/features/settings/sections/SyncSection.tsx`, `src/features/workspace/profileTabs.ts` |
 
-## One password (2026-10-22)
-
-Sync is sealed under the person's Misty password; there is no separate sync password or secret to keep. Design and plan: [docs/plans/extensions-sync-plan.md](../plans/extensions-sync-plan.md).
-
-- **Two values from one password, on the device.** Argon2id stretches the password with a salt taken from the server's address and the account email (so the same email and password give each Misty server a different credential), and HKDF splits the result: a login credential and a vault wrapping key (`AccountKeys` in `src-tauri/crates/browser-sync/src/crypto.rs`). The desktop app sends the server the credential where it used to send the password, so the server never sees the password the vault key comes from. The wrapping key never leaves the device.
-- **Accounts that hold their password the old way.** The server has seen those passwords in plain form, so they must not seed keys. Sign-in tries the credential first. For an account this device has not seen sign in with a credential, it then sends the password as typed; one that only works that way is not remembered as a credential account and is asked to choose a new password (`SyncPasswordDialog`) before it gets an account wrapper. For an account this device knows uses credentials, the password is never sent in plain form: a wrong password just fails, and for an account whose password an older server reset by email the sign-in page offers "Sign in with the reset password" as an explicit choice (such a reset means the server saw the new password, so the vault is reset). Servers no longer reset by email: a setup key's sign-in link is the reset, and the new password is derived on the device like any other. The device also remembers the exact email the keys were derived from, so a changed email on the server does not change them.
-- **Google accounts** have no Misty password. The sync password is chosen on the device, asked twice, and never sent anywhere.
-- **Moving a vault over.** Re-sealing the open vault (`browser_sync_use_account_password`) creates an account wrapper, signs a key transition with the vault root for the next generation, and sends both to `PUT /sync/vault/key`. Every device checks the transition against the root public key it pinned at enrollment (`CachedVault::check_remote`), so the server cannot swap or replay a wrapper. A device that was offline adopts the new wrapper the next time its password is typed. A password change re-seals the open vault first, then changes the server's password, then marks the account safe, and ends every other session of the account. The vault key itself is not rotated: someone holding an old copy of the wrapper and the old password can still open it, so a leaked password needs a vault reset, not just a change.
-- **Forgotten password.** The vault cannot be opened. Reset sync removes the synced data from the server and every device starts it again from its local copy.
-- **Strength.** The server cannot judge a password it never sees, so the rules (12 characters or more, no common passwords, no runs, not the email) run on the device (`password.rs`).
-- **Not covered here.** Web sign-in has no native key derivation and keeps sending the password as typed; an account can sign in on the web only until it moves to a derived credential. Status: built and unit tested. The migration, the key-rotation store code and the password change were run against a throwaway PostgreSQL 16 on 2026-10-22 (`TestRotateVaultKeyAgainstPostgres`, `TestChangePasswordAgainstPostgres`, gated by `MISTY_KEY_TRANSITION_TEST_DSN`) using small tables that hold only the columns they use, not the full migration chain (it needs pgvector). The HTTP handlers, row-level security and the app are not yet run.
-
-### Independent review, 2026-10-23
-
-A reviewer who saw only the code found the cryptographic core sound (key independence, wrapper binding, signature scope and the Rust and Go agreement) and a number of exposures in the sign-in and password-change flows. All but the items below were fixed the same day:
-
-- No automatic plaintext sign-in or password-change fallback for an account the device knows uses credentials; the person asks for it after an old reset by email.
-- The current password cannot be reused as the new one; the vault is re-sealed before the server password changes; other sessions end with a password change; the email the keys derive from is pinned on the device; the server's address is part of the derivation; passwords and emails are put in NFKC form; generation counters cannot overflow; length counts characters.
-- The server records whether an account's password hash is of a derived credential (`users.credential_password`, set on register, password change and a setup key's reset with `credential: true`, cleared by an old reset by email) and returns it at sign-in and in `/me`. A device whose local record disagrees with a `false` from the server drops its record, so a reset made elsewhere is noticed.
-- New vaults must use the account wrapper; the server refuses the sync-secret wrapper on creation.
-- Deleting a vault (and so every device's synced data) needs the account password, checked on the server with a limit of five wrong attempts in fifteen minutes; replacing a wrapper is limited to ten requests in ten minutes. A forgotten password is recovered with a sign-in link (a setup key from whoever runs the server; on Misty Cloud, `mistysys.com/sign-in`), choosing a new password, and then resetting sync unless another device still has the vault open.
-
-Still open:
-
-- **The server's flag can be lied about.** A malicious server can still get the password as typed from a device that has never seen the account sign in with a credential, and can claim an account is safe when it is not. Only an in-app reset that sends a derived credential, and a server that cannot be trusted less than the device, would remove that.
-- **A near variant of an old password** (not the identical one) is not caught for an account the server saw in plain form.
-- **A server holding an old signed transition** can have a device pinned at an earlier generation adopt a stale wrapper (a lockout, not a leak).
-- **The sign-in lockout** is per process and in memory, and the credential and plain attempts of an older account count separately.
-- **The unlock form shown** follows the server's report of which wrapper protects the vault; it can only phrase a prompt, because unlocking runs locally.
-- **The vault key is not rotated** by a password change, so a leaked password needs a vault reset.
+The live test `crates/browser-sync/tests/vault_live.rs`, driven by `misty-server/test/contract/http/api/sync_vaults_rust_test.go`,
+runs real Rust sessions against the real server.

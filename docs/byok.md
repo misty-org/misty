@@ -8,8 +8,8 @@ or your ChatGPT plan covers it.
 
 ## Settings › Models
 
-The page, and the last step of the setup wizard, offer three ways in. On Misty Cloud the wizard
-reaches this step after the setup key and the account's new password:
+The page, and the last step of the setup wizard, offer three ways in. The wizard reaches this
+step after signing in:
 
 - **Sign in with ChatGPT** uses your ChatGPT plan instead of a key (below).
 - **Sign in with OpenRouter** has OpenRouter make a key for Misty and saves it.
@@ -27,7 +27,7 @@ reaches this step after the setup key and the account's new password:
 **Check the agent model** asks the chosen model to call a tool and to read a screenshot a tool
 returned, the two things every agent run needs, and says which one works. It runs on the device's
 runtime (`/v1/device/model-test`, with the checks in
-`server/apps/agent-runtime/src/model-checks.ts`).
+`src-tauri/services/agent-runtime/src/model-checks.ts`).
 
 Model IDs are `<provider>/<model as the provider names it>`, for example
 `anthropic/claude-sonnet-5-5`, `chatgpt/gpt-6.1-sol`, `openrouter/anthropic/claude-sonnet-5.5`,
@@ -90,8 +90,9 @@ This is OpenAI's ChatGPT plan usage for open-source and locally hosted apps
 
 - **Signing in** opens your browser at `auth.openai.com` with PKCE, a loopback callback on
   `http://127.0.0.1:<port>/auth/callback`, and this computer's host ID (`urn:uuid:…`, made once
-  and kept in the credential store). The first sign-in registers a client through
-  `dynamic_agent_client`; later ones reuse the client it issued. Scopes are
+  and kept in the credential store). The callback waits 15 minutes, then closes; its page opens Misty again with a `misty://` link. The first
+  sign-in registers a client through `dynamic_agent_client`; later ones reuse the client it
+  issued. Scopes are
   `openid profile email offline_access resource.invoke chatgpt.tokens.use.direct`, for the
   resource `https://api.openai.com/v1`.
 - **The ID token** is checked for issuer, audience, expiry and nonce. It comes straight from the
@@ -106,12 +107,12 @@ This is OpenAI's ChatGPT plan usage for open-source and locally hosted apps
 - **Requests** go to the Responses API with the access token as the bearer, `store: false` and
   `stream: true`. System text moves into `instructions`, and `max_output_tokens`, `temperature`,
   `top_p`, `previous_response_id` and the other fields the preview refuses are dropped
-  (`server/apps/agent-runtime/src/chatgpt-provider.ts`). A plan usage limit shows as a 429.
+  (`src-tauri/services/agent-runtime/src/chatgpt-provider.ts`). A plan usage limit shows as a 429.
 - **Signing out** revokes the refresh token at the issuer's revocation endpoint and clears the
   tokens. If OpenAI doesn't confirm it, Settings says so; you can disconnect Misty in ChatGPT's
   settings.
 
-Paid or remotely hosted apps must use OpenAI's interest form instead, so Misty Cloud may need
+Paid or remotely hosted apps must use OpenAI's interest form instead, so Misty Pro may need
 that before its customers sign in with ChatGPT. Misty never offers a Claude.ai login: Anthropic
 forbids third-party apps from using Claude subscription sign-ins. Use an Anthropic API key.
 

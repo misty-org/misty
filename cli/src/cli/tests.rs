@@ -3,8 +3,11 @@ use super::*;
 #[test]
 fn parses_the_stable_command_surface() {
     for arguments in [
+        vec!["misty"],
+        vec!["misty", "build"],
+        vec!["misty", "release"],
+        vec!["misty", "release", "--dry-run"],
         vec!["misty", "doctor"],
-        vec!["misty", "tool", "vite", "build", "--mode", "desktop"],
         vec!["misty", "env", "init", "dev"],
         vec!["misty", "env", "status", "dev"],
         vec!["misty", "home", "generate"],
@@ -17,7 +20,6 @@ fn parses_the_stable_command_surface() {
         vec!["misty", "check", "features"],
         vec!["misty", "check", "cli"],
         vec!["misty", "desktop", "dev", "--profile", "owner"],
-        vec!["misty", "desktop", "build"],
         vec!["misty", "desktop", "clean", "--apply"],
         vec!["misty", "desktop", "icons", "sync"],
         vec!["misty", "docs", "dev"],
@@ -25,17 +27,12 @@ fn parses_the_stable_command_surface() {
         vec!["misty", "server", "up", "--no-build"],
         vec!["misty", "server", "url"],
         vec!["misty", "server", "down", "--volumes"],
-        vec!["misty", "server", "image", "build", "--tag", "local"],
         vec!["misty", "server", "worker", "generate-secrets"],
         vec!["misty", "server", "r2", "configure-cors", "--apply"],
-        vec!["misty", "release", "start", "0.1.0"],
-        vec!["misty", "release", "start", "0.1.0", "--os", "macos"],
-        vec!["misty", "release", "start", "0.1.0", "--os", "windows"],
-        vec!["misty", "release", "verify", "0.1.0", "--dry-run"],
     ] {
         Cli::try_parse_from(arguments).unwrap();
     }
-    // Deployment is server/compose.yml's job, never the CLI's.
+    // Deployment is misty-server/compose.yml's job, never the CLI's.
     for arguments in [
         vec!["misty", "env", "init", "prod"],
         vec!["misty", "server", "prod", "up"],
@@ -50,43 +47,17 @@ fn parses_the_stable_command_surface() {
             "production",
         ],
         vec!["misty", "setup", "cloudflare", "--target", "prod"],
+        // Releases only go through the guided flow.
+        vec!["misty", "release", "publish", "0.1.0"],
     ] {
         assert!(Cli::try_parse_from(arguments).is_err());
     }
 }
 
 #[test]
-fn release_os_accepts_multiple_platforms_and_rejects_invalid_values() {
-    let parsed = Cli::try_parse_from([
-        "misty",
-        "release",
-        "start",
-        "0.1.0",
-        "--os",
-        "macos,windows",
-    ])
-    .unwrap();
-    let Command::Release(Release {
-        command: ReleaseCommand::Start { os, .. },
-    }) = parsed.command
-    else {
-        panic!("expected release start");
-    };
-    assert_eq!(os, [release::ReleaseOs::Macos, release::ReleaseOs::Windows]);
-    for value in ["linux", "", "macos,linux"] {
-        assert!(
-            Cli::try_parse_from(["misty", "release", "start", "0.1.0", "--os", value]).is_err()
-        );
-    }
-    for flag in ["--no-macos", "--no-windows"] {
-        assert!(Cli::try_parse_from(["misty", "release", "start", "0.1.0", flag]).is_err());
-    }
-}
-
-#[test]
 fn destructive_flags_are_never_implicit() {
     let down = Cli::try_parse_from(["misty", "server", "down"]).unwrap();
-    let Command::Server(server) = down.command else {
+    let Some(Command::Server(server)) = down.command else {
         panic!("expected server command");
     };
     assert!(matches!(
@@ -95,7 +66,7 @@ fn destructive_flags_are_never_implicit() {
     ));
 
     let cors = Cli::try_parse_from(["misty", "server", "r2", "configure-cors"]).unwrap();
-    let Command::Server(server) = cors.command else {
+    let Some(Command::Server(server)) = cors.command else {
         panic!("expected server command");
     };
     assert!(matches!(

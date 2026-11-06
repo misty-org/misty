@@ -1,4 +1,4 @@
-import type { SpaceActorRef, SpaceConversation, SpaceMessage } from "@/api/spaces/dto/entities";
+import type { SpaceConversation, SpaceMessage } from "@/api/spaces/dto/entities";
 import type { MessageSpan } from "@/api/spaces/dto/common";
 
 type SpaceRequest = <T = void>(path: string, init?: RequestInit) => Promise<T>;
@@ -9,20 +9,22 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       request<{ conversations: SpaceConversation[] }>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations`,
       ),
-    createConversation: (spaceId: string, title: string, participants: SpaceActorRef[]) =>
+    /** A group chat: public to the Space, with everyone in the Space in it. */
+    createConversation: (spaceId: string, title: string) =>
       request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
         method: "POST",
-        body: JSON.stringify({ title, participants }),
+        body: JSON.stringify({ title }),
       }),
-    updateConversation: (
-      spaceId: string,
-      conversationId: string,
-      title: string,
-      participants: SpaceActorRef[],
-    ) =>
+    /** The DM with another person in the Space, visible only to the two of you. */
+    openDirectMessage: (spaceId: string, userId: string) =>
+      request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations/dm`, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
+    updateConversation: (spaceId: string, conversationId: string, title: string) =>
       request<SpaceConversation>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
-        { method: "PATCH", body: JSON.stringify({ title, participants }) },
+        { method: "PATCH", body: JSON.stringify({ title }) },
       ),
     deleteOrClearConversation: (spaceId: string, conversationId: string) =>
       deleteConversation(request, spaceId, conversationId),

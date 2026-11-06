@@ -25,14 +25,12 @@ describe("useWorkspaceViewTitle", () => {
   });
 
   it("renames only the workspace tab rendering the content", () => {
-    useWorkspaceStore.getState().setScope("space:family");
     const first = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
       groupKey: "space:family:planner",
       title: "Planner",
       route: "/spaces/family/planner/tasks/board",
       instanceKey: "family:planner",
-      scopeKey: "space:family",
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });
@@ -42,7 +40,6 @@ describe("useWorkspaceViewTitle", () => {
       title: "Journal",
       route: "/spaces/family/notes",
       instanceKey: "family:journal",
-      scopeKey: "space:family",
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });

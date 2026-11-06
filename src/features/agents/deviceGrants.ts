@@ -19,7 +19,6 @@ const workspaceCapabilities = [
   "browser.tab.open",
   "bookmark.list",
   "bookmark.add",
-  "web.fetch",
   "browser.session",
   // Programs against the agent's own tabs (docs/agents/harness.md, browser_run).
   "browser.run",

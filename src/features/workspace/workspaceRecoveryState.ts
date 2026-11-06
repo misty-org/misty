@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { RecoverySaveStatus } from "@/features/browser-sync/recovery";
+import type { RecoverySaveStatus } from "@/features/workspace/recoveryStorage";
 import type { UnrestoredView } from "./workspaceMigrations";
 
 const noSaves: RecoverySaveStatus = { pending: [], failed: [] };

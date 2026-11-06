@@ -1,5 +1,9 @@
 import { apiSessionInvalidEvent, readApiAuthToken } from "@/api/client/session";
-import { isLocalProfile, profileIdFor, restoreAccountWorkspace } from "@/features/workspace";
+import {
+  accountScopeFor,
+  isLocalAccountScope,
+  restoreAccountWorkspace,
+} from "@/features/workspace";
 import { continueWithTemporaryWorkspace } from "@/features/workspace/nativeWorkspaceRecovery";
 import { nativeWorkspaceRecoveryEnabled } from "@/features/workspace/workspaceRecoveryPlatform";
 import { useEffect, useRef, type MutableRefObject } from "react";
@@ -28,18 +32,18 @@ export function useNativeWorkspaceRecovery(
 ) {
   useEffect(() => {
     if (!nativeWorkspaceRecoveryEnabled() || accountOperationActive.current) return;
-    const profileId = profileIdFor(activeUserId);
+    const accountScope = accountScopeFor(activeUserId);
     let canceled = false;
     void (async () => {
       // This restores the OS-held account cookies without requiring a network
       // response. Local layout recovery also works while sync is locked/offline.
       // The local profile has no account cookies.
-      if (!isLocalProfile(profileId)) await readApiAuthToken();
+      if (!isLocalAccountScope(accountScope)) await readApiAuthToken();
       if (canceled || accountOperationActive.current) return;
-      await restoreAccountWorkspace(profileId);
+      await restoreAccountWorkspace(accountScope);
     })().catch((error) => {
       if (!canceled && !accountOperationActive.current)
-        continueWithTemporaryWorkspace(profileId, error);
+        continueWithTemporaryWorkspace(accountScope, error);
     });
     return () => {
       canceled = true;

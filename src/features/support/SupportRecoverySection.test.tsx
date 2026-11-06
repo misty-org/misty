@@ -30,7 +30,7 @@ vi.mock("./recoveryActions", () => ({
   resetWorkspaceLayout: mocks.resetLayout,
 }));
 
-import { useSetupStore } from "@/features/setup";
+import { useSignInSheetStore } from "@/features/auth/signInSheet/signInSheetStore";
 import { SupportRecoverySection } from "./SupportRecoverySection";
 
 describe("SupportRecoverySection", () => {
@@ -108,7 +108,7 @@ describe("SupportRecoverySection", () => {
   });
 
   it("reopens setup and closes settings when requested", async () => {
-    useSetupStore.setState({ isOpen: false, step: "tabs" });
+    useSignInSheetStore.getState().close();
     const closeSettingsListener = vi.fn();
     window.addEventListener("misty:close-settings", closeSettingsListener);
 
@@ -121,8 +121,8 @@ describe("SupportRecoverySection", () => {
     await act(async () => openSetupButton?.click());
 
     expect(closeSettingsListener).toHaveBeenCalledOnce();
-    expect(useSetupStore.getState().isOpen).toBe(true);
-    expect(useSetupStore.getState().step).toBe("import");
+    expect(useSignInSheetStore.getState().reason).toBe("device");
+    useSignInSheetStore.getState().close();
     window.removeEventListener("misty:close-settings", closeSettingsListener);
   });
 });

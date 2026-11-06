@@ -140,7 +140,7 @@ SheetDescription.displayName = SheetPrimitive.Description.displayName;
 
 export { Sheet, SheetContent, SheetDescription, SheetTitle };
 
-export interface SheetContentProps
+interface SheetContentProps
   extends
     React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {

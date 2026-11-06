@@ -39,10 +39,10 @@ pub(super) extern "C" fn event(pointer: *const c_char) {
         }
         return;
     }
-    // Every event names the Space whose host raised it, and goes to that Space only.
-    let Some(space) = value["space"]
+    // Every event names the profile whose host raised it, and goes to that profile only.
+    let Some(profile) = value["space"]
         .as_str()
-        .filter(|key| crate::infra::space_windows::valid_key(key))
+        .filter(|key| crate::infra::profile_windows::valid_key(key))
         .map(str::to_owned)
     else {
         return;
@@ -55,14 +55,19 @@ pub(super) extern "C" fn event(pointer: *const c_char) {
                     let _ = view.close();
                 }
             }
-            crate::infra::space_windows::emit_to_space(&app, &space, "misty://extensions", value);
+            crate::infra::profile_windows::emit_to_profile(
+                &app,
+                &profile,
+                "misty://extensions",
+                value,
+            );
         });
     } else {
         if value["kind"] == "runtime-error" {
             let event = value.clone();
-            let space = space.clone();
+            let profile = profile.clone();
             tauri::async_runtime::spawn(async move {
-                let mut state = super::super::service(&space).lock().await;
+                let mut state = super::super::service(&profile).lock().await;
                 if event["account"].as_str() == Some(&state.account) {
                     if let Some(status) =
                         event["id"].as_str().and_then(|id| state.states.get_mut(id))
@@ -81,6 +86,6 @@ pub(super) extern "C" fn event(pointer: *const c_char) {
                 }
             });
         }
-        crate::infra::space_windows::emit_to_space(app, &space, "misty://extensions", value);
+        crate::infra::profile_windows::emit_to_profile(app, &profile, "misty://extensions", value);
     }
 }

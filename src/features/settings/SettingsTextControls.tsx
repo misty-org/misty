@@ -1,6 +1,5 @@
-import { Button, cn, IconButton, Input, Textarea } from "@/shared/ui";
+import { Button, cn, Input, Textarea } from "@/shared/ui";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Copy } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
 
 import {
@@ -133,38 +132,5 @@ export function FilePathControl(props: {
         </Button>
       </div>
     </div>
-  );
-}
-
-export function CopyableValueText(props: { value: string; disabled?: boolean }) {
-  const settingLabel = useSettingsControlLabel("value");
-  const copyValue = () => {
-    if (props.disabled) return;
-    void navigator.clipboard?.writeText(props.value).catch(() => undefined);
-  };
-
-  return (
-    <span className="flex min-w-0 max-w-[360px] items-center justify-end gap-2">
-      <span
-        className={cn(
-          "min-w-0 select-text overflow-hidden text-ellipsis whitespace-nowrap text-right text-md",
-          props.disabled ? "text-cream-muted" : "text-cream",
-        )}
-        title={props.value}
-      >
-        {props.value}
-      </span>
-      <IconButton
-        size="md"
-        variant="outline"
-        label={`Copy ${settingLabel.toLowerCase()}`}
-        className={settingsDisabledControlClass}
-        disabled={props.disabled}
-        title="Copy"
-        onClick={copyValue}
-      >
-        <Copy size={14} />
-      </IconButton>
-    </span>
   );
 }

@@ -3,7 +3,7 @@
 //! window of its own, reparenting the extension's tab into it. Misty's window
 //! leaves the page's geometry and visibility alone while it is away (a hidden
 //! page stops painting).
-use super::super::space_windows;
+use super::super::profile_windows;
 use serde_json::json;
 use std::{
     collections::HashMap,
@@ -105,8 +105,8 @@ pub async fn extension_popup_open(
     width: f64,
     height: f64,
 ) -> Result<String, String> {
-    if !space_windows::is_space_window(window.label()) {
-        return Err("Only tabs in a Space window can open popups.".into());
+    if !profile_windows::is_person_window(window.label()) {
+        return Err("Only tabs in a profile's window can open popups.".into());
     }
     let webview = app
         .get_webview(&browser_label(&tab)?)
@@ -154,9 +154,9 @@ pub async fn extension_popup_open(
         .lock()
         .map_err(|_| "extension_popup_unavailable")?
         .insert(label.clone(), (tab, window.label().to_owned()));
-    // The popup belongs to its tab's Space: that Space's extension host owns the
-    // page, and its events and new tabs stay in that Space.
-    space_windows::adopt(&label, window.label());
+    // The popup belongs to its tab's profile: that profile's extension host owns the
+    // page, and its events and new tabs stay in that profile.
+    profile_windows::adopt(&label, window.label());
     let closing = (app.clone(), label.clone());
     host.on_window_event(move |event| match event {
         tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -186,8 +186,8 @@ pub async fn extension_popup_close(
     app: AppHandle,
     host: String,
 ) -> Result<(), String> {
-    if !space_windows::is_space_window(window.label()) {
-        return Err("Only a Space window can close extension popups.".into());
+    if !profile_windows::is_person_window(window.label()) {
+        return Err("Only a profile's window can close extension popups.".into());
     }
     close(&app, &host)
 }

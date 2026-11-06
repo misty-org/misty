@@ -3,7 +3,7 @@ import type { ShortcutBindingPair, ShortcutPlatform, ShortcutScope } from "./reg
 
 export type ShortcutSlot = "primary" | "alternate";
 
-export interface ParsedShortcut {
+interface ParsedShortcut {
   alt: boolean;
   ctrl: boolean;
   key: string;

@@ -62,7 +62,7 @@ export function ModelKeyRow(props: {
           />
         ) : (
           <>
-            <span className="mr-auto text-[14px] text-cream-muted">Saved</span>
+            <span className="mr-auto text-sm text-cream-muted">Saved</span>
             <Button
               variant="outline"
               size="sm"

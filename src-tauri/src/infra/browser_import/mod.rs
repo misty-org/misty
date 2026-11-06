@@ -3,8 +3,8 @@
 //! and Safari, and bookmarks from or to the HTML file every browser reads.
 //! Source files are only read, from private copies. The renderer names a
 //! source by browser and profile ID; paths and cookie values never cross.
-//! Commands are limited to Space windows (`app_command_policy`), and what they
-//! write lands in the calling window's Space.
+//! Commands are limited to profile windows (`app_command_policy`), and what they
+//! write lands in the calling window's profile.
 mod bookmark_file;
 pub use bookmark_file::*;
 mod chromium;
@@ -36,22 +36,23 @@ pub struct ImportSourceRequest {
     pub profile: String,
 }
 
-/// A source whose history, permissions and sign-ins land in the calling window's Space.
+/// A source whose history, permissions and sign-ins land in the calling window's profile.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportTargetRequest {
     pub source: ImportSourceRequest,
 }
 
-/// The website data store of the calling window's Space: its own store, or `None`
-/// for the personal Space's. Never named by the renderer.
-fn space_store(webview: &tauri::Webview) -> Result<Option<String>, String> {
+/// The website data store of the calling window's profile; `None` is this computer's original
+/// store. Never named by the renderer.
+fn profile_store(webview: &tauri::Webview) -> Result<Option<String>, String> {
     let label = webview.label();
-    if !super::space_windows::is_person_window(label) {
-        return Err("Import from a Space window.".into());
+    if !super::profile_windows::is_person_window(label) {
+        return Err("Import from a profile's window.".into());
     }
-    let key = super::space_windows::space_for_window(label).ok_or("Import from a Space window.")?;
-    Ok(super::space_windows::space_store_identity(&key))
+    let key = super::profile_windows::profile_for_window(label)
+        .ok_or("Import from a profile's window.")?;
+    super::profile_windows::store_for_profile(&key)
 }
 
 #[derive(Serialize)]
@@ -181,7 +182,7 @@ pub async fn browser_import_history(
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
-    let target = super::browser_library::history::profile_key(space_store(&webview)?);
+    let target = super::browser_library::history::profile_key(profile_store(&webview)?);
     blocking(move || {
         let source = profile(&request.source)?;
         let visits = history::read(request.source.browser.family(), &source.path)?;
@@ -209,7 +210,7 @@ pub async fn browser_import_settings(
     webview: tauri::Webview,
     request: ImportTargetRequest,
 ) -> Result<ImportedSettingsResult, String> {
-    let misty_profile = space_store(&webview)?;
+    let misty_profile = profile_store(&webview)?;
     blocking(move || {
         let source = profile(&request.source)?;
         let settings = settings::read(request.source.browser.family(), &source.path);
@@ -240,7 +241,7 @@ pub async fn browser_import_signins(
     app: AppHandle,
     request: ImportTargetRequest,
 ) -> Result<Added, String> {
-    let misty_profile = space_store(&webview)?;
+    let misty_profile = profile_store(&webview)?;
     let source = request.source.clone();
     let read = blocking(move || {
         let path = profile(&source)?.path;

@@ -1,82 +1,106 @@
 //! Running the storage script in a page and reading its answer.
 use super::*;
 
-/// Reading another profile's store is never skipped past: it aborts capture.
-pub(in crate::infra::website_data) const PROFILE_UNVERIFIED: &str =
-    "Website profile could not be verified";
+/// The script world storage runs in, shared by no other Misty code.
+const WORLD: &str = "misty-site-storage";
+/// The script refuses to return more than 8 MiB of items; this leaves room for its envelope.
+const MAX_ANSWER: usize = (8 << 20) + (64 << 10);
 
-pub(in crate::infra::website_data) async fn evaluate(
+/// One origin's localStorage as a page reported it.
+#[derive(Deserialize)]
+pub(crate) struct PageStorage {
+    /// A hash of everything in the origin, so a later read can skip sending it.
+    pub stamp: String,
+    /// `None` when it is unchanged, or too large to sync.
+    pub items: Option<BTreeMap<String, String>>,
+    pub unchanged: bool,
+    pub too_large: bool,
+    pub write_failed: bool,
+    origin: String,
+}
+
+/// Why a page's storage could not be read. Fixed values, so no page text can reach a log.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StorageError {
+    /// The view isn't in the store it should be in: it is left alone.
+    Profile,
+    /// Navigating, busy or gone. The next pass tries again.
+    Unavailable,
+}
+
+/// Reads an origin's storage from a page of it. `known` is the stamp already held.
+pub(crate) async fn read_page(
     view: &Webview,
     physical: &str,
     origin: &str,
-    write: Option<Value>,
-) -> Result<Value, String> {
-    evaluate_request(
+    known: Option<&str>,
+) -> Result<PageStorage, StorageError> {
+    evaluate(
         view,
         physical,
         origin,
-        json!({"origin":origin, "write":write}),
+        json!({"origin": origin, "known": known}),
     )
     .await
 }
 
-/// A periodic read: `read` names the areas wanted and `known` the stamps of
-/// what the caller already holds. Areas whose stamp still matches come back
-/// listed in `unchanged` instead of exported again.
-pub(in crate::infra::website_data) async fn evaluate_read(
+/// Replaces an origin's storage. The answer is what the page holds afterwards.
+pub(crate) async fn write_page(
     view: &Webview,
     physical: &str,
     origin: &str,
-    read: Value,
-    known: Value,
-) -> Result<Value, String> {
-    evaluate_request(
+    items: &BTreeMap<String, String>,
+) -> Result<PageStorage, StorageError> {
+    evaluate(
         view,
         physical,
         origin,
-        json!({"origin":origin, "write":null, "read":read, "known":known}),
+        json!({"origin": origin, "write": items}),
     )
     .await
 }
 
-pub(super) async fn evaluate_request(
+async fn evaluate(
     view: &Webview,
     physical: &str,
     origin: &str,
-    mut request: Value,
-) -> Result<Value, String> {
-    let url = view.url().map_err(|_| "Website storage is unavailable")?;
+    request: Value,
+) -> Result<PageStorage, StorageError> {
+    let url = view.url().map_err(|_| StorageError::Unavailable)?;
     if url.origin().ascii_serialization() != origin {
-        return Err("Website navigated during sync".into());
+        return Err(StorageError::Unavailable);
     }
-    // Verify the real store without the about:blank-only cookie-import guard.
-    // WebView2 verifies its native profile inside evaluate_storage below.
-    #[cfg(target_os = "macos")]
+    // Verify the real store, never just what the view says about itself.
     super::super::cookie_store::verify_storage_profile(view, physical)
         .await
-        .map_err(|_| PROFILE_UNVERIFIED)?;
-    request["scope"] = super::super::signin_scope::page_scope();
-    let request = serde_json::to_string(&request).map_err(|_| "Invalid website storage request")?;
-    let script = SCRIPT.replace("__MISTY_STORAGE_REQUEST__", &request);
-    #[cfg(target_os = "macos")]
+        .map_err(|_| StorageError::Profile)?;
+    // A JSON string parsed in the page: as object source, a `__proto__` key would be lost.
+    let request = serde_json::to_string(&request).map_err(|_| StorageError::Unavailable)?;
+    let request = serde_json::to_string(&request).map_err(|_| StorageError::Unavailable)?;
+    let script = SCRIPT.replacen("__MISTY_STORAGE_REQUEST__", &request, 1);
     let raw =
-        super::super::super::browser_macos::evaluate_browser_async_javascript(view.clone(), script)
+        crate::infra::browser_content_world::evaluate_in_content_world(view.clone(), WORLD, script)
             .await
-            .map_err(|_| "This website's storage could not be transferred")?;
-    #[cfg(windows)]
-    let raw = super::super::cookie_store::evaluate_storage(view, physical, script)
-        .await
-        .map_err(|error| match error {
-            super::super::cookie_store::CookieStoreError::Profile => PROFILE_UNVERIFIED,
-            _ => "This website's storage could not be transferred",
-        })?;
+            .map_err(|_| StorageError::Unavailable)?;
     let raw = zeroize::Zeroizing::new(raw);
-    if raw.len() > 8 << 20 {
-        return Err("Website storage exceeds the sync limit".into());
+    if raw.len() > MAX_ANSWER {
+        return Err(StorageError::Unavailable);
     }
-    let value: Value = serde_json::from_str(&raw).map_err(|_| "Invalid website storage")?;
-    if value["origin"].as_str() != Some(origin) {
-        return Err("Website changed origin during sync".into());
+    let answer: PageStorage = serde_json::from_str(&raw).map_err(|_| StorageError::Unavailable)?;
+    if answer.origin != origin {
+        return Err(StorageError::Unavailable);
     }
-    Ok(value)
+    Ok(answer)
+}
+
+/// Whether an inert origin document has finished opening. The title is the DOM's, so Misty's
+/// world can read what the page's world wrote.
+pub(super) async fn ready(view: &Webview, origin: &str) -> bool {
+    let script = format!(
+        "return location.origin === {} && document.title === 'Misty storage' ? 'ready' : '';",
+        serde_json::to_string(origin).unwrap_or_default()
+    );
+    crate::infra::browser_content_world::evaluate_in_content_world(view.clone(), WORLD, script)
+        .await
+        .is_ok_and(|answer| answer == "ready")
 }

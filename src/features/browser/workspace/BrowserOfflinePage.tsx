@@ -30,7 +30,7 @@ export function BrowserOfflinePage({ url, onRetry, onGoHome }: BrowserOfflinePag
         <WifiOff className="mb-4 size-6 text-cream-muted" aria-hidden="true" />
         <h1 className="mb-1.5 text-base font-semibold">Cannot connect to the internet</h1>
         <p className="mb-5 text-sm leading-5 text-cream-muted">
-          Misty could not load this page because your device appears to be offline. Check your
+          Misty could not load this page because your computer appears to be offline. Check your
           network connection and try again.
         </p>
 

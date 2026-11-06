@@ -1,6 +1,6 @@
 import { cn } from "@/shared/ui";
 import { VenetianMask } from "lucide-react";
-import { isIncognitoWindow } from "@/features/workspace/spaceWindow";
+import { isIncognitoWindow } from "@/features/workspace/profileWindow";
 
 /** Marks beside the address: a private window's tab, and a tab scoped to Misty's work. */
 export function BrowserTabBadges(props: { agentOwned: boolean }) {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   isSetupKey,
   parseServerAddress,
@@ -29,7 +29,48 @@ describe("server addresses", () => {
     });
   });
 
-  it("allows plain http only on this computer", () => {
+  describe("in a release build", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("takes https domains", () => {
+      vi.stubEnv("DEV", false);
+      expect(parseServerAddress("misty.example.com")).toEqual({
+        origin: "https://misty.example.com",
+        apiBase: "https://misty.example.com/v1",
+      });
+      expect(parseServerAddress("https://misty.example.org:8443")).not.toHaveProperty("error");
+    });
+
+    it("refuses plain http, IP addresses and this computer", () => {
+      vi.stubEnv("DEV", false);
+      for (const input of [
+        "http://misty.example.org",
+        "http://127.0.0.1:8081",
+        "http://localhost:8081",
+        "http://[::1]:8081",
+        "localhost:8081",
+        "https://localhost",
+        "https://localhost.",
+        "https://app.localhost",
+        "https://127.0.0.1:8443",
+        "https://192.168.1.20",
+        "https://[::1]",
+        "https://misty",
+      ]) {
+        expect(parseServerAddress(input)).toHaveProperty("error");
+      }
+    });
+
+    it("refuses setup links to this computer", () => {
+      vi.stubEnv("DEV", false);
+      expect(parseSetupLink(`http://127.0.0.1:8081/setup#key=${key}`)).toBeNull();
+      expect(parseSetupLink(`https://mistysys.com/setup#server=localhost&key=${key}`)).toBeNull();
+      expect(parseSetupDeepLink(`misty://setup?server=localhost:8081&key=${key}`)).toBeNull();
+      expect(parseSetupDeepLink(`misty://setup?server=api.mistysys.com&key=${key}`)).not.toBeNull();
+    });
+  });
+
+  it("allows plain http only on this computer in development", () => {
     expect(parseServerAddress("http://127.0.0.1:8081")).toEqual({
       origin: "http://127.0.0.1:8081",
       apiBase: "http://127.0.0.1:8081/v1",

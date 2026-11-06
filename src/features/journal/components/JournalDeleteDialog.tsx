@@ -7,6 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  ErrorNotification,
 } from "@/shared/ui";
 import { useEffect, useState } from "react";
 
@@ -58,11 +59,7 @@ export function JournalDeleteDialog(props: {
             undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {error ? (
-          <p className="m-0 text-sm text-notification-red" role="alert">
-            {error}
-          </p>
-        ) : null}
+        <ErrorNotification message={error} onDismiss={() => setError(null)} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction

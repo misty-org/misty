@@ -174,4 +174,4 @@ interface NotesStoreActions {
   deleteNote: (noteId: string) => Promise<void>;
 }
 
-export type NotesStore = NotesStoreState & NotesStoreActions;
+type NotesStore = NotesStoreState & NotesStoreActions;

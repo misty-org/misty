@@ -26,7 +26,7 @@ import {
   viewActive,
 } from "./browserWebviewPlacement";
 import type { BrowserTheme } from "@/features/webviews/types";
-import { useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
+import { mayPreload, useWorkspaceStore, type WorkspaceView } from "@/features/workspace";
 
 interface BrowserGeometryInput {
   hostRef: RefObject<HTMLDivElement | null>;
@@ -59,10 +59,12 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     const macNativeLiveResize = input.nativeLiveResize && isMacNativeRuntime();
 
     // A tab in the panel that has not been shown yet loads its page in the background, so
-    // clicking it shows the page at once instead of loading it then.
+    // clicking it shows the page at once instead of loading it then. For a tab from another
+    // computer, `tabPreload` decides when.
     let prewarmQueued = false;
     const prewarm = () => {
       if (prewarmQueued || isAuthPath(window.location.pathname)) return;
+      if (!mayPreload(tabId)) return;
       prewarmQueued = true;
       queueBrowserPrewarm(() => {
         const current = latest.current;
@@ -91,6 +93,10 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
       // While the chrome slides to a new edge the page holds still, rather than chasing every
       // frame of the motion through native calls. The layout's end re-measures every page.
       if (isBrowserLayoutMoving()) return;
+      // Scroll/theme/recovery events can also schedule a frame during a drag.
+      // Let AppKit keep sizing the visible child until the window settles, and
+      // do not force a layout just to measure a size nothing will use.
+      if (macNativeLiveResize && windowResizeActive) return;
       const current = latest.current;
       if (current.offline) {
         if (!hiddenForInvalidBounds) {
@@ -111,9 +117,6 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
         return;
       }
       hiddenForInvalidBounds = false;
-      // Scroll/theme/recovery events can also schedule a frame during a drag.
-      // Let AppKit keep sizing the visible child until the window settles.
-      if (macNativeLiveResize && windowResizeActive) return;
       void syncBrowserWebview({
         tab: current.tab,
         url: current.url,
@@ -204,14 +207,18 @@ export function useBrowserWebviewGeometry(input: BrowserGeometryInput): void {
     });
     window.addEventListener(browserRuntimeResumeEvent, schedule);
     window.addEventListener(appZoomChangedEvent, schedule);
-    // The chrome around rounded corners changes color with the theme and the Space.
+    // The chrome around rounded corners changes color with the theme and the profile.
     window.addEventListener(appThemeChangedEvent, schedule);
     window.addEventListener(windowChromeChangedEvent, schedule);
     window.visualViewport?.addEventListener("resize", observeWindowResize);
     window.visualViewport?.addEventListener("scroll", schedule);
     document.addEventListener("visibilitychange", schedule);
     schedule();
-    const recoverLayout = () => requestBrowserWebviewLayout(effectTab);
+    const recoverLayout = () => {
+      // Panes re-position on every step of a window drag; its settle re-measures once.
+      if (macNativeLiveResize && windowResizeActive) return;
+      requestBrowserWebviewLayout(effectTab);
+    };
     window.addEventListener("misty:workspace-geometry-changed", recoverLayout);
     // A page that already exists only needs re-measuring while the layout
     // settles; forcing a native reconcile each time re-clips and re-stacks it,

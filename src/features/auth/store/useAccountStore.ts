@@ -1,16 +1,15 @@
 import { clearApiCache } from "@/api/cache/api-cache";
 import { captureAccountCookies, forgetAccountCookies } from "@/api/client/cookie-session";
 import { accountApi, AccountApiError, isAccountUnauthorizedError } from "@/api/account/api";
-import {
-  deriveLoginCredential,
-  isCredentialEmail,
-  markCredentialAccount,
-  passwordProblem,
-  unmarkCredentialAccount,
-} from "./accountCredential";
-import type { AccountAuthUser, AccountMeResponse, LoginResponse } from "@/api/account/types";
-import { markPasswordPending } from "./pendingPassword";
+import type {
+  AccountAuthUser,
+  AccountMeResponse,
+  LoginResponse,
+  SetupKeyResponse,
+} from "@/api/account/types";
+import { ConfirmEmailSent } from "./confirmEmailSent";
 import { rememberPasswordReset } from "./passwordReset";
+import { passwordProblem } from "./passwordRules";
 import {
   beginGoogleSignInCodeWait,
   deliveredGoogleSignInCode,
@@ -19,7 +18,7 @@ import {
 } from "../googleSignInCode";
 import { saveAccountAuthToken } from "./useAuthTokenStore";
 
-export type { AccountAuthUser, AccountMeResponse } from "@/api/account/types";
+;
 export { isAccountUnauthorizedError } from "@/api/account/api";
 
 function authenticatedUser(data: LoginResponse, operation: string): AccountAuthUser {
@@ -40,54 +39,22 @@ async function persistLogin(data: LoginResponse, operation: string): Promise<Acc
   return user;
 }
 
-/**
- * The password did not open an account this device knows signs in with a derived
- * credential. The password is not sent a second time in plain form: a typo
- * would reach the server, and so would the real password if the server lied.
- * The person can ask for that explicitly (`legacy`) after a reset by email.
- */
-export class CredentialSignInRefused extends AccountApiError {
-  name = "CredentialSignInRefused";
-  constructor() {
-    super("That password did not work.", 401);
-  }
-}
-
-export async function accountSignIn(
-  email: string,
-  password: string,
-  options: { legacy?: boolean } = {},
-): Promise<AccountAuthUser> {
-  // The desktop app sends a credential derived on the device, not the password.
-  const credential = options.legacy ? null : await deriveLoginCredential(email, password);
-  if (credential) {
-    try {
-      const user = await persistLogin(await accountApi.signIn(email, credential), "Sign-in");
-      markCredentialAccount(user.id, email);
-      return user;
-    } catch (error) {
-      if (!isAccountUnauthorizedError(error)) throw error;
-      if (isCredentialEmail(email)) throw new CredentialSignInRefused();
-    }
-  }
-  // An account made before that, or one whose password was reset by email,
-  // holds the password itself: the server has seen it, so it must not seed keys.
-  const user = await persistLogin(await accountApi.signIn(email, password), "Sign-in");
-  unmarkCredentialAccount(user.id);
-  return user;
+export async function accountSignIn(email: string, password: string): Promise<AccountAuthUser> {
+  return persistLogin(await accountApi.signIn(email, password), "Sign-in");
 }
 
 /**
  * Signs in with a setup key from a sign-in link, which the server takes once in place of a
- * password (`POST /setup-keys/redeem`, answered like `/login`). An account with no derived
- * password yet is marked so the wizard asks for one, and sync waits for it (`pendingPassword.ts`).
- * The answer's reset token lets the wizard choose a new password for an account that has one:
- * that is how a forgotten password is reset (`passwordReset.ts`).
+ * password (`POST /setup-keys/redeem`, answered like `/login`). The answer's reset token lets the
+ * wizard choose a new password: that is how a forgotten password is reset (`passwordReset.ts`).
  */
 export async function accountRedeemSetupKey(setupKey: string): Promise<AccountAuthUser> {
-  const data = await accountApi.redeemSetupKey(setupKey.trim());
+  return accountFinishSetupKey(await accountApi.redeemSetupKey(setupKey.trim()));
+}
+
+/** Takes the answer to a setup key, redeemed here or just before moving to its server. */
+export async function accountFinishSetupKey(data: SetupKeyResponse): Promise<AccountAuthUser> {
   const user = await persistLogin(data, "Setup key");
-  if (!data.credential_account) markPasswordPending(user.id, user.email);
   rememberPasswordReset(user.id, data.password_reset_token);
   return user;
 }
@@ -146,8 +113,8 @@ async function googleFlow(
   }
 }
 
-/** Ends the account's server session and forgets its saved cookies, so the
- * next use of this account requires its password. Local cookies are forgotten
+/** Ends the account's server session and forgets its saved tokens, so the
+ * next use of this account requires its password. Local tokens are forgotten
  * even when the server cannot be reached; that failure is still reported. */
 export async function accountLogout(accountId: string): Promise<void> {
   try {
@@ -165,22 +132,48 @@ export async function accountRegister(
   email: string,
   password: string,
 ): Promise<AccountAuthUser> {
-  // The password protects the sync vault, so its rules are enforced here: the
-  // server only ever sees a value derived from it.
-  const credential = await deriveLoginCredential(email, password);
-  if (credential) {
-    const problem = await passwordProblem(email, password);
-    if (problem) throw new Error(problem);
+  const problem = passwordProblem(password);
+  if (problem) throw new Error(problem);
+  const answer = await accountApi.register({ username, email, password });
+  if ("status" in answer) throw new ConfirmEmailSent();
+  return persistLogin(answer, "Registration");
+}
+
+const confirmationCheckMs = 6000;
+
+function confirmationCheckDelay(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, confirmationCheckMs);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
+ * Resolves once the link in a sign-up's confirmation email has made its account, so the form
+ * can sign in. A refused password ends the wait: the sign-up expired or was replaced. Anything
+ * else, such as being offline, only delays the next check.
+ */
+export async function accountWaitForConfirmation(
+  email: string,
+  password: string,
+  signal: AbortSignal,
+): Promise<void> {
+  for (;;) {
+    await confirmationCheckDelay(signal);
+    try {
+      const { status } = await accountApi.confirmationStatus(email, password);
+      if (status === "confirmed") return;
+    } catch (error) {
+      if (isAccountUnauthorizedError(error)) throw error;
+    }
   }
-  const body = {
-    username,
-    email,
-    password: credential ?? password,
-    credential: Boolean(credential),
-  };
-  const user = await persistLogin(await accountApi.register(body), "Registration");
-  if (credential) markCredentialAccount(user.id, email);
-  return user;
 }
 
 export function accountFetchMe(): Promise<AccountMeResponse> {

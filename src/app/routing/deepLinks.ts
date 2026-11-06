@@ -2,12 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { deliverGoogleSignInCode } from "@/features/auth/googleSignInCode";
 import { openSetupDeepLink } from "@/features/auth/setupLinks";
 import { openExternalLink } from "@/features/workspace/externalLinks";
-import { isLinkTargetWindow } from "@/features/workspace/spaceWindow";
+import { isLinkTargetWindow } from "@/features/workspace/profileWindow";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-/** Native routes web links to the Space that claims their site, then says so here. */
-const spaceLinksEvent = "misty://space-links";
+/** Native routes web links to the profile that claims their site, then says so here. */
+const profileLinksEvent = "misty://profile-links";
 const mistyDeepLinkScheme = "misty:";
 const ignoredMistyHosts = new Set(["recent", "starred", "trash"]);
 export function installMistyDeepLinkHandler(
@@ -22,7 +22,7 @@ export function installMistyDeepLinkHandler(
   let lastHandledAt = 0;
   const currentUrlPoll: number | null = null;
   // Web links from other apps (Misty as the default browser) are routed natively to
-  // the Space that claims their site, else to the window used last; each window
+  // the profile that claims their site, else to the window used last; each window
   // takes its own, one tab each.
   const takeWebLinks = async () => {
     if (!active) return;
@@ -40,7 +40,7 @@ export function installMistyDeepLinkHandler(
     if (!active || !urls) return;
     const mistyUrls = urls.filter((url) => !isWebUrl(url));
     if (!mistyUrls.length) return;
-    // Every Space window hears these; only the one used last opens them.
+    // Every window hears these; only the one used last opens them.
     if (!(await isLinkTargetWindow())) return;
     if (!active) return;
     const signature = mistyUrls.join("\n");
@@ -70,7 +70,7 @@ export function installMistyDeepLinkHandler(
     try {
       if (!hasTauriInternals()) return;
       await handleCurrentUrls();
-      unlistenLinks = await listen(spaceLinksEvent, () => void takeWebLinks());
+      unlistenLinks = await listen(profileLinksEvent, () => void takeWebLinks());
       await takeWebLinks();
       unlisten = await onOpenUrl((urls) => void handleUrls(urls, "event"));
     } catch {}
@@ -108,7 +108,7 @@ export function routeForMistyDeepLink(
     return resolveAuthRoute();
   }
   if (first === "setup") {
-    // The website's setup page: the wizard opens on Misty Cloud, filled in.
+    // The website's setup page: the wizard opens on Misty Pro, filled in.
     openSetupDeepLink(rawUrl);
     return null;
   }

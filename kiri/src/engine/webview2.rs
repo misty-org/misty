@@ -1,10 +1,12 @@
-//! WebView2 on Windows: the PermissionRequested event. WebView2 has no call to
-//! stop capture, so the page script keeps the streams it handed out and the
-//! host asks it to end them. Whether a page arrived wholly over secure
+//! WebView2 on Windows: the PermissionRequested event, for camera, microphone
+//! and location. WebView2 has no call to stop capture, so the page script
+//! keeps the streams it handed out and the host asks it to end them. Whether a page arrived wholly over secure
 //! connections comes from Chromium's DevTools Security domain, which WebView2
 //! has no property for.
 
-use super::{media_verdict, MediaRequest, PageFacts, Reply, StoreScope};
+use super::{
+    location_verdict, media_verdict, LocationRequest, MediaRequest, PageFacts, Reply, StoreScope,
+};
 use crate::permissions::{canonical_origin, MediaKind, Verdict};
 use std::{cell::RefCell, thread::LocalKey};
 use tauri::Webview;
@@ -12,9 +14,9 @@ use webview2_com::{
     CallDevToolsProtocolMethodCompletedHandler, DevToolsProtocolEventReceivedEventHandler,
     Microsoft::Web::WebView2::Win32::{
         ICoreWebView2, ICoreWebView2PermissionRequestedEventArgs, COREWEBVIEW2_PERMISSION_KIND,
-        COREWEBVIEW2_PERMISSION_KIND_CAMERA, COREWEBVIEW2_PERMISSION_KIND_MICROPHONE,
-        COREWEBVIEW2_PERMISSION_STATE_ALLOW, COREWEBVIEW2_PERMISSION_STATE_DEFAULT,
-        COREWEBVIEW2_PERMISSION_STATE_DENY,
+        COREWEBVIEW2_PERMISSION_KIND_CAMERA, COREWEBVIEW2_PERMISSION_KIND_GEOLOCATION,
+        COREWEBVIEW2_PERMISSION_KIND_MICROPHONE, COREWEBVIEW2_PERMISSION_STATE_ALLOW,
+        COREWEBVIEW2_PERMISSION_STATE_DEFAULT, COREWEBVIEW2_PERMISSION_STATE_DENY,
     },
     PermissionRequestedEventHandler,
 };
@@ -128,22 +130,31 @@ fn decide(
     unsafe {
         let mut kind = COREWEBVIEW2_PERMISSION_KIND::default();
         args.PermissionKind(&mut kind)?;
-        let kind = if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA {
-            MediaKind::Camera
+        let top_origin = origin(sender.and_then(|view| take_string(|p| view.Source(p))));
+        let requester_origin = origin(take_string(|p| args.Uri(p)));
+        let media = |kind| MediaRequest {
+            webview: label.to_owned(),
+            top_origin: top_origin.clone(),
+            requester_origin: requester_origin.clone(),
+            kind: Some(kind),
+            store: None,
+        };
+        let verdict = if kind == COREWEBVIEW2_PERMISSION_KIND_CAMERA {
+            media_verdict(&media(MediaKind::Camera))
         } else if kind == COREWEBVIEW2_PERMISSION_KIND_MICROPHONE {
-            MediaKind::Microphone
+            media_verdict(&media(MediaKind::Microphone))
+        } else if kind == COREWEBVIEW2_PERMISSION_KIND_GEOLOCATION {
+            location_verdict(&LocationRequest {
+                webview: label.to_owned(),
+                top_origin: top_origin.clone(),
+                requester_origin: requester_origin.clone(),
+                store: None,
+            })
         } else {
             // Other permissions keep WebView2's own handling.
             return Ok(());
         };
-        let request = MediaRequest {
-            webview: label.to_owned(),
-            top_origin: origin(sender.and_then(|view| take_string(|p| view.Source(p)))),
-            requester_origin: origin(take_string(|p| args.Uri(p))),
-            kind: Some(kind),
-            store: None,
-        };
-        args.SetState(match media_verdict(&request) {
+        args.SetState(match verdict {
             Verdict::Prompt => COREWEBVIEW2_PERMISSION_STATE_DEFAULT,
             Verdict::Grant => COREWEBVIEW2_PERMISSION_STATE_ALLOW,
             Verdict::Deny => COREWEBVIEW2_PERMISSION_STATE_DENY,
@@ -151,7 +162,7 @@ fn decide(
     }
 }
 
-pub(super) fn install_media_permissions(webview: &Webview) -> Result<(), String> {
+pub(super) fn install_site_permissions(webview: &Webview) -> Result<(), String> {
     let label = webview.label().to_owned();
     webview
         .with_webview(move |platform| unsafe {

@@ -1,9 +1,8 @@
-import { Button, Input, cn } from "@/shared/ui";
-import { ChevronLeft } from "lucide-react";
+import { BackButton, Button, ErrorNotification, Input, cn } from "@/shared/ui";
 import { useEffect, useState } from "react";
 import type { SpaceDrawing } from "../types";
 
-export interface DrawingHeaderProps {
+interface DrawingHeaderProps {
   reportError?: (input: { title: string; error: unknown; scope: string }) => void;
   drawing: SpaceDrawing;
   onBack?: () => void;
@@ -52,17 +51,7 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
   return (
     <header className="flex min-h-11 shrink-0 items-center gap-2 border-b border-charcoal-border bg-charcoal-bg py-1.5 pl-1 pr-3">
       {onBack ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 shrink-0 gap-1.5 px-2 text-cream-muted hover:text-cream-bright"
-          onClick={onBack}
-          aria-label="Back to drawings"
-        >
-          <ChevronLeft size={16} />
-          <span className="text-xs font-medium">Drawings</span>
-        </Button>
+        <BackButton onClick={onBack} aria-label="Back to drawings" />
       ) : (
         <span className="shrink-0 text-sm font-semibold text-cream-muted">Journal -</span>
       )}
@@ -111,11 +100,10 @@ export function DrawingHeader({ reportError, drawing, onBack, onRename }: Drawin
           </Button>
         ) : null}
       </div>
-      {saveFailed ? (
-        <span role="alert" className="text-xs text-cream-muted">
-          Title not saved. Press Enter in the title to retry.
-        </span>
-      ) : null}
+      <ErrorNotification
+        message={saveFailed ? "Title not saved. Press Enter in the title to retry." : ""}
+        onDismiss={() => setSaveFailed(false)}
+      />
     </header>
   );
 }

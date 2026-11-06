@@ -5,8 +5,7 @@ All four phases are written in the `claude/friendly-thompson-857543` worktree, n
 tested or committed (see Build status). Parity item C16 in
 [docs/competitors.md](../competitors.md). Mockups:
 [mockups/no-account.html](mockups/no-account.html) (seven states: first run, signed out, the sign-in sheet, Settings ›
-Sync, merging on sync, signed in, signing out). It builds on
-[Spaces as profiles](../spaces/as-profiles.md) and [Sync](../sync/README.md), and it
+Sync, merging on sync, signed in, signing out). It builds on [Sync](../sync/README.md), and it
 sits beside C17 (open-sourcing the desktop app), which keeps the sync crate open. C18
 (importing Arc's Spaces) was dropped on 2026-10-23.
 
@@ -16,7 +15,7 @@ Misty opens straight into a full browser. Tabs, groups, favorites, bookmarks, hi
 downloads, saved passwords, extensions, search shortcuts, site permissions, browser import and
 incognito all work with no account, and nothing is sent to Misty. An account is asked for only
 when someone turns on sync, creates or joins a Space, or uses an agent. When they sign in, the
-browsing they already have becomes their account's personal Space on this device, with nothing
+browsing they already have stays where it is in this computer's first profile, with nothing
 reloaded and no tab closed.
 
 The people Misty wants from Zen, Helium and Brave reject browsers that need an account, and
@@ -28,53 +27,69 @@ without an account comes first for both.
 ### First launch
 
 The welcome screen (`WelcomePage`) shows once, on first launch, in the small fixed window it
-uses today. **Start browsing** is the primary button and **Sign in** sits beside it, with one
-muted line: "No account needed. Sign in later to sync, share Spaces or use agents." Create
-account moves into the sign-in sheet. Start browsing runs first-run setup (import from your
-browser, which side the tabs sit on), then the window grows to its normal size. Every later
-launch opens the browser directly, signed in or not.
+uses today. **Start browsing** is the primary button and **Sign in** sits beside it. **Sign in**
+goes to the sign-in page, which first shows **Choose a server** if this device has none (a device
+starts with no server): Misty Pro or Self-hosted. A sign-in link isn't entered here; it opens the
+app through `misty://setup`. A development build asks too, with its dev server's address filled
+in under Self-hosted. The wizard only comes after signing in: a sheet with the
+model step, this computer's import and extensions, then which side the tabs sit on. If this device
+has already run it, signing in asks "Run setup again?" instead, with **Continue**. **Start
+browsing** opens the browser straight away and, on first run only, asks which side the tabs sit on.
+Backing out of sign-in on a later run shows the welcome again, and Start browsing then asks nothing.
+Every later launch opens the browser directly, signed in or not. Help › Run setup again opens the same steps in the sheet.
 
 ### A signed-out window
 
 The same window as today, minus what needs an account:
 
-- **No Space bar.** Everything in it needs an account: the Spaces menu, Home, Chat, People,
-  Memory and the Agents button. The bar is not drawn and the page takes its height.
+- **A Space bar that asks to sign in.** Everything in it needs an account: Home, Chat, Agents,
+  Library, Memory and New. The bar still shows them, so people can see what is there, and pressing
+  any of them goes to the welcome page. It has no Space menu or People, since there is no Space yet.
+  Its auto-hide button still works.
 - **No Space color.** A signed-out window shows no Space, so the window chrome keeps the plain
   workspace color.
-- **The account row reads Sign in.** Below the sidebar card, a hollow person glyph and "Sign
-  in" open the sign-in sheet; Settings stays beside it. The Sync button is not shown until
-  there is an account.
+- **The account row reads Sign in.** Below the sidebar card, "Sign in" goes to the welcome page;
+  Settings stays beside it. The Sync button is not shown until there is an account.
 - **No AI chrome.** No Agents button, no composer chips, no selection menu on pages. The
-  cursor companion, dictation, capture, recall and screen memory don't mount (they already
+  cursor companion, dictation, capture and recall don't mount (they already
   mount only with an account).
 
 ### Where sign-in is asked
 
-One sheet, opened over the browsing window, for every reason. Its title and one line say what
-asked, and **Not now** returns to the page. It reuses the sign-in form that exists today
-(`AuthCard`, `GoogleSignInButton`) with Create account as a link inside it. There is no
-forgot-password form: a server sends no email, so the form says to ask whoever runs the server
-for a sign-in link (on Misty Cloud, `https://mistysys.com/sign-in`).
+Everything goes to the welcome page, in the small signed-out window, with **Sign in** and **Create
+account**; signing in returns to the page that asked. The sign-in pages have no back button: the
+logo in the bar goes to the welcome page, and someone adding an account gets back from there. An expired
+session skips straight to the sign-in page with its email filled in. Popups don't explain what an
+account is for: people can explore. There is no forgot-password form: a sign-in link comes from whoever runs the server, so
+the form says to ask the server's owner for a sign-in link or get one at
+`https://mistysys.com/sign-in`.
 
-| What the person did | Where | Sheet title |
-| --- | --- | --- |
-| Pressed Sign in | Account row, first-run welcome, a new Misty › Sign In… menu item | Sign in to Misty |
-| Turned on sync | Settings › Sync, Settings › Devices | Sign in to turn on sync |
-| Asked for a new Space | A new Spaces › New Space… menu item (beside Open Space…), the account row's menu | Sign in to create a Space |
-| Opened a Space invite link | `misty://invite/…` or the web invite page | Sign in to join a Space |
-| Used an agent shortcut | Companion and dictation hotkeys | Sign in to use agents |
+Google sign-in doesn't run in a webview of ours: Google's policy rules out embedded webviews, WKWebView
+by name, so a small window of our own was declined on November 3, 2026. It opens in the person's
+default browser, and the page there hands the code back through a `misty://` link or for typing.
+While Misty is the default browser that would land in one of its own tabs, so on macOS it uses the
+system's web authentication session instead (`src-tauri/src/infra/google_sign_in_sheet.rs`), which
+catches the link and closes. macOS asks permission first and opens another browser's window, Safari
+unless that browser supports these sessions, and Misty can't size or place it.
 
-The sheet never appears on its own: no timed prompts, no banners, no badge on the account row.
+| What the person did | Where |
+| --- | --- |
+| Pressed Sign in | Account row, a new Misty › Sign In… menu item |
+| Turned on sync | Settings › Sync, Settings › Devices |
+| Pressed a control in the Space bar, or asked for a new Space | The Space bar, a new Spaces › New Space… menu item (beside Open Space…), the account row's menu |
+| Opened a Space invite link | `misty://invite/…` or the web invite page |
+| Used an agent shortcut | Companion and dictation hotkeys |
+
+Nothing asks on its own: no timed prompts, no banners, no badge on the account row.
 
 ### What works without an account
 
 | Works signed out | Needs an account |
 | --- | --- |
-| Tabs, tab groups, favorites, pinned tabs, focus mode | Sync and the device list |
-| Bookmarks, history, downloads | Spaces beyond the personal one, members, invites |
+| Tabs, tab groups, favorites, pinned tabs, focus mode | Sync and the signed-in sessions list |
+| Bookmarks, history, downloads | Spaces, members, invites |
 | Saved passwords and autofill | Space Home, Chat, People, Memory and the memory tree |
-| Extensions from the Chrome and Firefox stores | Agents, the companion, dictation, capture, recall, screen memory |
+| Extensions from the Chrome and Firefox stores | Agents, the companion, dictation, capture, recall |
 | Search engines and `!bangs`, site permissions | Cloud clipboard, connected devices |
 | Browser import (bookmarks, history, settings, sign-ins, extensions) | Journal and Library items kept on your Misty server |
 | Incognito windows, night light, every device setting | |
@@ -82,37 +97,34 @@ The sheet never appears on its own: no timed prompts, no banners, no badge on th
 
 ### Signing in
 
-- **A new account** takes this device's browsing as its personal Space. Nothing to confirm.
-- **An existing account that has never synced** does the same.
-- **An existing account that already syncs from other devices** keeps this device's browsing
-  on the device until sync turns on (next section).
-
-Either way the window stays open: the Space bar slides in, the window takes the personal
-Space's color, and the account row shows the person with Sync beside Settings. A short notice
-says "Signed in. Your browsing on this Mac is now your personal Space." with **Turn on sync**.
+Signing in changes nothing about the browsing on this computer: it stays in the first profile, on
+the store it already uses, so no site signs out. The window stays open, the Space bar goes live and
+the account row shows the person with Sync beside Settings.
 
 ### Turning on sync
 
-For a new account, this device's data seeds the personal Space's vault. For an account that
-already has synced data, one sheet asks first, with counts per kind: "Add this Mac's browsing
-to your account?" **Merge and turn on sync** or **Not now**. Merging skips duplicates
-(bookmarks by URL within a folder, passwords by site and username with the newest kept,
-history visits by URL and time) and adds the rest. Tabs never merge: every device keeps its
-own workspace in the sync tree, so this device's tabs simply appear beside the others.
+Once, right after the first sign-in, one screen offers to create the vault, with **Not now**. Skipping
+keeps everything on this computer and Misty never asks again; Settings › Sync can start it later.
+Another signed-in session asks for the vault password once, which is the only way in.
+
+Joining merges silently into the vault's first profile, with nothing to confirm: everything local
+uploads, and records merge by newest edit ([Sync](../sync/README.md#how-it-works)). Local data stays
+on the computer whatever happens to the vault.
 
 ### Signing out
 
-Signing out no longer ends at the welcome screen. Sync, Spaces and agents stop on this device;
-other Spaces' windows close; the window keeps browsing with the personal Space's tabs,
-bookmarks, passwords, history and extensions, which belong to no account again. The sheet has
-one checkbox, off by default: "Also remove my browsing data from this Mac", which erases them
-and the website sign-ins here (the account keeps its synced copy).
+Signing out no longer ends at the welcome screen. Sync, Spaces and agents stop on this computer and
+the vault key is forgotten; the window keeps browsing with its tabs, bookmarks, passwords, history
+and extensions, which stay readable by anyone using this computer. Signing back in asks for the vault
+password once. The sheet has one checkbox, off by default: "Also remove my browsing data from this
+Mac", which erases them and the website sign-ins here (a synced copy stays in the vault).
 
 ### When the session expires
 
 A session the server rejects no longer signs the person out to the welcome screen. Browsing
-carries on; sync pauses and agents stop, and the account row shows "Sign in again" with the
-same sheet. Today `useInvalidSessionHandling` sends the window to `/welcome`.
+carries on; sync pauses and agents stop. The account's name and picture leave the account row and
+the Space bar, which look signed out, and a notice says to sign in. Nothing on the computer is
+removed, and signing in brings the account back.
 
 ### Settings
 
@@ -132,7 +144,7 @@ return.
 
 ## How it works
 
-### The local profile
+### The local scope
 
 Everything Misty keeps per account today is keyed by `(deployment, account id)`. Signed out,
 those same paths take a fixed local identity, `deployment = "local"` and `account = "local"`,
@@ -142,55 +154,41 @@ so the existing code paths run unchanged:
   under the local identity. `browser_recovery_open` stops requiring a signed-in API client for
   it; only a real account checks the session.
 - **Extensions** install under `extensions/local/personal/packages`.
-- **First-run setup** already records completion under a `guest` key (`useSetupStore`).
+- **First-run setup** is about the device: it runs once, inside the welcome's sheet, signed in or not (`useSetupStore` keeps only `welcomed`).
 - **History and downloads** are already account-free in `misty.db`.
-- **Website data**: the personal Space already uses the device's `default` WebKit/WebView2
-  store, so sites stay signed in across signing in and out.
-- **The window's Space** is already `personal` with no Space id until Spaces load
-  (`spaceWindow.ts`); signed out it simply never gets a Space record.
+- **Website data**: the first profile adopts the store already in use (`~/.misty/profiles.json`),
+  so sites stay signed in across signing in and out.
+- **The window's Space** has no Space id until Spaces load (`spaceWindow.ts`); signed out it simply
+  never gets a Space record.
 
-### The local vault
+### Local records
 
-Saved passwords live only in the personal Space's vault, and a vault opens only after
-sign-in and a sync unlock, so signed out (or signed in without sync) they could not be
-saved at all ("Unlock your sync vault to use saved passwords.").
-
-Every device gets a local vault on first use: the same encrypted store and records as a
-synced vault, with a root made on the device and kept in Misty's credential store (the
-keychain-held master key), and a worker that never connects (`local_vault.rs`, and
-`Worker::local` in the sync crate). Passwords use it whenever no synced personal vault
-exists. It is a local mode of the existing `crates/browser-sync`, not a second store, so
-turning on sync later connects the same records.
-
-The rest of a Space's data already works without a vault: site permissions, search
-engines and bangs, the downloads list and the extensions list keep this device's own values
-while no synced vault is open, and the personal vault copies them in once when sync turns on
-(`seed_personal_space`).
+Saved passwords, bookmarks, site permissions, search engines and bangs, the downloads list and the
+extensions list are records in each computer's encrypted local store (`LocalStore`,
+`crates/browser-sync/src/local.rs`), which works with no vault and no account. Its key is kept in
+Misty's credential store (the keychain-held master key). Turning on sync later copies those same
+records, so there is no second store and nothing to migrate.
 
 ### Adoption
 
-Signing in from the local profile carries this device's browsing into the account, and
-signing out hands it back. Nothing reloads either way.
+Signing in from the local scope carries this computer's browsing into the account, and signing out
+hands it back. Nothing reloads either way.
 
 1. **The app stays mounted.** `RootLayout` keys its page tree on `outletKey`, which changes
-   only when switching between two accounts, not when signing in from the local profile or
+   only when switching between two accounts, not when signing in from the local scope or
    signing out to it.
 2. **Windows and tabs**: the ones on screen become the account's workspace
    (`adoptAccountWorkspace`, which opens the account's recovery store and saves the live
-   windows into it). A record the account already had on this device is archived first, never
-   lost. The local profile's copy is then removed. Signing out does the reverse into the
-   local profile.
-3. **Saved passwords** stay in the device's local vault while no synced vault exists. When
-   sync turns on they join the account (`browser_passwords_device_merge`): silently for an
-   account with no passwords yet, after one question with a count otherwise. Signing out keeps
-   a copy of the account's passwords in the local vault (`browser_passwords_device_keep`).
-4. **Extensions belong to the device,** as their install list (a device setting) does, so
+   windows into it). A record the account already had on this computer is archived first, never
+   lost. The local scope's copy is then removed. Signing out does the reverse.
+3. **Saved passwords** are records like any other. They stay on this computer until sync turns on,
+   then merge silently with the rest.
+4. **Extensions belong to the computer,** as their install list (a device setting) does, so
    signing in or out leaves them installed and running with nothing to move.
-5. **Setup** done while signed out counts for whoever signs in: it is about the device.
+5. **Setup** done while signed out counts for whoever signs in: it is about the computer.
 
-Removing browsing data on sign-out erases the local vault's passwords, history, downloads,
-website sign-ins and cached files, and the local profile's saved windows; the account keeps its
-synced copy.
+Removing browsing data on sign-out erases this profile's history, downloads, website sign-ins and
+cached files, and the local scope's saved windows; a synced copy stays in the vault.
 
 ## Inventory of code that assumes an account
 
@@ -202,31 +200,30 @@ synced copy.
 | Small sign-in window | `DesktopLayout/useSignedOutWindow.ts` | Auth routes shrink and lock the window and hide the others | First-run welcome only; sign-in becomes a sheet |
 | Shell | `DesktopLayout/index.tsx` | `isAuthRoute` branch; Sync badge and account row take `user?.id` | Account row shows Sign in; Sync hidden signed out |
 | Account row and menu | `DesktopLayout/AccountIsland.tsx`, `ProfileMenu.tsx` | A signed-in person with a menu | Signed-out variant opens the sheet |
-| Space bar | `DesktopLayout/SpaceBar.tsx`, `src/features/spaces/components/spaceRow/` | A Space from the server list (`useWindowSpace`) | Not drawn without an account |
+| Space bar | `DesktopLayout/SpaceBar.tsx`, `src/features/spaces/components/spaceRow/` | A Space from the server list (`useWindowSpace`) | Its controls open the sheet without an account |
 | Window color | `src/features/workspace/windowColors.ts`, `spaceWindow.ts` | The Space record's color | None signed out |
-| First-run setup | `DesktopLayout/useDesktopRouteEffects.ts`, `src/features/setup/FirstRunSetup.tsx` | Starts and shows only with a user id | Runs for the local profile (`guest` key exists) |
+| First-run setup | `src/features/auth/signInSheet/SignInSheet.tsx`, `src/features/setup/SetupSteps.tsx` | A dialog over the browser after the welcome | The last part of the welcome's sheet; never over the browser |
 | Welcome | `src/features/welcome/WelcomePage.tsx` | Sign in and Create account only | Start browsing first; first run only |
 | Sign in and register | `src/features/auth/SignInPage.tsx`, `RegisterPage.tsx`, `components/` | Full-window routes | Content reused in the sheet |
 | Sign-out | `src/features/auth/provider/useDeactivateToChooser.ts`, `useLogout.ts` | Saves or removes the account workspace, navigates to `/welcome` | Reverse adoption, keep browsing |
 | Session expiry | `src/features/auth/provider/useAccountSideEffects.ts` (`useInvalidSessionHandling`), `src/api/client/session` | A dead session signs out to `/welcome` | Notice and Sign in again; keep browsing |
 | Workspace restore | `useNativeWorkspaceRecovery`, `src/features/workspace/nativeWorkspaceRecovery.ts`, `workspaceAccountState.ts` | Restores per account id | Restores per profile id |
 | Recovery store | `src-tauri/src/infra/workspace_recovery.rs` (`browser_recovery_open`) | Calls `account_api`, which needs a signed-in cookie client; folder hashed from deployment and account | Local identity skips the account check |
-| Vault collections | `src-tauri/src/infra/browser/host_messages/passwords.rs` (`vault_handle`); `infra/search/space/vault.rs`, `infra/extensions/space.rs`, `infra/browser_library/space.rs`, `infra/site_settings/permissions/space.rs` (`space_vault`, `store_vault`) | Passwords need an unlocked synced vault; the others fall back to the device's own values | Passwords use the local vault when no synced one exists; the others stay as they are |
-| Vault storage | `src-tauri/src/infra/browser_sync/database.rs`, `space_data.rs`, `crates/browser-sync/src/secure_store.rs`, `worker/run_loop.rs` | Folders and roots keyed by deployment and account; the worker always connects | Local scope; a worker mode with no transport |
+| Records | `src-tauri/src/infra/profile_data/` (`LocalStore`) | Nothing: records work with no vault and no account | None |
 | Extensions | `src-tauri/src/infra/extensions/spaces.rs`, `src/features/extensions/useExtensionsRuntime.ts` | Packages under `extensions/<account>`; runtime keyed by `user?.id ?? ""` | Keyed by the device (`local`), signed in or not |
-| Browser import | `src/features/browser-import/runImport.ts`, `src-tauri/src/infra/browser_import/mod.rs` | Sign-ins go to the vault | Work through the local vault |
+| Browser import | `src/features/browser-import/runImport.ts`, `src-tauri/src/infra/browser_import/mod.rs` | Sign-ins go to the vault | Sign-ins go to the profile's records |
 | Updates | `src/features/updater/UpdateNotices.tsx` | Returns early with no account id, so no update notices | Show them signed out |
 | Tab archive | `src/features/workspace/tabArchive.ts`, `browser/internal/ArchivedTabsList.tsx`, `webviews/useBrowserRuntimeServices.ts` | Archiving and the list need an account id | Use the profile id |
 | Settings pages | `settings/sections/PasswordsSettings.tsx`, `devices/AddThisDevice.tsx`, `MistySection.tsx` | Read `useSyncController(user?.id)` or `user.id` | Local vault for passwords; sign-in rows elsewhere |
 | Deep links | `src/app/routing/navigation.ts`, `SpaceInvitationRedemption` | Invite route works signed out, then asks to sign in in the small window | Invite opens the sheet over the window |
-| Account-only features | `src/features/agents`, `misty`, `journal`, `ai-surface`, `voice`, `recall`, `screen-memory`, `library`, `connected-devices`, `infra/cloud_clipboard` | An account | Unchanged: hidden signed out, or the sheet when invoked |
+| Account-only features | `src/features/agents`, `misty`, `journal`, `ai-surface`, `voice`, `recall`, `library`, `connected-devices`, `infra/cloud_clipboard` | An account | Unchanged: hidden signed out, or the sheet when invoked |
 
 No license check blocks browsing: `allows_use` on the native session is read but gates nothing.
 
 ## Build plan
 
 About four and a half weeks, so it ships by early December, before Arc stops working. Phases
-build in order but release together: nothing ships until phase 2's local vault works
+build in order but release together: nothing ships until phase 2's local records work
 (decision 12).
 
 **Phase 1: browse signed out (about 1 week).** Remove the startup and frame redirects; local
@@ -237,16 +234,12 @@ or Space color without an account; Sign in on the account row; the sign-in sheet
 and tab archiving without an account; session expiry keeps browsing. Done when a fresh install
 browses, quits and reopens with its tabs, and makes no request to Misty's API while signed out.
 
-**Phase 2: the local vault (about 1 week).** A local mode in the existing sync crate: a
-root made on the device, a worker that never connects, and saved passwords (saving, autofill
-and the Passwords list) falling back to it whenever no synced personal vault exists. Site
-permissions, search shortcuts, downloads and extensions already keep the device's own values
-signed out. Done when a password saved signed out autofills after a relaunch.
+**Phase 2: local records (about 1 week).** Saved passwords (saving, autofill and the Passwords
+list) and the rest of a profile's records work with no vault. Done when a password saved signed
+out autofills after a relaunch.
 
 **Phase 3: adoption (about 1 week).** Keep `RootLayout` mounted across sign-in and sign-out;
-the live windows and tabs carried into the account and back; passwords merged into the
-account when sync turns on, with the question for accounts that already have some, and kept
-on the device at sign-out; the sign-out sheet with its remove option. Done when signing in
+the live windows and tabs carried into the account and back; the sign-out sheet with its remove option. Done when signing in
 and out keeps every tab open and every bookmark and password in place.
 
 **Phase 4: entry points and polish (about 1 week).** Misty › Sign In… and Sign Out…, and
@@ -270,21 +263,20 @@ committed. Checked so far:
   doesn't touch (stale size baselines and `ChatSidebar.tsx`); they name only those files. Tests that asserted the old behaviour were updated: the app frame no longer redirects to
   sign-in, an expired session keeps the account and marks it expired, and the Space bar tests
   run signed in.
-- The sync crate's tests all pass, plus a new one (`worker/local_tests.rs`) showing a local
-  vault saves, deletes and reopens records with no server reachable.
 - The app's Rust tests for the command policy, app menu, workspace recovery, sync and
-  passwords pass, including new ones for the password merge rules (`passwords/device.rs`).
+  passwords pass.
 - New component tests cover the sign-in sheet (a title per reason, Not now, Create account
   in the same sheet), the sign-out sheet (keeps data unless removal is checked), the
-  signed-out account row (Sign in, no Sync; Sign in again when expired), the first-run
+  signed-out account row (Sign in, no Sync; the same row and a notice when expired), the first-run
   welcome (Start browsing passes it for good), setup carrying over to an account, and the
   windows on screen moving into the account at sign-in and back at sign-out.
 
 Tried by hand on 2026-10-23 in the desktop app (a separate `c16` dev profile on a fresh data
 folder, against the local development server):
 
-- First run shows the small welcome with Start browsing and Sign in. Start browsing grows the
-  window, runs setup, and the welcome never returns.
+- First run shows the small welcome with Start browsing and Sign in. Start browsing runs setup
+  in the sheet over the welcome, then grows the window into the browser, and the welcome never
+  returns.
 - Signed out, the window has no Space bar and no Space color, the account row reads Sign in,
   and there is no Sync button. The app menu has Sign In…, Sign Out… and New Space….
 - Tabs survive a relaunch. A password saved signed out is offered again after a relaunch.
@@ -297,7 +289,7 @@ folder, against the local development server):
 
 Fixed along the way: the welcome was skipped on first launch (the shell sent "/" to the
 active tab first; the app frame now redirects before the shell mounts); the save-password
-notice said "encrypted with your sync vault" (now "encrypted and kept in Misty"); the
+notice said "encrypted with your sync vault" (it now shows only its title, the account and site, and its buttons); the
 profile menu said "Log out" (now "Sign out…", like the sheet); and the credential store fell
 back to `~/.misty` when a custom data folder didn't exist yet, splitting keys from their data
 (`src-tauri/src/lib.rs` now creates the folder first; this only affected dev profiles with a
@@ -307,33 +299,29 @@ custom data root).
 
 Answered 2026-10-23. Nothing blocks the build.
 
-1. **Spaces need an account.** Signed-out people have the one personal Space and no others.
+1. **Spaces need an account.** Signed-out people have none.
    Importing Arc's sidebar (C18) is dropped: Arc users get bookmarks, history, sign-ins and
    extensions through the normal Chromium import, and no Spaces, pinned tabs or folders.
 2. **Signing out keeps the browsing data** on the device. Removing it is the opt-in checkbox
    in the sign-out sheet.
-3. **Add account stays.** The local profile is adopted by the first account that signs in,
-   and an added account starts with an empty profile. Signing out of the last account on the
-   device returns the window to the local profile, carrying that account's personal Space
-   data back with it (decision 2).
-4. **Merging asks once,** with counts, when sync turns on for an account that already syncs
-   from other devices (as mocked).
+3. **Add account stays.** The local scope is adopted by the first account that signs in, and an
+   added account starts empty. Signing out of the last account on the computer returns the
+   window to the local scope, carrying that account's browsing back with it (decision 2).
+4. **Joining merges silently** into the vault's first profile, with no sheet and no counts
+   (updated by [Sync](../sync/README.md); the sheet in the mockup is gone).
 5. **No telemetry while signed out.** Nothing is sent to Misty until someone signs in. Since
    October 31, 2026 the app sends no analytics or crash reports at all: PostHog was removed.
 6. **The Terms and Privacy footer stays** on the first-run welcome.
 7. **No AI chrome while signed out.** Only the agent shortcuts reach the sign-in sheet.
-8. **The local vault is a local mode of the existing sync crate** (`crates/browser-sync`), with
-   no second store. Sync is not proprietary: the crate stays whole in the open-source app,
-   and only the agent runtime and Spaces stay closed (C17). This replaces the earlier plan to
-   split out a `misty-profile-store`.
-9. **One website data store per device.** Every personal Space keeps using the `default`
-   store, so the signed-out profile's website sign-ins carry through adoption. Two accounts
-   on one device share website sign-ins, as today.
+8. **Local records live in the sync crate** (`crates/browser-sync`), with no second store. This
+   replaces the earlier plan to split out a `misty-profile-store`.
+9. **The first profile adopts the store in use,** so the signed-out browsing's website sign-ins
+   carry through adoption. Two accounts on one computer share website sign-ins, as today.
 10. **Invite links use a generic title,** "Sign in to join a Space". The Space's name shows
     after sign-in, so the server needs no unauthenticated invite preview.
 11. **No Space bar while signed out.** The page takes its height, and the bar slides in once
     someone signs in.
-12. **The release waits for the local vault.** C16 is not released with phase 1 alone, so the
+12. **The release waits for local records.** C16 is not released with phase 1 alone, so the
     first signed-out version saves passwords, search shortcuts and site permissions like a
     complete browser.
 13. **First run keeps the small welcome window** (760×640), which grows into the full browser

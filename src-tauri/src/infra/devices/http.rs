@@ -1,5 +1,5 @@
-//! Native calls to the device endpoints. Session cookies stay in the native
-//! cookie jar; device-signed calls add a fresh signature by the device key.
+//! Native calls to the device endpoints. The session's tokens stay in native
+//! code; device-signed calls add a fresh signature by the device key.
 use std::{sync::Arc, time::Duration};
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::identity::{canonical_request, DeviceIdentity};
-use crate::infra::account::cookies::{self, AccountClient};
+use crate::infra::account::session::{self, AccountClient};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_RESPONSE_BYTES: usize = 1 << 20;
@@ -29,7 +29,7 @@ impl std::fmt::Display for DeviceHttpError {
             // `src/api/client/accountLimits.ts` words them.
             Self::Status(403, code) if code == "account_suspended" => write!(
                 f,
-                "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Cloud, write to support@mistysys.com."
+                "This account is suspended, and its data is kept. Contact whoever runs your Misty server; for Misty Pro, write to support@mistysys.com."
             ),
             Self::Status(403, code) if code == "account_closing" => write!(
                 f,
@@ -43,9 +43,6 @@ impl std::fmt::Display for DeviceHttpError {
                 write!(f, "This device was removed from your account.")
             }
             Self::Status(403, _) => write!(f, "This device isn't allowed to do that."),
-            Self::Status(409, code) if code == "sync_setup_required" => {
-                write!(f, "Set up sync to add devices.")
-            }
             Self::Status(409, _) => write!(f, "Your devices changed. Try again."),
             Self::Status(status, _) => write!(f, "Misty couldn't update devices ({status})."),
             Self::Network => write!(f, "Can't reach Misty right now."),
@@ -69,8 +66,8 @@ pub struct DeviceHttp {
 
 impl DeviceHttp {
     pub fn new(api_base: &str, account_id: &str) -> Result<Self, String> {
-        let base = cookies::server(api_base)?;
-        let client = cookies::current(&base)?;
+        let base = session::server(api_base)?;
+        let client = session::current(&base)?;
         client.require_account(&base, account_id)?;
         Ok(Self {
             base,
@@ -179,6 +176,10 @@ impl DeviceHttp {
             .request(method.clone(), url.clone())
             .timeout(REQUEST_TIMEOUT)
             .header("X-Misty-CSRF", "1");
+        if let Some(bearer) = self.client.access_header() {
+            let bearer = session::authorization(&bearer).map_err(|_| DeviceHttpError::Invalid)?;
+            request = request.header(reqwest::header::AUTHORIZATION, bearer);
+        }
         let payload = body.unwrap_or_default();
         if let Some(identity) = identity {
             let timestamp = std::time::SystemTime::now()
@@ -213,29 +214,9 @@ impl DeviceHttp {
     }
 
     /// Rotates the account session once, serialized with every other user of
-    /// the same cookie jar.
+    /// the same account client.
     async fn refresh(&self) -> bool {
-        let _guard = self.client.refresh_lock.lock().await;
-        let mut url = self.base.clone();
-        url.set_path(&format!(
-            "{}/auth/refresh",
-            self.base.path().trim_end_matches('/')
-        ));
-        let Ok(response) = self
-            .client
-            .http
-            .post(url)
-            .timeout(REQUEST_TIMEOUT)
-            .header("X-Misty-CSRF", "1")
-            .send()
-            .await
-        else {
-            return false;
-        };
-        if !matches!(response.status().as_u16(), 200 | 204) {
-            return false;
-        }
-        self.client.persist(&self.base).is_ok()
+        self.client.refresh(&self.base).await.is_ok()
     }
 }
 
@@ -266,9 +247,5 @@ mod tests {
         assert!(suspended.contains("suspended"), "{suspended}");
         let closing = DeviceHttpError::Status(403, "account_closing".into()).to_string();
         assert!(closing.contains("read-only"), "{closing}");
-        assert_eq!(
-            DeviceHttpError::Status(409, "device_list_conflict".into()).to_string(),
-            "Your devices changed. Try again."
-        );
     }
 }

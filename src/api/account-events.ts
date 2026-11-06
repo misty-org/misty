@@ -9,7 +9,6 @@ import {
 } from "./client/session";
 import { readDeploymentScope, resolveApiBase } from "./deployment/api";
 import { validEvent, type AccountEvent, type Subscriber } from "./account-event-model";
-import { followNativeFeed, nativeFeedConnected, watchNativeFeed } from "./account-events-native";
 
 interface Subscription {
   listeners: Set<Subscriber>;
@@ -37,9 +36,7 @@ export function subscribeAccountEvents(accountId: string, listener: Subscriber):
     };
     const stopRecovery = onRateLimitRecovery(() => dispatch({ topic: "reset" }));
     current.controller.signal.addEventListener("abort", stopRecovery, { once: true });
-    void coordinate(channelKey, current.controller.signal, generation, dispatch, accountId).catch(
-      () => {},
-    );
+    void coordinate(channelKey, current.controller.signal, generation, dispatch).catch(() => {});
   }
   subscription.listeners.add(listener);
   const current = subscription;
@@ -57,7 +54,6 @@ async function coordinate(
   signal: AbortSignal,
   generation: number,
   dispatch: Subscriber,
-  accountId: string,
 ) {
   const shared = typeof BroadcastChannel !== "undefined" && navigator.locks;
   const channel = shared ? new BroadcastChannel(`misty:account-events:${key}`) : null;
@@ -72,34 +68,17 @@ async function coordinate(
   try {
     if (shared)
       await navigator.locks.request(`misty:account-events:${key}`, { signal }, () =>
-        stream(signal, generation, deliver, accountId),
+        stream(signal, generation, deliver),
       );
-    else await stream(signal, generation, deliver, accountId);
+    else await stream(signal, generation, deliver);
   } finally {
     channel?.close();
   }
 }
 
-async function stream(
-  signal: AbortSignal,
-  generation: number,
-  deliver: Subscriber,
-  accountId: string,
-) {
+async function stream(signal: AbortSignal, generation: number, deliver: Subscriber) {
   let failures = 0;
   while (!signal.aborted && generation === readApiSessionGeneration()) {
-    // On the desktop, the sync socket already carries these invalidations;
-    // follow it instead of holding a second connection while it is up.
-    if (await nativeFeedConnected(accountId)) {
-      await followNativeFeed(accountId, signal, deliver);
-      failures = 0;
-      continue;
-    }
-    // Hand over to the native feed as soon as it connects.
-    const attempt = new AbortController();
-    const abortAttempt = () => attempt.abort();
-    signal.addEventListener("abort", abortAttempt, { once: true });
-    const stopWatching = watchNativeFeed(accountId, abortAttempt);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let delay = Math.min(60_000, 1_000 * 2 ** Math.min(failures++, 6)) + Math.random() * 1_000;
     try {
@@ -109,7 +88,7 @@ async function stream(
       if (token) headers.set("Authorization", `Bearer ${token}`);
       const response = await httpRequest(`${base}/misty/events`, {
         headers,
-        signal: attempt.signal,
+        signal,
         credentials: apiRequestCredentials(),
       });
       delay = Math.max(delay, parseRetryAfter(response.headers.get("Retry-After")) ?? 0);
@@ -131,7 +110,7 @@ async function stream(
       const decoder = new TextDecoder();
       let buffer = "";
       const connectedAt = Date.now();
-      while (!attempt.signal.aborted) {
+      while (!signal.aborted) {
         const chunk = await reader.read();
         if (chunk.done) break;
         buffer += decoder.decode(chunk.value, { stream: true });
@@ -156,13 +135,9 @@ async function stream(
     } catch {
       /* Reconnect observes durable state; it never replays an action. */
     } finally {
-      stopWatching();
-      signal.removeEventListener("abort", abortAttempt);
       await reader?.cancel().catch(() => {});
       reader?.releaseLock();
     }
-    // A handover to the native feed retries at once.
-    if (!signal.aborted && attempt.signal.aborted) continue;
     // Share the client's outage cooldown instead of reconnecting into it.
     await waitForEventRetry(Math.max(delay, httpOutageRemainingMs()), signal);
   }

@@ -1,4 +1,3 @@
-// Adapted from @audeeo/core (MIT, Matthew Chen), github.com/kannachi323/audeeo at packages/core, rev 2be9ad63. See LICENSE in this folder.
 import { speakerKey, type Segment } from "./segment";
 
 export type Turn = {
@@ -23,9 +22,14 @@ export class Transcript {
   accept(segment: Segment): boolean {
     const previous = this.byId.get(segment.id);
     if (previous && (previous.final || segment.revision <= previous.revision)) return false;
-    if (!segment.sourceText.trim() && !previous) return false;
+    if (!segment.sourceText.trim() && !segment.translatedText.trim() && !previous) return false;
     this.byId.set(segment.id, { ...segment });
     return true;
+  }
+
+  /** The newest segments as they arrived, with a translation that came after its speech. */
+  latest(count: number): Segment[] {
+    return [...this.byId.values()].slice(-count);
   }
 
   segments(): Segment[] {

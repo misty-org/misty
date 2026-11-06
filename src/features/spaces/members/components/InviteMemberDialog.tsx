@@ -35,10 +35,7 @@ export function InviteMemberDialog({
           <form onSubmit={(event) => void dialogs.submitInvite(event)}>
             <DialogHeader>
               <DialogTitle>Invite to {spaceName}</DialogTitle>
-              <DialogDescription>
-                Anyone can be invited by email. You get a link to send them; they can create an
-                account or sign in before joining. The invitation expires after seven days.
-              </DialogDescription>
+              <DialogDescription>The invitation expires after seven days.</DialogDescription>
             </DialogHeader>
             <label className="mt-5 grid gap-2 text-xs font-medium text-cream-muted">
               Email address
@@ -71,7 +68,7 @@ export function InviteMemberDialog({
   );
 }
 
-/** The link right after inviting: Misty sends no email, so the owner passes it on. */
+/** The link right after inviting, for the owner to pass on. A server with Mailjet also emails it. */
 function InvitationLink(props: { email: string; link: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -88,11 +85,8 @@ function InvitationLink(props: { email: string; link: string; onDone: () => void
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Send this link to {props.email}</DialogTitle>
-        <DialogDescription>
-          It opens the invitation in Misty, for the invited email only, and expires after seven
-          days. Misty doesn&apos;t send email, so share it however you like.
-        </DialogDescription>
+        <DialogTitle>Invitation for {props.email}</DialogTitle>
+        <DialogDescription>Share this link with them. It expires in seven days.</DialogDescription>
       </DialogHeader>
       <div className="mt-5 flex gap-2">
         <Input

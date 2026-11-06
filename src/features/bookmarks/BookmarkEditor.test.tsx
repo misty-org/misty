@@ -23,7 +23,7 @@ it("keeps invalid addresses editable and reports the error", () => {
   const onClose = vi.fn();
   render(<BookmarkEditor title="Invalid" url="javascript:alert(1)" onClose={onClose} />);
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  expect(screen.getByRole("alert")).toBeTruthy();
+  expect(screen.getByRole("alert", { hidden: true })).toBeTruthy();
   expect(onClose).not.toHaveBeenCalled();
   expect(useWorkspaceStore.getState().bookmarks).toEqual([]);
 });

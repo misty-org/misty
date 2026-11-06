@@ -159,7 +159,7 @@ pub(super) async fn ask(
 /// answer, so a page or a dock window can't approve for them.
 #[tauri::command]
 pub fn agent_action_confirm(webview: Webview, id: String, allow: bool) -> Result<(), String> {
-    if !crate::infra::space_windows::is_space_window(webview.label()) {
+    if !crate::infra::profile_windows::is_person_window(webview.label()) {
         return Err("Only Misty's main window can answer this.".into());
     }
     let sender = pending()
