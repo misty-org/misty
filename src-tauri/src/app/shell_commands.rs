@@ -1,6 +1,8 @@
 //! `shell.run` jobs. The page script only passes a job along: this checks the job's signed grant
 //! itself, for the shell and for any folder it touches, so a compromised page can't run a command
-//! the run wasn't granted or widen what one reaches.
+//! the run wasn't granted or widen what one reaches. The workspace comes from the grant's chat and
+//! write access from the person's native answer for that chat, so neither a window nor the server
+//! can point a command at another chat's files.
 #![cfg(desktop)]
 
 use std::{
@@ -32,8 +34,6 @@ const FOLDER_WRITE_CAPABILITY: &str = "folder.write";
 #[serde(rename_all = "camelCase")]
 struct ShellJobInput {
     command: String,
-    /// The chat or workflow this workspace belongs to.
-    workspace_key: String,
     #[serde(default)]
     timeout_seconds: Option<u64>,
     /// The chat's shared folder, if it has one.
@@ -57,6 +57,11 @@ impl Drop for RunningJob {
     }
 }
 
+/// Each account's chats are kept apart on a computer that several accounts use.
+fn workspace_key(account_id: &str, chat_key: &str) -> String {
+    format!("{account_id}\n{chat_key}")
+}
+
 /// Runs one claimed `shell.run` job after checking its grant.
 #[tauri::command]
 pub async fn device_shell_job(
@@ -70,8 +75,11 @@ pub async fn device_shell_job(
     require_device_window(&webview)?;
     let grant: SignedRecord = serde_json::from_value(config["runGrant"].clone())
         .map_err(|_| "device_grant_invalid".to_owned())?;
-    trust::verify_job_grant(&grant, &scope_id, SHELL_CAPABILITY)
+    let verified = trust::verify_job_grant(&grant, &scope_id, SHELL_CAPABILITY)
         .map_err(|_| "device_grant_invalid".to_owned())?;
+    if verified.chat_key.is_empty() {
+        return Err("device_grant_invalid".to_owned());
+    }
     let input: ShellJobInput =
         serde_json::from_value(input).map_err(|_| "shell_job_invalid".to_owned())?;
     let folder = match input.folder_scope_id {
@@ -79,7 +87,11 @@ pub async fn device_shell_job(
         Some(folder_scope) => {
             trust::verify_job_grant(&grant, &folder_scope, FOLDER_READ_CAPABILITY)
                 .map_err(|_| "device_grant_invalid".to_owned())?;
-            let writable = trust::verify_job_grant(&grant, &folder_scope, FOLDER_WRITE_CAPABILITY).is_ok();
+            let writable = trust::verify_job_grant(&grant, &folder_scope, FOLDER_WRITE_CAPABILITY).is_ok()
+                && state
+                    .agents
+                    .folder_changes_allowed(verified.chat_key.clone(), folder_scope.clone())
+                    .await;
             let root = state
                 .agents
                 .folder_root(folder_scope)
@@ -97,7 +109,7 @@ pub async fn device_shell_job(
     agent_shell::run(
         &state.environment.misty_dir(),
         ShellRequest {
-            workspace_key: input.workspace_key,
+            workspace_key: workspace_key(&verified.account_id, &verified.chat_key),
             command: input.command,
             timeout: input.timeout_seconds.map(Duration::from_secs),
             folder,
@@ -117,7 +129,7 @@ pub async fn device_shell_cancel(webview: tauri::Webview, job_id: String) -> Res
     Ok(())
 }
 
-/// Deletes a chat's workspace when the chat is deleted.
+/// Deletes a chat's workspace and its "Allow changes" answers when the chat is deleted.
 #[tauri::command]
 pub async fn agents_forget_workspace(
     webview: tauri::Webview,
@@ -126,7 +138,12 @@ pub async fn agents_forget_workspace(
 ) -> Result<(), String> {
     require_device_window(&webview)?;
     let misty_dir = state.environment.misty_dir();
-    tauri::async_runtime::spawn_blocking(move || agent_shell::forget_workspace(&misty_dir, &conversation_id))
+    let _ = state.agents.stop_folder_changes(conversation_id.clone(), None).await;
+    let Some(account_id) = trust::account_id() else {
+        return Err("shell_workspace_unavailable".to_owned());
+    };
+    let key = workspace_key(&account_id, &conversation_id);
+    tauri::async_runtime::spawn_blocking(move || agent_shell::forget_workspace(&misty_dir, &key))
         .await
         .map_err(|error| error.to_string())?
 }

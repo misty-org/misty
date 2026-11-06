@@ -1,3 +1,4 @@
+import { invoke } from "@/native/invoke";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -60,6 +61,7 @@ export function DownloadsSettings(props: BrowserSettingsProps) {
         <FilePathControl
           directory
           title="Choose a download folder"
+          choose={() => invoke<string | null>("browser_choose_download_directory")}
           value={stringSetting(props.document, "general", "browser_download_directory", "")}
           emptyLabel="Downloads"
           disabled={props.working}

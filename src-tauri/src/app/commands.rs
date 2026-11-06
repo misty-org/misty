@@ -2,13 +2,11 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::app::runtime::MistyRuntime;
-use crate::domain::explorer::{DirectoryListing, ListDirectoryRequest};
 use crate::error::{ApiError, ApiResult};
 use crate::infra::agents::PrepareScopedAgentDocumentRequest;
 use crate::infra::autostart::LaunchOnLoginSnapshot;
 use crate::infra::default_browser::DefaultBrowserSnapshot;
 use crate::infra::documents::PreparedAgentDocument;
-use crate::infra::drives::DeviceSnapshot;
 use crate::infra::environment::AppEnvironmentSnapshot;
 use crate::infra::settings::{SaveSettingsRequest, SettingsSnapshot};
 
@@ -71,14 +69,6 @@ pub async fn agents_prepare_scoped_document(
 }
 
 #[tauri::command]
-pub async fn explorer_list_directory(
-    request: ListDirectoryRequest,
-    state: State<'_, MistyRuntime>,
-) -> ApiResult<DirectoryListing> {
-    state.explorer.list_directory(request).await
-}
-
-#[tauri::command]
 pub async fn settings_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<SettingsSnapshot> {
     state.settings.snapshot().await
 }
@@ -109,14 +99,6 @@ pub fn settings_default_browser_snapshot() -> ApiResult<DefaultBrowserSnapshot> 
 #[tauri::command]
 pub fn settings_request_default_browser() -> ApiResult<DefaultBrowserSnapshot> {
     Ok(crate::infra::default_browser::request())
-}
-
-#[tauri::command]
-pub async fn devices_snapshot(state: State<'_, MistyRuntime>) -> ApiResult<DeviceSnapshot> {
-    let devices = state.devices.clone();
-    tokio::task::spawn_blocking(move || devices.snapshot())
-        .await
-        .map_err(|err| ApiError::Message(format!("Device scan failed: {err}")))
 }
 
 #[tauri::command]

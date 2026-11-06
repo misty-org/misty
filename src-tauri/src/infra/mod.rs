@@ -40,11 +40,7 @@ pub mod desktop_control_windows;
 pub mod desktop_overlays_windows;
 pub mod devices;
 pub mod documents;
-pub mod drives;
-#[cfg(windows)]
-mod drives_windows;
 pub mod environment;
-pub mod explorer;
 pub mod extensions;
 pub mod file_access;
 pub mod global_hotkey;

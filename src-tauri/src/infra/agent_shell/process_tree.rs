@@ -5,8 +5,9 @@
 //! 100 ms and remembered with their start times; stopping the command kills
 //! each one still alive, checking the start time first so a reused process id
 //! never hits an unrelated process. (A process that detaches and loses its
-//! parent within one interval can still slip by; it stays inside the sandbox,
-//! and its CPU time is capped by the runner's RLIMIT_CPU.)
+//! parent within one interval can still slip by. It stays inside the sandbox
+//! with the profile it started with, even after a grant is taken back; a
+//! process that mostly sleeps doesn't reach the runner's RLIMIT_CPU.)
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},

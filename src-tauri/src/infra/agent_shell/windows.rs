@@ -1,6 +1,7 @@
 //! Commands in an AppContainer with no capabilities, so no network and nothing but what's granted
 //! here. A job bounds memory, CPU and process count, and ends everything when the command does. This
 //! compiles from macOS, but only `windows-confine`'s tests on a Windows machine prove it holds.
+use crate::infra::file_access::secrets::{is_secret_file, is_secret_folder};
 use std::{
     ffi::{OsStr, OsString},
     fs::File,
@@ -22,18 +23,6 @@ use super::{output::CappedOutput, ShellOutcome, ShellRequest};
 
 /// Files that hold secrets stay closed even in a shared folder, because a command's output reaches
 /// the model. Windows has no rule by name, so they're found before a command runs.
-fn is_secret(name: &str) -> bool {
-    let lower = name.to_ascii_lowercase();
-    lower == ".env"
-        || lower.starts_with(".env.")
-        || matches!(lower.as_str(), "id_rsa" | "id_dsa" | "id_ecdsa" | "id_ed25519" | "credentials" | ".netrc" | ".npmrc" | ".pypirc")
-        || [".pem", ".key", ".p12", ".pfx", ".keystore"].iter().any(|end| lower.ends_with(end))
-}
-
-fn is_secret_folder(name: &str) -> bool {
-    matches!(name.to_ascii_lowercase().as_str(), ".ssh" | ".aws" | ".gnupg" | ".kube" | ".docker")
-}
-
 /// How many entries of a shared folder are looked through for secrets and Git folders.
 const MAX_SCANNED_ENTRIES: usize = 200_000;
 
@@ -67,7 +56,7 @@ fn scan(root: &Path) -> Scanned {
                 } else {
                     queue.push(path);
                 }
-            } else if is_secret(&name) {
+            } else if is_secret_file(&name) {
                 found.closed.push(path);
             }
         }

@@ -1,16 +1,11 @@
 import { useEffect, useState } from "react";
-import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { OptionSelect, Switch } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
-import { agentsDeviceSnapshot } from "../store/useAgentsStore";
+import { agentsDeviceSnapshot, allowFolderChanges, stopFolderChanges } from "../store/useAgentsStore";
 import { useScheduleFolders } from "./useScheduleFolders";
 
 const none = "none";
-const writeWarning = (name: string) =>
-  `This workflow runs with nobody watching. It will be able to add and edit files in “${name}”. ` +
-  "It can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.";
-
 /** A scheduled workflow's shared folder on this computer, and whether it may change files there. */
 export function ScheduleFolderField({ workflowId }: { workflowId: string }) {
   const [folders, setFolders] = useState<AgentScope[]>([]);
@@ -34,7 +29,12 @@ export function ScheduleFolderField({ workflowId }: { workflowId: string }) {
   const current = folders.find((folder) => folder.id === chosen?.folderId);
   const toggle = async (writable: boolean) => {
     if (!current) return;
-    if (writable && !(await confirmAction(writeWarning(current.displayName), "Allow changes"))) return;
+    const key = `workflow:${workflowId}`;
+    if (writable) {
+      if (!(await allowFolderChanges(key, current.id).catch(() => false))) return;
+    } else {
+      await stopFolderChanges(key, current.id).catch(() => undefined);
+    }
     setFolder(workflowId, { folderId: current.id, writable });
   };
   return (

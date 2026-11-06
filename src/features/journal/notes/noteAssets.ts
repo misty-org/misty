@@ -4,7 +4,6 @@ import {
   resolveJournalAssetUrl,
   uploadJournalAsset,
 } from "@/api/journal/assets";
-import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 const MAX_NOTE_ASSET_BYTES = MAX_JOURNAL_ASSET_BYTES;
 
@@ -34,10 +33,6 @@ export async function resolveNoteAssetUrl(url: string): Promise<string> {
   if (/^\/spaces\/[^/]+\/notes\/[^/]+\/assets\/[^/]+\/download$/i.test(url)) {
     return resolveJournalAssetUrl(url);
   }
-  if (!url || isBrowserUrl(url)) return url;
-  return safeTauriAssetUrl(url);
-}
-
-function isBrowserUrl(url: string): boolean {
-  return /^(https?:|data:|blob:|asset:|tauri:)/i.test(url);
+  // A note comes from whoever wrote it, so a path in one never opens a file on this computer.
+  return url;
 }

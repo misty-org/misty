@@ -106,6 +106,11 @@ pub(super) fn handle_download_event(
         }
         DownloadEvent::Finished { url, path, success } => {
             let record = finish_download(&state, tab_id, &url, path.as_deref(), success);
+            // This file, for this session: an agent's download is uploaded to its Space through
+            // `asset:`, which covers nothing else until the person picks or drops something.
+            if record.success {
+                let _ = app.asset_protocol_scope().allow_file(&record.path);
+            }
             if record.initiator == "human" {
                 super::super::browser_library::download_finished(
                     app,
@@ -319,4 +324,40 @@ pub(super) fn finish_download(
         }
     }
     record
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserTabDownloadOpenRequest {
+    pub tab_id: String,
+    pub download_id: String,
+}
+
+/// Opens a finished download from a tab's own history, for files an agent downloaded, which stay out
+/// of the person's download list. The path comes from that history, never from the window asking.
+#[tauri::command]
+pub fn browser_tab_download_open(
+    app: AppHandle,
+    state: State<'_, BrowserSessionState>,
+    request: BrowserTabDownloadOpenRequest,
+) -> Result<(), String> {
+    let path = state
+        .sessions
+        .lock()
+        .map_err(|_| "The download list is unavailable.".to_owned())?
+        .get(&request.tab_id)
+        .and_then(|session| {
+            session
+                .downloads
+                .iter()
+                .find(|item| item.download_id == request.download_id && item.success)
+                .map(|item| item.path.clone())
+        })
+        .ok_or_else(|| "This download is no longer available.".to_owned())?;
+    if !fs::is_file(&path) {
+        return Err("The file was moved or deleted.".to_owned());
+    }
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .open_path(path, None::<&str>)
+        .map_err(|error| error.to_string())
 }

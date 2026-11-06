@@ -47,10 +47,6 @@ impl AppEnvironmentService {
         )
     }
 
-    pub fn home_dir(&self) -> PathBuf {
-        self.inner.home_dir.clone()
-    }
-
     pub fn cache_dir(&self) -> PathBuf {
         self.inner.cache_dir.clone()
     }

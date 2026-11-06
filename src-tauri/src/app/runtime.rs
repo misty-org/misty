@@ -6,8 +6,7 @@ use crate::domain::clipboard::{NativeClipboard, SharedClipboardClient};
 #[cfg(desktop)]
 use crate::infra::cloud_clipboard::CloudClipboard;
 use crate::infra::{
-    agents::AgentService, drives::DeviceService, environment::AppEnvironmentService,
-    explorer::ExplorerService, settings::SettingsService, shortcuts::ShortcutService,
+    agents::AgentService, environment::AppEnvironmentService, settings::SettingsService, shortcuts::ShortcutService,
 };
 
 pub struct MistyRuntime {
@@ -16,10 +15,8 @@ pub struct MistyRuntime {
     pub clipboard: Arc<ClipboardService>,
     pub settings: SettingsService,
     pub shortcuts: ShortcutService,
-    pub devices: DeviceService,
     #[cfg(desktop)]
     pub cloud_clipboard: CloudClipboard,
-    pub explorer: ExplorerService,
     pub agents: AgentService,
 }
 
@@ -50,8 +47,6 @@ impl MistyRuntime {
         }
         let settings = SettingsService::new(environment.clone());
         let shortcuts = ShortcutService::new(environment.clone());
-        let devices = DeviceService::new();
-        let explorer = ExplorerService::new(environment.clone());
         let agents = AgentService::new(environment.clone());
 
         Self {
@@ -62,10 +57,8 @@ impl MistyRuntime {
             clipboard,
             settings,
             shortcuts,
-            devices,
             #[cfg(desktop)]
             cloud_clipboard,
-            explorer,
             agents,
         }
     }

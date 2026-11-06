@@ -16,6 +16,7 @@ fn run_grants_verify_their_signer_and_expire() {
         requester_device_id: device('a'),
         target_device_id: device('b'),
         agent_id: String::new(),
+        chat_key: "chat-1".to_owned(),
         capabilities: vec!["folder.read".into()],
         scopes: vec!["scope-1".into()],
         issued_at: 1_000,

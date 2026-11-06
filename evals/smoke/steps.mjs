@@ -16,8 +16,21 @@ const tryCalls = (commands) =>
    return out;`;
 
 export const firstSteps = {
-  async boot({ check }) {
-    const person = await inWindow(tryCalls(["model_keys_saved", "agents_device_snapshot", "definitely_not_a_command"]));
+  async boot({ check, scratch }) {
+    const person = await inWindow(tryCalls(["model_keys_saved", "agents_device_snapshot", "definitely_not_a_command", "explorer_list_directory", "devices_snapshot"]));
+    check("boot", "folder listing and drive scanning are gone", /not allowed/.test(person.explorer_list_directory) && /not allowed/.test(person.devices_snapshot), JSON.stringify(person));
+    // A file nobody picked, in a folder the app's windows could once read whole.
+    const unpicked = resolve(scratch, "unpicked.txt");
+    writeFileSync(unpicked, "not picked");
+    const reached = await inWindow(
+      `const internals = window.__TAURI_INTERNALS__;
+       const path = ${JSON.stringify(unpicked)};
+       const opened = await internals.invoke("plugin:opener|open_path", { path }).then(() => "opened", String);
+       const asset = await fetch(internals.convertFileSrc(path)).then((response) => response.status, () => "failed");
+       return { opened, asset };`,
+    );
+    check("boot", "a window can't open a file nobody picked", /not allowed/.test(reached.opened), JSON.stringify(reached));
+    check("boot", "a window can't read a file nobody picked", reached.asset !== 200, JSON.stringify(reached));
     check("boot", "a person's window runs common commands", person.model_keys_saved === "ok" && person.agents_device_snapshot === "ok", JSON.stringify(person));
     check("boot", "an unknown command is refused", /not allowed/.test(person.definitely_not_a_command), person.definitely_not_a_command);
     await inWindow(`await __smoke.invoke("profile_incognito_open", {}); return true;`);
@@ -57,11 +70,14 @@ export const firstSteps = {
        await __smoke.sleep(150);
        await __smoke.submit("#register-email");
        await __smoke.until(() => location.pathname === "/browser", "the browser after sign-in", 30000);
-       return { choice, text: __smoke.text().slice(0, 200) };`,
+       // Which screen shows the name depends on what opens first, so ask the store who signed in.
+       const { useUserStore } = await __smoke.module("features/auth/store/useUserStore.ts");
+       await __smoke.until(() => useUserStore.getState().me?.username, "the signed-in account", 10000);
+       return { choice, username: useUserStore.getState().me.username };`,
       { timeoutMs: 60_000 },
     );
     check("signin", "the server was chosen through the setup screen", landed.choice?.url === `${server}/v1`, JSON.stringify(landed.choice));
-    check("signin", "the first account registered and reached the browser", landed.text.includes(account.username), landed.text);
+    check("signin", "the first account registered and reached the browser", landed.username === account.username, landed.username);
   },
 
   async models({ check }) {
@@ -166,6 +182,13 @@ export const firstSteps = {
     check("folder", "read-only: folder_read answers", /original/.test((await mock.toolResults()).find((result) => result.id === "call_f4")?.content), out);
 
     await mock.reset();
+    await mock.script([shell("call_f5", "echo x > shared-folder/unanswered.txt"), finish()]);
+    run = await startChat("A window says yes by itself", { folder, writable: true, answered: false });
+    await waitForState(run.invocationId);
+    out = await output();
+    check("folder", "a window can't give itself write access", /denied|not permitted/i.test(out) && !existsSync(resolve(root, "unanswered.txt")), out);
+
+    await mock.reset();
     await mock.script([
       shell("call_f3", "echo x > shared-folder/rw-new.txt; echo add=$?; echo edited >> shared-folder/existing.txt; echo edit=$?; rm shared-folder/existing.txt; echo rm=$?; rm -rf shared-folder/rw-new.txt; echo rmrf=$?; mv shared-folder/existing.txt shared-folder/moved.txt; echo mv=$?; find shared-folder/ -name rw-new.txt -delete; echo find=$?"),
       finish(),
@@ -192,6 +215,27 @@ export const firstSteps = {
     check("tools", "screen_open opens the agent's own tab", /Your own browser tab is open/.test(out), out);
     check("tools", "browser_run reads that tab", /Example Domain|documentation examples/.test(out), out);
     check("tools", "the notebook saves", /"saved":true/.test(out), out);
+
+    // The parallel case browser_run exists for: one program, one call, several tabs at the same time.
+    const mockRoot = mockBase.replace(/\/v1$/, "");
+    const names = ["a", "b", "c"];
+    const parallel = `const pages = await Promise.all(${JSON.stringify(names.map((name) => `${mockRoot}/__slow-page?name=${name}`))}.map(async (url) => {
+        const tab = await openTab(url);
+        return (await tab.text({ maxChars: 200 })).text;
+      }));
+      return pages.join(" | ");`;
+    await mock.reset();
+    await mock.script([
+      { tools: [{ id: "call_p1", name: "screen_open", args: { url: `${mockRoot}/__slow-page?name=first`, reason: "start" } }] },
+      { tools: [{ id: "call_p2", name: "browser_run", args: { code: parallel } }] },
+      finish(),
+    ]);
+    run = await startChat("Read three pages at once");
+    check("tools", "a program over several tabs completes", (await waitForState(run.invocationId, undefined, 90_000)) === "completed");
+    out = await output();
+    check("tools", "browser_run reads every tab it opened", names.every((name) => out.includes(`Slow page ${name}`)), out);
+    const pages = await (await fetch(`${mockRoot}/__slow-pages`)).json();
+    check("tools", "browser_run's tabs really load at the same time", pages.mostAtOnce >= 2, JSON.stringify(pages));
 
     await mock.reset();
     await mock.script([{ text: "Mock says the first answer is forty two." }, { text: "Second answer." }]);

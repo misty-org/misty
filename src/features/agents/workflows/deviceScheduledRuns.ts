@@ -11,6 +11,7 @@ import {
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useConversationFolder } from "../store/useConversationFolder";
 import { desktopDeviceGrants } from "../deviceGrants";
+import { adoptFolderChanges } from "../store/useAgentsStore";
 import { useScheduleFolders } from "./useScheduleFolders";
 import { holdAwake, releaseAwake } from "../keepAwake";
 import { useWorkflowSchedulesStore } from "./useWorkflowSchedulesStore";
@@ -133,7 +134,13 @@ async function pickUp(accountId: string) {
           methodInputs: claim.inputs,
           scheduleId: claim.schedule_id,
           scheduleClaim: claim.claim,
-          deviceContexts: await desktopDeviceGrants(folder?.folderId ?? null, folder?.writable),
+          deviceContexts: await (async () => {
+            await adoptFolderChanges(
+              `workflow:${run.method_id}`,
+              claim.conversation_id ?? claim.idempotency_key,
+            ).catch(() => undefined);
+            return desktopDeviceGrants(folder?.folderId ?? null, folder?.writable);
+          })(),
           executionMode: "user",
           idempotencyKey: claim.idempotency_key,
           timezone: claim.timezone,
@@ -144,6 +151,9 @@ async function pickUp(accountId: string) {
           const folders = useConversationFolder.getState();
           folders.setFolder(claim.conversation_id, folder.folderId);
           folders.setWritable(claim.conversation_id, folder.folderId, folder.writable);
+          await adoptFolderChanges(`workflow:${run.method_id}`, claim.conversation_id).catch(
+            () => undefined,
+          );
         }
         await useMistyStore.getState().submitAnswer(
           claim.title || method.definition.title,

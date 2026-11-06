@@ -12,6 +12,8 @@ import type { AiInvocationDeviceContext } from "./types";
 export async function withDeviceRunGrants(
   contexts: AiInvocationDeviceContext[] | undefined,
   agentId: string | undefined,
+  /** The chat or scheduled run. Its workspace and write access come from this. */
+  chatKey: string,
 ): Promise<AiInvocationDeviceContext[] | undefined> {
   if (!contexts?.length || !hasTauriInternals()) return contexts;
   const unsigned = contexts.filter((context) => !context.runGrant);
@@ -28,6 +30,7 @@ export async function withDeviceRunGrants(
     targets.map(([targetDeviceId, items]) => ({
       targetDeviceId,
       agentId: agentId ?? "",
+      chatKey,
       capabilities: [...new Set(items.flatMap((item) => item.capabilities))].sort(),
       scopes: [...new Set(items.map((item) => item.opaqueRef))].sort(),
     })),

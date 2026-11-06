@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { invoke } from "@/native/invoke";
 import { useTaskArtifacts } from "./taskArtifacts";
 import { Button, ErrorNotification } from "@/shared/ui";
 
@@ -35,7 +35,11 @@ export function TaskArtifacts({ taskId }: { taskId: string }) {
             <Button
               variant="link"
               className="h-auto p-0 text-xs underline"
-              onClick={() => void openPath(item.path).catch((reason) => setError(String(reason)))}
+              onClick={() =>
+                void invoke("browser_tab_download_open", {
+                  request: { tabId: item.tabId, downloadId: item.id },
+                }).catch((reason) => setError(String(reason)))
+              }
             >
               Open
             </Button>

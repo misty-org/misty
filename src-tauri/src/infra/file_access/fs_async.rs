@@ -13,9 +13,9 @@ pub async fn write(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> io::Re
     tokio::fs::write(path, contents).await
 }
 
-/// Opens a file for the `asset:` handler, which has already checked it against Tauri's asset scope
-/// in `tauri.conf.json`. That scope is what decides here, not a grant: narrowing it is the action
-/// layer's job (docs/plans/app-permissions.md), and the handler refuses website tabs.
+/// Opens a file for the `asset:` handler, which has already checked it against Tauri's asset scope.
+/// That scope is what decides here, not the gate. It starts empty and holds only files the person
+/// picked or dropped this session and files Misty downloaded, and the handler refuses website tabs.
 pub async fn open_for_asset_protocol(path: impl AsRef<Path>) -> io::Result<tokio::fs::File> {
     tokio::fs::File::open(path).await
 }

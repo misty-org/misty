@@ -31,6 +31,29 @@ pub(super) async fn run_grants(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderChanges {
+    key: String,
+    scope_id: String,
+}
+
+/// Records "Allow changes" as `agents_allow_folder_changes` does after the person says yes, without
+/// the native question a test can't click.
+pub(super) async fn allow_folder_changes(
+    AxumState(bridge): AxumState<Bridge>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let body = match request::<FolderChanges>(&bridge, &headers, &body) {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let state = bridge.app.state::<MistyRuntime>();
+    let done = state.agents.allow_folder_changes(body.key, body.scope_id).await;
+    reply(done.map(|()| json!({ "ok": true })).map_err(|error| error.to_string()))
+}
+
+#[derive(Deserialize)]
 struct ShareFolder {
     path: String,
 }

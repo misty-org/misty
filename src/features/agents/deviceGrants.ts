@@ -1,6 +1,6 @@
 import type { AiInvocationDeviceContext } from "@/features/ai-surface/types";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { agentsDeviceSnapshot } from "./store/useAgentsStore";
+import { adoptFolderChanges, agentsDeviceSnapshot } from "./store/useAgentsStore";
 import { ensureServerAgentDevice } from "./store/useAgentDeviceStore";
 import { useConversationFolder } from "./store/useConversationFolder";
 
@@ -72,7 +72,10 @@ export async function chatDeviceGrants(
 ): Promise<AiInvocationDeviceContext[]> {
   const folders = useConversationFolder.getState();
   const folder = folders.folder(conversationId) ?? (startsConversation ? folders.draft : null);
-  if (startsConversation) folders.adoptDraft(conversationId);
+  if (startsConversation) {
+    await adoptFolderChanges("draft", conversationId).catch(() => undefined);
+    folders.adoptDraft(conversationId);
+  }
   return desktopDeviceGrants(folder, folder ? folders.writable(folder, conversationId) : false).catch(
     () => [],
   );

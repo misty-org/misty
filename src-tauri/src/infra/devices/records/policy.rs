@@ -69,6 +69,9 @@ pub struct RunGrant {
     pub requester_device_id: String,
     pub target_device_id: String,
     pub agent_id: String,
+    /// The chat or scheduled run this grant is for. A command's workspace and its write access to a
+    /// shared folder come from this, never from the job, so a job can't reach another chat's.
+    pub chat_key: String,
     pub capabilities: Vec<String>,
     pub scopes: Vec<String>,
     pub issued_at: i64,
@@ -84,6 +87,7 @@ impl RunGrant {
             &self.requester_device_id,
             &self.target_device_id,
             &self.agent_id,
+            &self.chat_key,
             &self.capabilities,
             &self.scopes,
             self.issued_at,
@@ -102,7 +106,7 @@ impl RunGrant {
         if !verify_device_signature(requester_public_key, &bytes, &record.signature) {
             return None;
         }
-        let [account, grant, requester, target, agent, capabilities, scopes, issued, expires]: [Value; 9] =
+        let [account, grant, requester, target, agent, chat_key, capabilities, scopes, issued, expires]: [Value; 10] =
             fields.try_into().ok()?;
         let strings = |value: &Value| -> Option<Vec<String>> {
             value
@@ -117,6 +121,7 @@ impl RunGrant {
             requester_device_id: requester.as_str()?.to_owned(),
             target_device_id: target.as_str()?.to_owned(),
             agent_id: agent.as_str()?.to_owned(),
+            chat_key: chat_key.as_str()?.to_owned(),
             capabilities: strings(&capabilities)?,
             scopes: strings(&scopes)?,
             issued_at: issued.as_i64()?,

@@ -14,7 +14,12 @@ import {
   MenuTrigger,
 } from "@/shared/ui";
 import type { AgentScope } from "../model/types";
-import { agentsDeviceSnapshot, shareFolder } from "../store/useAgentsStore";
+import {
+  agentsDeviceSnapshot,
+  allowFolderChanges,
+  shareFolder,
+  stopFolderChanges,
+} from "../store/useAgentsStore";
 import { useConversationFolder } from "../store/useConversationFolder";
 
 const none = "none";
@@ -23,10 +28,6 @@ const none = "none";
 export const shareFolderWarning =
   "Agents in chats you give this folder to can read its files. " +
   "In Auto, a page could trick an agent into sending them out over the web, and Misty won't stop to ask.";
-const writeWarning = (name: string) =>
-  `Agents in this chat will be able to add and edit files in “${name}”. ` +
-  "They can't delete, rename or move anything, but an edit can overwrite a file's contents, and there's no undo.";
-
 /**
  * The composer strip's folder menu: the folder on this computer the conversation
  * can read, or none. Only the chosen folder travels with the chat. Desktop only.
@@ -43,7 +44,7 @@ export function AgentFolderMenu({
   const chosen = useConversationFolder((s) =>
     conversationId ? (s.byConversation[conversationId] ?? null) : s.draft,
   );
-  const setFolder = useConversationFolder((s) => s.setFolder);
+  const chooseFolder = useConversationFolder((s) => s.chooseFolder);
   const setWritable = useConversationFolder((s) => s.setWritable);
   const canWrite = useConversationFolder((s) =>
     chosen
@@ -70,7 +71,7 @@ export function AgentFolderMenu({
     try {
       const added = await shareFolder();
       await load();
-      if (added) setFolder(conversationId, added.id);
+      if (added) chooseFolder(conversationId, added.id);
     } catch (error) {
       const text = typeof error === "string" ? error : error instanceof Error ? error.message : "";
       setFailed(text && !text.includes("_") ? text : "That folder couldn’t be added.");
@@ -78,8 +79,14 @@ export function AgentFolderMenu({
   };
   const toggleWrite = async (allow: boolean) => {
     if (!current) return;
-    if (allow && !(await confirmAction(writeWarning(current.displayName), "Allow changes"))) return;
-    setWritable(conversationId, current.id, allow);
+    const key = conversationId ?? "draft";
+    if (allow) {
+      if (await allowFolderChanges(key, current.id).catch(() => false))
+        setWritable(conversationId, current.id, true);
+      return;
+    }
+    await stopFolderChanges(key, current.id).catch(() => undefined);
+    setWritable(conversationId, current.id, false);
   };
   return (
     <>
@@ -96,7 +103,7 @@ export function AgentFolderMenu({
         <DropdownMenuContent align="start" className="w-72" data-misty-layer-portal>
           <DropdownMenuRadioGroup
             value={current?.id ?? none}
-            onValueChange={(next) => setFolder(conversationId, next === none ? null : next)}
+            onValueChange={(next) => chooseFolder(conversationId, next === none ? null : next)}
           >
             <DropdownMenuRadioItem value={none}>No folder</DropdownMenuRadioItem>
             {folders.map((folder) => (

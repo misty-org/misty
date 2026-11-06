@@ -80,6 +80,13 @@ impl Policy {
             .any(|rule| rule.gives(access) && rule.covers(real))
     }
 
+    /// Whether the person picked exactly this file in a system dialog.
+    pub fn was_picked(&self, real: &Path) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| rule.reach == Reach::PickedFile && rule.root == real)
+    }
+
     #[cfg(test)]
     pub fn allows_path(&self, path: &Path, access: Access) -> bool {
         real_path::resolve(path).is_ok_and(|real| self.allows(&real, access))

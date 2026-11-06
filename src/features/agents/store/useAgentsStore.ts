@@ -6,6 +6,21 @@ export async function agentsDeviceSnapshot(): Promise<AgentDeviceSnapshot> {
 }
 
 /** Shares a folder with agents, read-only, chosen in the system picker. */
+/** The native question behind "Allow changes", for a chat, the new chat ("draft") or `workflow:<id>`. */
+export function allowFolderChanges(key: string, scopeId: string): Promise<boolean> {
+  return invoke<boolean>("agents_allow_folder_changes", { key, scopeId });
+}
+
+/** Takes "Allow changes" back, from the next command on. */
+export function stopFolderChanges(key: string, scopeId?: string): Promise<void> {
+  return invoke<void>("agents_stop_folder_changes", { key, scopeId: scopeId ?? null });
+}
+
+/** A new chat takes on its draft's answer, or a scheduled run its workflow's. */
+export function adoptFolderChanges(from: string, chat: string): Promise<void> {
+  return invoke<void>("agents_adopt_folder_changes", { from, chat });
+}
+
 export async function shareFolder(): Promise<{ id: string; displayName: string } | null> {
   const result = await invoke<{ id: string; displayName: string } | null>("agents_share_folder");
   await republishDeviceFolders();

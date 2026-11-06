@@ -129,6 +129,7 @@ pub(crate) fn start_if_requested(app: &AppHandle) {
             .route("/capture", post(pages::capture))
             .route("/run-grants", post(grants::run_grants))
             .route("/share-folder", post(grants::share_folder))
+            .route("/allow-folder-changes", post(grants::allow_folder_changes))
             .route("/models", post(models::models))
             .route("/windows", post(window_eval::windows))
             .route("/window-eval", post(window_eval::window_eval))

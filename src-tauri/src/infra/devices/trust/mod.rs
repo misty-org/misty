@@ -154,6 +154,10 @@ pub fn set_server_device_id(device_id: &str) -> ApiResult<()> {
     })
 }
 
+pub fn account_id() -> Option<String> {
+    Some(state().lock().ok()?.as_ref()?.file.account_id.clone())
+}
+
 pub fn server_device_id() -> Option<String> {
     state().lock().ok()?.as_ref()?.file.server_device_id.clone()
 }

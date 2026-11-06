@@ -1,6 +1,6 @@
 //! The few places Misty looks at a path no grant covers. Each learns only what kind of thing a path
-//! is, its real location, or a folder's names, sizes and dates, never a file's contents, and each
-//! has its own function so reading this file lists them all.
+//! is or its real location, never a file's contents or a folder's listing, and each has its own
+//! function so reading this file lists them all.
 // Some of these only have callers on one platform.
 #![cfg_attr(windows, allow(dead_code))]
 use std::{
@@ -30,21 +30,6 @@ pub fn chosen_folder_attributes(path: &Path) -> Option<u32> {
         .map(|metadata| metadata.file_attributes())
 }
 
-/// Misty's own file picker: the real location of a folder the person browsed to.
-pub fn picker_real_path(path: &Path) -> io::Result<PathBuf> {
-    fs::canonicalize(path)
-}
-
-/// Misty's own file picker: a folder's listing, for the person choosing a file.
-pub fn picker_list(path: &Path) -> io::Result<fs::ReadDir> {
-    fs::read_dir(path)
-}
-
-/// Misty's own file picker: the size and dates of an entry it lists, without following links.
-pub fn picker_entry(path: &Path) -> io::Result<fs::Metadata> {
-    fs::symlink_metadata(path)
-}
-
 /// What the clipboard's file references are. They're paths the person copied in another app, and
 /// Misty never opens them; the pasting app does.
 pub struct ClipboardFile {
@@ -61,11 +46,6 @@ pub fn clipboard_file(path: &Path) -> Option<ClipboardFile> {
 /// A file from Misty's own download history: its size, and whether it's still there, for the list.
 pub fn recorded_download(path: &Path) -> Option<fs::Metadata> {
     fs::metadata(path).ok()
-}
-
-/// Whether a mounted drive takes writes, for the list of drives.
-pub fn mount_is_writable(path: &Path) -> bool {
-    fs::metadata(path).is_ok_and(|metadata| !metadata.permissions().readonly())
 }
 
 /// Whether a program Misty might start is there. Starting it is `Command`'s business; nothing is

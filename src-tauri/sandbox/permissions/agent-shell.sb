@@ -4,7 +4,10 @@
 (version 1)
 (deny default)
 (allow process-fork)
+;; launchctl changes what starts at login, outside this profile, with a message no rule below can
+;; stop.
 (allow process-exec*)
+(deny process-exec (literal "/bin/launchctl"))
 (allow signal (target same-sandbox))
 (allow sysctl-read)
 (allow file-read-metadata)
@@ -13,11 +16,15 @@
   (subpath "/System") (subpath "/usr") (subpath "/bin") (subpath "/sbin")
   (subpath "/Library/Apple") (subpath "/Library/Developer/CommandLineTools")
   (subpath "/Library/Frameworks") (subpath "/Applications/Xcode.app")
-  (subpath "/opt/homebrew") (subpath "/private/var/select")
+  (subpath "/opt/homebrew/bin") (subpath "/opt/homebrew/sbin") (subpath "/opt/homebrew/lib")
+  (subpath "/opt/homebrew/opt") (subpath "/opt/homebrew/Cellar") (subpath "/opt/homebrew/share")
+  (subpath "/opt/homebrew/Frameworks") (subpath "/private/var/select")
   (subpath "/private/var/db/timezone") (subpath "/private/etc")
   (literal "/") (literal "/etc") (literal "/var") (literal "/tmp") (literal "/private")
   (literal "/private/var") (literal "/dev") (literal "/dev/null") (literal "/dev/zero")
   (literal "/dev/urandom") (literal "/dev/random") (literal "/dev/tty") (literal "/dev/fd"))
+;; Databases and configuration installed under /usr/local aren't tools.
+(deny file-read* (subpath "/usr/local/var") (subpath "/usr/local/etc"))
 (allow file-write-data (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty"))
 (allow file-ioctl (literal "/dev/null") (literal "/dev/tty"))
 (allow mach-lookup

@@ -178,7 +178,8 @@ pub async fn browser_webview_save_page(
 ) -> Result<(), String> {
     let webview = running_webview(&app, &request.id)?;
     let path = PathBuf::from(&request.path);
-    if !path.is_absolute() {
+    // Page contents go only where the person just picked, not anywhere else Misty may write.
+    if !path.is_absolute() || !crate::infra::file_access::is_picked_file(&path) {
         return Err("Choose where to save the page.".to_owned());
     }
     #[cfg(target_os = "macos")]

@@ -1,6 +1,6 @@
 // Sending a real message from the app's own store, and reading back what the mock model received.
 import { execSync } from "node:child_process";
-import { inWindow } from "./bridge.mjs";
+import { bridge, inWindow } from "./bridge.mjs";
 
 const mockPort = process.env.MISTY_SMOKE_MOCK_PORT ?? 18098;
 const mockAddress = `http://127.0.0.1:${mockPort}`;
@@ -54,7 +54,16 @@ export const mock = {
  * Starts a new chat as the composer would: its modes and folder are the draft choice, and the
  * message goes through `submitAnswer`. Resolves with the invocation once it is admitted.
  */
-export function startChat(prompt, { permission = "auto", mode = "act", folder = null, writable = false } = {}) {
+export async function startChat(prompt, { permission = "auto", mode = "act", folder = null, writable = false, answered = writable } = {}) {
+  // "Allow changes" is a native question a test can't click, so the bridge records the yes, after
+  // choosing the folder, which clears any earlier answer.
+  await inWindow(
+    `const folders = (await __smoke.module("features/agents/store/useConversationFolder.ts")).useConversationFolder;
+     folders.getState().chooseFolder(undefined, ${JSON.stringify(folder)});
+     await __smoke.sleep(300);
+     return true;`,
+  );
+  if (answered && folder) await bridge("/allow-folder-changes", { key: "draft", scopeId: folder });
   return inWindow(
     `const misty = (await __smoke.module("features/misty/useMistyStore.ts")).useMistyStore;
      const collaboration = (await __smoke.module("features/agents/collaboration/store.ts")).useCollaborationStore;
@@ -62,7 +71,7 @@ export function startChat(prompt, { permission = "auto", mode = "act", folder = 
      await __smoke.until(() => misty.getState().accountId && !misty.getState().conversationsLoading, "the account's chats", 30000);
      await misty.getState().newConversation?.();
      collaboration.setState({ draftPermissionMode: ${JSON.stringify(permission)}, draftMode: ${JSON.stringify(mode)} });
-     folders.getState().setFolder(undefined, ${JSON.stringify(folder)});
+     folders.setState({ draft: ${JSON.stringify(folder)}, draftWrites: null });
      if (${JSON.stringify(writable)} && ${JSON.stringify(folder)}) folders.getState().setWritable(undefined, ${JSON.stringify(folder)}, true);
      void misty.getState().submitAnswer(${JSON.stringify(prompt)}, [], undefined, "panel").catch((error) => __smoke.errors.push({ kind: "submit", text: String(error) }));
      const invocationId = await __smoke.until(() => misty.getState().invocationId, "the run to be admitted", 20000);
