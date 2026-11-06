@@ -1,31 +1,28 @@
-;; permission-agent-shell: what an agent's shell command may reach. It starts with nothing and adds
-;; system tools, a private workspace and, when the person granted it, one shared folder. The rules
-;; for that folder are in src-tauri/src/infra/agent_shell/macos.rs.
+;; permission-agent-shell: what an agent's shell command may reach. It starts with nothing and adds the
+;; shell tools Misty ships, a private workspace and, when the person granted it, one shared folder. The
+;; rules for that folder are in src-tauri/src/infra/agent_shell/macos.rs.
 (version 1)
 (deny default)
 (allow process-fork)
-;; launchctl changes what starts at login, outside this profile, with a message no rule below can
-;; stop.
-(allow process-exec*)
-(deny process-exec (literal "/bin/launchctl"))
+;; The one program commands can start, whatever it's called. So nothing on the computer can run from
+;; here: no Perl or Python to read other programs' environments, no launchctl, nothing written to the
+;; workspace. Scripts still run, as `sh script.sh`.
+(allow process-exec (literal (param "TOOL")))
 (allow signal (target same-sandbox))
 (allow sysctl-read)
 (allow file-read-metadata)
-;; System tools, read and run. Nothing here holds the person's own files.
+;; The tools, the system libraries every program loads, and the clock. Nothing here holds the person's
+;; own files.
 (allow file-read*
-  (subpath "/System") (subpath "/usr") (subpath "/bin") (subpath "/sbin")
-  (subpath "/Library/Apple") (subpath "/Library/Developer/CommandLineTools")
-  (subpath "/Library/Frameworks") (subpath "/Applications/Xcode.app")
-  (subpath "/opt/homebrew/bin") (subpath "/opt/homebrew/sbin") (subpath "/opt/homebrew/lib")
-  (subpath "/opt/homebrew/opt") (subpath "/opt/homebrew/Cellar") (subpath "/opt/homebrew/share")
-  (subpath "/opt/homebrew/Frameworks") (subpath "/private/var/select")
-  (subpath "/private/var/db/timezone") (subpath "/private/etc")
+  (subpath (param "TOOLS"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (subpath "/private/var/db/timezone") (literal "/private/etc/localtime")
   (literal "/") (literal "/etc") (literal "/var") (literal "/tmp") (literal "/private")
   (literal "/private/var") (literal "/dev") (literal "/dev/null") (literal "/dev/zero")
-  (literal "/dev/urandom") (literal "/dev/random") (literal "/dev/tty") (literal "/dev/fd"))
-;; Databases and configuration installed under /usr/local aren't tools.
-(deny file-read* (subpath "/usr/local/var") (subpath "/usr/local/etc"))
-(allow file-write-data (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty"))
+  (literal "/dev/urandom") (literal "/dev/random") (literal "/dev/tty") (subpath "/dev/fd"))
+(allow file-write-data (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (subpath "/dev/fd"))
 (allow file-ioctl (literal "/dev/null") (literal "/dev/tty"))
 (allow mach-lookup
   (global-name "com.apple.system.opendirectoryd.libinfo")

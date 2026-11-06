@@ -12,7 +12,8 @@ set -euo pipefail
 
 command="${1:?up or down}"
 scratch="${2:?a scratch folder}"
-server_repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../misty-server" && pwd)"
+# A checkout somewhere else, like a worktree, names its server with MISTY_SMOKE_SERVER_REPO.
+server_repo="$(cd "${MISTY_SMOKE_SERVER_REPO:-$(dirname "${BASH_SOURCE[0]}")/../../../misty-server}" && pwd)"
 container="misty-smoke-postgres"
 db_port="${MISTY_SMOKE_DB_PORT:-55439}"
 api_port="${MISTY_SMOKE_API_PORT:-18099}"

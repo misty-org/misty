@@ -1,0 +1,9 @@
+// Every name the shell worker answers to. Misty reads this list too, to make the links on `PATH`, so
+// the two can't disagree. A test checks each one is really a tool.
+&[
+    "base64", "basename", "bash", "cat", "cksum", "comm", "cp", "csplit", "cut", "date", "dirname", "du",
+    "env", "expand", "expr", "find", "fmt", "fold", "grep", "gunzip", "gzip", "head", "join", "ln", "ls",
+    "mkdir", "mktemp", "mv", "nl", "od", "paste", "readlink", "realpath", "rm", "rmdir", "sed", "seq", "sh",
+    "shuf", "sleep", "sort", "split", "tac", "tail", "tar", "tee", "touch", "tr", "truncate", "uniq",
+    "unzip", "wc", "xargs", "zip",
+]

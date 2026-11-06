@@ -1,8 +1,8 @@
 //! `shell.run`: a real shell for agents, inside `permission-agent-shell`
 //! (`docs/plans/app-permissions.md`). Each chat gets a private workspace in Misty's data folder.
-//! Commands can use system tools, their workspace and, when granted, one shared folder. They have
-//! no network, no environment beyond what's set here, and no way to reach tabs, keys or the rest of
-//! `.misty`.
+//! Commands get the same shell and tools on every computer, all one program Misty ships (`tools`), and
+//! their workspace and, when granted, one shared folder. They have no network, no environment beyond
+//! what's set here, and no way to reach tabs, keys or the rest of `.misty`.
 //!
 //! Rust starts every command itself, so the limits don't depend on anything an agent wrote. Linux has
 //! no OS wall here yet, so commands are refused there rather than run without one.
@@ -16,6 +16,8 @@ mod macos;
 mod output;
 #[cfg(target_os = "macos")]
 mod process_tree;
+#[cfg(any(target_os = "macos", windows))]
+mod tools;
 #[cfg(windows)]
 mod windows;
 
