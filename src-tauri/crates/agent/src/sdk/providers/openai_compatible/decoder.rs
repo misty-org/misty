@@ -52,7 +52,7 @@ impl CompatibleDecoder {
 
     fn close_reasoning(&mut self, out: &mut Vec<StreamPart>) {
         if self.reasoning_open {
-            out.push(StreamPart::ReasoningEnd { id: REASONING_ID.into() });
+            out.push(StreamPart::ReasoningEnd { id: REASONING_ID.into(), provider_metadata: None });
             self.reasoning_open = false;
         }
     }
@@ -218,18 +218,18 @@ impl StreamDecoder for CompatibleDecoder {
             .filter(|text| !text.is_empty());
         if let Some(text) = reasoning {
             if !self.reasoning_open {
-                out.push(StreamPart::ReasoningStart { id: REASONING_ID.into() });
+                out.push(StreamPart::ReasoningStart { id: REASONING_ID.into(), provider_metadata: None });
                 self.reasoning_open = true;
             }
-            out.push(StreamPart::ReasoningDelta { id: REASONING_ID.into(), delta: text.to_owned() });
+            out.push(StreamPart::ReasoningDelta { id: REASONING_ID.into(), delta: text.to_owned(), provider_metadata: None });
         }
         if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|text| !text.is_empty()) {
             self.close_reasoning(out);
             if !self.text_open {
-                out.push(StreamPart::TextStart { id: TEXT_ID.into() });
+                out.push(StreamPart::TextStart { id: TEXT_ID.into(), provider_metadata: None });
                 self.text_open = true;
             }
-            out.push(StreamPart::TextDelta { id: TEXT_ID.into(), delta: text.to_owned() });
+            out.push(StreamPart::TextDelta { id: TEXT_ID.into(), delta: text.to_owned(), provider_metadata: None });
         }
         if let Some(calls) = delta.get("tool_calls").and_then(Value::as_array) {
             self.close_reasoning(out);
@@ -242,7 +242,7 @@ impl StreamDecoder for CompatibleDecoder {
     fn finish(&mut self, out: &mut Vec<StreamPart>) {
         self.close_reasoning(out);
         if self.text_open {
-            out.push(StreamPart::TextEnd { id: TEXT_ID.into() });
+            out.push(StreamPart::TextEnd { id: TEXT_ID.into(), provider_metadata: None });
             self.text_open = false;
         }
         // Calls whose name never came still get their chance, and fail plainly if they can't.

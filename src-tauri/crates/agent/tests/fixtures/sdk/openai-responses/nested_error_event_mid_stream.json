@@ -1,0 +1,110 @@
+{
+  "name": "nested_error_event_mid_stream",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":0}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":1}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"status\":\"in_progress\",\"role\":\"assistant\",\"content\":[]},\"sequence_number\":2}\n\nevent: response.content_part.added\ndata: {\"type\":\"response.content_part.added\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"\",\"annotations\":[]},\"sequence_number\":3}\n\nevent: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"delta\":\"Par\",\"logprobs\":[],\"sequence_number\":4}\n\nevent: response.output_text.done\ndata: {\"type\":\"response.output_text.done\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"text\":\"Par\",\"logprobs\":[],\"sequence_number\":5}\n\nevent: response.content_part.done\ndata: {\"type\":\"response.content_part.done\",\"item_id\":\"msg_1\",\"output_index\":0,\"content_index\":0,\"part\":{\"type\":\"output_text\",\"text\":\"Par\",\"annotations\":[]},\"sequence_number\":6}\n\nevent: response.output_item.done\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"msg_1\",\"type\":\"message\",\"status\":\"completed\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Par\",\"annotations\":[]}]},\"sequence_number\":7}\n\nevent: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"t\",\"code\":\"c\",\"message\":\"Broken.\",\"extra\":1},\"sequence_number\":8}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp_1",
+      "timestamp": "2026-09-21T14:13:20.000Z",
+      "modelId": "gpt-5.1-2026-01-01"
+    },
+    {
+      "type": "text-start",
+      "id": "msg_1",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "msg_1"
+        }
+      }
+    },
+    {
+      "type": "text-delta",
+      "id": "msg_1",
+      "delta": "Par"
+    },
+    {
+      "type": "text-end",
+      "id": "msg_1",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "msg_1"
+        }
+      }
+    },
+    {
+      "type": "error",
+      "error": {
+        "type": "error",
+        "sequence_number": 8,
+        "error": {
+          "type": "t",
+          "code": "c",
+          "message": "Broken."
+        }
+      }
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "error",
+        "raw": "error"
+      },
+      "usage": {
+        "inputTokens": {},
+        "outputTokens": {}
+      },
+      "providerMetadata": {
+        "openai": {
+          "responseId": "resp_1"
+        }
+      }
+    }
+  ]
+}

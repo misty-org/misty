@@ -1,0 +1,171 @@
+{
+  "name": "tool_call_streamed_with_strict_false",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Weather in Oslo?"
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "weather_forecast",
+        "description": "The forecast for a place.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "days": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ],
+    "toolChoice": {
+      "type": "auto"
+    }
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":0}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":1}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\",\"status\":\"in_progress\",\"arguments\":\"\",\"call_id\":\"call_1\",\"name\":\"weather_forecast\"},\"sequence_number\":2}\n\nevent: response.function_call_arguments.delta\ndata: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"{\\\"place\\\":\",\"sequence_number\":3}\n\nevent: response.function_call_arguments.delta\ndata: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_1\",\"output_index\":0,\"delta\":\"\\\"Oslo\\\"}\",\"sequence_number\":4}\n\nevent: response.function_call_arguments.done\ndata: {\"type\":\"response.function_call_arguments.done\",\"item_id\":\"fc_1\",\"output_index\":0,\"arguments\":\"{\\\"place\\\":\\\"Oslo\\\"}\",\"sequence_number\":5}\n\nevent: response.output_item.done\ndata: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"id\":\"fc_1\",\"type\":\"function_call\",\"status\":\"completed\",\"arguments\":\"{\\\"place\\\":\\\"Oslo\\\"}\",\"call_id\":\"call_1\",\"name\":\"weather_forecast\"},\"sequence_number\":6}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"completed\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":{\"input_tokens\":12,\"input_tokens_details\":{\"cached_tokens\":0},\"output_tokens\":3,\"output_tokens_details\":{\"reasoning_tokens\":0},\"total_tokens\":15}},\"sequence_number\":7}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Weather in Oslo?"
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "weather_forecast",
+            "description": "The forecast for a place.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "place": {
+                  "type": "string"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "place"
+              ],
+              "additionalProperties": false
+            },
+            "strict": false
+          }
+        ],
+        "tool_choice": "auto",
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp_1",
+      "timestamp": "2026-09-21T14:13:20.000Z",
+      "modelId": "gpt-5.1-2026-01-01"
+    },
+    {
+      "type": "tool-input-start",
+      "id": "call_1",
+      "toolName": "weather_forecast"
+    },
+    {
+      "type": "tool-input-delta",
+      "id": "call_1",
+      "delta": "{\"place\":"
+    },
+    {
+      "type": "tool-input-delta",
+      "id": "call_1",
+      "delta": "\"Oslo\"}"
+    },
+    {
+      "type": "tool-input-end",
+      "id": "call_1"
+    },
+    {
+      "type": "tool-call",
+      "toolCallId": "call_1",
+      "toolName": "weather_forecast",
+      "input": "{\"place\":\"Oslo\"}",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "fc_1"
+        }
+      }
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "tool-calls"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "input_tokens": 12,
+          "input_tokens_details": {
+            "cached_tokens": 0
+          },
+          "output_tokens": 3,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "providerMetadata": {
+        "openai": {
+          "responseId": "resp_1"
+        }
+      }
+    }
+  ]
+}

@@ -11,14 +11,22 @@ rust-version = "1.80"
 name = "misty_agent"
 
 [dependencies]
+base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 futures-util = "0.3"
+brotli-decompressor = "5"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+html5ever = "0.38"
+rand = "0.8"
+regex = "1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
 serde = { version = "1", features = ["derive"] }
 # `raw_value` keeps tool schemas and call inputs in their original key order (`src/sdk/raw_json.rs`).
 serde_json = { version = "1", features = ["raw_value"] }
 thiserror = "1"
+url = "2"
+tokio = { version = "1", features = ["net", "sync", "time"] }
 
 [dev-dependencies]
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "test-util"] }

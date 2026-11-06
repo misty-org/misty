@@ -40,6 +40,20 @@ pub(crate) fn js_suffix(text: &str, count: usize) -> &str {
     &text[byte_offset(text, length.saturating_sub(count))..]
 }
 
+/// A character JavaScript's `\s` and `trim` count as space. Rust's own set differs: it has U+0085
+/// and lacks U+FEFF.
+pub(crate) fn js_is_space(character: char) -> bool {
+    matches!(
+        character,
+        '\t' | '\n' | '\u{B}' | '\u{C}' | '\r' | ' ' | '\u{A0}' | '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{2028}' | '\u{2029}' | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
+    )
+}
+
+/// `text.trim()`.
+pub(crate) fn js_trim(text: &str) -> &str {
+    text.trim_matches(js_is_space)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,6 +63,12 @@ mod tests {
         assert_eq!(js_len("abc"), 3);
         assert_eq!(js_len("é"), 1);
         assert_eq!(js_len("😀"), 2);
+    }
+
+    #[test]
+    fn trimming_uses_javascripts_spaces() {
+        assert_eq!(js_trim("\u{FEFF} a\u{A0}\n"), "a");
+        assert_eq!(js_trim("\u{85}a"), "\u{85}a");
     }
 
     #[test]

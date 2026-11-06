@@ -1,0 +1,191 @@
+{
+  "name": "invalid_chunks_mid_stream",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-6-20260101\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":1,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}}\n\nevent: something_new\ndata: {\"type\":\"something_new\",\"a\":1}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"unknown_block\"}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"unknown_delta\"}}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{},\"usage\":{}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Fine.\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":3}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "msg_1",
+      "modelId": "claude-sonnet-4-6-20260101"
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [],\n    \"note\": \"No matching discriminator\",\n    \"discriminator\": \"type\",\n    \"options\": [\n      \"message_start\",\n      \"content_block_start\",\n      \"content_block_delta\",\n      \"content_block_stop\",\n      \"error\",\n      \"message_delta\",\n      \"message_stop\",\n      \"ping\"\n    ],\n    \"path\": [\n      \"type\"\n    ],\n    \"message\": \"Invalid discriminator value. Expected 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'error' | 'message_delta' | 'message_stop' | 'ping'\"\n  }\n]"
+        },
+        "value": {
+          "type": "something_new",
+          "a": 1
+        }
+      }
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [],\n    \"note\": \"No matching discriminator\",\n    \"discriminator\": \"type\",\n    \"options\": [\n      \"text\",\n      \"thinking\",\n      \"tool_use\",\n      \"redacted_thinking\",\n      \"compaction\",\n      \"server_tool_use\",\n      \"mcp_tool_use\",\n      \"mcp_tool_result\",\n      \"web_fetch_tool_result\",\n      \"web_search_tool_result\",\n      \"code_execution_tool_result\",\n      \"bash_code_execution_tool_result\",\n      \"text_editor_code_execution_tool_result\",\n      \"tool_search_tool_result\",\n      \"advisor_tool_result\",\n      \"fallback\"\n    ],\n    \"path\": [\n      \"content_block\",\n      \"type\"\n    ],\n    \"message\": \"Invalid discriminator value. Expected 'text' | 'thinking' | 'tool_use' | 'redacted_thinking' | 'compaction' | 'server_tool_use' | 'mcp_tool_use' | 'mcp_tool_result' | 'web_fetch_tool_result' | 'web_search_tool_result' | 'code_execution_tool_result' | 'bash_code_execution_tool_result' | 'text_editor_code_execution_tool_result' | 'tool_search_tool_result' | 'advisor_tool_result' | 'fallback'\"\n  }\n]"
+        },
+        "value": {
+          "type": "content_block_start",
+          "index": 0,
+          "content_block": {
+            "type": "unknown_block"
+          }
+        }
+      }
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"content_block\",\n      \"text\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  }\n]"
+        },
+        "value": {
+          "type": "content_block_start",
+          "index": 0,
+          "content_block": {
+            "type": "text"
+          }
+        }
+      }
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [],\n    \"note\": \"No matching discriminator\",\n    \"discriminator\": \"type\",\n    \"options\": [\n      \"input_json_delta\",\n      \"text_delta\",\n      \"thinking_delta\",\n      \"signature_delta\",\n      \"compaction_delta\",\n      \"citations_delta\"\n    ],\n    \"path\": [\n      \"delta\",\n      \"type\"\n    ],\n    \"message\": \"Invalid discriminator value. Expected 'input_json_delta' | 'text_delta' | 'thinking_delta' | 'signature_delta' | 'compaction_delta' | 'citations_delta'\"\n  }\n]"
+        },
+        "value": {
+          "type": "content_block_delta",
+          "index": 0,
+          "delta": {
+            "type": "unknown_delta"
+          }
+        }
+      }
+    },
+    {
+      "type": "error",
+      "error": {
+        "name": "AI_TypeValidationError",
+        "cause": {
+          "name": "ZodError",
+          "message": "[\n  {\n    \"expected\": \"number\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"usage\",\n      \"output_tokens\"\n    ],\n    \"message\": \"Invalid input: expected number, received undefined\"\n  }\n]"
+        },
+        "value": {
+          "type": "message_delta",
+          "delta": {},
+          "usage": {}
+        }
+      }
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Fine."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "end_turn"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "outputTokens": {
+          "total": 3
+        },
+        "raw": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 3
+        }
+      },
+      "providerMetadata": {
+        "anthropic": {
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 3
+          },
+          "stopSequence": null,
+          "iterations": null,
+          "container": null,
+          "contextManagement": null
+        }
+      }
+    }
+  ]
+}

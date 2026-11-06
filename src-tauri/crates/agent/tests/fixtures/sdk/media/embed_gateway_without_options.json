@@ -1,0 +1,49 @@
+{
+  "name": "embed_gateway_without_options",
+  "kind": "embed",
+  "modelId": "gateway/openai/text-embedding-3-small",
+  "credentialProvider": "gateway",
+  "input": {
+    "values": [
+      "one"
+    ]
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embeddings\":[[0.1]]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embedding-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-embedding-model-specification-version": "4",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/text-embedding-3-small",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "values": [
+          "one"
+        ]
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

@@ -1,0 +1,16 @@
+<html><head>
+<title>Title with <b>tags</b> &amp; entities</title>
+<style>p > a { content: "</p><p>style text"; }</style>
+<script>if (a < b) { document.write("<p>from script</p>"); } // </div></script>
+<script><!-- document.write("<script>inner</script>after escape"); --></script>
+</head><body>
+<p>Kept</p>
+<textarea rows=2>Text &amp; <b>tags</b> in textarea</textarea>
+<xmp><b>xmp</b> &amp; text</xmp>
+<listing><b>listing</b> text</listing>
+<noembed>noembed <b>text</b></noembed>
+<noframes>noframes <b>text</b></noframes>
+<script src=x /></script><p>After self-closing script</p>
+<style/>Not inside style
+<plaintext>Not plain <b>at all</b>
+</body></html>

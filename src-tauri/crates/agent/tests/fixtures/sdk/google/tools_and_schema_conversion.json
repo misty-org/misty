@@ -1,0 +1,376 @@
+{
+  "name": "tools_and_schema_conversion",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Use them."
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "zeta_first",
+        "description": "Order matters.",
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "zulu",
+            "alpha"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "zulu": {
+              "type": "string",
+              "description": "Last letter.",
+              "minLength": 2,
+              "format": "date-time"
+            },
+            "alpha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mike": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bravo": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "golf": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/thing"
+              }
+            },
+            "kilo": {
+              "enum": [
+                "a",
+                "b"
+              ]
+            },
+            "lima": {
+              "type": "integer",
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "nova": {
+              "const": "only"
+            },
+            "oscar": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "papa": {
+              "allOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            },
+            "quebec": {
+              "type": "object",
+              "description": "Anything."
+            },
+            "romeo": {
+              "type": "object"
+            },
+            "sierra": true,
+            "tango": {
+              "type": [
+                "null"
+              ]
+            },
+            "uniform": {
+              "enum": [
+                "a",
+                null
+              ]
+            },
+            "victor": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "$defs": {
+            "thing": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "function",
+        "name": "no_input",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hi.\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Use them."
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "functionDeclarations": [
+              {
+                "name": "zeta_first",
+                "description": "Order matters.",
+                "parameters": {
+                  "required": [
+                    "zulu",
+                    "alpha"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "zulu": {
+                      "description": "Last letter.",
+                      "format": "date-time",
+                      "type": "string",
+                      "minLength": 2
+                    },
+                    "alpha": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "mike": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "bravo": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ],
+                      "nullable": true
+                    },
+                    "golf": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "kilo": {
+                      "type": "string",
+                      "enum": [
+                        "a",
+                        "b"
+                      ]
+                    },
+                    "lima": {
+                      "type": "integer",
+                      "format": "enum",
+                      "enum": [
+                        "1",
+                        "2"
+                      ]
+                    },
+                    "nova": {
+                      "type": "string",
+                      "enum": [
+                        "only"
+                      ]
+                    },
+                    "oscar": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "papa": {
+                      "allOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "quebec": {
+                      "type": "object",
+                      "description": "Anything."
+                    },
+                    "romeo": {
+                      "type": "object"
+                    },
+                    "sierra": {
+                      "type": "boolean",
+                      "properties": {}
+                    },
+                    "tango": {
+                      "type": "null"
+                    },
+                    "uniform": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "a"
+                      ]
+                    },
+                    "victor": {
+                      "type": "object"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "no_input",
+                "description": ""
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

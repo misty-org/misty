@@ -1,0 +1,78 @@
+{
+  "name": "embed_nvidia",
+  "kind": "embed",
+  "modelId": "nvidia/nv-embed",
+  "credentialProvider": "nvidia",
+  "input": {
+    "values": [
+      "one"
+    ],
+    "providerOptions": {
+      "openai": {
+        "dimensions": 128
+      },
+      "openai-compatible": {
+        "dimensions": 128
+      },
+      "openrouter": {
+        "dimensions": 128
+      },
+      "nvidia": {
+        "dimensions": 128
+      },
+      "ollama": {
+        "dimensions": 128
+      },
+      "google": {
+        "outputDimensionality": 128
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"data\":[{\"embedding\":[0.5]}],\"usage\":{\"prompt_tokens\":2},\"providerMetadata\":{\"nvidia\":{\"kept\":true}}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "nv-embed",
+        "input": [
+          "one"
+        ],
+        "encoding_format": "float",
+        "dimensions": 128
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.5
+      ]
+    ],
+    "tokens": 2,
+    "warnings": [
+      {
+        "type": "deprecated",
+        "setting": "providerOptions key 'openai-compatible'",
+        "message": "Use 'openaiCompatible' instead."
+      }
+    ],
+    "providerMetadata": {
+      "nvidia": {
+        "kept": true
+      }
+    }
+  }
+}

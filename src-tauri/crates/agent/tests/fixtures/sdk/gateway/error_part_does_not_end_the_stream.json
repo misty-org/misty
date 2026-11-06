@@ -1,0 +1,92 @@
+{
+  "name": "error_part_does_not_end_the_stream",
+  "modelId": "gateway/openai/gpt-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"type\":\"stream-start\",\"warnings\":[]}\n\ndata: {\"type\":\"error\",\"error\":{\"message\":\"Partial failure.\",\"type\":\"internal_server_error\"}}\n\ndata: {\"type\":\"finish\",\"finishReason\":{\"unified\":\"error\"},\"usage\":{\"inputTokens\":{\"total\":5,\"noCache\":5,\"cacheRead\":0},\"outputTokens\":{\"total\":2,\"text\":2,\"reasoning\":0},\"raw\":{\"a\":1}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"openai/gpt-test\"},\"cost\":\"0.001\"}}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "openai/gpt-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "error",
+      "error": {
+        "message": "Partial failure.",
+        "type": "internal_server_error"
+      }
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "error"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 5,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 2,
+          "text": 2,
+          "reasoning": 0
+        },
+        "raw": {
+          "a": 1
+        }
+      },
+      "providerMetadata": {
+        "gateway": {
+          "routing": {
+            "originalModelId": "openai/gpt-test"
+          },
+          "cost": "0.001"
+        }
+      }
+    }
+  ]
+}

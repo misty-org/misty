@@ -216,7 +216,7 @@ fn assistant_message<'a>(content: &'a [AssistantPart], provider: &str) -> ChatMe
     let mut calls = Vec::new();
     for part in content {
         match part {
-            AssistantPart::Text { text: piece } => text.push_str(piece),
+            AssistantPart::Text { text: piece, .. } => text.push_str(piece),
             AssistantPart::Reasoning { text: piece, .. } => reasoning.push_str(piece),
             AssistantPart::ToolCall { tool_call_id, tool_name, input, provider_options } => {
                 calls.push(ChatToolCall {

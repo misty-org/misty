@@ -1,0 +1,57 @@
+{
+  "name": "auth_failure",
+  "modelId": "gateway/openai/gpt-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 401,
+  "contentType": "application/json",
+  "response": "{\"error\":{\"message\":\"Bad key test-key-parity\",\"type\":\"authentication_error\"}}",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "openai/gpt-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Go."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "GatewayAuthenticationError",
+    "message": "AI Gateway authentication failed: Invalid API key or token.\n\nCreate a new API key: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%2Fapi-keys\n\nProvide an API key or Vercel access token via 'apiKey' option or 'AI_GATEWAY_API_KEY' environment variable.",
+    "statusCode": 401,
+    "isRetryable": false
+  }
+}

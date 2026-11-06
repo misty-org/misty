@@ -1,0 +1,43 @@
+{
+  "name": "speech_openai_for_the_voice_pipeline",
+  "kind": "speech",
+  "modelId": "openai/gpt-4o-mini-tts",
+  "credentialProvider": "openai",
+  "input": {
+    "text": "Hello.",
+    "voice": "alloy",
+    "outputFormat": "pcm"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "bodyBase64": "AQIDBAUGBwg="
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/speech",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-4o-mini-tts",
+        "input": "Hello.",
+        "voice": "alloy",
+        "response_format": "pcm"
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "AQIDBAUGBwg=",
+    "mediaType": "audio/mp3",
+    "format": "mp3",
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

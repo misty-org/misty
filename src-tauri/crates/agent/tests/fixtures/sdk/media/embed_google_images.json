@@ -1,0 +1,88 @@
+{
+  "name": "embed_google_images",
+  "kind": "embed",
+  "modelId": "google/gemini-embedding-2",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "",
+      "two"
+    ],
+    "providerOptions": {
+      "google": {
+        "content": [
+          [
+            {
+              "inlineData": {
+                "mimeType": "image/png",
+                "data": "iVBORw0KGgo="
+              }
+            }
+          ],
+          null
+        ]
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embeddings\":[{\"values\":[0.1]},{\"values\":[0.2]}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-2:batchEmbedContents",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "requests": [
+          {
+            "model": "models/gemini-embedding-2",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "inlineData": {
+                    "mimeType": "image/png",
+                    "data": "iVBORw0KGgo="
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-2",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "two"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ],
+      [
+        0.2
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

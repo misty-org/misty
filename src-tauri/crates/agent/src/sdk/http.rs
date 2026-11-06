@@ -33,7 +33,30 @@ pub(crate) async fn post_json<B: Serialize>(
     Err(failure(response, secret, error_message).await)
 }
 
-async fn failure(
+/// Sends a body of any kind, returning whatever the provider answered.
+pub(crate) async fn post_body(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &[(&str, String)],
+    content_type: &str,
+    body: Vec<u8>,
+    secret: &str,
+) -> Result<reqwest::Response, ModelError> {
+    let mut request = client
+        .post(url)
+        .header(reqwest::header::CONTENT_TYPE, content_type)
+        .body(body);
+    for (name, value) in headers {
+        request = request.header(*name, value);
+    }
+    request
+        .send()
+        .await
+        .map_err(|error| ModelError::Network(scrub(&error.to_string(), secret)))
+}
+
+/// Reads a failed response into its error.
+pub(crate) async fn failure(
     response: reqwest::Response,
     secret: &str,
     error_message: fn(&Value) -> Option<String>,
@@ -54,11 +77,71 @@ async fn failure(
     }
 }
 
-fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<u64> {
-    let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
-    if let Some(ms) = header("retry-after-ms").and_then(|value| value.parse::<f64>().ok()) {
+/// `parseFloat`: the number a text starts with, ignoring what follows.
+fn leading_number(text: &str) -> Option<f64> {
+    let text = text.trim_start();
+    let mut end = 0;
+    let mut seen_dot = false;
+    for (at, character) in text.char_indices() {
+        let fits = character.is_ascii_digit()
+            || (at == 0 && matches!(character, '+' | '-'))
+            || (character == '.' && !seen_dot);
+        if !fits {
+            break;
+        }
+        seen_dot |= character == '.';
+        end = at + character.len_utf8();
+    }
+    text[..end].parse().ok()
+}
+
+fn now_ms() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |elapsed| elapsed.as_millis() as f64)
+}
+
+/// How long a provider asked callers to wait, as the SDK reads it in `getRetryDelayInMs`: in
+/// milliseconds, in seconds, or until a date. A negative wait counts as none.
+pub(crate) fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+    let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok()).filter(|value| !value.is_empty());
+    if let Some(ms) = header("retry-after-ms").and_then(leading_number) {
         return (ms >= 0.0).then_some(ms as u64);
     }
-    let seconds = header("retry-after")?.parse::<f64>().ok()?;
-    (seconds >= 0.0).then_some((seconds * 1000.0) as u64)
+    let value = header("retry-after")?;
+    let ms = match leading_number(value) {
+        Some(seconds) => seconds * 1000.0,
+        None => chrono::DateTime::parse_from_rfc2822(value).ok()?.timestamp_millis() as f64 - now_ms(),
+    };
+    (ms >= 0.0).then_some(ms as u64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::header::{HeaderMap, HeaderValue};
+
+    fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
+        let mut map = HeaderMap::new();
+        for (name, value) in pairs {
+            map.insert(*name, HeaderValue::from_str(value).unwrap());
+        }
+        map
+    }
+
+    #[test]
+    fn retry_after_reads_as_the_sdk_does() {
+        assert_eq!(retry_after(&headers(&[("retry-after-ms", "1500")])), Some(1500));
+        assert_eq!(retry_after(&headers(&[("retry-after", "2")])), Some(2000));
+        assert_eq!(retry_after(&headers(&[("retry-after", "2.5 seconds")])), Some(2500));
+        assert_eq!(retry_after(&headers(&[("retry-after-ms", "100"), ("retry-after", "2")])), Some(100));
+        assert_eq!(retry_after(&headers(&[("retry-after-ms", "nope"), ("retry-after", "2")])), Some(2000));
+        assert_eq!(retry_after(&headers(&[("retry-after", "-1")])), None);
+        assert_eq!(retry_after(&headers(&[("retry-after", "Wed, 21 Oct 2015 07:28:00 GMT")])), None, "a date in the past");
+        assert_eq!(retry_after(&headers(&[("retry-after", "soon")])), None);
+        assert_eq!(retry_after(&headers(&[])), None);
+        let later = chrono::DateTime::from_timestamp((now_ms() / 1000.0) as i64 + 30, 0).unwrap().to_rfc2822();
+        let waited = retry_after(&headers(&[("retry-after", later.as_str())])).unwrap();
+        assert!(waited > 25_000 && waited <= 30_000, "{waited}");
+    }
 }

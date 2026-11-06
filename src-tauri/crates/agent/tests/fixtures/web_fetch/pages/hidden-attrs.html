@@ -1,0 +1,13 @@
+<html><head><title>Hidden</title></head><body>
+<div hidden="">a</div><div hidden="false">b</div><div hidden="until-found">c</div>
+<div aria-hidden="true">d</div><div aria-hidden="false">e</div><div aria-hidden>f</div><div aria-hidden="TRUE">g</div>
+<div role="navigation">h</div><div role="banner">i</div><div role="contentinfo">j</div><div role="main navigation">k</div><div role="">l</div>
+<nav>m</nav><header>n</header><footer>o</footer><aside>p</aside><select><option>q</select>
+<noscript>r</noscript><template>s</template><canvas>t</canvas><iframe>u</iframe>
+<div><nav><div>v</div></nav>w</div>
+<section hidden><p>x</p><main>y</main></section>
+<div hidden hidden="x" role=banner>z</div>
+<p aria-hidden="true" aria-hidden="false">first attribute wins</p>
+<p aria-hidden="false" aria-hidden="true">first attribute wins here too</p>
+<span>inline</span><span> joined</span>
+</body></html>

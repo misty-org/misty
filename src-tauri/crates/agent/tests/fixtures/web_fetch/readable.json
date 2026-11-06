@@ -1,0 +1,910 @@
+[
+ {
+  "page": "attributes.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Attributes",
+   "text": "quote first\nequals first\nno space between",
+   "truncated": false
+  }
+ },
+ {
+  "page": "bom.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "BOM",
+   "text": "After a byte order mark.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "comment-only.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": null
+ },
+ {
+  "page": "comments.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Comments",
+   "text": "Before\nNot IE\nshort commentstill text\na < b and c > d, <3 and x\nTag soup: <> link\nSelf closed p then text\nSelf closed div",
+   "truncated": false
+  }
+ },
+ {
+  "page": "crlf.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "CRLF",
+   "text": "Line one line two line three\n- A\n- B",
+   "truncated": false
+  }
+ },
+ {
+  "page": "docs-page.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Configuring the client - Docs",
+   "text": "# Configuring the client\nSet options with client.configure(). See options.\n## Options\nClient options\nName | Type | Default\ntimeout | number | 30\nretries | number | 3\nAll values are optional\n### Example\nconst client = new Client({ timeout: 10, // seconds retries: 1 < 2 ? 1 : 2, });\n#### Notes\ntimeout\nSeconds to wait.\nretries\nTimes to try again.\nAdvanced\nUse Ctrl+C to stop.\n##### Fine print\n###### Finer print\nSearch docs\nGo\nFeedback\nHelpful?\nSay more &amp; more\nWritten by the docs team",
+   "truncated": false
+  }
+ },
+ {
+  "page": "ecommerce-product.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Trail Runner 3 Shoes\n    | Peak Outfitters",
+   "text": "# Trail Runner 3\n4.2 out of 5 stars (182 reviews)\n$140.00 $99.00\nSize\nRegular\nWide\nAdd to cart\nIn stock\nShips in 2 days\nFree returns\n## Details\nWeight: 280 g\nDrop: 6 mm\n- Upper: mesh\nWidth | Regular\nSeason | All\n## Reviews\nLight and fast.\nRuns small.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "empty.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": null
+ },
+ {
+  "page": "entities.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Tom & Jerry — “Home” &bogus; <b> &",
+   "text": "Named: & < > \" ' © ® ™ … € £ ¥\nNo semicolon: & < > © ® ¬in ¬it; &ere; & &Amp;\nNumeric: A A A 😀 😀 – � � � &#; &#x;\nUnknown: &foo; &foo &; & &&\nSpaces: a b c d e​f",
+   "truncated": false
+  }
+ },
+ {
+  "page": "fragment-divs.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "",
+   "text": "Inner article",
+   "truncated": false
+  }
+ },
+ {
+  "page": "fragment.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "frameset.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Frames",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "head-first-script.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Script first",
+   "text": "Script before head.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "head-then-link.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Link between",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "head-then-script.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Script between",
+   "text": "Body after a script.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "hidden-attrs.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Hidden",
+   "text": "e\nf\ng\nk\nl\nw\nfirst attribute wins here too",
+   "truncated": false
+  }
+ },
+ {
+  "page": "hidden-root.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "implied-close.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Implied",
+   "text": "One\nTwo\nThree\nFour\nFive\nSix\n# Heading\nIn heading\nAfter heading\n- A\n- B\n- C\n- D\n- one\n- nested in div\nT1\nD1\nT2\nD2\n1 | 2\n3 | 4 | 5\nkank( boldbothitalicplain link\ndiv in link\naftertail stray closes\nafter br close\ntwo text after input\nBtn\nBtn2\ninner\ncenteredfontnobr\nSecond body\nSecond html",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-cdata.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "CDATA",
+   "text": "Before\nAfter",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-close-tag-space.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Space in a close tag",
+   "text": "One\nTwo",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-comment-bang.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Comment end",
+   "text": "Before\nAfter",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-crlf-title.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Line one\r\nline two",
+   "text": "Body",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-nul.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Nul\u0000 in title",
+   "text": "a\u0000b",
+   "truncated": false
+  }
+ },
+ {
+  "page": "known-upper-attrs.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Upper attributes",
+   "text": "Upper hidden\nUpper role\nUpper aria\nKept",
+   "truncated": false
+  }
+ },
+ {
+  "page": "line-rules.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Lines",
+   "text": "Same\nOther\nSame\n-a\nPrefix lost to the paragraph\n- Kept prefix\n- Span keeps it\nSecond line\nHeading lost to the div\n## Kept heading\nText after empty heading\n- Same\na\nb\nlots of space here\nx\ntrailing\n| leading\nL\nLe\nSu\nCa\nDd",
+   "truncated": false
+  }
+ },
+ {
+  "page": "long-article.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 1 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 2 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 3 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 4 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 5 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 6 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 7 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 8 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 9 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 10 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 11 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 12 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 13 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 14 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 15 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 16 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 17 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 18 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 19 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 20 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 21 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 22 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 23 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 24 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 25 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 26 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 27 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 28 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 29 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 30 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 31 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 32 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 33 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 34 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 35 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 36 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 37 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 38 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 39 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 40 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 41 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 42 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 43 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 44 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 45 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 46 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 47 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 48 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 49 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 50 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 51 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 52 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 53 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 54 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 55 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 56 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 57 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 58 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 59 tells the long history of the company and its many offices around the world, with details nobody asked for.\n## Pricing\nThe Business plan costs $24 per user per month.\nDiscounts follow for annual billing.\n### Préférences\n日本語 の説明 and an emoji 😀 sit here.\n- Business support\n- User limits\nParagraph 60 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 61 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 62 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 63 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 64 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 65 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 66 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 67 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 68 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 69 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 70 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 71 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 72 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 73 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 74 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 75 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 76 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 77 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 78 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 79 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 80 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 81 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 82 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 83 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 84 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 85 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 86 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 87 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 88 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 89 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 90 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 91 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 92 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 93 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 94 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 95 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 96 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 97 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 98 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 99 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 100 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 101 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 102 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 103 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 104 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 105 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 106 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 107 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 108 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 109 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 110 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 111 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 112 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 113 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 114 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 115 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 116 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 117 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 118 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 119 tells the long history of the company and its many offices around the world, with details nobody asked for.\n😀😀😀",
+   "truncated": false
+  }
+ },
+ {
+  "page": "main-below-threshold.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Threshold",
+   "text": "12345",
+   "truncated": false
+  }
+ },
+ {
+  "page": "main-small.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Small main",
+   "text": "Intro\n## Team\n$12 a month\n## Pro\n$30 a month",
+   "truncated": false
+  }
+ },
+ {
+  "page": "main-threshold.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Threshold",
+   "text": "123456",
+   "truncated": false
+  }
+ },
+ {
+  "page": "nested-body.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Nested",
+   "text": "Inner body\nOuter",
+   "truncated": false
+  }
+ },
+ {
+  "page": "news-article.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "City council approves new transit plan | The Daily Gazette",
+   "text": "# City council approves new transit plan\nBy Jane O’Brien · October 30, 2026\nA city bus on Main Street. Photo: J. Lee\nThe city council voted 7–2 on Tuesday to approve a $1.2 billion transit plan, ending months of debate.\n“This is a generational investment,” said Mayor Ana Ruiz. Critics disagree, calling it \"too expensive\".\nWe can't afford to wait another decade.\nCouncilmember Park\n## What happens next\nConstruction begins in spring. Fares stay flat through 2028.\n- Three new bus lines\n- Two light-rail extensions\n- Free transfers\nRead more at our transit page.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "no-body-tag.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "No body tag",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "no-body-with-main.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Main only",
+   "text": "# Main area\nStill found.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "no-head.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "",
+   "text": "# No head\nLate title\nBody text.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "no-html.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "old-school.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Bob's Home Page",
+   "text": "# Welcome to Bob's Page!\nThis page is always under construction.\nPrices start at $5 & up. © 1998 Bob All rights reserved\nItem | Cost\nWidget | $5\n- One\n- Two\nText after breaks",
+   "truncated": false
+  }
+ },
+ {
+  "page": "omitted-both.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Omitted",
+   "text": "In body",
+   "truncated": false
+  }
+ },
+ {
+  "page": "omitted-head-close.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Omitted close",
+   "text": "Implied head close.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "pricing.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Pricing – Acme Notes",
+   "text": "# Simple, transparent pricing\nChoose the plan that fits. Compare all features.\nMonthly\nYearly Save 20%\n## Free\n$0 per user/month\n- Up to 3 notebooks\n- 7 days of history\nStart free\n## Pro Most popular\n$12 per user/month, billed annually\n- Unlimited notebooks\n- Version history & backups\n- Priority support\nStart trial\n## Business\n$24 per user/month\nEverything in Pro, plus:\n- SSO & SCIM\n- Audit logs\nFeature | Free | Pro | Business\nNotebooks | 3 | Unlimited | Unlimited\nSSO | | | Yes\nSupport | — | Email | 24/7",
+   "truncated": false
+  }
+ },
+ {
+  "page": "raw-text.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Title with <b>tags</b> & entities",
+   "text": "Kept\nText &amp; <b>tags</b> in textarea <b>xmp</b> &amp; text listing text noembed text noframes text\nAfter self-closing script",
+   "truncated": false
+  }
+ },
+ {
+  "page": "role-main.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Role main",
+   "text": "# Role main\nThis is the content of the page, long enough to win.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "script-only.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": null
+ },
+ {
+  "page": "spa-shell.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Dashboard",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "svg-math.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Foreign",
+   "text": "Before after svg\nAfter self-closed svg\nDiv closes itself now\nx=2 Span too\nBack to normal\nEnd",
+   "truncated": false
+  }
+ },
+ {
+  "page": "tables.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Tables",
+   "text": "Text in table\nOne | Two\nMore text\nDiv in table\nOnly\n| Second\nA\nOuter\nInner\n| After\na | b | c\nx\ny\nz\nstray cell | after\nstray row",
+   "truncated": false
+  }
+ },
+ {
+  "page": "tag-edges.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Tag edges",
+   "text": "onetwothree\nname with bracket\nspaced self close\nx\nyz\nupper\nmixed\nafter upper style after upper script <b>upper area</b> after script with attributes after near miss after newline in close second titleafter second title\nx\nafter newline in p close\n- li\n# spaced h1\nnot a heading\n# self closed heading dup <1>not a tag odd name <ÿ>non ascii name tab in tag doctype mid page double dash empty comment after spaced",
+   "truncated": false
+  }
+ },
+ {
+  "page": "text-only.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": null
+ },
+ {
+  "page": "truncated-close.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-close2.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-comment.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-decl.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-doctype.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-entity.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Ends in &",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-name.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-numeric-entity.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Ends in \u0006",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-partial-entity.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Ends in &am",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-pi.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-script.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-style.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-tag.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Whole line\nHalf a line",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-text.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Ends in text <",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-textarea.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-title-entity.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut &",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-title.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Never closed <b>title</b></head><body><p>Swallowed</p>",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "page": "truncated-xmp.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Cut",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "two-articles.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Two",
+   "text": "First article has most of the words on this page by far.",
+   "truncated": false
+  }
+ },
+ {
+  "page": "unclosed-nav.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Unclosed",
+   "text": "Before",
+   "truncated": false
+  }
+ },
+ {
+  "page": "unicode.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Ünïcødé 日本語 😀",
+   "text": "日本語のテキスト 😀 emoji 👩‍👩‍👧 family\nالعربية שלום right to left\nno break em ideographic\nzero​width and feff and nel and line para\npréférences naïve Straße İstanbul ΣΑΣ",
+   "truncated": false
+  }
+ },
+ {
+  "page": "wikipedia-like.html",
+  "contentType": "text/html",
+  "question": "",
+  "limit": 15000,
+  "result": {
+   "title": "Lake Example - Encyclopedia",
+   "text": "# Lake Example\nFrom Encyclopedia, the free encyclopedia\nLake Example\nLocation\nCountry | Exampleland\nDepth | 42 m[1]\nMap | Photo\nLake Example is a lake in Exampleland.[1] It is known for its clear water.\nThe lake was named in 1802.\n## History[edit]\nEarly settlers fished here.\n- First settlement\n- Second settlement\n- A hamlet\n- A mill\n- Third settlement\n## References\n- ^ Survey, 1990",
+   "truncated": false
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "what does the business plan cost per user",
+  "limit": 15000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 1 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 2 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 3 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 4 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 5 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 6 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 7 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 8 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 9 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 10 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 11 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 12 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 13 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 14 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 15 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 16 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 17 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 18 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 19 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 20 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 21 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 22 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 23 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 24 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 25 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 26 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 27 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 28 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 29 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 30 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 31 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 32 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 33 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 34 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 35 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 36 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 37 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 38 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 39 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 40 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 41 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 42 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 43 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 44 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 45 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 46 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 47 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 48 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 49 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 50 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 51 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 52 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 53 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 54 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 55 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 56 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 57 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 58 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 59 tells the long history of the company and its many offices around the world, with details nobody asked for.\n## Pricing\nThe Business plan costs $24 per user per month.\nDiscounts follow for annual billing.\n### Préférences\n日本語 の説明 and an emoji 😀 sit here.\n- Business support\n- User limits\nParagraph 60 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 61 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 62 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 63 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 64 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 65 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 66 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 67 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 68 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 69 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 70 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 71 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 72 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 73 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 74 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 75 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 76 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 77 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 78 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 79 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 80 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 81 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 82 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 83 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 84 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 85 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 86 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 87 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 88 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 89 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 90 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 91 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 92 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 93 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 94 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 95 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 96 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 97 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 98 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 99 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 100 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 101 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 102 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 103 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 104 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 105 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 106 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 107 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 108 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 109 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 110 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 111 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 112 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 113 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 114 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 115 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 116 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 117 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 118 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 119 tells the long history of the company and its many offices around the world, with details nobody asked for.\n😀😀😀",
+   "truncated": false
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "what does the business plan cost per user",
+  "limit": 2000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 1 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 2 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 3 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 4 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 5 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 6 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 7 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 8 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 9 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 10 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 11 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 12 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 13 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 14 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 15 tells the long history of the company and its many offices around the world, with details nobody asked for.\n## Pricing\nThe Business plan costs $24 per user per month.\nDis",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "zebra quartz nothing matches",
+  "limit": 2000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 59 tells the long history of the company and its many offices around the world, with details nobody asked for.\n## Pricing\nThe Business plan costs $24 per user per month.\nDiscounts follow for annual billing.\n### Préférences\n日本語 の説明 and an emoji 😀 sit here.",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "",
+  "limit": 2000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 1 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 2 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 3 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 4 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 5 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 6 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 7 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 8 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 9 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 10 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 11 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 12 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 13 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 14 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 15 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 16 tells the long history of the company and its man",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "the",
+  "limit": 500,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 1 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 2 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 3 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagrap",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "long-article.html",
+  "question": "préférences 日本語 emoji",
+  "limit": 3000,
+  "result": {
+   "title": "Long read",
+   "text": "# Long read\nParagraph 0 tells the long history of the company and its many offices around the world, with details nobody asked for.\nParagraph 59 tells the long history of the company and its many offices around the world, with details nobody asked for.\n## Pricing\nThe Business plan costs $24 per user per month.\nDiscounts follow for annual billing.\n### Préférences\n日本語 の説明 and an emoji 😀 sit here.\n- Business support",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "unicode.html",
+  "question": "",
+  "limit": 7,
+  "result": {
+   "title": "Ünïcødé 日本語 😀",
+   "text": "日本語のテキス",
+   "truncated": true
+  }
+ },
+ {
+  "contentType": "text/html",
+  "page": "unicode.html",
+  "question": "",
+  "limit": 40,
+  "result": {
+   "title": "Ünïcødé 日本語 😀",
+   "text": "日本語のテキスト 😀 emoji 👩‍👩‍👧 family\nالعربي",
+   "truncated": true
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "plain.txt",
+  "contentType": "text/plain",
+  "result": {
+   "title": "",
+   "text": "Plain text stays as it is.\n\nEven <b>this</b>.",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "data.json",
+  "contentType": "application/json",
+  "result": {
+   "title": "",
+   "text": "{ \"ok\": true,\n  \"items\": [1, 2] }",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "plain.txt",
+  "contentType": "",
+  "result": {
+   "title": "",
+   "text": "",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "pricing.html",
+  "contentType": "application/xhtml+xml",
+  "result": {
+   "title": "Pricing – Acme Notes",
+   "text": "# Simple, transparent pricing\nChoose the plan that fits. Compare all features.\nMonthly\nYearly Save 20%\n## Free\n$0 per user/month\n- Up to 3 notebooks\n- 7 days of history\nStart free\n## Pro Most popular\n$12 per user/month, billed annually\n- Unlimited notebooks\n- Version history & backups\n- Priority support\nStart trial\n## Business\n$24 per user/month\nEverything in Pro, plus:\n- SSO & SCIM\n- Audit logs\nFeature | Free | Pro | Business\nNotebooks | 3 | Unlimited | Unlimited\nSSO | | | Yes\nSupport | — | Email | 24/7",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "pricing.html",
+  "contentType": "text/xml; charset=utf-8",
+  "result": {
+   "title": "Pricing – Acme Notes",
+   "text": "# Simple, transparent pricing\nChoose the plan that fits. Compare all features.\nMonthly\nYearly Save 20%\n## Free\n$0 per user/month\n- Up to 3 notebooks\n- 7 days of history\nStart free\n## Pro Most popular\n$12 per user/month, billed annually\n- Unlimited notebooks\n- Version history & backups\n- Priority support\nStart trial\n## Business\n$24 per user/month\nEverything in Pro, plus:\n- SSO & SCIM\n- Audit logs\nFeature | Free | Pro | Business\nNotebooks | 3 | Unlimited | Unlimited\nSSO | | | Yes\nSupport | — | Email | 24/7",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "pricing.html",
+  "contentType": "",
+  "result": {
+   "title": "Pricing – Acme Notes",
+   "text": "# Simple, transparent pricing\nChoose the plan that fits. Compare all features.\nMonthly\nYearly Save 20%\n## Free\n$0 per user/month\n- Up to 3 notebooks\n- 7 days of history\nStart free\n## Pro Most popular\n$12 per user/month, billed annually\n- Unlimited notebooks\n- Version history & backups\n- Priority support\nStart trial\n## Business\n$24 per user/month\nEverything in Pro, plus:\n- SSO & SCIM\n- Audit logs\nFeature | Free | Pro | Business\nNotebooks | 3 | Unlimited | Unlimited\nSSO | | | Yes\nSupport | — | Email | 24/7",
+   "truncated": false
+  }
+ },
+ {
+  "question": "",
+  "limit": 15000,
+  "page": "pricing.html",
+  "contentType": "text/plain",
+  "result": {
+   "title": "",
+   "text": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Pricing &ndash; Acme Notes</title>\n  <meta name=\"description\" content=\"Plans for every team\">\n  <link rel=\"stylesheet\" href=\"/app.css\">\n  <script src=\"/analytics.js\" async></script>\n  <script>window.__STATE__ = {\"plans\":[\"<b>Pro</b>\"]};</script>\n  <style>.price{color:red}</style>\n</head>\n<body class=\"pricing\">\n  <header class=\"site-header\">\n    <a href=\"/\"><img src=\"/logo.svg\" alt=\"Acme\"></a>\n    <nav aria-label=\"Main\"><ul><li><a href=\"/features\">Features</a></li><li><a href=\"/pricing\">Pricing</a></li></ul></nav>\n    <button>Sign in</button>\n  </header>\n  <main id=\"content\">\n    <h1>Simple, transparent pricing</h1>\n    <p>Choose the plan that fits. <a href=\"/compare\">Compare all features</a>.</p>\n    <div class=\"toggle\" role=\"tablist\">\n      <button role=\"tab\" aria-selected=\"false\">Monthly</button>\n      <button role=\"tab\" aria-selected=\"true\">Yearly <span class=\"badge\">Save 20%</span></button>\n    </div>\n    <section class=\"cards\">\n      <article class=\"card\">\n        <h2>Free</h2>\n        <div class=\"price\"><span class=\"sr-only\">$0 per user/month</span><span aria-hidden=\"true\"><i>$</i><i>0</i></span></div>\n        <ul>\n          <li>Up to 3 notebooks</li>\n          <li>7 days of history</li>\n        </ul>\n        <a class=\"cta\" href=\"/signup\">Start free</a>\n      </article>\n      <article class=\"card featured\">\n        <h2>Pro <small>Most popular</small></h2>\n        <div class=\"price\">$12 <span>per user/month, billed annually</span></div>\n        <ul>\n          <li>Unlimited notebooks</li>\n          <li>Version history &amp; backups</li>\n          <li>Priority support</li>\n        </ul>\n        <a class=\"cta\" href=\"/signup?plan=pro\">Start trial</a>\n      </article>\n      <article class=\"card\">\n        <h2>Business</h2>\n        <div class=\"price\">$24 <span>per user/month</span></div>\n        <p>Everything in Pro, plus:</p>\n        <ul>\n          <li>SSO &amp; SCIM</li>\n          <li>Audit logs</li>\n        </ul>\n      </article>\n    </section>\n    <table class=\"compare\">\n      <thead><tr><th>Feature</th><th>Free</th><th>Pro</th><th>Business</th></tr></thead>\n      <tbody>\n        <tr><td>Notebooks</td><td>3</td><td>Unlimited</td><td>Unlimited</td></tr>\n        <tr><td>SSO</td><td></td><td></td><td>Yes</td></tr>\n        <tr><td>Support</td><td>&mdash;</td><td>Email</td><td>24/7</td></tr>\n      </tbody>\n    </table>\n  </main>\n  <aside class=\"promo\"><p>Students get 50% off.</p></aside>\n  <footer><p>&copy; 2026 Acme, Inc.</p><nav><a href=\"/terms\">Terms</a></nav></footer>\n  <script>document.querySelector('.toggle').addEventListener('click', () => {});</script>\n</body>\n</html>",
+   "truncated": false
+  }
+ }
+]

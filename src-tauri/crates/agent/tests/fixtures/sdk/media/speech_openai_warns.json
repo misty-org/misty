@@ -1,0 +1,59 @@
+{
+  "name": "speech_openai_warns",
+  "kind": "speech",
+  "modelId": "openai/tts-1",
+  "credentialProvider": "openai",
+  "input": {
+    "text": "Hello.",
+    "voice": "nova",
+    "outputFormat": "weird",
+    "language": "de",
+    "speed": 1.5,
+    "instructions": "Softly."
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "bodyBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/speech",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "tts-1",
+        "input": "Hello.",
+        "voice": "nova",
+        "response_format": "mp3",
+        "speed": 1.5,
+        "instructions": "Softly."
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA",
+    "mediaType": "audio/wav",
+    "format": "wav",
+    "warnings": [
+      {
+        "type": "unsupported",
+        "feature": "outputFormat",
+        "details": "Unsupported output format: weird. Using mp3 instead."
+      },
+      {
+        "type": "unsupported",
+        "feature": "language",
+        "details": "OpenAI speech models do not support language selection. Language parameter \"de\" was ignored."
+      }
+    ],
+    "providerMetadata": {}
+  }
+}

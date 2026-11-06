@@ -1,0 +1,38 @@
+{
+  "name": "speech_elevenlabs_failure",
+  "kind": "speech",
+  "modelId": "elevenlabs/eleven_flash_v2_5",
+  "credentialProvider": "elevenlabs",
+  "input": {
+    "text": "Hello."
+  },
+  "replies": [
+    {
+      "status": 401,
+      "contentType": "application/json",
+      "body": "{\"error\":{\"message\":\"No key.\",\"code\":401}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM?output_format=mp3_44100_128",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "xi-api-key": "test-key-parity"
+      },
+      "body": {
+        "text": "Hello.",
+        "model_id": "eleven_flash_v2_5"
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "No key.",
+    "statusCode": 401,
+    "isRetryable": false
+  }
+}

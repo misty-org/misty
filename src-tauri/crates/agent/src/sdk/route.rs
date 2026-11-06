@@ -9,7 +9,14 @@ use super::{
     error::ModelError,
     model::LanguageModel,
     prompt::{Message, OutputItem, ToolOutput, ToolResultPart, UserPart},
-    providers::openai_compatible::OpenAiCompatibleModel,
+    providers::{
+        anthropic::AnthropicModel,
+        chatgpt::{self, ChatGptModel},
+        gateway::{self, GatewayModel},
+        google::{self, GoogleModel},
+        openai_compatible::OpenAiCompatibleModel,
+        openai_responses::OpenAiResponsesModel,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -72,7 +79,7 @@ impl ProviderId {
     }
 
     /// Where a chat-completions provider lives unless the person's settings say otherwise.
-    fn default_compatible_base(self) -> Option<&'static str> {
+    pub(crate) fn default_compatible_base(self) -> Option<&'static str> {
         match self {
             Self::Openrouter => Some("https://openrouter.ai/api/v1"),
             Self::Nvidia => Some("https://integrate.api.nvidia.com/v1"),
@@ -185,13 +192,43 @@ fn screenshots_taken_from(part: ToolResultPart, images: &mut Vec<UserPart>) -> T
     }
 }
 
-/// One call's model on the route's key, with the call's options adjusted for that provider.
-pub fn resolve_model(
-    model_id: &str,
-    mut options: CallOptions,
-    route: &ModelRoute,
-    client: &reqwest::Client,
-) -> Result<(Arc<dyn LanguageModel>, CallOptions), ModelError> {
+/// Gateway routing options mean nothing to any other provider.
+fn without_gateway_options(options: &mut CallOptions) {
+    if let Some(provider_options) = &mut options.provider_options {
+        provider_options.remove("gateway");
+    }
+}
+
+/// Gateway model lists name models as the Gateway does, without a `gateway/` prefix.
+fn gateway_options(options: &mut CallOptions) {
+    let models = options
+        .provider_options
+        .as_mut()
+        .and_then(|provider_options| provider_options.get_mut("gateway"))
+        .and_then(|routing| routing.get_mut("models"))
+        .and_then(serde_json::Value::as_array_mut);
+    for model in models.into_iter().flatten() {
+        if let Some(name) = model.as_str().and_then(|name| name.strip_prefix("gateway/")) {
+            *model = name.into();
+        }
+    }
+}
+
+/// The Gateway names `claude-haiku-5.5`, and Anthropic's own API names `claude-haiku-5-5`.
+fn anthropic_model_name(model: &str) -> String {
+    model.replace('.', "-")
+}
+
+/// Which provider, model name and key one call uses.
+pub(crate) struct Target {
+    pub(crate) provider: ProviderId,
+    pub(crate) model: String,
+    pub(crate) api_key: String,
+    pub(crate) base_url: Option<String>,
+}
+
+/// `resolveTarget`, for every kind of model.
+pub(crate) fn resolve_target(model_id: &str, route: &ModelRoute) -> Result<Target, ModelError> {
     let (provider, model) = parse_model_id(model_id)?;
     let credential = &route.credential;
     // A key is used only for its own provider.
@@ -206,6 +243,18 @@ pub fn resolve_model(
     if provider == ProviderId::OpenaiCompatible && base_url.is_none() {
         return Err(ModelError::bad_base_url("An OpenAI-compatible model needs a base URL."));
     }
+    Ok(Target { provider, model: model.to_owned(), api_key, base_url })
+}
+
+/// One call's model on the route's key, with the call's options adjusted for that provider.
+pub fn resolve_model(
+    model_id: &str,
+    mut options: CallOptions,
+    route: &ModelRoute,
+    client: &reqwest::Client,
+) -> Result<(Arc<dyn LanguageModel>, CallOptions), ModelError> {
+    let Target { provider, model, api_key, base_url } = resolve_target(model_id, route)?;
+    let model = model.as_str();
     options.reasoning = route.reasoning.clone().filter(|value| !value.is_empty()).or(options.reasoning);
     match provider {
         ProviderId::Openrouter
@@ -230,8 +279,40 @@ pub fn resolve_model(
         ProviderId::Elevenlabs | ProviderId::Soniox => {
             Err(ModelError::unsupported_model("This provider has no language models."))
         }
-        ProviderId::Openai | ProviderId::Anthropic | ProviderId::Google | ProviderId::Gateway | ProviderId::Chatgpt => {
-            Err(ModelError::unsupported_model("This provider isn't available in the Rust runtime yet."))
+        ProviderId::Google => {
+            without_gateway_options(&mut options);
+            let base = base_url.as_deref().unwrap_or(google::DEFAULT_BASE_URL);
+            Ok((Arc::new(GoogleModel::new(client.clone(), base, &api_key, model)), options))
+        }
+        ProviderId::Gateway => {
+            gateway_options(&mut options);
+            let base = base_url.as_deref().unwrap_or(gateway::DEFAULT_BASE_URL);
+            Ok((Arc::new(GatewayModel::new(client.clone(), base, &api_key, model)), options))
+        }
+        ProviderId::Openai => {
+            without_gateway_options(&mut options);
+            // Responses normalizes an omitted strict flag, which can turn optional capability
+            // arguments into required fields. The admitted schema stays as it is unless the caller
+            // asked for strict function calling.
+            for tool in &mut options.tools {
+                tool.strict.get_or_insert(false);
+            }
+            Ok((
+                Arc::new(OpenAiResponsesModel::new(client.clone(), base_url.as_deref(), &api_key, model)),
+                options,
+            ))
+        }
+        ProviderId::Anthropic => {
+            without_gateway_options(&mut options);
+            Ok((
+                Arc::new(AnthropicModel::new(client.clone(), base_url.as_deref(), &api_key, &anthropic_model_name(model))),
+                options,
+            ))
+        }
+        ProviderId::Chatgpt => {
+            without_gateway_options(&mut options);
+            let options = chatgpt::prepared_options(options);
+            Ok((Arc::new(ChatGptModel::new(client.clone(), chatgpt::API_URL, &api_key, model)), options))
         }
     }
 }

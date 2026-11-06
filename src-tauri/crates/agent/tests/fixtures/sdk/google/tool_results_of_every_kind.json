@@ -1,0 +1,346 @@
+{
+  "name": "tool_results_of_every_kind",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Do it."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "toolCallId": "a",
+            "toolName": "plain",
+            "input": {
+              "z": 1,
+              "a": 2
+            },
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "sig-kept"
+              }
+            }
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "b",
+            "toolName": "structured",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "c",
+            "toolName": "failed",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "d",
+            "toolName": "failed_json",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "e",
+            "toolName": "denied",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "f",
+            "toolName": "denied_reason",
+            "input": {}
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool-result",
+            "toolCallId": "a",
+            "toolName": "plain",
+            "output": {
+              "type": "text",
+              "value": "Fine."
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "b",
+            "toolName": "structured",
+            "output": {
+              "type": "json",
+              "value": {
+                "z": 1,
+                "a": [
+                  true,
+                  null
+                ]
+              }
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "c",
+            "toolName": "failed",
+            "output": {
+              "type": "error-text",
+              "value": "Broke."
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "d",
+            "toolName": "failed_json",
+            "output": {
+              "type": "error-json",
+              "value": {
+                "code": 5
+              }
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "e",
+            "toolName": "denied",
+            "output": {
+              "type": "execution-denied"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "f",
+            "toolName": "denied_reason",
+            "output": {
+              "type": "execution-denied",
+              "reason": "Not allowed."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hi.\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Do it."
+              }
+            ]
+          },
+          {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "a",
+                  "name": "plain",
+                  "args": {
+                    "z": 1,
+                    "a": 2
+                  }
+                },
+                "thoughtSignature": "sig-kept"
+              },
+              {
+                "functionCall": {
+                  "id": "b",
+                  "name": "structured",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "c",
+                  "name": "failed",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "d",
+                  "name": "failed_json",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "e",
+                  "name": "denied",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "f",
+                  "name": "denied_reason",
+                  "args": {}
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "parts": [
+              {
+                "functionResponse": {
+                  "id": "a",
+                  "name": "plain",
+                  "response": {
+                    "name": "plain",
+                    "content": "Fine."
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "b",
+                  "name": "structured",
+                  "response": {
+                    "name": "structured",
+                    "content": {
+                      "z": 1,
+                      "a": [
+                        true,
+                        null
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "c",
+                  "name": "failed",
+                  "response": {
+                    "name": "failed",
+                    "content": "Broke."
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "d",
+                  "name": "failed_json",
+                  "response": {
+                    "name": "failed_json",
+                    "content": {
+                      "code": 5
+                    }
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "e",
+                  "name": "denied",
+                  "response": {
+                    "name": "denied",
+                    "content": "Tool call execution denied."
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "f",
+                  "name": "denied_reason",
+                  "response": {
+                    "name": "denied_reason",
+                    "content": "Not allowed."
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "name": "stream_ends_without_a_finish",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hm."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Partial\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\" answer\",\"thought\":true}]},\"index\":0}]}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Hm."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Partial"
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "reasoning-start",
+      "id": "1"
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "1",
+      "delta": " answer"
+    },
+    {
+      "type": "reasoning-end",
+      "id": "1"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "other"
+      },
+      "usage": {
+        "inputTokens": {},
+        "outputTokens": {}
+      }
+    }
+  ]
+}

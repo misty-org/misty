@@ -1,0 +1,53 @@
+{
+  "name": "speech_elevenlabs_format_names",
+  "kind": "speech",
+  "modelId": "elevenlabs/eleven_flash_v2_5",
+  "credentialProvider": "elevenlabs",
+  "input": {
+    "text": "Hello.",
+    "outputFormat": "mp3",
+    "language": "de",
+    "speed": 1.2,
+    "instructions": "Softly."
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "bodyBase64": "//uQAAEC"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM?output_format=mp3_44100_128",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "xi-api-key": "test-key-parity"
+      },
+      "body": {
+        "text": "Hello.",
+        "model_id": "eleven_flash_v2_5",
+        "language_code": "de",
+        "voice_settings": {
+          "speed": 1.2
+        }
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "//uQAAEC",
+    "mediaType": "audio/mpeg",
+    "format": "mp3",
+    "warnings": [
+      {
+        "type": "unsupported",
+        "feature": "instructions",
+        "details": "ElevenLabs speech models do not support instructions. Instructions parameter was ignored."
+      }
+    ],
+    "providerMetadata": {}
+  }
+}

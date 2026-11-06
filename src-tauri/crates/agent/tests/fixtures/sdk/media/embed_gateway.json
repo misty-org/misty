@@ -1,0 +1,103 @@
+{
+  "name": "embed_gateway",
+  "kind": "embed",
+  "modelId": "gateway/openai/text-embedding-3-small",
+  "credentialProvider": "gateway",
+  "input": {
+    "values": [
+      "one",
+      "two"
+    ],
+    "providerOptions": {
+      "openai": {
+        "dimensions": 32
+      },
+      "openai-compatible": {
+        "dimensions": 32
+      },
+      "openrouter": {
+        "dimensions": 32
+      },
+      "nvidia": {
+        "dimensions": 32
+      },
+      "ollama": {
+        "dimensions": 32
+      },
+      "google": {
+        "outputDimensionality": 32
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embeddings\":[[0.1],[0.2]],\"usage\":{\"tokens\":4},\"warnings\":[{\"type\":\"other\",\"message\":\"Careful.\"}],\"providerMetadata\":{\"gateway\":{\"cost\":\"0.1\"}}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embedding-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-embedding-model-specification-version": "4",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/text-embedding-3-small",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "values": [
+          "one",
+          "two"
+        ],
+        "providerOptions": {
+          "openai": {
+            "dimensions": 32
+          },
+          "openai-compatible": {
+            "dimensions": 32
+          },
+          "openrouter": {
+            "dimensions": 32
+          },
+          "nvidia": {
+            "dimensions": 32
+          },
+          "ollama": {
+            "dimensions": 32
+          },
+          "google": {
+            "outputDimensionality": 32
+          }
+        }
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ],
+      [
+        0.2
+      ]
+    ],
+    "tokens": 4,
+    "warnings": [
+      {
+        "type": "other",
+        "message": "Careful."
+      }
+    ],
+    "providerMetadata": {
+      "gateway": {
+        "cost": "0.1"
+      }
+    }
+  }
+}

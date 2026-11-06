@@ -58,6 +58,8 @@ pub enum UserPart {
 pub enum AssistantPart {
     Text {
         text: String,
+        #[serde(default, rename = "providerOptions", skip_serializing_if = "Option::is_none")]
+        provider_options: Option<ProviderOptions>,
     },
     Reasoning {
         text: String,
