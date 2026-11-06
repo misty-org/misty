@@ -1,0 +1,119 @@
+{
+  "name": "routing_without_a_model_list",
+  "modelId": "gateway/openai/gpt-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ],
+    "providerOptions": {
+      "gateway": {
+        "order": [
+          "openai"
+        ]
+      }
+    }
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"type\":\"stream-start\",\"warnings\":[]}\n\ndata: {\"type\":\"response-metadata\",\"id\":\"gen_1\",\"modelId\":\"openai/gpt-test\",\"timestamp\":\"2026-09-21T14:13:20Z\"}\n\ndata: {\"type\":\"text-start\",\"id\":\"t1\"}\n\ndata: {\"type\":\"text-delta\",\"id\":\"t1\",\"delta\":\"Hi.\"}\n\ndata: {\"type\":\"text-end\",\"id\":\"t1\"}\n\ndata: {\"type\":\"finish\",\"finishReason\":{\"unified\":\"stop\",\"raw\":\"stop\"},\"usage\":{\"inputTokens\":{\"total\":5,\"noCache\":5,\"cacheRead\":0},\"outputTokens\":{\"total\":2,\"text\":2,\"reasoning\":0},\"raw\":{\"a\":1}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"openai/gpt-test\"},\"cost\":\"0.001\"}}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "openai/gpt-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "providerOptions": {
+          "gateway": {
+            "order": [
+              "openai"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "gen_1",
+      "modelId": "openai/gpt-test",
+      "timestamp": "2026-09-21T14:13:20.000Z"
+    },
+    {
+      "type": "text-start",
+      "id": "t1"
+    },
+    {
+      "type": "text-delta",
+      "id": "t1",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "t1"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "stop"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 5,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 2,
+          "text": 2,
+          "reasoning": 0
+        },
+        "raw": {
+          "a": 1
+        }
+      },
+      "providerMetadata": {
+        "gateway": {
+          "routing": {
+            "originalModelId": "openai/gpt-test"
+          },
+          "cost": "0.001"
+        }
+      }
+    }
+  ]
+}

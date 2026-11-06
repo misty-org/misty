@@ -1,0 +1,171 @@
+{
+  "name": "calls_across_chunks_keep_finish_reason",
+  "modelId": "google/gemini-2.5-flash",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Weather?"
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "weather_forecast",
+        "description": "The forecast for a place.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "days": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"id\":\"call-one\",\"name\":\"weather_forecast\",\"args\":{\"place\":\"Oslo\"}}}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Also.\"}]},\"index\":0,\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":4,\"candidatesTokenCount\":1}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Weather?"
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "functionDeclarations": [
+              {
+                "name": "weather_forecast",
+                "description": "The forecast for a place.",
+                "parameters": {
+                  "required": [
+                    "place"
+                  ],
+                  "type": "object",
+                  "properties": {
+                    "place": {
+                      "type": "string"
+                    },
+                    "days": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "tool-input-start",
+      "id": "call-one",
+      "toolName": "weather_forecast"
+    },
+    {
+      "type": "tool-input-delta",
+      "id": "call-one",
+      "delta": "{\"place\":\"Oslo\"}"
+    },
+    {
+      "type": "tool-input-end",
+      "id": "call-one"
+    },
+    {
+      "type": "tool-call",
+      "toolCallId": "call-one",
+      "toolName": "weather_forecast",
+      "input": "{\"place\":\"Oslo\"}"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Also."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "tool-calls",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 4,
+          "noCache": 4,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 1,
+          "text": 1,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 4,
+          "candidatesTokenCount": 1
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 4,
+            "candidatesTokenCount": 1
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

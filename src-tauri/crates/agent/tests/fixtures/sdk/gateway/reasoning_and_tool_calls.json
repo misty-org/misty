@@ -1,0 +1,225 @@
+{
+  "name": "reasoning_and_tool_calls",
+  "modelId": "gateway/google/gemini-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "weather_forecast",
+        "description": "The forecast for a place.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "days": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"type\":\"stream-start\",\"warnings\":[{\"type\":\"other\",\"message\":\"Careful.\"}]}\n\ndata: {\"type\":\"response-metadata\",\"id\":\"gen_2\"}\n\ndata: {\"type\":\"reasoning-start\",\"id\":\"r1\",\"providerMetadata\":{\"google\":{\"thoughtSignature\":\"s\"}}}\n\ndata: {\"type\":\"reasoning-delta\",\"id\":\"r1\",\"delta\":\"Hmm.\",\"providerMetadata\":{\"google\":{\"thoughtSignature\":\"s\"}}}\n\ndata: {\"type\":\"reasoning-end\",\"id\":\"r1\",\"providerMetadata\":{\"anthropic\":{\"signature\":\"a\"}}}\n\ndata: {\"type\":\"text-start\",\"id\":\"t1\",\"providerMetadata\":{\"openai\":{\"itemId\":\"m1\"}}}\n\ndata: {\"type\":\"text-delta\",\"id\":\"t1\",\"delta\":\"Calling.\",\"providerMetadata\":{\"openai\":{\"itemId\":\"m1\"}}}\n\ndata: {\"type\":\"text-end\",\"id\":\"t1\",\"providerMetadata\":{\"openai\":{\"itemId\":\"m1\"}}}\n\ndata: {\"type\":\"tool-input-start\",\"id\":\"c1\",\"toolName\":\"weather_forecast\",\"providerMetadata\":{\"google\":{\"thoughtSignature\":\"s2\"}}}\n\ndata: {\"type\":\"tool-input-delta\",\"id\":\"c1\",\"delta\":\"{\\\"place\\\":\\\"Oslo\\\"}\"}\n\ndata: {\"type\":\"tool-input-end\",\"id\":\"c1\"}\n\ndata: {\"type\":\"tool-call\",\"toolCallId\":\"c1\",\"toolName\":\"weather_forecast\",\"input\":\"{\\\"place\\\":\\\"Oslo\\\"}\",\"providerMetadata\":{\"google\":{\"thoughtSignature\":\"s2\"}}}\n\ndata: {\"type\":\"finish\",\"finishReason\":{\"unified\":\"tool-calls\",\"raw\":\"tool_use\"},\"usage\":{\"inputTokens\":{\"total\":5,\"noCache\":5,\"cacheRead\":0},\"outputTokens\":{\"total\":2,\"text\":2,\"reasoning\":0},\"raw\":{\"a\":1}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"openai/gpt-test\"},\"cost\":\"0.001\"}}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "google/gemini-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "weather_forecast",
+            "description": "The forecast for a place.",
+            "inputSchema": {
+              "type": "object",
+              "properties": {
+                "place": {
+                  "type": "string"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "place"
+              ],
+              "additionalProperties": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": [
+        {
+          "type": "other",
+          "message": "Careful."
+        }
+      ]
+    },
+    {
+      "type": "response-metadata",
+      "id": "gen_2"
+    },
+    {
+      "type": "reasoning-start",
+      "id": "r1",
+      "providerMetadata": {
+        "google": {
+          "thoughtSignature": "s"
+        }
+      }
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "r1",
+      "delta": "Hmm.",
+      "providerMetadata": {
+        "google": {
+          "thoughtSignature": "s"
+        }
+      }
+    },
+    {
+      "type": "reasoning-end",
+      "id": "r1",
+      "providerMetadata": {
+        "anthropic": {
+          "signature": "a"
+        }
+      }
+    },
+    {
+      "type": "text-start",
+      "id": "t1",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "m1"
+        }
+      }
+    },
+    {
+      "type": "text-delta",
+      "id": "t1",
+      "delta": "Calling.",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "m1"
+        }
+      }
+    },
+    {
+      "type": "text-end",
+      "id": "t1",
+      "providerMetadata": {
+        "openai": {
+          "itemId": "m1"
+        }
+      }
+    },
+    {
+      "type": "tool-input-start",
+      "id": "c1",
+      "toolName": "weather_forecast",
+      "providerMetadata": {
+        "google": {
+          "thoughtSignature": "s2"
+        }
+      }
+    },
+    {
+      "type": "tool-input-delta",
+      "id": "c1",
+      "delta": "{\"place\":\"Oslo\"}"
+    },
+    {
+      "type": "tool-input-end",
+      "id": "c1"
+    },
+    {
+      "type": "tool-call",
+      "toolCallId": "c1",
+      "toolName": "weather_forecast",
+      "input": "{\"place\":\"Oslo\"}",
+      "providerMetadata": {
+        "google": {
+          "thoughtSignature": "s2"
+        }
+      }
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "tool-calls",
+        "raw": "tool_use"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 5,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 2,
+          "text": 2,
+          "reasoning": 0
+        },
+        "raw": {
+          "a": 1
+        }
+      },
+      "providerMetadata": {
+        "gateway": {
+          "routing": {
+            "originalModelId": "openai/gpt-test"
+          },
+          "cost": "0.001"
+        }
+      }
+    }
+  ]
+}

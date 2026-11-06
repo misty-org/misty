@@ -1,0 +1,55 @@
+{
+  "name": "rejected_token",
+  "modelId": "chatgpt/gpt-test",
+  "credentialProvider": "chatgpt",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 401,
+  "contentType": "application/json",
+  "response": "{\"error\":{\"message\":\"Bad token.\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "text/event-stream",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-test",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "store": false,
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Bad token.",
+    "statusCode": 401,
+    "isRetryable": false
+  }
+}

@@ -1,0 +1,31 @@
+<html><head><title>Tag edges</title></head><body>
+<p>one<a/b>two</a/b>three</p>
+<div<span>name with bracket</div<span>
+<p/ >spaced self close</p>
+<br/ >x<hr/>y<img src=a/>z
+<DIV CLASS=a>upper</DIV><dIv>mixed</DiV>
+<STYLE>p{}</STYLE>after upper style
+<SCRIPT>var a="<p>x</p>";</SCRIPT>after upper script
+<TEXTAREA><b>upper area</b></TEXTAREA>
+<script>a</script foo="bar">after script with attributes
+<script>b</scriptx></script>after near miss
+<style>c</style
+>after newline in close
+<title>second title</title>after second title
+<p>x</p
+>after newline in p close
+<li attr=1 / >li</li>
+<h1 >spaced h1</h1 >
+<h7>not a heading</h7>
+<h1/>self closed heading
+<a b=1 b=2 >dup</a>
+<1>not a tag</1>
+<a@b>odd name</a@b>
+<ÿ>non ascii name</ÿ>
+<a	b>tab in tag</a>
+<!doctype html>doctype mid page
+<!-- a -- b -->double dash
+<!---->empty comment
+<!--->
+<!--a-- >spaced close-->after spaced
+</body></html>

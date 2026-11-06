@@ -1,0 +1,71 @@
+{
+  "name": "speech_gateway",
+  "kind": "speech",
+  "modelId": "gateway/openai/tts-1",
+  "credentialProvider": "gateway",
+  "input": {
+    "text": "Hello.",
+    "voice": "alloy",
+    "outputFormat": "pcm",
+    "speed": 1.1,
+    "language": "en",
+    "instructions": "Softly.",
+    "providerOptions": {
+      "openai": {
+        "a": 1
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"audio\":\"//uQAAEC\",\"warnings\":[{\"type\":\"other\",\"message\":\"Careful.\"}],\"providerMetadata\":{\"gateway\":{\"cost\":\"0.1\"}}}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/speech-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-model-id": "openai/tts-1",
+        "ai-speech-model-specification-version": "4",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "Hello.",
+        "voice": "alloy",
+        "outputFormat": "pcm",
+        "instructions": "Softly.",
+        "speed": 1.1,
+        "language": "en",
+        "providerOptions": {
+          "openai": {
+            "a": 1
+          }
+        }
+      }
+    }
+  ],
+  "result": {
+    "audioBase64": "//uQAAEC",
+    "mediaType": "audio/mpeg",
+    "format": "mp3",
+    "warnings": [
+      {
+        "type": "other",
+        "message": "Careful."
+      }
+    ],
+    "providerMetadata": {
+      "gateway": {
+        "cost": "0.1"
+      }
+    }
+  }
+}

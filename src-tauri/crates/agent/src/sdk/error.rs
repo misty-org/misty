@@ -1,5 +1,6 @@
 //! Why a model call failed. A message here never carries a key: everything that holds one goes
 //! through [`scrub`] first, so errors are safe for logs, run history and the person.
+use serde_json::Value;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -22,6 +23,24 @@ pub enum ModelError {
     /// Something the model call needs isn't supported by this provider.
     #[error("{0}")]
     Unsupported(String),
+    /// The call worked but gave nothing usable, such as an answer that isn't the JSON asked for.
+    /// `name` is the SDK's error name.
+    #[error("{message}")]
+    NoOutput { name: &'static str, message: String },
+    /// Every try failed. `errors` holds each failure, the last one last.
+    #[error("{message}")]
+    Retry {
+        reason: RetryReason,
+        message: String,
+        errors: Vec<ModelError>,
+    },
+}
+
+/// Why trying again stopped.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetryReason {
+    MaxRetriesExceeded,
+    ErrorNotRetryable,
 }
 
 impl ModelError {
@@ -51,7 +70,7 @@ impl ModelError {
         match self {
             Self::Api { retryable, .. } => *retryable,
             Self::Network(_) => true,
-            Self::Setup { .. } | Self::Unsupported(_) => false,
+            Self::Setup { .. } | Self::Unsupported(_) | Self::NoOutput { .. } | Self::Retry { .. } => false,
         }
     }
 }
@@ -72,6 +91,16 @@ pub(crate) fn scrub(text: &str, secret: &str) -> String {
     text.replace(secret, "[redacted]")
 }
 
+/// Removes a key from every string in an error a provider sent, as `scrub` does for text.
+pub(crate) fn scrub_value(value: &mut Value, secret: &str) {
+    match value {
+        Value::String(text) => *text = scrub(text, secret),
+        Value::Array(items) => items.iter_mut().for_each(|item| scrub_value(item, secret)),
+        Value::Object(fields) => fields.values_mut().for_each(|field| scrub_value(field, secret)),
+        _ => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,6 +109,13 @@ mod tests {
     fn scrubbing_removes_keys_but_not_short_values() {
         assert_eq!(scrub("bad key sk-12345678", "sk-12345678"), "bad key [redacted]");
         assert_eq!(scrub("abc", "abc"), "abc");
+    }
+
+    #[test]
+    fn scrubbing_reaches_every_string_in_a_value() {
+        let mut error = serde_json::json!({ "message": "bad sk-12345678", "data": [{ "text": "sk-12345678!" }] });
+        scrub_value(&mut error, "sk-12345678");
+        assert_eq!(error, serde_json::json!({ "message": "bad [redacted]", "data": [{ "text": "[redacted]!" }] }));
     }
 
     #[test]

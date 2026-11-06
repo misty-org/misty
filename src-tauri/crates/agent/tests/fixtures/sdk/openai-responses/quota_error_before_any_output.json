@@ -1,0 +1,54 @@
+{
+  "name": "quota_error_before_any_output",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":0}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":1}\n\nevent: error\ndata: {\"type\":\"error\",\"error\":{\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\",\"message\":\"Out of quota.\",\"param\":null},\"sequence_number\":2}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Out of quota.",
+    "statusCode": 429,
+    "isRetryable": true
+  }
+}

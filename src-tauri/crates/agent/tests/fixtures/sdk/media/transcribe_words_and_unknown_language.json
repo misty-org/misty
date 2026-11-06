@@ -1,0 +1,63 @@
+{
+  "name": "transcribe_words_and_unknown_language",
+  "kind": "transcribe",
+  "modelId": "openai/gpt-4o-mini-transcribe",
+  "credentialProvider": "openai",
+  "input": {
+    "audioBase64": "AQIDBAUGBwg="
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"Hi there\",\"language\":\"klingon\",\"words\":[{\"word\":\"Hi\",\"start\":0,\"end\":0.5},{\"word\":\"there\",\"start\":0.5,\"end\":1}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "model",
+            "filename": null,
+            "contentType": null,
+            "base64": "Z3B0LTRvLW1pbmktdHJhbnNjcmliZQ=="
+          },
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "AQIDBAUGBwg="
+          }
+        ]
+      }
+    }
+  ],
+  "result": {
+    "text": "Hi there",
+    "segments": [
+      {
+        "text": "Hi",
+        "startSecond": 0,
+        "endSecond": 0.5
+      },
+      {
+        "text": "there",
+        "startSecond": 0.5,
+        "endSecond": 1
+      }
+    ],
+    "language": null,
+    "durationInSeconds": null,
+    "warnings": [],
+    "providerMetadata": {}
+  }
+}

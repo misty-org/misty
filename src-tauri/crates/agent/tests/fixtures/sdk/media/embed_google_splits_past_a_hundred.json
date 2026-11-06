@@ -1,0 +1,1266 @@
+{
+  "name": "embed_google_splits_past_a_hundred",
+  "kind": "embed",
+  "modelId": "google/gemini-embedding-001",
+  "credentialProvider": "google",
+  "input": {
+    "values": [
+      "v0",
+      "v1",
+      "v2",
+      "v3",
+      "v4",
+      "v5",
+      "v6",
+      "v7",
+      "v8",
+      "v9",
+      "v10",
+      "v11",
+      "v12",
+      "v13",
+      "v14",
+      "v15",
+      "v16",
+      "v17",
+      "v18",
+      "v19",
+      "v20",
+      "v21",
+      "v22",
+      "v23",
+      "v24",
+      "v25",
+      "v26",
+      "v27",
+      "v28",
+      "v29",
+      "v30",
+      "v31",
+      "v32",
+      "v33",
+      "v34",
+      "v35",
+      "v36",
+      "v37",
+      "v38",
+      "v39",
+      "v40",
+      "v41",
+      "v42",
+      "v43",
+      "v44",
+      "v45",
+      "v46",
+      "v47",
+      "v48",
+      "v49",
+      "v50",
+      "v51",
+      "v52",
+      "v53",
+      "v54",
+      "v55",
+      "v56",
+      "v57",
+      "v58",
+      "v59",
+      "v60",
+      "v61",
+      "v62",
+      "v63",
+      "v64",
+      "v65",
+      "v66",
+      "v67",
+      "v68",
+      "v69",
+      "v70",
+      "v71",
+      "v72",
+      "v73",
+      "v74",
+      "v75",
+      "v76",
+      "v77",
+      "v78",
+      "v79",
+      "v80",
+      "v81",
+      "v82",
+      "v83",
+      "v84",
+      "v85",
+      "v86",
+      "v87",
+      "v88",
+      "v89",
+      "v90",
+      "v91",
+      "v92",
+      "v93",
+      "v94",
+      "v95",
+      "v96",
+      "v97",
+      "v98",
+      "v99",
+      "v100"
+    ]
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"embeddings\":[{\"values\":[0.1]}],\"embedding\":{\"values\":[0.1]}}"
+    }
+  ],
+  "unorderedRequests": true,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-001:batchEmbedContents",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "requests": [
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v0"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v1"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v2"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v3"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v4"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v5"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v6"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v7"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v8"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v9"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v10"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v11"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v12"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v13"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v14"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v15"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v16"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v17"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v18"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v19"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v20"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v21"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v22"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v23"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v24"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v25"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v26"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v27"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v28"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v29"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v30"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v31"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v32"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v33"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v34"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v35"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v36"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v37"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v38"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v39"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v40"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v41"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v42"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v43"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v44"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v45"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v46"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v47"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v48"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v49"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v50"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v51"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v52"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v53"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v54"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v55"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v56"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v57"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v58"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v59"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v60"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v61"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v62"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v63"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v64"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v65"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v66"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v67"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v68"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v69"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v70"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v71"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v72"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v73"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v74"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v75"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v76"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v77"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v78"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v79"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v80"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v81"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v82"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v83"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v84"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v85"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v86"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v87"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v88"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v89"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v90"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v91"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v92"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v93"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v94"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v95"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v96"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v97"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v98"
+                }
+              ]
+            }
+          },
+          {
+            "model": "models/gemini-embedding-001",
+            "content": {
+              "role": "user",
+              "parts": [
+                {
+                  "text": "v99"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-embedding-001:embedContent",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "models/gemini-embedding-001",
+        "content": {
+          "parts": [
+            {
+              "text": "v100"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.1
+      ],
+      [
+        0.1
+      ]
+    ],
+    "tokens": null,
+    "warnings": [],
+    "providerMetadata": null
+  }
+}

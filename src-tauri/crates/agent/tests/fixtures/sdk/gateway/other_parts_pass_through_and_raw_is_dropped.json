@@ -1,0 +1,120 @@
+{
+  "name": "other_parts_pass_through_and_raw_is_dropped",
+  "modelId": "gateway/openai/gpt-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"type\":\"stream-start\",\"warnings\":[]}\n\ndata: {\"type\":\"raw\",\"rawValue\":{\"secret\":\"no\"}}\n\ndata: {\"type\":\"source\",\"sourceType\":\"url\",\"id\":\"s1\",\"url\":\"https://example.com\",\"title\":\"Example\"}\n\ndata: {\"type\":\"file\",\"mediaType\":\"image/png\",\"data\":{\"type\":\"data\",\"data\":\"iVBORw0KGgo=\"}}\n\ndata: {\"type\":\"tool-call\",\"toolCallId\":\"p1\",\"toolName\":\"search\",\"input\":\"{}\",\"providerExecuted\":true}\n\ndata: {\"type\":\"tool-result\",\"toolCallId\":\"p1\",\"toolName\":\"search\",\"result\":{\"ok\":true}}\n\ndata: {\"type\":\"something-new\",\"value\":1}\n\ndata: {\"type\":\"finish\",\"finishReason\":{\"unified\":\"stop\",\"raw\":\"stop\"},\"usage\":{\"inputTokens\":{\"total\":5,\"noCache\":5,\"cacheRead\":0},\"outputTokens\":{\"total\":2,\"text\":2,\"reasoning\":0},\"raw\":{\"a\":1}},\"providerMetadata\":{\"gateway\":{\"routing\":{\"originalModelId\":\"openai/gpt-test\"},\"cost\":\"0.001\"}}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "openai/gpt-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "source",
+      "sourceType": "url",
+      "id": "s1",
+      "url": "https://example.com",
+      "title": "Example"
+    },
+    {
+      "type": "file",
+      "mediaType": "image/png",
+      "data": {
+        "type": "data",
+        "data": "iVBORw0KGgo="
+      }
+    },
+    {
+      "type": "tool-call",
+      "toolCallId": "p1",
+      "toolName": "search",
+      "input": "{}",
+      "providerExecuted": true
+    },
+    {
+      "type": "tool-result",
+      "toolCallId": "p1",
+      "toolName": "search",
+      "result": {
+        "ok": true
+      }
+    },
+    {
+      "type": "something-new",
+      "value": 1
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "stop"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 5,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 2,
+          "text": 2,
+          "reasoning": 0
+        },
+        "raw": {
+          "a": 1
+        }
+      },
+      "providerMetadata": {
+        "gateway": {
+          "routing": {
+            "originalModelId": "openai/gpt-test"
+          },
+          "cost": "0.001"
+        }
+      }
+    }
+  ]
+}

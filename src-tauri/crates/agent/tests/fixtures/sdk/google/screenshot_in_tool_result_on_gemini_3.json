@@ -1,0 +1,296 @@
+{
+  "name": "screenshot_in_tool_result_on_gemini_3",
+  "modelId": "google/gemini-3-pro",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Look."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "toolCallId": "a",
+            "toolName": "shot",
+            "input": {},
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "s1"
+              }
+            }
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "b",
+            "toolName": "only_image",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "c",
+            "toolName": "by_url",
+            "input": {}
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool-result",
+            "toolCallId": "a",
+            "toolName": "shot",
+            "output": {
+              "type": "content",
+              "value": [
+                {
+                  "type": "text",
+                  "text": "One."
+                },
+                {
+                  "type": "text",
+                  "text": "Two."
+                },
+                {
+                  "type": "file",
+                  "mediaType": "image/*",
+                  "data": {
+                    "type": "data",
+                    "data": "iVBORw0KGgo="
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "b",
+            "toolName": "only_image",
+            "output": {
+              "type": "content",
+              "value": [
+                {
+                  "type": "file",
+                  "mediaType": "image/png",
+                  "data": {
+                    "type": "data",
+                    "data": "iVBORw0KGgo="
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "c",
+            "toolName": "by_url",
+            "output": {
+              "type": "content",
+              "value": [
+                {
+                  "type": "file",
+                  "mediaType": "image/png",
+                  "data": {
+                    "type": "url",
+                    "url": "data:image/jpeg;base64,/9j/4AAQ"
+                  }
+                },
+                {
+                  "type": "file",
+                  "data": {
+                    "type": "url",
+                    "url": "https://example.com/a.png"
+                  },
+                  "mediaType": "image/png"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hi.\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-3-pro:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Look."
+              }
+            ]
+          },
+          {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "a",
+                  "name": "shot",
+                  "args": {}
+                },
+                "thoughtSignature": "s1"
+              },
+              {
+                "functionCall": {
+                  "id": "b",
+                  "name": "only_image",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "c",
+                  "name": "by_url",
+                  "args": {}
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "parts": [
+              {
+                "functionResponse": {
+                  "id": "a",
+                  "name": "shot",
+                  "response": {
+                    "name": "shot",
+                    "content": "One.\nTwo."
+                  },
+                  "parts": [
+                    {
+                      "inlineData": {
+                        "mimeType": "image/png",
+                        "data": "iVBORw0KGgo="
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "b",
+                  "name": "only_image",
+                  "response": {
+                    "name": "only_image",
+                    "content": "Tool executed successfully."
+                  },
+                  "parts": [
+                    {
+                      "inlineData": {
+                        "mimeType": "image/png",
+                        "data": "iVBORw0KGgo="
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "c",
+                  "name": "by_url",
+                  "response": {
+                    "name": "by_url",
+                    "content": "{\"type\":\"file\",\"data\":{\"type\":\"url\",\"url\":\"https://example.com/a.png\"},\"mediaType\":\"image/png\"}"
+                  },
+                  "parts": [
+                    {
+                      "inlineData": {
+                        "mimeType": "image/jpeg",
+                        "data": "/9j/4AAQ"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

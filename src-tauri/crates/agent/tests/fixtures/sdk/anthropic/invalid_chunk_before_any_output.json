@@ -1,0 +1,56 @@
+{
+  "name": "invalid_chunk_before_any_output",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: something_new\ndata: {\"type\":\"something_new\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "AI_APICallError",
+    "message": "Type validation failed: Value: {\"type\":\"something_new\"}.\nError message: [\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [],\n    \"note\": \"No matching discriminator\",\n    \"discriminator\": \"type\",\n    \"options\": [\n      \"message_start\",\n      \"content_block_start\",\n      \"content_block_delta\",\n      \"content_block_stop\",\n      \"error\",\n      \"message_delta\",\n      \"message_stop\",\n      \"ping\"\n    ],\n    \"path\": [\n      \"type\"\n    ],\n    \"message\": \"Invalid discriminator value. Expected 'message_start' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'error' | 'message_delta' | 'message_stop' | 'ping'\"\n  }\n]",
+    "statusCode": 500,
+    "isRetryable": false
+  }
+}

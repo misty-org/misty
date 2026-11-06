@@ -1,0 +1,64 @@
+{
+  "name": "embed_openai_compatible_warns_about_its_key",
+  "kind": "embed",
+  "modelId": "openai-compatible/local",
+  "credentialProvider": "openai-compatible",
+  "input": {
+    "values": [
+      "one"
+    ],
+    "providerOptions": {
+      "openai-compatible": {
+        "dimensions": 64
+      }
+    }
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"data\":[{\"embedding\":[0.5]}]}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "local",
+        "input": [
+          "one"
+        ],
+        "encoding_format": "float",
+        "dimensions": 64
+      }
+    }
+  ],
+  "result": {
+    "embeddings": [
+      [
+        0.5
+      ]
+    ],
+    "tokens": null,
+    "warnings": [
+      {
+        "type": "deprecated",
+        "setting": "providerOptions key 'openai-compatible'",
+        "message": "Use 'openaiCompatible' instead."
+      },
+      {
+        "type": "deprecated",
+        "setting": "providerOptions key 'openai-compatible'",
+        "message": "Use 'openaiCompatible' instead."
+      }
+    ],
+    "providerMetadata": null
+  }
+}

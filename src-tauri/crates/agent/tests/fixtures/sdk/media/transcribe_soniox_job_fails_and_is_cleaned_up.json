@@ -1,0 +1,97 @@
+{
+  "name": "transcribe_soniox_job_fails_and_is_cleaned_up",
+  "kind": "transcribe",
+  "modelId": "soniox/stt-async-v4",
+  "credentialProvider": "soniox",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"file-1\"}"
+    },
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"job-1\"}"
+    },
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"id\":\"job-1\",\"status\":\"error\",\"error_message\":\"Bad audio.\"}"
+    },
+    {
+      "status": 204,
+      "contentType": "text/plain",
+      "body": ""
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/files",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/v1/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "stt-async-v4",
+        "file_id": "file-1"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v1/transcriptions/job-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/transcriptions/job-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/files/file-1",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity"
+      },
+      "body": null
+    }
+  ],
+  "thrown": {
+    "name": "TranscriptionJobFailed",
+    "message": "Transcription failed: Bad audio."
+  }
+}

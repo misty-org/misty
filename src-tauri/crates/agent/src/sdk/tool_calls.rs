@@ -63,7 +63,7 @@ impl ToolCallTracker {
                 continue;
             }
             call.finished = true;
-            out.push(StreamPart::ToolInputEnd { id: call.id.clone() });
+            out.push(StreamPart::ToolInputEnd { id: call.id.clone(), provider_metadata: None });
             out.push(StreamPart::ToolCall {
                 tool_call_id: call.id.clone(),
                 tool_name: call.name.clone(),
@@ -84,12 +84,14 @@ impl ToolCallTracker {
         out.push(StreamPart::ToolInputStart {
             id: id.clone(),
             tool_name: name.clone(),
+            provider_metadata: None,
         });
         let arguments = delta.arguments.unwrap_or_default();
         if !arguments.is_empty() {
             out.push(StreamPart::ToolInputDelta {
                 id: id.clone(),
                 delta: arguments.clone(),
+                provider_metadata: None,
             });
         }
         let position = self.calls.len();
@@ -116,6 +118,7 @@ impl ToolCallTracker {
             out.push(StreamPart::ToolInputDelta {
                 id: call.id.clone(),
                 delta: arguments,
+                provider_metadata: None,
             });
         }
     }

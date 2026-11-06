@@ -1,0 +1,164 @@
+{
+  "name": "reasoning_adaptive_with_signature",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "reasoning": "low",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ],
+    "temperature": 0.5,
+    "topP": 0.9,
+    "maxOutputTokens": 500
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-6-20260101\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":1,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"Let me think.\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"sig-abc\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"Done.\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":20,\"output_tokens_details\":{\"thinking_tokens\":15,\"extra\":1}}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 500,
+        "thinking": {
+          "type": "adaptive",
+          "display": "summarized"
+        },
+        "output_config": {
+          "effort": "low"
+        },
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": [
+        {
+          "type": "unsupported",
+          "feature": "temperature",
+          "details": "temperature is not supported when thinking is enabled"
+        },
+        {
+          "type": "unsupported",
+          "feature": "topP",
+          "details": "topP is not supported when thinking is enabled"
+        }
+      ]
+    },
+    {
+      "type": "response-metadata",
+      "id": "msg_1",
+      "modelId": "claude-sonnet-4-6-20260101"
+    },
+    {
+      "type": "reasoning-start",
+      "id": "0"
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "0",
+      "delta": "Let me think."
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "0",
+      "delta": "",
+      "providerMetadata": {
+        "anthropic": {
+          "signature": "sig-abc"
+        }
+      }
+    },
+    {
+      "type": "reasoning-end",
+      "id": "0"
+    },
+    {
+      "type": "text-start",
+      "id": "1"
+    },
+    {
+      "type": "text-delta",
+      "id": "1",
+      "delta": "Done."
+    },
+    {
+      "type": "text-end",
+      "id": "1"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "end_turn"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "outputTokens": {
+          "total": 20,
+          "text": 5,
+          "reasoning": 15
+        },
+        "raw": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 20,
+          "output_tokens_details": {
+            "thinking_tokens": 15
+          }
+        }
+      },
+      "providerMetadata": {
+        "anthropic": {
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 20,
+            "output_tokens_details": {
+              "thinking_tokens": 15
+            }
+          },
+          "stopSequence": null,
+          "iterations": null,
+          "container": null,
+          "contextManagement": null
+        }
+      }
+    }
+  ]
+}

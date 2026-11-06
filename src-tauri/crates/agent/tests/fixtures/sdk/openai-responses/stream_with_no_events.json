@@ -1,0 +1,68 @@
+{
+  "name": "stream_with_no_events",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "other"
+      },
+      "usage": {
+        "inputTokens": {},
+        "outputTokens": {}
+      },
+      "providerMetadata": {
+        "openai": {
+          "responseId": null
+        }
+      }
+    }
+  ]
+}

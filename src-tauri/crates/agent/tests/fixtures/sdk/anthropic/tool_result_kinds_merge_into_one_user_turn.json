@@ -1,0 +1,315 @@
+{
+  "name": "tool_result_kinds_merge_into_one_user_turn",
+  "modelId": "anthropic/claude-sonnet-4-6",
+  "credentialProvider": "anthropic",
+  "options": {
+    "prompt": [
+      {
+        "role": "system",
+        "content": "Be brief."
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "Working "
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "a",
+            "toolName": "one",
+            "input": {
+              "z": 1,
+              "a": {
+                "y": 2,
+                "b": 3
+              }
+            }
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "b",
+            "toolName": "two",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "c",
+            "toolName": "three",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "d",
+            "toolName": "four",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "e",
+            "toolName": "five",
+            "input": "not an object"
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool-result",
+            "toolCallId": "a",
+            "toolName": "one",
+            "output": {
+              "type": "json",
+              "value": {
+                "ok": true,
+                "list": [
+                  1,
+                  "two"
+                ]
+              }
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "b",
+            "toolName": "two",
+            "output": {
+              "type": "error-text",
+              "value": "It broke"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "c",
+            "toolName": "three",
+            "output": {
+              "type": "error-json",
+              "value": {
+                "code": 1
+              }
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "d",
+            "toolName": "four",
+            "output": {
+              "type": "execution-denied"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "e",
+            "toolName": "five",
+            "output": {
+              "type": "execution-denied",
+              "reason": "Not allowed."
+            }
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "And then?"
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-6-20260101\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":12,\"output_tokens\":1,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi.\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":3}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/messages",
+      "headers": {
+        "accept": "*/*",
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        "x-api-key": "test-key-parity"
+      },
+      "body": {
+        "model": "claude-sonnet-4-6",
+        "max_tokens": 128000,
+        "system": [
+          {
+            "type": "text",
+            "text": "Be brief."
+          }
+        ],
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Go."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "text",
+                "text": "Working "
+              },
+              {
+                "type": "tool_use",
+                "id": "a",
+                "name": "one",
+                "input": {
+                  "z": 1,
+                  "a": {
+                    "y": 2,
+                    "b": 3
+                  }
+                }
+              },
+              {
+                "type": "tool_use",
+                "id": "b",
+                "name": "two",
+                "input": {}
+              },
+              {
+                "type": "tool_use",
+                "id": "c",
+                "name": "three",
+                "input": {}
+              },
+              {
+                "type": "tool_use",
+                "id": "d",
+                "name": "four",
+                "input": {}
+              },
+              {
+                "type": "tool_use",
+                "id": "e",
+                "name": "five",
+                "input": {
+                  "rawInvalidInput": "not an object"
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "a",
+                "content": "{\"ok\":true,\"list\":[1,\"two\"]}"
+              },
+              {
+                "type": "tool_result",
+                "tool_use_id": "b",
+                "content": "It broke",
+                "is_error": true
+              },
+              {
+                "type": "tool_result",
+                "tool_use_id": "c",
+                "content": "{\"code\":1}",
+                "is_error": true
+              },
+              {
+                "type": "tool_result",
+                "tool_use_id": "d",
+                "content": "Tool call execution denied."
+              },
+              {
+                "type": "tool_result",
+                "tool_use_id": "e",
+                "content": "Not allowed."
+              },
+              {
+                "type": "text",
+                "text": "And then?"
+              }
+            ]
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "msg_1",
+      "modelId": "claude-sonnet-4-6-20260101"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "end_turn"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "outputTokens": {
+          "total": 3
+        },
+        "raw": {
+          "input_tokens": 12,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 3
+        }
+      },
+      "providerMetadata": {
+        "anthropic": {
+          "usage": {
+            "input_tokens": 12,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "output_tokens": 3
+          },
+          "stopSequence": null,
+          "iterations": null,
+          "container": null,
+          "contextManagement": null
+        }
+      }
+    }
+  ]
+}

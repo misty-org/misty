@@ -1,0 +1,15 @@
+<html><head><title>Attributes</title></head><body>
+<div role=main class="a b" data-x='1' data-y=2 hidden=>unquoted empty</div>
+<div role = "navigation" >spaced</div>
+<div
+role="banner"
+>newlines</div>
+<div/role="banner">slash before attribute</div>
+<div role="banner"/>slash after attribute</div>
+<div "role="banner">quote first</div>
+<div =role="banner">equals first</div>
+<p class="x"y="z">no space between</p>
+<a href="a>b">gt in quotes</a>
+<a href=a>b>gt unquoted</a>
+<custom-element some-attr>custom</custom-element><x:y>namespaced</x:y>
+</body></html>

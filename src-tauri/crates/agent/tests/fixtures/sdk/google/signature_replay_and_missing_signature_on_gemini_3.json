@@ -1,0 +1,267 @@
+{
+  "name": "signature_replay_and_missing_signature_on_gemini_3",
+  "modelId": "google/gemini-3-pro",
+  "credentialProvider": "google",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "One."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool-call",
+            "toolCallId": "a",
+            "toolName": "unsigned",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "b",
+            "toolName": "signed",
+            "input": {},
+            "providerOptions": {
+              "google": {
+                "thoughtSignature": "s2"
+              }
+            }
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "c",
+            "toolName": "after_signed",
+            "input": {}
+          },
+          {
+            "type": "tool-call",
+            "toolCallId": "d",
+            "toolName": "unsigned",
+            "input": {}
+          }
+        ]
+      },
+      {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool-result",
+            "toolCallId": "a",
+            "toolName": "unsigned",
+            "output": {
+              "type": "text",
+              "value": "ok"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "b",
+            "toolName": "signed",
+            "output": {
+              "type": "text",
+              "value": "ok"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "c",
+            "toolName": "after_signed",
+            "output": {
+              "type": "text",
+              "value": "ok"
+            }
+          },
+          {
+            "type": "tool-result",
+            "toolCallId": "d",
+            "toolName": "unsigned",
+            "output": {
+              "type": "text",
+              "value": "ok"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hi.\"}]},\"index\":0}]}\n\ndata: {\"responseId\":\"resp-google-1\",\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":12,\"candidatesTokenCount\":3,\"totalTokenCount\":15}}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/models/gemini-3-pro:streamGenerateContent?alt=sse",
+      "headers": {
+        "accept": "*/*",
+        "content-type": "application/json",
+        "x-goog-api-key": "test-key-parity"
+      },
+      "body": {
+        "generationConfig": {},
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text": "One."
+              }
+            ]
+          },
+          {
+            "role": "model",
+            "parts": [
+              {
+                "functionCall": {
+                  "id": "a",
+                  "name": "unsigned",
+                  "args": {}
+                },
+                "thoughtSignature": "skip_thought_signature_validator"
+              },
+              {
+                "functionCall": {
+                  "id": "b",
+                  "name": "signed",
+                  "args": {}
+                },
+                "thoughtSignature": "s2"
+              },
+              {
+                "functionCall": {
+                  "id": "c",
+                  "name": "after_signed",
+                  "args": {}
+                }
+              },
+              {
+                "functionCall": {
+                  "id": "d",
+                  "name": "unsigned",
+                  "args": {}
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "parts": [
+              {
+                "functionResponse": {
+                  "id": "a",
+                  "name": "unsigned",
+                  "response": {
+                    "name": "unsigned",
+                    "content": "ok"
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "b",
+                  "name": "signed",
+                  "response": {
+                    "name": "signed",
+                    "content": "ok"
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "c",
+                  "name": "after_signed",
+                  "response": {
+                    "name": "after_signed",
+                    "content": "ok"
+                  }
+                }
+              },
+              {
+                "functionResponse": {
+                  "id": "d",
+                  "name": "unsigned",
+                  "response": {
+                    "name": "unsigned",
+                    "content": "ok"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": [
+        {
+          "type": "other",
+          "message": "Replayed 1 `functionCall` part(s) for a Gemini 3 model without a `thoughtSignature` (tools: `unsigned`). Injected the documented `skip_thought_signature_validator` sentinel to keep the request from failing with HTTP 400. The likely cause is application code that drops `providerOptions.google.thoughtSignature` when persisting or serializing assistant tool-call messages. See https://ai.google.dev/gemini-api/docs/thought-signatures."
+        }
+      ]
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp-google-1"
+    },
+    {
+      "type": "text-start",
+      "id": "0"
+    },
+    {
+      "type": "text-delta",
+      "id": "0",
+      "delta": "Hi."
+    },
+    {
+      "type": "text-end",
+      "id": "0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "STOP"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 12,
+          "noCache": 12,
+          "cacheRead": 0
+        },
+        "outputTokens": {
+          "total": 3,
+          "text": 3,
+          "reasoning": 0
+        },
+        "raw": {
+          "promptTokenCount": 12,
+          "candidatesTokenCount": 3,
+          "totalTokenCount": 15
+        }
+      },
+      "providerMetadata": {
+        "google": {
+          "promptFeedback": null,
+          "groundingMetadata": null,
+          "urlContextMetadata": null,
+          "safetyRatings": null,
+          "usageMetadata": {
+            "promptTokenCount": 12,
+            "candidatesTokenCount": 3,
+            "totalTokenCount": 15
+          },
+          "finishMessage": null,
+          "serviceTier": null
+        }
+      }
+    }
+  ]
+}

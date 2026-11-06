@@ -1,0 +1,57 @@
+{
+  "name": "unknown_error_shape",
+  "modelId": "gateway/openai/gpt-test",
+  "credentialProvider": "gateway",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Go."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 502,
+  "contentType": "text/plain",
+  "response": "bad gateway",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/language-model",
+      "headers": {
+        "accept": "*/*",
+        "ai-gateway-auth-method": "api-key",
+        "ai-gateway-protocol-version": "0.0.1",
+        "ai-language-model-id": "openai/gpt-test",
+        "ai-language-model-specification-version": "4",
+        "ai-language-model-streaming": "true",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "prompt": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Go."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "parts": [],
+  "thrown": {
+    "name": "GatewayResponseError",
+    "message": "Invalid error response format: Gateway request failed",
+    "statusCode": 502,
+    "isRetryable": true
+  }
+}

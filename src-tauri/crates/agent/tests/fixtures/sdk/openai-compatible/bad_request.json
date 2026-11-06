@@ -42,6 +42,7 @@
   "parts": [],
   "thrown": {
     "name": "AI_APICallError",
+    "message": "Bad",
     "statusCode": 400,
     "isRetryable": false
   }

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pricing &ndash; Acme Notes</title>
+  <meta name="description" content="Plans for every team">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/analytics.js" async></script>
+  <script>window.__STATE__ = {"plans":["<b>Pro</b>"]};</script>
+  <style>.price{color:red}</style>
+</head>
+<body class="pricing">
+  <header class="site-header">
+    <a href="/"><img src="/logo.svg" alt="Acme"></a>
+    <nav aria-label="Main"><ul><li><a href="/features">Features</a></li><li><a href="/pricing">Pricing</a></li></ul></nav>
+    <button>Sign in</button>
+  </header>
+  <main id="content">
+    <h1>Simple, transparent pricing</h1>
+    <p>Choose the plan that fits. <a href="/compare">Compare all features</a>.</p>
+    <div class="toggle" role="tablist">
+      <button role="tab" aria-selected="false">Monthly</button>
+      <button role="tab" aria-selected="true">Yearly <span class="badge">Save 20%</span></button>
+    </div>
+    <section class="cards">
+      <article class="card">
+        <h2>Free</h2>
+        <div class="price"><span class="sr-only">$0 per user/month</span><span aria-hidden="true"><i>$</i><i>0</i></span></div>
+        <ul>
+          <li>Up to 3 notebooks</li>
+          <li>7 days of history</li>
+        </ul>
+        <a class="cta" href="/signup">Start free</a>
+      </article>
+      <article class="card featured">
+        <h2>Pro <small>Most popular</small></h2>
+        <div class="price">$12 <span>per user/month, billed annually</span></div>
+        <ul>
+          <li>Unlimited notebooks</li>
+          <li>Version history &amp; backups</li>
+          <li>Priority support</li>
+        </ul>
+        <a class="cta" href="/signup?plan=pro">Start trial</a>
+      </article>
+      <article class="card">
+        <h2>Business</h2>
+        <div class="price">$24 <span>per user/month</span></div>
+        <p>Everything in Pro, plus:</p>
+        <ul>
+          <li>SSO &amp; SCIM</li>
+          <li>Audit logs</li>
+        </ul>
+      </article>
+    </section>
+    <table class="compare">
+      <thead><tr><th>Feature</th><th>Free</th><th>Pro</th><th>Business</th></tr></thead>
+      <tbody>
+        <tr><td>Notebooks</td><td>3</td><td>Unlimited</td><td>Unlimited</td></tr>
+        <tr><td>SSO</td><td></td><td></td><td>Yes</td></tr>
+        <tr><td>Support</td><td>&mdash;</td><td>Email</td><td>24/7</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <aside class="promo"><p>Students get 50% off.</p></aside>
+  <footer><p>&copy; 2026 Acme, Inc.</p><nav><a href="/terms">Terms</a></nav></footer>
+  <script>document.querySelector('.toggle').addEventListener('click', () => {});</script>
+</body>
+</html>

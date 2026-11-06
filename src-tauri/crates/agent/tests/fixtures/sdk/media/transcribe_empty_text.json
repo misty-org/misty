@@ -1,0 +1,54 @@
+{
+  "name": "transcribe_empty_text",
+  "kind": "transcribe",
+  "modelId": "openai/whisper-1",
+  "credentialProvider": "openai",
+  "input": {
+    "audioBase64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/json",
+      "body": "{\"text\":\"\"}"
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/transcriptions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "multipart/form-data"
+      },
+      "body": {
+        "multipart": [
+          {
+            "name": "model",
+            "filename": null,
+            "contentType": null,
+            "base64": "d2hpc3Blci0x"
+          },
+          {
+            "name": "file",
+            "filename": "audio.wav",
+            "contentType": "audio/wav",
+            "base64": "UklGRiQAAABXQVZFZm10IAAAAAAAAAAA"
+          },
+          {
+            "name": "response_format",
+            "filename": null,
+            "contentType": null,
+            "base64": "dmVyYm9zZV9qc29u"
+          }
+        ]
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_NoTranscriptGeneratedError",
+    "message": "No transcript generated."
+  }
+}

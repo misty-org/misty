@@ -21,23 +21,6 @@ impl SseDecoder {
         events
     }
 
-    /// Takes what's left when the stream ends. As in the event stream standard, an event with no
-    /// blank line after it was never finished and doesn't count, but a last line with no newline
-    /// of its own and already holding complete data is kept: some servers end that way.
-    pub(crate) fn finish(&mut self) -> Vec<String> {
-        let mut events = Vec::new();
-        if !self.pending.is_empty() {
-            let rest = std::mem::take(&mut self.pending);
-            let rest = String::from_utf8_lossy(&rest);
-            self.line(rest.trim_end_matches('\r'), &mut events);
-        }
-        if !self.data.is_empty() {
-            events.push(self.data.join("\n"));
-            self.data.clear();
-        }
-        events
-    }
-
     fn line(&mut self, line: &str, events: &mut Vec<String>) {
         if line.is_empty() {
             if !self.data.is_empty() {
@@ -69,9 +52,9 @@ mod tests {
     }
 
     #[test]
-    fn an_unfinished_last_event_is_still_delivered() {
+    fn an_unfinished_last_event_stays_unfinished() {
         let mut decoder = SseDecoder::default();
         assert!(decoder.push(b"data: last").is_empty());
-        assert_eq!(decoder.finish(), ["last"]);
+        assert_eq!(decoder.push(b"\n\n"), ["last"]);
     }
 }

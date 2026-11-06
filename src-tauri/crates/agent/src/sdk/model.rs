@@ -5,8 +5,9 @@ use futures_util::{future::BoxFuture, stream, Stream, StreamExt};
 use serde_json::json;
 
 use super::{
+    generate::{collect_turn, stream_failure, CollectedTurn},
     call::CallOptions,
-    error::{scrub, ModelError},
+    error::{scrub, scrub_value, ModelError},
     sse::SseDecoder,
     stream::StreamPart,
 };
@@ -16,6 +17,18 @@ pub type ModelStream = Pin<Box<dyn Stream<Item = StreamPart> + Send>>;
 pub trait LanguageModel: Send + Sync {
     /// Starts a call. Dropping the stream cancels it.
     fn stream(&self, options: CallOptions) -> BoxFuture<'_, Result<ModelStream, ModelError>>;
+
+    /// A whole answer, for callers that don't follow along. Reading the stream to its end does it
+    /// for most providers, and one whose whole answers come another way can say so.
+    fn generate(&self, options: CallOptions) -> BoxFuture<'_, Result<CollectedTurn, ModelError>> {
+        Box::pin(async move {
+            let turn = collect_turn(self.stream(options).await?).await;
+            match turn.errors.first() {
+                Some(error) => Err(stream_failure(error)),
+                None => Ok(turn),
+            }
+        })
+    }
 }
 
 /// Turns one provider's event stream into [`StreamPart`]s.
@@ -26,8 +39,11 @@ pub(crate) trait StreamDecoder: Send + 'static {
     fn finish(&mut self, out: &mut Vec<StreamPart>);
 }
 
+/// A response body as it arrives.
+pub(crate) type BodyStream = Pin<Box<dyn Stream<Item = Result<Vec<u8>, String>> + Send>>;
+
 struct Decoding<D> {
-    body: Pin<Box<dyn Stream<Item = Result<Vec<u8>, String>> + Send>>,
+    body: BodyStream,
     events: SseDecoder,
     decoder: D,
     secret: String,
@@ -44,23 +60,50 @@ impl<D: StreamDecoder> Decoding<D> {
                 self.decoder.event(&event, &mut out);
             }
         }
-        self.ready.extend(out);
+        self.deliver(out);
     }
+
+    fn finish(&mut self) {
+        let mut out = Vec::new();
+        self.decoder.finish(&mut out);
+        self.deliver(out);
+    }
+
+    /// A provider's failure can echo the key it was sent, so errors are cleaned on the way out.
+    fn deliver(&mut self, parts: Vec<StreamPart>) {
+        for mut part in parts {
+            if let StreamPart::Error { error } = &mut part {
+                scrub_value(error, &self.secret);
+            }
+            self.ready.push_back(part);
+        }
+    }
+}
+
+/// A response's body, in the form [`decoded_body`] takes.
+pub(crate) fn body_of(response: reqwest::Response) -> BodyStream {
+    Box::pin(
+        response
+            .bytes_stream()
+            .map(|chunk| chunk.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string())),
+    )
 }
 
 /// Decodes a response's event stream as it arrives.
 pub(crate) fn decoded_stream<D: StreamDecoder>(
     response: reqwest::Response,
-    mut decoder: D,
+    decoder: D,
     secret: &str,
 ) -> ModelStream {
+    decoded_body(body_of(response), decoder, secret)
+}
+
+/// Decodes a body a client has already started reading.
+pub(crate) fn decoded_body<D: StreamDecoder>(body: BodyStream, mut decoder: D, secret: &str) -> ModelStream {
     let mut started = Vec::new();
     decoder.start(&mut started);
-    let body = response
-        .bytes_stream()
-        .map(|chunk| chunk.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string()));
     let state = Decoding {
-        body: Box::pin(body),
+        body,
         events: SseDecoder::default(),
         decoder,
         secret: secret.to_owned(),
@@ -90,17 +133,12 @@ pub(crate) fn decoded_stream<D: StreamDecoder>(
                             "isRetryable": true,
                         }),
                     });
-                    let mut out = Vec::new();
-                    state.decoder.finish(&mut out);
-                    state.ready.extend(out);
+                    state.finish();
                 }
                 None => {
                     state.ended = true;
-                    let events = state.events.finish();
-                    state.handle(events);
-                    let mut out = Vec::new();
-                    state.decoder.finish(&mut out);
-                    state.ready.extend(out);
+                    // An event with no blank line after it was never finished, so it doesn't count.
+                    state.finish();
                 }
             }
         }

@@ -1,0 +1,38 @@
+{
+  "name": "speech_no_audio",
+  "kind": "speech",
+  "modelId": "openai/tts-1",
+  "credentialProvider": "openai",
+  "input": {
+    "text": "Hello."
+  },
+  "replies": [
+    {
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "bodyBase64": ""
+    }
+  ],
+  "unorderedRequests": false,
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/audio/speech",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "tts-1",
+        "input": "Hello.",
+        "voice": "alloy",
+        "response_format": "mp3"
+      }
+    }
+  ],
+  "thrown": {
+    "name": "AI_NoSpeechGeneratedError",
+    "message": "No speech audio generated."
+  }
+}

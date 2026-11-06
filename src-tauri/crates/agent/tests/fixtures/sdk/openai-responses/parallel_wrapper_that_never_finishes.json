@@ -1,0 +1,134 @@
+{
+  "name": "parallel_wrapper_that_never_finishes",
+  "modelId": "openai/gpt-5.1",
+  "credentialProvider": "openai",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hi."
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "name": "weather_forecast",
+        "description": "The forecast for a place.",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "days": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "place"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":0}\n\nevent: response.in_progress\ndata: {\"type\":\"response.in_progress\",\"response\":{\"id\":\"resp_1\",\"object\":\"response\",\"created_at\":1790000000,\"status\":\"in_progress\",\"model\":\"gpt-5.1-2026-01-01\",\"output\":[],\"usage\":null},\"sequence_number\":1}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"id\":\"fc_p\",\"type\":\"function_call\",\"arguments\":\"\",\"call_id\":\"call_p\",\"name\":\"parallel\"},\"sequence_number\":2}\n\nevent: response.function_call_arguments.delta\ndata: {\"type\":\"response.function_call_arguments.delta\",\"item_id\":\"fc_p\",\"output_index\":0,\"delta\":\"{\\\"tool\",\"sequence_number\":3}\n\nevent: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":1,\"item\":{\"id\":\"fc_q\",\"type\":\"function_call\",\"arguments\":\"\",\"call_id\":\"call_q\",\"name\":\"weather_forecast\"},\"sequence_number\":4}\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/responses",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "gpt-5.1",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Hi."
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "weather_forecast",
+            "description": "The forecast for a place.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "place": {
+                  "type": "string"
+                },
+                "days": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "place"
+              ],
+              "additionalProperties": false
+            },
+            "strict": false
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "resp_1",
+      "timestamp": "2026-09-21T14:13:20.000Z",
+      "modelId": "gpt-5.1-2026-01-01"
+    },
+    {
+      "type": "tool-input-start",
+      "id": "call_q",
+      "toolName": "weather_forecast"
+    },
+    {
+      "type": "tool-input-start",
+      "id": "call_p",
+      "toolName": "parallel"
+    },
+    {
+      "type": "tool-input-delta",
+      "id": "call_p",
+      "delta": "{\"tool"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "other"
+      },
+      "usage": {
+        "inputTokens": {},
+        "outputTokens": {}
+      },
+      "providerMetadata": {
+        "openai": {
+          "responseId": "resp_1"
+        }
+      }
+    }
+  ]
+}
