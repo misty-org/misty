@@ -24,6 +24,7 @@ fn main() {
         println!("cargo:rustc-link-search=native={}", runtime_dir.trim());
         println!("cargo:rustc-link-lib=static=clang_rt.osx");
         println!("cargo:rerun-if-changed=native/macos/MistyContext.m");
+        println!("cargo:rerun-if-changed=native/macos/MistyLocalAuth.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensions.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionRequests.m");
         println!("cargo:rerun-if-changed=native/macos/MistyExtensionDelegate.m");
@@ -78,6 +79,7 @@ fn main() {
             .file("native/macos/MistyAgentWindowRing.m")
             .file("native/macos/MistyDesktopCapture.m")
             .file("native/macos/MistyDefaultBrowser.m")
+            .file("native/macos/MistyLocalAuth.m")
             .file("native/macos/MistyDictationInsert.m")
             .file("native/macos/MistySpaceDock.m")
             .flag("-fobjc-arc")
@@ -97,6 +99,7 @@ fn main() {
             "CoreImage",
             "CoreMedia",
             "CoreVideo",
+            "LocalAuthentication",
             "NaturalLanguage",
             "UserNotifications",
             "Vision",

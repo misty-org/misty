@@ -363,6 +363,7 @@ impl LocalStore {
                  WHEN 'bookmarks' THEN 2
                  WHEN 'cookies' THEN 3
                  WHEN 'passwords' THEN 3
+                 WHEN 'autofill' THEN 3
                  WHEN 'history' THEN 9
                  ELSE 5 END, edited_at
              LIMIT ?1",

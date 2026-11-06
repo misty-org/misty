@@ -4,7 +4,7 @@ use crate::infra::profile_windows;
 
 /// What an incognito window may never reach: account data, sync, recovery, history,
 /// memory and agents. Incognito is entirely local and Misty does nothing with it.
-const ACCOUNT_DATA: [&str; 14] = [
+const ACCOUNT_DATA: [&str; 15] = [
     "agent",
     "profile_records_",
     "profile_tabs_",
@@ -15,6 +15,7 @@ const ACCOUNT_DATA: [&str; 14] = [
     "cursor_companion_",
     "misty_screen",
     "browser_passwords",
+    "browser_autofill",
     "browser_site_data",
     "voice_",
     "dictation_",
@@ -133,6 +134,26 @@ mod tests {
         assert!(allows("incognito-1", "browser_page_password_fill"));
         for label in ["misty-browser-a", "render-control", "misty-cursor-1"] {
             assert!(!allows(label, "browser_page_password_fill"), "{label}");
+        }
+    }
+
+    /// Saved addresses and cards belong to a profile, so private windows never reach them, and
+    /// neither do website views or anything else that isn't Misty's own window.
+    #[test]
+    fn saved_addresses_and_cards_stay_with_the_people_windows() {
+        for command in [
+            "browser_autofill_choose",
+            "browser_autofill_offer_respond",
+            "browser_autofill_addresses_list",
+            "browser_autofill_address_save",
+            "browser_autofill_cards_list",
+            "browser_autofill_card_save",
+            "browser_autofill_delete",
+        ] {
+            assert!(allows("window-1", command));
+            for label in ["incognito-1", "misty-browser-a", "browser-a", "misty-cursor-1"] {
+                assert!(!allows(label, command), "{label} reached {command}");
+            }
         }
     }
 

@@ -16,6 +16,7 @@ const KNOWN: &[&str] = &[
     collections::HISTORY,
     collections::EXTENSION_SYNC,
     collections::PASSWORDS,
+    collections::AUTOFILL,
     collections::EXTENSIONS,
     collections::SITE_PERMISSIONS,
     collections::SEARCH,

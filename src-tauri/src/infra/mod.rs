@@ -6,6 +6,8 @@ pub mod app_menu;
 pub mod autostart;
 #[cfg(desktop)]
 pub mod browser;
+#[cfg(desktop)]
+pub mod local_auth;
 #[cfg(all(desktop, any(target_os = "macos", windows)))]
 pub(crate) mod browser_content_world;
 #[cfg(target_os = "macos")]

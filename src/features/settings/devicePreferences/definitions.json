@@ -298,6 +298,42 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "autofill.addresses",
+    "label": "Fill addresses",
+    "keywords": ["autofill", "address", "shipping", "forms"],
+    "page": "autofill",
+    "section": "autofill",
+    "key": "addresses_enabled",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "autofill.cards",
+    "label": "Fill cards",
+    "keywords": ["autofill", "credit card", "debit card", "payment", "checkout"],
+    "page": "autofill",
+    "section": "autofill",
+    "key": "cards_enabled",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "autofill.offerToSave",
+    "label": "Offer to save",
+    "keywords": ["autofill", "save address", "save card", "forms"],
+    "page": "autofill",
+    "section": "autofill",
+    "key": "offer_to_save",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "browser.mouseGestures",
     "label": "Mouse gestures",
     "keywords": ["gesture", "right drag", "mouse", "back", "forward"],

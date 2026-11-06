@@ -77,6 +77,8 @@ pub fn validate(kind: Kind, fields: &Fields) -> Result<()> {
             added_at(Some(v.created_at))?;
             added_at(Some(v.updated_at))?;
         }
+        Kind::Address => autofill::validate_address(&serde_json::from_value(value)?)?,
+        Kind::Card => autofill::validate_card(&serde_json::from_value(value)?)?,
         Kind::SpaceSites => {
             let v: SpaceSites = serde_json::from_value(value)?;
             let unique: BTreeSet<&str> = v.hosts.iter().map(String::as_str).collect();

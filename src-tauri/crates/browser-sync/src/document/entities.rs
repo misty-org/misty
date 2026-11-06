@@ -37,6 +37,10 @@ pub enum Kind {
     /// A saved website sign-in (`passwords` collection). Native-only: sealed with
     /// the vault key and never projected to a renderer.
     Login,
+    /// A saved address for filling forms (`autofill` collection). Native-only.
+    Address,
+    /// A saved payment card for filling forms (`autofill` collection). Native-only.
+    Card,
     /// The sites a profile claims: links to them from other apps open in its
     /// window. Native-only.
     SpaceSites,
@@ -83,6 +87,8 @@ impl Kind {
             Self::ExtensionSyncKey => "extension_sync_key",
             Self::ExtensionRemoval => "extension_removal",
             Self::Login => "login",
+            Self::Address => "address",
+            Self::Card => "card",
             Self::SpaceSites => "space_sites",
             Self::Extension => "extension",
             Self::SitePermission => "site_permission",
@@ -252,9 +258,11 @@ fn group_icon(value: &str) -> Result<()> {
     }
 }
 
+mod autofill;
 mod collections;
 mod layout;
 mod validate;
+pub use autofill::{card_number_valid, Address, Card};
 pub use collections::{
     login_origin, site_host, Download, Extension, HistoryBatch, Login, SearchBang, SearchDefault,
     SearchEngine, SiteDecision, SitePermission, SpaceSites, Visit, MAX_SPACE_SITES,

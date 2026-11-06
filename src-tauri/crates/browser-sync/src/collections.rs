@@ -8,6 +8,9 @@ pub const EXTENSION_SYNC: &str = "extension_sync";
 /// Saved website sign-ins. Native-only, never projected to a renderer; the
 /// server only ever holds each one sealed with the vault key.
 pub const PASSWORDS: &str = "passwords";
+/// Saved addresses and payment cards. Native-only, never projected to a renderer as records; the
+/// server only ever holds each one sealed with the vault key.
+pub const AUTOFILL: &str = "autofill";
 /// The profile's installed extensions: store id, version and on/off. Each
 /// computer fetches the packages from the store itself. Native-only.
 pub const EXTENSIONS: &str = "extensions";
