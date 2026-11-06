@@ -6,12 +6,8 @@ import passwordsScript from "../../../src-tauri/src/infra/browser/scripts/passwo
 
 // The page scripts as they ship. jsdom marks dispatched events untrusted, which the scripts rightly
 // ignore, so that one check is lifted here and nothing else changes.
-type Page = {
-  __MISTY_AUTOFILL__: { offer(kind: string): void };
-};
-const page = () => window as unknown as Page;
-
-const popups = () => document.documentElement.querySelectorAll(":scope > [popover]").length;
+const sent: string[] = [];
+const actions = () => sent.map((url) => url.slice(0, url.indexOf("?")));
 
 /** What a click does: the old field loses focus, then the new one gets it. */
 function moveFocus(from: HTMLElement | null, to: HTMLElement) {
@@ -27,55 +23,83 @@ function input(name: string) {
 beforeAll(() => {
   // jsdom lays nothing out, so every element is on the page.
   Element.prototype.getBoundingClientRect = () =>
-    ({ left: 10, right: 110, top: 10, bottom: 30, width: 100, height: 20, x: 10, y: 10 }) as DOMRect;
+    ({
+      left: 10,
+      right: 110,
+      top: 10,
+      bottom: 30,
+      width: 100,
+      height: 20,
+      x: 10,
+      y: 10,
+    }) as DOMRect;
+  Element.prototype.getClientRects = () => [{}] as unknown as DOMRectList;
   const lift = (script: string) => script.replace(/event\.isTrusted/g, "true");
   new Function(
     "sendHostNavigation",
     "encode",
     "shortcutToken",
     `${lift(passwordsScript)}\n${fieldsScript}\n${lift(autofillScript)}`,
-  )(() => undefined, encodeURIComponent, "token");
+  )((url: string) => sent.push(url), encodeURIComponent, "token");
 });
 
 beforeEach(() => {
+  sent.length = 0;
   vi.useFakeTimers();
 });
 
 afterEach(() => {
   vi.runOnlyPendingTimers();
   vi.useRealTimers();
-  // Popups sit beside the body, so resetting it wouldn't clear one a test left open.
-  document.documentElement.querySelectorAll(":scope > [popover]").forEach((popup) => popup.remove());
   document.body.innerHTML = "";
 });
 
-describe("a fill popup stays open", () => {
-  it("when an address field's answer arrives right after moving from another field", () => {
+describe("Misty's fill surfaces stay open", () => {
+  it("when moving between an address form's fields", () => {
     document.body.innerHTML = `<form>
       <input name="name" autocomplete="name"><input name="street" autocomplete="street-address">
       <input name="zip" autocomplete="postal-code"></form>`;
     moveFocus(null, input("name"));
     moveFocus(input("name"), input("street"));
-    // Misty answers before the first field's 150ms close timer has run.
-    vi.advanceTimersByTime(30);
-    page().__MISTY_AUTOFILL__.offer("address");
-    expect(popups()).toBe(1);
     vi.advanceTimersByTime(500);
-    expect(popups()).toBe(1);
+    expect(actions()).not.toContain("misty-autofill:hide");
+  });
+
+  it("when moving from a username to its password", () => {
+    document.body.innerHTML = `<form><input name="user" type="text">
+      <input name="pass" type="password"></form>`;
+    moveFocus(null, input("user"));
+    moveFocus(input("user"), input("pass"));
+    vi.advanceTimersByTime(500);
+    expect(actions()).not.toContain("misty-passwords:hide");
   });
 });
 
-describe("a fill popup still closes", () => {
-  it("when focus really leaves its field", () => {
+describe("Misty's fill surfaces still close", () => {
+  it("when focus really leaves an address form", () => {
     document.body.innerHTML = `<form>
       <input name="street" autocomplete="street-address"><input name="zip" autocomplete="postal-code">
-      <input name="city" autocomplete="address-level2"></form>
-      <input name="other"><input name="other2" type="password">`;
+      <input name="city" autocomplete="address-level2"></form><button name="elsewhere"></button>`;
     moveFocus(null, input("street"));
-    page().__MISTY_AUTOFILL__.offer("address");
-    expect(popups()).toBe(1);
-    moveFocus(input("street"), input("other"));
+    moveFocus(input("street"), document.querySelector<HTMLElement>('[name="elsewhere"]')!);
     vi.advanceTimersByTime(200);
-    expect(popups()).toBe(0);
+    expect(actions()).toContain("misty-autofill:hide");
+  });
+
+  it("when the password field loses focus", () => {
+    document.body.innerHTML = `<form><input name="user" type="text">
+      <input name="pass" type="password"></form><button name="elsewhere"></button>`;
+    moveFocus(null, input("pass"));
+    moveFocus(input("pass"), document.querySelector<HTMLElement>('[name="elsewhere"]')!);
+    vi.advanceTimersByTime(200);
+    expect(actions()).toContain("misty-passwords:hide");
+  });
+
+  it("not at all for a field that never asked", () => {
+    document.body.innerHTML = `<input name="search"><button name="elsewhere"></button>`;
+    moveFocus(null, input("search"));
+    moveFocus(input("search"), document.querySelector<HTMLElement>('[name="elsewhere"]')!);
+    vi.advanceTimersByTime(200);
+    expect(sent).toEqual([]);
   });
 });

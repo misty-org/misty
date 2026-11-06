@@ -93,8 +93,8 @@ export function AutofillChooserMenu(props: {
 }
 
 /**
- * Lists saved addresses or cards in Misty's own interface after the person clicks a page's fill
- * chip. Pages never receive this list: nothing reaches a site until something here is picked.
+ * Lists saved addresses or cards in Misty's own interface after the person clicks Misty's fill
+ * chip (`AutofillChip`). Pages never receive this list: nothing reaches a site until something here is picked.
  */
 export function AutofillChooser() {
   const [choice, setChoice] = useState<AutofillChoice | null>(null);

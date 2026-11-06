@@ -1,7 +1,8 @@
-// Saved addresses and cards: the chip, filling and capture. Runs in the same initialization closure
-// as the context menu (sendHostNavigation, encode, shortcutToken), in the top-level page only.
-// Everything drawn here is in the site's reach, so no saved detail is ever sent here until the person
-// has picked it in Misty's own interface. The chip only says what kind of thing can be filled.
+// Saved addresses and cards: filling and capture. Runs in the same initialization closure as the
+// context menu (sendHostNavigation, encode, shortcutToken), in the top-level page only. This is the
+// page's own JavaScript world, so anything here can be hooked or called by the page. It therefore
+// draws nothing and can't open the list of saved details. It only says a form has focus and where;
+// Misty draws the chip, and nothing tells the page whether anything is saved.
 (() => {
   if (window.top !== window) return;
   // Captured before page scripts run, so a page can't intercept fills here.
@@ -10,7 +11,6 @@
     TEXTAREA: Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set,
     SELECT: Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set,
   };
-  const showPopover = HTMLElement.prototype.showPopover;
   const fields = autofillFields;
   const send = (action, extra) => {
     sendHostNavigation('misty-autofill:' + action + '?token=' + encode(shortcutToken) + extra);
@@ -79,61 +79,23 @@
 
   let target = null;
   let targetKind = '';
-  let chip = null;
   let closeTimer = 0;
-  const closeChip = () => {
-    chip?.remove();
-    chip = null;
+  let asked = false;
+  const hide = () => {
+    if (!asked) return;
+    asked = false;
+    send('hide', '');
   };
-  const showChip = (field, kind) => {
-    // The field focus just left may still have its close waiting, which isn't about this chip.
-    clearTimeout(closeTimer);
-    closeChip();
-    const host = document.createElement('div');
-    const shadow = host.attachShadow({ mode: 'closed' });
-    const rect = field.getBoundingClientRect();
-    host.style.cssText =
-      'all:initial;position:fixed;z-index:2147483647;left:' + Math.round(rect.left) + 'px;top:' +
-      Math.round(rect.bottom + 4) + 'px';
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.textContent = kind === 'card' ? 'Fill card' : 'Fill address';
-    row.setAttribute('style',
-      'display:block;padding:6px 12px;border:1px solid #3a3a3c;border-radius:8px;background:#1c1c1e;' +
-      'color:#f2f2f2;font:13px -apple-system,system-ui,sans-serif;cursor:pointer;' +
-      'box-shadow:0 8px 24px rgba(0,0,0,.35)');
-    row.addEventListener('mouseenter', () => { row.style.background = '#3a3a3c'; });
-    row.addEventListener('mouseleave', () => { row.style.background = '#1c1c1e'; });
-    // Keep focus in the field so the fill lands where the person was typing.
-    row.addEventListener('mousedown', (event) => event.preventDefault());
-    const shownAt = performance.now();
-    row.addEventListener('click', (event) => {
-      // A chip that appears under a click meant for the page isn't a choice.
-      if (!event.isTrusted || performance.now() - shownAt < 300) return;
-      const box = field.getBoundingClientRect();
-      closeChip();
-      send(
-        'choose',
-        '&kind=' + kind +
-          '&x=' + encode('' + box.left / Math.max(window.innerWidth, 1)) +
-          '&y=' + encode('' + (box.bottom + 4) / Math.max(window.innerHeight, 1)),
-      );
-    });
-    shadow.append(row);
-    // In the top layer, so a site's modal dialog can't cover it. A modal makes everything outside
-    // it unclickable, so the chip goes inside the field's dialog.
-    host.setAttribute('popover', 'manual');
-    (field.closest('dialog') || document.documentElement).append(host);
-    showPopover?.call(host);
-    chip = host;
+  // Fractions of the page, so the chip lands under the field at any zoom. A page can lie about
+  // these; Misty keeps the chip inside the page and ignores early clicks.
+  const place = (field) => {
+    const box = field.getBoundingClientRect();
+    const fraction = (value, size) => encode('' + value / (size || 1));
+    return '&left=' + fraction(box.left, innerWidth) + '&bottom=' + fraction(box.bottom, innerHeight);
   };
 
   Object.defineProperty(window, '__MISTY_AUTOFILL__', {
     value: Object.freeze({
-      offer(kind) {
-        if (!target || kind !== targetKind || target.getRootNode().activeElement !== target) return;
-        showChip(target, kind);
-      },
       fill(kind, values) {
         if (!target || kind !== targetKind || !target.isConnected) return;
         const all = fieldsIn(scopeOf(target));
@@ -161,17 +123,20 @@
     if (!type) return;
     const kind = fields.kindOf(type);
     if (!fields.formIsFor(kind, fieldsIn(scopeOf(element)).map((field) => field.type))) return;
+    clearTimeout(closeTimer);
     target = element;
     targetKind = kind;
-    send('focus', '&kind=' + kind);
+    asked = true;
+    send('focus', '&kind=' + kind + place(element));
   }, true);
   document.addEventListener('focusout', () => {
     clearTimeout(closeTimer);
-    closeTimer = setTimeout(closeChip, 150);
+    closeTimer = setTimeout(hide, 150);
   }, true);
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeChip();
+    if (event.key === 'Escape') hide();
   }, true);
+  window.addEventListener('pagehide', hide, true);
 
   // A submitted address or card goes to Misty, which asks before saving it. Security codes are
   // never classified as anything, so they're never read.

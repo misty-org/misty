@@ -142,6 +142,7 @@ mod tests {
     #[test]
     fn saved_addresses_and_cards_stay_with_the_people_windows() {
         for command in [
+            "browser_autofill_open",
             "browser_autofill_choose",
             "browser_autofill_offer_respond",
             "browser_autofill_addresses_list",
@@ -151,7 +152,12 @@ mod tests {
             "browser_autofill_delete",
         ] {
             assert!(allows("window-1", command));
-            for label in ["incognito-1", "misty-browser-a", "browser-a", "misty-cursor-1"] {
+            for label in [
+                "incognito-1",
+                "misty-browser-a",
+                "browser-a",
+                "misty-cursor-1",
+            ] {
                 assert!(!allows(label, command), "{label} reached {command}");
             }
         }

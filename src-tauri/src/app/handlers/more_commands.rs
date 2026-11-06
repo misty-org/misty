@@ -156,6 +156,8 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser::host_messages::autofill::browser_autofill_offer_respond,
             #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_open,
+            #[cfg(desktop)]
             crate::infra::browser::host_messages::autofill::browser_autofill_choose,
             #[cfg(desktop)]
             crate::infra::browser::host_messages::autofill::browser_autofill_addresses_list,

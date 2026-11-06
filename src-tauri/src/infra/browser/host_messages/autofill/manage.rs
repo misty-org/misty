@@ -10,6 +10,35 @@ const CHOICE_SECONDS: u64 = 120;
 /// Offers expire after ten minutes, like sign-ins.
 const OFFER_SECONDS: u64 = 600;
 
+/// A click on Misty's chip. A page has no way to call this, so it can't put the list of saved
+/// details under the person's pointer.
+#[tauri::command]
+pub async fn browser_autofill_open(
+    webview: Webview,
+    id: String,
+    kind: String,
+    left: f64,
+    bottom: f64,
+) -> Result<(), String> {
+    let profile = managed_profile(&webview)?;
+    let kind = FillKind::parse(&kind).ok_or("Misty can't fill that.")?;
+    let app = webview.app_handle();
+    let page = app
+        .get_webview(&webview_label(&id)?)
+        .ok_or("This page has closed.")?;
+    if page.window().label() != webview.window().label() {
+        return Err("This window doesn't show that page.".into());
+    }
+    let fraction = |value: f64| {
+        if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    };
+    open_chooser(app, &id, &profile, kind, fraction(left), fraction(bottom)).await
+}
+
 /// The person's pick in the chooser, or `None` when they closed it.
 #[tauri::command]
 pub async fn browser_autofill_choose(

@@ -1,14 +1,18 @@
 //! Saved addresses and cards: offering, choosing, filling and capturing, in the `autofill`
 //! collection of the profile whose pages use them.
 //!
-//! A site learns nothing until the person picks something. The page script only hears that there
-//! is something to fill and draws an empty "Fill address" or "Fill card" chip. Clicking it opens
-//! the list in Misty's own interface (`AutofillChooser`), so no saved detail, not even a name or
-//! the last four digits, is ever in the page's reach before the choice. Cards then need Touch ID,
-//! Windows Hello or this computer's password, and only ever fill on https. None of this runs in a
-//! private tab or a tab an agent is working in, so agents can't reach saved details at all.
+//! A site learns nothing until the person picks something. The page script runs in the page's own
+//! JavaScript world, so nothing it sends can be trusted as the person's choice. It only says a form
+//! has focus: Misty draws the "Fill address" or "Fill card" chip (`AutofillChip`) without telling the
+//! page, and only a click there opens the list (`browser_autofill_open`, `AutofillChooser`). No saved
+//! detail, not even a name or the last four digits, nor whether anything is saved, is in the page's
+//! reach before the choice. Cards then need Touch ID, Windows Hello or this computer's password, and
+//! only ever fill on https. None of this runs in a private tab or a tab an agent is working in, so
+//! agents can't reach saved details at all.
 use super::super::*;
-use super::passwords::{now_ms, page_origin, page_profile, profile_records, reply, UNAVAILABLE};
+use super::passwords::{
+    now_ms, page_origin, page_profile, profile_records, reply, MenuPlace, UNAVAILABLE,
+};
 use misty_browser_sync::{
     collections::AUTOFILL,
     document::{
@@ -251,6 +255,15 @@ fn pending_saves() -> &'static Mutex<HashMap<String, PendingSave>> {
     PENDING.get_or_init(Mutex::default)
 }
 
+/// Tells the window showing this page to draw the chip, or with no kind to close it.
+fn show_chip(app: &AppHandle, id: &str, kind: Option<FillKind>, place: MenuPlace) {
+    let _ = app.emit_to(
+        browser_owner_label(app, id).as_str(),
+        "misty://browser-autofill-chip",
+        json!({"id": id, "kind": kind.map(FillKind::name), "place": place}),
+    );
+}
+
 /// Handles `misty-autofill:` messages from the page script. Returns whether the message was one.
 pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
     if url.scheme() != "misty-autofill" {
@@ -272,6 +285,7 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
     let kind = values.get("kind").and_then(|kind| FillKind::parse(kind));
     match (url.path(), kind) {
         ("focus", Some(kind)) => {
+            let place = MenuPlace::from_query(&values);
             tauri::async_runtime::spawn(async move {
                 let has_saved = saved(&profile)
                     .await
@@ -281,57 +295,11 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
                     && choices(&app).await.allows(kind)
                     && page_origin(&app, &id).as_deref() == Some(&origin)
                 {
-                    reply(
-                        &app,
-                        &id,
-                        format!("window.__MISTY_AUTOFILL__?.offer({:?});", kind.name()),
-                    );
+                    show_chip(&app, &id, Some(kind), place);
                 }
             });
         }
-        ("choose", Some(kind)) => {
-            let position = |key: &str| {
-                values
-                    .get(key)
-                    .and_then(|value| value.parse::<f64>().ok())
-                    .filter(|value| value.is_finite())
-                    .unwrap_or(0.0)
-                    .clamp(0.0, 1.0)
-            };
-            let (x, y) = (position("x"), position("y"));
-            tauri::async_runtime::spawn(async move {
-                if !allowed_on(kind, &origin) || !choices(&app).await.allows(kind) {
-                    return;
-                }
-                let Ok(records) = saved(&profile).await else {
-                    return;
-                };
-                let items = chooser_items(&records, kind);
-                if items.is_empty() {
-                    return;
-                }
-                let key = uuid::Uuid::new_v4().to_string();
-                if let Ok(mut pending) = pending_choices().lock() {
-                    // Only a page's latest chooser can answer, and old ones don't pile up.
-                    pending.retain(|_, choice| choice.page != id);
-                    pending.insert(
-                        key.clone(),
-                        PendingChoice {
-                            page: id.clone(),
-                            profile,
-                            origin,
-                            kind,
-                            at: std::time::Instant::now(),
-                        },
-                    );
-                }
-                let _ = app.emit_to(
-                    browser_owner_label(&app, &id),
-                    "misty://browser-autofill-choose",
-                    json!({"key": key, "id": id, "kind": kind.name(), "x": x, "y": y, "items": items}),
-                );
-            });
-        }
+        ("hide", _) => show_chip(&app, &id, None, MenuPlace::default()),
         ("capture", _) => {
             let data = Zeroizing::new(values.get("data").cloned().unwrap_or_default());
             if data.is_empty() || data.len() > MAX_CAPTURE_BYTES {
@@ -344,6 +312,51 @@ pub(super) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool {
         _ => {}
     }
     true
+}
+
+/// Opens the list of saved details over a page, after a click on Misty's own chip.
+async fn open_chooser(
+    app: &AppHandle,
+    id: &str,
+    profile: &str,
+    kind: FillKind,
+    x: f64,
+    y: f64,
+) -> Result<(), String> {
+    const MOVED_ON: &str = "This page changed. Click the field again.";
+    let origin = page_origin(app, id).ok_or(MOVED_ON)?;
+    if page_excluded(app, id) || !allowed_on(kind, &origin) {
+        return Err(MOVED_ON.into());
+    }
+    if !choices(app).await.allows(kind) {
+        return Err("Autofill is off in Settings.".into());
+    }
+    let records = saved(profile).await?;
+    let items = chooser_items(&records, kind);
+    if items.is_empty() {
+        return Err("That item was removed.".into());
+    }
+    let key = uuid::Uuid::new_v4().to_string();
+    if let Ok(mut pending) = pending_choices().lock() {
+        // Only a page's latest chooser can answer, and old ones don't pile up.
+        pending.retain(|_, choice| choice.page != id);
+        pending.insert(
+            key.clone(),
+            PendingChoice {
+                page: id.to_owned(),
+                profile: profile.to_owned(),
+                origin,
+                kind,
+                at: std::time::Instant::now(),
+            },
+        );
+    }
+    app.emit_to(
+        browser_owner_label(app, id).as_str(),
+        "misty://browser-autofill-choose",
+        json!({"key": key, "id": id, "kind": kind.name(), "x": x, "y": y, "items": items}),
+    )
+    .map_err(|error| error.to_string())
 }
 
 /// Decides what a submitted form would save and asks. The renderer learns only the labels.
