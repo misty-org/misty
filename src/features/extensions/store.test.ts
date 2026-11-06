@@ -26,6 +26,8 @@ const review = {
   entry: { id: "12", store: "firefox", guid: "fixture@misty.test", name: "Fixture" },
   permissions: ["storage"],
   hosts: ["https://example.com/*"],
+  addedPermissions: ["storage"],
+  addedHosts: ["https://example.com/*"],
   blocked: false,
   privateAllowed: true,
 } as ExtensionReview;
@@ -66,13 +68,47 @@ describe("extension account controls", () => {
     await install(review, true);
     const first = parseInstallations(String(mocks.values["extensions.installations"]))[0];
     expect(first).toMatchObject({ enabled: true, privateAccess: true, agentAccess: false });
-    await install({ ...review, privateAllowed: false, permissions: ["storage", "tabs"] }, true);
+    await install(
+      { ...review, privateAllowed: false, permissions: ["storage", "tabs"], addedPermissions: ["tabs"], addedHosts: [] },
+      true,
+    );
     expect(parseInstallations(String(mocks.values["extensions.installations"]))[0]).toMatchObject({
       generation: first.generation,
       privateAccess: false,
       permissions: ["storage", "tabs"],
     });
     expect(mocks.values["extensions.pins"]).toBeUndefined();
+  });
+  it("tells native the person approved, and leaves access they removed removed", async () => {
+    await install(review, false);
+    expect(mocks.commit).toHaveBeenCalledWith("review", expect.any(String), true);
+    const before = useExtensionsStore.getState().reconcileRequest;
+    // They removed storage here; a new version adds tabs and still asks for storage.
+    await setPreference(
+      "installations",
+      JSON.stringify([
+        {
+          ...parseInstallations(String(mocks.values["extensions.installations"]))[0],
+          id: 12,
+          permissions: [],
+        },
+      ]),
+    );
+    await install(
+      {
+        ...review,
+        permissions: ["storage", "tabs"],
+        hosts: ["https://example.com/*"],
+        addedPermissions: ["tabs"],
+        addedHosts: [],
+      },
+      false,
+    );
+    const [item] = parseInstallations(String(mocks.values["extensions.installations"]));
+    expect(item?.permissions).toEqual(["tabs"]);
+    expect(mocks.commit).toHaveBeenLastCalledWith("review", null, true);
+    // Approving can change nothing in the list, so the runtime is told to look again.
+    expect(useExtensionsStore.getState().reconcileRequest).toBe(before + 1);
   });
   it("stores Firefox IDs as numbers for older versions and reads both forms", async () => {
     await install(review, true);

@@ -60,11 +60,14 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
     probe = root / "probe"
     messaging = root / "messaging"
     compat = root / "compat-probe"
+    permissions = root / "permissions-probe"
     spaces = root / "space-probe"
     executable = root / "native-host"
     production = [NATIVE / "MistyExtensions.m", NATIVE / "MistyExtensionNativeMessaging.m",
                   NATIVE / "MistyExtensionTabs.m", NATIVE / "MistyExtensionPopupWindows.m",
-                  NATIVE / "MistyExtensionCompat.m",
+                  NATIVE / "MistyExtensionCompat.m", NATIVE / "MistyExtensionCompatActions.m",
+                  NATIVE / "MistyExtensionDelegate.m", NATIVE / "MistyExtensionRequests.m",
+                  NATIVE / "MistyExtensionsBridge.m",
                   NATIVE / "MistyExtensionNotifications.m"]
     run(*FLAGS, HERE / "probe.m", "-o", probe)
     run(*FLAGS, HERE / "host-probe.m", *production, "-o", host)
@@ -72,6 +75,7 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
     run(*FLAGS, HERE / "host-benchmark.m", *production, "-o", benchmark)
     run(*FLAGS, HERE / "native-messaging-probe.m", production[1], "-o", messaging)
     run(*FLAGS, HERE / "compat-probe.m", *production, "-o", compat)
+    run(*FLAGS, HERE / "permissions-probe.m", *production, "-o", permissions)
     run(*FLAGS, HERE / "space-probe.m", "-o", spaces)
     if NOTIFICATIONS:
         # UserNotifications serves only registered app bundles outside
@@ -108,6 +112,11 @@ with tempfile.TemporaryDirectory(prefix="misty-extension-tests-") as temporary:
         shutil.copytree(HERE / "fixtures/compat", fixture)
         shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
         run(compat, fixture, page)
+        # An extension asking for far more than it's granted, trying to use all of it.
+        fixture = root / "permissions"
+        shutil.copytree(HERE / "fixtures/permissions", fixture)
+        shutil.copytree(TAURI.parent / "kiri/src/extensions/compat", fixture / "__misty_compat__")
+        run(permissions, fixture, page)
         # Two Spaces' controllers at once: storage stays in its Space, survives a
         # restart (a second process) and goes with the Space.
         identities = [str(uuid.uuid4()) for _ in range(4)]

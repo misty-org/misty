@@ -46,7 +46,7 @@ void MistySetPageMuted(WKWebView *view, BOOL muted) {
 - (void)goBackForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done { [self.view goBack]; done(nil); }
 - (void)goForwardForWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done { [self.view goForward]; done(nil); }
 - (void)loadURL:(NSURL *)url forWebExtensionContext:(WKWebExtensionContext *)context completionHandler:(void (^)(NSError *))done {
-    if (![@[@"https", @"http", @"webkit-extension"] containsObject:url.scheme]) { done(ExtensionError(@"This URL cannot be opened by an extension.")); return; }
+    if (![@[@"https", @"http", @"webkit-extension"] containsObject:url.scheme] || !MistyExtensionMayOpen(context, url)) { done(ExtensionError(@"This URL cannot be opened by an extension.")); return; }
     if (self.window.popupWindow) { [self.view loadRequest:[NSURLRequest requestWithURL:url]]; done(nil); return; }
     [self.host event:@"navigate" data:@{@"tabId":self.identifier, @"url":url.absoluteString}]; done(nil);
 }

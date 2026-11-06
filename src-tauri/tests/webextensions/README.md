@@ -44,6 +44,13 @@ Space). It checks that a content script runs in both, that extension storage sta
 in its own Space across a restart (a second process), and that removing a Space's
 controller data and store leaves nothing behind.
 
+`permissions-probe.m` runs an extension asking for far more than it's granted through
+the production host. It checks that WebKit's and Misty's APIs refuse what wasn't granted,
+that content scripts run only on granted hosts and can't see the page's world, that
+`downloads.open` and unsafe download headers are refused, that a website can't move a tab
+into an extension page the manifest doesn't list, that removed access stops at once, and
+that another extension's storage is out of reach.
+
 JavaScript tests use the production sync bridge. Rust tests cover package integrity,
 identity, traversal, symlinks, expanded-size limits, compatibility findings,
 encrypted journal namespace binding, encrypted collection records, removal

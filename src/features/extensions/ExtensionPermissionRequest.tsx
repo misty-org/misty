@@ -1,10 +1,9 @@
-import { permissionLabel } from "./permissions";
+import { accessLabels } from "./permissions";
 import { useState } from "react";
 import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -23,13 +22,14 @@ export function ExtensionPermissionRequest() {
     setBusy(true);
     setError("");
     try {
+      // The answer first: native records the approval, and the list that follows stays within it.
+      await extensionsNative.respond(request.requestId, allowed && Boolean(extension));
       if (allowed && extension) {
         await updateInstallation(extension.id, {
           permissions: [...new Set([...extension.permissions, ...(request.permissions ?? [])])],
           hosts: [...new Set([...extension.hosts, ...(request.hosts ?? [])])],
         });
       }
-      await extensionsNative.respond(request.requestId, allowed && Boolean(extension));
       finishPermission(request.requestId);
     } catch (error) {
       setError(String(error));
@@ -44,19 +44,18 @@ export function ExtensionPermissionRequest() {
         if (!open && !busy) void respond(false);
       }}
     >
-      <DialogContent>
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Allow additional access?</DialogTitle>
-          <DialogDescription>
-            {extension?.name ?? "An extension"} is asking for more access.
-          </DialogDescription>
+          <DialogTitle>{extension?.name ?? "An extension"} is asking for more access</DialogTitle>
         </DialogHeader>
         <ul className="list-inside list-disc break-words text-sm">
-          {[...(request?.permissions ?? []), ...(request?.hosts ?? [])].map((permission) => (
-            <li key={permission} title={permission}>
-              {permissionLabel(permission)}
-            </li>
-          ))}
+          {accessLabels([...(request?.permissions ?? []), ...(request?.hosts ?? [])]).map(
+            ({ label, source }) => (
+              <li key={label} title={source}>
+                {label}
+              </li>
+            ),
+          )}
         </ul>
         <ErrorNotification message={error} onDismiss={() => setError("")} />
         <DialogFooter>

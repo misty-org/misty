@@ -16,7 +16,7 @@ Status and open items are at the end of this file.
 | Capabilities (`capabilities/`) | Website pages | `plugin:kiri\|call` (Tauri IPC) | Anything a page may do; origin comes from the engine |
 | Engine hooks (`engine/`) | The engine (camera, mic and location prompts) | Native delegates and events | The host's site-permission store decides |
 | Host channel (`channel/`) | The embedder's own injected scripts | Each engine's native message handler | The embedder authenticates each message (Misty: per-tab token) |
-| Extensions (`extensions/`) | WebExtension pages | WebKit's reply handler, answered by the embedder | Permissions the account granted |
+| Extensions (`extensions/`) | WebExtension pages | WebKit's reply handler, answered by the embedder | The embedder identifies the page from the engine and checks what the person approved |
 
 ## Capabilities: how a page call flows
 
@@ -115,7 +115,8 @@ listens only to its own `ipc` handler, so they never reach Tauri's IPC parser.
 `extensions::apply` installs the WebExtension compatibility layer into an unpacked package:
 scripts that run before an extension's own and define the Firefox APIs WebKit lacks. The
 layer's host page relays requests that need answers to the embedder, which checks them
-against the permissions the account granted.
+against what the person approved on this computer. The layer's scripts run in the extension's
+own pages, so nothing in them can be a check.
 
 ## Layout
 

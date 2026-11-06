@@ -54,6 +54,9 @@ pub(crate) async fn remove_profile(app: &tauri::AppHandle, key: &str) -> Result<
     }))
     .await
     .map(|_| ());
+    if let Err(error) = approvals::forget_scope(&sync::journal_scope(&account, key)) {
+        result = result.and(Err(error));
+    }
     let folder = root(app, &account, key)?;
     if fs::exists(&folder) {
         if let Err(error) = fs::remove_dir_all(folder) {

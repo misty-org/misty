@@ -64,6 +64,12 @@ fn rejects_traversal_absolute_duplicate_and_bridge_paths() {
         "MANIFEST.JSON",
         "__misty_sync__/bridge.js",
         "__misty_compat__/core.js",
+        "manifest.json::$DATA",
+        "assets/stream:hidden",
+        "assets/trailing.",
+        "assets/trailing ",
+        "assets/aux.js",
+        "CON",
     ] {
         let bytes = archive(Some(path));
         let root = tempfile::tempdir().unwrap();

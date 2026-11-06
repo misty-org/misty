@@ -17,3 +17,8 @@ the app on each platform; the Windows checklist is
 [extensions-windows-test.md](../plans/extensions-windows-test.md). The live intake test
 (`windows_limited_apis_for_chrome_store_extensions`, run with `--ignored`) shows which APIs WebView2
 doesn't offer.
+
+Kiri's layer makes no decisions: scripts in the extension's own pages are as hostile as the extension.
+Each request goes to the native host, which takes the caller from the engine and checks the permission
+the person approved on this computer (`approvals.rs`). The audit of all this, with what holds and
+what's still open, is in [browser security](../browser/security.md#extension-permissions).

@@ -216,6 +216,15 @@ const MIGRATIONS: &[&str] = &[
          json_type(document, '$.agent.coding_default_tool'),
          json_type(document, '$.agent.coding_fallback_tool'),
          json_type(document, '$.agent.coding_usage_cap')) IS NOT NULL ELSE 0 END;",
+    // 21: what the person approved for each extension on this computer. It never syncs: nothing
+    // from the server can stand in for the person's answer (infra/extensions/approvals.rs).
+    "CREATE TABLE extension_approvals (
+         scope TEXT NOT NULL,
+         extension TEXT NOT NULL,
+         permissions TEXT NOT NULL,
+         hosts TEXT NOT NULL,
+         PRIMARY KEY (scope, extension)
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]

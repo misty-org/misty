@@ -39,6 +39,14 @@ pub async fn extensions_respond(
     let result: Result<_,String> = async {
     let profile = native::caller_profile(&caller)?;
     let account = service(&profile).lock().await.account.clone();
+    // An extension's own request: what it asked for comes from the host, and the person's yes
+    // becomes part of what's approved here, before WebKit hears it.
+    if let Some((guid, permissions, hosts)) = approvals::take_request(&request_id).filter(|_| allowed) {
+        let extension = service(&profile).lock().await.desired.values().find(|item| item.guid == guid && item.installed).map(|item| item.id.clone());
+        if let Some(extension) = extension {
+            approvals::approve(&sync::journal_scope(&account, &profile), &extension, &permissions, &hosts)?;
+        }
+    }
     native::request(json!({"operation":"permission-response","account":account,"space":profile,"requestId":request_id,"allowed":allowed})).await
 
     }.await;

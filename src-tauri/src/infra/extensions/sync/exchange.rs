@@ -46,7 +46,7 @@ pub(super) async fn pass(
             return Ok(());
         }
         remove_local(app, &scope, installation)?;
-        drop_origin(profile, &installation_origin(account, &installation.guid));
+        drop_origin(profile, &installation_host(account, &installation.guid));
         let mut state = service(profile).lock().await;
         if state.account == account {
             state.loaded.remove(&installation.id);

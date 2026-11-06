@@ -160,6 +160,8 @@ pub async fn browser_webview_navigate(
             .oauth_callback
             .map(|callback| (callback, std::time::Instant::now()));
     }
+    // Misty's own request, unlike anything a page starts itself.
+    crate::infra::extensions::trust_navigation(&request.id, &url);
     with_webview(&app, &request.id, |webview| {
         webview.navigate(url).map_err(|e| e.to_string())
     })

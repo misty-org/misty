@@ -45,7 +45,42 @@ export function permissionLabel(permission: string): string {
     desktopCapture: "Record your screen or a window you choose",
     sidePanel: "Show a side panel (opens in a tab in Misty)",
     offscreen: "Run a hidden extension page in the background",
-    "<all_urls>": "Read and change data on all websites",
+    pageCapture: "Save pages you visit",
+    background: "Keep running in the background",
+    geolocation: "See your location",
+    gcm: "Receive messages from its developer's servers",
+    favicon: "Read the icons of websites you visit",
+    ttsEngine: "Read text aloud with its own voice",
+    "system.cpu": "Read details about your computer",
+    "system.memory": "Read details about your computer",
+    "system.display": "Read details about your displays",
+    "system.storage": "Read details about your computer's storage",
+    debugger: "Inspect and control your pages (not available in Misty)",
+    proxy: "Route your traffic through a server (not available in Misty)",
   };
-  return labels[permission] ?? permission;
+  return labels[permission] ?? hostLabel(permission) ?? permission;
+}
+
+/** A host pattern in plain words, or null when `pattern` isn't one. */
+function hostLabel(pattern: string): string | null {
+  if (pattern === "<all_urls>") return allSites;
+  const match = /^(\*|[a-z-]+):\/\/([^/]*)\/.*$/.exec(pattern);
+  if (!match) return null;
+  const [, scheme, host] = match;
+  if (scheme === "file") return "Read files you open from this computer";
+  if (host === "*") return allSites;
+  if (host?.startsWith("*.")) return `Read and change data on ${host.slice(2)} and its subdomains`;
+  return `Read and change data on ${host}`;
+}
+
+const allSites = "Read and change data on all websites";
+
+/** Each distinct line to show for a list of access, with what it came from for the tooltip. */
+export function accessLabels(access: string[]): { label: string; source: string }[] {
+  const lines = new Map<string, string[]>();
+  for (const item of access) {
+    const label = permissionLabel(item);
+    lines.set(label, [...(lines.get(label) ?? []), item]);
+  }
+  return [...lines].map(([label, sources]) => ({ label, source: sources.join(", ") }));
 }

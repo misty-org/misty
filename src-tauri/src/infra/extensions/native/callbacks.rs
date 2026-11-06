@@ -17,6 +17,30 @@ impl kiri::extensions::bridge::ExtensionChannel for CompatHost {
     }
 }
 
+/// Whether a page or extension may go to an extension page. The native host asks before it
+/// swaps a tab into an extension's view, which WebKit's own check never sees.
+#[cfg(target_os = "macos")]
+pub(super) extern "C" fn navigation_policy(
+    tab: *const c_char,
+    url: *const c_char,
+    source: *const c_char,
+) -> bool {
+    let text = |pointer: *const c_char| {
+        (!pointer.is_null())
+            .then(|| unsafe { CStr::from_ptr(pointer) }.to_str().ok())
+            .flatten()
+    };
+    let Some(target) = text(url).and_then(|url| url::Url::parse(url).ok()) else {
+        return false;
+    };
+    let source = text(source).and_then(|url| url::Url::parse(url).ok());
+    super::super::web_access::navigation_allowed(
+        text(tab).filter(|tab| !tab.is_empty()),
+        &target,
+        source.as_ref(),
+    )
+}
+
 #[cfg(target_os = "macos")]
 pub(super) extern "C" fn event(pointer: *const c_char) {
     if pointer.is_null() {
@@ -39,6 +63,7 @@ pub(super) extern "C" fn event(pointer: *const c_char) {
         }
         return;
     }
+    super::super::approvals::observe_request(&value);
     // Every event names the profile whose host raised it, and goes to that profile only.
     let Some(profile) = value["space"]
         .as_str()

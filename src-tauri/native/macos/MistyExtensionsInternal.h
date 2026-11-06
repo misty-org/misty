@@ -149,6 +149,10 @@ API_AVAILABLE(macos(15.4))
 - (BOOL)handleNotification:(NSString *)method args:(NSArray *)args identifier:(NSString *)identifier reply:(void (^)(id, NSString *))reply;
 @end
 
+/// Whether this extension may open `url`: anything that isn't an extension page, its own
+/// pages, or another extension's page that one lists as open to it.
+API_AVAILABLE(macos(15.4)) BOOL MistyExtensionMayOpen(WKWebExtensionContext *context, NSURL *url);
+
 /// The live host of a Space, if its window is open.
 API_AVAILABLE(macos(15.4)) MistyExtensionHost *MistyExtensionHostForSpace(NSString *space);
 

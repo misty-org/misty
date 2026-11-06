@@ -32,7 +32,8 @@ use windows_sys::Win32::{
     },
     Storage::FileSystem::{
         CreateFileW, DELETE, FILE_ALL_ACCESS, FILE_FLAG_BACKUP_SEMANTICS,
-        FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ, FILE_SHARE_DELETE,
+        FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
+        FILE_SHARE_DELETE,
         FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL, WRITE_DAC,
     },
 };
@@ -58,6 +59,9 @@ pub enum Access {
     /// Read, write and delete everything inside the folder; the folder
     /// itself can't be deleted or renamed.
     Inside,
+    /// Read, run, add and edit everything inside, but never delete, rename or move: both need the
+    /// delete rights this leaves out.
+    AddEdit,
     /// Read and run the folder and everything inside.
     ReadExecute,
 }
@@ -72,6 +76,7 @@ impl Access {
                 (FILE_ALL_ACCESS & !DELETE, 0),
                 (FILE_ALL_ACCESS, INSIDE_ONLY),
             ],
+            Self::AddEdit => &[(FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE, INHERIT)],
             Self::ReadExecute => &[(FILE_GENERIC_READ | FILE_GENERIC_EXECUTE, INHERIT)],
         }
     }

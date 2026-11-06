@@ -23,6 +23,10 @@ export const useExtensionsStore = create<{
   installRequest: string | null;
   /** "Remove from Misty" on a store page: the installed extension to confirm removing. */
   removeRequest: string | null;
+  /** Extensions this profile has on other computers that nobody approved here. */
+  fromProfile: { id: string; name: string }[];
+  /** Goes up when the runtime should look again though the install list didn't change. */
+  reconcileRequest: number;
 }>(() => ({
   account: "",
   ready: false,
@@ -33,6 +37,8 @@ export const useExtensionsStore = create<{
   permissionRequests: [],
   installRequest: null,
   removeRequest: null,
+  fromProfile: [],
+  reconcileRequest: 0,
 }));
 
 /** Opens the install review for an extension ID or Firefox Add-ons slug. */
@@ -227,7 +233,8 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
   const account = useExtensionsStore.getState().account;
   const existing = installations().find((item) => item.id === review.entry.id && item.installed);
   const generation = existing?.generation ?? crypto.randomUUID();
-  await extensionsNative.commit(review.token, existing ? null : generation);
+  // The person's answer to the review. Native records what the review lists, not what's sent here.
+  await extensionsNative.commit(review.token, existing ? null : generation, true);
   if (account !== useExtensionsStore.getState().account)
     throw new Error("The account changed during installation.");
   await changeControls(async () => {
@@ -243,11 +250,13 @@ export async function install(review: ExtensionReview, privateAccess: boolean) {
       privateAccess: review.privateAllowed && privateAccess,
       // A new extension is off limits to agents until the person allows it.
       agentAccess: old?.agentAccess ?? false,
-      permissions: [...new Set([...(old?.permissions ?? []), ...review.permissions])],
-      hosts: [...new Set([...(old?.hosts ?? []), ...review.hosts])],
+      // What's new joins what's left on, so access the person removed stays removed.
+      permissions: [...new Set([...(old?.permissions ?? []), ...review.addedPermissions])],
+      hosts: [...new Set([...(old?.hosts ?? []), ...review.addedHosts])],
     };
     await setInstallations(storedInstallations([...current.filter((i) => i.id !== next.id), next]));
   });
+  useExtensionsStore.setState((state) => ({ reconcileRequest: state.reconcileRequest + 1 }));
 }
 export function reportExtensionError(error: unknown) {
   useExtensionsStore.setState({ error: error instanceof Error ? error.message : String(error) });

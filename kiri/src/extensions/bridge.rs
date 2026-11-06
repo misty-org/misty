@@ -3,8 +3,8 @@
 //! the compat layer's requests need answers. Kiri therefore registers a
 //! reply-capable script message handler, `kiriExtension`, in the page world of
 //! the compat host page, admits only well-formed top-level requests, and hands
-//! each to the embedder's extension host, which answers against the
-//! permissions the account granted.
+//! each to the embedder's extension host, which answers against what the
+//! person approved on this computer.
 #![allow(unexpected_cfgs)]
 
 use objc::runtime::{Class, Object, Sel, BOOL, YES};

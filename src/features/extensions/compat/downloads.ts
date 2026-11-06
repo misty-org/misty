@@ -114,7 +114,6 @@ export const downloadHandlers: Record<string, CompatHandler> = {
   },
   "downloads.search": async ([query]) => (await search(query)).map(downloadItem),
   "downloads.cancel": ([id]) => browserLibrary.cancelDownload(entryFor(id)),
-  "downloads.open": ([id]) => browserLibrary.openDownload(entryFor(id)),
   "downloads.show": async ([id]) => {
     await browserLibrary.revealDownload(entryFor(id));
     return true;

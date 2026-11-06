@@ -2,6 +2,13 @@
 use super::*;
 use crate::infra::file_access::fs;
 
+/// Fills in what the review asks for beyond what the person already approved here.
+fn with_added(mut review: package::Review, profile_scope: &str) -> Result<package::Review, String> {
+    let approval = approvals::read(profile_scope, &review.entry.id)?.unwrap_or_default();
+    (review.added_permissions, review.added_hosts) = approval.added(&review);
+    Ok(review)
+}
+
 pub(super) async fn prepare(
     app: &tauri::AppHandle,
     account: &str,
@@ -9,6 +16,7 @@ pub(super) async fn prepare(
     id: &str,
 ) -> Result<package::Review, String> {
     let epoch = ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire);
+    let scope = sync::journal_scope(account, profile);
     let entry = cancellable(epoch, catalog::latest(id)).await?;
     {
         let state = service(profile).lock().await;
@@ -18,7 +26,7 @@ pub(super) async fn prepare(
         for path in state.prepared.values() {
             if let Ok(review) = read_review(path) {
                 if review.entry.id == entry.id && review.entry.digest == entry.digest {
-                    return Ok(review);
+                    return with_added(review, &scope);
                 }
             }
         }
@@ -81,7 +89,7 @@ pub(super) async fn prepare(
         return Err("The account changed during download.".into());
     }
     state.prepared.insert(token, path);
-    Ok(review)
+    with_added(review, &scope)
 }
 
 #[tauri::command]
@@ -102,18 +110,24 @@ pub async fn extensions_prepare(
     result.map_err(ExtensionFailure::from)
 }
 
+/// Commits a reviewed package. `approved` is the person's answer to Misty's review of this
+/// token, and records exactly what the review on disk lists, never a list from the caller.
+/// Without it the package must stay within what they approved before, so an update asking for
+/// more, or anything a synced list started, can't get past here.
 pub(super) async fn commit(
     app: &tauri::AppHandle,
     profile: &str,
     token: &str,
+    approved: bool,
 ) -> Result<package::Review, String> {
     let (account, path) = {
-        let mut state = service(profile).lock().await;
+        let state = service(profile).lock().await;
         (
             state.account.clone(),
             state
                 .prepared
-                .remove(token)
+                .get(token)
+                .cloned()
                 .ok_or("This installation review expired. Download the extension again.")?,
         )
     };
@@ -121,6 +135,14 @@ pub(super) async fn commit(
     if review.blocked {
         return Err("This extension requires unavailable browser APIs.".into());
     }
+    let scope = sync::journal_scope(&account, profile);
+    if approved {
+        approvals::approve(&scope, &review.entry.id, &review.permissions, &review.hosts)?;
+    } else if approvals::needs_review(approvals::read(&scope, &review.entry.id)?.as_ref(), &review)
+    {
+        return Err("This extension's access hasn't been approved on this computer.".into());
+    }
+    service(profile).lock().await.prepared.remove(token);
     let package = root(app, &account, profile)?
         .join("packages")
         .join(&review.entry.id);
@@ -171,6 +193,7 @@ pub async fn extensions_commit(
     app: tauri::AppHandle,
     token: String,
     generation: Option<String>,
+    approved: bool,
 ) -> Result<package::Review, ExtensionFailure> {
     let result: Result<_, String> = async {
         let profile = native::caller_profile(&caller)?;
@@ -181,7 +204,7 @@ pub async fn extensions_commit(
         {
             return Err("Invalid installation generation.".into());
         }
-        let review = commit(&app, &profile, &token).await?;
+        let review = commit(&app, &profile, &token, approved).await?;
         if let Some(generation) = generation {
             let state = service(&profile).lock().await;
             if !state

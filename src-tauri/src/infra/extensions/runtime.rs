@@ -44,18 +44,26 @@ async fn activate(
     let mut review = selected_package(&package_root, false)
         .ok()
         .and_then(|path| read_review(&path).ok());
+    // Nothing runs that the person hasn't approved on this computer, whatever the list says.
+    let Some(approval) = approvals::read(&sync::journal_scope(account, profile), &id)? else {
+        native::request(json!({"operation":"unload","account":account,"space":profile,"id":id}))
+            .await?;
+        service(profile).lock().await.loaded.remove(&id);
+        sync::forget(account, profile, &id);
+        drop_origin(profile, &installation_host(account, &installation.guid));
+        return Ok(InstalledState {
+            new_tab: None,
+            id,
+            status: "needs-review".into(),
+            version: review.as_ref().map(|v| v.entry.version.clone()),
+            detail: None,
+            review,
+        });
+    };
     if review.is_none() {
         let prepared = prepare(app, account, profile, &id).await?;
         if prepared.entry.guid != installation.guid
-            || prepared.blocked
-            || prepared
-                .permissions
-                .iter()
-                .any(|p| !installation.permissions.contains(p))
-            || prepared
-                .hosts
-                .iter()
-                .any(|p| !installation.hosts.contains(p))
+            || approvals::needs_review(Some(&approval), &prepared)
         {
             return Ok(InstalledState {
                 new_tab: None,
@@ -66,7 +74,7 @@ async fn activate(
                 review: Some(prepared),
             });
         }
-        review = Some(commit(app, profile, &prepared.token).await?);
+        review = Some(commit(app, profile, &prepared.token, false).await?);
     }
     let review = review.ok_or("The installed package is missing.")?;
     let current = selected_package(&package_root, false)?;
@@ -76,6 +84,8 @@ async fn activate(
     if review.entry.guid != installation.guid {
         return Err("Installed package identity does not match the account.".into());
     }
+    let granted = approvals::effective(installation, &approval, &review);
+    let installation = &granted;
     let signature = identity(
         &serde_json::to_string(&(installation, &review.entry.digest)).map_err(|e| e.to_string())?,
     );
@@ -84,7 +94,8 @@ async fn activate(
         // Extension pages load from this host: the origin itself on macOS,
         // the extension ID derived from it on Windows.
         if let Some(host) = page_host(&origin) {
-            allow_origin(profile, host);
+            allow_origin(profile, host.clone());
+            web_access::remember(host, &current.join("runtime"));
         }
         sync::forget(account, profile, &id);
         // Packages installed before the compatibility layer existed gain it here.
@@ -121,6 +132,18 @@ async fn activate(
             .loaded
             .insert(id.clone(), signature);
         prune_versions(&package_root);
+        // A control changed while an update waits for review: the old version kept running with
+        // the new control, and the update still waits.
+        if let Some(previous) = service(profile).lock().await.states.get(&id).cloned() {
+            let waiting = previous.status == "needs-review"
+                && previous
+                    .review
+                    .as_ref()
+                    .is_some_and(|waiting| waiting.entry.digest != review.entry.digest);
+            if waiting {
+                return Ok(previous);
+            }
+        }
     } else if let Some(previous) = service(profile).lock().await.states.get(&id).cloned() {
         if matches!(previous.status.as_str(), "needs-attention" | "needs-review") {
             return Ok(previous);
@@ -216,6 +239,7 @@ pub async fn extensions_reconcile(
         if ACCOUNT_EPOCH.load(std::sync::atomic::Ordering::Acquire)!=reconcile_epoch { return Err("The extension account changed.".into()); }
         if !installation.installed {
             let _ = native::request(json!({"operation":"remove", "account":account,"space":profile,"id":installation.id,"guid":installation.guid})).await;
+            approvals::forget(&sync::journal_scope(&account,&profile),&installation.id)?;
             sync::queue_removal(&app,&account,&profile,installation)?;
             sync::forget(&account,&profile,&installation.id);
             sync::clear_local(&app,&account,&profile,installation).await?;

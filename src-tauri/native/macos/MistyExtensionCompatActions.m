@@ -30,6 +30,17 @@ static NSSet<NSString *> *WebsiteDataTypes(NSDictionary *types) {
     return result;
 }
 
+/// Headers the web platform keeps for the browser, as Chrome's downloads API does. With them a
+/// download could pass as another site's own request or carry someone else's cookies.
+static BOOL DownloadHeaderAllowed(NSString *name) {
+    NSString *lower = name.lowercaseString;
+    if ([lower hasPrefix:@"proxy-"] || [lower hasPrefix:@"sec-"]) return NO;
+    return ![@[@"accept-charset", @"accept-encoding", @"access-control-request-headers", @"access-control-request-method", @"connection", @"content-length", @"cookie", @"cookie2", @"date", @"dnt", @"expect", @"host", @"keep-alive", @"origin", @"referer", @"set-cookie", @"te", @"trailer", @"transfer-encoding", @"upgrade", @"via"] containsObject:lower];
+}
+bool misty_extensions_download_header_allowed(const char *name) {
+    return DownloadHeaderAllowed([NSString stringWithUTF8String:name]);
+}
+
 /// Whether a website data record (named by registrable domain) belongs to one of the hosts.
 static BOOL RecordMatches(WKWebsiteDataRecord *record, NSArray *hosts) {
     NSString *name = record.displayName.lowercaseString;
@@ -171,8 +182,9 @@ static BOOL RecordMatches(WKWebsiteDataRecord *record, NSArray *hosts) {
     }
     if ([options[@"headers"] isKindOfClass:NSArray.class]) {
         for (NSDictionary *header in options[@"headers"]) {
-            if ([header isKindOfClass:NSDictionary.class] && [header[@"name"] isKindOfClass:NSString.class] && [header[@"value"] isKindOfClass:NSString.class])
-                [request setValue:header[@"value"] forHTTPHeaderField:header[@"name"]];
+            if (![header isKindOfClass:NSDictionary.class] || ![header[@"name"] isKindOfClass:NSString.class] || ![header[@"value"] isKindOfClass:NSString.class]) continue;
+            if (!DownloadHeaderAllowed(header[@"name"])) return [@"Unsafe download header: " stringByAppendingString:header[@"name"]];
+            [request setValue:header[@"value"] forHTTPHeaderField:header[@"name"]];
         }
     }
     __weak WKWebView *weakView = view;

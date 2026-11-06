@@ -36,9 +36,13 @@ Packages are checked before anything unpacks:
   must be the Chrome Web Store's publisher key. A package the store did not sign, or
   one signed for another ID, never installs.
 
-Installation is a permission review, with private access selected by default. While
-Misty downloads and checks the package, the dialog shows a skeleton of the review.
-A store that takes an extension down (Google's `error-unknownApplication`, a 404 or
+Installation is a permission review: what the manifest asks for, in plain words, with
+private tabs off until the person turns them on. While Misty downloads and checks the
+package, the dialog shows a skeleton of the review. Saying yes is the only thing that
+records an approval (`infra/extensions/approvals.rs`, in `misty.db`, never synced): native
+code caps every load to it and to what the version declares. A new version asking for more
+waits for the same review, showing only what's new, while the old version keeps running;
+Settings shows Review access until then. A store that takes an extension down (Google's `error-unknownApplication`, a 404 or
 `is_disabled` from Mozilla) stops it running at the next update check, with a plain
 explanation in Settings.
 
@@ -60,7 +64,9 @@ is never represented as running. Extension artwork keeps its official colors. Al
 preferences use the device settings system.
 
 Installed extensions are saved on this device in the `extensions.installations` setting
-(other Spaces' lists in `extensions.space_installations`); they never sync. Firefox IDs
+(other Spaces' lists in `extensions.space_installations`); they never sync. A profile's
+list on other computers (`followProfile.ts`) approves nothing here: what's added elsewhere is only offered in Settings under From your other
+computers, for the same review. Removing and switching off and on do follow. Firefox IDs
 are stored as numbers so older versions of Misty keep reading them; Chrome Web Store IDs are 32
 letters a–p and are their own identity (`guid == id`). A Firefox identity never looks
 like a Chrome ID, so approvals and extension origins cannot collide.
@@ -74,7 +80,8 @@ compatibility layer (`kiri/src/extensions/compat/`, part of Kiri) for the common
 used Firefox and Chrome APIs WebKit lacks. Its scripts load before an extension's
 own and define only missing APIs:
 
-- Backed by Misty: notifications, downloads, history, topSites, search, sessions,
+- Backed by Misty: notifications, downloads (never opening one; only the person's click
+  does that), history, topSites, search, sessions,
   browsingData, find, idle, tts, bookmarks (Misty's bookmarks; Favorites and Apps
   stay private) and tab groups (`tabs.group`, `tabGroups`, current window).
 - `chrome.js`: side panels open in a tab; offscreen documents run as a frame in the

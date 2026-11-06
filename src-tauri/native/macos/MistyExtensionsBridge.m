@@ -163,6 +163,16 @@ void misty_extensions_tab_event(const char *spaceKey, const char *identifier, co
     }
 }
 
+static MistyExtensionNavigationPolicy navigationPolicy;
+void misty_extensions_set_navigation_policy(MistyExtensionNavigationPolicy policy) { navigationPolicy = policy; }
+static BOOL NavigationAllowed(NSString *tab, NSURL *url, NSURL *source) {
+    return !navigationPolicy || navigationPolicy(tab.UTF8String ?: "", url.absoluteString.UTF8String ?: "", source.absoluteString.UTF8String ?: "");
+}
+BOOL MistyExtensionMayOpen(WKWebExtensionContext *context, NSURL *url) {
+    if (![url.scheme isEqual:@"webkit-extension"] || [url.host isEqual:context.baseURL.host]) return YES;
+    return NavigationAllowed(nil, url, context.baseURL);
+}
+
 bool misty_extensions_supported(void) { if (@available(macOS 15.4, *)) return true; return false; }
 bool misty_extensions_navigation(void *viewPointer, void *actionPointer) {
     if (@available(macOS 15.4, *)) {
@@ -184,6 +194,9 @@ bool misty_extensions_navigation(void *viewPointer, void *actionPointer) {
             }
             NSString *origin=[url.scheme isEqual:@"webkit-extension"] ? url.host : nil;
             if ((!origin && !tab.configuredOrigin) || [origin isEqual:tab.configuredOrigin]) return false;
+            // Swapping views makes this Misty's own load, so WebKit's check on extension pages
+            // never runs. A private window has no extension view to swap to at all.
+            if (origin && (tab.window.privateWindow || !NavigationAllowed(tab.identifier, url, view.URL))) return true;
             // Preserve the actual request, including POST bodies. Only the native
             // view changes; tab identity and granted browser scope remain intact.
             tab.pendingNavigation=action.request;

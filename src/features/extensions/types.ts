@@ -45,6 +45,9 @@ export interface ExtensionReview {
   privateAllowed: boolean;
   hasOptions: boolean;
   manifestVersion: number;
+  /** What it asks for that the person hasn't approved on this computer yet. */
+  addedPermissions: string[];
+  addedHosts: string[];
 }
 export interface InstalledState {
   id: string;

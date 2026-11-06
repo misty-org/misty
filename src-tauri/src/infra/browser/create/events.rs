@@ -26,6 +26,15 @@ pub(super) fn new_window(
         }
         return NewWindowResponse::Deny;
     }
+    // A new tab loads as Misty's own request, which skips the engine's check on extension
+    // pages, so a page's `window.open` meets the same rule its navigations do.
+    let opener = webview_label(popup_id)
+        .ok()
+        .and_then(|label| popup_app.get_webview(&label))
+        .and_then(|view| view.url().ok());
+    if !crate::infra::extensions::page_may_open(&url, opener.as_ref()) {
+        return NewWindowResponse::Deny;
+    }
     if external_url(url.as_str()).is_ok() {
         let _ = popup_app.emit_to(
             browser_owner_label(popup_app, popup_id).as_str(),
