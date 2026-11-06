@@ -1,0 +1,24 @@
+[package]
+name = "misty-agent"
+version = "0.1.0"
+description = "Misty's agent runtime and the model clients it runs on"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+rust-version = "1.80"
+
+[lib]
+name = "misty_agent"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+futures-util = "0.3"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
+serde = { version = "1", features = ["derive"] }
+# `raw_value` keeps tool schemas and call inputs in their original key order (`src/sdk/raw_json.rs`).
+serde_json = { version = "1", features = ["raw_value"] }
+thiserror = "1"
+
+[dev-dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread"] }

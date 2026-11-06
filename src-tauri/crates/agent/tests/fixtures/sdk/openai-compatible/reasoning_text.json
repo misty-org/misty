@@ -1,0 +1,119 @@
+{
+  "name": "reasoning_text",
+  "modelId": "nvidia/test-model",
+  "credentialProvider": "nvidia",
+  "reasoning": "high",
+  "options": {
+    "prompt": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Think, then answer."
+          }
+        ]
+      }
+    ]
+  },
+  "status": 200,
+  "contentType": "text/event-stream",
+  "response": "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1790000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"reasoning_content\":\"Let \"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1790000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"me think.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1790000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Done.\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1790000000,\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":9,\"total_tokens\":14,\"completion_tokens_details\":{\"reasoning_tokens\":4},\"prompt_tokens_details\":{\"cached_tokens\":2}}}\n\ndata: [DONE]\n\n",
+  "sent": [
+    {
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "headers": {
+        "accept": "*/*",
+        "authorization": "Bearer test-key-parity",
+        "content-type": "application/json"
+      },
+      "body": {
+        "model": "test-model",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Think, then answer."
+          }
+        ],
+        "stream": true
+      }
+    }
+  ],
+  "parts": [
+    {
+      "type": "stream-start",
+      "warnings": []
+    },
+    {
+      "type": "response-metadata",
+      "id": "chatcmpl-1",
+      "modelId": "test-model",
+      "timestamp": "2026-09-21T14:13:20.000Z"
+    },
+    {
+      "type": "reasoning-start",
+      "id": "reasoning-0"
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "reasoning-0",
+      "delta": "Let "
+    },
+    {
+      "type": "reasoning-delta",
+      "id": "reasoning-0",
+      "delta": "me think."
+    },
+    {
+      "type": "reasoning-end",
+      "id": "reasoning-0"
+    },
+    {
+      "type": "text-start",
+      "id": "txt-0"
+    },
+    {
+      "type": "text-delta",
+      "id": "txt-0",
+      "delta": "Done."
+    },
+    {
+      "type": "text-end",
+      "id": "txt-0"
+    },
+    {
+      "type": "finish",
+      "finishReason": {
+        "unified": "stop",
+        "raw": "stop"
+      },
+      "usage": {
+        "inputTokens": {
+          "total": 5,
+          "noCache": 3,
+          "cacheRead": 2
+        },
+        "outputTokens": {
+          "total": 9,
+          "text": 5,
+          "reasoning": 4
+        },
+        "raw": {
+          "prompt_tokens": 5,
+          "completion_tokens": 9,
+          "total_tokens": 14,
+          "prompt_tokens_details": {
+            "cached_tokens": 2
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 4
+          }
+        }
+      },
+      "providerMetadata": {
+        "nvidia": {}
+      }
+    }
+  ]
+}

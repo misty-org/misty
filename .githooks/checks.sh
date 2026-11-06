@@ -26,7 +26,7 @@ packages() { [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci
 agent_runtime() { (cd src-tauri/services/agent-runtime && packages && npm run typecheck && npm test); }
 rust_cli() { cargo test --locked --quiet --tests --manifest-path cli/Cargo.toml; }
 # Tests only: compiling for other platforms and building examples wait for a release.
-rust_desktop() { parallel desktop-crate browser-sync-crate kiri-crate desktop-services; }
+rust_desktop() { parallel desktop-crate browser-sync-crate agent-crate kiri-crate desktop-services; }
 desktop_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/Cargo.toml; }
 # The desktop crate compiles for Windows too, and every example with it. Not part of a
 # commit or push: compiling is for cutting a release, which runs this through `release`.
@@ -41,6 +41,7 @@ desktop_windows() {
   cargo xwin check --locked --quiet --all-targets --target x86_64-pc-windows-msvc --manifest-path cli/Cargo.toml
 }
 browser_sync_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/browser-sync/Cargo.toml; }
+agent_crate() { cargo test --locked --quiet --tests --manifest-path src-tauri/crates/agent/Cargo.toml; }
 # Kiri's core tests need no Tauri; the desktop crate builds its native side.
 kiri_crate() { cargo test --locked --quiet --tests --no-default-features --manifest-path kiri/Cargo.toml; }
 desktop_services() {
