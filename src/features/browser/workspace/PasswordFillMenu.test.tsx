@@ -14,11 +14,8 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
-import {
-  listenForPasswordMenus,
-  PASSWORD_MENU_CLICK_DELAY_MS,
-  usePasswordMenuStore,
-} from "@/features/passwords/fillMenu";
+import { listenForPasswordMenus, usePasswordMenuStore } from "@/features/passwords/fillMenu";
+import { FIELD_MENU_CLICK_DELAY_MS as PASSWORD_MENU_CLICK_DELAY_MS } from "@/features/webviews/pageFieldMenu";
 import { PasswordFillMenu } from "./PasswordFillMenu";
 
 const offer = (logins = [{ id: "login:1", username: "alice@example.com" }]) => ({

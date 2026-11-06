@@ -152,14 +152,14 @@ pub(super) fn reply(app: &AppHandle, id: &str, script: String) {
 
 /// Where a page says its sign-in field is, as fractions of the page, kept inside the page.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
-struct MenuPlace {
-    left: f64,
-    bottom: f64,
-    width: f64,
+pub(super) struct MenuPlace {
+    pub(super) left: f64,
+    pub(super) bottom: f64,
+    pub(super) width: f64,
 }
 
 impl MenuPlace {
-    fn from_query(values: &HashMap<String, String>) -> Self {
+    pub(super) fn from_query(values: &HashMap<String, String>) -> Self {
         let fraction = |name: &str| {
             values
                 .get(name)

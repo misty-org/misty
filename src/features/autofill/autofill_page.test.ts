@@ -6,7 +6,7 @@ import fieldsScript from "../../../src-tauri/src/infra/browser/scripts/autofill_
 // The page script as it ships, in jsdom. jsdom marks dispatched events untrusted, which the script
 // rightly ignores, so that one check is lifted here and nothing else changes.
 type Autofill = {
-  offer(kind: string): void;
+  offer?: unknown;
   fill(kind: string, values: Record<string, unknown>): void;
 };
 const autofill = () => (window as unknown as { __MISTY_AUTOFILL__: Autofill }).__MISTY_AUTOFILL__;
@@ -115,50 +115,54 @@ describe("offering", () => {
     expect(message("focus")).toBeUndefined();
   });
 
-  it("draws a chip holding no saved details, and asks only when clicked", () => {
+  it("says where the field is and nothing about the person", () => {
     form(ADDRESS);
     focus(input("street"));
-    autofill().offer("address");
-    expect(shadows).toHaveLength(1);
-    const chip = shadows[0]!.querySelector("button")!;
-    expect(chip.textContent).toBe("Fill address");
-    expect(message("choose")).toBeUndefined();
+    expect([...message("focus")!.keys()].sort()).toEqual(["bottom", "kind", "left", "token"]);
   });
 
-  it("ignores a click landing just as the chip appears", () => {
-    const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+  it("says when focus leaves, and not while moving between the form's fields", () => {
+    vi.useFakeTimers();
     form(ADDRESS);
     focus(input("street"));
-    autofill().offer("address");
-    const chip = shadows[0]!.querySelector("button")!;
-    now.mockReturnValue(1100);
-    chip.click();
-    expect(message("choose")).toBeUndefined();
-    now.mockReturnValue(1400);
-    chip.click();
-    expect(message("choose")?.get("kind")).toBe("address");
-    now.mockRestore();
+    input("street").dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    focus(input("city"));
+    vi.advanceTimersByTime(200);
+    expect(message("hide")).toBeUndefined();
+    input("city").dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    vi.advanceTimersByTime(200);
+    expect(message("hide")).toBeDefined();
+    vi.useRealTimers();
   });
+});
 
-  it("sends the field's position when asking, and nothing about the person", () => {
-    const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+describe("a hostile page", () => {
+  it("gets nothing drawn in its document and no word on whether anything is saved", () => {
+    const create = vi.spyOn(document, "createElement");
     form(ADDRESS);
+    create.mockClear();
     focus(input("street"));
-    autofill().offer("address");
-    now.mockReturnValue(2000);
-    shadows[0]!.querySelector("button")!.click();
-    expect([...message("choose")!.keys()].sort()).toEqual(["kind", "token", "x", "y"]);
-    now.mockRestore();
-  });
-
-  it("offers nothing for another kind or a field that lost focus", () => {
-    form(ADDRESS);
-    focus(input("street"));
-    autofill().offer("card");
+    expect(create).not.toHaveBeenCalled();
     expect(shadows).toHaveLength(0);
-    input("street").blur();
-    autofill().offer("address");
-    expect(shadows).toHaveLength(0);
+    expect(autofill().offer).toBeUndefined();
+    create.mockRestore();
+  });
+
+  it("has nothing to hook or forge that opens the list", () => {
+    const captured: EventListenerOrEventListenerObject[] = [];
+    const hook = vi
+      .spyOn(EventTarget.prototype, "addEventListener")
+      .mockImplementation((_type, listener) => {
+        if (listener) captured.push(listener);
+      });
+    form(ADDRESS);
+    focus(input("street"));
+    for (const listener of captured) {
+      if (typeof listener === "function") listener({ isTrusted: true } as unknown as Event);
+    }
+    hook.mockRestore();
+    expect(pageScript).not.toContain("'choose'");
+    expect(message("choose")).toBeUndefined();
   });
 });
 
@@ -292,8 +296,8 @@ describe("capturing", () => {
 describe("the token", () => {
   it("is never put where a page could read it", () => {
     expect(Object.keys(window)).not.toContain("shortcutToken");
-    expect(JSON.stringify(Object.getOwnPropertyDescriptor(window, "__MISTY_AUTOFILL__"))).not.toContain(
-      "token",
-    );
+    expect(
+      JSON.stringify(Object.getOwnPropertyDescriptor(window, "__MISTY_AUTOFILL__")),
+    ).not.toContain("token");
   });
 });

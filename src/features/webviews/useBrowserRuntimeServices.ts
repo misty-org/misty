@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/features/auth";
 import { useBrowserMediaStore } from "@/features/browser/library";
+import { listenForAutofillChips } from "@/features/autofill/chip";
 import { listenForAutofillOffers } from "@/features/autofill/offers";
 import { listenForPasswordMenus } from "@/features/passwords/fillMenu";
 import { listenForPasswordOffers } from "@/features/passwords/offers";
@@ -12,6 +13,7 @@ export function useBrowserRuntimeServices(): void {
   useEffect(() => listenForPasswordOffers(), []);
   useEffect(() => listenForPasswordMenus(), []);
   useEffect(() => listenForAutofillOffers(), []);
+  useEffect(() => listenForAutofillChips(), []);
   const { user } = useAuth();
   // Archived tabs belong to the profile: the account, or the local one signed out.
   const archiveAccount = useRef(accountScopeFor(user?.id));

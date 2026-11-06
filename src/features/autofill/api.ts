@@ -37,7 +37,7 @@ export interface AutofillOffer {
   update: boolean;
 }
 
-/** The person clicked a page's fill chip: what they can pick from, and where to show it. */
+/** The person clicked Misty's fill chip: what they can pick from, and where to show it. */
 export interface AutofillChoice {
   key: string;
   /** The browser page's native runtime id. */
@@ -80,6 +80,9 @@ export const autofillApi = {
       expYear: input.expYear,
     }),
   remove: (id: string) => invoke<void>("browser_autofill_delete", { id }),
+  /** Opens the list of saved details over a page, after a click on Misty's chip. */
+  open: (id: string, kind: "address" | "card", left: number, bottom: number) =>
+    invoke<void>("browser_autofill_open", { id, kind, left, bottom }),
   choose: (key: string, item: string | null) =>
     invoke<void>("browser_autofill_choose", { key, item }),
   respondToOffer: (id: string, save: boolean) =>

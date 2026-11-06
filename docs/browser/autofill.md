@@ -5,8 +5,9 @@ with their own save offer and menu (`host_messages/passwords.rs`).
 
 ## How it works for a person
 
-1. They click into an address or card form. An empty chip under the field reads **Fill address** or
-   **Fill card**. It appears only if something of that kind is saved.
+1. They click into an address or card form. Misty draws a chip under the field reading **Fill
+   address** or **Fill card**, over the page rather than in it. It appears only if something of that
+   kind is saved.
 2. Clicking it opens a menu in Misty's own interface, listing what's saved, with **Manage autofill**
    last.
 3. Picking an address fills the form. Picking a card asks for Touch ID, Windows Hello or the
@@ -20,11 +21,15 @@ Cards lists, to add, change and delete. The switches belong to the computer and 
 
 ## What protects the person
 
-- **A site learns nothing until a pick.** Anything the page script draws is within the site's reach,
-  because a page can replace `document.createElement` or a property setter. So the page script never
-  gets saved details to draw: not a name, not the last four digits. The list goes only to Misty's
-  renderer (`AutofillChooser`). The one thing a site could infer is that something of that kind is
-  saved, once someone focuses a field in its form.
+- **A site learns nothing until a pick.** The page script runs in the page's own JavaScript world,
+  where a page can replace `addEventListener`, `document.createElement` or a property setter and call
+  whatever it captures. So it draws nothing and gets nothing: no saved detail, and no word on whether
+  anything is saved. It only says a form has focus. The chip (`AutofillChip`) and the list
+  (`AutofillChooser`) are Misty's own.
+- **A page can't choose for the person.** Only a click on the chip opens the list, through
+  `browser_autofill_open`, which website views can't call. A page can focus a field, and so bring up
+  the chip wherever it says the field is, to catch a click meant for something else. So the chip stays
+  inside the page and ignores clicks in its first half second, starting again whenever it reappears.
 - **Only what's on the page is filled or read.** Fields that are hidden, transparent, tiny, off the
   page, disabled or read-only are skipped (`onPage` in `scripts/autofill.js`), so a site can't collect
   more than the person sees. A native select may be transparent, because styled dropdowns lay one over
@@ -73,11 +78,11 @@ goes through the `browser_autofill_*` commands, which incognito windows are refu
 | Part | Where |
 | --- | --- |
 | Field recognition, fill plan, value formats | `src-tauri/src/infra/browser/scripts/autofill_fields.js` |
-| Chip, filling and capture in the page | `src-tauri/src/infra/browser/scripts/autofill.js` |
+| Filling and capture in the page | `src-tauri/src/infra/browser/scripts/autofill.js` |
 | Page messages, offers and fills | `src-tauri/src/infra/browser/host_messages/autofill.rs` |
 | What a submitted form means | `host_messages/autofill/form.rs` |
 | Commands for the app and Settings | `host_messages/autofill/manage.rs` |
 | Touch ID and Windows Hello | `src-tauri/src/infra/local_auth.rs`, `native/macos/MistyLocalAuth.m` |
 | Record types and validation | `crates/browser-sync/src/document/entities/autofill.rs` |
-| Chooser, save offer, editors | `src/features/autofill/`, `browser/workspace/AutofillOfferNotice.tsx` |
+| Chip, chooser, save offer, editors | `src/features/autofill/`, `browser/workspace/AutofillChip.tsx`, `browser/workspace/AutofillOfferNotice.tsx` |
 | Settings | `src/features/settings/sections/AutofillSettings.tsx` |
