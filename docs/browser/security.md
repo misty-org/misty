@@ -71,7 +71,8 @@ Reviewed on 2026-11-06 by someone who hadn't written it, reading the code and te
 | Medium | `folder.send` and `folder.read` could reach `.env` and keys that the shell couldn't | One list of closed files for both | `secrets` tests |
 | Medium | A window could name any folder as the download folder and get write access to it, then save a page into it | The folder comes from a native dialog only, and a saved page goes only to a file just picked | `settings.rs`, `is_picked_file` |
 | Medium | A hard link kept write access after it was taken back | Refused in a shared folder | `tests.rs` |
-| Medium | `launchctl disable` changed what starts at login, from inside | `launchctl` can't be started | `tests.rs` |
+| High | A command could read other programs' environments through Perl, so a key in a dev server's could reach the model | Only Misty's own tools can start, and none can make that call | `only_mistys_own_tools_can_start` |
+| Medium | `launchctl disable` changed what starts at login, from inside | Nothing but Misty's own tools can start | `only_mistys_own_tools_can_start` |
 | Medium | Hook files could be written to run later outside the sandbox | `.git`, `.githooks`, `.husky` and `.envrc` stay read-only, and the question names the risk | `tests.rs` |
 | Medium | A command could remove the quarantine flag, or plant a file without one | Refused, and what a command adds or edits is marked when it ends | `tests.rs` |
 | Medium | An incognito window could reach the account's stored credentials | Removed from incognito windows | `app_command_policy` test, smoke |
@@ -79,14 +80,11 @@ Reviewed on 2026-11-06 by someone who hadn't written it, reading the code and te
 
 Still open:
 
-- **A command can read other processes' arguments and environment (high).** Perl can make the
-  `KERN_PROCARGS2` call, and no profile rule tried stopped it. It returned a variable from a process
-  outside the sandbox running as the same person, though not from a system program. So a key kept in a
-  dev server's or CLI's environment can reach the model, and an agent's web tools could send it out.
-  Misty's own workers start with a clean environment. Closing this needs commands under a separate
-  user, which takes an installer with admin rights. Removing Perl and Python wouldn't be enough unless
-  commands were also refused from running programs in their workspace, and that would cost the scripts
-  the shell is for.
+- **Other programs' environments, closed by leaving out what could read them.** A process can read the
+  environment of another one running as the same person through `KERN_PROCARGS2`, and no profile rule tried
+  stopped it. Commands used to reach it through Perl. Now only Misty's own tools can start, and none of them
+  make that call. The profile still doesn't refuse it, so anything added to the tools must not offer raw
+  system calls or a way to load code, and that means no general scripting language with such a feature.
 - **A malicious server can skip Manual's pause.** The server decides when a run pauses. It can't get a
   command past its sandbox, its grant or its chat's workspace, but nothing on the computer checks that
   the person approved a given command. Low, since people choose the server they run against.

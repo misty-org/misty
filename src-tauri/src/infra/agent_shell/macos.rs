@@ -1,4 +1,5 @@
-//! Commands under Seatbelt, through the system's `sandbox-exec`, the way the document worker runs.
+//! Commands under Seatbelt, through the system's `sandbox-exec`, the way the document worker runs. The
+//! shell and its tools are the program in `tools`, and that's the only program the profile can start.
 use std::{
     path::Path,
     process::Stdio,
@@ -12,7 +13,8 @@ use std::{
 use tokio::{io::AsyncReadExt, process::Command};
 
 use super::{
-    exit_watcher::ExitWatcher, output::CappedOutput, process_tree::Tree, ShellOutcome, ShellRequest,
+    exit_watcher::ExitWatcher, output::CappedOutput, process_tree::Tree, tools, ShellOutcome,
+    ShellRequest,
 };
 
 const BASE_PROFILE: &str = include_str!("../../../sandbox/permissions/agent-shell.sb");
@@ -92,11 +94,6 @@ fn mark_changed_files(root: &Path, since: std::time::SystemTime) {
 /// How many entries of a shared folder are looked through after a command that can write to it.
 const MAX_MARKED_ENTRIES: usize = 200_000;
 
-/// Developer tools come first: `/usr/bin/git` and `/usr/bin/python3` are stubs that fail inside a
-/// sandbox with a misleading Xcode license message, while the real copies work.
-const TOOL_PATH: &str =
-    "/opt/homebrew/bin:/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin";
-
 pub(super) async fn run(
     workspace: &Path,
     request: &ShellRequest,
@@ -107,6 +104,7 @@ pub(super) async fn run(
     let started_at = std::time::SystemTime::now() - Duration::from_secs(2);
     let mut marked_folder = None;
     let max_processes = running_processes() + EXTRA_PROCESSES;
+    let tools = tools::ready()?;
     let mut profile = BASE_PROFILE.to_owned();
     let mut command = Command::new("/usr/bin/sandbox-exec");
     if let Some(folder) = &request.folder {
@@ -124,11 +122,16 @@ pub(super) async fn run(
         .arg(profile)
         .arg("-D")
         .arg(format!("WORKSPACE={}", workspace.display()))
-        .args(["/bin/sh", "-c"])
+        .arg("-D")
+        .arg(format!("TOOLS={}", tools.folder.display()))
+        .arg("-D")
+        .arg(format!("TOOL={}", tools.program.display()))
+        .arg(tools.folder.join("sh"))
+        .arg("-c")
         .arg(&request.command)
         .current_dir(workspace)
         .env_clear()
-        .env("PATH", TOOL_PATH)
+        .env("PATH", &tools.folder)
         .env("HOME", workspace)
         .env("TMPDIR", workspace.join(".tmp"))
         .env("LANG", "en_US.UTF-8")

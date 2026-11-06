@@ -206,7 +206,11 @@ fn build_builtin_workers() {
     for input in ["src", "Cargo.toml"] {
         println!("cargo:rerun-if-changed={}", shared.join(input).display());
     }
-    for (service, protocol) in [("document-processing", 6), ("page-reader", 1)] {
+    for (service, protocol) in [
+        ("document-processing", 6),
+        ("page-reader", 1),
+        ("agent-shell", 1),
+    ] {
         let directory = root.join(service);
         for input in ["src", "Cargo.toml", "Cargo.lock"] {
             println!("cargo:rerun-if-changed={}", directory.join(input).display());

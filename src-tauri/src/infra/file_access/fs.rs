@@ -105,6 +105,14 @@ pub fn symlink(target: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<(
     std::os::unix::fs::symlink(target, link)
 }
 
+/// Makes a hard link, which reaches the file's contents, so both ends have to be allowed.
+#[cfg(windows)]
+pub fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
+    check(original.as_ref(), Access::Read)?;
+    check_link(link.as_ref(), Access::Write)?;
+    std::fs::hard_link(original, link)
+}
+
 /// Makes a folder link, on the same terms as `symlink`.
 #[cfg(windows)]
 pub fn symlink_dir(target: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {

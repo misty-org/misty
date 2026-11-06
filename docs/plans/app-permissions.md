@@ -81,7 +81,7 @@ src-tauri/sandbox/
 | --- | --- | --- |
 | `permission-document-worker` | The one file it's handed, no network | Nothing |
 | `permission-page-reader` | The page it's handed, no network or files | Nothing |
-| `permission-agent-shell` | The chat's workspace, system tools, no network | Nothing; folder access comes from grants |
+| `permission-agent-shell` | The chat's workspace, Misty's own shell tools, no network | Nothing; folder access comes from grants |
 | Agent actions | Ask and Auto as they work today | Remembered approvals |
 | Site access | Off | Camera, microphone and location, per site |
 | Browser import | Off, asks on first use | On or off in Settings |
@@ -174,10 +174,10 @@ tools.
 | Tool | What it's for | Where it runs |
 | --- | --- | --- |
 | `browser_run` | The only way to script tabs: loops, forms, collecting rows | QuickJS in the app, with no files or network of its own |
-| `shell.run` | Scripts and system tools for everything else: files, data, batch work | A real shell, confined by `permission-agent-shell` |
+| `shell.run` | Scripts and shell tools for everything else: files, data, batch work | A real shell, the same on every computer, confined by `permission-agent-shell` |
 
 - **Private workspace:** each chat gets its own folder, which commands can read and write freely. They
-  can also run system tools and use the chat's shared folder as granted, and nothing else. It lasts until
+  can also run Misty's own shell tools and use the chat's shared folder as granted, and nothing else. It lasts until
   the chat is deleted, has a size limit, and no other chat can see it. Agents save anything worth keeping
   to the Library or a shared folder.
 - **No network, and no way to add it:** commands can't reach the internet or other machines, so there's
@@ -193,8 +193,25 @@ tools.
   - Its lessons still apply: a profile's `localhost` rule also matches `0.0.0.0`, so commands can't
     listen; a process calling `setsid()` escapes group kills, so descendants must be tracked; `.env` and
     key files stay unreadable, because command output reaches the model.
-- **Tools:** Misty won't bundle a scripting language, to keep the app small, so scripts use what's on the
-  computer. See [what's been tested](#whats-been-tested) for what works.
+- **Tools:** one program in Rust that Misty ships (`src-tauri/services/agent-shell`), so it's the same
+  shell and commands on every computer, with no developer tools needed:
+  - The shell is `brush-core`, which follows bash. The commands are uutils: coreutils, findutils, grep and
+    sed. `tar`, `zip`, `unzip`, `gzip` and `gunzip` are small commands of Misty's, over the Rust crates.
+  - A release build of the program is 9.9 MB, 4.3 MB compressed. The app embeds it and writes it out once.
+  - It's the only program commands can start. Nothing on the computer runs, and neither does anything an
+    agent writes, except a script as `sh script.sh`. That leaves no Perl or Python to read other programs'
+    environments, and no `launchctl`.
+  - Each tool is a link to the one program on `PATH`, so pipes and redirects work as they do anywhere.
+- **What's missing or different:**
+  - No `awk`, since uutils awk isn't finished, so sums and column work use shell loops. Shell arithmetic
+    takes whole numbers only.
+  - No `chmod` or `stat`, which don't build on Windows. Keeping the same set everywhere matters more.
+  - `$!` is empty, because brush runs background commands as tasks rather than one process. `&` and `wait`
+    work, and `kill $!` doesn't.
+  - uutils grep and sed are early versions, and some options may be missing or behave differently.
+  - Nobody has measured what this costs in steps. The benchmarks will show that, and whether `awk` is worth
+    adding once it's ready.
+- **Windows:** the same program, and brush's support there is preview. It compiles, and it hasn't run.
 - **`browser_run` on several tabs:** one program with `Promise.all` loaded pages at the same time in
   real tabs (up to 4 at once in the smoke test, on pages that each take 1.5 seconds). It still needs
   benchmarking, since that's the parallel case.
@@ -253,11 +270,11 @@ reader on the same macOS, as the second table says.
 | Delete, rename or move in a folder with write access | Refused, and the files survived |
 | Create, append or overwrite there | Worked |
 | Read or `rm -rf` outside, list the home folder or `.misty` | Denied |
-| `curl` | Failed, no network |
-| `sh`, `zsh`, `awk`, `grep`, `sort`, `tar`, `zip`, `jq`, `perl` | Worked |
-| `/usr/bin/git`, `/usr/bin/python3` | Failed with a misleading Xcode license message |
-| The same two from `/Library/Developer/CommandLineTools/usr/bin` | Worked, but not every Mac has them |
-| `ruby` | Failed |
+| `curl` | Not found, and a shell's `/dev/tcp` redirect failed too |
+| `cut`, `sort`, `uniq`, `grep`, `sed`, `find`, `xargs`, `tar`, `zip`, `unzip`, `gzip`, loops, pipes, `sh script.sh` | Worked |
+| `/usr/bin/perl`, `python3`, `git`, `ssh`, `/bin/launchctl`, `/bin/ls`, `/bin/sh` | Refused, exit 126 |
+| A copy of a tool in the workspace, or a script run as `./x` | Refused |
+| Listing `/usr/bin`, `/bin`, `/opt/homebrew`, `/usr/local`, `/Applications`, `/Users` | Refused |
 
 The page reader's real worker, in its real profile, from its debug build's probes
 (`infra/page_reader/macos_tests.rs`):
@@ -331,8 +348,6 @@ Not tested yet:
 
 ## What this doesn't cover
 
-- **Other processes' environments:** a command can read them, so a key in another program's environment
-  isn't safe from it ([browser security](../browser/security.md#the-agent-shell)).
 - **The main process:** agent code now runs in it. A memory bug in it, or a page escaping WebKit, could get
   past the gate, because the main app has no OS sandbox. So the docs should say Misty asks before using files, not that a disk
   wipe is impossible.

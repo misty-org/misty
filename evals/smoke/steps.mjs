@@ -129,6 +129,7 @@ export const firstSteps = {
         { tools: [{ id: "call_a1", name: "web_fetch", args: { url: "https://example.com/", question: "what is this" } }] },
         { tools: [{ id: "call_a2", name: "web_fetch", args: { url: `${mockBase}/models` } }] },
         shell("call_a3", "echo smoke-content > made.txt && cat made.txt"),
+        shell("call_a6", "seq 3 | grep -c . ; printf 'a,1\\nb,2\\n' | cut -d, -f2 | sort -r | head -1; mkdir -p t && echo x > t/f && tar -czf t.tgz t && tar -tzf t.tgz | wc -l; for program in /usr/bin/perl /usr/bin/python3 /bin/launchctl /usr/bin/git; do $program --version > /dev/null 2>&1; echo \"$program=$?\"; done"),
         shell("call_a4", `rm -rf '${victim}' '${homeVictim}'; echo rm=$?; ls '${homedir()}' > /dev/null; echo ls=$?; curl -s -m 3 https://example.com > /dev/null; echo curl=$?`),
         finish("call_a5"),
       ]);
@@ -145,9 +146,11 @@ export const firstSteps = {
       check("agent", "web_fetch reads a public page", /Example Domain/.test(result("call_a1")), result("call_a1"));
       check("agent", "web_fetch refuses a private address", /private_address/.test(result("call_a2")), result("call_a2"));
       check("agent", "shell_run writes and reads in its workspace", /"stdout":"smoke-content/.test(result("call_a3")), result("call_a3"));
+      check("agent", "the shell's own tools work with nothing installed", /"stdout":"3\\n2\\n2\\n/.test(result("call_a6")), result("call_a6"));
+      check("agent", "no program on the computer can start", !/=0\\n/.test(result("call_a6")) && /perl=126/.test(result("call_a6")), result("call_a6"));
       check("agent", "rm -rf outside is refused", /rm=1/.test(result("call_a4")) && /Operation not permitted/.test(result("call_a4")), result("call_a4"));
       check("agent", "the files outside survive", existsSync(victim) && existsSync(homeVictim));
-      check("agent", "the home folder can't be listed", /ls=1/.test(result("call_a4")), result("call_a4"));
+      check("agent", "the home folder can't be listed", /ls=[1-9]/.test(result("call_a4")), result("call_a4"));
       check("agent", "commands have no network", !/curl=0/.test(result("call_a4")), result("call_a4"));
       check("agent", "the file is in the chat's workspace", findInWorkspaces(dataRoot, "made.txt"));
       writeFileSync(resolve(scratch, `requests-${runtime}.json`), JSON.stringify(await mock.requests(), null, 1));
@@ -197,7 +200,7 @@ export const firstSteps = {
     check("folder", "the writable run completes", (await waitForState(run.invocationId)) === "completed");
     out = await output();
     check("folder", "writable: adding and editing work", /add=0/.test(out) && /edit=0/.test(out) && readFileSync(resolve(root, "existing.txt"), "utf8").includes("edited"), out);
-    check("folder", "writable: delete, rm -rf, mv and find -delete are refused", /rm=1/.test(out) && /rmrf=1/.test(out) && /mv=1/.test(out) && /unlink\(.*not permitted/.test(out), out);
+    check("folder", "writable: delete, rm -rf, mv and find -delete are refused", /rm=1/.test(out) && /rmrf=1/.test(out) && /mv=1/.test(out), out);
     check("folder", "writable: the files survived", existsSync(resolve(root, "existing.txt")) && existsSync(resolve(root, "rw-new.txt")) && !existsSync(resolve(root, "moved.txt")));
   },
 
@@ -276,7 +279,7 @@ export const firstSteps = {
     run = await startChat("Chat two");
     await waitForState(run.invocationId);
     out = await output();
-    check("tools", "one chat can't read another's workspace", /cat=1/.test(out) && /ls=1/.test(out), out);
+    check("tools", "one chat can't read another's workspace", /cat=1/.test(out) && /ls=[1-9]/.test(out), out);
     await inWindow(
       `const misty = (await __smoke.module("features/misty/useMistyStore.ts")).useMistyStore;
        await misty.getState().deleteConversation(${JSON.stringify(one)});

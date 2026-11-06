@@ -19,7 +19,7 @@ use misty_windows_confine::{
 };
 use sha2::{Digest, Sha256};
 
-use super::{output::CappedOutput, ShellOutcome, ShellRequest};
+use super::{output::CappedOutput, tools, ShellOutcome, ShellRequest};
 
 /// Files that hold secrets stay closed even in a shared folder, because a command's output reaches
 /// the model. Windows has no rule by name, so they're found before a command runs.
@@ -90,6 +90,32 @@ fn read_capped(file: &mut File) -> (String, bool) {
     output.finish()
 }
 
+/// One argument as a Windows program reads its command line: quotes around it, a quote inside it
+/// escaped, and backslashes doubled only where they come before a quote.
+fn quote_argument(argument: &str) -> String {
+    let mut quoted = String::with_capacity(argument.len() + 2);
+    quoted.push('"');
+    let mut backslashes = 0;
+    for character in argument.chars() {
+        match character {
+            '\\' => backslashes += 1,
+            '"' => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
+                quoted.push('"');
+                backslashes = 0;
+            }
+            other => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes));
+                quoted.push(other);
+                backslashes = 0;
+            }
+        }
+    }
+    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
+    quoted.push('"');
+    quoted
+}
+
 fn run_blocking(
     workspace: &Path,
     command: &str,
@@ -100,6 +126,8 @@ fn run_blocking(
     let digest = Sha256::digest(workspace.to_string_lossy().as_bytes());
     let container = Container::open(&format!("misty.shell.{}", &hex::encode(digest)[..32]))?;
     container.grant(workspace, Access::Inside)?;
+    let tools = tools::ready()?;
+    container.grant(&tools.folder, Access::ReadExecute)?;
     let mut grant = None;
     if let Some((root, writable)) = folder {
         let access = if writable { Access::AddEdit } else { Access::ReadExecute };
@@ -121,17 +149,17 @@ fn run_blocking(
         process_cpu: Duration::from_secs(600),
         processes: 64,
     })?;
-    let system_root = std::env::var_os("SystemRoot").ok_or("shell_start_failed")?;
-    let shell = Path::new(&system_root).join("System32").join("cmd.exe");
-    let mut line = OsString::from("cmd.exe /d /s /c \"");
-    line.push(command);
-    line.push("\"");
+    let shell = tools.folder.join("sh.exe");
+    let mut line = OsString::from("sh.exe -c ");
+    line.push(quote_argument(command));
     let temp = workspace.join(".tmp");
     let mut variables = system_variables();
     for name in ["TEMP", "TMP", "USERPROFILE", "HOME"] {
         let value = if name.starts_with('T') { temp.as_os_str() } else { workspace.as_os_str() };
         variables.push((OsStr::new(name).to_owned(), value.to_owned()));
     }
+    variables.push((OsStr::new("PATH").to_owned(), tools.folder.as_os_str().to_owned()));
+    variables.push((OsStr::new("PATHEXT").to_owned(), OsStr::new(".EXE").to_owned()));
     let process = spawn(&Launch {
         application: &shell,
         command_line: &line,
@@ -187,4 +215,21 @@ pub(super) async fn run(
     })
     .await
     .map_err(|_| "shell_start_failed".to_owned())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quote_argument;
+
+    #[test]
+    fn quoting_follows_the_windows_rules() {
+        for (argument, quoted) in [
+            ("echo hi", r#""echo hi""#),
+            (r#"echo "hi""#, r#""echo \"hi\"""#),
+            (r"C:\a b\", r#""C:\a b\\""#),
+            (r#"a\"b"#, r#""a\\\"b""#),
+        ] {
+            assert_eq!(quote_argument(argument), quoted);
+        }
+    }
 }
