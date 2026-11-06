@@ -77,6 +77,8 @@ export function FilePathControl(props: {
   emptyLabel?: string;
   /** Choose a folder instead of a file. */
   directory?: boolean;
+  /** A native question of the control's own, for a choice that has to come from the person. */
+  choose?: () => Promise<string | null>;
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
@@ -85,12 +87,14 @@ export function FilePathControl(props: {
   const chooseFile = async () => {
     setChoosing(true);
     try {
-      const selected = await open({
-        directory: props.directory ?? false,
-        multiple: false,
-        title: props.title,
-        filters: props.filters,
-      });
+      const selected = props.choose
+        ? await props.choose()
+        : await open({
+            directory: props.directory ?? false,
+            multiple: false,
+            title: props.title,
+            filters: props.filters,
+          });
       if (typeof selected === "string") props.onChange(selected);
     } finally {
       setChoosing(false);

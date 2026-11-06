@@ -12,7 +12,6 @@
   ],
   "permissions": [
     "action-app",
-    "action-auth",
     "action-browser",
     "action-clipboard",
     "action-devices",

@@ -76,7 +76,11 @@ export const aiSurfaceApi = {
       body: JSON.stringify({ rating, reason, comment }),
     }),
   createInvocation: async (input: AiInvocationRequest) => {
-    const deviceContexts = await withDeviceRunGrants(input.deviceContexts, input.agentId);
+    const deviceContexts = await withDeviceRunGrants(
+      input.deviceContexts,
+      input.agentId,
+      input.conversationId ?? input.idempotencyKey,
+    );
     return apiRequest<AiInvocationCreated>("/ai/invocations", {
       method: "POST",
       headers: { "Idempotency-Key": input.idempotencyKey },

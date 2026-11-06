@@ -1,14 +1,22 @@
 //! Each chat's private folder. It lasts until the chat is deleted, has a size limit, and no other
 //! chat can see it.
 use crate::infra::file_access::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use sha2::{Digest, Sha256};
 
 use super::SharedFolder;
 
 /// The most one workspace may hold before commands are refused.
-const MAX_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub(super) const MAX_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// How often a running command's workspace is measured.
+const SIZE_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
 /// The name a chat's shared folder has inside its workspace. The agent never needs the real path.
 pub(super) const SHARED_FOLDER_LINK: &str = "shared-folder";
 
@@ -36,6 +44,27 @@ pub(super) fn prepare(misty_dir: &Path, key: &str) -> Result<PathBuf, String> {
     }
     fs::create_dir_all(path.join(".tmp")).map_err(|_| "shell_workspace_unavailable".to_owned())?;
     Ok(path)
+}
+
+/// A command could otherwise fill the disk before the next one is refused. Stops it instead.
+pub(super) async fn stop_when_full(
+    workspace: PathBuf,
+    max_bytes: u64,
+    stop: Arc<AtomicBool>,
+    full: Arc<AtomicBool>,
+) {
+    loop {
+        tokio::time::sleep(SIZE_CHECK_INTERVAL).await;
+        let measured = workspace.clone();
+        let Ok(bytes) = tokio::task::spawn_blocking(move || folder_bytes(&measured)).await else {
+            return;
+        };
+        if bytes > max_bytes {
+            full.store(true, Ordering::Release);
+            stop.store(true, Ordering::Release);
+            return;
+        }
+    }
 }
 
 #[cfg(unix)]

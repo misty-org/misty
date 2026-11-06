@@ -87,6 +87,7 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser::page_tools::browser_clear_website_data,
             #[cfg(desktop)]
+            crate::infra::browser::browser_choose_download_directory,
             crate::infra::browser::browser_set_download_directory,
             #[cfg(desktop)]
             crate::infra::browser::browser_set_download_prompt,
@@ -191,6 +192,7 @@ macro_rules! with_more_commands {
             crate::infra::browser_library::browser_download_cancel,
             #[cfg(desktop)]
             crate::infra::browser_library::browser_download_open,
+            crate::infra::browser::browser_tab_download_open,
             #[cfg(desktop)]
             crate::infra::browser_library::browser_download_reveal,
             #[cfg(desktop)]
@@ -236,8 +238,6 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser::agent_control::browser_agent_execution_renew,
             crate::app::clipboard_commands::clipboard_write_file_bytes,
-            crate::app::commands::devices_snapshot,
-            crate::app::commands::explorer_list_directory,
             #[cfg(desktop)]
             crate::infra::permissions::commands::sandbox_permissions_list,
             #[cfg(desktop)]

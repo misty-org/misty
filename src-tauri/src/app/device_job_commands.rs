@@ -58,6 +58,9 @@ pub struct RunGrantRequest {
     pub target_device_id: String,
     #[serde(default)]
     pub agent_id: String,
+    /// The chat or scheduled run. A grant with no chat can't run commands.
+    #[serde(default)]
+    pub chat_key: String,
     pub capabilities: Vec<String>,
     pub scopes: Vec<String>,
 }
@@ -93,6 +96,7 @@ pub(crate) async fn sign_run_grants(
                 &context,
                 &grant.target_device_id,
                 &grant.agent_id,
+                &grant.chat_key,
                 grant.capabilities,
                 grant.scopes,
                 6 * 3600,

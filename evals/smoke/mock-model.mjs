@@ -6,6 +6,8 @@
 //   GET  /__held                    How many replies are being held
 //   POST /__release                 Lets every held reply go
 //   POST /__reset                   Clears the queue and the log
+//   GET  /__slow-page?name=N        A page that takes a while, so tabs can be seen overlapping
+//   GET  /__slow-pages              The most slow pages being served at once, and how many were asked for
 //
 // A step is {text}, {tools: [{name, args, id?}]}, or either with hold: true, which waits for
 // /__release before answering. Everything else, such as titles and checks, gets a short text reply.
@@ -133,9 +135,22 @@ async function chat(request, response) {
   else answerWhole(response, body, step);
 }
 
+const slowPages = { serving: 0, mostAtOnce: 0, served: 0 };
+const servePage = async (response, name) => {
+  slowPages.served += 1;
+  slowPages.serving += 1;
+  slowPages.mostAtOnce = Math.max(slowPages.mostAtOnce, slowPages.serving);
+  await new Promise((done) => setTimeout(done, 1500));
+  slowPages.serving -= 1;
+  response.writeHead(200, { "content-type": "text/html" });
+  response.end(`<!doctype html><title>Page ${name}</title><h1>Slow page ${name}</h1>`);
+};
+
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://localhost");
+    if (url.pathname === "/__slow-page") return await servePage(response, url.searchParams.get("name"));
+    if (url.pathname === "/__slow-pages") return reply(response, 200, slowPages);
     if (url.pathname === "/__script") {
       const { steps } = JSON.parse(await readBody(request));
       script = [...script, ...steps];

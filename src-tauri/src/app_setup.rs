@@ -86,8 +86,6 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
     #[cfg(target_os = "macos")]
     infra::app_menu::setup(app)?;
-    #[cfg(any(target_os = "macos", windows))]
-    infra::drives::start_device_change_listener(app.handle().clone());
     #[cfg(windows)]
     infra::misty_context_windows::start_foreground_watch();
     #[cfg(desktop)]

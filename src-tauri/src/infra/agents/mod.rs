@@ -1,4 +1,5 @@
 use crate::infra::file_access::{self, fs};
+pub mod folder_changes;
 mod shared_folders;
 mod storage;
 pub mod web_fetch;
@@ -118,6 +119,49 @@ impl AgentService {
         }
     }
 
+    /// The name a shared folder goes by, for the question about it.
+    pub async fn folder_name(&self, scope_id: String) -> ApiResult<String> {
+        run_db(self.database_path.clone(), move |connection| {
+            connection.query_row(
+                "SELECT display_name FROM local_agent_scopes WHERE id=?1",
+                [&scope_id],
+                |row| row.get(0),
+            )
+        })
+        .await
+    }
+
+    /// Only for after the person said yes in the native dialog.
+    pub async fn allow_folder_changes(&self, key: String, scope_id: String) -> ApiResult<()> {
+        run_db(self.database_path.clone(), move |connection| {
+            folder_changes::allow(connection, &key, &scope_id)
+        })
+        .await
+    }
+
+    pub async fn stop_folder_changes(&self, key: String, scope_id: Option<String>) -> ApiResult<()> {
+        run_db(self.database_path.clone(), move |connection| {
+            folder_changes::stop(connection, &key, scope_id.as_deref())
+        })
+        .await
+    }
+
+    pub async fn adopt_folder_changes(&self, from: String, chat: String) -> ApiResult<()> {
+        run_db(self.database_path.clone(), move |connection| {
+            folder_changes::adopt(connection, &from, &chat)
+        })
+        .await
+    }
+
+    /// Off when the database can't answer: a failure must never read as a yes.
+    pub async fn folder_changes_allowed(&self, key: String, scope_id: String) -> bool {
+        run_db(self.database_path.clone(), move |connection| {
+            folder_changes::allowed(connection, &key, &scope_id)
+        })
+        .await
+        .unwrap_or(false)
+    }
+
     /// A shared folder's real path, for a job already checked against its grant.
     pub async fn folder_root(&self, scope_id: String) -> ApiResult<PathBuf> {
         run_db(self.database_path.clone(), move |connection| {
@@ -140,6 +184,7 @@ impl AgentService {
                     |row| row.get(0),
                 )
                 .optional()?;
+            folder_changes::forget_folder(connection, &scope_id)?;
             connection.execute("DELETE FROM local_agent_scopes WHERE id=?1", [scope_id])?;
             Ok(folder)
         })

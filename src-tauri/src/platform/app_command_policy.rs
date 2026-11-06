@@ -157,6 +157,7 @@ mod tests {
         assert!(allowed.contains("browser_page_password_fill"));
         for prefix in [
             "agent",
+            "auth_",
             "profile_records_",
             "profile_tabs_",
             "profile_extensions_",

@@ -17,6 +17,7 @@ mod fs_handles;
 pub mod looks;
 mod policy;
 pub mod quarantine;
+pub mod secrets;
 mod real_path;
 
 use std::{
@@ -171,6 +172,17 @@ pub(crate) fn check_link(path: &Path, access: Access) -> io::Result<()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .allows(&real, access);
     allowed.then_some(()).ok_or_else(|| refused(path, access))
+}
+
+/// Whether the person picked exactly this file in a system dialog, for a write only that answer
+/// justifies, as opposed to one anywhere Misty may write.
+pub fn is_picked_file(path: &Path) -> bool {
+    real_path::resolve(path).is_ok_and(|real| {
+        POLICY
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .was_picked(&real)
+    })
 }
 
 /// A file the person picked in a native dialog. Only code that just showed the dialog calls this,

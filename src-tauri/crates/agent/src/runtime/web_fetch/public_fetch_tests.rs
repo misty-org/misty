@@ -38,11 +38,13 @@ fn refuses_private_and_special_addresses() {
 fn range_edges_and_other_ipv6_forms_land_on_the_right_side() {
     for address in [
         "0:0:0:0:0:0:0:1", "::ffff:7f00:1", "::ffff:a00:1", "::7f00:1", "::1.2.3.4", "fd12:3456::1", "fdff::1", "febf::1", "ffff::1", "2001:db8:ffff::1", "2002::1", "64:ff9b::1:1",
+        // Refused here though not by the TypeScript: local NAT64 and the old site-local range.
+        "64:ff9b:1::1", "fec0::1", "feff::1",
         "100.127.255.255", "172.31.255.255", "198.19.255.255", "192.0.0.255", "223.255.255.255.1",
     ] {
         assert!(!is_public_address(address), "{address}");
     }
-    for address in ["100.128.0.1", "100.63.255.255", "172.32.0.1", "172.15.255.255", "198.20.0.1", "198.17.255.255", "192.0.1.1", "223.255.255.255", "fec0::1", "2001:db9::1", "2003::1", "64:ff9c::1", "::1:0:0:1"] {
+    for address in ["100.128.0.1", "100.63.255.255", "172.32.0.1", "172.15.255.255", "198.20.0.1", "198.17.255.255", "192.0.1.1", "223.255.255.255", "64:ff9b:2::1", "2001:db9::1", "2003::1", "64:ff9c::1", "::1:0:0:1"] {
         assert!(is_public_address(address), "{address}");
     }
     // A zone is valid in Node's check but not here: it isn't a form that reaches a public site.

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { stopFolderChanges } from "./useAgentsStore";
 
 /**
  * The shared folder each conversation can read, or none. Folders are on this
@@ -44,6 +45,8 @@ interface ConversationFolderState {
   /** The folder a conversation (or the new chat) can read; null for none. */
   folder(conversationId: string | undefined): string | null;
   setFolder(conversationId: string | undefined, scopeId: string | null): void;
+  /** The person picked another folder. "Allow changes" was for the old one, so it goes, natively too. */
+  chooseFolder(conversationId: string | undefined, scopeId: string | null): void;
   /** Gives a just-created conversation the new chat's choice. */
   adoptDraft(conversationId: string): void;
   /** Forgets a folder everywhere (it stopped being shared). */
@@ -69,6 +72,10 @@ export const useConversationFolder = create<ConversationFolderState>((set, get) 
   },
   folder: (conversationId) =>
     conversationId ? (get().byConversation[conversationId] ?? null) : get().draft,
+  chooseFolder: (conversationId, scopeId) => {
+    void stopFolderChanges(conversationId ?? "draft").catch(() => undefined);
+    get().setFolder(conversationId, scopeId);
+  },
   setFolder: (conversationId, scopeId) => {
     if (!conversationId) return set({ draft: scopeId, draftWrites: null });
     const byConversation = { ...get().byConversation };

@@ -33,14 +33,14 @@ src-tauri/sandbox/
 - `AppManifest::commands` lists every command, and a command with no permission entry is refused for
   every window. Tauri generates an `allow-<command>` entry for each, which the `action-*` sets group.
 - `AppManifest::permissions_path_pattern` and `Attributes::capabilities_path_pattern` point Tauri at
-  this folder instead of its defaults. Both exist in Tauri's source, but I haven't tried them here.
+  this folder instead of its defaults.
 - Website tabs keep only `kiri:default`, and a test fails when a command belongs to no action set.
 
 ### What the manifest can't do
 
 - **Tauri only checks webview calls:** a shell or worker process never passes through it. The Rust gate
-  and the OS profiles read the same definitions, and each `permission-*` entry for a process produces
-  that process's OS profile. This hasn't been built or tried yet.
+  and the OS profiles live beside the definitions in `sandbox/permissions/`, as `.sb` files each process
+  loads. Nothing generates them from a shared definition.
 - **People's choices are data:** the manifest defines the kinds of grant and the default permissions.
   What someone actually granted or added lives in `misty.db`, on the device, and never syncs. Tauri can
   add a capability while running, but I found no way to remove one, so revoking would need a restart.
@@ -49,15 +49,12 @@ src-tauri/sandbox/
 
 ## Actions: fixed by Misty
 
-Today `build.rs` calls plain `tauri_build::build()`, so about 260 app commands are open to every app
-window, and `src-tauri/src/platform/app_command_policy.rs` narrows that by name prefix.
-
-- Replace the prefix rules with `action-*` sets per window.
-- Narrow `opener:allow-open-path` and the asset protocol scope in `tauri.conf.json` so neither covers
-  whole folders like Documents.
-- Agent tools and device jobs are actions too. Move the list of allowed jobs out of `workerExecute.ts`
-  and `deviceAgentTools.ts` into one definition the native check enforces, so a compromised page script
-  can't add to it.
+- Windows get `action-*` sets, and `app_command_policy.rs` only checks exact labels.
+- Windows can't open a path themselves: `opener:allow-open-path` is gone, and a download opens through
+  native code that looks up its path. The `asset:` scope starts empty and holds only files the person
+  picked or dropped this session and files Misty downloaded.
+- Agent tools and device jobs are actions too. The allowed jobs are one list the native check enforces
+  (`sandbox/actions/agent_jobs.in`), so a compromised page script can't add to it.
 
 ## Grants: driven by the person
 
@@ -67,7 +64,7 @@ window, and `src-tauri/src/platform/app_command_policy.rs` narrows that by name 
 | Downloads folder | A prompt on the first download |
 | A shared folder | The person picks it, per chat, read-only |
 | Write access to a shared folder | The person turns it on, per folder, per chat |
-| A file | The system file picker, for that file only |
+| A file | The system file picker, for that file only. Misty has no folder view of its own |
 
 - All file access in the Rust app goes through one module, `src-tauri/src/infra/file_access`, that
   refuses anything without a grant. Clippy's `disallowed_methods` bans direct `std::fs` calls
@@ -198,8 +195,11 @@ tools.
     key files stay unreadable, because command output reaches the model.
 - **Tools:** Misty won't bundle a scripting language, to keep the app small, so scripts use what's on the
   computer. See [what's been tested](#whats-been-tested) for what works.
-- **Check `browser_run`:** confirm it can really work on several tabs at the same time, and benchmark
-  it, since that's the parallel case.
+- **`browser_run` on several tabs:** one program with `Promise.all` loaded pages at the same time in
+  real tabs (up to 4 at once in the smoke test, on pages that each take 1.5 seconds). It still needs
+  benchmarking, since that's the parallel case.
+- **Bound to the chat:** a grant is signed for one chat, and the workspace comes from the grant and the
+  account, never from the job.
 
 ### Modes
 
@@ -227,7 +227,11 @@ Once granted, commands can add and edit files there, but can't delete, rename or
 
 | Works | Refused |
 | --- | --- |
-| New files and folders, appending, overwriting a file | `rm`, `rm -rf`, `find -delete`, `rmdir`, `mv` |
+| New files and folders, appending, overwriting a file, moving a file in from the workspace | `rm`, `rm -rf`, `find -delete`, `rmdir`, `mv` of what's already there, hard links, changing extended attributes, writing to `.git`, `.githooks`, `.husky` or `.envrc` |
+
+"Allow changes" is a native question, recorded natively and checked before every command, so a window
+can't answer it and turning it off holds from the next command. What a command adds or edits there gets
+the quarantine flag when it ends.
 
 - **Overwriting isn't protected:** a command can still empty or replace a file's contents, and there's
   no undo, since the undo copies were removed with coding. The grant prompt has to say so.
@@ -327,6 +331,8 @@ Not tested yet:
 
 ## What this doesn't cover
 
+- **Other processes' environments:** a command can read them, so a key in another program's environment
+  isn't safe from it ([browser security](../browser/security.md#the-agent-shell)).
 - **The main process:** agent code now runs in it. A memory bug in it, or a page escaping WebKit, could get
   past the gate, because the main app has no OS sandbox. So the docs should say Misty asks before using files, not that a disk
   wipe is impossible.
@@ -350,14 +356,18 @@ Coding is removed, and its leftovers get deleted, which can't be undone:
 
 ## Order of work
 
-1. The small Rust runtime test, which decides the rest of the runtime work.
+1. The small Rust runtime test, which decides the rest of the runtime work. Done.
 2. Port the runtime to Rust and pass the benchmarks. Page reading moves to a confined worker here.
-3. `shell.run` under its permission, tested against the benchmarks.
-4. The `sandbox/` folder and `AppManifest`, one window at a time.
-5. The file gate, the first-download prompt and first-use prompts.
-6. Move the allowed job list into native code.
+   Ported, wired in and through the smoke test on a scripted model. **The benchmarks haven't run:**
+   they need a model key, and the TypeScript runtime stays until the scores match or beat it.
+3. `shell.run` under its permission, tested against the benchmarks. Built and tested on the OS wall.
+   Not benchmarked, for the same reason.
+4. The `sandbox/` folder and `AppManifest`, one window at a time. Done.
+5. The file gate, the first-download prompt and first-use prompts. Done.
+6. Move the allowed job list into native code. Done.
 7. Audit extension permissions. Done 2026-11-06.
-8. Bring Windows level with macOS, then release both.
+8. Bring Windows level with macOS, then release both. Compiles. **Not run on Windows**, so the shell,
+   its write rule and the page reader there are untested. Production's migration also waits.
 
 Update [browser security](../browser/security.md) as each step lands, and fold this plan into it when
 the last one ships.

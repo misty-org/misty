@@ -133,7 +133,7 @@ fn job(processes: u32) -> Job {
 }
 
 #[test]
-fn commands_reach_only_the_project() {
+fn commands_reach_only_the_folder() {
     let mut scratch = Scratch::new();
     let project = scratch.path("project");
     let git = project.join(".git");

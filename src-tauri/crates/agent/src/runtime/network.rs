@@ -50,7 +50,23 @@ impl Resolve for Ipv4FirstResolver {
 /// A client builder whose connections go to the first address only, IPv4 before IPv6. The app builds
 /// the client it passes to model and search calls from this.
 pub(crate) fn ipv4_first_client() -> reqwest::ClientBuilder {
-    reqwest::Client::builder().dns_resolver(Arc::new(Ipv4FirstResolver))
+    reqwest::Client::builder()
+        .dns_resolver(Arc::new(Ipv4FirstResolver))
+        .redirect(stay_on_the_host())
+}
+
+/// A key goes only to its provider. reqwest takes `Authorization` off a redirect to another host, but
+/// not `X-API-KEY` and the other headers providers use, so such a redirect isn't followed at all.
+fn stay_on_the_host() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        let place = |url: &reqwest::Url| (url.host_str().map(str::to_owned), url.port_or_known_default());
+        let same = attempt.previous().first().is_some_and(|first| place(first) == place(attempt.url()));
+        if same && attempt.previous().len() < 10 {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
+    })
 }
 
 #[cfg(test)]
@@ -64,6 +80,64 @@ mod tests {
             ipv4_first([ip("2606:4700::1"), ip("1.1.1.1"), ip("2606:4700::2"), ip("8.8.8.8")]),
             [ip("1.1.1.1"), ip("8.8.8.8"), ip("2606:4700::1"), ip("2606:4700::2")]
         );
+    }
+
+    /// Answers one request with `reply` and says what it was sent.
+    async fn serves_once(reply: String) -> (u16, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let served = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buffer = [0u8; 2048];
+            let read = socket.read(&mut buffer).await.unwrap();
+            socket.write_all(reply.as_bytes()).await.unwrap();
+            String::from_utf8_lossy(&buffer[..read]).into_owned()
+        });
+        (port, served)
+    }
+
+    #[tokio::test]
+    async fn a_redirect_to_another_host_never_gets_the_key() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let (other, other_served) = serves_once("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n".to_owned()).await;
+        let (first, _) = serves_once(format!(
+            "HTTP/1.1 307 Temporary Redirect\r\nlocation: http://127.0.0.1:{other}/steal\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+        ))
+        .await;
+        let client = ipv4_first_client().no_proxy().build().unwrap();
+        let response = client
+            .post(format!("http://127.0.0.1:{first}/search"))
+            .header("X-API-KEY", "secret")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 307, "the redirect comes back rather than being followed");
+        tokio::task::yield_now().await;
+        assert!(!other_served.is_finished(), "the other host was never asked");
+        other_served.abort();
+    }
+
+    #[tokio::test]
+    async fn a_redirect_on_the_same_host_is_followed() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            for reply in [
+                "HTTP/1.1 307 Temporary Redirect\r\nlocation: /v1/search\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+                "HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut buffer = [0u8; 2048];
+                let _ = socket.read(&mut buffer).await;
+                socket.write_all(reply.as_bytes()).await.unwrap();
+            }
+        });
+        let client = ipv4_first_client().no_proxy().build().unwrap();
+        let response = client.post(format!("http://127.0.0.1:{port}/search")).send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 200);
     }
 
     #[tokio::test]

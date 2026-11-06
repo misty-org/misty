@@ -44,7 +44,22 @@ export function MistyPickerShell({
     libraryAvailable ? initialSource : "files",
   );
 
-  const sourceToggle = libraryAvailable ? (
+  // With nothing else to offer, there's no reason to show a dialog before the system's own.
+  if (!libraryAvailable) {
+    return (
+      <MistyFilePicker
+        mode={fileMode}
+        multiple={multiple}
+        title={title}
+        allowedExtensions={allowedExtensions}
+        onCancel={onCancel}
+        onSelect={(path) => onChooseFiles([path])}
+        onSelectMany={(paths) => onChooseFiles(paths)}
+      />
+    );
+  }
+
+  const sourceToggle = (
     <ToggleGroup
       className="shrink-0 rounded-md bg-charcoal-card p-0.5"
       type="single"
@@ -63,7 +78,7 @@ export function MistyPickerShell({
         Library
       </ToggleGroupItem>
     </ToggleGroup>
-  ) : null;
+  );
 
   return (
     <Dialog
@@ -98,7 +113,7 @@ export function MistyPickerShell({
           />
         </div>
 
-        {libraryAvailable && spaceId && onChooseLibraryItems ? (
+        {spaceId && onChooseLibraryItems ? (
           <div style={{ display: source === "library" ? "contents" : "none" }}>
             <MistyLibraryPicker
               embedded

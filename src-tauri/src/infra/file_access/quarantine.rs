@@ -7,12 +7,26 @@ use std::path::Path;
 /// as it is: a volume without extended attributes shouldn't fail the download.
 #[cfg(target_os = "macos")]
 pub fn mark_from_internet(path: &Path) {
+    if super::check(path, super::Access::Write).is_ok() {
+        mark(path);
+    }
+}
+
+/// Marks a file an agent's command added to a shared folder, so a program planted there still gets
+/// Gatekeeper's check when the person opens it. The gate only lets Misty read that folder; the
+/// command had the write access.
+#[cfg(target_os = "macos")]
+pub fn mark_from_agent(path: &Path) {
+    if super::check(path, super::Access::Read).is_ok() {
+        mark(path);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn mark(path: &Path) {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
 
     const NAME: &std::ffi::CStr = c"com.apple.quarantine";
-    if super::check(path, super::Access::Write).is_err() {
-        return;
-    }
     let Ok(file) = CString::new(path.as_os_str().as_bytes()) else {
         return;
     };

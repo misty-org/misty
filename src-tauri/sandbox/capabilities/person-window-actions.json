@@ -11,6 +11,7 @@
     "window-*"
   ],
   "permissions": [
+    "keystore:default",
     "action-agent",
     "action-api-cache",
     "action-app",

@@ -42,6 +42,7 @@ fn device_record_fixture() {
         requester_device_id: device.into(),
         target_device_id: target.into(),
         agent_id: String::new(),
+        chat_key: "chat-1".to_owned(),
         capabilities: vec!["folder.list".into(), "folder.read".into()],
         scopes: vec!["scope-1".into()],
         issued_at: ISSUED_AT,

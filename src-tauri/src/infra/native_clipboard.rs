@@ -14,7 +14,7 @@ use crate::domain::{
         ClipboardFileRef, ClipboardImage, ClipboardOrigin, ClipboardPayload, ClipboardPayloadKind,
         NativeClipboard,
     },
-    explorer::PasteItem,
+    clipboard::PasteItem,
 };
 use crate::error::ApiResult;
 use crate::infra::file_access::looks;

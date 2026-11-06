@@ -9,6 +9,8 @@
 mod workspace;
 
 #[cfg(target_os = "macos")]
+mod exit_watcher;
+#[cfg(target_os = "macos")]
 mod macos;
 #[cfg(any(target_os = "macos", windows))]
 mod output;
@@ -24,7 +26,10 @@ mod tests;
 
 use std::{
     path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -82,8 +87,20 @@ pub async fn run(
     let timeout = request.timeout.unwrap_or(DEFAULT_TIMEOUT).min(MAX_TIMEOUT);
     let workspace = workspace::prepare(misty_dir, &request.workspace_key)?;
     let linked = workspace::link_folder(&workspace, request.folder.as_ref())?;
-    let mut outcome = platform_run(&workspace, &request, timeout, stop).await?;
+    let full = Arc::new(AtomicBool::new(false));
+    let size_watch = tokio::spawn(workspace::stop_when_full(
+        workspace.clone(),
+        workspace::MAX_WORKSPACE_BYTES,
+        stop.clone(),
+        full.clone(),
+    ));
+    let outcome = platform_run(&workspace, &request, timeout, stop).await;
+    size_watch.abort();
+    let mut outcome = outcome?;
     outcome.shared_folder = linked;
+    if full.load(Ordering::Acquire) {
+        outcome.stderr.push_str("\nStopped: this chat's workspace is full. Delete files in it to make room.");
+    }
     Ok(outcome)
 }
 

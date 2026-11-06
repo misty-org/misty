@@ -190,6 +190,174 @@ async fn nothing_it_started_outlives_a_timeout() {
     assert_ne!(unsafe { libc::kill(pid, 0) }, 0, "the detached child was stopped too");
 }
 
+/// Not a test of its own: `a_crash_stops_running_commands` runs this in a second process and kills
+/// that process, which is the only honest way to see what a crash leaves behind.
+#[tokio::test]
+#[ignore = "started by a_crash_stops_running_commands"]
+async fn crash_victim() {
+    let Ok(misty) = std::env::var("MISTY_SHELL_CRASH_HOME") else {
+        return;
+    };
+    let _ = run(
+        Path::new(&misty),
+        ShellRequest {
+            workspace_key: "chat".into(),
+            command: "sleep 300 & echo $! > background.pid; echo $$ > leader.pid; wait".into(),
+            timeout: Some(Duration::from_secs(300)),
+            folder: None,
+        },
+        Arc::new(AtomicBool::new(false)),
+    )
+    .await;
+}
+
+fn read_pid(path: &Path) -> Option<i32> {
+    fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
+#[test]
+fn a_crash_stops_running_commands() {
+    let scene = scene();
+    let workspace = workspace::prepare(&scene.misty, "chat").unwrap();
+    // Test names leave out the crate, which `module_path!` starts with.
+    let module = module_path!().split_once("::").unwrap().1;
+    let mut victim = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", &format!("{module}::crash_victim"), "--ignored"])
+        .env("MISTY_SHELL_CRASH_HOME", &scene.misty)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+
+    let started = std::time::Instant::now();
+    let (leader, background) = loop {
+        if let (Some(leader), Some(background)) =
+            (read_pid(&workspace.join("leader.pid")), read_pid(&workspace.join("background.pid")))
+        {
+            break (leader, background);
+        }
+        assert!(started.elapsed() < Duration::from_secs(60), "the command never started");
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    let alive = |pid: i32| unsafe { libc::kill(pid, 0) == 0 };
+    assert!(alive(leader) && alive(background), "both run until the crash");
+
+    victim.kill().unwrap();
+    victim.wait().unwrap();
+
+    let crashed = std::time::Instant::now();
+    while (alive(leader) || alive(background)) && crashed.elapsed() < Duration::from_secs(5) {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(!alive(leader), "the command stopped with the app");
+    assert!(!alive(background), "so did what it left in the background");
+}
+
+#[tokio::test]
+async fn a_writable_folder_holds_links_quarantine_and_files_that_run_by_themselves() {
+    let scene = scene();
+    let folder = Some((scene.folder.as_path(), true));
+    let tried = shell(
+        &scene,
+        "chat",
+        "ln shared-folder/a.txt held; echo link=$?; \
+         mkdir shared-folder/.githooks; echo githooks=$?; \
+         mkdir shared-folder/.husky; echo husky=$?; \
+         echo x > shared-folder/.envrc; echo envrc=$?; \
+         mkdir -p shared-folder/.git/hooks; echo git=$?; \
+         xattr -w user.note x shared-folder/a.txt; echo xattr=$?; \
+         mkdir shared-folder/out; echo mkdir=$?; \
+         echo new > shared-folder/out/new.txt; echo add=$?; \
+         git init -q private-repo; echo private_git=$?",
+        folder,
+    )
+    .await;
+    for refused in ["link=1", "githooks=1", "husky=1", "envrc=1", "git=1", "xattr=1"] {
+        assert!(tried.stdout.contains(refused), "{refused} in {}", tried.stdout);
+    }
+    for works in ["mkdir=0", "add=0", "private_git=0"] {
+        assert!(tried.stdout.contains(works), "{works} in {}", tried.stdout);
+    }
+}
+
+#[tokio::test]
+async fn launchctl_cant_be_started() {
+    let scene = scene();
+    let tried = shell(&scene, "chat", "launchctl print-disabled user/$(id -u) >/dev/null 2>&1; echo status=$?", None).await;
+    assert!(!tried.stdout.contains("status=0"), "{}", tried.stdout);
+}
+
+#[tokio::test]
+async fn system_databases_stay_closed() {
+    let scene = scene();
+    let tried = shell(&scene, "chat", "ls /opt/homebrew/var >/dev/null 2>&1; echo var=$?; ls /opt/homebrew/bin >/dev/null 2>&1; echo status=$?", None).await;
+    if Path::new("/opt/homebrew/var").exists() {
+        assert!(!tried.stdout.contains("var=0"), "{}", tried.stdout);
+    }
+}
+
+#[tokio::test]
+async fn nothing_from_misty_leaks_into_a_command() {
+    let scene = scene();
+    // Asked of the shell itself: `ls` would count the folder it opens to answer.
+    let tried = shell(&scene, "chat", "for fd in $(seq 3 256); do [ -e /dev/fd/$fd ] && echo $fd; done; true", None).await;
+    assert_eq!(tried.stdout.trim(), "", "files left open in a command");
+    let limit = shell(&scene, "chat", "ulimit -u", None).await;
+    assert!(limit.stdout.trim().parse::<u64>().is_ok_and(|limit| limit < 100_000), "{}", limit.stdout);
+    let forks = shell(&scene, "chat", "(sleep 0 & wait); echo status=$?", None).await;
+    assert!(forks.stdout.contains("status=0"), "a command can still start processes: {}", forks.stdout);
+}
+
+#[tokio::test]
+async fn a_workspace_that_fills_up_stops_its_command() {
+    let scene = scene();
+    let workspace = workspace::prepare(&scene.misty, "chat").unwrap();
+    fs::write(workspace.join("big"), vec![0u8; 2048]).unwrap();
+    let (stop, full) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+    tokio::time::timeout(
+        Duration::from_secs(10),
+        workspace::stop_when_full(workspace, 1024, stop.clone(), full.clone()),
+    )
+    .await
+    .unwrap();
+    assert!(stop.load(Ordering::Acquire) && full.load(Ordering::Acquire));
+}
+
+#[tokio::test]
+async fn a_command_cant_reach_anothers_workspace_by_its_key() {
+    let scene = scene();
+    assert_ne!(
+        workspace::prepare(&scene.misty, "account-a\nchat").unwrap(),
+        workspace::prepare(&scene.misty, "account-b\nchat").unwrap()
+    );
+}
+
+fn sleeping_group() -> std::process::Child {
+    use std::os::unix::process::CommandExt;
+    std::process::Command::new("/bin/sleep").arg("300").process_group(0).spawn().unwrap()
+}
+
+#[tokio::test]
+async fn stopping_the_watcher_leaves_the_group_alone() {
+    let mut group = sleeping_group();
+    exit_watcher::ExitWatcher::start(group.id() as i32).unwrap().stop().await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(group.try_wait().unwrap().is_none(), "a finished command's number is never killed");
+    group.kill().unwrap();
+    group.wait().unwrap();
+}
+
+#[tokio::test]
+async fn dropping_the_watcher_stops_the_group() {
+    let mut group = sleeping_group();
+    drop(exit_watcher::ExitWatcher::start(group.id() as i32).unwrap());
+    let dropped = std::time::Instant::now();
+    while group.try_wait().unwrap().is_none() {
+        assert!(dropped.elapsed() < Duration::from_secs(5), "a cancelled run cleans up");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
 #[tokio::test]
 async fn system_tools_work_inside_the_wall() {
     let scene = scene();

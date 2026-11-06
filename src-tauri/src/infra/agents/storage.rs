@@ -47,6 +47,7 @@ pub(super) fn scoped_file_path_sync(
     )?;
     let relative_path = Path::new(relative);
     if relative.trim().is_empty()
+        || crate::infra::file_access::secrets::closed_to_agents(relative_path)
         || relative_path.is_absolute()
         || relative_path.components().any(|part| {
             matches!(
@@ -61,7 +62,11 @@ pub(super) fn scoped_file_path_sync(
     }
     let root = canonical(root).map_err(io_error)?;
     let target = canonical(root.join(relative_path)).map_err(io_error)?;
-    if !target.starts_with(&root) || !crate::infra::file_access::fs::is_file(&target) {
+    // Asked again of where it really is, in case a link inside the folder pointed at a secret.
+    let closed = target
+        .strip_prefix(&root)
+        .is_ok_and(crate::infra::file_access::secrets::closed_to_agents);
+    if closed || !target.starts_with(&root) || !crate::infra::file_access::fs::is_file(&target) {
         return Err(validation_error(
             "Document path is outside its device scope.",
         ));

@@ -95,9 +95,12 @@ const REFUSED_V4: [(Ipv4Addr, u32); 14] = [
 ];
 
 // ::/96 also covers :: and ::1. NAT64 and 6to4 addresses can carry a private IPv4 address.
-const REFUSED_V6: [(Ipv6Addr, u32); 7] = [
+const REFUSED_V6: [(Ipv6Addr, u32); 9] = [
     (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0), 96),
     (Ipv6Addr::new(0x64, 0xff9b, 0, 0, 0, 0, 0, 0), 96),
+    (Ipv6Addr::new(0x64, 0xff9b, 1, 0, 0, 0, 0, 0), 48),
+    // Site-local, deprecated but still routed on some networks.
+    (Ipv6Addr::new(0xfec0, 0, 0, 0, 0, 0, 0, 0), 10),
     (Ipv6Addr::new(0x2002, 0, 0, 0, 0, 0, 0, 0), 16),
     (Ipv6Addr::new(0xfc00, 0, 0, 0, 0, 0, 0, 0), 7),
     (Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0), 10),

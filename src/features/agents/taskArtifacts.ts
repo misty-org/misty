@@ -10,6 +10,7 @@ import { saveAgentArtifact } from "./agentArtifacts";
  */
 interface TaskArtifact {
   id: string;
+  tabId: string;
   taskId: string;
   agentId: string;
   name: string;
@@ -65,6 +66,7 @@ export async function trackTaskArtifacts(accountId: string) {
       const artifact: TaskArtifact = {
         ...(previous ?? {
           id: payload.downloadId,
+          tabId: payload.tabId,
           taskId: execution!.taskId,
           agentId: execution!.agentId,
         }),

@@ -1,7 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
+const adoptFolderChanges = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("./store/useAgentsStore", () => ({
+  adoptFolderChanges,
+  stopFolderChanges: vi.fn(async () => undefined),
   agentsDeviceSnapshot: vi.fn(async () => ({
     device: { id: "local", status: "online" },
     scopes: [
@@ -49,6 +52,7 @@ it("sends a new chat's folder and hands the choice to the new conversation", asy
   expect(kinds(contexts)[0]).toBe("local_folder:scope_blog");
   expect(useConversationFolder.getState().folder("conversation-new")).toBe("scope_blog");
   expect(useConversationFolder.getState().draft).toBeNull();
+  expect(adoptFolderChanges).toHaveBeenCalledWith("draft", "conversation-new");
   // A later message in another conversation with no folder sends none.
   expect(kinds(await chatDeviceGrants("conversation-other", false))).toEqual([
     "workspace:workspace:device_1",

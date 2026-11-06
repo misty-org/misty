@@ -18,7 +18,7 @@ use tauri::State;
 use crate::app::device_commands::require_main;
 use crate::app::runtime::MistyRuntime;
 use crate::domain::clipboard::ClipboardPayload;
-use crate::domain::explorer::PasteItem;
+use crate::domain::clipboard::PasteItem;
 use crate::error::{ApiError, ApiResult};
 use crate::infra::cloud_clipboard::CloudClipboardView;
 

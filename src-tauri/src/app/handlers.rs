@@ -99,6 +99,9 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::app::shared_folder_commands::agents_share_folder,
             #[cfg(desktop)]
             crate::app::shared_folder_commands::agents_forget_folder,
+            crate::app::shared_folder_commands::agents_allow_folder_changes,
+            crate::app::shared_folder_commands::agents_stop_folder_changes,
+            crate::app::shared_folder_commands::agents_adopt_folder_changes,
             #[cfg(desktop)]
             crate::app::device_job_commands::device_read_shared_file,
             #[cfg(desktop)]

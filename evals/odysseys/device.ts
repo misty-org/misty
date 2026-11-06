@@ -31,7 +31,8 @@ export async function deviceContexts(bridge: Bridge, apiBase: string, deviceId: 
   const signed = await bridgeCall<unknown[]>(bridge, "/run-grants", {
     apiBase,
     accountId: userId,
-    grants: [{ targetDeviceId: deviceId, agentId, capabilities: workspaceCapabilities, scopes: [scope] }],
+    // Each benchmark run keeps its own workspace.
+    grants: [{ targetDeviceId: deviceId, agentId, chatKey: `odysseys-${crypto.randomUUID()}`, capabilities: workspaceCapabilities, scopes: [scope] }],
   });
   if (!signed[0]) throw new Error("run grant: the desktop signed nothing");
   return [{ device_id: deviceId, kind: "workspace", opaque_ref: scope, display_name: "Misty browser",

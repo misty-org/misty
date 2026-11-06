@@ -1,4 +1,3 @@
-import type { FileEntry } from "@/native/ipc";
 import {
   File,
   FileArchive,
@@ -16,7 +15,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn, itemToneClass, itemTones, type ItemTone } from "@/shared/ui";
-import { fileListStyles } from "./fileListStyles";
 
 // Group by content rather than assigning a different brand/color to every format.
 const fileTypes: ReadonlyArray<readonly [LucideIcon, ItemTone, ReadonlySet<string>]> = [
@@ -72,7 +70,7 @@ const codeNames = new Set([
 
 type FileGlyph = { icon: LucideIcon; tone?: ItemTone };
 
-function fileIconFor(name: string, extension?: string, mimeType?: string | null): FileGlyph {
+function fileIconFor(name: string): FileGlyph {
   const normalizedName = name.toLowerCase();
   if (
     codeNames.has(normalizedName) ||
@@ -82,18 +80,10 @@ function fileIconFor(name: string, extension?: string, mimeType?: string | null)
     return { icon: FileCode, tone: itemTones.code };
   }
   const dot = normalizedName.lastIndexOf(".");
-  const suffix =
-    extension?.replace(/^\./, "").toLowerCase() || (dot > 0 ? normalizedName.slice(dot + 1) : "");
+  const suffix = dot > 0 ? normalizedName.slice(dot + 1) : "";
   for (const [icon, tone, extensions] of fileTypes) {
     if (extensions.has(suffix)) return { icon, tone };
   }
-  // Remote and extensionless files can still supply a useful content type.
-  const mime = mimeType?.toLowerCase();
-  if (mime?.startsWith("image/")) return { icon: FileImage, tone: itemTones.image };
-  if (mime?.startsWith("audio/")) return { icon: FileAudio, tone: itemTones.media };
-  if (mime?.startsWith("video/")) return { icon: FileVideo, tone: itemTones.media };
-  if (mime === "application/pdf") return { icon: FileText, tone: itemTones.pdf };
-  if (mime?.startsWith("text/")) return { icon: FileText, tone: itemTones.document };
   return { icon: File };
 }
 
@@ -108,21 +98,14 @@ function EntryIcon(props: FileGlyph & { size?: number; className?: string }) {
       size={props.size ?? 20}
       strokeWidth={1.75}
       className={cn(
-        fileListStyles.entryIcon,
-        props.tone ? itemToneClass(props.tone) : fileListStyles.entryIconMuted,
+        "block shrink-0",
+        props.tone
+          ? itemToneClass(props.tone)
+          : "text-cream-muted group-data-[state=selected]/file-row:text-cream group-aria-pressed/file-row:text-cream group-hover/file-row:text-cream",
         props.className,
       )}
     />
   );
-}
-
-export function FileIcon(props: { entry: FileEntry; size?: number }) {
-  const { entry } = props;
-  const glyph =
-    entry.kind === "folder"
-      ? folderGlyph
-      : fileIconFor(entry.name, entry.extension, entry.mimeType);
-  return <EntryIcon {...glyph} size={props.size} />;
 }
 
 export function FileNameIcon(props: {

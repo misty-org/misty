@@ -13,10 +13,8 @@ Most serious first.
 
 1. **The app has no OS sandbox.** `src-tauri/Entitlements.plist` has no App Sandbox, so a bug in
    the main process or the app's own windows runs with the person's full user rights. The file gate
-   (below) keeps Misty's own code to what's granted, but can't stop a memory bug. Three things still
-   reach further than `.misty` and grants: Misty's file picker lists any folder
-   (`file_access/looks.rs`), the `asset:` scope in `tauri.conf.json` still covers whole folders like
-   Documents, and `misty-browser-sync` and the credential store open their files themselves.
+   (below) keeps Misty's own code to what's granted, but can't stop a memory bug.
+   `misty-browser-sync` and the credential store still open their files themselves.
 2. **Agent code runs in the main process.** The runtime is a crate inside Misty, with Misty's rights,
    and it holds the person's model keys. It rests on Rust's memory safety and on agents reaching only
    the fixed actions list, with each run's panics kept inside its own task. Untrusted input stays
@@ -41,7 +39,10 @@ Most serious first.
 | Files the app itself touches | One gate refuses anything without a grant, and clippy bans the standard calls elsewhere. It checks real paths, so `..` and links can't get around it. Tests cover this; the prompts haven't been tried in the running app | `src-tauri/src/infra/file_access/`, `src-tauri/clippy.toml` |
 | Other browsers, the screen, other apps, typing | Off until the person says yes to a native prompt. Background calls are refused without one. Settings › Agents › Access changes them | `src-tauri/src/infra/permissions/` |
 | Downloads | The folder is asked for on the first download. Nothing opens or runs a download except the person's click. On macOS 26.5 a WKDownload carried `com.apple.quarantine` in a small test program, not in Misty itself. Misty adds the flag to pages and clipboard images it saves | `src-tauri/src/infra/browser/downloads.rs`, `src-tauri/src/infra/file_access/quarantine.rs` |
-| Local files | A custom `asset:` handler refuses website tabs, which Tauri's own handler does not | `src-tauri/src/platform/asset_protocol.rs` |
+| Local files | Files are picked in the system's dialog, and Misty has no view of a person's folders of its own. A custom `asset:` handler refuses website tabs, which Tauri's own handler does not, and its scope starts empty: it holds only files picked or dropped this session and files Misty downloaded | `src-tauri/src/platform/asset_protocol.rs`, `src/features/picker/FilePicker.tsx` |
+| Agent commands | Each runs under `sandbox-exec` or an AppContainer, with no network, stops with its run and stops if Misty crashes. Its workspace comes from the run's signed grant, and write access from the person's native answer for that chat, asked again before every command. See [the shell](#the-agent-shell) | `src-tauri/src/infra/agent_shell/`, `src-tauri/src/app/shell_commands.rs` |
+| Secrets in a shared folder | `.env`, keys and `.git` are closed to commands and to `folder.read` and `folder.send` at any depth | `src-tauri/src/infra/file_access/secrets.rs` |
+| Keys and redirects | A model or search call follows a redirect only on the same host, so a key never reaches another one | `src-tauri/crates/agent/src/runtime/network.rs` |
 | Navigation | App windows stay on bundled pages; tabs load only http(s) and extension pages | `src-tauri/src/platform/navigation_guard.rs`, `src-tauri/src/infra/browser/mod.rs` |
 | Saved passwords | A page never sees saved sign-ins or asks for one. Misty draws the menu, ignores clicks in its first half second, and only a click there fills, into the site the sign-in was saved for. The fix's tests pass, but it hasn't been tried in the running app | `src/features/browser/workspace/PasswordFillMenu.tsx`, `src-tauri/src/infra/browser/host_messages/passwords/manage.rs` |
 | Extensions | Nothing runs, and nothing runs wider, than the person approved on this computer. See [below](#extension-permissions) | `src-tauri/src/infra/extensions/approvals.rs` |
@@ -57,6 +58,47 @@ Most serious first.
 The webviews sandbox their own page processes. Nothing in Misty's code overrides TLS errors or
 turns off safe browsing, so those stay at each engine's default; the defaults themselves were not
 tested.
+
+## The agent shell
+
+Reviewed on 2026-11-06 by someone who hadn't written it, reading the code and testing the profile under
+`sandbox-exec`. A review, not a penetration test. What came of it:
+
+| Severity | Problem | Fix | Test |
+| --- | --- | --- | --- |
+| High | A compromised window could sign itself write access to a shared folder, since "Allow changes" lived in the page | A native question, and a native record of the answer that every command checks, so turning it off holds from the next command | `folder_changes` tests, smoke |
+| High | A job named its own workspace, so the server could run a command in another chat's | The grant is signed for one chat, and the workspace comes from the grant and the account | `shell_commands.rs`, `device_records` contract test |
+| Medium | `folder.send` and `folder.read` could reach `.env` and keys that the shell couldn't | One list of closed files for both | `secrets` tests |
+| Medium | A window could name any folder as the download folder and get write access to it, then save a page into it | The folder comes from a native dialog only, and a saved page goes only to a file just picked | `settings.rs`, `is_picked_file` |
+| Medium | A hard link kept write access after it was taken back | Refused in a shared folder | `tests.rs` |
+| Medium | `launchctl disable` changed what starts at login, from inside | `launchctl` can't be started | `tests.rs` |
+| Medium | Hook files could be written to run later outside the sandbox | `.git`, `.githooks`, `.husky` and `.envrc` stay read-only, and the question names the risk | `tests.rs` |
+| Medium | A command could remove the quarantine flag, or plant a file without one | Refused, and what a command adds or edits is marked when it ends | `tests.rs` |
+| Medium | An incognito window could reach the account's stored credentials | Removed from incognito windows | `app_command_policy` test, smoke |
+| Low | No process limit, a workspace could fill the disk during a command, files left open across exec, two IPv6 ranges | Each one fixed | `tests.rs` |
+
+Still open:
+
+- **A command can read other processes' arguments and environment (high).** Perl can make the
+  `KERN_PROCARGS2` call, and no profile rule tried stopped it. It returned a variable from a process
+  outside the sandbox running as the same person, though not from a system program. So a key kept in a
+  dev server's or CLI's environment can reach the model, and an agent's web tools could send it out.
+  Misty's own workers start with a clean environment. Closing this needs commands under a separate
+  user, or no Perl or Python in the shell.
+- **A malicious server can skip Manual's pause.** The server decides when a run pauses. It can't get a
+  command past its sandbox, its grant or its chat's workspace, but nothing on the computer checks that
+  the person approved a given command. Low, since people choose the server they run against.
+- **A compromised window can still use any folder it has shared in any chat, read-only, and reuse a
+  chat's write answer by signing a grant for that chat.** Write access still reaches only a folder the
+  person said yes to.
+- **A directory moved in keeps what's inside it.** Under write access, `mv repo shared-folder/` from the
+  workspace works, with any `.git` inside it, since the rule can't see inside a moved folder. It only
+  runs if the person commits in that folder themselves.
+- **A process that detaches within 100 ms can outlive its command,** inside the sandbox, with the profile
+  it started with, and a sleeping one can go on until a restart.
+- **The picked-folder path:** Tauri's dialog adds a picked folder whole to the `asset:` scope. Misty's
+  interface picks only files through it, except settings, but a compromised window could ask, and the
+  person would still have to pick the folder.
 
 ## Extension permissions
 
