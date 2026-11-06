@@ -68,7 +68,7 @@ export function AutofillChooserMenu(props: {
         side="bottom"
         sideOffset={0}
         collisionPadding={8}
-        width="lg"
+        width="xl"
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
         {choice.items.map((item) => (
@@ -76,7 +76,8 @@ export function AutofillChooserMenu(props: {
             key={item.id}
             icon={<Icon size={17} aria-hidden="true" />}
             label={item.label || item.detail}
-            shortcut={item.label ? item.detail : undefined}
+            // The trailing slot fits a short hint like an expiry, not a name beside an address.
+            shortcut={choice.kind === "card" ? item.detail : undefined}
             onSelect={() => props.onSelect(item.id)}
           />
         ))}

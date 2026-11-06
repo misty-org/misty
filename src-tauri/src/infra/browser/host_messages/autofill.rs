@@ -106,9 +106,16 @@ fn page_excluded(app: &AppHandle, id: &str) -> bool {
         .unwrap_or(true)
 }
 
-/// Cards are only ever typed into or read from pages on an encrypted connection.
+/// Cards are only ever typed into or read from pages on an encrypted connection. A development
+/// build also allows this computer's own addresses, so a local page can test them.
 fn allowed_on(kind: FillKind, origin: &str) -> bool {
-    kind == FillKind::Address || origin.starts_with("https://")
+    kind == FillKind::Address
+        || origin.starts_with("https://")
+        || (cfg!(debug_assertions)
+            && Url::parse(origin)
+                .ok()
+                .and_then(|url| url.host_str().map(str::to_owned))
+                .is_some_and(|host| matches!(host.as_str(), "127.0.0.1" | "localhost")))
 }
 
 fn host_of(origin: &str) -> String {
@@ -181,24 +188,31 @@ struct ChooserItem {
     detail: String,
 }
 
+/// Newest first, like Settings.
 fn chooser_items(records: &[ViewRecord], kind: FillKind) -> Vec<ChooserItem> {
     match kind {
-        FillKind::Address => records_of::<Address>(records, Kind::Address)
-            .into_iter()
-            .map(|(id, address)| ChooserItem {
-                label: address_label(&address),
-                detail: address.name,
-                id,
-            })
-            .collect(),
-        FillKind::Card => records_of::<Card>(records, Kind::Card)
-            .into_iter()
-            .map(|(id, card)| ChooserItem {
-                label: card_label(&card),
-                detail: format!("{:02}/{}", card.exp_month, card.exp_year % 100),
-                id,
-            })
-            .collect(),
+        FillKind::Address => {
+            let mut list = records_of::<Address>(records, Kind::Address);
+            list.sort_by_key(|(_, address)| std::cmp::Reverse(address.updated_at));
+            list.into_iter()
+                .map(|(id, address)| ChooserItem {
+                    label: address_label(&address),
+                    detail: address.name,
+                    id,
+                })
+                .collect()
+        }
+        FillKind::Card => {
+            let mut list = records_of::<Card>(records, Kind::Card);
+            list.sort_by_key(|(_, card)| std::cmp::Reverse(card.updated_at));
+            list.into_iter()
+                .map(|(id, card)| ChooserItem {
+                    label: card_label(&card),
+                    detail: format!("{:02}/{:02}", card.exp_month, card.exp_year % 100),
+                    id,
+                })
+                .collect()
+        }
     }
 }
 
@@ -451,4 +465,18 @@ async fn fill(app: &AppHandle, choice: &PendingChoice, item: &str) -> Result<(),
     ));
     reply(app, &choice.page, script.to_string());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cards_stay_on_encrypted_pages_and_addresses_go_anywhere() {
+        assert!(allowed_on(FillKind::Card, "https://shop.example"));
+        assert!(!allowed_on(FillKind::Card, "http://shop.example"));
+        assert!(!allowed_on(FillKind::Card, "http://localhost.example"));
+        assert!(!allowed_on(FillKind::Card, "http://127.0.0.1.example"));
+        assert!(allowed_on(FillKind::Address, "http://shop.example"));
+    }
 }
