@@ -84,7 +84,9 @@ Still open:
   outside the sandbox running as the same person, though not from a system program. So a key kept in a
   dev server's or CLI's environment can reach the model, and an agent's web tools could send it out.
   Misty's own workers start with a clean environment. Closing this needs commands under a separate
-  user, or no Perl or Python in the shell.
+  user, which takes an installer with admin rights. Removing Perl and Python wouldn't be enough unless
+  commands were also refused from running programs in their workspace, and that would cost the scripts
+  the shell is for.
 - **A malicious server can skip Manual's pause.** The server decides when a run pauses. It can't get a
   command past its sandbox, its grant or its chat's workspace, but nothing on the computer checks that
   the person approved a given command. Low, since people choose the server they run against.
