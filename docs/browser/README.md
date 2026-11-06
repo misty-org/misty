@@ -6,6 +6,7 @@ Misty is a browser first, and it has to be worth using with no AI at all.
 | To learn about | Read |
 | --- | --- |
 | Browsing with no account: sign-in only for sync, Spaces and agents | [no-account.md](no-account.md) ([mockup](mockups/no-account.html)) |
+| Saved addresses and cards, and filling them into forms | [autofill.md](autofill.md) |
 | The now-playing card in the tab sidebar | [media-controls.md](media-controls.md) ([mockup](mockups/media-controls.html)) |
 | Known Windows limits and checks | [windows-limits.md](windows-limits.md) |
 | Security boundaries and open problems | [security.md](security.md) |

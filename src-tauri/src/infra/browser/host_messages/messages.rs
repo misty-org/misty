@@ -106,7 +106,11 @@ pub(super) fn navigate_message(raw: &str) -> Option<Url> {
     let url = Url::parse(&message.navigate).ok()?;
     matches!(
         url.scheme(),
-        "misty-shortcut" | "misty-context-menu" | "misty-passwords" | "misty-extension-store"
+        "misty-shortcut"
+            | "misty-context-menu"
+            | "misty-passwords"
+            | "misty-autofill"
+            | "misty-extension-store"
     )
     .then_some(url)
 }

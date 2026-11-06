@@ -20,7 +20,7 @@ use zeroize::Zeroizing;
 mod manage;
 pub use manage::*;
 
-const UNAVAILABLE: &str = "This computer's key storage is unavailable.";
+pub(super) const UNAVAILABLE: &str = "This computer's key storage is unavailable.";
 
 struct PendingCapture {
     /// The profile of the page that submitted it, where it saves whichever window answers.
@@ -36,11 +36,11 @@ fn pending() -> &'static Mutex<HashMap<String, PendingCapture>> {
     PENDING.get_or_init(Mutex::default)
 }
 
-fn now_ms() -> i64 {
+pub(super) fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
-fn profile_records(profile: &str) -> Result<ProfileRecords, String> {
+pub(super) fn profile_records(profile: &str) -> Result<ProfileRecords, String> {
     crate::infra::profile_data::profile_records(profile).ok_or_else(|| UNAVAILABLE.to_owned())
 }
 
@@ -119,7 +119,7 @@ async fn save_login(
 }
 
 /// The page's real top-level origin, for http(s) pages only.
-fn page_origin(app: &AppHandle, id: &str) -> Option<String> {
+pub(super) fn page_origin(app: &AppHandle, id: &str) -> Option<String> {
     let view = app.get_webview(&webview_label(id).ok()?)?;
     let url = view.url().ok()?;
     matches!(url.scheme(), "http" | "https").then(|| url.origin().ascii_serialization())
@@ -127,7 +127,7 @@ fn page_origin(app: &AppHandle, id: &str) -> Option<String> {
 
 /// The profile a page belongs to, from the window that holds it: an incognito page's is the
 /// profile of its window. Never from anything the page says.
-fn page_profile(app: &AppHandle, id: &str) -> Option<String> {
+pub(super) fn page_profile(app: &AppHandle, id: &str) -> Option<String> {
     let view = app.get_webview(&webview_label(id).ok()?)?;
     crate::infra::profile_windows::profile_for_owner(view.window().label())
 }
@@ -141,7 +141,7 @@ fn private_session(app: &AppHandle, id: &str) -> bool {
         .unwrap_or(true)
 }
 
-fn reply(app: &AppHandle, id: &str, script: String) {
+pub(super) fn reply(app: &AppHandle, id: &str, script: String) {
     if let Some(view) = webview_label(id)
         .ok()
         .and_then(|label| app.get_webview(&label))

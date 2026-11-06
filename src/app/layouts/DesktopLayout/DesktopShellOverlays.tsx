@@ -1,5 +1,6 @@
 import { AgentJobWorker } from "@/features/agents/AgentJobWorker";
 import { WorkflowSchedulesBridge } from "@/features/agents";
+import { AutofillChooser } from "@/features/autofill/AutofillChooser";
 import { BrowserSearchDialog } from "@/features/browser-search/BrowserSearchDialog";
 import { MistyContextBridgeHost } from "@/features/misty/MistyContextBridgeHost";
 import { BrowserContextMenuBridge } from "@/features/misty/BrowserContextMenuBridge";
@@ -19,6 +20,7 @@ export function DesktopShellOverlays(props: {
       <BrowserSearchDialog />
       <BrowserRuntimeBridge />
       <BrowserContextMenuBridge />
+      <AutofillChooser />
       <DeferUntilIdle>
         {props.userId ? <MistyContextBridgeHost /> : null}
         <WorkflowSchedulesBridge />

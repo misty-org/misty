@@ -154,6 +154,20 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::infra::browser::host_messages::passwords::browser_passwords_save,
             #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_offer_respond,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_choose,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_addresses_list,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_address_save,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_cards_list,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_card_save,
+            #[cfg(desktop)]
+            crate::infra::browser::host_messages::autofill::browser_autofill_delete,
+            #[cfg(desktop)]
             crate::infra::global_hotkey::global_hotkey_signed_out,
             #[cfg(desktop)]
             crate::infra::browser_library::history::browser_history_clear,

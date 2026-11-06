@@ -96,6 +96,7 @@ Edge, Opera Neon, Vivaldi and Orion were not checked against their own sites and
 | Website sign-ins carry over between your computers | ✓ some sites ask again | ✗ not in its synced types | ? | ? Enterprise gives agents company cookies and browser state | ✗ not in its synced types | ? | ? | ✗ no sync | ? |
 | Built-in ad and tracker blocking | ✗ by extension, such as uBlock Origin Lite | ✓ | ? | ✓ default filter lists, on at setup | ✓ | ? | ? | ✓ ads, trackers and cookie banners by default | ✓ Shields |
 | Password manager | ✓ | ✓ | ? | ✓ Aside Vault, Secure Enclave keys | ✓ | ◐ passwords through Firefox Sync | ✓ passwords move to Dia | ✗ none built in | ✓ |
+| Card and address autofill | ◐ built, not yet run on a real checkout; not in payment providers' frames ([autofill](browser/autofill.md)) | ✓ autofill syncs | ? | ? | ? | ? | ? | ? | ? |
 | Import from other browsers | ✓ including sign-ins | ✓ including passwords | ? | ✓ plus 1Password, Proton Pass, NordPass and Apple Passwords | ✓ | ? | ? | ✓ | ✓ bookmarks and settings |
 | Cross-device clipboard | ◐ built, not shipped | ✗ | ✗ | ? | ✗ | ? | ? | ? | ? |
 

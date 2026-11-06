@@ -18,6 +18,7 @@ export const settingsSections = [
   "browser-appearance",
   "browser-tabs",
   "passwords",
+  "autofill",
   "browser-privacy",
   "browser-permissions",
   "browser-signins",

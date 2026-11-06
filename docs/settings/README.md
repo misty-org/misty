@@ -27,7 +27,7 @@ section id lands is `settingsRouting.ts`).
 | | Voice | Dictation, Speech, Captures |
 | | Privacy | Browsing data, Permissions |
 | | Advanced | Pages (link previews, status, gestures, sleeping tabs), Display (pane dimming, compact mode, frame pacing) |
-| Browser | Passwords | Saved sign-ins |
+| Browser | Passwords | Logins, Autofill (Fill addresses, Fill cards, Offer to save), Addresses, Cards |
 | | Extensions | Stores, and one section per installed extension |
 | | Sync | Before setup, the setup wizard opens; after it, Setup (Open setup, frequency), Restore, Workspaces, Websites, Recovery and Devices |
 | Agents | Models | Sign-ins, Provider and keys, Choices, Voice keys, Search |
